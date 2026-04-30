@@ -22,11 +22,13 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = () => {
-    // Placeholder: cuando integremos Supabase, aquí va la llamada real
+    // Placeholder: cuando integremos Supabase, aquí va la llamada real.
+    // Después de iniciar sesión arrancamos el onboarding:
+    //   Verification → LocationPermission → Terms → Success → Home
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      navigation.replace('Home');
+      navigation.navigate('Verification');
     }, 600);
   };
 
