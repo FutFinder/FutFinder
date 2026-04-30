@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "FutFinder",
+    "slug": "futfinder",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#201F1D"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.futfinder.app"
+    },
+    "android": {
+      "package": "com.futfinder.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "name": "FutFinder",
+      "shortName": "FutFinder",
+      "themeColor": "#71B533",
+      "backgroundColor": "#201F1D"
+    },
+    "plugins": [],
+    "scheme": "futfinder"
+  }
+}
