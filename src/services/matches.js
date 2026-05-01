@@ -7,21 +7,21 @@ import { supabase, isSupabaseConfigured } from './supabase';
 export async function listOpenMatches({ comuna = null, limit = 20 } = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), error: null };
 
-  // Query simplificada: traemos todas las columnas SIN el JOIN al organizador.
-  // Si algún día queremos ese JOIN, hay que asegurar que el FK lo reconoce
-  // PostgREST (a veces requiere reload del schema cache).
+  // Mostramos partidos abiertos cuya hora oficial sea hace ≤ 2 horas
+  // (siguen siendo válidos para confirmar asistencia hasta 90 min después).
+  const dosHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
   let q = supabase
     .from('matches')
     .select('*')
     .eq('estado', 'abierto')
-    .gte('hora', new Date().toISOString())
+    .gte('hora', dosHorasAtras)
     .order('hora', { ascending: true })
     .limit(limit);
 
   if (comuna) q = q.eq('comuna', comuna);
   const { data, error } = await q;
   if (error) {
-    // Log explícito para que el usuario pueda ver el error en la consola
     console.error('[FutFinder] listOpenMatches error:', error);
   }
   return { data: data || [], error };
