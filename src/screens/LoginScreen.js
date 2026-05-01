@@ -10,26 +10,45 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, AlertCircle } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
+import { signInOrUp } from '../services/auth';
+import { isSupabaseConfigured } from '../services/supabase';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
 
-  const handleLogin = () => {
-    // Placeholder: cuando integremos Supabase, aquí va la llamada real.
-    // Después de iniciar sesión arrancamos el onboarding:
-    //   Verification → LocationPermission → Terms → Success → Home
+  const handleLogin = async () => {
+    setErrorMsg(null);
+
+    if (!email.trim() || password.length < 6) {
+      setErrorMsg('Ingresa tu correo y una contraseña de al menos 6 caracteres');
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigation.navigate('Verification');
-    }, 600);
+    const result = await signInOrUp({ email: email.trim(), password });
+    setLoading(false);
+
+    if (result.error) {
+      setErrorMsg(result.error.message || 'No pudimos iniciar sesión');
+      return;
+    }
+
+    // Caso 1: ya tiene sesión activa → saltarse Verification e ir a permisos
+    if (result.session) {
+      navigation.navigate('LocationPermission');
+      return;
+    }
+
+    // Caso 2: signUp creado, falta confirmar email vía OTP
+    navigation.navigate('Verification', { email: email.trim() });
   };
 
   return (
@@ -43,7 +62,6 @@ export default function LoginScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header con back + logo */}
           <View style={styles.header}>
             <Pressable
               onPress={() => navigation.goBack()}
@@ -58,7 +76,6 @@ export default function LoginScreen({ navigation }) {
             <View style={{ width: 40 }} />
           </View>
 
-          {/* Card de login */}
           <View style={styles.card}>
             <Text style={styles.title}>Iniciar sesión o registrarse</Text>
             <Text style={styles.subtitle}>
@@ -88,10 +105,17 @@ export default function LoginScreen({ navigation }) {
               autoComplete="password"
             />
 
-            <View style={{ height: 20 }} />
+            {errorMsg && (
+              <View style={styles.errorBox}>
+                <AlertCircle color={colors.error} size={16} />
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            )}
+
+            <View style={{ height: 18 }} />
 
             <Button
-              label="Iniciar sesión"
+              label={loading ? 'Conectando…' : 'Iniciar sesión'}
               variant="primary"
               loading={loading}
               onPress={handleLogin}
@@ -107,14 +131,12 @@ export default function LoginScreen({ navigation }) {
               </Text>
             </View>
 
-            {/* Divider */}
             <View style={styles.dividerRow}>
               <View style={styles.divider} />
               <Text style={styles.dividerText}>o continúa con</Text>
               <View style={styles.divider} />
             </View>
 
-            {/* Social */}
             <View style={styles.socialRow}>
               <Pressable
                 style={({ pressed }) => [styles.socialBtn, pressed && { opacity: 0.7 }]}
@@ -128,6 +150,13 @@ export default function LoginScreen({ navigation }) {
                 <Text style={styles.socialLabel}>Apple</Text>
               </Pressable>
             </View>
+
+            {!isSupabaseConfigured && (
+              <Text style={styles.demoBanner}>
+                ⚠️ Modo demo — Supabase no configurado. Cualquier email/password
+                avanzará al onboarding.
+              </Text>
+            )}
           </View>
 
           <Text style={styles.footer}>FUTFINDER v1.2.0 · © 2026</Text>
@@ -138,15 +167,8 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    flexGrow: 1,
-  },
+  root: { flex: 1, backgroundColor: colors.background },
+  scroll: { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -161,10 +183,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
+  logoCenter: { flex: 1, alignItems: 'center' },
   card: {
     marginTop: 12,
     backgroundColor: colors.surfaceAlt,
@@ -201,6 +220,23 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 15,
   },
+  errorBox: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.errorSoft,
+    borderRadius: radius.md,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+  },
   linksRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -233,9 +269,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginHorizontal: 12,
   },
-  socialRow: {
-    flexDirection: 'row',
-  },
+  socialRow: { flexDirection: 'row' },
   socialBtn: {
     flex: 1,
     height: 50,
@@ -250,6 +284,13 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: '700',
     fontSize: 14,
+  },
+  demoBanner: {
+    color: colors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 18,
+    lineHeight: 16,
   },
   footer: {
     textAlign: 'center',

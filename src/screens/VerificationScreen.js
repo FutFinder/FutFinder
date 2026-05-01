@@ -15,17 +15,21 @@ import { ArrowLeft, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
+import { verifyEmailOtp, resendOtp } from '../services/auth';
+import { isSupabaseConfigured } from '../services/supabase';
 
 const CODE_LENGTH = 6;
 
-export default function VerificationScreen({ navigation }) {
+export default function VerificationScreen({ navigation, route }) {
+  const email = route?.params?.email || '';
+
   const [digits, setDigits] = useState(Array(CODE_LENGTH).fill(''));
-  const [channel, setChannel] = useState('SMS'); // 'Correo' | 'SMS'
-  const [error, setError] = useState(false);
+  const [channel, setChannel] = useState('Correo'); // Correo | SMS
+  const [error, setError] = useState(null);
   const [seconds, setSeconds] = useState(42);
+  const [loading, setLoading] = useState(false);
   const inputs = useRef([]);
 
-  // Contador "Reenviar en 0:42"
   useEffect(() => {
     if (seconds <= 0) return;
     const t = setTimeout(() => setSeconds(seconds - 1), 1000);
@@ -33,14 +37,12 @@ export default function VerificationScreen({ navigation }) {
   }, [seconds]);
 
   const handleChange = (val, idx) => {
-    setError(false);
+    setError(null);
     const clean = val.replace(/\D/g, '').slice(-1);
     const next = [...digits];
     next[idx] = clean;
     setDigits(next);
-    if (clean && idx < CODE_LENGTH - 1) {
-      inputs.current[idx + 1]?.focus();
-    }
+    if (clean && idx < CODE_LENGTH - 1) inputs.current[idx + 1]?.focus();
   };
 
   const handleKey = (e, idx) => {
@@ -49,21 +51,42 @@ export default function VerificationScreen({ navigation }) {
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const code = digits.join('');
-    // Demo: si el código es exactamente "472000" o no está completo → error
-    if (code.length < CODE_LENGTH || code !== '472000') {
-      setError(true);
+    if (code.length < CODE_LENGTH) {
+      setError('Ingresa los 6 dígitos');
+      return;
+    }
+
+    // Modo demo: si Supabase no está configurado, aceptamos 472000
+    if (!isSupabaseConfigured) {
+      if (code !== '472000') {
+        setError('Código incorrecto. Intente de nuevo');
+        return;
+      }
+      navigation.navigate('LocationPermission');
+      return;
+    }
+
+    setLoading(true);
+    const { error: err } = await verifyEmailOtp({ email, token: code });
+    setLoading(false);
+
+    if (err) {
+      setError(err.message || 'Código incorrecto. Intente de nuevo');
       return;
     }
     navigation.navigate('LocationPermission');
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
+    setError(null);
     setSeconds(42);
-    setError(false);
     setDigits(Array(CODE_LENGTH).fill(''));
     inputs.current[0]?.focus();
+    if (isSupabaseConfigured && email) {
+      await resendOtp({ email });
+    }
   };
 
   const fmt = `0:${seconds.toString().padStart(2, '0')}`;
@@ -79,7 +102,6 @@ export default function VerificationScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
           <View style={styles.header}>
             <Pressable
               onPress={() => navigation.goBack()}
@@ -94,17 +116,17 @@ export default function VerificationScreen({ navigation }) {
             <View style={{ width: 40 }} />
           </View>
 
-          {/* Card */}
           <View style={styles.card}>
             <View style={styles.titleRow}>
               <ShieldCheck color={colors.primary} size={20} />
               <Text style={styles.title}>Verificación de cuenta</Text>
             </View>
             <Text style={styles.subtitle}>
-              Ingresa el código de 6 dígitos enviado a tu correo o SMS
+              {email
+                ? `Ingresa el código de 6 dígitos enviado a ${email}`
+                : 'Ingresa el código de 6 dígitos enviado a tu correo o SMS'}
             </Text>
 
-            {/* 6 input boxes */}
             <View style={styles.codeRow}>
               {digits.map((d, i) => (
                 <TextInput
@@ -126,7 +148,6 @@ export default function VerificationScreen({ navigation }) {
               ))}
             </View>
 
-            {/* Channel toggle + Resend timer */}
             <View style={styles.channelRow}>
               <View style={styles.channelGroup}>
                 {['Correo', 'SMS'].map((c) => {
@@ -152,11 +173,7 @@ export default function VerificationScreen({ navigation }) {
                   );
                 })}
               </View>
-              <Pressable
-                disabled={seconds > 0}
-                onPress={handleResend}
-                hitSlop={8}
-              >
+              <Pressable disabled={seconds > 0} onPress={handleResend} hitSlop={8}>
                 <Text
                   style={[
                     styles.resend,
@@ -171,26 +188,27 @@ export default function VerificationScreen({ navigation }) {
             <View style={{ height: 18 }} />
 
             <Button
-              label="Verificar código"
+              label={loading ? 'Verificando…' : 'Verificar código'}
               variant="primary"
               onPress={handleVerify}
+              loading={loading}
             />
 
             {error && (
               <View style={styles.errorBox}>
                 <AlertCircle color={colors.error} size={16} />
-                <Text style={styles.errorText}>
-                  Código incorrecto. Intente de nuevo
-                </Text>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
-            <Text style={styles.hint}>
-              💡 Para esta demo el código válido es{' '}
-              <Text style={{ color: colors.primary, fontWeight: '700' }}>
-                472000
+            {!isSupabaseConfigured && (
+              <Text style={styles.hint}>
+                💡 Modo demo: el código válido es{' '}
+                <Text style={{ color: colors.primary, fontWeight: '700' }}>
+                  472000
+                </Text>
               </Text>
-            </Text>
+            )}
           </View>
 
           <Text style={styles.footer}>FUTFINDER v1.2.0 · © 2026</Text>
@@ -261,16 +279,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 22,
     fontWeight: '800',
-    ...Platform.select({
-      web: { outlineStyle: 'none' },
-    }),
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
-  codeBoxFilled: {
-    borderColor: colors.primary,
-  },
-  codeBoxError: {
-    borderColor: colors.error,
-  },
+  codeBoxFilled: { borderColor: colors.primary },
+  codeBoxError: { borderColor: colors.error },
   channelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -286,27 +298,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  channelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  channelBtnActive: {
-    backgroundColor: colors.primary,
-  },
-  channelText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  channelTextActive: {
-    color: '#0E0E0D',
-  },
-  resend: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  channelBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: radius.pill },
+  channelBtnActive: { backgroundColor: colors.primary },
+  channelText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  channelTextActive: { color: '#0E0E0D' },
+  resend: { color: colors.textSecondary, fontSize: 13, fontWeight: '500' },
   errorBox: {
     marginTop: 14,
     flexDirection: 'row',
@@ -318,11 +314,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.error,
   },
-  errorText: {
-    color: colors.error,
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  errorText: { color: colors.error, fontSize: 13, fontWeight: '600', flex: 1 },
   hint: {
     color: colors.textMuted,
     fontSize: 11,

@@ -18,6 +18,7 @@ import {
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
+import { requestLocationPermission } from '../services/location';
 
 const REASONS = [
   {
@@ -41,9 +42,15 @@ const REASONS = [
 ];
 
 export default function LocationPermissionScreen({ navigation }) {
-  const handleAllow = () => {
-    // En la fase 2 aquí pediremos permiso real con expo-location.
-    // Por ahora solo avanzamos en el flujo.
+  const handleAllow = async () => {
+    // Pide el permiso real al sistema operativo / navegador.
+    // No bloqueamos el flujo si el usuario lo rechaza — pueden
+    // habilitarlo después desde Ajustes.
+    try {
+      await requestLocationPermission();
+    } catch (e) {
+      // Silencioso: la pantalla siguiente igual se abre
+    }
     navigation.navigate('Terms');
   };
 

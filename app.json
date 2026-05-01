@@ -11,10 +11,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.futfinder.app"
+      "bundleIdentifier": "com.futfinder.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "FutFinder usa tu ubicación para mostrarte partidos cerca y confirmar tu asistencia."
+      }
     },
     "android": {
-      "package": "com.futfinder.app"
+      "package": "com.futfinder.app",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "web": {
       "bundler": "metro",
@@ -23,7 +27,14 @@
       "themeColor": "#71B533",
       "backgroundColor": "#201F1D"
     },
-    "plugins": [],
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "FutFinder usa tu ubicación para mostrarte partidos cerca y confirmar tu asistencia."
+        }
+      ]
+    ],
     "scheme": "futfinder"
   }
 }

@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
-  Image,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -15,54 +16,120 @@ import {
   Search,
   LogOut,
   Plus,
+  ShieldCheck,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
 import Logo from '../components/Logo';
+import { listOpenMatches, joinMatch } from '../services/matches';
+import { confirmAttendanceWithGPS } from '../services/attendance';
+import { signOut, getCurrentProfile } from '../services/auth';
+import { isSupabaseConfigured } from '../services/supabase';
 
-// Datos de prueba — luego vendrán de Supabase
-const MOCK_MATCHES = [
-  {
-    id: '1',
-    title: 'Partido en Estadio Nacional',
-    venue: 'Complejo Ñuñoa · Cancha 3',
-    distance: '1.2 km',
-    time: 'Hoy · 20:30',
-    players: '8/10',
-    level: 'Intermedio',
-    price: '$3.500',
-  },
-  {
-    id: '2',
-    title: 'Pichanga las Condes',
-    venue: 'Club Manquehue · Cancha A',
-    distance: '3.8 km',
-    time: 'Mañana · 19:00',
-    players: '6/12',
-    level: 'Principiante',
-    price: '$4.200',
-  },
-  {
-    id: '3',
-    title: 'Fulbito post-pega',
-    venue: 'Providencia Sport · Cancha 1',
-    distance: '5.4 km',
-    time: 'Vie · 21:00',
-    players: '9/10',
-    level: 'Avanzado',
-    price: '$5.000',
-  },
-];
+function formatHora(iso) {
+  try {
+    const d = new Date(iso);
+    const today = new Date();
+    const sameDay =
+      d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const isTomorrow =
+      d.getFullYear() === tomorrow.getFullYear() &&
+      d.getMonth() === tomorrow.getMonth() &&
+      d.getDate() === tomorrow.getDate();
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    if (sameDay) return `Hoy · ${hh}:${mm}`;
+    if (isTomorrow) return `Mañana · ${hh}:${mm}`;
+    return d.toLocaleDateString('es-CL', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+    }) + ` · ${hh}:${mm}`;
+  } catch {
+    return iso;
+  }
+}
+
+function nivelLabel(n) {
+  return ({ recreativo: 'Recreativo', intermedio: 'Intermedio', competitivo: 'Competitivo' })[n] || n;
+}
 
 export default function HomeScreen({ navigation }) {
+  const [matches, setMatches] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busyMatchId, setBusyMatchId] = useState(null);
+
+  const load = useCallback(async () => {
+    const [{ data: list }, prof] = await Promise.all([
+      listOpenMatches({ limit: 20 }),
+      getCurrentProfile(),
+    ]);
+    setMatches(list || []);
+    setProfile(prof);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
+  };
+
+  const handleJoin = async (matchId) => {
+    setBusyMatchId(matchId);
+    const result = await joinMatch(matchId);
+    setBusyMatchId(null);
+    if (!result.ok) {
+      Alert.alert('No pudimos inscribirte', result.reason || 'Inténtalo de nuevo');
+      return;
+    }
+    Alert.alert('¡Te inscribiste!', 'Confirma tu asistencia con GPS al llegar.');
+    load();
+  };
+
+  const handleConfirmGPS = async (matchId) => {
+    setBusyMatchId(matchId);
+    const result = await confirmAttendanceWithGPS(matchId);
+    setBusyMatchId(null);
+    if (result.ok) {
+      Alert.alert(
+        '✅ Asistencia confirmada',
+        result.distance
+          ? `Estás a ${Math.round(result.distance)} m de la cancha.\n+1 a tu Trust Score.`
+          : 'Tu asistencia quedó registrada.'
+      );
+      load();
+    } else {
+      Alert.alert('No se pudo confirmar', result.reason || 'Intenta de nuevo');
+    }
+  };
+
+  const trustScore = profile?.trust_score ?? 100;
+  const partidosJugados = profile?.partidos_jugados ?? 0;
+  const username = profile?.username || 'jugador';
+
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        {/* Header */}
         <View style={styles.header}>
           <Logo size={28} />
           <Pressable
-            onPress={() => navigation.replace('Welcome')}
+            onPress={handleLogout}
             style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
             hitSlop={8}
           >
@@ -73,33 +140,44 @@ export default function HomeScreen({ navigation }) {
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         >
-          {/* Saludo */}
           <View style={styles.greetingBox}>
-            <Text style={styles.hello}>¡Hola, jugador!</Text>
+            <Text style={styles.hello}>¡Hola, {username}!</Text>
             <Text style={styles.subhello}>
-              Hay 12 partidos cerca de ti hoy
+              {loading
+                ? 'Cargando partidos…'
+                : `Hay ${matches.length} partidos cerca de ti`}
             </Text>
           </View>
 
-          {/* Search bar */}
           <View style={styles.searchBar}>
             <Search color={colors.textMuted} size={18} />
             <Text style={styles.searchText}>Buscar canchas o partidos…</Text>
           </View>
 
-          {/* Trust score badge */}
+          {/* Trust Score card */}
           <View style={styles.trustCard}>
             <View style={styles.trustLeft}>
               <Text style={styles.trustLabel}>Tu Trust Score</Text>
-              <Text style={styles.trustValue}>4.8 / 5.0</Text>
+              <Text style={styles.trustValue}>{trustScore} / 100</Text>
+              <Text style={styles.trustSub}>
+                {partidosJugados} partidos jugados
+              </Text>
             </View>
             <View style={styles.trustBadge}>
+              <ShieldCheck color="#0E0E0D" size={14} />
               <Text style={styles.trustBadgeText}>VERIFICADO</Text>
             </View>
           </View>
 
-          {/* Section title */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Partidos cerca de ti</Text>
             <Pressable hitSlop={8}>
@@ -107,49 +185,101 @@ export default function HomeScreen({ navigation }) {
             </Pressable>
           </View>
 
-          {/* Match list */}
-          {MOCK_MATCHES.map((m) => (
-            <Pressable
-              key={m.id}
-              style={({ pressed }) => [
-                styles.matchCard,
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <View style={styles.matchTopRow}>
-                <Text style={styles.matchTitle}>{m.title}</Text>
-                <View style={styles.priceTag}>
-                  <Text style={styles.priceText}>{m.price}</Text>
+          {matches.length === 0 && !loading && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>
+                Aún no hay partidos cargados.{'\n'}¡Sé el primero en publicar uno!
+              </Text>
+            </View>
+          )}
+
+          {matches.map((m) => {
+            const cuposLeft = m.cupos_disponibles ?? 0;
+            const cuposTotales = m.cupos_totales ?? cuposLeft;
+            const isBusy = busyMatchId === m.id;
+            return (
+              <View key={m.id} style={styles.matchCard}>
+                <View style={styles.matchTopRow}>
+                  <Text style={styles.matchTitle} numberOfLines={1}>
+                    {m.titulo}
+                  </Text>
+                  <View style={styles.priceTag}>
+                    <Text style={styles.priceText}>
+                      {m.precio_cuota === 0
+                        ? 'Gratis'
+                        : `$${m.precio_cuota.toLocaleString('es-CL')}`}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.matchVenue}>
+                  {m.cancha_nombre} · {m.comuna}
+                </Text>
+
+                <View style={styles.matchMeta}>
+                  <View style={styles.metaItem}>
+                    <Clock color={colors.primary} size={14} />
+                    <Text style={styles.metaText}>{formatHora(m.hora)}</Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Users color={colors.primary} size={14} />
+                    <Text style={styles.metaText}>
+                      {cuposTotales - cuposLeft}/{cuposTotales}
+                    </Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <MapPin color={colors.primary} size={14} />
+                    <Text style={styles.metaText}>{m.comuna}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.actionsRow}>
+                  <View style={styles.levelTag}>
+                    <Text style={styles.levelText}>
+                      Nivel: {nivelLabel(m.nivel || 'recreativo')}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }} />
+                  <Pressable
+                    onPress={() => handleConfirmGPS(m.id)}
+                    disabled={isBusy}
+                    style={({ pressed }) => [
+                      styles.gpsBtn,
+                      pressed && { opacity: 0.7 },
+                      isBusy && { opacity: 0.5 },
+                    ]}
+                  >
+                    <MapPin color={colors.primary} size={14} />
+                    <Text style={styles.gpsLabel}>Confirmar GPS</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleJoin(m.id)}
+                    disabled={isBusy || cuposLeft === 0}
+                    style={({ pressed }) => [
+                      styles.joinBtn,
+                      pressed && { opacity: 0.85 },
+                      (isBusy || cuposLeft === 0) && { opacity: 0.5 },
+                    ]}
+                  >
+                    <Text style={styles.joinLabel}>
+                      {cuposLeft === 0 ? 'Lleno' : 'Unirme'}
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
+            );
+          })}
 
-              <Text style={styles.matchVenue}>{m.venue}</Text>
-
-              <View style={styles.matchMeta}>
-                <View style={styles.metaItem}>
-                  <MapPin color={colors.primary} size={14} />
-                  <Text style={styles.metaText}>{m.distance}</Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Clock color={colors.primary} size={14} />
-                  <Text style={styles.metaText}>{m.time}</Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Users color={colors.primary} size={14} />
-                  <Text style={styles.metaText}>{m.players}</Text>
-                </View>
-              </View>
-
-              <View style={styles.levelTag}>
-                <Text style={styles.levelText}>Nivel: {m.level}</Text>
-              </View>
-            </Pressable>
-          ))}
+          {!isSupabaseConfigured && (
+            <Text style={styles.demoNotice}>
+              ⚠️ Modo demo — los partidos arriba son de ejemplo. Configura
+              Supabase para datos reales.
+            </Text>
+          )}
 
           <View style={{ height: 100 }} />
         </ScrollView>
 
-        {/* Floating action button */}
         <Pressable
           style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
         >
@@ -161,10 +291,7 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  root: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -180,25 +307,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  greetingBox: {
-    marginTop: 8,
-    marginBottom: 16,
-  },
+  scroll: { paddingHorizontal: 20, paddingBottom: 24 },
+  greetingBox: { marginTop: 8, marginBottom: 16 },
   hello: {
     color: colors.textPrimary,
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.4,
   },
-  subhello: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: 2,
-  },
+  subhello: { color: colors.textSecondary, fontSize: 14, marginTop: 2 },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -210,10 +327,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderSoft,
   },
-  searchText: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
+  searchText: { color: colors.textMuted, fontSize: 14 },
   trustCard: {
     marginTop: 16,
     flexDirection: 'row',
@@ -226,18 +340,18 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   trustLeft: {},
-  trustLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  trustLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '500' },
   trustValue: {
     color: colors.textPrimary,
     fontSize: 22,
     fontWeight: '800',
     marginTop: 2,
   },
+  trustSub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -256,15 +370,21 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
   },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '700',
+  sectionTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
+  sectionLink: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  emptyState: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    padding: 28,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    alignItems: 'center',
   },
-  sectionLink: {
-    color: colors.primary,
+  emptyText: {
+    color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 19,
   },
   matchCard: {
     backgroundColor: colors.surfaceAlt,
@@ -287,27 +407,15 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  matchVenue: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginBottom: 12,
-  },
+  matchVenue: { color: colors.textSecondary, fontSize: 13, marginBottom: 12 },
   matchMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 14,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  metaText: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaText: { color: colors.textPrimary, fontSize: 12, fontWeight: '500' },
   priceTag: {
     backgroundColor: colors.primarySoft,
     borderRadius: radius.sm,
@@ -316,24 +424,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
   },
-  priceText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  priceText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   levelTag: {
-    alignSelf: 'flex-start',
     backgroundColor: colors.background,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  levelText: {
-    color: colors.textSecondary,
+  levelText: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' },
+  gpsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  gpsLabel: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  joinBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+  },
+  joinLabel: { color: '#0E0E0D', fontSize: 13, fontWeight: '800' },
+  demoNotice: {
+    color: colors.textMuted,
     fontSize: 11,
-    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 18,
+    paddingHorizontal: 24,
+    lineHeight: 16,
   },
   fab: {
     position: 'absolute',
