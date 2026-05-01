@@ -206,7 +206,8 @@ begin
 end;
 $$;
 
--- 8. FUNCTION: unirse a un partido (decrementa cupo atomically)
+-- 8. FUNCTION: unirse a un partido (decrementa cupo atomically) ----
+-- Idempotente: si el jugador ya estaba inscrito, NO descuenta otro cupo.
 create or replace function public.join_match(p_match_id uuid)
 returns json
 language plpgsql
@@ -216,6 +217,7 @@ as $$
 declare
     v_user_id uuid := auth.uid();
     v_match record;
+    v_inserted_id uuid;
 begin
     if v_user_id is null then
         return json_build_object('ok', false, 'reason', 'No autenticado');
@@ -232,9 +234,17 @@ begin
         return json_build_object('ok', false, 'reason', 'Partido no está abierto');
     end if;
 
+    -- Solo insertamos si NO estaba ya inscrito.
     insert into public.attendees(id_partido, id_jugador)
     values (p_match_id, v_user_id)
-    on conflict (id_partido, id_jugador) do nothing;
+    on conflict (id_partido, id_jugador) do nothing
+    returning id into v_inserted_id;
+
+    -- Si v_inserted_id es null, ya estaba inscrito → no descontamos cupo
+    if v_inserted_id is null then
+        return json_build_object('ok', true, 'already', true,
+                                 'reason', 'Ya estabas inscrito en este partido');
+    end if;
 
     update public.matches
     set cupos_disponibles = cupos_disponibles - 1,

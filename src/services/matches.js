@@ -7,13 +7,12 @@ import { supabase, isSupabaseConfigured } from './supabase';
 export async function listOpenMatches({ comuna = null, limit = 20 } = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), error: null };
 
+  // Query simplificada: traemos todas las columnas SIN el JOIN al organizador.
+  // Si algún día queremos ese JOIN, hay que asegurar que el FK lo reconoce
+  // PostgREST (a veces requiere reload del schema cache).
   let q = supabase
     .from('matches')
-    .select(
-      'id, titulo, comuna, cancha_nombre, latitud, longitud, hora, ' +
-        'cupos_disponibles, cupos_totales, precio_cuota, nivel, estado, ' +
-        'organizador:profiles!id_organizador(id, username, trust_score)'
-    )
+    .select('*')
     .eq('estado', 'abierto')
     .gte('hora', new Date().toISOString())
     .order('hora', { ascending: true })
@@ -21,6 +20,10 @@ export async function listOpenMatches({ comuna = null, limit = 20 } = {}) {
 
   if (comuna) q = q.eq('comuna', comuna);
   const { data, error } = await q;
+  if (error) {
+    // Log explícito para que el usuario pueda ver el error en la consola
+    console.error('[FutFinder] listOpenMatches error:', error);
+  }
   return { data: data || [], error };
 }
 

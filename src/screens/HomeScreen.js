@@ -6,7 +6,6 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -21,6 +20,8 @@ import {
 
 import { colors, radius } from '../theme/colors';
 import Logo from '../components/Logo';
+import Banner from '../components/Banner';
+import { notify } from '../utils/notify';
 import { listOpenMatches, joinMatch } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { signOut, getCurrentProfile } from '../services/auth';
@@ -64,6 +65,17 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState(null);
+  // banner: { type: 'success'|'error'|'info', title, message } | null
+  const [banner, setBanner] = useState(null);
+
+  const showBanner = useCallback((type, title, message = '') => {
+    setBanner({ type, title, message });
+    notify(title, message);
+    // auto-clear éxitos a los 6 segundos; los errores se quedan hasta que el user los cierre
+    if (type === 'success') {
+      setTimeout(() => setBanner(null), 6000);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     const [{ data: list }, prof] = await Promise.all([
@@ -91,31 +103,82 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleJoin = async (matchId) => {
-    setBusyMatchId(matchId);
-    const result = await joinMatch(matchId);
-    setBusyMatchId(null);
-    if (!result.ok) {
-      Alert.alert('No pudimos inscribirte', result.reason || 'Inténtalo de nuevo');
+    console.log('[FutFinder] >>> handleJoin click', { matchId, busyMatchId });
+    if (busyMatchId === matchId) {
+      console.log('[FutFinder] click ignorado: ya hay petición en vuelo');
       return;
     }
-    Alert.alert('¡Te inscribiste!', 'Confirma tu asistencia con GPS al llegar.');
-    load();
+    setBanner(null);
+    setBusyMatchId(matchId);
+    try {
+      const result = await joinMatch(matchId);
+      console.log('[FutFinder] joinMatch result:', result);
+      if (!result?.ok) {
+        showBanner(
+          'error',
+          'No pudimos inscribirte',
+          result?.reason || result?.error?.message || 'Inténtalo de nuevo'
+        );
+        return;
+      }
+      if (result.already) {
+        showBanner('info', 'Ya estabas inscrito', 'Tu cupo en este partido sigue activo.');
+      } else {
+        showBanner(
+          'success',
+          '¡Te inscribiste al partido!',
+          'Aprieta "Confirmar GPS" cuando estés en la cancha.'
+        );
+      }
+      await load();
+    } catch (e) {
+      console.error('[FutFinder] handleJoin EXCEPCIÓN:', e);
+      showBanner(
+        'error',
+        'Error inesperado al inscribirte',
+        e?.message || String(e)
+      );
+    } finally {
+      setBusyMatchId(null);
+    }
   };
 
   const handleConfirmGPS = async (matchId) => {
+    console.log('[FutFinder] >>> handleConfirmGPS click', { matchId, busyMatchId });
+    if (busyMatchId === matchId) {
+      console.log('[FutFinder] click ignorado: ya hay petición en vuelo');
+      return;
+    }
+    setBanner(null);
     setBusyMatchId(matchId);
-    const result = await confirmAttendanceWithGPS(matchId);
-    setBusyMatchId(null);
-    if (result.ok) {
-      Alert.alert(
-        '✅ Asistencia confirmada',
-        result.distance
-          ? `Estás a ${Math.round(result.distance)} m de la cancha.\n+1 a tu Trust Score.`
-          : 'Tu asistencia quedó registrada.'
+    try {
+      const result = await confirmAttendanceWithGPS(matchId);
+      console.log('[FutFinder] confirmAttendanceWithGPS result:', result);
+      if (result?.ok) {
+        showBanner(
+          'success',
+          '✅ Asistencia confirmada',
+          result.distance
+            ? `Estás a ${Math.round(result.distance)} m de la cancha. +1 a tu Trust Score.`
+            : 'Tu asistencia quedó registrada.'
+        );
+        await load();
+      } else {
+        showBanner(
+          'error',
+          'No pude confirmar tu asistencia',
+          result?.reason || 'Intenta de nuevo'
+        );
+      }
+    } catch (e) {
+      console.error('[FutFinder] handleConfirmGPS EXCEPCIÓN:', e);
+      showBanner(
+        'error',
+        'Error inesperado al confirmar GPS',
+        e?.message || String(e)
       );
-      load();
-    } else {
-      Alert.alert('No se pudo confirmar', result.reason || 'Intenta de nuevo');
+    } finally {
+      setBusyMatchId(null);
     }
   };
 
@@ -157,6 +220,15 @@ export default function HomeScreen({ navigation }) {
                 : `Hay ${matches.length} partidos cerca de ti`}
             </Text>
           </View>
+
+          {banner && (
+            <Banner
+              type={banner.type}
+              title={banner.title}
+              message={banner.message}
+              onClose={() => setBanner(null)}
+            />
+          )}
 
           <View style={styles.searchBar}>
             <Search color={colors.textMuted} size={18} />
