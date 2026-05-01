@@ -353,6 +353,7 @@ export default function HomeScreen({ navigation }) {
         </ScrollView>
 
         <Pressable
+          onPress={() => navigation.navigate('CreateMatch')}
           style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
         >
           <Plus color="#0E0E0D" size={26} strokeWidth={2.5} />

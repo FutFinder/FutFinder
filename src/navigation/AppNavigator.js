@@ -9,6 +9,7 @@ import LocationPermissionScreen from '../screens/LocationPermissionScreen';
 import TermsScreen from '../screens/TermsScreen';
 import SuccessScreen from '../screens/SuccessScreen';
 import HomeScreen from '../screens/HomeScreen';
+import CreateMatchScreen from '../screens/CreateMatchScreen';
 
 import { colors } from '../theme/colors';
 
@@ -48,6 +49,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Terms" component={TermsScreen} />
         <Stack.Screen name="Success" component={SuccessScreen} options={{ animation: 'fade' }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ animation: 'fade' }} />
+        <Stack.Screen name="CreateMatch" component={CreateMatchScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
