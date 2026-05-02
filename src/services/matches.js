@@ -1,10 +1,28 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
 /**
+ * Distancia haversine en km entre dos coords {lat, lng}.
+ * Útil para ordenar y filtrar partidos del lado del cliente.
+ */
+export function haversineKm(a, b) {
+  if (!a || !b) return null;
+  const R = 6371; // km
+  const toRad = (x) => (x * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/**
  * Lista partidos abiertos cerca del usuario, ordenados por hora.
  * Si pasas comuna filtra por comuna.
  */
-export async function listOpenMatches({ comuna = null, limit = 20 } = {}) {
+export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), error: null };
 
   // Mostramos partidos abiertos cuya hora oficial sea hace ≤ 2 horas
@@ -25,6 +43,73 @@ export async function listOpenMatches({ comuna = null, limit = 20 } = {}) {
     console.error('[FutFinder] listOpenMatches error:', error);
   }
   return { data: data || [], error };
+}
+
+/**
+ * Filtra una lista de partidos por criterios del usuario y los enriquece
+ * con la distancia calculada desde sus coordenadas (si vienen).
+ *
+ * filters:
+ *   - text: string  → busca en titulo, cancha_nombre, comuna
+ *   - maxKm: number → solo si userCoords está presente
+ *   - timeWindow: 'hoy' | 'manana' | 'finde' | 'todos'
+ *   - niveles: ['recreativo','intermedio','competitivo'] o []
+ *   - precioMin: number, precioMax: number
+ * userCoords: { lat, lng } | null
+ */
+export function applyFilters(matches, filters, userCoords) {
+  const text = (filters.text || '').toLowerCase().trim();
+  const niveles = filters.niveles || [];
+  const timeWindow = filters.timeWindow || 'todos';
+  const maxKm = filters.maxKm ?? null;
+  const pMin = filters.precioMin ?? 0;
+  const pMax = filters.precioMax ?? 999999;
+
+  // Pre-calculamos distancia para todos
+  const enriched = matches.map((m) => {
+    const km = userCoords
+      ? haversineKm(userCoords, { lat: m.latitud, lng: m.longitud })
+      : null;
+    return { ...m, _distanciaKm: km };
+  });
+
+  // Ventana horaria
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startTomorrow = new Date(startOfDay);
+  startTomorrow.setDate(startTomorrow.getDate() + 1);
+  const endTomorrow = new Date(startTomorrow);
+  endTomorrow.setDate(endTomorrow.getDate() + 1);
+  const dayOfWeek = now.getDay(); // 0=dom 6=sáb
+  const daysToSat = (6 - dayOfWeek + 7) % 7;
+  const startSat = new Date(startOfDay);
+  startSat.setDate(startSat.getDate() + daysToSat);
+  const endSun = new Date(startSat);
+  endSun.setDate(endSun.getDate() + 2);
+
+  function inWindow(matchHora) {
+    const h = new Date(matchHora);
+    if (timeWindow === 'todos') return true;
+    if (timeWindow === 'hoy') return h >= now && h < startTomorrow;
+    if (timeWindow === 'manana') return h >= startTomorrow && h < endTomorrow;
+    if (timeWindow === 'finde') return h >= startSat && h < endSun;
+    return true;
+  }
+
+  return enriched.filter((m) => {
+    if (text) {
+      const hay =
+        (m.titulo || '').toLowerCase().includes(text) ||
+        (m.cancha_nombre || '').toLowerCase().includes(text) ||
+        (m.comuna || '').toLowerCase().includes(text);
+      if (!hay) return false;
+    }
+    if (niveles.length > 0 && !niveles.includes(m.nivel)) return false;
+    if (m.precio_cuota < pMin || m.precio_cuota > pMax) return false;
+    if (!inWindow(m.hora)) return false;
+    if (maxKm !== null && m._distanciaKm !== null && m._distanciaKm > maxKm) return false;
+    return true;
+  });
 }
 
 /**

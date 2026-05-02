@@ -230,10 +230,13 @@ export default function HomeScreen({ navigation }) {
             />
           )}
 
-          <View style={styles.searchBar}>
+          <Pressable
+            onPress={() => navigation.navigate('Search')}
+            style={({ pressed }) => [styles.searchBar, pressed && { opacity: 0.7 }]}
+          >
             <Search color={colors.textMuted} size={18} />
             <Text style={styles.searchText}>Buscar canchas o partidos…</Text>
-          </View>
+          </Pressable>
 
           {/* Trust Score card */}
           <View style={styles.trustCard}>

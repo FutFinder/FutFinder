@@ -10,6 +10,7 @@ import TermsScreen from '../screens/TermsScreen';
 import SuccessScreen from '../screens/SuccessScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CreateMatchScreen from '../screens/CreateMatchScreen';
+import SearchScreen from '../screens/SearchScreen';
 
 import { colors } from '../theme/colors';
 
@@ -50,6 +51,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Success" component={SuccessScreen} options={{ animation: 'fade' }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ animation: 'fade' }} />
         <Stack.Screen name="CreateMatch" component={CreateMatchScreen} />
+        <Stack.Screen name="Search" component={SearchScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
