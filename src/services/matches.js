@@ -51,6 +51,8 @@ export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
  *
  * filters:
  *   - text: string  → busca en titulo, cancha_nombre, comuna
+ *   - region: string → solo partidos de esa región (null = cualquiera)
+ *   - comuna: string → solo de esa comuna (null = cualquiera)
  *   - maxKm: number → solo si userCoords está presente
  *   - timeWindow: 'hoy' | 'manana' | 'finde' | 'todos'
  *   - niveles: ['recreativo','intermedio','competitivo'] o []
@@ -59,6 +61,8 @@ export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
  */
 export function applyFilters(matches, filters, userCoords) {
   const text = (filters.text || '').toLowerCase().trim();
+  const region = filters.region || null;
+  const comunaF = filters.comuna || null;
   const niveles = filters.niveles || [];
   const timeWindow = filters.timeWindow || 'todos';
   const maxKm = filters.maxKm ?? null;
@@ -104,6 +108,8 @@ export function applyFilters(matches, filters, userCoords) {
         (m.comuna || '').toLowerCase().includes(text);
       if (!hay) return false;
     }
+    if (region && m.region !== region) return false;
+    if (comunaF && m.comuna !== comunaF) return false;
     if (niveles.length > 0 && !niveles.includes(m.nivel)) return false;
     if (m.precio_cuota < pMin || m.precio_cuota > pMax) return false;
     if (!inWindow(m.hora)) return false;
@@ -118,6 +124,7 @@ export function applyFilters(matches, filters, userCoords) {
  */
 export async function createMatch({
   titulo,
+  region,
   comuna,
   cancha_nombre,
   latitud,
@@ -138,6 +145,7 @@ export async function createMatch({
     .insert({
       id_organizador: user.id,
       titulo,
+      region,
       comuna,
       cancha_nombre,
       latitud,

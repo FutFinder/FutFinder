@@ -35,6 +35,7 @@ create table if not exists public.matches (
     id uuid primary key default uuid_generate_v4(),
     id_organizador uuid not null references public.profiles(id) on delete cascade,
     titulo text not null,
+    region text,
     comuna text not null,
     cancha_nombre text not null,
     -- Ubicación GPS desglosada (más simple que PostGIS para empezar)
@@ -51,6 +52,7 @@ create table if not exists public.matches (
     created_at timestamptz not null default now()
 );
 
+create index if not exists idx_matches_region on public.matches(region);
 create index if not exists idx_matches_comuna on public.matches(comuna);
 create index if not exists idx_matches_hora on public.matches(hora);
 create index if not exists idx_matches_estado on public.matches(estado);

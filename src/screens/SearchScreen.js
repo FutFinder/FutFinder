@@ -31,6 +31,7 @@ import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentLocation } from '../services/location';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
+import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 
 // Opciones cíclicas para cada filtro
 const KM_OPTS = [
@@ -106,6 +107,13 @@ export default function SearchScreen({ navigation }) {
   const [timeIdx, setTimeIdx] = useState(0);
   const [nivelIdx, setNivelIdx] = useState(0);
   const [precioIdx, setPrecioIdx] = useState(0);
+  // Región y comuna: string | null (null = "todas")
+  const [regionSel, setRegionSel] = useState(null);
+  const [comunaSel, setComunaSel] = useState(null);
+  // Cuál picker está expandido: 'region' | 'comuna' | null
+  const [pickerOpen, setPickerOpen] = useState(null);
+
+  const comunasOfRegion = regionSel ? getComunasOfRegion(regionSel) : [];
 
   // Cargar partidos + ubicación
   const load = useCallback(async () => {
@@ -132,6 +140,8 @@ export default function SearchScreen({ navigation }) {
   const filtered = useMemo(() => {
     const filters = {
       text,
+      region: regionSel,
+      comuna: comunaSel,
       maxKm: KM_OPTS[kmIdx].value,
       timeWindow: TIME_OPTS[timeIdx].value,
       niveles: NIVEL_OPTS[nivelIdx].value ? [NIVEL_OPTS[nivelIdx].value] : [],
@@ -146,7 +156,7 @@ export default function SearchScreen({ navigation }) {
       }
       return new Date(a.hora) - new Date(b.hora);
     });
-  }, [matches, text, kmIdx, timeIdx, nivelIdx, precioIdx, userCoords]);
+  }, [matches, text, regionSel, comunaSel, kmIdx, timeIdx, nivelIdx, precioIdx, userCoords]);
 
   const showBanner = (type, title, message) => {
     setBanner({ type, title, message });
@@ -288,6 +298,24 @@ export default function SearchScreen({ navigation }) {
           >
             <FilterChip
               icon={MapPin}
+              label={regionSel ? truncate(regionSel, 18) : 'Región'}
+              active={!!regionSel}
+              onPress={() =>
+                setPickerOpen(pickerOpen === 'region' ? null : 'region')
+              }
+            />
+            {regionSel && (
+              <FilterChip
+                icon={MapPin}
+                label={comunaSel || 'Comuna'}
+                active={!!comunaSel}
+                onPress={() =>
+                  setPickerOpen(pickerOpen === 'comuna' ? null : 'comuna')
+                }
+              />
+            )}
+            <FilterChip
+              icon={MapPin}
               label={KM_OPTS[kmIdx].label}
               active={KM_OPTS[kmIdx].value !== null}
               onPress={() => setKmIdx((kmIdx + 1) % KM_OPTS.length)}
@@ -311,6 +339,99 @@ export default function SearchScreen({ navigation }) {
               onPress={() => setPrecioIdx((precioIdx + 1) % PRECIO_OPTS.length)}
             />
           </ScrollView>
+
+          {/* Panel expandible de Región */}
+          {pickerOpen === 'region' && (
+            <View style={styles.picker}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>Selecciona una región</Text>
+                {regionSel && (
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      setRegionSel(null);
+                      setComunaSel(null);
+                      setPickerOpen(null);
+                    }}
+                  >
+                    <Text style={styles.clearLink}>Limpiar</Text>
+                  </Pressable>
+                )}
+              </View>
+              <ScrollView style={{ maxHeight: 280 }} nestedScrollEnabled>
+                {REGIONES.map((r) => (
+                  <Pressable
+                    key={r.nombre}
+                    onPress={() => {
+                      setRegionSel(r.nombre);
+                      setComunaSel(null); // reset comuna cuando cambia región
+                      setPickerOpen(null);
+                    }}
+                    style={[
+                      styles.pickerOption,
+                      r.nombre === regionSel && styles.pickerOptionActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        r.nombre === regionSel && styles.pickerOptionTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {r.nombre} ({r.codigo})
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Panel expandible de Comuna (solo si hay región) */}
+          {pickerOpen === 'comuna' && regionSel && (
+            <View style={styles.picker}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>
+                  Comunas de {regionSel.replace('Región ', '')}
+                </Text>
+                {comunaSel && (
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      setComunaSel(null);
+                      setPickerOpen(null);
+                    }}
+                  >
+                    <Text style={styles.clearLink}>Limpiar</Text>
+                  </Pressable>
+                )}
+              </View>
+              <ScrollView style={{ maxHeight: 280 }} nestedScrollEnabled>
+                {comunasOfRegion.map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => {
+                      setComunaSel(c);
+                      setPickerOpen(null);
+                    }}
+                    style={[
+                      styles.pickerOption,
+                      c === comunaSel && styles.pickerOptionActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        c === comunaSel && styles.pickerOptionTextActive,
+                      ]}
+                    >
+                      {c}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Status row */}
           <View style={styles.statusRow}>
@@ -497,6 +618,12 @@ export default function SearchScreen({ navigation }) {
   );
 }
 
+// ---- Helpers ----
+function truncate(s, n) {
+  if (!s) return '';
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
 // ---- Subcomponentes ----
 
 function FilterChip({ icon: Icon, label, active, onPress }) {
@@ -566,6 +693,51 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 8,
     paddingRight: 20,
+  },
+  picker: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  pickerTitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  clearLink: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pickerOption: {
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  pickerOptionActive: {
+    backgroundColor: colors.primarySoft,
+  },
+  pickerOptionText: {
+    color: colors.textPrimary,
+    fontSize: 13,
+  },
+  pickerOptionTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   chip: {
     flexDirection: 'row',

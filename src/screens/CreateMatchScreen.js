@@ -32,14 +32,10 @@ import { createMatch } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
+import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 
-// Comunas más comunes de Santiago para el primer lanzamiento
-const COMUNAS_SANTIAGO = [
-  'Providencia', 'Ñuñoa', 'Las Condes', 'Vitacura', 'Lo Barnechea',
-  'Santiago Centro', 'Macul', 'La Reina', 'Peñalolén', 'La Florida',
-  'San Miguel', 'Maipú', 'Quilicura', 'Recoleta', 'Independencia',
-  'San Joaquín', 'Estación Central', 'Cerrillos', 'Pudahuel',
-];
+const REGION_DEFAULT = 'Región Metropolitana de Santiago';
+const COMUNA_DEFAULT = 'Providencia';
 
 const NIVELES = [
   { value: 'recreativo', label: 'Recreativo' },
@@ -80,8 +76,13 @@ export default function CreateMatchScreen({ navigation }) {
   // Cancha
   const [titulo, setTitulo] = useState('');
   const [canchaNombre, setCanchaNombre] = useState('');
-  const [comuna, setComuna] = useState('Providencia');
+  const [region, setRegion] = useState(REGION_DEFAULT);
+  const [comuna, setComuna] = useState(COMUNA_DEFAULT);
+  const [regionPickerOpen, setRegionPickerOpen] = useState(false);
   const [comunaPickerOpen, setComunaPickerOpen] = useState(false);
+
+  // Comunas filtradas por la región actual
+  const comunasOfRegion = getComunasOfRegion(region);
 
   // GPS
   const [coords, setCoords] = useState(null); // {latitude, longitude}
@@ -135,6 +136,7 @@ export default function CreateMatchScreen({ navigation }) {
   const validate = () => {
     if (!titulo.trim()) return 'Pon un título al partido';
     if (!canchaNombre.trim()) return 'Falta el nombre de la cancha';
+    if (!region) return 'Falta la región';
     if (!comuna) return 'Falta la comuna';
     if (!coords) return 'Falta capturar la ubicación GPS de la cancha';
     const dt = parseDateTime(fechaStr, horaStr);
@@ -167,6 +169,7 @@ export default function CreateMatchScreen({ navigation }) {
     const dt = parseDateTime(fechaStr, horaStr);
     const result = await createMatch({
       titulo: titulo.trim(),
+      region,
       comuna,
       cancha_nombre: canchaNombre.trim(),
       latitud: coords.latitude,
@@ -305,17 +308,68 @@ export default function CreateMatchScreen({ navigation }) {
                   />
                 </Field>
 
-                <Field label="Comuna">
+                <Field label="Región">
                   <Pressable
-                    onPress={() => setComunaPickerOpen(!comunaPickerOpen)}
+                    onPress={() => {
+                      setRegionPickerOpen(!regionPickerOpen);
+                      setComunaPickerOpen(false);
+                    }}
                     style={styles.input}
                   >
-                    <Text style={styles.pickerText}>{comuna}</Text>
+                    <Text style={styles.pickerText} numberOfLines={1}>
+                      {region}
+                    </Text>
+                  </Pressable>
+                  {regionPickerOpen && (
+                    <View style={styles.picker}>
+                      <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+                        {REGIONES.map((r) => (
+                          <Pressable
+                            key={r.nombre}
+                            onPress={() => {
+                              setRegion(r.nombre);
+                              // Si la comuna actual no pertenece a la nueva región,
+                              // la reseteamos a la primera de la región nueva.
+                              if (!r.comunas.includes(comuna)) {
+                                setComuna(r.comunas[0] || '');
+                              }
+                              setRegionPickerOpen(false);
+                            }}
+                            style={[
+                              styles.pickerOption,
+                              r.nombre === region && styles.pickerOptionActive,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.pickerOptionText,
+                                r.nombre === region && styles.pickerOptionTextActive,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {r.nombre} ({r.codigo})
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </Field>
+
+                <Field label={`Comuna (${comunasOfRegion.length} disponibles)`}>
+                  <Pressable
+                    onPress={() => {
+                      setComunaPickerOpen(!comunaPickerOpen);
+                      setRegionPickerOpen(false);
+                    }}
+                    style={styles.input}
+                  >
+                    <Text style={styles.pickerText}>{comuna || 'Selecciona una comuna'}</Text>
                   </Pressable>
                   {comunaPickerOpen && (
                     <View style={styles.picker}>
-                      <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                        {COMUNAS_SANTIAGO.map((c) => (
+                      <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+                        {comunasOfRegion.map((c) => (
                           <Pressable
                             key={c}
                             onPress={() => {
