@@ -19,9 +19,14 @@ create table if not exists public.profiles (
             'arquero','defensa','medio','delantero','lateral','volante','sin_definir'
         )
     ) default 'sin_definir',
+    flanco text check (flanco is null or flanco in ('derecho','izquierdo','ambos')),
+    edad integer check (edad is null or (edad >= 12 and edad <= 99)),
+    bio text,
+    mvps integer not null default 0,
     trust_score integer not null default 100 check (trust_score >= 0 and trust_score <= 100),
     partidos_jugados integer not null default 0,
     asistencias_confirmadas integer not null default 0,
+    region text,
     comuna text,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()

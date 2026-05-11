@@ -16,8 +16,10 @@ import { colors, radius } from '../theme/colors';
 export default function SuccessScreen({ navigation }) {
   const goHome = () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   const goProfile = () =>
-    // Placeholder: cuando exista la pantalla Perfil, cambiamos esto.
-    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    navigation.reset({
+      index: 1,
+      routes: [{ name: 'Home' }, { name: 'EditProfile' }],
+    });
 
   return (
     <View style={styles.root}>

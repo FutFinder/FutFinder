@@ -13,7 +13,7 @@ import {
   Clock,
   Users,
   Search,
-  LogOut,
+  User as UserIcon,
   Plus,
   ShieldCheck,
 } from 'lucide-react-native';
@@ -101,6 +101,8 @@ export default function HomeScreen({ navigation }) {
     await signOut();
     navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
+
+  const handleOpenProfile = () => navigation.navigate('Profile');
 
   const handleJoin = async (matchId) => {
     console.log('[FutFinder] >>> handleJoin click', { matchId, busyMatchId });
@@ -192,11 +194,11 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.header}>
           <Logo size={28} />
           <Pressable
-            onPress={handleLogout}
+            onPress={handleOpenProfile}
             style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
             hitSlop={8}
           >
-            <LogOut color={colors.textSecondary} size={20} />
+            <UserIcon color={colors.textSecondary} size={20} />
           </Pressable>
         </View>
 

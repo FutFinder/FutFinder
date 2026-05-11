@@ -11,6 +11,8 @@ import SuccessScreen from '../screens/SuccessScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CreateMatchScreen from '../screens/CreateMatchScreen';
 import SearchScreen from '../screens/SearchScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 
 import { colors } from '../theme/colors';
 
@@ -52,6 +54,8 @@ export default function AppNavigator() {
         <Stack.Screen name="Home" component={HomeScreen} options={{ animation: 'fade' }} />
         <Stack.Screen name="CreateMatch" component={CreateMatchScreen} />
         <Stack.Screen name="Search" component={SearchScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
