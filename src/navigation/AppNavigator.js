@@ -10,6 +10,7 @@ import TermsScreen from '../screens/TermsScreen';
 import SuccessScreen from '../screens/SuccessScreen';
 import CreateMatchScreen from '../screens/CreateMatchScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import ChatThreadScreen from '../screens/ChatThreadScreen';
 import MainTabs from './MainTabs';
 
 import { colors } from '../theme/colors';
@@ -71,6 +72,11 @@ export default function AppNavigator() {
           name="EditProfile"
           component={EditProfileScreen}
           options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="ChatThread"
+          component={ChatThreadScreen}
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

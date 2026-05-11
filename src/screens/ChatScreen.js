@@ -1,91 +1,281 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  Bell,
   MessageCircle,
   Users,
-  Bell,
-  Lock,
+  User as UserIcon,
   Sparkles,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import { colors, radius } from '../theme/colors';
+import { listMyThreads, subscribeToMessages } from '../services/messages';
+import { isSupabaseConfigured } from '../services/supabase';
 
-export default function ChatScreen() {
+function timeAgo(iso) {
+  try {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'ahora';
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} h`;
+    const d = Math.floor(h / 24);
+    if (d < 7) return `${d} d`;
+    return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+  } catch {
+    return '';
+  }
+}
+
+export default function ChatScreen({ navigation }) {
+  const [tab, setTab] = useState('all'); // 'all' | 'dm' | 'match'
+  const [threads, setThreads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    const list = await listMyThreads();
+    setThreads(list);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+    // Refrescar la lista cuando volvemos a la pestaña Chat
+    const unsubFocus = navigation.addListener('focus', load);
+
+    // Suscripción Realtime: cuando llegue/cambie cualquier mensaje
+    // refrescamos la lista. Es barato comparado a la fluidez.
+    const unsubRT = subscribeToMessages(() => {
+      load();
+    });
+
+    return () => {
+      unsubFocus();
+      unsubRT();
+    };
+  }, [load, navigation]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
+  };
+
+  const filtered = useMemo(() => {
+    if (tab === 'all') return threads;
+    return threads.filter((t) => t.type === tab);
+  }, [tab, threads]);
+
+  const unreadTotal = threads.reduce((acc, t) => acc + (t.unread || 0), 0);
+
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
           <Logo size={28} />
-          <View style={styles.iconBtn}>
-            <Bell color={colors.textSecondary} size={20} />
+          <View style={{ position: 'relative' }}>
+            <Pressable
+              hitSlop={8}
+              style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Bell color={colors.textSecondary} size={20} />
+            </Pressable>
+            {unreadTotal > 0 && (
+              <View style={styles.unreadDot}>
+                <Text style={styles.unreadDotText}>
+                  {unreadTotal > 9 ? '9+' : unreadTotal}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
+        {/* Title */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+          <Text style={styles.bigTitle}>Chats y amigos</Text>
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabsRow}>
+          <TabPill
+            label="Todos"
+            count={threads.length}
+            active={tab === 'all'}
+            onPress={() => setTab('all')}
+          />
+          <TabPill
+            label="Directos"
+            count={threads.filter((t) => t.type === 'dm').length}
+            active={tab === 'dm'}
+            onPress={() => setTab('dm')}
+          />
+          <TabPill
+            label="Partidos"
+            count={threads.filter((t) => t.type === 'match').length}
+            active={tab === 'match'}
+            onPress={() => setTab('match')}
+          />
+        </View>
+
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
         >
-          {/* Hero placeholder */}
-          <View style={styles.hero}>
-            <View style={styles.heroIcon}>
-              <MessageCircle color={colors.primary} size={36} strokeWidth={1.5} />
+          {loading && filtered.length === 0 && (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.loadingText}>Cargando conversaciones…</Text>
             </View>
-            <Text style={styles.title}>Chats y Amigos</Text>
-            <Text style={styles.subtitle}>
-              La mensajería entre jugadores llega muy pronto. Vas a poder
-              coordinar partidos, retos y mensajes directos sin salir de
-              FutFinder.
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <EmptyState
+              type={tab}
+              onCreate={() => navigation.navigate('SearchTab')}
+            />
+          )}
+
+          {filtered.map((t) => (
+            <Pressable
+              key={t.key}
+              onPress={() =>
+                navigation.getParent()?.navigate('ChatThread', {
+                  threadKey: t.key,
+                  title: t.title,
+                  subtitle: t.subtitle,
+                })
+              }
+              style={({ pressed }) => [
+                styles.threadRow,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <View
+                style={[
+                  styles.avatar,
+                  t.type === 'match' && styles.avatarMatch,
+                ]}
+              >
+                {t.type === 'dm' ? (
+                  <UserIcon color={colors.primary} size={20} />
+                ) : (
+                  <Users color={colors.primary} size={20} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.threadTopRow}>
+                  <Text style={styles.threadTitle} numberOfLines={1}>
+                    {t.title}
+                  </Text>
+                  <Text style={styles.threadTime}>{timeAgo(t.last_at)}</Text>
+                </View>
+                <View style={styles.threadBottomRow}>
+                  <Text
+                    style={[
+                      styles.threadPreview,
+                      t.unread > 0 && { color: colors.textPrimary, fontWeight: '700' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {t.last_message?.content || t.subtitle}
+                  </Text>
+                  {t.unread > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>{t.unread}</Text>
+                    </View>
+                  )}
+                </View>
+                {t.type === 'match' && (
+                  <View style={styles.matchTag}>
+                    <Sparkles color={colors.primary} size={10} />
+                    <Text style={styles.matchTagText}>Chat de partido</Text>
+                  </View>
+                )}
+              </View>
+            </Pressable>
+          ))}
+
+          {!isSupabaseConfigured && (
+            <Text style={styles.demoNotice}>
+              ⚠️ Modo demo — el chat se activa cuando Supabase esté configurado.
             </Text>
-            <View style={styles.statusPill}>
-              <Sparkles color={colors.primary} size={13} />
-              <Text style={styles.statusText}>Próximamente</Text>
-            </View>
-          </View>
-
-          {/* Features que tendrá */}
-          <Text style={styles.sectionTitle}>QUÉ INCLUIRÁ</Text>
-
-          <FeatureRow
-            icon={MessageCircle}
-            title="Chats de Partido"
-            description="Coordina con los jugadores inscritos al mismo partido sin compartir teléfonos."
-          />
-          <FeatureRow
-            icon={Users}
-            title="Chats de Equipo"
-            description="Conversación permanente con tu equipo recurrente. Uniforme, pagos, alineaciones."
-          />
-          <FeatureRow
-            icon={MessageCircle}
-            title="Mensajes Directos"
-            description="Habla con jugadores que conociste en un partido y agregaste como amigos."
-          />
-          <FeatureRow
-            icon={Lock}
-            title="Privacidad por defecto"
-            description="Los mensajes desaparecen 7 días después de finalizar el partido. Sin números, sin spam."
-          />
-
-          <View style={{ height: 24 }} />
+          )}
         </ScrollView>
       </SafeAreaView>
     </View>
   );
 }
 
-function FeatureRow({ icon: Icon, title, description }) {
+function TabPill({ label, count, active, onPress }) {
   return (
-    <View style={styles.featureRow}>
-      <View style={styles.featureIcon}>
-        <Icon color={colors.primary} size={18} strokeWidth={1.8} />
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.tabPill,
+        active && styles.tabPillActive,
+        pressed && { opacity: 0.8 },
+      ]}
+    >
+      <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>
+        {label}
+      </Text>
+      <View style={[styles.tabPillCount, active && styles.tabPillCountActive]}>
+        <Text
+          style={[
+            styles.tabPillCountText,
+            active && { color: colors.background },
+          ]}
+        >
+          {count}
+        </Text>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.featureTitle}>{title}</Text>
-        <Text style={styles.featureDesc}>{description}</Text>
+    </Pressable>
+  );
+}
+
+function EmptyState({ type, onCreate }) {
+  return (
+    <View style={styles.empty}>
+      <View style={styles.emptyIcon}>
+        <MessageCircle color={colors.primary} size={32} strokeWidth={1.5} />
       </View>
+      <Text style={styles.emptyTitle}>Aún no tienes conversaciones</Text>
+      <Text style={styles.emptyText}>
+        {type === 'match'
+          ? 'Cuando te inscribas a un partido, el chat grupal aparecerá aquí.'
+          : type === 'dm'
+          ? 'Los mensajes directos con otros jugadores aparecerán aquí.'
+          : 'Inscríbete a un partido para empezar a chatear con otros jugadores.'}
+      </Text>
+      <Pressable
+        onPress={onCreate}
+        style={({ pressed }) => [
+          styles.emptyBtn,
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        <Text style={styles.emptyBtnText}>Buscar partidos</Text>
+      </Pressable>
     </View>
   );
 }
@@ -107,69 +297,94 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40 },
-
-  hero: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    padding: 28,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginBottom: 24,
-  },
-  heroIcon: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
+  unreadDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
+    borderWidth: 1.5,
+    borderColor: colors.background,
   },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 22,
+  unreadDotText: {
+    color: '#FFFFFF',
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: -0.4,
-    marginBottom: 8,
   },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 19,
+  bigTitle: {
+    color: colors.textPrimary,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 20,
     marginBottom: 16,
-    paddingHorizontal: 8,
   },
-  statusPill: {
+  tabPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.primarySoft,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.surfaceAlt,
     borderRadius: radius.pill,
     borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  tabPillActive: {
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  statusText: {
-    color: colors.primary,
+  tabPillText: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  tabPillTextActive: {
+    color: '#0E0E0D',
+  },
+  tabPillCount: {
+    backgroundColor: colors.background,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 10,
+    minWidth: 22,
+    alignItems: 'center',
+  },
+  tabPillCountActive: {
+    backgroundColor: colors.background,
+  },
+  tabPillCountText: {
+    color: colors.textSecondary,
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontWeight: '700',
   },
 
-  sectionTitle: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: 12,
+  loadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 18,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    justifyContent: 'center',
   },
-  featureRow: {
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+
+  threadRow: {
     flexDirection: 'row',
     gap: 12,
     padding: 14,
@@ -179,25 +394,123 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSoft,
     marginBottom: 10,
   },
-  featureIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.primarySoft,
     borderWidth: 1,
     borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featureTitle: {
+  avatarMatch: {
+    backgroundColor: colors.background,
+    borderColor: colors.primary,
+  },
+  threadTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  threadTitle: {
     color: colors.textPrimary,
     fontSize: 14,
     fontWeight: '700',
-    marginBottom: 2,
+    flex: 1,
+    marginRight: 8,
   },
-  featureDesc: {
+  threadTime: {
+    color: colors.textMuted,
+    fontSize: 11,
+  },
+  threadBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  threadPreview: {
     color: colors.textSecondary,
     fontSize: 12,
-    lineHeight: 17,
+    flex: 1,
+  },
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadgeText: {
+    color: '#0E0E0D',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  matchTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  matchTagText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  empty: {
+    alignItems: 'center',
+    padding: 28,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 18,
+  },
+  emptyBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+  },
+  emptyBtnText: {
+    color: '#0E0E0D',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  demoNotice: {
+    color: colors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 18,
+    lineHeight: 16,
   },
 });

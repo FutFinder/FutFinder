@@ -1,0 +1,539 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  ArrowLeft,
+  Send,
+  CheckCheck,
+  Check,
+  Users,
+  User as UserIcon,
+} from 'lucide-react-native';
+
+import { colors, radius } from '../theme/colors';
+import {
+  listThreadMessages,
+  sendMessage,
+  markThreadAsRead,
+  subscribeToMessages,
+  messageBelongsToThread,
+  parseThreadKey,
+} from '../services/messages';
+import { supabase } from '../services/supabase';
+import { notify } from '../utils/notify';
+
+function formatTime(iso) {
+  try {
+    const d = new Date(iso);
+    return d.getHours().toString().padStart(2, '0') + ':' +
+      d.getMinutes().toString().padStart(2, '0');
+  } catch {
+    return '';
+  }
+}
+
+function sameDay(a, b) {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+function dayLabel(iso) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date();
+  yest.setDate(today.getDate() - 1);
+  if (sameDay(d, today)) return 'Hoy';
+  if (sameDay(d, yest)) return 'Ayer';
+  return d.toLocaleDateString('es-CL', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'short',
+  });
+}
+
+export default function ChatThreadScreen({ route, navigation }) {
+  const threadKey = route?.params?.threadKey;
+  const title = route?.params?.title || 'Chat';
+  const subtitle = route?.params?.subtitle || '';
+
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [myId, setMyId] = useState(null);
+
+  const listRef = useRef(null);
+  const isMountedRef = useRef(true);
+
+  const t = parseThreadKey(threadKey);
+  const isGroup = t?.type === 'match';
+
+  // Cargar usuario actual e historial
+  useEffect(() => {
+    isMountedRef.current = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (isMountedRef.current) setMyId(user?.id || null);
+
+      const msgs = await listThreadMessages(threadKey, { limit: 60 });
+      if (isMountedRef.current) {
+        setMessages(msgs);
+        setLoading(false);
+      }
+      // Marcar como leído al abrir (DMs)
+      await markThreadAsRead(threadKey);
+    })();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [threadKey]);
+
+  // Suscripción Realtime
+  useEffect(() => {
+    const unsubscribe = subscribeToMessages((payload) => {
+      // payload.eventType: 'INSERT' | 'UPDATE' | 'DELETE'
+      // payload.new: la nueva fila (en INSERT/UPDATE)
+      const row = payload.new || payload.old;
+      if (!row || !myId) return;
+
+      if (payload.eventType === 'INSERT') {
+        if (!messageBelongsToThread(row, threadKey, myId)) return;
+        setMessages((prev) => {
+          // Dedup: si ya existe (lo insertamos optimisticamente) lo ignoramos
+          if (prev.some((m) => m.id === row.id)) return prev;
+          return [...prev, row];
+        });
+        // Marcar como leído si llegó a mí mientras estoy viendo el hilo
+        if (row.receiver_id === myId && !row.read_at) {
+          markThreadAsRead(threadKey);
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        if (!messageBelongsToThread(row, threadKey, myId)) return;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === row.id ? { ...m, ...row } : m))
+        );
+      }
+    });
+    return unsubscribe;
+  }, [threadKey, myId]);
+
+  // Auto-scroll al final cuando llegan mensajes
+  useEffect(() => {
+    if (messages.length > 0) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd?.({ animated: true });
+      });
+    }
+  }, [messages.length]);
+
+  const handleSend = useCallback(async () => {
+    if (sending) return;
+    const content = draft.trim();
+    if (!content) return;
+
+    setSending(true);
+    setDraft('');
+
+    // Optimistic update: agregamos el mensaje localmente al toque
+    const tempId = `temp_${Date.now()}`;
+    const optimistic = {
+      id: tempId,
+      created_at: new Date().toISOString(),
+      sender_id: myId,
+      content,
+      _optimistic: true,
+      ...(isGroup ? { match_id: t.id } : { receiver_id: t.id }),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
+    const { data, error } = await sendMessage(threadKey, content);
+    setSending(false);
+
+    if (error) {
+      notify('No pudimos enviar', error.message || 'Intenta de nuevo');
+      // Revertir el optimistic
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      return;
+    }
+
+    // Reemplazar el optimistic por el real
+    if (data) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? data : m))
+      );
+    }
+  }, [draft, sending, myId, isGroup, t?.id, threadKey]);
+
+  // Renderiza un mensaje + separador de día si corresponde
+  const renderItem = ({ item, index }) => {
+    const prev = messages[index - 1];
+    const showDay = !prev || !sameDay(prev.created_at, item.created_at);
+    return (
+      <View>
+        {showDay && (
+          <View style={styles.dayDivider}>
+            <Text style={styles.dayDividerText}>{dayLabel(item.created_at)}</Text>
+          </View>
+        )}
+        <Bubble
+          message={item}
+          isMine={item.sender_id === myId}
+          isGroup={isGroup}
+        />
+      </View>
+    );
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={12}
+            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+          >
+            <ArrowLeft color={colors.textPrimary} size={20} />
+          </Pressable>
+          <View style={styles.headerCenter}>
+            <View style={[styles.headerAvatar, isGroup && styles.headerAvatarGroup]}>
+              {isGroup ? (
+                <Users color={colors.primary} size={16} />
+              ) : (
+                <UserIcon color={colors.primary} size={16} />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+              {subtitle ? (
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Lista */}
+        {loading ? (
+          <View style={styles.loadingFull}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.loadingText}>Cargando mensajes anteriores…</Text>
+          </View>
+        ) : messages.length === 0 ? (
+          <View style={styles.emptyFull}>
+            <Text style={styles.emptyTitle}>
+              {isGroup ? 'Sé el primero en saludar 👋' : 'Empieza la conversación'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {isGroup
+                ? 'Coordina con los jugadores del partido sin compartir números.'
+                : 'Escribe un mensaje al jugador para coordinar el próximo partido.'}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(m) => m.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.list}
+            onContentSizeChange={() =>
+              listRef.current?.scrollToEnd?.({ animated: false })
+            }
+            keyboardShouldPersistTaps="handled"
+          />
+        )}
+
+        {/* Input */}
+        <View style={styles.composer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Escribe un mensaje…"
+            placeholderTextColor={colors.textMuted}
+            value={draft}
+            onChangeText={setDraft}
+            multiline
+            maxLength={1000}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+            blurOnSubmit={false}
+          />
+          <Pressable
+            onPress={handleSend}
+            disabled={!draft.trim() || sending}
+            style={({ pressed }) => [
+              styles.sendBtn,
+              pressed && { opacity: 0.85 },
+              (!draft.trim() || sending) && { opacity: 0.4 },
+            ]}
+          >
+            <Send color="#0E0E0D" size={18} strokeWidth={2.4} />
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
+  );
+}
+
+// ============================================================
+// Bubble: la burbujita de chat estilo luxury-night
+// ============================================================
+function Bubble({ message, isMine, isGroup }) {
+  const time = formatTime(message.created_at);
+  const senderName = message.sender?.username
+    ? '@' + message.sender.username
+    : null;
+
+  return (
+    <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+      <View
+        style={[
+          styles.bubble,
+          isMine ? styles.bubbleMine : styles.bubbleTheirs,
+          message._optimistic && { opacity: 0.65 },
+        ]}
+      >
+        {!isMine && isGroup && senderName ? (
+          <Text style={styles.senderName}>{senderName}</Text>
+        ) : null}
+        <Text
+          style={[
+            styles.bubbleText,
+            isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
+          ]}
+          selectable
+        >
+          {message.content}
+        </Text>
+        <View style={styles.metaRow}>
+          <Text
+            style={[
+              styles.metaTime,
+              isMine ? { color: 'rgba(14,14,13,0.55)' } : { color: colors.textMuted },
+            ]}
+          >
+            {time}
+          </Text>
+          {isMine && !isGroup && (
+            message.read_at ? (
+              <CheckCheck color="#0E0E0D" size={12} strokeWidth={2.4} />
+            ) : (
+              <Check color="rgba(14,14,13,0.55)" size={12} strokeWidth={2.4} />
+            )
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 10,
+  },
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarGroup: {
+    backgroundColor: colors.background,
+  },
+  headerTitle: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  headerSubtitle: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 1,
+  },
+
+  list: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+
+  dayDivider: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  dayDividerText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+
+  row: {
+    flexDirection: 'row',
+    paddingHorizontal: 4,
+    marginVertical: 3,
+  },
+  rowMine: { justifyContent: 'flex-end' },
+  rowTheirs: { justifyContent: 'flex-start' },
+
+  bubble: {
+    maxWidth: '78%',
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 6,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  bubbleMine: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    borderBottomRightRadius: 4,
+  },
+  bubbleTheirs: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.borderSoft,
+    borderBottomLeftRadius: 4,
+  },
+  senderName: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 2,
+    letterSpacing: 0.2,
+  },
+  bubbleText: {
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  bubbleTextMine: { color: '#0E0E0D' },
+  bubbleTextTheirs: { color: colors.textPrimary },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    marginTop: 2,
+  },
+  metaTime: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  input: {
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    backgroundColor: colors.surfaceAlt,
+    color: colors.textPrimary,
+    fontSize: 14,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loadingFull: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+  emptyFull: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+});
