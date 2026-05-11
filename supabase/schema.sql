@@ -12,13 +12,12 @@ create extension if not exists "uuid-ossp";
 -- 1:1 con auth.users (id mismo). Se crea automáticamente con trigger.
 create table if not exists public.profiles (
     id uuid primary key references auth.users(id) on delete cascade,
-    username text unique,
+    username text,
     foto_url text,
-    posicion_preferida text check (
-        posicion_preferida in (
-            'arquero','defensa','medio','delantero','lateral','volante','sin_definir'
-        )
-    ) default 'sin_definir',
+    posicion_preferida text[] not null default array['sin_definir'] check (
+        posicion_preferida <@ array['arquero','defensa','medio','delantero','lateral','volante','sin_definir']
+        and array_length(posicion_preferida, 1) >= 1
+    ),
     flanco text check (flanco is null or flanco in ('derecho','izquierdo','ambos')),
     edad integer check (edad is null or (edad >= 12 and edad <= 99)),
     bio text,
@@ -32,7 +31,10 @@ create table if not exists public.profiles (
     updated_at timestamptz not null default now()
 );
 
-create index if not exists idx_profiles_username on public.profiles(username);
+-- Unique case-insensitive: "Carlos" y "carlos" cuentan como el mismo
+create unique index if not exists profiles_username_ci_idx
+    on public.profiles (lower(username))
+    where username is not null;
 
 -- 3. TABLE: matches --------------------------------------------
 -- Foco geográfico: Santiago de Chile

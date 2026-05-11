@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ArrowLeft,
   Settings,
   Bell,
   User as UserIcon,
@@ -17,8 +16,6 @@ import {
   MapPin,
   Star,
   ShieldCheck,
-  Tag,
-  AlertCircle,
   FileText,
   Edit3,
   LogOut,
@@ -94,7 +91,13 @@ export default function ProfileScreen({ navigation }) {
 
   const handleLogout = async () => {
     await signOut();
-    navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
+    // El logout sale del tab navigator y vuelve al stack raíz (Welcome)
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.reset({ index: 0, routes: [{ name: 'Welcome' }] });
+    } else {
+      navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
+    }
   };
 
   const stats = deriveStats(profile, history);
@@ -104,14 +107,7 @@ export default function ProfileScreen({ navigation }) {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
-          >
-            <ArrowLeft color={colors.textPrimary} size={20} />
-          </Pressable>
-          <Logo size={26} />
+          <Logo size={28} />
           <Pressable
             onPress={() => navigation.navigate('EditProfile')}
             hitSlop={12}
@@ -168,13 +164,7 @@ export default function ProfileScreen({ navigation }) {
                 ) : null}
               </View>
               <View style={styles.tagsRow}>
-                {profile?.posicion_preferida && (
-                  <View style={styles.smallTag}>
-                    <Text style={styles.smallTagText}>
-                      {POSICION_LABEL[profile.posicion_preferida] || profile.posicion_preferida}
-                    </Text>
-                  </View>
-                )}
+                {renderPosiciones(profile?.posicion_preferida)}
                 {profile?.flanco && (
                   <View style={styles.smallTag}>
                     <Text style={styles.smallTagText}>{FLANCO_LABEL[profile.flanco]}</Text>
@@ -406,6 +396,21 @@ export default function ProfileScreen({ navigation }) {
 }
 
 // ---- Helpers internos ----
+
+function renderPosiciones(pref) {
+  // pref puede ser array (nuevo schema), string (legacy) o null
+  let arr = [];
+  if (Array.isArray(pref)) arr = pref;
+  else if (typeof pref === 'string' && pref) arr = [pref];
+  if (arr.length === 0) return null;
+  return arr
+    .filter((p) => p !== 'sin_definir')
+    .map((p) => (
+      <View key={p} style={styles.smallTag}>
+        <Text style={styles.smallTagText}>{POSICION_LABEL[p] || p}</Text>
+      </View>
+    ));
+}
 
 function signalFromTrust(score) {
   if (score == null) return 'Excelente';

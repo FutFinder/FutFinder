@@ -198,9 +198,9 @@ export default function CreateMatchScreen({ navigation }) {
     });
     notify('¡Partido publicado!', 'Aparecerá en el feed de partidos cercanos.');
 
-    // Volver al Home tras un breve delay para que el usuario vea el banner
+    // Volver al feed Home tras un breve delay para que se vea el banner
     setTimeout(() => {
-      navigation.navigate('Home');
+      navigation.navigate('Main', { screen: 'HomeTab' });
     }, 900);
   };
 

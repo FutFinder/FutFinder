@@ -14,11 +14,11 @@ import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
 
 export default function SuccessScreen({ navigation }) {
-  const goHome = () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  const goHome = () => navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
   const goProfile = () =>
     navigation.reset({
       index: 1,
-      routes: [{ name: 'Home' }, { name: 'EditProfile' }],
+      routes: [{ name: 'Main' }, { name: 'EditProfile' }],
     });
 
   return (

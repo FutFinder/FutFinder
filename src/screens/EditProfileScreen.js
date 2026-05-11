@@ -49,7 +49,8 @@ export default function EditProfileScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [edad, setEdad] = useState('');
   const [bio, setBio] = useState('');
-  const [posicion, setPosicion] = useState('sin_definir');
+  // posiciones es un array — el jugador puede seleccionar varias
+  const [posiciones, setPosiciones] = useState(['sin_definir']);
   const [flanco, setFlanco] = useState('derecho');
   const [region, setRegion] = useState('');
   const [comuna, setComuna] = useState('');
@@ -64,7 +65,14 @@ export default function EditProfileScreen({ navigation }) {
         setUsername(p.username || '');
         setEdad(p.edad ? String(p.edad) : '');
         setBio(p.bio || '');
-        setPosicion(p.posicion_preferida || 'sin_definir');
+        // posicion_preferida ahora es array. Soportamos también string viejo.
+        if (Array.isArray(p.posicion_preferida) && p.posicion_preferida.length) {
+          setPosiciones(p.posicion_preferida);
+        } else if (typeof p.posicion_preferida === 'string') {
+          setPosiciones([p.posicion_preferida]);
+        } else {
+          setPosiciones(['sin_definir']);
+        }
         setFlanco(p.flanco || 'derecho');
         setRegion(p.region || '');
         setComuna(p.comuna || '');
@@ -75,15 +83,32 @@ export default function EditProfileScreen({ navigation }) {
 
   const comunasOfRegion = region ? getComunasOfRegion(region) : [];
 
+  const togglePosicion = (val) => {
+    setPosiciones((prev) => {
+      // Si solo queda 1 y la deseleccionan, dejamos 'sin_definir'
+      if (prev.includes(val)) {
+        const next = prev.filter((x) => x !== val);
+        return next.length === 0 ? ['sin_definir'] : next;
+      }
+      // Si tenemos solo 'sin_definir' y agregan otra real, sacamos 'sin_definir'
+      const cleaned = prev.filter((x) => x !== 'sin_definir');
+      // Tope razonable de 4 posiciones simultáneas
+      if (cleaned.length >= 4) return prev;
+      return [...cleaned, val];
+    });
+  };
+
   const validate = () => {
     if (!username.trim()) return 'El @username no puede estar vacío';
     if (username.length < 3) return '@username debe tener al menos 3 caracteres';
+    if (username.length > 20) return '@username no puede tener más de 20 caracteres';
     if (!/^[a-zA-Z0-9_]+$/.test(username))
       return '@username solo puede tener letras, números y guión bajo';
     if (edad) {
       const n = parseInt(edad, 10);
       if (Number.isNaN(n) || n < 12 || n > 99) return 'La edad debe estar entre 12 y 99';
     }
+    if (!posiciones || posiciones.length === 0) return 'Elige al menos una posición';
     return null;
   };
 
@@ -109,7 +134,7 @@ export default function EditProfileScreen({ navigation }) {
       username: username.trim(),
       edad: edad ? parseInt(edad, 10) : null,
       bio: bio.trim() || null,
-      posicion_preferida: posicion,
+      posicion_preferida: posiciones,
       flanco,
       region: region || null,
       comuna: comuna || null,
@@ -117,10 +142,20 @@ export default function EditProfileScreen({ navigation }) {
     setSaving(false);
 
     if (error) {
-      const msg = error.message?.includes('duplicate')
-        ? 'Ese @username ya está tomado, prueba otro.'
-        : error.message || 'No pudimos guardar';
-      setBanner({ type: 'error', title: 'No pudimos guardar', message: msg });
+      const code = error.code || '';
+      const msg = error.message || '';
+      let userMsg = 'No pudimos guardar';
+      // Postgres unique violation
+      if (code === '23505' || /duplicate|unique/i.test(msg)) {
+        if (/username|profiles_username_ci_idx/i.test(msg)) {
+          userMsg = 'Ese @username ya está tomado, elige otro.';
+        } else {
+          userMsg = 'Hay un valor duplicado en el formulario.';
+        }
+      } else if (msg) {
+        userMsg = msg;
+      }
+      setBanner({ type: 'error', title: 'No pudimos guardar', message: userMsg });
       return;
     }
 
@@ -192,13 +227,18 @@ export default function EditProfileScreen({ navigation }) {
             <Label>@username</Label>
             <TextInput
               style={styles.input}
-              placeholder="ej: carlosmendez_10"
+              placeholder="ej: CarlosMendez_10"
               placeholderTextColor={colors.textMuted}
               value={username}
-              onChangeText={(v) => setUsername(v.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              onChangeText={(v) => setUsername(v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20))}
               autoCapitalize="none"
               autoCorrect={false}
+              maxLength={20}
             />
+            <Text style={styles.fieldHint}>
+              Letras (mayús/minús), números y guión bajo. No es sensible a
+              mayúsculas para detectar duplicados.
+            </Text>
 
             <View style={styles.row2}>
               <View style={{ flex: 1 }}>
@@ -223,28 +263,31 @@ export default function EditProfileScreen({ navigation }) {
               </View>
             </View>
 
-            <Label>Posición preferida</Label>
+            <Label>Posiciones preferidas (puedes elegir varias)</Label>
             <View style={styles.posGrid}>
-              {POSICIONES.map((p) => (
-                <Pressable
-                  key={p.value}
-                  onPress={() => setPosicion(p.value)}
-                  style={[
-                    styles.posChip,
-                    posicion === p.value && styles.posChipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.posChipLabel,
-                      posicion === p.value && styles.posChipLabelActive,
-                    ]}
+              {POSICIONES.map((p) => {
+                const selected = posiciones.includes(p.value);
+                return (
+                  <Pressable
+                    key={p.value}
+                    onPress={() => togglePosicion(p.value)}
+                    style={[styles.posChip, selected && styles.posChipActive]}
                   >
-                    {p.label}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Text
+                      style={[
+                        styles.posChipLabel,
+                        selected && styles.posChipLabelActive,
+                      ]}
+                    >
+                      {selected ? '✓ ' : ''}{p.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
+            <Text style={styles.fieldHint}>
+              Seleccionadas: {posiciones.length} · máx. 4
+            </Text>
 
             <Label>Descripción (bio)</Label>
             <TextInput
@@ -506,6 +549,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'right',
     marginTop: 4,
+  },
+  fieldHint: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 4,
+    lineHeight: 15,
   },
   row2: { flexDirection: 'row' },
 

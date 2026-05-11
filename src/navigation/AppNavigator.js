@@ -8,11 +8,9 @@ import VerificationScreen from '../screens/VerificationScreen';
 import LocationPermissionScreen from '../screens/LocationPermissionScreen';
 import TermsScreen from '../screens/TermsScreen';
 import SuccessScreen from '../screens/SuccessScreen';
-import HomeScreen from '../screens/HomeScreen';
 import CreateMatchScreen from '../screens/CreateMatchScreen';
-import SearchScreen from '../screens/SearchScreen';
-import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import MainTabs from './MainTabs';
 
 import { colors } from '../theme/colors';
 
@@ -31,8 +29,16 @@ const navTheme = {
 };
 
 /**
- * Flujo de onboarding (Fase 1 — Beta):
- *   Welcome → Login → Verification → LocationPermission → Terms → Success → Home
+ * Estructura de la app:
+ *
+ *  RootStack
+ *  ├── Welcome (initial)
+ *  ├── Login / Verification / LocationPermission / Terms / Success  (onboarding)
+ *  ├── Main         ← BottomTabs (HomeTab, SearchTab, CreateTab*, ChatTab, ProfileTab)
+ *  ├── CreateMatch  (modal-style, oculta tab bar)
+ *  └── EditProfile  (modal-style, oculta tab bar)
+ *
+ *  * CreateTab intercepta el press y navega al stack CreateMatch.
  */
 export default function AppNavigator() {
   return (
@@ -51,11 +57,21 @@ export default function AppNavigator() {
         <Stack.Screen name="LocationPermission" component={LocationPermissionScreen} />
         <Stack.Screen name="Terms" component={TermsScreen} />
         <Stack.Screen name="Success" component={SuccessScreen} options={{ animation: 'fade' }} />
-        <Stack.Screen name="Home" component={HomeScreen} options={{ animation: 'fade' }} />
-        <Stack.Screen name="CreateMatch" component={CreateMatchScreen} />
-        <Stack.Screen name="Search" component={SearchScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+
+        {/* Una vez logueado, el usuario vive dentro de Main (tabs) */}
+        <Stack.Screen name="Main" component={MainTabs} options={{ animation: 'fade' }} />
+
+        {/* Detalles que se abren sobre las tabs (la tab bar se oculta) */}
+        <Stack.Screen
+          name="CreateMatch"
+          component={CreateMatchScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="EditProfile"
+          component={EditProfileScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

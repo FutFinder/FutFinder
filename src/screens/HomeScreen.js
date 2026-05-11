@@ -13,8 +13,7 @@ import {
   Clock,
   Users,
   Search,
-  User as UserIcon,
-  Plus,
+  Bell,
   ShieldCheck,
 } from 'lucide-react-native';
 
@@ -24,7 +23,7 @@ import Banner from '../components/Banner';
 import { notify } from '../utils/notify';
 import { listOpenMatches, joinMatch } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
-import { signOut, getCurrentProfile } from '../services/auth';
+import { getCurrentProfile } from '../services/auth';
 import { isSupabaseConfigured } from '../services/supabase';
 
 function formatHora(iso) {
@@ -97,12 +96,9 @@ export default function HomeScreen({ navigation }) {
     load();
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
+  const handleOpenNotifications = () => {
+    // Placeholder hasta que tengamos pantalla de notificaciones
   };
-
-  const handleOpenProfile = () => navigation.navigate('Profile');
 
   const handleJoin = async (matchId) => {
     console.log('[FutFinder] >>> handleJoin click', { matchId, busyMatchId });
@@ -194,11 +190,11 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.header}>
           <Logo size={28} />
           <Pressable
-            onPress={handleOpenProfile}
+            onPress={handleOpenNotifications}
             style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
             hitSlop={8}
           >
-            <UserIcon color={colors.textSecondary} size={20} />
+            <Bell color={colors.textSecondary} size={20} />
           </Pressable>
         </View>
 
@@ -354,15 +350,8 @@ export default function HomeScreen({ navigation }) {
             </Text>
           )}
 
-          <View style={{ height: 100 }} />
+          <View style={{ height: 24 }} />
         </ScrollView>
-
-        <Pressable
-          onPress={() => navigation.navigate('CreateMatch')}
-          style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
-        >
-          <Plus color="#0E0E0D" size={26} strokeWidth={2.5} />
-        </Pressable>
       </SafeAreaView>
     </View>
   );
@@ -539,16 +528,5 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 24,
     lineHeight: 16,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
