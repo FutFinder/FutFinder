@@ -18,6 +18,7 @@ import {
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
+import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
 import { listMyThreads, subscribeToMessages } from '../services/messages';
 import { isSupabaseConfigured } from '../services/supabase';
@@ -43,28 +44,58 @@ export default function ChatScreen({ navigation }) {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorBanner, setErrorBanner] = useState(null);
 
   const load = useCallback(async () => {
-    const list = await listMyThreads();
-    setThreads(list);
-    setLoading(false);
-    setRefreshing(false);
+    try {
+      const result = await listMyThreads();
+      const list = result?.data || [];
+      setThreads(list);
+      if (result?.error) {
+        const msg = result.error.message || String(result.error);
+        // Caso típico: tabla messages no existe (migration 04 sin correr)
+        if (/relation .* messages.* does not exist/i.test(msg) ||
+            /undefined.*messages/i.test(msg)) {
+          setErrorBanner({
+            type: 'error',
+            title: 'Chat no está configurado',
+            message: 'Falta correr la migration 04 en Supabase (crea la tabla messages).',
+          });
+        } else {
+          setErrorBanner({
+            type: 'error',
+            title: 'No pude cargar tus chats',
+            message: msg,
+          });
+        }
+      } else {
+        setErrorBanner(null);
+      }
+    } catch (e) {
+      console.error('[FutFinder] ChatScreen.load exception:', e);
+      setErrorBanner({
+        type: 'error',
+        title: 'Error inesperado',
+        message: e?.message || String(e),
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
   useEffect(() => {
     load();
-    // Refrescar la lista cuando volvemos a la pestaña Chat
     const unsubFocus = navigation.addListener('focus', load);
-
-    // Suscripción Realtime: cuando llegue/cambie cualquier mensaje
-    // refrescamos la lista. Es barato comparado a la fluidez.
-    const unsubRT = subscribeToMessages(() => {
-      load();
-    });
-
+    let unsubRT = () => {};
+    try {
+      unsubRT = subscribeToMessages(() => load());
+    } catch (e) {
+      console.warn('[FutFinder] No se pudo suscribir a Realtime:', e?.message || e);
+    }
     return () => {
       unsubFocus();
-      unsubRT();
+      try { unsubRT(); } catch {}
     };
   }, [load, navigation]);
 
@@ -141,6 +172,15 @@ export default function ChatScreen({ navigation }) {
             />
           }
         >
+          {errorBanner && (
+            <Banner
+              type={errorBanner.type}
+              title={errorBanner.title}
+              message={errorBanner.message}
+              onClose={() => setErrorBanner(null)}
+            />
+          )}
+
           {loading && filtered.length === 0 && (
             <View style={styles.loadingBox}>
               <ActivityIndicator color={colors.primary} />

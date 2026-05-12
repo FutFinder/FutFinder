@@ -27,145 +27,213 @@ export function parseThreadKey(key) {
  *    todavía de "iniciar un DM vacío").
  */
 export async function listMyThreads() {
-  if (!isSupabaseConfigured) return [];
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  const me = user.id;
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: [], error: null };
+    const me = user.id;
 
-  // 1) Mis inscripciones — esto define los chats de partido que veo
-  const { data: myAttendances = [], error: aErr } = await supabase
-    .from('attendees')
-    .select(
-      'id_partido, inscrito_at,' +
-      ' match:matches(id, titulo, comuna, cancha_nombre, hora, estado, id_organizador)'
-    )
-    .eq('id_jugador', me)
-    .order('inscrito_at', { ascending: false });
-  if (aErr) console.error('[FutFinder] listMyThreads attendances:', aErr);
+    // 1) Mis inscripciones (SIN join para evitar problemas de FK detection)
+    const { data: myAttendances, error: aErr } = await supabase
+      .from('attendees')
+      .select('id_partido, inscrito_at')
+      .eq('id_jugador', me)
+      .order('inscrito_at', { ascending: false });
 
-  // 2) Último mensaje por partido (un solo round-trip)
-  const matchIds = (myAttendances || [])
-    .map((a) => a.id_partido)
-    .filter(Boolean);
-  const lastByMatch = new Map();
-  if (matchIds.length > 0) {
-    const { data: matchMsgs = [], error: mErr } = await supabase
+    if (aErr) {
+      console.error('[FutFinder] listMyThreads attendances:', aErr);
+      return { data: [], error: aErr };
+    }
+
+    // 2) Trae datos de los partidos en una sola query
+    const matchIds = (myAttendances || [])
+      .map((a) => a.id_partido)
+      .filter(Boolean);
+
+    let matchesById = new Map();
+    if (matchIds.length > 0) {
+      const { data: ms, error: mErr } = await supabase
+        .from('matches')
+        .select('id, titulo, comuna, cancha_nombre, hora, estado, id_organizador')
+        .in('id', matchIds);
+      if (mErr) {
+        console.error('[FutFinder] listMyThreads matches:', mErr);
+        return { data: [], error: mErr };
+      }
+      for (const m of ms || []) matchesById.set(m.id, m);
+    }
+
+    // 3) Último mensaje por partido
+    const lastByMatch = new Map();
+    if (matchIds.length > 0) {
+      const { data: matchMsgs, error: mmErr } = await supabase
+        .from('messages')
+        .select('id, content, created_at, sender_id, match_id')
+        .in('match_id', matchIds)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (mmErr) {
+        console.error('[FutFinder] listMyThreads match msgs:', mmErr);
+        // No retornamos error — el chat puede mostrarse sin último mensaje
+      } else {
+        for (const msg of matchMsgs || []) {
+          if (!lastByMatch.has(msg.match_id)) lastByMatch.set(msg.match_id, msg);
+        }
+      }
+    }
+
+    const matchThreads = (myAttendances || [])
+      .map((a) => {
+        const match = matchesById.get(a.id_partido);
+        if (!match) return null;
+        const last = lastByMatch.get(a.id_partido);
+        return {
+          key: threadKey({ type: 'match', id: a.id_partido }),
+          type: 'match',
+          match_id: a.id_partido,
+          title: match.titulo || 'Partido',
+          subtitle:
+            (match.cancha_nombre || '') +
+            (match.comuna ? ` · ${match.comuna}` : ''),
+          is_organizer: match.id_organizador === me,
+          last_message: last || null,
+          last_at: last?.created_at || match.hora || a.inscrito_at,
+          unread: 0,
+        };
+      })
+      .filter(Boolean);
+
+    // 4) DMs — query simple, agrupamos en JS
+    const { data: dms, error: dmErr } = await supabase
       .from('messages')
-      .select('id, content, created_at, sender_id, match_id')
-      .in('match_id', matchIds)
+      .select('id, created_at, sender_id, receiver_id, content, read_at')
+      .is('match_id', null)
+      .or(`sender_id.eq.${me},receiver_id.eq.${me}`)
       .order('created_at', { ascending: false })
       .limit(200);
-    if (mErr) console.error('[FutFinder] listMyThreads match msgs:', mErr);
-    for (const msg of matchMsgs) {
-      if (!lastByMatch.has(msg.match_id)) lastByMatch.set(msg.match_id, msg);
+
+    if (dmErr) {
+      console.error('[FutFinder] listMyThreads DMs:', dmErr);
+      // Si la tabla messages no existe, devolvemos solo match threads
+      return { data: matchThreads, error: dmErr };
     }
+
+    // 5) Resolver usernames de DMs en una sola query
+    const otherIds = new Set();
+    for (const m of dms || []) {
+      const other = m.sender_id === me ? m.receiver_id : m.sender_id;
+      if (other) otherIds.add(other);
+    }
+    let userById = new Map();
+    if (otherIds.size > 0) {
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, username, foto_url')
+        .in('id', Array.from(otherIds));
+      for (const p of profs || []) userById.set(p.id, p);
+    }
+
+    const dmMap = new Map();
+    for (const m of dms || []) {
+      const otherId = m.sender_id === me ? m.receiver_id : m.sender_id;
+      if (!otherId) continue;
+      const key = threadKey({ type: 'dm', id: otherId });
+      if (!dmMap.has(key)) {
+        const other = userById.get(otherId);
+        dmMap.set(key, {
+          key,
+          type: 'dm',
+          other_id: otherId,
+          other_username: other?.username || 'jugador',
+          other_foto: other?.foto_url || null,
+          title: '@' + (other?.username || 'jugador'),
+          subtitle: 'Mensaje directo',
+          last_message: m,
+          last_at: m.created_at,
+          unread: 0,
+        });
+      }
+      if (m.receiver_id === me && !m.read_at) {
+        dmMap.get(key).unread += 1;
+      }
+    }
+
+    const all = [...matchThreads, ...dmMap.values()].sort(
+      (a, b) => new Date(b.last_at) - new Date(a.last_at)
+    );
+    return { data: all, error: null };
+  } catch (e) {
+    console.error('[FutFinder] listMyThreads exception:', e);
+    return { data: [], error: e };
   }
-
-  const matchThreads = (myAttendances || [])
-    .filter((a) => a.match) // si el partido fue borrado, lo saltamos
-    .map((a) => {
-      const last = lastByMatch.get(a.id_partido);
-      return {
-        key: threadKey({ type: 'match', id: a.id_partido }),
-        type: 'match',
-        match_id: a.id_partido,
-        title: a.match.titulo || 'Partido',
-        subtitle:
-          (a.match.cancha_nombre || '') +
-          (a.match.comuna ? ` · ${a.match.comuna}` : ''),
-        is_organizer: a.match.id_organizador === me,
-        last_message: last || null,
-        last_at: last?.created_at || a.match.hora || a.inscrito_at,
-        unread: 0, // grupales: sin contador per-usuario en V1
-      };
-    });
-
-  // 3) DMs (solo los que tienen al menos un mensaje)
-  const { data: dms = [], error: dmErr } = await supabase
-    .from('messages')
-    .select(
-      'id, created_at, sender_id, receiver_id, content, read_at,' +
-      ' sender:sender_id(id, username, foto_url),' +
-      ' receiver:receiver_id(id, username, foto_url)'
-    )
-    .is('match_id', null)
-    .or(`sender_id.eq.${me},receiver_id.eq.${me}`)
-    .order('created_at', { ascending: false })
-    .limit(200);
-  if (dmErr) console.error('[FutFinder] listMyThreads DMs:', dmErr);
-
-  const dmMap = new Map();
-  for (const m of dms) {
-    const other = m.sender_id === me ? m.receiver : m.sender;
-    const otherId = m.sender_id === me ? m.receiver_id : m.sender_id;
-    if (!otherId) continue;
-    const key = threadKey({ type: 'dm', id: otherId });
-    if (!dmMap.has(key)) {
-      dmMap.set(key, {
-        key,
-        type: 'dm',
-        other_id: otherId,
-        other_username: other?.username || 'jugador',
-        other_foto: other?.foto_url || null,
-        title: '@' + (other?.username || 'jugador'),
-        subtitle: 'Mensaje directo',
-        last_message: m,
-        last_at: m.created_at,
-        unread: 0,
-      });
-    }
-    if (m.receiver_id === me && !m.read_at) {
-      dmMap.get(key).unread += 1;
-    }
-  }
-
-  return [...matchThreads, ...dmMap.values()].sort(
-    (a, b) => new Date(b.last_at) - new Date(a.last_at)
-  );
 }
 
 /**
- * Devuelve el historial de un hilo (newest last).
+ * Devuelve el historial de un hilo (newest last) sin JOIN de PostgREST.
+ * Resolvemos senders en una query aparte para evitar errores raros
+ * de FK detection cuando el partido tiene varios senders.
+ * Retorna { data, error } para que la pantalla pueda diferenciar.
  */
 export async function listThreadMessages(threadKeyStr, { limit = 50 } = {}) {
-  if (!isSupabaseConfigured) return [];
-  const t = parseThreadKey(threadKeyStr);
-  if (!t) return [];
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  try {
+    const t = parseThreadKey(threadKeyStr);
+    if (!t) return { data: [], error: { message: 'Hilo inválido' } };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  const me = user.id;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: [], error: { message: 'No autenticado' } };
+    const me = user.id;
 
-  let q = supabase
-    .from('messages')
-    .select(
-      'id, created_at, sender_id, receiver_id, match_id, content, read_at,' +
-      ' sender:sender_id(id, username, foto_url)'
-    )
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    let q = supabase
+      .from('messages')
+      .select('id, created_at, sender_id, receiver_id, match_id, content, read_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
-  if (t.type === 'dm') {
-    // mensajes entre me y t.id (en cualquier dirección)
-    q = q
-      .is('match_id', null)
-      .or(
-        `and(sender_id.eq.${me},receiver_id.eq.${t.id}),` +
-        `and(sender_id.eq.${t.id},receiver_id.eq.${me})`
+    if (t.type === 'dm') {
+      q = q
+        .is('match_id', null)
+        .or(
+          `and(sender_id.eq.${me},receiver_id.eq.${t.id}),` +
+          `and(sender_id.eq.${t.id},receiver_id.eq.${me})`
+        );
+    } else if (t.type === 'match') {
+      q = q.eq('match_id', t.id);
+    } else {
+      return { data: [], error: { message: 'Tipo de hilo desconocido' } };
+    }
+
+    const { data, error } = await q;
+    if (error) {
+      console.error('[FutFinder] listThreadMessages:', error);
+      return { data: [], error };
+    }
+
+    const messages = (data || []).reverse(); // antiguo → nuevo
+
+    // Resolver senders en una sola query (para mostrar @username en grupos)
+    if (t.type === 'match' && messages.length > 0) {
+      const senderIds = Array.from(
+        new Set(messages.map((m) => m.sender_id).filter(Boolean))
       );
-  } else if (t.type === 'match') {
-    q = q.eq('match_id', t.id);
-  } else {
-    return [];
-  }
+      if (senderIds.length > 0) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, username, foto_url')
+          .in('id', senderIds);
+        const byId = new Map((profs || []).map((p) => [p.id, p]));
+        for (const m of messages) {
+          const s = byId.get(m.sender_id);
+          if (s) m.sender = s;
+        }
+      }
+    }
 
-  const { data, error } = await q;
-  if (error) {
-    console.error('[FutFinder] listThreadMessages:', error);
-    return [];
+    return { data: messages, error: null };
+  } catch (e) {
+    console.error('[FutFinder] listThreadMessages exception:', e);
+    return { data: [], error: e };
   }
-  // Devolvemos en orden ascendente (más antiguo → más nuevo)
-  return (data || []).reverse();
 }
 
 /**
@@ -192,10 +260,7 @@ export async function sendMessage(threadKeyStr, content) {
   const { data, error } = await supabase
     .from('messages')
     .insert(payload)
-    .select(
-      'id, created_at, sender_id, receiver_id, match_id, content, read_at,' +
-      ' sender:sender_id(id, username, foto_url)'
-    )
+    .select('id, created_at, sender_id, receiver_id, match_id, content, read_at')
     .single();
 
   if (error) console.error('[FutFinder] sendMessage:', error);

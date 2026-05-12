@@ -31,6 +31,7 @@ import {
 } from '../services/messages';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
+import Banner from '../components/Banner';
 
 function formatTime(iso) {
   try {
@@ -76,6 +77,7 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState('');
   const [myId, setMyId] = useState(null);
+  const [errorBanner, setErrorBanner] = useState(null);
 
   const listRef = useRef(null);
   const isMountedRef = useRef(true);
@@ -87,25 +89,45 @@ export default function ChatThreadScreen({ route, navigation }) {
   useEffect(() => {
     isMountedRef.current = true;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (isMountedRef.current) setMyId(user?.id || null);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (isMountedRef.current) setMyId(user?.id || null);
 
-      const msgs = await listThreadMessages(threadKey, { limit: 60 });
-      if (isMountedRef.current) {
+        const result = await listThreadMessages(threadKey, { limit: 60 });
+        if (!isMountedRef.current) return;
+        const msgs = Array.isArray(result) ? result : (result?.data || []);
         setMessages(msgs);
+        if (result?.error) {
+          setErrorBanner({
+            type: 'error',
+            title: 'No pude cargar los mensajes',
+            message: result.error.message || String(result.error),
+          });
+        }
         setLoading(false);
+        try { await markThreadAsRead(threadKey); } catch {}
+      } catch (e) {
+        console.error('[FutFinder] ChatThread load exception:', e);
+        if (isMountedRef.current) {
+          setLoading(false);
+          setErrorBanner({
+            type: 'error',
+            title: 'Error inesperado',
+            message: e?.message || String(e),
+          });
+        }
       }
-      // Marcar como leído al abrir (DMs)
-      await markThreadAsRead(threadKey);
     })();
     return () => {
       isMountedRef.current = false;
     };
   }, [threadKey]);
 
-  // Suscripción Realtime
+  // Suscripción Realtime (blindada — si falla no crashea la pantalla)
   useEffect(() => {
-    const unsubscribe = subscribeToMessages((payload) => {
+    let unsubscribe = () => {};
+    try {
+      unsubscribe = subscribeToMessages((payload) => {
       // payload.eventType: 'INSERT' | 'UPDATE' | 'DELETE'
       // payload.new: la nueva fila (en INSERT/UPDATE)
       const row = payload.new || payload.old;
@@ -129,7 +151,12 @@ export default function ChatThreadScreen({ route, navigation }) {
         );
       }
     });
-    return unsubscribe;
+    } catch (e) {
+      console.warn('[FutFinder] Realtime subscribe failed:', e?.message || e);
+    }
+    return () => {
+      try { unsubscribe(); } catch {}
+    };
   }, [threadKey, myId]);
 
   // Auto-scroll al final cuando llegan mensajes
@@ -234,6 +261,18 @@ export default function ChatThreadScreen({ route, navigation }) {
           </View>
           <View style={{ width: 40 }} />
         </View>
+
+        {/* Banner de error si algo falla */}
+        {errorBanner && (
+          <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
+            <Banner
+              type={errorBanner.type}
+              title={errorBanner.title}
+              message={errorBanner.message}
+              onClose={() => setErrorBanner(null)}
+            />
+          </View>
+        )}
 
         {/* Lista */}
         {loading ? (
