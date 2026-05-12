@@ -40,6 +40,8 @@ export async function updateMyProfile(patch) {
   const allowed = [
     'username', 'foto_url', 'posicion_preferida', 'flanco',
     'edad', 'bio', 'region', 'comuna',
+    'latitud', 'longitud', 'location_updated_at',
+    'onboarding_completed',
   ];
   const payload = {};
   for (const k of allowed) {
@@ -54,6 +56,53 @@ export async function updateMyProfile(patch) {
     .select()
     .single();
   return { data, error };
+}
+
+/**
+ * Marca el onboarding como completado en el perfil del usuario actual.
+ * Si pasa coords, también guarda lat/lng como ubicación persistente.
+ */
+export async function completeOnboarding({ latitud = null, longitud = null } = {}) {
+  if (!isSupabaseConfigured) return { error: null };
+  const patch = { onboarding_completed: true };
+  if (latitud != null && longitud != null) {
+    patch.latitud = latitud;
+    patch.longitud = longitud;
+    patch.location_updated_at = new Date().toISOString();
+  }
+  return updateMyProfile(patch);
+}
+
+/**
+ * Guarda la ubicación GPS actual del usuario para no volver a pedirla.
+ */
+export async function saveMyLocation({ latitud, longitud }) {
+  return updateMyProfile({
+    latitud, longitud,
+    location_updated_at: new Date().toISOString(),
+  });
+}
+
+/**
+ * Devuelve si el usuario actual ya completó el onboarding.
+ *  - true  → mandar directo a Main
+ *  - false → continuar con LocationPermission/Terms
+ *  - null  → no hay sesión iniciada
+ */
+export async function getOnboardingState() {
+  if (!isSupabaseConfigured) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('onboarding_completed, username')
+    .eq('id', user.id)
+    .single();
+  if (error) {
+    console.warn('[FutFinder] getOnboardingState:', error.message);
+    return false;
+  }
+  return Boolean(data?.onboarding_completed);
 }
 
 /**

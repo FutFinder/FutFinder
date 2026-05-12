@@ -18,7 +18,8 @@ import {
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
-import { requestLocationPermission } from '../services/location';
+import { getCurrentLocation } from '../services/location';
+import { saveMyLocation } from '../services/profile';
 
 const REASONS = [
   {
@@ -43,13 +44,15 @@ const REASONS = [
 
 export default function LocationPermissionScreen({ navigation }) {
   const handleAllow = async () => {
-    // Pide el permiso real al sistema operativo / navegador.
-    // No bloqueamos el flujo si el usuario lo rechaza — pueden
-    // habilitarlo después desde Ajustes.
+    // Pide GPS, lo lee y lo guarda en el perfil para no volver a pedirlo.
+    // Si el usuario rechaza, igual avanzamos a Terms.
     try {
-      await requestLocationPermission();
+      const r = await getCurrentLocation();
+      if (r?.ok) {
+        await saveMyLocation({ latitud: r.latitude, longitud: r.longitude });
+      }
     } catch (e) {
-      // Silencioso: la pantalla siguiente igual se abre
+      // Silencioso
     }
     navigation.navigate('Terms');
   };

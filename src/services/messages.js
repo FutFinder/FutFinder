@@ -19,8 +19,12 @@ export function parseThreadKey(key) {
 }
 
 /**
- * Lista de conversaciones del usuario: agrupa por hilo y devuelve
- * el último mensaje + contador de no leídos.
+ * Lista de conversaciones del usuario:
+ *  - Match chats: TODO partido al que esté inscrito (incluso sin mensajes).
+ *    Si soy el organizador, también aparece porque el trigger me agrega
+ *    como attendee automáticamente.
+ *  - DMs: solo aquellos con al menos un mensaje (porque no hay forma
+ *    todavía de "iniciar un DM vacío").
  */
 export async function listMyThreads() {
   if (!isSupabaseConfigured) return [];
@@ -28,7 +32,55 @@ export async function listMyThreads() {
   if (!user) return [];
   const me = user.id;
 
-  // 1) Mensajes DM donde soy sender o receiver
+  // 1) Mis inscripciones — esto define los chats de partido que veo
+  const { data: myAttendances = [], error: aErr } = await supabase
+    .from('attendees')
+    .select(
+      'id_partido, inscrito_at,' +
+      ' match:matches(id, titulo, comuna, cancha_nombre, hora, estado, id_organizador)'
+    )
+    .eq('id_jugador', me)
+    .order('inscrito_at', { ascending: false });
+  if (aErr) console.error('[FutFinder] listMyThreads attendances:', aErr);
+
+  // 2) Último mensaje por partido (un solo round-trip)
+  const matchIds = (myAttendances || [])
+    .map((a) => a.id_partido)
+    .filter(Boolean);
+  const lastByMatch = new Map();
+  if (matchIds.length > 0) {
+    const { data: matchMsgs = [], error: mErr } = await supabase
+      .from('messages')
+      .select('id, content, created_at, sender_id, match_id')
+      .in('match_id', matchIds)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (mErr) console.error('[FutFinder] listMyThreads match msgs:', mErr);
+    for (const msg of matchMsgs) {
+      if (!lastByMatch.has(msg.match_id)) lastByMatch.set(msg.match_id, msg);
+    }
+  }
+
+  const matchThreads = (myAttendances || [])
+    .filter((a) => a.match) // si el partido fue borrado, lo saltamos
+    .map((a) => {
+      const last = lastByMatch.get(a.id_partido);
+      return {
+        key: threadKey({ type: 'match', id: a.id_partido }),
+        type: 'match',
+        match_id: a.id_partido,
+        title: a.match.titulo || 'Partido',
+        subtitle:
+          (a.match.cancha_nombre || '') +
+          (a.match.comuna ? ` · ${a.match.comuna}` : ''),
+        is_organizer: a.match.id_organizador === me,
+        last_message: last || null,
+        last_at: last?.created_at || a.match.hora || a.inscrito_at,
+        unread: 0, // grupales: sin contador per-usuario en V1
+      };
+    });
+
+  // 3) DMs (solo los que tienen al menos un mensaje)
   const { data: dms = [], error: dmErr } = await supabase
     .from('messages')
     .select(
@@ -40,44 +92,16 @@ export async function listMyThreads() {
     .or(`sender_id.eq.${me},receiver_id.eq.${me}`)
     .order('created_at', { ascending: false })
     .limit(200);
-
   if (dmErr) console.error('[FutFinder] listMyThreads DMs:', dmErr);
 
-  // 2) Match chats donde estoy inscrito (vía attendees → matches → messages)
-  //    Usamos un join: traemos los mensajes match_id != null de partidos donde participo.
-  const { data: myAttendances = [], error: aErr } = await supabase
-    .from('attendees')
-    .select('id_partido')
-    .eq('id_jugador', me);
-  if (aErr) console.error('[FutFinder] listMyThreads attendances:', aErr);
-
-  const matchIds = (myAttendances || []).map((a) => a.id_partido);
-  let matchMsgs = [];
-  if (matchIds.length > 0) {
-    const { data, error } = await supabase
-      .from('messages')
-      .select(
-        'id, created_at, sender_id, match_id, content,' +
-        ' sender:sender_id(id, username, foto_url),' +
-        ' match:match_id(id, titulo, comuna, cancha_nombre)'
-      )
-      .in('match_id', matchIds)
-      .order('created_at', { ascending: false })
-      .limit(200);
-    if (error) console.error('[FutFinder] listMyThreads match msgs:', error);
-    matchMsgs = data || [];
-  }
-
-  // 3) Agrupar
-  const map = new Map();
-
-  for (const m of dms || []) {
+  const dmMap = new Map();
+  for (const m of dms) {
     const other = m.sender_id === me ? m.receiver : m.sender;
     const otherId = m.sender_id === me ? m.receiver_id : m.sender_id;
     if (!otherId) continue;
     const key = threadKey({ type: 'dm', id: otherId });
-    if (!map.has(key)) {
-      map.set(key, {
+    if (!dmMap.has(key)) {
+      dmMap.set(key, {
         key,
         type: 'dm',
         other_id: otherId,
@@ -91,29 +115,11 @@ export async function listMyThreads() {
       });
     }
     if (m.receiver_id === me && !m.read_at) {
-      map.get(key).unread += 1;
+      dmMap.get(key).unread += 1;
     }
   }
 
-  for (const m of matchMsgs) {
-    const key = threadKey({ type: 'match', id: m.match_id });
-    if (!map.has(key)) {
-      map.set(key, {
-        key,
-        type: 'match',
-        match_id: m.match_id,
-        title: m.match?.titulo || 'Partido',
-        subtitle: (m.match?.cancha_nombre || '') +
-          (m.match?.comuna ? ` · ${m.match.comuna}` : ''),
-        last_message: m,
-        last_at: m.created_at,
-        unread: 0, // grupales: sin contador per-usuario en V1
-      });
-    }
-  }
-
-  // 4) Ordenar por último mensaje
-  return Array.from(map.values()).sort(
+  return [...matchThreads, ...dmMap.values()].sort(
     (a, b) => new Date(b.last_at) - new Date(a.last_at)
   );
 }

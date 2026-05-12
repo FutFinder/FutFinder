@@ -16,6 +16,7 @@ import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
 import { signInOrUp } from '../services/auth';
+import { getOnboardingState } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 
 export default function LoginScreen({ navigation }) {
@@ -41,9 +42,15 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    // Caso 1: ya tiene sesión activa → saltarse Verification e ir a permisos
+    // Caso 1: sesión activa
     if (result.session) {
-      navigation.navigate('LocationPermission');
+      // ¿Ya completó el onboarding alguna vez? → directo al Home
+      const done = await getOnboardingState();
+      if (done) {
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      } else {
+        navigation.navigate('LocationPermission');
+      }
       return;
     }
 

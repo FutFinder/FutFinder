@@ -12,6 +12,7 @@ import { ArrowLeft, FileText, Check } from 'lucide-react-native';
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
+import { completeOnboarding } from '../services/profile';
 
 const TERMS_TEXT =
   'Al usar FUTFINDER aceptas nuestros Términos de Servicios y Políticas de Privacidad. Tus datos de ubicación se procesarán de forma segura y no se compartirán con terceros sin tu consentimiento. Nos comprometemos a proteger tu información personal y a usarla exclusivamente para mejorar tu experiencia deportiva dentro de la plataforma.';
@@ -36,8 +37,11 @@ export default function TermsScreen({ navigation }) {
 
   const canContinue = acceptTerms;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!canContinue) return;
+    // Marcamos onboarding como completado — el usuario nunca más
+    // tendrá que pasar por LocationPermission / Terms / Success.
+    await completeOnboarding();
     navigation.navigate('Success');
   };
 

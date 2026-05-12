@@ -28,7 +28,7 @@ import Logo from '../components/Logo';
 import Button from '../components/Button';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
-import { createMatch } from '../services/matches';
+import { createMatch, getMatchById, updateMatch } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
@@ -69,7 +69,10 @@ function parseDateTime(dateStr, timeStr) {
   return d;
 }
 
-export default function CreateMatchScreen({ navigation }) {
+export default function CreateMatchScreen({ navigation, route }) {
+  // Si llega matchId, estamos editando un partido existente
+  const editingId = route?.params?.matchId || null;
+  const isEditing = Boolean(editingId);
   // Tabs
   const [tab, setTab] = useState('falta_uno'); // 'falta_uno' | 'retos'
 
@@ -113,8 +116,33 @@ export default function CreateMatchScreen({ navigation }) {
 
   // Capturar GPS al montar (no es bloqueante)
   useEffect(() => {
-    fetchGPS();
-  }, []);
+    if (!isEditing) fetchGPS();
+  }, [isEditing]);
+
+  // Si estamos editando, precargar los datos del partido
+  useEffect(() => {
+    if (!editingId) return;
+    (async () => {
+      const { data, error } = await getMatchById(editingId);
+      if (error || !data) return;
+      setTitulo(data.titulo || '');
+      setCanchaNombre(data.cancha_nombre || '');
+      if (data.region) setRegion(data.region);
+      if (data.comuna) setComuna(data.comuna);
+      if (data.latitud != null && data.longitud != null) {
+        setCoords({ latitude: data.latitud, longitude: data.longitud });
+      }
+      if (data.hora) {
+        const d = new Date(data.hora);
+        setFechaStr(formatDate(d));
+        setHoraStr(formatTime(d));
+      }
+      if (data.cupos_totales != null) setCuposTotales(String(data.cupos_totales));
+      if (data.precio_cuota != null) setPrecioCuota(String(data.precio_cuota));
+      if (data.nivel) setNivel(data.nivel);
+      if (data.descripcion) setDescripcion(data.descripcion);
+    })();
+  }, [editingId]);
 
   const fetchGPS = async () => {
     setGpsLoading(true);
@@ -143,7 +171,7 @@ export default function CreateMatchScreen({ navigation }) {
     if (!dt) return 'Fecha u hora con formato inválido (usa DD/MM/YYYY y HH:MM)';
     if (dt.getTime() < Date.now() - 60 * 1000) return 'La fecha/hora ya pasó';
     const cupos = parseInt(cuposTotales, 10);
-    if (Number.isNaN(cupos) || cupos < 2 || cupos > 30) return 'Los cupos deben estar entre 2 y 30';
+    if (Number.isNaN(cupos) || cupos < 1 || cupos > 30) return 'Los cupos disponibles deben estar entre 1 y 30';
     const precio = parseInt(precioCuota, 10);
     if (Number.isNaN(precio) || precio < 0) return 'La cuota debe ser un número (0 si es gratis)';
     return null;
@@ -167,7 +195,7 @@ export default function CreateMatchScreen({ navigation }) {
 
     setSubmitting(true);
     const dt = parseDateTime(fechaStr, horaStr);
-    const result = await createMatch({
+    const payload = {
       titulo: titulo.trim(),
       region,
       comuna,
@@ -179,24 +207,27 @@ export default function CreateMatchScreen({ navigation }) {
       precio_cuota: parseInt(precioCuota, 10),
       nivel,
       descripcion: descripcion.trim() || null,
-    });
+    };
+    const result = isEditing
+      ? await updateMatch(editingId, payload)
+      : await createMatch(payload);
     setSubmitting(false);
 
     if (result.error) {
-      console.error('[FutFinder] createMatch error:', result.error);
+      console.error('[FutFinder] save match error:', result.error);
       showError(
-        'No pudimos publicar el partido',
+        isEditing ? 'No pudimos guardar los cambios' : 'No pudimos publicar el partido',
         result.error.message || 'Intenta de nuevo'
       );
       return;
     }
 
-    setBanner({
-      type: 'success',
-      title: '¡Partido publicado!',
-      message: 'Ya aparece en el feed de partidos cercanos.',
-    });
-    notify('¡Partido publicado!', 'Aparecerá en el feed de partidos cercanos.');
+    const okTitle = isEditing ? '¡Partido actualizado!' : '¡Partido publicado!';
+    const okMsg = isEditing
+      ? 'Los cambios ya están visibles para los inscritos.'
+      : 'Aparecerá en el feed de partidos cercanos.';
+    setBanner({ type: 'success', title: okTitle, message: okMsg });
+    notify(okTitle, okMsg);
 
     // Volver al feed Home tras un breve delay para que se vea el banner
     setTimeout(() => {
@@ -496,7 +527,7 @@ export default function CreateMatchScreen({ navigation }) {
                       <Stepper
                         value={parseInt(cuposTotales, 10) || 0}
                         onChange={(v) => setCuposTotales(String(v))}
-                        min={2}
+                        min={1}
                         max={30}
                       />
                     </Field>
@@ -598,7 +629,11 @@ export default function CreateMatchScreen({ navigation }) {
               {/* Submit */}
               <View style={{ marginTop: 8, marginBottom: 24 }}>
                 <Button
-                  label={submitting ? 'Publicando…' : 'Publicar Partido'}
+                  label={
+                    submitting
+                      ? (isEditing ? 'Guardando…' : 'Publicando…')
+                      : (isEditing ? 'Guardar cambios' : 'Publicar Partido')
+                  }
                   variant="primary"
                   onPress={handleSubmit}
                   loading={submitting}

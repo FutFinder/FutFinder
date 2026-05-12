@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ImageBackground,
   Pressable,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -20,12 +21,47 @@ import Logo from '../components/Logo';
 import Button from '../components/Button';
 import FeatureCard from '../components/FeatureCard';
 import { colors, radius } from '../theme/colors';
+import { getOnboardingState } from '../services/profile';
 
 const HERO_IMAGE = {
   uri: 'https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=1600&q=80',
 };
 
 export default function WelcomeScreen({ navigation }) {
+  const [checking, setChecking] = useState(true);
+
+  // Auth gate: si el usuario ya está logueado y completó el onboarding,
+  // lo mandamos directo al Home. Si está logueado pero no terminó,
+  // lo retomamos en LocationPermission.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const state = await getOnboardingState();
+      if (cancelled) return;
+      if (state === true) {
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+        return;
+      }
+      if (state === false) {
+        navigation.reset({ index: 0, routes: [{ name: 'LocationPermission' }] });
+        return;
+      }
+      // state === null → no hay sesión, mostramos Welcome
+      setChecking(false);
+    })();
+    return () => { cancelled = true; };
+  }, [navigation]);
+
+  if (checking) {
+    return (
+      <View style={[styles.root, styles.splashCenter]}>
+        <Logo size={48} />
+        <View style={{ height: 24 }} />
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <ScrollView
@@ -117,6 +153,10 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  splashCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scroll: {
     flexGrow: 1,

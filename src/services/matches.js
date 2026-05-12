@@ -164,6 +164,58 @@ export async function createMatch({
 }
 
 /**
+ * Trae un partido por id (para edición o detalle).
+ */
+export async function getMatchById(matchId) {
+  if (!isSupabaseConfigured) return { data: null, error: null };
+  const { data, error } = await supabase
+    .from('matches')
+    .select('*')
+    .eq('id', matchId)
+    .single();
+  return { data, error };
+}
+
+/**
+ * Actualiza un partido existente.
+ * RLS solo permite al organizador.
+ */
+export async function updateMatch(matchId, patch) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
+  const allowed = [
+    'titulo', 'region', 'comuna', 'cancha_nombre',
+    'latitud', 'longitud', 'hora',
+    'cupos_totales', 'cupos_disponibles',
+    'precio_cuota', 'nivel', 'descripcion', 'estado',
+  ];
+  const payload = {};
+  for (const k of allowed) {
+    if (patch[k] !== undefined) payload[k] = patch[k];
+  }
+  const { data, error } = await supabase
+    .from('matches')
+    .update(payload)
+    .eq('id', matchId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+/**
+ * Elimina un partido. RLS solo permite al organizador.
+ * El borrado en cascada elimina attendees y messages asociados.
+ */
+export async function deleteMatch(matchId) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  const { error } = await supabase
+    .from('matches')
+    .delete()
+    .eq('id', matchId);
+  if (error) console.error('[FutFinder] deleteMatch:', error);
+  return { error };
+}
+
+/**
  * El usuario actual se inscribe a un partido.
  * Usa la función RPC join_match (atómica, decrementa cupo).
  */

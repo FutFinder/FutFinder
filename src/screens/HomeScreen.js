@@ -15,15 +15,17 @@ import {
   Search,
   Bell,
   ShieldCheck,
+  Edit3,
+  Trash2,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
 import Logo from '../components/Logo';
 import Banner from '../components/Banner';
 import { notify } from '../utils/notify';
-import { listOpenMatches, joinMatch } from '../services/matches';
+import { listOpenMatches, joinMatch, deleteMatch } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
-import { getCurrentProfile } from '../services/auth';
+import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { isSupabaseConfigured } from '../services/supabase';
 
 function formatHora(iso) {
@@ -61,6 +63,7 @@ function nivelLabel(n) {
 export default function HomeScreen({ navigation }) {
   const [matches, setMatches] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [myUserId, setMyUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState(null);
@@ -77,12 +80,14 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [{ data: list }, prof] = await Promise.all([
+    const [{ data: list }, prof, user] = await Promise.all([
       listOpenMatches({ limit: 20 }),
       getCurrentProfile(),
+      getCurrentUser(),
     ]);
     setMatches(list || []);
     setProfile(prof);
+    setMyUserId(user?.id || null);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -139,6 +144,29 @@ export default function HomeScreen({ navigation }) {
     } finally {
       setBusyMatchId(null);
     }
+  };
+
+  const handleEdit = (matchId) => {
+    navigation.navigate('CreateMatch', { matchId });
+  };
+
+  const handleDelete = async (matchId) => {
+    // Confirmación compatible con web y nativo
+    const ok =
+      typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm('¿Eliminar este partido? Los inscritos perderán acceso al chat.')
+        : true;
+    if (!ok) return;
+
+    setBusyMatchId(matchId);
+    const { error } = await deleteMatch(matchId);
+    setBusyMatchId(null);
+    if (error) {
+      showBanner('error', 'No pudimos eliminarlo', error.message || 'Intenta de nuevo');
+      return;
+    }
+    showBanner('success', 'Partido eliminado', 'Ya no aparece en el feed.');
+    load();
   };
 
   const handleConfirmGPS = async (matchId) => {
@@ -270,19 +298,26 @@ export default function HomeScreen({ navigation }) {
             const cuposLeft = m.cupos_disponibles ?? 0;
             const cuposTotales = m.cupos_totales ?? cuposLeft;
             const isBusy = busyMatchId === m.id;
+            const isMine = myUserId && m.id_organizador === myUserId;
             return (
               <View key={m.id} style={styles.matchCard}>
                 <View style={styles.matchTopRow}>
                   <Text style={styles.matchTitle} numberOfLines={1}>
                     {m.titulo}
                   </Text>
-                  <View style={styles.priceTag}>
-                    <Text style={styles.priceText}>
-                      {m.precio_cuota === 0
-                        ? 'Gratis'
-                        : `$${m.precio_cuota.toLocaleString('es-CL')}`}
-                    </Text>
-                  </View>
+                  {isMine ? (
+                    <View style={styles.organizerTag}>
+                      <Text style={styles.organizerTagText}>TÚ ORGANIZAS</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.priceTag}>
+                      <Text style={styles.priceText}>
+                        {m.precio_cuota === 0
+                          ? 'Gratis'
+                          : `$${m.precio_cuota.toLocaleString('es-CL')}`}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <Text style={styles.matchVenue}>
@@ -297,7 +332,7 @@ export default function HomeScreen({ navigation }) {
                   <View style={styles.metaItem}>
                     <Users color={colors.primary} size={14} />
                     <Text style={styles.metaText}>
-                      {cuposTotales - cuposLeft}/{cuposTotales}
+                      {cuposLeft} cupos disp.
                     </Text>
                   </View>
                   <View style={styles.metaItem}>
@@ -313,31 +348,61 @@ export default function HomeScreen({ navigation }) {
                     </Text>
                   </View>
                   <View style={{ flex: 1 }} />
-                  <Pressable
-                    onPress={() => handleConfirmGPS(m.id)}
-                    disabled={isBusy}
-                    style={({ pressed }) => [
-                      styles.gpsBtn,
-                      pressed && { opacity: 0.7 },
-                      isBusy && { opacity: 0.5 },
-                    ]}
-                  >
-                    <MapPin color={colors.primary} size={14} />
-                    <Text style={styles.gpsLabel}>Confirmar GPS</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleJoin(m.id)}
-                    disabled={isBusy || cuposLeft === 0}
-                    style={({ pressed }) => [
-                      styles.joinBtn,
-                      pressed && { opacity: 0.85 },
-                      (isBusy || cuposLeft === 0) && { opacity: 0.5 },
-                    ]}
-                  >
-                    <Text style={styles.joinLabel}>
-                      {cuposLeft === 0 ? 'Lleno' : 'Unirme'}
-                    </Text>
-                  </Pressable>
+                  {isMine ? (
+                    <>
+                      <Pressable
+                        onPress={() => handleEdit(m.id)}
+                        disabled={isBusy}
+                        style={({ pressed }) => [
+                          styles.editBtn,
+                          pressed && { opacity: 0.7 },
+                          isBusy && { opacity: 0.5 },
+                        ]}
+                      >
+                        <Edit3 color={colors.primary} size={13} />
+                        <Text style={styles.editLabel}>Editar</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleDelete(m.id)}
+                        disabled={isBusy}
+                        style={({ pressed }) => [
+                          styles.deleteBtn,
+                          pressed && { opacity: 0.7 },
+                          isBusy && { opacity: 0.5 },
+                        ]}
+                      >
+                        <Trash2 color={colors.error} size={14} />
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      <Pressable
+                        onPress={() => handleConfirmGPS(m.id)}
+                        disabled={isBusy}
+                        style={({ pressed }) => [
+                          styles.gpsBtn,
+                          pressed && { opacity: 0.7 },
+                          isBusy && { opacity: 0.5 },
+                        ]}
+                      >
+                        <MapPin color={colors.primary} size={14} />
+                        <Text style={styles.gpsLabel}>GPS</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleJoin(m.id)}
+                        disabled={isBusy || cuposLeft === 0}
+                        style={({ pressed }) => [
+                          styles.joinBtn,
+                          pressed && { opacity: 0.85 },
+                          (isBusy || cuposLeft === 0) && { opacity: 0.5 },
+                        ]}
+                      >
+                        <Text style={styles.joinLabel}>
+                          {cuposLeft === 0 ? 'Lleno' : 'Unirme'}
+                        </Text>
+                      </Pressable>
+                    </>
+                  )}
                 </View>
               </View>
             );
@@ -521,6 +586,40 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   joinLabel: { color: '#0E0E0D', fontSize: 13, fontWeight: '800' },
+  organizerTag: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  organizerTagText: {
+    color: '#0E0E0D',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  editLabel: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  deleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.error,
+    backgroundColor: colors.errorSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   demoNotice: {
     color: colors.textMuted,
     fontSize: 11,

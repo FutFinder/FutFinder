@@ -21,14 +21,17 @@ import {
   Zap,
   Lightbulb,
   User as UserIcon,
+  Edit3,
+  Trash2,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
-import { listOpenMatches, applyFilters, joinMatch } from '../services/matches';
+import { listOpenMatches, applyFilters, joinMatch, deleteMatch } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentLocation } from '../services/location';
+import { getCurrentUser } from '../services/auth';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
@@ -100,6 +103,7 @@ export default function SearchScreen({ navigation }) {
   const [userCoords, setUserCoords] = useState(null);
   const [busyMatchId, setBusyMatchId] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [myUserId, setMyUserId] = useState(null);
 
   // Estado de filtros (índices en cada arreglo OPTS)
   const [text, setText] = useState('');
@@ -115,14 +119,16 @@ export default function SearchScreen({ navigation }) {
 
   const comunasOfRegion = regionSel ? getComunasOfRegion(regionSel) : [];
 
-  // Cargar partidos + ubicación
+  // Cargar partidos + ubicación + user
   const load = useCallback(async () => {
-    const [{ data }, loc] = await Promise.all([
+    const [{ data }, loc, user] = await Promise.all([
       listOpenMatches({ limit: 50 }),
       getCurrentLocation(),
+      getCurrentUser(),
     ]);
     setMatches(data || []);
     if (loc?.ok) setUserCoords({ lat: loc.latitude, lng: loc.longitude });
+    setMyUserId(user?.id || null);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -188,6 +194,27 @@ export default function SearchScreen({ navigation }) {
     } finally {
       setBusyMatchId(null);
     }
+  };
+
+  const handleEdit = (matchId) => {
+    navigation.getParent()?.navigate('CreateMatch', { matchId });
+  };
+
+  const handleDelete = async (matchId) => {
+    const ok =
+      typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm('¿Eliminar este partido? Los inscritos perderán acceso al chat.')
+        : true;
+    if (!ok) return;
+    setBusyMatchId(matchId);
+    const { error } = await deleteMatch(matchId);
+    setBusyMatchId(null);
+    if (error) {
+      showBanner('error', 'No pudimos eliminarlo', error.message || 'Intenta de nuevo');
+      return;
+    }
+    showBanner('success', 'Partido eliminado', 'Ya no aparece en el feed.');
+    load();
   };
 
   const handleConfirmGPS = async (matchId) => {
@@ -454,6 +481,7 @@ export default function SearchScreen({ navigation }) {
             const startsInMin = (new Date(m.hora) - Date.now()) / 60000;
             const isSpontaneous = startsInMin >= 0 && startsInMin < 60 && m.precio_cuota === 0;
             const isBusy = busyMatchId === m.id;
+            const isMine = myUserId && m.id_organizador === myUserId;
 
             return (
               <View
@@ -461,6 +489,7 @@ export default function SearchScreen({ navigation }) {
                 style={[
                   styles.matchCard,
                   isSpontaneous && styles.matchCardSpontaneous,
+                  isMine && styles.matchCardMine,
                 ]}
               >
                 {isSpontaneous && (
@@ -529,11 +558,43 @@ export default function SearchScreen({ navigation }) {
                       <UserIcon color={colors.textMuted} size={14} />
                     </View>
                     <View>
-                      <Text style={styles.orgName}>Organizador</Text>
-                      <Text style={styles.orgRating}>Confiable ✓</Text>
+                      <Text style={styles.orgName}>
+                        {isMine ? 'Tú organizas' : 'Organizador'}
+                      </Text>
+                      <Text style={styles.orgRating}>
+                        {isMine ? 'Anfitrión' : 'Confiable ✓'}
+                      </Text>
                     </View>
                   </View>
                   <View style={{ flex: 1 }} />
+                  {isMine ? (
+                    <>
+                      <Pressable
+                        onPress={() => handleEdit(m.id)}
+                        disabled={isBusy}
+                        style={({ pressed }) => [
+                          styles.editBtn,
+                          pressed && { opacity: 0.7 },
+                          isBusy && { opacity: 0.5 },
+                        ]}
+                      >
+                        <Edit3 color={colors.primary} size={13} />
+                        <Text style={styles.editLabel}>Editar</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleDelete(m.id)}
+                        disabled={isBusy}
+                        style={({ pressed }) => [
+                          styles.deleteBtn,
+                          pressed && { opacity: 0.7 },
+                          isBusy && { opacity: 0.5 },
+                        ]}
+                      >
+                        <Trash2 color={colors.error} size={14} />
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
                   <Pressable
                     onPress={() => handleConfirmGPS(m.id)}
                     disabled={isBusy}
@@ -559,6 +620,8 @@ export default function SearchScreen({ navigation }) {
                       {m.cupos_disponibles === 0 ? 'Lleno' : 'Unirme'}
                     </Text>
                   </Pressable>
+                    </>
+                  )}
                 </View>
               </View>
             );
@@ -797,6 +860,32 @@ const styles = StyleSheet.create({
   matchCardSpontaneous: {
     borderColor: colors.primary,
     borderWidth: 1.5,
+  },
+  matchCardMine: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.background,
+  },
+  editLabel: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  deleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.error,
+    backgroundColor: colors.errorSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   spontaneousTag: {
     flexDirection: 'row',
