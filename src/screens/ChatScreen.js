@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -369,6 +370,7 @@ export default function ChatScreen({ navigation }) {
                   threadKey: t.key,
                   title: t.title,
                   subtitle: t.subtitle,
+                  fotoUrl: t.foto_url || null,
                 })
               }
               style={({ pressed }) => [
@@ -382,7 +384,9 @@ export default function ChatScreen({ navigation }) {
                   t.type === 'match' && styles.avatarMatch,
                 ]}
               >
-                {t.type === 'dm' ? (
+                {t.foto_url ? (
+                  <Image source={{ uri: t.foto_url }} style={styles.avatarImg} />
+                ) : t.type === 'dm' ? (
                   <UserIcon color={colors.primary} size={20} />
                 ) : (
                   <Users color={colors.primary} size={20} />
@@ -675,7 +679,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImg: { width: '100%', height: '100%' },
   avatarMatch: {
     backgroundColor: colors.background,
     borderColor: colors.primary,

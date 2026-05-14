@@ -33,6 +33,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "FutFinder usa tu ubicación para mostrarte partidos cerca y confirmar tu asistencia."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FutFinder necesita acceso a tus fotos para que puedas subir tu foto de perfil y portadas de partidos.",
+          "cameraPermission": "FutFinder usa tu cámara para que puedas tomar fotos de perfil."
+        }
       ]
     ],
     "scheme": "futfinder"

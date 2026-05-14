@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -71,6 +72,7 @@ export default function ChatThreadScreen({ route, navigation }) {
   const threadKey = route?.params?.threadKey;
   const title = route?.params?.title || 'Chat';
   const subtitle = route?.params?.subtitle || '';
+  const fotoUrl = route?.params?.fotoUrl || null;
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -267,7 +269,9 @@ export default function ChatThreadScreen({ route, navigation }) {
             ]}
           >
             <View style={[styles.headerAvatar, isGroup && styles.headerAvatarGroup]}>
-              {isGroup ? (
+              {fotoUrl ? (
+                <Image source={{ uri: fotoUrl }} style={styles.headerAvatarImg} />
+              ) : isGroup ? (
                 <Users color={colors.primary} size={16} />
               ) : (
                 <UserIcon color={colors.primary} size={16} />
@@ -388,7 +392,11 @@ function Bubble({ message, isMine, isGroup, onPressSender }) {
             pressed && { opacity: 0.7 },
           ]}
         >
-          <UserIcon color={colors.primary} size={14} />
+          {message.sender?.foto_url ? (
+            <Image source={{ uri: message.sender.foto_url }} style={styles.bubbleAvatarImg} />
+          ) : (
+            <UserIcon color={colors.primary} size={14} />
+          )}
         </Pressable>
       )}
 
@@ -473,7 +481,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  headerAvatarImg: { width: '100%', height: '100%' },
   headerAvatarGroup: {
     backgroundColor: colors.background,
   },
@@ -538,7 +548,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+    overflow: 'hidden',
   },
+  bubbleAvatarImg: { width: '100%', height: '100%' },
 
   bubble: {
     maxWidth: '78%',

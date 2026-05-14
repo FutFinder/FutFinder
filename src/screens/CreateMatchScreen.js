@@ -8,6 +8,8 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -22,6 +24,8 @@ import {
   Locate,
   CheckCircle2,
   Bell,
+  Camera,
+  ImageIcon,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -30,6 +34,7 @@ import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
 import { createMatch, getMatchById, updateMatch } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
+import { pickImage, uploadMatchCover } from '../services/storage';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
@@ -106,6 +111,10 @@ export default function CreateMatchScreen({ navigation, route }) {
   // Aprobación (placeholder, no se persiste todavía en DB)
   const [aprobacion, setAprobacion] = useState('inmediata'); // | 'manual'
 
+  // Portada del partido (solo edición permite cambiarla porque necesita matchId)
+  const [fotoUrl, setFotoUrl] = useState(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+
   // Recordatorios (placeholder)
   const [confirmarPost, setConfirmarPost] = useState(false);
   const [notificar1h, setNotificar1h] = useState(true);
@@ -141,8 +150,38 @@ export default function CreateMatchScreen({ navigation, route }) {
       if (data.precio_cuota != null) setPrecioCuota(String(data.precio_cuota));
       if (data.nivel) setNivel(data.nivel);
       if (data.descripcion) setDescripcion(data.descripcion);
+      if (data.foto_url) setFotoUrl(data.foto_url);
     })();
   }, [editingId]);
+
+  const handlePickCover = async () => {
+    if (uploadingCover) return;
+    if (!editingId) {
+      setBanner({
+        type: 'info',
+        title: 'Crea el partido primero',
+        message: 'La portada se puede subir después de publicar el partido (entras a "Editar partido").',
+      });
+      return;
+    }
+    const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.7 });
+    if (!ok) {
+      if (reason && reason !== 'Cancelado') {
+        setBanner({ type: 'error', title: 'No pude abrir tus fotos', message: reason });
+      }
+      return;
+    }
+    setUploadingCover(true);
+    const { url, error } = await uploadMatchCover(editingId, asset);
+    setUploadingCover(false);
+    if (error) {
+      setBanner({ type: 'error', title: 'No pude subir la portada', message: error.message || '' });
+      return;
+    }
+    setFotoUrl(url);
+    setBanner({ type: 'success', title: 'Portada actualizada', message: '' });
+    setTimeout(() => setBanner(null), 2500);
+  };
 
   const fetchGPS = async () => {
     setGpsLoading(true);
@@ -312,6 +351,45 @@ export default function CreateMatchScreen({ navigation, route }) {
             </View>
           ) : (
             <>
+              {/* Card: Portada del partido (solo en modo edición) */}
+              {isEditing && (
+                <View style={styles.card}>
+                  <View style={styles.sectionTitle}>
+                    <ImageIcon color={colors.primary} size={18} />
+                    <Text style={styles.sectionTitleText}>Portada del partido</Text>
+                  </View>
+                  <Pressable
+                    onPress={handlePickCover}
+                    disabled={uploadingCover}
+                    style={({ pressed }) => [
+                      styles.coverBox,
+                      pressed && { opacity: 0.85 },
+                    ]}
+                  >
+                    {fotoUrl ? (
+                      <Image source={{ uri: fotoUrl }} style={styles.coverImage} />
+                    ) : (
+                      <View style={styles.coverPlaceholder}>
+                        <Camera color={colors.primary} size={26} />
+                        <Text style={styles.coverPlaceholderText}>
+                          Toca para subir una foto
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.coverEditBtn}>
+                      {uploadingCover ? (
+                        <ActivityIndicator color="#0E0E0D" size="small" />
+                      ) : (
+                        <Camera color="#0E0E0D" size={14} strokeWidth={2.2} />
+                      )}
+                    </View>
+                  </Pressable>
+                  <Text style={styles.coverHint}>
+                    Visible para los inscritos y en el chat del partido.
+                  </Text>
+                </View>
+              )}
+
               {/* Card: Cancha / Ubicación */}
               <View style={styles.card}>
                 <View style={styles.sectionTitle}>
@@ -714,6 +792,42 @@ function ToggleRow({ label, value, onToggle }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 },
+
+  coverBox: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.background,
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverImage: { width: '100%', height: '100%' },
+  coverPlaceholder: { alignItems: 'center', gap: 6 },
+  coverPlaceholderText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  coverEditBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverHint: {
+    marginTop: 8,
+    color: colors.textMuted,
+    fontSize: 11,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

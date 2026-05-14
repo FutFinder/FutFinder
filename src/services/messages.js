@@ -99,7 +99,7 @@ export async function listMyThreads() {
     if (matchIds.length > 0) {
       const { data: ms, error: mErr } = await supabase
         .from('matches')
-        .select('id, titulo, comuna, cancha_nombre, hora, estado, id_organizador')
+        .select('id, titulo, comuna, cancha_nombre, hora, estado, id_organizador, foto_url')
         .in('id', matchIds);
       if (mErr) {
         console.error('[FutFinder] listMyThreads matches:', mErr);
@@ -141,6 +141,7 @@ export async function listMyThreads() {
             (match.cancha_nombre || '') +
             (match.comuna ? ` · ${match.comuna}` : ''),
           is_organizer: match.id_organizador === me,
+          foto_url: match.foto_url || null,
           last_message: last || null,
           last_at: last?.created_at || match.hora || a.inscrito_at,
           unread: 0,
@@ -191,6 +192,7 @@ export async function listMyThreads() {
           other_id: otherId,
           other_username: other?.username || 'jugador',
           other_foto: other?.foto_url || null,
+          foto_url: other?.foto_url || null,
           title: '@' + (other?.username || 'jugador'),
           subtitle: 'Mensaje directo',
           last_message: m,

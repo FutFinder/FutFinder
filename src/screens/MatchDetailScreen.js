@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -237,6 +238,13 @@ export default function MatchDetailScreen({ route, navigation }) {
             />
           )}
 
+          {/* Portada si existe */}
+          {match.foto_url ? (
+            <View style={styles.coverWrap}>
+              <Image source={{ uri: match.foto_url }} style={styles.cover} />
+            </View>
+          ) : null}
+
           {/* Hero card */}
           <View style={styles.hero}>
             <Text style={styles.matchTitle}>{match.titulo}</Text>
@@ -363,8 +371,10 @@ export default function MatchDetailScreen({ route, navigation }) {
               ]}
             >
               <View style={[styles.avatar, a.is_organizer && styles.avatarOrganizer]}>
-                {a.is_organizer ? (
-                  <Crown color={colors.primary} size={18} />
+                {a.foto_url ? (
+                  <Image source={{ uri: a.foto_url }} style={styles.avatarImage} />
+                ) : a.is_organizer ? (
+                  <Crown color={a.is_organizer ? '#0E0E0D' : colors.primary} size={18} />
                 ) : (
                   <UserIcon color={colors.primary} size={18} />
                 )}
@@ -437,6 +447,16 @@ const styles = StyleSheet.create({
   },
 
   scroll: { paddingHorizontal: 20, paddingBottom: 24 },
+  coverWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  cover: { width: '100%', height: '100%' },
 
   loadingText: { color: colors.textSecondary, marginTop: 12 },
   notFoundText: { color: colors.textSecondary, fontSize: 14, marginBottom: 16 },
@@ -596,7 +616,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImage: { width: '100%', height: '100%' },
   avatarOrganizer: {
     backgroundColor: colors.primary,
   },

@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -278,7 +279,11 @@ export default function ProfileScreen({ navigation, route }) {
           {/* Hero card */}
           <View style={styles.heroCard}>
             <View style={styles.avatar}>
-              <UserIcon color={colors.primary} size={42} strokeWidth={1.5} />
+              {profile?.foto_url ? (
+                <Image source={{ uri: profile.foto_url }} style={styles.avatarImage} />
+              ) : (
+                <UserIcon color={colors.primary} size={42} strokeWidth={1.5} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.username}>
@@ -790,7 +795,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImage: { width: '100%', height: '100%' },
   username: {
     color: colors.textPrimary,
     fontSize: 20,

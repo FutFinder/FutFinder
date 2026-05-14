@@ -186,7 +186,7 @@ export async function updateMatch(matchId, patch) {
     'titulo', 'region', 'comuna', 'cancha_nombre',
     'latitud', 'longitud', 'hora',
     'cupos_totales', 'cupos_disponibles',
-    'precio_cuota', 'nivel', 'descripcion', 'estado',
+    'precio_cuota', 'nivel', 'descripcion', 'estado', 'foto_url',
   ];
   const payload = {};
   for (const k of allowed) {

@@ -8,12 +8,14 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   User as UserIcon,
-  Edit3,
+  Camera,
   Save,
 } from 'lucide-react-native';
 
@@ -22,6 +24,7 @@ import Button from '../components/Button';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
 import { getMyProfile, updateMyProfile } from '../services/profile';
+import { pickImage, uploadAvatar } from '../services/storage';
 import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 
@@ -49,11 +52,12 @@ export default function EditProfileScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [edad, setEdad] = useState('');
   const [bio, setBio] = useState('');
-  // posiciones es un array — el jugador puede seleccionar varias
   const [posiciones, setPosiciones] = useState(['sin_definir']);
   const [flanco, setFlanco] = useState('derecho');
   const [region, setRegion] = useState('');
   const [comuna, setComuna] = useState('');
+  const [fotoUrl, setFotoUrl] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [regionOpen, setRegionOpen] = useState(false);
   const [comunaOpen, setComunaOpen] = useState(false);
@@ -76,10 +80,33 @@ export default function EditProfileScreen({ navigation }) {
         setFlanco(p.flanco || 'derecho');
         setRegion(p.region || '');
         setComuna(p.comuna || '');
+        setFotoUrl(p.foto_url || null);
       }
       setLoading(false);
     })();
   }, []);
+
+  // ---- Subida de foto de perfil ----
+  const handlePickAvatar = async () => {
+    if (uploadingPhoto) return;
+    const { ok, asset, reason } = await pickImage({ aspect: [1, 1], quality: 0.7 });
+    if (!ok) {
+      if (reason && reason !== 'Cancelado') {
+        setBanner({ type: 'error', title: 'No pude abrir tus fotos', message: reason });
+      }
+      return;
+    }
+    setUploadingPhoto(true);
+    const { url, error } = await uploadAvatar(asset);
+    setUploadingPhoto(false);
+    if (error) {
+      setBanner({ type: 'error', title: 'No pude subir la foto', message: error.message || '' });
+      return;
+    }
+    setFotoUrl(url);
+    setBanner({ type: 'success', title: 'Foto actualizada', message: 'Tu nueva foto de perfil ya está guardada.' });
+    setTimeout(() => setBanner(null), 3000);
+  };
 
   const comunasOfRegion = region ? getComunasOfRegion(region) : [];
 
@@ -208,21 +235,30 @@ export default function EditProfileScreen({ navigation }) {
 
           {/* Card 1: Identidad */}
           <View style={styles.card}>
-            <View style={styles.avatarBig}>
-              <UserIcon color={colors.primary} size={42} strokeWidth={1.5} />
-              <Pressable
-                style={styles.avatarEditBtn}
-                onPress={() =>
-                  setBanner({
-                    type: 'info',
-                    title: 'Próximamente',
-                    message: 'Subir foto desde tu dispositivo se habilita pronto.',
-                  })
-                }
-              >
-                <Edit3 color="#0E0E0D" size={12} />
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={handlePickAvatar}
+              disabled={uploadingPhoto}
+              style={({ pressed }) => [
+                styles.avatarBig,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              {fotoUrl ? (
+                <Image source={{ uri: fotoUrl }} style={styles.avatarImage} />
+              ) : (
+                <UserIcon color={colors.primary} size={42} strokeWidth={1.5} />
+              )}
+              <View style={styles.avatarEditBtn}>
+                {uploadingPhoto ? (
+                  <ActivityIndicator color="#0E0E0D" size="small" />
+                ) : (
+                  <Camera color="#0E0E0D" size={14} strokeWidth={2.2} />
+                )}
+              </View>
+            </Pressable>
+            <Text style={styles.avatarHint}>
+              {uploadingPhoto ? 'Subiendo foto…' : 'Toca el avatar para cambiar tu foto'}
+            </Text>
 
             <Label>@username</Label>
             <TextInput
@@ -495,30 +531,41 @@ const styles = StyleSheet.create({
   },
 
   avatarBig: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     backgroundColor: colors.primarySoft,
     borderWidth: 1.5,
     borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
-    marginBottom: 18,
+    marginBottom: 8,
     position: 'relative',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarEditBtn: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    bottom: -2,
+    right: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: colors.surfaceAlt,
+  },
+  avatarHint: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: 11,
+    marginBottom: 18,
   },
 
   label: {
