@@ -15,12 +15,23 @@ import {
   Users,
   User as UserIcon,
   Sparkles,
+  EyeOff,
+  UserPlus,
+  UserCheck,
+  UserX,
+  Send,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
-import { listMyThreads, subscribeToMessages } from '../services/messages';
+import { listMyThreads, subscribeToMessages, hideThread } from '../services/messages';
+import {
+  listMyFriends,
+  listIncomingRequests,
+  acceptFriendRequest,
+  rejectFriendRequest,
+} from '../services/friends';
 import { isSupabaseConfigured } from '../services/supabase';
 
 function timeAgo(iso) {
@@ -40,17 +51,26 @@ function timeAgo(iso) {
 }
 
 export default function ChatScreen({ navigation }) {
-  const [tab, setTab] = useState('all'); // 'all' | 'dm' | 'match'
+  const [tab, setTab] = useState('all'); // 'all' | 'dm' | 'match' | 'friends'
   const [threads, setThreads] = useState([]);
+  const [friends, setFriends] = useState([]);
+  const [incomingReqs, setIncomingReqs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorBanner, setErrorBanner] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
   const load = useCallback(async () => {
     try {
-      const result = await listMyThreads();
+      const [result, frs, reqs] = await Promise.all([
+        listMyThreads(),
+        listMyFriends(),
+        listIncomingRequests(),
+      ]);
       const list = result?.data || [];
       setThreads(list);
+      setFriends(frs || []);
+      setIncomingReqs(reqs || []);
       if (result?.error) {
         const msg = result.error.message || String(result.error);
         // Caso típico: tabla messages no existe (migration 04 sin correr)
@@ -105,11 +125,49 @@ export default function ChatScreen({ navigation }) {
   };
 
   const filtered = useMemo(() => {
-    if (tab === 'all') return threads;
+    if (tab === 'friends' || tab === 'all') return threads;
     return threads.filter((t) => t.type === tab);
   }, [tab, threads]);
 
   const unreadTotal = threads.reduce((acc, t) => acc + (t.unread || 0), 0);
+
+  const handleHide = async (threadKey) => {
+    const ok =
+      typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm('¿Esconder esta conversación de tu vista? Reaparecerá si llega un mensaje nuevo.')
+        : true;
+    if (!ok) return;
+    setBusyId(threadKey);
+    await hideThread(threadKey);
+    setBusyId(null);
+    load();
+  };
+
+  const handleAcceptReq = async (friendshipId) => {
+    setBusyId(friendshipId);
+    await acceptFriendRequest(friendshipId);
+    setBusyId(null);
+    load();
+  };
+
+  const handleRejectReq = async (friendshipId) => {
+    setBusyId(friendshipId);
+    await rejectFriendRequest(friendshipId);
+    setBusyId(null);
+    load();
+  };
+
+  const openDM = (userId, username) => {
+    navigation.getParent()?.navigate('ChatThread', {
+      threadKey: 'dm:' + userId,
+      title: '@' + (username || 'jugador'),
+      subtitle: 'Mensaje directo',
+    });
+  };
+
+  const openUserProfile = (userId) => {
+    navigation.getParent()?.navigate('UserProfile', { userId });
+  };
 
   return (
     <View style={styles.root}>
@@ -140,7 +198,11 @@ export default function ChatScreen({ navigation }) {
         </View>
 
         {/* Tabs */}
-        <View style={styles.tabsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsRow}
+        >
           <TabPill
             label="Todos"
             count={threads.length}
@@ -159,7 +221,14 @@ export default function ChatScreen({ navigation }) {
             active={tab === 'match'}
             onPress={() => setTab('match')}
           />
-        </View>
+          <TabPill
+            label="Amigos"
+            count={friends.length + incomingReqs.length}
+            active={tab === 'friends'}
+            onPress={() => setTab('friends')}
+            highlight={incomingReqs.length > 0}
+          />
+        </ScrollView>
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
@@ -181,21 +250,118 @@ export default function ChatScreen({ navigation }) {
             />
           )}
 
-          {loading && filtered.length === 0 && (
+          {loading && filtered.length === 0 && tab !== 'friends' && (
             <View style={styles.loadingBox}>
               <ActivityIndicator color={colors.primary} />
               <Text style={styles.loadingText}>Cargando conversaciones…</Text>
             </View>
           )}
 
-          {!loading && filtered.length === 0 && (
+          {/* === Tab Amigos === */}
+          {tab === 'friends' && (
+            <>
+              {incomingReqs.length > 0 && (
+                <>
+                  <Text style={styles.sectionHeading}>SOLICITUDES RECIBIDAS</Text>
+                  {incomingReqs.map((r) => (
+                    <View key={r.friendship_id} style={styles.threadRow}>
+                      <Pressable
+                        onPress={() => openUserProfile(r.user_id)}
+                        style={styles.avatar}
+                      >
+                        <UserIcon color={colors.primary} size={20} />
+                      </Pressable>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.threadTitle} numberOfLines={1}>
+                          @{r.username}
+                        </Text>
+                        <Text style={styles.threadPreview} numberOfLines={1}>
+                          Quiere agregarte como amigo · Trust {r.trust_score}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => handleAcceptReq(r.friendship_id)}
+                        disabled={busyId === r.friendship_id}
+                        style={({ pressed }) => [
+                          styles.acceptBtn,
+                          pressed && { opacity: 0.85 },
+                        ]}
+                      >
+                        <UserCheck color="#0E0E0D" size={14} />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleRejectReq(r.friendship_id)}
+                        disabled={busyId === r.friendship_id}
+                        style={({ pressed }) => [
+                          styles.rejectBtn,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <UserX color={colors.error} size={14} />
+                      </Pressable>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              <Text style={styles.sectionHeading}>
+                {friends.length > 0 ? 'MIS AMIGOS' : 'TODAVÍA NO TIENES AMIGOS'}
+              </Text>
+
+              {friends.length === 0 && incomingReqs.length === 0 && (
+                <View style={styles.empty}>
+                  <View style={styles.emptyIcon}>
+                    <UserPlus color={colors.primary} size={28} strokeWidth={1.6} />
+                  </View>
+                  <Text style={styles.emptyTitle}>Empieza a hacer red</Text>
+                  <Text style={styles.emptyText}>
+                    Visita el perfil de otros jugadores (desde un partido o
+                    buscando) y tócales "Agregar amigo".
+                  </Text>
+                </View>
+              )}
+
+              {friends.map((f) => (
+                <View key={f.friendship_id} style={styles.threadRow}>
+                  <Pressable
+                    onPress={() => openUserProfile(f.user_id)}
+                    style={styles.avatar}
+                  >
+                    <UserIcon color={colors.primary} size={20} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => openUserProfile(f.user_id)}
+                    style={{ flex: 1 }}
+                  >
+                    <Text style={styles.threadTitle} numberOfLines={1}>
+                      @{f.username}
+                    </Text>
+                    <Text style={styles.threadPreview} numberOfLines={1}>
+                      {f.comuna ? f.comuna + ' · ' : ''}Trust {f.trust_score}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => openDM(f.user_id, f.username)}
+                    style={({ pressed }) => [
+                      styles.dmBtn,
+                      pressed && { opacity: 0.85 },
+                    ]}
+                  >
+                    <Send color={colors.primary} size={14} />
+                  </Pressable>
+                </View>
+              ))}
+            </>
+          )}
+
+          {tab !== 'friends' && !loading && filtered.length === 0 && (
             <EmptyState
               type={tab}
               onCreate={() => navigation.navigate('SearchTab')}
             />
           )}
 
-          {filtered.map((t) => (
+          {tab !== 'friends' && filtered.map((t) => (
             <Pressable
               key={t.key}
               onPress={() =>
@@ -252,6 +418,19 @@ export default function ChatScreen({ navigation }) {
                   </View>
                 )}
               </View>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  handleHide(t.key);
+                }}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.hideBtn,
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <EyeOff color={colors.textMuted} size={14} />
+              </Pressable>
             </Pressable>
           ))}
 
@@ -266,7 +445,7 @@ export default function ChatScreen({ navigation }) {
   );
 }
 
-function TabPill({ label, count, active, onPress }) {
+function TabPill({ label, count, active, onPress, highlight = false }) {
   return (
     <Pressable
       onPress={onPress}
@@ -279,11 +458,18 @@ function TabPill({ label, count, active, onPress }) {
       <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>
         {label}
       </Text>
-      <View style={[styles.tabPillCount, active && styles.tabPillCountActive]}>
+      <View
+        style={[
+          styles.tabPillCount,
+          active && styles.tabPillCountActive,
+          highlight && !active && styles.tabPillCountHighlight,
+        ]}
+      >
         <Text
           style={[
             styles.tabPillCountText,
             active && { color: colors.background },
+            highlight && !active && { color: '#FFFFFF' },
           ]}
         >
           {count}
@@ -406,6 +592,52 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
+  },
+  tabPillCountHighlight: {
+    backgroundColor: colors.error,
+  },
+  sectionHeading: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  hideBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.errorSoft,
+    borderWidth: 1,
+    borderColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dmBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   loadingBox: {

@@ -20,6 +20,12 @@ import {
   Edit3,
   LogOut,
   ChevronRight,
+  ArrowLeft,
+  UserPlus,
+  UserCheck,
+  UserX,
+  MessageCircle,
+  Clock,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -27,10 +33,19 @@ import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
 import {
   getMyProfile,
+  getProfileById,
   getMyAttendanceHistory,
   deriveStats,
 } from '../services/profile';
-import { signOut } from '../services/auth';
+import { signOut, getCurrentUser } from '../services/auth';
+import {
+  getFriendshipWith,
+  sendFriendRequest,
+  acceptFriendRequest,
+  rejectFriendRequest,
+  cancelFriendRequest,
+  removeFriend,
+} from '../services/friends';
 import { isSupabaseConfigured } from '../services/supabase';
 
 const POSICION_LABEL = {
@@ -59,23 +74,44 @@ function fmtFecha(iso) {
   }
 }
 
-export default function ProfileScreen({ navigation }) {
+export default function ProfileScreen({ navigation, route }) {
+  const viewUserId = route?.params?.userId || null;
+  const [myId, setMyId] = useState(null);
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [banner, setBanner] = useState(null);
+  const [friendship, setFriendship] = useState(null); // estado de amistad
+  const [friendBusy, setFriendBusy] = useState(false);
+
+  // ¿Estoy viendo mi propio perfil o el de otro?
+  const isMyProfile = !viewUserId || viewUserId === myId;
 
   const load = useCallback(async () => {
-    const [p, h] = await Promise.all([
-      getMyProfile(),
-      getMyAttendanceHistory(8),
-    ]);
-    setProfile(p);
-    setHistory(h);
+    const user = await getCurrentUser();
+    setMyId(user?.id || null);
+
+    if (!viewUserId || viewUserId === user?.id) {
+      const [p, h] = await Promise.all([
+        getMyProfile(),
+        getMyAttendanceHistory(8),
+      ]);
+      setProfile(p);
+      setHistory(h);
+      setFriendship(null);
+    } else {
+      const [p, f] = await Promise.all([
+        getProfileById(viewUserId),
+        getFriendshipWith(viewUserId),
+      ]);
+      setProfile(p);
+      setHistory([]); // no exponemos historial ajeno en V1
+      setFriendship(f);
+    }
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [viewUserId]);
 
   useEffect(() => {
     load();
@@ -100,21 +136,123 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+  const showBanner = (type, title, message = '') => {
+    setBanner({ type, title, message });
+    if (type === 'success') setTimeout(() => setBanner(null), 4000);
+  };
+
+  // ---- Acciones de amistad (cuando estoy viendo otro perfil) ----
+  const handleAddFriend = async () => {
+    if (friendBusy) return;
+    setFriendBusy(true);
+    const { error } = await sendFriendRequest(viewUserId);
+    setFriendBusy(false);
+    if (error) {
+      showBanner('error', 'No pude enviar la solicitud', error.message || '');
+      return;
+    }
+    showBanner('success', 'Solicitud enviada', '@' + (profile?.username || 'jugador') + ' decidirá si te acepta.');
+    load();
+  };
+
+  const handleAcceptFriend = async () => {
+    if (!friendship || friendBusy) return;
+    setFriendBusy(true);
+    const { error } = await acceptFriendRequest(friendship.id);
+    setFriendBusy(false);
+    if (error) {
+      showBanner('error', 'No pude aceptar', error.message || '');
+      return;
+    }
+    showBanner('success', '¡Amistad confirmada!', 'Ya puedes mandarle mensajes.');
+    load();
+  };
+
+  const handleRejectFriend = async () => {
+    if (!friendship || friendBusy) return;
+    setFriendBusy(true);
+    const { error } = await rejectFriendRequest(friendship.id);
+    setFriendBusy(false);
+    if (error) {
+      showBanner('error', 'No pude rechazar', error.message || '');
+      return;
+    }
+    showBanner('info', 'Solicitud rechazada', '');
+    load();
+  };
+
+  const handleCancelRequest = async () => {
+    if (!friendship || friendBusy) return;
+    setFriendBusy(true);
+    const { error } = await cancelFriendRequest(friendship.id);
+    setFriendBusy(false);
+    if (error) {
+      showBanner('error', 'No pude cancelar', error.message || '');
+      return;
+    }
+    showBanner('info', 'Solicitud cancelada', '');
+    load();
+  };
+
+  const handleRemoveFriend = async () => {
+    if (friendBusy || !viewUserId) return;
+    const ok =
+      typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm('¿Eliminar amistad con @' + (profile?.username || 'jugador') + '?')
+        : true;
+    if (!ok) return;
+    setFriendBusy(true);
+    const { error } = await removeFriend(viewUserId);
+    setFriendBusy(false);
+    if (error) {
+      showBanner('error', 'No pude eliminar', error.message || '');
+      return;
+    }
+    showBanner('info', 'Amistad eliminada', '');
+    load();
+  };
+
+  const handleSendMessage = () => {
+    if (!viewUserId || !profile) return;
+    const parent = navigation.getParent();
+    const nav = parent || navigation;
+    nav.navigate('ChatThread', {
+      threadKey: 'dm:' + viewUserId,
+      title: '@' + (profile.username || 'jugador'),
+      subtitle: 'Mensaje directo',
+    });
+  };
+
   const stats = deriveStats(profile, history);
 
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        {/* Header */}
+        {/* Header — distinto si es mi perfil o el de otro */}
         <View style={styles.header}>
-          <Logo size={28} />
-          <Pressable
-            onPress={() => navigation.navigate('EditProfile')}
-            hitSlop={12}
-            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
-          >
-            <Settings color={colors.textPrimary} size={20} />
-          </Pressable>
+          {isMyProfile ? (
+            <Logo size={28} />
+          ) : (
+            <Pressable
+              onPress={() => navigation.goBack()}
+              hitSlop={12}
+              style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+            >
+              <ArrowLeft color={colors.textPrimary} size={20} />
+            </Pressable>
+          )}
+          {!isMyProfile && <Logo size={26} />}
+          {isMyProfile ? (
+            <Pressable
+              onPress={() => navigation.navigate('EditProfile')}
+              hitSlop={12}
+              style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Settings color={colors.textPrimary} size={20} />
+            </Pressable>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
         </View>
 
         <ScrollView
@@ -179,7 +317,7 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.bioCard}>
               <Text style={styles.bioText}>{profile.bio}</Text>
             </View>
-          ) : (
+          ) : isMyProfile ? (
             <Pressable
               onPress={() => navigation.navigate('EditProfile')}
               style={({ pressed }) => [
@@ -193,6 +331,21 @@ export default function ProfileScreen({ navigation }) {
                 Agrega una descripción sobre tu trayectoria
               </Text>
             </Pressable>
+          ) : null}
+
+          {/* Botones de acción para perfil ajeno */}
+          {!isMyProfile && (
+            <FriendActionRow
+              friendship={friendship}
+              myId={myId}
+              busy={friendBusy}
+              onAdd={handleAddFriend}
+              onAccept={handleAcceptFriend}
+              onReject={handleRejectFriend}
+              onCancel={handleCancelRequest}
+              onRemove={handleRemoveFriend}
+              onMessage={handleSendMessage}
+            />
           )}
 
           {/* Card: Historial Deportivo */}
@@ -354,33 +507,37 @@ export default function ProfileScreen({ navigation }) {
             </Pressable>
           </View>
 
-          {/* Acciones */}
-          <Pressable
-            onPress={() => navigation.navigate('EditProfile')}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Edit3 color={colors.primary} size={16} />
-            <Text style={styles.actionLabel}>Editar mi perfil</Text>
-            <ChevronRight color={colors.textMuted} size={16} />
-          </Pressable>
+          {/* Acciones — solo en mi perfil */}
+          {isMyProfile && (
+            <>
+              <Pressable
+                onPress={() => navigation.navigate('EditProfile')}
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Edit3 color={colors.primary} size={16} />
+                <Text style={styles.actionLabel}>Editar mi perfil</Text>
+                <ChevronRight color={colors.textMuted} size={16} />
+              </Pressable>
 
-          <Pressable
-            onPress={handleLogout}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              { borderColor: colors.error },
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <LogOut color={colors.error} size={16} />
-            <Text style={[styles.actionLabel, { color: colors.error }]}>
-              Cerrar sesión
-            </Text>
-            <ChevronRight color={colors.error} size={16} />
-          </Pressable>
+              <Pressable
+                onPress={handleLogout}
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  { borderColor: colors.error },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <LogOut color={colors.error} size={16} />
+                <Text style={[styles.actionLabel, { color: colors.error }]}>
+                  Cerrar sesión
+                </Text>
+                <ChevronRight color={colors.error} size={16} />
+              </Pressable>
+            </>
+          )}
 
           {!isSupabaseConfigured && (
             <Text style={styles.demoNotice}>
@@ -391,6 +548,112 @@ export default function ProfileScreen({ navigation }) {
           <View style={{ height: 32 }} />
         </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+// ---- Botonera de amistad ----
+function FriendActionRow({
+  friendship, myId, busy,
+  onAdd, onAccept, onReject, onCancel, onRemove, onMessage,
+}) {
+  let state = 'none';
+  if (friendship) {
+    if (friendship.status === 'accepted') state = 'friends';
+    else if (friendship.status === 'pending') {
+      state = friendship.requester_id === myId ? 'sent' : 'received';
+    } else if (friendship.status === 'rejected' || friendship.status === 'blocked') {
+      state = 'none'; // permite reintentar
+    }
+  }
+
+  return (
+    <View style={friendStyles.row}>
+      {state === 'none' && (
+        <Pressable
+          onPress={onAdd}
+          disabled={busy}
+          style={({ pressed }) => [
+            friendStyles.primaryBtn,
+            pressed && { opacity: 0.85 },
+            busy && { opacity: 0.5 },
+          ]}
+        >
+          <UserPlus color="#0E0E0D" size={16} strokeWidth={2.4} />
+          <Text style={friendStyles.primaryLabel}>Agregar amigo</Text>
+        </Pressable>
+      )}
+
+      {state === 'sent' && (
+        <Pressable
+          onPress={onCancel}
+          disabled={busy}
+          style={({ pressed }) => [
+            friendStyles.outlineBtn,
+            pressed && { opacity: 0.7 },
+            busy && { opacity: 0.5 },
+          ]}
+        >
+          <Clock color={colors.textSecondary} size={14} />
+          <Text style={friendStyles.outlineLabel}>Solicitud enviada · cancelar</Text>
+        </Pressable>
+      )}
+
+      {state === 'received' && (
+        <>
+          <Pressable
+            onPress={onAccept}
+            disabled={busy}
+            style={({ pressed }) => [
+              friendStyles.primaryBtn,
+              pressed && { opacity: 0.85 },
+              busy && { opacity: 0.5 },
+            ]}
+          >
+            <UserCheck color="#0E0E0D" size={16} strokeWidth={2.4} />
+            <Text style={friendStyles.primaryLabel}>Aceptar</Text>
+          </Pressable>
+          <Pressable
+            onPress={onReject}
+            disabled={busy}
+            style={({ pressed }) => [
+              friendStyles.dangerBtn,
+              pressed && { opacity: 0.7 },
+              busy && { opacity: 0.5 },
+            ]}
+          >
+            <UserX color={colors.error} size={16} />
+          </Pressable>
+        </>
+      )}
+
+      {state === 'friends' && (
+        <Pressable
+          onPress={onRemove}
+          disabled={busy}
+          style={({ pressed }) => [
+            friendStyles.outlineBtn,
+            pressed && { opacity: 0.7 },
+            busy && { opacity: 0.5 },
+          ]}
+        >
+          <UserCheck color={colors.primary} size={14} />
+          <Text style={[friendStyles.outlineLabel, { color: colors.primary }]}>
+            Amigos · quitar
+          </Text>
+        </Pressable>
+      )}
+
+      <Pressable
+        onPress={onMessage}
+        style={({ pressed }) => [
+          friendStyles.secondaryBtn,
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        <MessageCircle color={colors.primary} size={16} />
+        <Text style={friendStyles.secondaryLabel}>Mensaje</Text>
+      </Pressable>
     </View>
   );
 }
@@ -857,5 +1120,72 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 18,
     lineHeight: 16,
+  },
+});
+
+const friendStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  primaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  primaryLabel: {
+    color: '#0E0E0D',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  outlineBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  outlineLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  secondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  secondaryLabel: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  dangerBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.error,
+    backgroundColor: colors.errorSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

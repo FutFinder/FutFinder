@@ -233,7 +233,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        {/* Header */}
+        {/* Header — tappable en DMs (lleva al perfil del otro) */}
         <View style={styles.header}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -242,7 +242,18 @@ export default function ChatThreadScreen({ route, navigation }) {
           >
             <ArrowLeft color={colors.textPrimary} size={20} />
           </Pressable>
-          <View style={styles.headerCenter}>
+          <Pressable
+            onPress={() => {
+              if (!isGroup && t?.id) {
+                navigation.navigate('UserProfile', { userId: t.id });
+              }
+            }}
+            disabled={isGroup}
+            style={({ pressed }) => [
+              styles.headerCenter,
+              pressed && !isGroup && { opacity: 0.7 },
+            ]}
+          >
             <View style={[styles.headerAvatar, isGroup && styles.headerAvatarGroup]}>
               {isGroup ? (
                 <Users color={colors.primary} size={16} />
@@ -257,8 +268,11 @@ export default function ChatThreadScreen({ route, navigation }) {
                   {subtitle}
                 </Text>
               ) : null}
+              {!isGroup && (
+                <Text style={styles.headerHint}>Toca para ver perfil →</Text>
+              )}
             </View>
-          </View>
+          </Pressable>
           <View style={{ width: 40 }} />
         </View>
 
@@ -435,6 +449,13 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     marginTop: 1,
+  },
+  headerHint: {
+    color: colors.primary,
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
   list: {

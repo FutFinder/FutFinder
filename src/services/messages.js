@@ -26,12 +26,57 @@ export function parseThreadKey(key) {
  *  - DMs: solo aquellos con al menos un mensaje (porque no hay forma
  *    todavía de "iniciar un DM vacío").
  */
+/**
+ * Esconde un hilo de mi vista (chat_hides). Si después llega un mensaje
+ * más nuevo, el hilo reaparece automáticamente.
+ */
+export async function hideThread(threadKeyStr) {
+  if (!isSupabaseConfigured) return { error: null };
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: { message: 'No autenticado' } };
+    const { error } = await supabase
+      .from('chat_hides')
+      .upsert(
+        {
+          user_id: user.id,
+          thread_key: threadKeyStr,
+          hidden_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,thread_key' }
+      );
+    if (error) console.error('[FutFinder] hideThread:', error);
+    return { error };
+  } catch (e) {
+    return { error: e };
+  }
+}
+
+export async function unhideThread(threadKeyStr) {
+  if (!isSupabaseConfigured) return { error: null };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: 'No autenticado' } };
+  const { error } = await supabase
+    .from('chat_hides')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('thread_key', threadKeyStr);
+  return { error };
+}
+
 export async function listMyThreads() {
   if (!isSupabaseConfigured) return { data: [], error: null };
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: [], error: null };
     const me = user.id;
+
+    // 0) Hilos escondidos por mí
+    const { data: hides } = await supabase
+      .from('chat_hides')
+      .select('thread_key, hidden_at')
+      .eq('user_id', me);
+    const hiddenMap = new Map((hides || []).map((h) => [h.thread_key, h.hidden_at]));
 
     // 1) Mis inscripciones (SIN join para evitar problemas de FK detection)
     const { data: myAttendances, error: aErr } = await supabase
@@ -158,9 +203,17 @@ export async function listMyThreads() {
       }
     }
 
-    const all = [...matchThreads, ...dmMap.values()].sort(
-      (a, b) => new Date(b.last_at) - new Date(a.last_at)
-    );
+    const all = [...matchThreads, ...dmMap.values()]
+      // Filtrar hilos escondidos cuando no hay actividad posterior
+      .filter((t) => {
+        const hiddenAt = hiddenMap.get(t.key);
+        if (!hiddenAt) return true;
+        const lastAt = t.last_at ? new Date(t.last_at).getTime() : 0;
+        const hiddenAtTs = new Date(hiddenAt).getTime();
+        // Reaparece si hubo actividad posterior a cuando lo escondí
+        return lastAt > hiddenAtTs;
+      })
+      .sort((a, b) => new Date(b.last_at) - new Date(a.last_at));
     return { data: all, error: null };
   } catch (e) {
     console.error('[FutFinder] listMyThreads exception:', e);
