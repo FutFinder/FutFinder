@@ -206,6 +206,15 @@ export default function ChatThreadScreen({ route, navigation }) {
     }
   }, [draft, sending, myId, isGroup, t?.id, threadKey]);
 
+  // Cuando tocan el avatar o @username de un mensaje ajeno
+  const handlePressSender = useCallback(
+    (userId) => {
+      if (!userId || userId === myId) return;
+      navigation.navigate('UserProfile', { userId });
+    },
+    [navigation, myId]
+  );
+
   // Renderiza un mensaje + separador de día si corresponde
   const renderItem = ({ item, index }) => {
     const prev = messages[index - 1];
@@ -221,6 +230,7 @@ export default function ChatThreadScreen({ route, navigation }) {
           message={item}
           isMine={item.sender_id === myId}
           isGroup={isGroup}
+          onPressSender={handlePressSender}
         />
       </View>
     );
@@ -353,14 +363,33 @@ export default function ChatThreadScreen({ route, navigation }) {
 // ============================================================
 // Bubble: la burbujita de chat estilo luxury-night
 // ============================================================
-function Bubble({ message, isMine, isGroup }) {
+function Bubble({ message, isMine, isGroup, onPressSender }) {
   const time = formatTime(message.created_at);
   const senderName = message.sender?.username
     ? '@' + message.sender.username
     : null;
+  const showAvatarColumn = !isMine && isGroup;
+
+  const goToSender = () => {
+    if (onPressSender && message.sender_id) onPressSender(message.sender_id);
+  };
 
   return (
     <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
+      {/* Avatar lateral solo en grupos para mensajes ajenos */}
+      {showAvatarColumn && (
+        <Pressable
+          onPress={goToSender}
+          hitSlop={6}
+          style={({ pressed }) => [
+            styles.bubbleAvatar,
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <UserIcon color={colors.primary} size={14} />
+        </Pressable>
+      )}
+
       <View
         style={[
           styles.bubble,
@@ -369,7 +398,13 @@ function Bubble({ message, isMine, isGroup }) {
         ]}
       >
         {!isMine && isGroup && senderName ? (
-          <Text style={styles.senderName}>{senderName}</Text>
+          <Pressable
+            onPress={goToSender}
+            hitSlop={4}
+            style={({ pressed }) => pressed && { opacity: 0.7 }}
+          >
+            <Text style={styles.senderName}>{senderName} ›</Text>
+          </Pressable>
         ) : null}
         <Text
           style={[
@@ -484,11 +519,24 @@ const styles = StyleSheet.create({
 
   row: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
     paddingHorizontal: 4,
     marginVertical: 3,
   },
   rowMine: { justifyContent: 'flex-end' },
   rowTheirs: { justifyContent: 'flex-start' },
+  bubbleAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
 
   bubble: {
     maxWidth: '78%',
@@ -512,7 +560,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 11,
     fontWeight: '800',
-    marginBottom: 2,
+    marginBottom: 4,
     letterSpacing: 0.2,
   },
   bubbleText: {
