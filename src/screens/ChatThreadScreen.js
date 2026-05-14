@@ -254,14 +254,16 @@ export default function ChatThreadScreen({ route, navigation }) {
           </Pressable>
           <Pressable
             onPress={() => {
-              if (!isGroup && t?.id) {
+              if (!t?.id) return;
+              if (isGroup) {
+                navigation.navigate('MatchDetail', { matchId: t.id });
+              } else {
                 navigation.navigate('UserProfile', { userId: t.id });
               }
             }}
-            disabled={isGroup}
             style={({ pressed }) => [
               styles.headerCenter,
-              pressed && !isGroup && { opacity: 0.7 },
+              pressed && { opacity: 0.7 },
             ]}
           >
             <View style={[styles.headerAvatar, isGroup && styles.headerAvatarGroup]}>
@@ -278,9 +280,9 @@ export default function ChatThreadScreen({ route, navigation }) {
                   {subtitle}
                 </Text>
               ) : null}
-              {!isGroup && (
-                <Text style={styles.headerHint}>Toca para ver perfil →</Text>
-              )}
+              <Text style={styles.headerHint}>
+                {isGroup ? 'Toca para ver detalles y jugadores →' : 'Toca para ver perfil →'}
+              </Text>
             </View>
           </Pressable>
           <View style={{ width: 40 }} />

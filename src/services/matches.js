@@ -226,6 +226,78 @@ export async function joinMatch(matchId) {
   return data; // { ok: true } o { ok: false, reason }
 }
 
+/**
+ * El usuario actual se sale del partido (libera cupo).
+ * RLS: el organizador NO puede usar esto, debe eliminar el partido.
+ */
+export async function leaveMatch(matchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data, error } = await supabase.rpc('leave_match', { p_match_id: matchId });
+  if (error) return { ok: false, error };
+  return data;
+}
+
+/**
+ * Lista los jugadores inscritos en un partido con info de perfil.
+ * Devuelve [{id, username, foto_url, trust_score, comuna, posicion_preferida, is_organizer, estado, inscrito_at}]
+ */
+export async function getMatchAttendees(matchId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  try {
+    // 1) Trae attendees
+    const { data: atts, error: aErr } = await supabase
+      .from('attendees')
+      .select('id, id_jugador, estado, inscrito_at, confirmado_at')
+      .eq('id_partido', matchId)
+      .order('inscrito_at', { ascending: true });
+    if (aErr) {
+      console.error('[FutFinder] getMatchAttendees:', aErr);
+      return { data: [], error: aErr };
+    }
+
+    // 2) Trae datos del match (para saber quién es organizador)
+    const { data: match } = await supabase
+      .from('matches')
+      .select('id, titulo, comuna, cancha_nombre, hora, cupos_totales, cupos_disponibles, precio_cuota, nivel, descripcion, estado, id_organizador')
+      .eq('id', matchId)
+      .single();
+
+    const playerIds = (atts || []).map((a) => a.id_jugador);
+    if (playerIds.length === 0) {
+      return { data: [], match, error: null };
+    }
+
+    // 3) Trae perfiles en una sola query
+    const { data: profs } = await supabase
+      .from('profiles')
+      .select('id, username, foto_url, trust_score, comuna, posicion_preferida')
+      .in('id', playerIds);
+    const byId = new Map((profs || []).map((p) => [p.id, p]));
+
+    const list = (atts || []).map((a) => {
+      const p = byId.get(a.id_jugador) || {};
+      return {
+        attendee_id: a.id,
+        user_id: a.id_jugador,
+        username: p.username || 'jugador',
+        foto_url: p.foto_url || null,
+        trust_score: p.trust_score ?? 100,
+        comuna: p.comuna,
+        posicion_preferida: p.posicion_preferida,
+        is_organizer: a.id_jugador === match?.id_organizador,
+        estado: a.estado,
+        inscrito_at: a.inscrito_at,
+        confirmado_at: a.confirmado_at,
+      };
+    });
+
+    return { data: list, match, error: null };
+  } catch (e) {
+    console.error('[FutFinder] getMatchAttendees exception:', e);
+    return { data: [], error: e };
+  }
+}
+
 // ----- Datos de demo (cuando Supabase no está configurado todavía) -----
 function getDemoMatches() {
   const now = Date.now();

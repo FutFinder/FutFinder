@@ -12,6 +12,7 @@ import CreateMatchScreen from '../screens/CreateMatchScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ChatThreadScreen from '../screens/ChatThreadScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import MatchDetailScreen from '../screens/MatchDetailScreen';
 import MainTabs from './MainTabs';
 
 import { colors } from '../theme/colors';
@@ -82,6 +83,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="UserProfile"
           component={ProfileScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="MatchDetail"
+          component={MatchDetailScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
