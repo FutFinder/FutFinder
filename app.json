@@ -18,7 +18,22 @@
     },
     "android": {
       "package": "com.futfinder.app",
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#71B533",
+      "androidMode": "default",
+      "androidCollapsedTitle": "FutFinder",
+      "iosDisplayInForeground": true
     },
     "web": {
       "bundler": "metro",
@@ -40,8 +55,23 @@
           "photosPermission": "FutFinder necesita acceso a tus fotos para que puedas subir tu foto de perfil y portadas de partidos.",
           "cameraPermission": "FutFinder usa tu cámara para que puedas tomar fotos de perfil."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#71B533",
+          "defaultChannel": "default",
+          "sounds": ["./assets/sounds/whistle.wav"]
+        }
       ]
     ],
-    "scheme": "futfinder"
+    "scheme": "futfinder",
+    "extra": {
+      "eas": {
+        "projectId": "254ce906-c402-456b-80df-8e060a10b09b"
+      }
+    },
+    "owner": "futfinder"
   }
 }

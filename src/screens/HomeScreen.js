@@ -27,6 +27,10 @@ import { listOpenMatches, joinMatch, deleteMatch } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { isSupabaseConfigured } from '../services/supabase';
+import {
+  countUnread,
+  subscribeToNotifications,
+} from '../services/notifications';
 
 function formatHora(iso) {
   try {
@@ -69,6 +73,7 @@ export default function HomeScreen({ navigation }) {
   const [busyMatchId, setBusyMatchId] = useState(null);
   // banner: { type: 'success'|'error'|'info', title, message } | null
   const [banner, setBanner] = useState(null);
+  const [unread, setUnread] = useState(0);
 
   const showBanner = useCallback((type, title, message = '') => {
     setBanner({ type, title, message });
@@ -102,8 +107,29 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleOpenNotifications = () => {
-    // Placeholder hasta que tengamos pantalla de notificaciones
+    navigation.navigate('Notifications');
   };
+
+  // Cargar y mantener al día el contador de no leídas
+  useEffect(() => {
+    let unsubscribe = () => {};
+    const reload = async () => setUnread(await countUnread());
+    reload();
+    (async () => {
+      const u = await getCurrentUser();
+      if (!u?.id) return;
+      unsubscribe = subscribeToNotifications(u.id, () => {
+        // llega una notif nueva → refrescamos contador
+        reload();
+      });
+    })();
+    // refrescar al volver a la pantalla
+    const focusUnsub = navigation.addListener?.('focus', reload);
+    return () => {
+      unsubscribe();
+      focusUnsub?.();
+    };
+  }, [navigation]);
 
   const handleJoin = async (matchId) => {
     console.log('[FutFinder] >>> handleJoin click', { matchId, busyMatchId });
@@ -223,6 +249,13 @@ export default function HomeScreen({ navigation }) {
             hitSlop={8}
           >
             <Bell color={colors.textSecondary} size={20} />
+            {unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unread > 9 ? '9+' : String(unread)}
+                </Text>
+              </View>
+            )}
           </Pressable>
         </View>
 
@@ -438,6 +471,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  badgeText: {
+    color: '#0E0E0D',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   scroll: { paddingHorizontal: 20, paddingBottom: 24 },
   greetingBox: { marginTop: 8, marginBottom: 16 },

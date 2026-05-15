@@ -1,6 +1,14 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+  DarkTheme as NavDarkTheme,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+// Ref global para poder navegar desde fuera de las pantallas
+// (la usamos en App.js para reaccionar al tap de una notif push).
+export const navigationRef = createNavigationContainerRef();
 
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -13,15 +21,20 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import ChatThreadScreen from '../screens/ChatThreadScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import MatchDetailScreen from '../screens/MatchDetailScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import MainTabs from './MainTabs';
 
 import { colors } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
 
+// Extendemos DarkTheme (que ya trae fonts + colors completos)
+// y le pisamos solo los colores corporativos de FutFinder.
 const navTheme = {
+  ...NavDarkTheme,
   dark: true,
   colors: {
+    ...NavDarkTheme.colors,
     primary: colors.primary,
     background: colors.background,
     card: colors.background,
@@ -45,7 +58,7 @@ const navTheme = {
  */
 export default function AppNavigator() {
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator
         initialRouteName="Welcome"
         screenOptions={{
@@ -88,6 +101,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="MatchDetail"
           component={MatchDetailScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
