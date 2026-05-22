@@ -35,6 +35,12 @@ function handleNotificationTap(response) {
           navigationRef.navigate('MatchDetail', { matchId: data.matchId });
         }
         break;
+      case 'match_rate':
+        // Recordatorio de calificar → directo a la pantalla de rating
+        if (data.matchId) {
+          navigationRef.navigate('RateMatch', { matchId: data.matchId });
+        }
+        break;
       case 'friend_request':
       case 'friend_accept':
         // Vamos a la pestaña de perfil — luego puedes crear una pantalla "Notificaciones".

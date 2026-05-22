@@ -18,6 +18,7 @@ import {
   Users,
   MessageCircle,
   Calendar,
+  Star,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -52,6 +53,8 @@ function NotifIcon({ type }) {
       return <MessageCircle {...props} />;
     case 'match_reminder':
       return <Calendar {...props} />;
+    case 'match_rate':
+      return <Star {...props} />;
     default:
       return <Bell {...props} />;
   }
@@ -81,6 +84,11 @@ function navigateForNotif(navigation, n) {
     case 'match_reminder':
       if (data.matchId) {
         navigation.navigate('MatchDetail', { matchId: data.matchId });
+      }
+      break;
+    case 'match_rate':
+      if (data.matchId) {
+        navigation.navigate('RateMatch', { matchId: data.matchId });
       }
       break;
     case 'friend_request':
