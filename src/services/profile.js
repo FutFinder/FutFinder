@@ -31,6 +31,46 @@ export async function getProfileById(id) {
   return data;
 }
 
+/**
+ * Busca jugadores por username (búsqueda parcial, case-insensitive).
+ * Excluye al usuario actual. Si query está vacío, devuelve los perfiles
+ * con más actividad (orden por trust_score) como sugerencia inicial.
+ */
+export async function searchPlayers(query, { limit = 30 } = {}) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const myId = user?.id || null;
+
+  let q = supabase
+    .from('profiles')
+    .select(
+      'id, username, foto_url, comuna, posicion_preferida, trust_score, rating_count, rating_nivel_avg'
+    )
+    .limit(limit);
+
+  const term = (query || '').trim();
+  if (term.length > 0) {
+    // ilike con comodines → contiene el texto en cualquier parte
+    q = q.ilike('username', `%${term}%`);
+  } else {
+    // sin búsqueda: sugerimos perfiles con mejor reputación
+    q = q.order('trust_score', { ascending: false });
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    console.error('[FutFinder] searchPlayers:', error);
+    return { data: [], error };
+  }
+
+  // Excluir mi propio perfil de los resultados
+  const filtered = (data || []).filter((p) => p.id !== myId);
+  return { data: filtered, error: null };
+}
+
 export async function updateMyProfile(patch) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   const { data: { user } } = await supabase.auth.getUser();

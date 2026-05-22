@@ -7,6 +7,8 @@ import {
   Pressable,
   TextInput,
   RefreshControl,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -23,6 +25,8 @@ import {
   User as UserIcon,
   Edit3,
   Trash2,
+  Star,
+  ChevronRight,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -32,6 +36,7 @@ import { listOpenMatches, applyFilters, joinMatch, deleteMatch } from '../servic
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentLocation } from '../services/location';
 import { getCurrentUser } from '../services/auth';
+import { searchPlayers } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
@@ -105,6 +110,11 @@ export default function SearchScreen({ navigation }) {
   const [banner, setBanner] = useState(null);
   const [myUserId, setMyUserId] = useState(null);
 
+  // Modo de búsqueda: 'matches' (partidos) | 'players' (jugadores)
+  const [mode, setMode] = useState('matches');
+  const [players, setPlayers] = useState([]);
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
+
   // Estado de filtros (índices en cada arreglo OPTS)
   const [text, setText] = useState('');
   const [kmIdx, setKmIdx] = useState(0);
@@ -140,6 +150,29 @@ export default function SearchScreen({ navigation }) {
   const onRefresh = () => {
     setRefreshing(true);
     load();
+  };
+
+  // Búsqueda de jugadores (con debounce de 350ms) cuando el modo es 'players'
+  useEffect(() => {
+    if (mode !== 'players') return;
+    let cancelled = false;
+    setLoadingPlayers(true);
+    const t = setTimeout(async () => {
+      const { data } = await searchPlayers(text, { limit: 30 });
+      if (!cancelled) {
+        setPlayers(data || []);
+        setLoadingPlayers(false);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [mode, text]);
+
+  const handleOpenPlayer = (userId) => {
+    if (!userId) return;
+    navigation.getParent()?.navigate('UserProfile', { userId });
   };
 
   // Filtros aplicados → memoizado
@@ -292,17 +325,54 @@ export default function SearchScreen({ navigation }) {
             />
           }
         >
+          {/* Toggle Partidos / Jugadores */}
+          <View style={styles.modeToggle}>
+            <Pressable
+              onPress={() => setMode('matches')}
+              style={[styles.modeBtn, mode === 'matches' && styles.modeBtnActive]}
+            >
+              <Users
+                color={mode === 'matches' ? '#0E0E0D' : colors.textSecondary}
+                size={15}
+              />
+              <Text
+                style={[styles.modeBtnText, mode === 'matches' && styles.modeBtnTextActive]}
+              >
+                Partidos
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMode('players')}
+              style={[styles.modeBtn, mode === 'players' && styles.modeBtnActive]}
+            >
+              <UserIcon
+                color={mode === 'players' ? '#0E0E0D' : colors.textSecondary}
+                size={15}
+              />
+              <Text
+                style={[styles.modeBtnText, mode === 'players' && styles.modeBtnTextActive]}
+              >
+                Jugadores
+              </Text>
+            </Pressable>
+          </View>
+
           {/* Search bar */}
           <View style={styles.searchRow}>
             <View style={styles.searchBox}>
               <SearchIcon color={colors.textMuted} size={18} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Buscar por comuna, cancha o nombre…"
+                placeholder={
+                  mode === 'matches'
+                    ? 'Buscar por comuna, cancha o nombre…'
+                    : 'Buscar jugador por nombre de usuario…'
+                }
                 placeholderTextColor={colors.textMuted}
                 value={text}
                 onChangeText={setText}
                 returnKeyType="search"
+                autoCapitalize="none"
               />
             </View>
           </View>
@@ -317,6 +387,9 @@ export default function SearchScreen({ navigation }) {
             />
           )}
 
+          {/* ===================== MODO PARTIDOS ===================== */}
+          {mode === 'matches' && (
+          <View>
           {/* Filter chips */}
           <ScrollView
             horizontal
@@ -673,6 +746,71 @@ export default function SearchScreen({ navigation }) {
               ⚠️ Modo demo — los partidos arriba son de ejemplo.
             </Text>
           )}
+          </View>
+          )}
+
+          {/* ===================== MODO JUGADORES ===================== */}
+          {mode === 'players' && (
+          <View>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLeft}>
+                {loadingPlayers
+                  ? 'Buscando…'
+                  : text.trim()
+                  ? `${players.length} ${players.length === 1 ? 'jugador' : 'jugadores'}`
+                  : 'Sugeridos por reputación'}
+              </Text>
+            </View>
+
+            {loadingPlayers ? (
+              <View style={{ paddingVertical: 30 }}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : players.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyTitle}>Sin resultados</Text>
+                <Text style={styles.emptyText}>
+                  {text.trim()
+                    ? `No encontramos jugadores con "${text.trim()}". Revisa el nombre de usuario.`
+                    : 'Escribe el nombre de usuario de un jugador para encontrarlo.'}
+                </Text>
+              </View>
+            ) : (
+              players.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => handleOpenPlayer(p.id)}
+                  style={({ pressed }) => [
+                    styles.playerCard,
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  {p.foto_url ? (
+                    <Image source={{ uri: p.foto_url }} style={styles.playerAvatar} />
+                  ) : (
+                    <View style={[styles.playerAvatar, styles.playerAvatarFallback]}>
+                      <Text style={styles.playerAvatarLetter}>
+                        {(p.username || '?')[0]?.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.playerName} numberOfLines={1}>
+                      @{p.username || 'jugador'}
+                    </Text>
+                    <Text style={styles.playerMeta} numberOfLines={1}>
+                      {p.comuna ? `${p.comuna} · ` : ''}
+                      {p.rating_count > 0
+                        ? `★ ${Number(p.rating_nivel_avg || 0).toFixed(1)} (${p.rating_count})`
+                        : `Trust ${p.trust_score ?? 100}`}
+                    </Text>
+                  </View>
+                  <ChevronRight color={colors.textMuted} size={18} />
+                </Pressable>
+              ))
+            )}
+          </View>
+          )}
 
           <View style={{ height: 24 }} />
         </ScrollView>
@@ -731,6 +869,75 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scroll: { paddingHorizontal: 20, paddingBottom: 24 },
+
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    padding: 4,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  modeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+  },
+  modeBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  modeBtnText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modeBtnTextActive: {
+    color: '#0E0E0D',
+    fontWeight: '800',
+  },
+
+  playerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  playerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.surface,
+  },
+  playerAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playerAvatarLetter: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  playerName: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  playerMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 3,
+  },
 
   searchRow: { marginBottom: 12 },
   searchBox: {
