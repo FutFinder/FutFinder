@@ -69,6 +69,31 @@ const PRECIO_OPTS = [
   { label: '$8k+', value: { min: 8000, max: 999999 } },
 ];
 
+// Opciones de filtro para búsqueda de JUGADORES
+const POS_OPTS = [
+  { label: 'Cualquier posición', value: null },
+  { label: 'Arquero', value: 'arquero' },
+  { label: 'Defensa', value: 'defensa' },
+  { label: 'Lateral', value: 'lateral' },
+  { label: 'Volante', value: 'volante' },
+  { label: 'Mediocampista', value: 'medio' },
+  { label: 'Delantero', value: 'delantero' },
+];
+const FLANCO_OPTS = [
+  { label: 'Cualquier flanco', value: null },
+  { label: 'Flanco Der.', value: 'derecho' },
+  { label: 'Flanco Izq.', value: 'izquierdo' },
+  { label: 'Ambos flancos', value: 'ambos' },
+];
+const EDAD_OPTS = [
+  { label: 'Cualquier edad', value: null },
+  { label: '12–17', value: { min: 12, max: 17 } },
+  { label: '18–25', value: { min: 18, max: 25 } },
+  { label: '26–35', value: { min: 26, max: 35 } },
+  { label: '36–45', value: { min: 36, max: 45 } },
+  { label: '46+', value: { min: 46, max: 99 } },
+];
+
 function formatHora(iso) {
   try {
     const d = new Date(iso);
@@ -114,6 +139,10 @@ export default function SearchScreen({ navigation }) {
   const [mode, setMode] = useState('matches');
   const [players, setPlayers] = useState([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  // Filtros de jugadores (índices en sus OPTS). Región/comuna reusan regionSel/comunaSel.
+  const [posIdx, setPosIdx] = useState(0);
+  const [flancoIdx, setFlancoIdx] = useState(0);
+  const [edadIdx, setEdadIdx] = useState(0);
 
   // Estado de filtros (índices en cada arreglo OPTS)
   const [text, setText] = useState('');
@@ -157,8 +186,17 @@ export default function SearchScreen({ navigation }) {
     if (mode !== 'players') return;
     let cancelled = false;
     setLoadingPlayers(true);
+    const edadRange = EDAD_OPTS[edadIdx].value;
+    const filters = {
+      posicion: POS_OPTS[posIdx].value,
+      flanco: FLANCO_OPTS[flancoIdx].value,
+      region: regionSel,
+      comuna: comunaSel,
+      edadMin: edadRange?.min ?? null,
+      edadMax: edadRange?.max ?? null,
+    };
     const t = setTimeout(async () => {
-      const { data } = await searchPlayers(text, { limit: 30 });
+      const { data } = await searchPlayers(text, { limit: 30, filters });
       if (!cancelled) {
         setPlayers(data || []);
         setLoadingPlayers(false);
@@ -168,7 +206,7 @@ export default function SearchScreen({ navigation }) {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [mode, text]);
+  }, [mode, text, posIdx, flancoIdx, edadIdx, regionSel, comunaSel]);
 
   const handleOpenPlayer = (userId) => {
     if (!userId) return;
@@ -387,6 +425,98 @@ export default function SearchScreen({ navigation }) {
             />
           )}
 
+          {/* ===== Selectores compartidos de Región / Comuna (ambos modos) ===== */}
+          {pickerOpen === 'region' && (
+            <View style={styles.picker}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>Selecciona una región</Text>
+                {regionSel && (
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      setRegionSel(null);
+                      setComunaSel(null);
+                      setPickerOpen(null);
+                    }}
+                  >
+                    <Text style={styles.clearLink}>Limpiar</Text>
+                  </Pressable>
+                )}
+              </View>
+              <ScrollView style={{ maxHeight: 280 }} nestedScrollEnabled>
+                {REGIONES.map((r) => (
+                  <Pressable
+                    key={r.nombre}
+                    onPress={() => {
+                      setRegionSel(r.nombre);
+                      setComunaSel(null);
+                      setPickerOpen(null);
+                    }}
+                    style={[
+                      styles.pickerOption,
+                      r.nombre === regionSel && styles.pickerOptionActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        r.nombre === regionSel && styles.pickerOptionTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {r.nombre} ({r.codigo})
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {pickerOpen === 'comuna' && regionSel && (
+            <View style={styles.picker}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>
+                  Comunas de {regionSel.replace('Región ', '')}
+                </Text>
+                {comunaSel && (
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      setComunaSel(null);
+                      setPickerOpen(null);
+                    }}
+                  >
+                    <Text style={styles.clearLink}>Limpiar</Text>
+                  </Pressable>
+                )}
+              </View>
+              <ScrollView style={{ maxHeight: 280 }} nestedScrollEnabled>
+                {comunasOfRegion.map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => {
+                      setComunaSel(c);
+                      setPickerOpen(null);
+                    }}
+                    style={[
+                      styles.pickerOption,
+                      c === comunaSel && styles.pickerOptionActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        c === comunaSel && styles.pickerOptionTextActive,
+                      ]}
+                    >
+                      {c}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* ===================== MODO PARTIDOS ===================== */}
           {mode === 'matches' && (
           <View>
@@ -439,99 +569,6 @@ export default function SearchScreen({ navigation }) {
               onPress={() => setPrecioIdx((precioIdx + 1) % PRECIO_OPTS.length)}
             />
           </ScrollView>
-
-          {/* Panel expandible de Región */}
-          {pickerOpen === 'region' && (
-            <View style={styles.picker}>
-              <View style={styles.pickerHeader}>
-                <Text style={styles.pickerTitle}>Selecciona una región</Text>
-                {regionSel && (
-                  <Pressable
-                    hitSlop={8}
-                    onPress={() => {
-                      setRegionSel(null);
-                      setComunaSel(null);
-                      setPickerOpen(null);
-                    }}
-                  >
-                    <Text style={styles.clearLink}>Limpiar</Text>
-                  </Pressable>
-                )}
-              </View>
-              <ScrollView style={{ maxHeight: 280 }} nestedScrollEnabled>
-                {REGIONES.map((r) => (
-                  <Pressable
-                    key={r.nombre}
-                    onPress={() => {
-                      setRegionSel(r.nombre);
-                      setComunaSel(null); // reset comuna cuando cambia región
-                      setPickerOpen(null);
-                    }}
-                    style={[
-                      styles.pickerOption,
-                      r.nombre === regionSel && styles.pickerOptionActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pickerOptionText,
-                        r.nombre === regionSel && styles.pickerOptionTextActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {r.nombre} ({r.codigo})
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Panel expandible de Comuna (solo si hay región) */}
-          {pickerOpen === 'comuna' && regionSel && (
-            <View style={styles.picker}>
-              <View style={styles.pickerHeader}>
-                <Text style={styles.pickerTitle}>
-                  Comunas de {regionSel.replace('Región ', '')}
-                </Text>
-                {comunaSel && (
-                  <Pressable
-                    hitSlop={8}
-                    onPress={() => {
-                      setComunaSel(null);
-                      setPickerOpen(null);
-                    }}
-                  >
-                    <Text style={styles.clearLink}>Limpiar</Text>
-                  </Pressable>
-                )}
-              </View>
-              <ScrollView style={{ maxHeight: 280 }} nestedScrollEnabled>
-                {comunasOfRegion.map((c) => (
-                  <Pressable
-                    key={c}
-                    onPress={() => {
-                      setComunaSel(c);
-                      setPickerOpen(null);
-                    }}
-                    style={[
-                      styles.pickerOption,
-                      c === comunaSel && styles.pickerOptionActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pickerOptionText,
-                        c === comunaSel && styles.pickerOptionTextActive,
-                      ]}
-                    >
-                      {c}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
 
           {/* Status row */}
           <View style={styles.statusRow}>
@@ -752,6 +789,50 @@ export default function SearchScreen({ navigation }) {
           {/* ===================== MODO JUGADORES ===================== */}
           {mode === 'players' && (
           <View>
+            {/* Filtros de jugadores */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+            >
+              <FilterChip
+                icon={MapPin}
+                label={regionSel ? truncate(regionSel, 18) : 'Región'}
+                active={!!regionSel}
+                onPress={() =>
+                  setPickerOpen(pickerOpen === 'region' ? null : 'region')
+                }
+              />
+              {regionSel && (
+                <FilterChip
+                  icon={MapPin}
+                  label={comunaSel || 'Comuna'}
+                  active={!!comunaSel}
+                  onPress={() =>
+                    setPickerOpen(pickerOpen === 'comuna' ? null : 'comuna')
+                  }
+                />
+              )}
+              <FilterChip
+                icon={UserIcon}
+                label={POS_OPTS[posIdx].label}
+                active={POS_OPTS[posIdx].value !== null}
+                onPress={() => setPosIdx((posIdx + 1) % POS_OPTS.length)}
+              />
+              <FilterChip
+                icon={ArrowDownUp}
+                label={FLANCO_OPTS[flancoIdx].label}
+                active={FLANCO_OPTS[flancoIdx].value !== null}
+                onPress={() => setFlancoIdx((flancoIdx + 1) % FLANCO_OPTS.length)}
+              />
+              <FilterChip
+                icon={Clock}
+                label={EDAD_OPTS[edadIdx].label}
+                active={EDAD_OPTS[edadIdx].value !== null}
+                onPress={() => setEdadIdx((edadIdx + 1) % EDAD_OPTS.length)}
+              />
+            </ScrollView>
+
             <View style={styles.statusRow}>
               <Text style={styles.statusLeft}>
                 {loadingPlayers

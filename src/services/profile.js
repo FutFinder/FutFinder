@@ -32,11 +32,20 @@ export async function getProfileById(id) {
 }
 
 /**
- * Busca jugadores por username (búsqueda parcial, case-insensitive).
+ * Busca jugadores por username (búsqueda parcial, case-insensitive) + filtros.
  * Excluye al usuario actual. Si query está vacío, devuelve los perfiles
  * con más actividad (orden por trust_score) como sugerencia inicial.
+ *
+ * filters (todos opcionales):
+ *   posicion : 'arquero' | 'defensa' | ... (busca en el array posicion_preferida)
+ *   flanco   : 'derecho' | 'izquierdo' | 'ambos'
+ *              (derecho/izquierdo incluye también a quienes juegan 'ambos')
+ *   edadMin  : number
+ *   edadMax  : number
+ *   region   : string
+ *   comuna   : string
  */
-export async function searchPlayers(query, { limit = 30 } = {}) {
+export async function searchPlayers(query, { limit = 30, filters = {} } = {}) {
   if (!isSupabaseConfigured) return { data: [], error: null };
 
   const {
@@ -47,18 +56,38 @@ export async function searchPlayers(query, { limit = 30 } = {}) {
   let q = supabase
     .from('profiles')
     .select(
-      'id, username, foto_url, comuna, posicion_preferida, trust_score, rating_count, rating_nivel_avg'
+      'id, username, foto_url, comuna, region, edad, flanco, posicion_preferida, trust_score, rating_count, rating_nivel_avg'
     )
     .limit(limit);
 
   const term = (query || '').trim();
   if (term.length > 0) {
-    // ilike con comodines → contiene el texto en cualquier parte
     q = q.ilike('username', `%${term}%`);
   } else {
-    // sin búsqueda: sugerimos perfiles con mejor reputación
     q = q.order('trust_score', { ascending: false });
   }
+
+  // Filtros de ubicación
+  if (filters.region) q = q.eq('region', filters.region);
+  if (filters.comuna) q = q.eq('comuna', filters.comuna);
+
+  // Filtro de posición (posicion_preferida es un array → "contiene")
+  if (filters.posicion) {
+    q = q.contains('posicion_preferida', [filters.posicion]);
+  }
+
+  // Filtro de flanco: derecho/izquierdo incluye a los 'ambos'
+  if (filters.flanco === 'derecho') {
+    q = q.in('flanco', ['derecho', 'ambos']);
+  } else if (filters.flanco === 'izquierdo') {
+    q = q.in('flanco', ['izquierdo', 'ambos']);
+  } else if (filters.flanco === 'ambos') {
+    q = q.eq('flanco', 'ambos');
+  }
+
+  // Filtro de edad (rango)
+  if (filters.edadMin != null) q = q.gte('edad', filters.edadMin);
+  if (filters.edadMax != null) q = q.lte('edad', filters.edadMax);
 
   const { data, error } = await q;
   if (error) {
