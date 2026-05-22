@@ -102,14 +102,11 @@ Deno.serve(async (req) => {
     }
 
     // 2) Armar mensajes Expo (uno por token)
-    // Sonido custom: usa el nombre del archivo declarado en app.json
-    // (en assets/sounds/whistle.wav). En iOS NO se pone extensión.
-    // En Android el canal "default" del cliente ya lo trae configurado.
     const messages = tokens
       .filter((t) => t.token && t.token.startsWith("ExponentPushToken"))
       .map((t) => ({
         to: t.token,
-        sound: t.platform === "ios" ? "whistle.wav" : "default",
+        sound: "default",
         title: notif.title,
         body: notif.body ?? "",
         data: {

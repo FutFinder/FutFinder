@@ -39,6 +39,7 @@ import {
   deriveStats,
 } from '../services/profile';
 import { signOut, getCurrentUser } from '../services/auth';
+import { getUserRatingSummary } from '../services/ratings';
 import {
   getFriendshipWith,
   sendFriendRequest,
@@ -85,6 +86,7 @@ export default function ProfileScreen({ navigation, route }) {
   const [banner, setBanner] = useState(null);
   const [friendship, setFriendship] = useState(null); // estado de amistad
   const [friendBusy, setFriendBusy] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState(null);
 
   // ¿Estoy viendo mi propio perfil o el de otro?
   const isMyProfile = !viewUserId || viewUserId === myId;
@@ -92,6 +94,8 @@ export default function ProfileScreen({ navigation, route }) {
   const load = useCallback(async () => {
     const user = await getCurrentUser();
     setMyId(user?.id || null);
+
+    const targetId = !viewUserId || viewUserId === user?.id ? user?.id : viewUserId;
 
     if (!viewUserId || viewUserId === user?.id) {
       const [p, h] = await Promise.all([
@@ -110,6 +114,13 @@ export default function ProfileScreen({ navigation, route }) {
       setHistory([]); // no exponemos historial ajeno en V1
       setFriendship(f);
     }
+
+    // Resumen de calificaciones del perfil mostrado
+    if (targetId) {
+      const summary = await getUserRatingSummary(targetId);
+      setRatingSummary(summary);
+    }
+
     setLoading(false);
     setRefreshing(false);
   }, [viewUserId]);
@@ -415,7 +426,11 @@ export default function ProfileScreen({ navigation, route }) {
               <View>
                 <View style={styles.starsRow}>
                   {[1, 2, 3, 4, 5].map((i) => {
-                    const filled = i <= Math.round(stats?.stars ?? 5);
+                    const score =
+                      ratingSummary?.count > 0
+                        ? ratingSummary.overall
+                        : (stats?.stars ?? 5);
+                    const filled = i <= Math.round(score);
                     return (
                       <Star
                         key={i}
@@ -427,7 +442,9 @@ export default function ProfileScreen({ navigation, route }) {
                   })}
                 </View>
                 <Text style={styles.repSubtext}>
-                  {stats?.stars?.toFixed(1) || '5.0'} / 5.0
+                  {ratingSummary?.count > 0
+                    ? `${ratingSummary.overall.toFixed(1)} / 5.0 · ${ratingSummary.count} evaluación${ratingSummary.count === 1 ? '' : 'es'}`
+                    : 'Sin evaluaciones aún'}
                 </Text>
               </View>
               <View style={styles.trustBlock}>
@@ -436,18 +453,21 @@ export default function ProfileScreen({ navigation, route }) {
               </View>
             </View>
 
-            <Text style={styles.subSectionTitle}>ETIQUETAS DE LA COMUNIDAD</Text>
-            <View style={styles.tagsCloud}>
-              <Text style={styles.placeholderText}>
-                Las etiquetas aparecerán cuando otros jugadores te las asignen
-                después de partidos confirmados. ⚡
-              </Text>
-            </View>
-
-            <Text style={styles.subSectionTitle}>SEÑALES DE CONDUCTA</Text>
-            <SignalRow label="Puntualidad" value={signalFromTrust(stats?.trust_score)} />
-            <SignalRow label="Responsabilidad" value={signalFromTrust(stats?.trust_score)} />
-            <SignalRow label="Conflictividad" value="Ninguna" inverse />
+            <Text style={styles.subSectionTitle}>CALIFICACIONES DE COMPAÑEROS</Text>
+            {ratingSummary?.count > 0 ? (
+              <>
+                <RatingDimension label="Puntualidad" value={ratingSummary.avg_puntualidad} />
+                <RatingDimension label="Fair play" value={ratingSummary.avg_fairplay} />
+                <RatingDimension label="Nivel" value={ratingSummary.avg_nivel} />
+              </>
+            ) : (
+              <View style={styles.tagsCloud}>
+                <Text style={styles.placeholderText}>
+                  Las calificaciones aparecerán cuando otros jugadores te
+                  evalúen después de partidos confirmados por GPS. ⚡
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Card: Asistencia y Penalizaciones */}
@@ -689,6 +709,31 @@ function signalFromTrust(score) {
 }
 
 // ---- Subcomponentes ----
+
+function RatingDimension({ label, value }) {
+  const v = Number(value || 0);
+  return (
+    <View style={styles.ratingDimRow}>
+      <Text style={styles.ratingDimLabel}>{label}</Text>
+      <View style={styles.ratingDimRight}>
+        <View style={styles.ratingDimStars}>
+          {[1, 2, 3, 4, 5].map((i) => {
+            const filled = i <= Math.round(v);
+            return (
+              <Star
+                key={i}
+                color={filled ? '#F2C94C' : colors.borderSoft}
+                fill={filled ? '#F2C94C' : 'transparent'}
+                size={14}
+              />
+            );
+          })}
+        </View>
+        <Text style={styles.ratingDimValue}>{v.toFixed(1)}</Text>
+      </View>
+    </View>
+  );
+}
 
 function StatBlock({ value, label, highlighted }) {
   return (
@@ -980,6 +1025,30 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
     marginTop: 4,
+  },
+  ratingDimRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7,
+  },
+  ratingDimLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  ratingDimRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingDimStars: { flexDirection: 'row', gap: 1 },
+  ratingDimValue: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+    minWidth: 26,
+    textAlign: 'right',
   },
   trustBlock: {
     alignItems: 'flex-end',

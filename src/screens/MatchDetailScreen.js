@@ -25,6 +25,7 @@ import {
   LogOut,
   ShieldCheck,
   Send,
+  Star,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -99,6 +100,15 @@ export default function MatchDetailScreen({ route, navigation }) {
 
   const iAmOrganizer = match && myId && match.id_organizador === myId;
   const iAmAttendee = attendees.some((a) => a.user_id === myId);
+
+  // Calificación post-partido:
+  //  - tengo que haber confirmado por GPS
+  //  - el partido tiene que haber empezado hace al menos 90 min
+  const myAttendance = attendees.find((a) => a.user_id === myId);
+  const iAmConfirmedGps = myAttendance?.estado === 'confirmado_gps';
+  const matchHasPassed =
+    match?.hora && Date.now() - new Date(match.hora).getTime() >= 90 * 60 * 1000;
+  const canRateMatch = iAmConfirmedGps && matchHasPassed;
 
   const handleEdit = () => {
     navigation.navigate('CreateMatch', { matchId });
@@ -297,7 +307,7 @@ export default function MatchDetailScreen({ route, navigation }) {
               <Send color={colors.primary} size={16} />
               <Text style={styles.actionLabel}>Chat</Text>
             </Pressable>
-            {iAmAttendee && (
+            {iAmAttendee && !canRateMatch && (
               <Pressable
                 onPress={handleConfirmGPS}
                 disabled={busy}
@@ -305,6 +315,15 @@ export default function MatchDetailScreen({ route, navigation }) {
               >
                 <MapPin color={colors.primary} size={16} />
                 <Text style={styles.actionLabel}>GPS</Text>
+              </Pressable>
+            )}
+            {canRateMatch && (
+              <Pressable
+                onPress={() => navigation.navigate('RateMatch', { matchId })}
+                style={({ pressed }) => [styles.actionBtnRate, pressed && { opacity: 0.85 }]}
+              >
+                <Star color="#0E0E0D" size={16} fill="#0E0E0D" />
+                <Text style={styles.actionLabelRate}>Calificar</Text>
               </Pressable>
             )}
             {iAmOrganizer ? (
@@ -544,6 +563,16 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   actionLabel: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  actionBtnRate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+  },
+  actionLabelRate: { color: '#0E0E0D', fontSize: 13, fontWeight: '800' },
   actionPrimary: {
     flex: 1,
     alignItems: 'center',

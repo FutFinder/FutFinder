@@ -62,7 +62,7 @@
           "icon": "./assets/notification-icon.png",
           "color": "#71B533",
           "defaultChannel": "default",
-          "sounds": ["./assets/sounds/whistle.wav"]
+          "sounds": []
         }
       ]
     ],

@@ -22,6 +22,7 @@ import ChatThreadScreen from '../screens/ChatThreadScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import MatchDetailScreen from '../screens/MatchDetailScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import RateMatchScreen from '../screens/RateMatchScreen';
 import MainTabs from './MainTabs';
 
 import { colors } from '../theme/colors';
@@ -107,6 +108,11 @@ export default function AppNavigator() {
           name="Notifications"
           component={NotificationsScreen}
           options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="RateMatch"
+          component={RateMatchScreen}
+          options={{ animation: 'slide_from_bottom' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

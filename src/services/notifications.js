@@ -55,15 +55,12 @@ export async function registerForPushNotifications(userId) {
     }
 
     // 2.1 Canal Android (sin esto NO suena en Android)
-    // El sound: 'whistle' usa el archivo declarado en app.json
-    // (assets/sounds/whistle.wav). En Android va sin extensión.
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'FutFinder',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#71B533',
-        sound: 'whistle',
       });
     }
 
