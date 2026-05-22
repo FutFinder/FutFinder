@@ -68,6 +68,8 @@ export function applyFilters(matches, filters, userCoords) {
   const maxKm = filters.maxKm ?? null;
   const pMin = filters.precioMin ?? 0;
   const pMax = filters.precioMax ?? 999999;
+  const durMin = filters.duracionMin ?? null;
+  const durMax = filters.duracionMax ?? null;
 
   // Pre-calculamos distancia para todos
   const enriched = matches.map((m) => {
@@ -112,6 +114,12 @@ export function applyFilters(matches, filters, userCoords) {
     if (comunaF && m.comuna !== comunaF) return false;
     if (niveles.length > 0 && !niveles.includes(m.nivel)) return false;
     if (m.precio_cuota < pMin || m.precio_cuota > pMax) return false;
+    if (durMin !== null || durMax !== null) {
+      const d = m.duracion_min ?? null;
+      if (d === null) return false; // sin duración cargada → no matchea filtro de duración
+      if (durMin !== null && d < durMin) return false;
+      if (durMax !== null && d > durMax) return false;
+    }
     if (!inWindow(m.hora)) return false;
     if (maxKm !== null && m._distanciaKm !== null && m._distanciaKm > maxKm) return false;
     return true;
@@ -134,6 +142,7 @@ export async function createMatch({
   precio_cuota = 0,
   nivel = 'recreativo',
   descripcion = null,
+  duracion_min = 90,
 }) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo mode' } };
 
@@ -156,6 +165,7 @@ export async function createMatch({
       precio_cuota,
       nivel,
       descripcion,
+      duracion_min,
     })
     .select()
     .single();
@@ -187,6 +197,7 @@ export async function updateMatch(matchId, patch) {
     'latitud', 'longitud', 'hora',
     'cupos_totales', 'cupos_disponibles',
     'precio_cuota', 'nivel', 'descripcion', 'estado', 'foto_url',
+    'duracion_min',
   ];
   const payload = {};
   for (const k of allowed) {

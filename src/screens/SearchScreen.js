@@ -68,6 +68,13 @@ const PRECIO_OPTS = [
   { label: '$5k – $8k', value: { min: 5000, max: 8000 } },
   { label: '$8k+', value: { min: 8000, max: 999999 } },
 ];
+const DUR_OPTS = [
+  { label: 'Cualquier duración', value: null },
+  { label: '60 min', value: { min: 0, max: 60 } },
+  { label: '90 min', value: { min: 61, max: 90 } },
+  { label: '120 min', value: { min: 91, max: 120 } },
+  { label: '120+ min', value: { min: 121, max: 999 } },
+];
 
 // Opciones de filtro para búsqueda de JUGADORES
 const POS_OPTS = [
@@ -150,6 +157,7 @@ export default function SearchScreen({ navigation }) {
   const [timeIdx, setTimeIdx] = useState(0);
   const [nivelIdx, setNivelIdx] = useState(0);
   const [precioIdx, setPrecioIdx] = useState(0);
+  const [durIdx, setDurIdx] = useState(0);
   // Región y comuna: string | null (null = "todas")
   const [regionSel, setRegionSel] = useState(null);
   const [comunaSel, setComunaSel] = useState(null);
@@ -224,6 +232,8 @@ export default function SearchScreen({ navigation }) {
       niveles: NIVEL_OPTS[nivelIdx].value ? [NIVEL_OPTS[nivelIdx].value] : [],
       precioMin: PRECIO_OPTS[precioIdx].value?.min ?? 0,
       precioMax: PRECIO_OPTS[precioIdx].value?.max ?? 999999,
+      duracionMin: DUR_OPTS[durIdx].value?.min ?? null,
+      duracionMax: DUR_OPTS[durIdx].value?.max ?? null,
     };
     const list = applyFilters(matches, filters, userCoords);
     // Ordenar por distancia si tenemos GPS, si no por hora
@@ -233,7 +243,7 @@ export default function SearchScreen({ navigation }) {
       }
       return new Date(a.hora) - new Date(b.hora);
     });
-  }, [matches, text, regionSel, comunaSel, kmIdx, timeIdx, nivelIdx, precioIdx, userCoords]);
+  }, [matches, text, regionSel, comunaSel, kmIdx, timeIdx, nivelIdx, precioIdx, durIdx, userCoords]);
 
   const showBanner = (type, title, message) => {
     setBanner({ type, title, message });
@@ -568,6 +578,12 @@ export default function SearchScreen({ navigation }) {
               active={PRECIO_OPTS[precioIdx].value !== null}
               onPress={() => setPrecioIdx((precioIdx + 1) % PRECIO_OPTS.length)}
             />
+            <FilterChip
+              icon={Clock}
+              label={DUR_OPTS[durIdx].label}
+              active={DUR_OPTS[durIdx].value !== null}
+              onPress={() => setDurIdx((durIdx + 1) % DUR_OPTS.length)}
+            />
           </ScrollView>
 
           {/* Status row */}
@@ -636,7 +652,10 @@ export default function SearchScreen({ navigation }) {
                 <View style={styles.metaRow}>
                   <View style={styles.metaItem}>
                     <Clock color={colors.textSecondary} size={13} />
-                    <Text style={styles.metaText}>{formatHora(m.hora)}</Text>
+                    <Text style={styles.metaText}>
+                      {formatHora(m.hora)}
+                      {m.duracion_min ? ` · ${m.duracion_min}min` : ''}
+                    </Text>
                   </View>
                   <View style={styles.metaItem}>
                     <Users color={colors.textSecondary} size={13} />

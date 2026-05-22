@@ -48,6 +48,12 @@ const NIVELES = [
   { value: 'competitivo', label: 'Competitivo' },
 ];
 
+const DURACIONES = [
+  { value: 60, label: '60 min' },
+  { value: 90, label: '90 min' },
+  { value: 120, label: '120 min' },
+];
+
 // Helper: formatea Date a string DD/MM/YYYY
 function formatDate(d) {
   const dd = String(d.getDate()).padStart(2, '0');
@@ -106,6 +112,7 @@ export default function CreateMatchScreen({ navigation, route }) {
   const [cuposTotales, setCuposTotales] = useState('10');
   const [precioCuota, setPrecioCuota] = useState('5000');
   const [nivel, setNivel] = useState('intermedio');
+  const [duracionMin, setDuracionMin] = useState(90); // duración en minutos
   const [descripcion, setDescripcion] = useState('');
 
   // Aprobación (placeholder, no se persiste todavía en DB)
@@ -149,6 +156,7 @@ export default function CreateMatchScreen({ navigation, route }) {
       if (data.cupos_totales != null) setCuposTotales(String(data.cupos_totales));
       if (data.precio_cuota != null) setPrecioCuota(String(data.precio_cuota));
       if (data.nivel) setNivel(data.nivel);
+      if (data.duracion_min != null) setDuracionMin(data.duracion_min);
       if (data.descripcion) setDescripcion(data.descripcion);
       if (data.foto_url) setFotoUrl(data.foto_url);
     })();
@@ -245,6 +253,7 @@ export default function CreateMatchScreen({ navigation, route }) {
       cupos_totales: parseInt(cuposTotales, 10),
       precio_cuota: parseInt(precioCuota, 10),
       nivel,
+      duracion_min: duracionMin,
       descripcion: descripcion.trim() || null,
     };
     const result = isEditing
@@ -643,6 +652,30 @@ export default function CreateMatchScreen({ navigation, route }) {
                           ]}
                         >
                           {n.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </Field>
+
+                <Field label="Duración del partido" icon={Clock}>
+                  <View style={styles.segmented}>
+                    {DURACIONES.map((d) => (
+                      <Pressable
+                        key={d.value}
+                        onPress={() => setDuracionMin(d.value)}
+                        style={[
+                          styles.segmentBtn,
+                          duracionMin === d.value && styles.segmentBtnActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.segmentLabel,
+                            duracionMin === d.value && styles.segmentLabelActive,
+                          ]}
+                        >
+                          {d.label}
                         </Text>
                       </Pressable>
                     ))}
