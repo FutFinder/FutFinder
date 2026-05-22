@@ -26,6 +26,9 @@ import {
   ShieldCheck,
   Send,
   Star,
+  Check,
+  X,
+  Clock as ClockIcon,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -36,6 +39,9 @@ import {
   deleteMatch,
   leaveMatch,
   joinMatch,
+  requestJoinMatch,
+  approveJoinRequest,
+  rejectJoinRequest,
 } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentUser } from '../services/auth';
@@ -99,7 +105,17 @@ export default function MatchDetailScreen({ route, navigation }) {
   };
 
   const iAmOrganizer = match && myId && match.id_organizador === myId;
-  const iAmAttendee = attendees.some((a) => a.user_id === myId);
+  // "Attendee" cuenta solo a los aceptados (inscrito/confirmado), no a los pendientes
+  const iAmAttendee = attendees.some(
+    (a) => a.user_id === myId && a.estado !== 'pendiente'
+  );
+
+  // Aprobación manual
+  const isManual = match?.aprobacion === 'manual';
+  const myAtt = attendees.find((a) => a.user_id === myId);
+  const iAmPending = myAtt?.estado === 'pendiente';
+  const pendingRequests = attendees.filter((a) => a.estado === 'pendiente');
+  const confirmedAttendees = attendees.filter((a) => a.estado !== 'pendiente');
 
   // Calificación post-partido:
   //  - tengo que haber confirmado por GPS
@@ -157,6 +173,42 @@ export default function MatchDetailScreen({ route, navigation }) {
       return;
     }
     showBanner('success', '¡Te inscribiste!', 'Aprieta Confirmar GPS al llegar a la cancha.');
+    load();
+  };
+
+  const handleRequestJoin = async () => {
+    setBusy(true);
+    const result = await requestJoinMatch(matchId);
+    setBusy(false);
+    if (!result?.ok) {
+      showBanner('error', 'No pudimos enviar tu solicitud', result?.reason || result?.error?.message || '');
+      return;
+    }
+    showBanner('success', 'Solicitud enviada', 'El anfitrión recibirá tu solicitud y decidirá si te acepta.');
+    load();
+  };
+
+  const handleApprove = async (playerId) => {
+    setBusy(true);
+    const result = await approveJoinRequest(matchId, playerId);
+    setBusy(false);
+    if (!result?.ok) {
+      showBanner('error', 'No pude aprobar', result?.reason || result?.error?.message || '');
+      return;
+    }
+    showBanner('success', 'Jugador aceptado', 'Se sumó al partido y se le notificó.');
+    load();
+  };
+
+  const handleReject = async (playerId) => {
+    setBusy(true);
+    const result = await rejectJoinRequest(matchId, playerId);
+    setBusy(false);
+    if (!result?.ok) {
+      showBanner('error', 'No pude rechazar', result?.reason || result?.error?.message || '');
+      return;
+    }
+    showBanner('info', 'Solicitud rechazada', '');
     load();
   };
 
@@ -352,26 +404,92 @@ export default function MatchDetailScreen({ route, navigation }) {
               >
                 <LogOut color={colors.error} size={16} />
               </Pressable>
+            ) : iAmPending ? (
+              <View style={[styles.actionPrimary, styles.actionPending]}>
+                <ClockIcon color={colors.primary} size={15} />
+                <Text style={styles.actionPendingLabel}>Solicitud enviada</Text>
+              </View>
             ) : (
               <Pressable
-                onPress={handleJoin}
+                onPress={isManual ? handleRequestJoin : handleJoin}
                 disabled={busy || match.cupos_disponibles === 0}
                 style={({ pressed }) => [styles.actionPrimary, pressed && { opacity: 0.85 }, (busy || match.cupos_disponibles === 0) && { opacity: 0.5 }]}
               >
                 <Text style={styles.actionPrimaryLabel}>
-                  {match.cupos_disponibles === 0 ? 'Lleno' : 'Unirme'}
+                  {match.cupos_disponibles === 0
+                    ? 'Lleno'
+                    : isManual
+                    ? 'Solicitar unirme'
+                    : 'Unirme'}
                 </Text>
               </Pressable>
             )}
           </View>
 
+          {/* Solicitudes pendientes (solo anfitrión, partidos manuales) */}
+          {iAmOrganizer && pendingRequests.length > 0 && (
+            <>
+              <View style={styles.sectionRow}>
+                <Text style={[styles.sectionTitle, { color: colors.primary }]}>
+                  SOLICITUDES PENDIENTES
+                </Text>
+                <Text style={styles.sectionCount}>{pendingRequests.length}</Text>
+              </View>
+              {pendingRequests.map((a) => (
+                <View key={a.attendee_id} style={styles.pendingRow}>
+                  <Pressable
+                    onPress={() => handleOpenProfile(a.user_id)}
+                    style={styles.pendingUser}
+                  >
+                    <View style={styles.avatar}>
+                      {a.foto_url ? (
+                        <Image source={{ uri: a.foto_url }} style={styles.avatarImage} />
+                      ) : (
+                        <UserIcon color={colors.primary} size={18} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.playerName} numberOfLines={1}>
+                        @{a.username}
+                      </Text>
+                      <View style={styles.playerMeta}>
+                        <ShieldCheck color={colors.textMuted} size={11} />
+                        <Text style={styles.playerMetaText}>Trust {a.trust_score}</Text>
+                        {a.comuna ? (
+                          <>
+                            <Text style={styles.dot}>·</Text>
+                            <Text style={styles.playerMetaText}>{a.comuna}</Text>
+                          </>
+                        ) : null}
+                      </View>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleApprove(a.user_id)}
+                    disabled={busy}
+                    style={({ pressed }) => [styles.approveBtn, pressed && { opacity: 0.8 }, busy && { opacity: 0.5 }]}
+                  >
+                    <Check color="#0E0E0D" size={18} strokeWidth={2.6} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleReject(a.user_id)}
+                    disabled={busy}
+                    style={({ pressed }) => [styles.rejectBtn, pressed && { opacity: 0.7 }, busy && { opacity: 0.5 }]}
+                  >
+                    <X color={colors.error} size={18} strokeWidth={2.6} />
+                  </Pressable>
+                </View>
+              ))}
+            </>
+          )}
+
           {/* Jugadores inscritos */}
           <View style={styles.sectionRow}>
             <Text style={styles.sectionTitle}>JUGADORES INSCRITOS</Text>
-            <Text style={styles.sectionCount}>{attendees.length}</Text>
+            <Text style={styles.sectionCount}>{confirmedAttendees.length}</Text>
           </View>
 
-          {attendees.length === 0 && (
+          {confirmedAttendees.length === 0 && (
             <View style={styles.emptyBox}>
               <Text style={styles.emptyText}>
                 Aún no hay jugadores inscritos.
@@ -379,7 +497,7 @@ export default function MatchDetailScreen({ route, navigation }) {
             </View>
           )}
 
-          {attendees.map((a) => (
+          {confirmedAttendees.map((a) => (
             <Pressable
               key={a.attendee_id}
               onPress={() => handleOpenProfile(a.user_id)}
@@ -582,6 +700,51 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   actionPrimaryLabel: { color: '#0E0E0D', fontWeight: '800', fontSize: 14 },
+  actionPending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  actionPendingLabel: { color: colors.primary, fontWeight: '800', fontSize: 13 },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary + '55',
+    padding: 10,
+    marginBottom: 8,
+  },
+  pendingUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  approveBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.error,
+    backgroundColor: colors.errorSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   actionDanger: {
     width: 40,
     height: 40,

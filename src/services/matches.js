@@ -143,6 +143,7 @@ export async function createMatch({
   nivel = 'recreativo',
   descripcion = null,
   duracion_min = 90,
+  aprobacion = 'inmediata',
 }) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo mode' } };
 
@@ -166,6 +167,7 @@ export async function createMatch({
       nivel,
       descripcion,
       duracion_min,
+      aprobacion,
     })
     .select()
     .single();
@@ -197,7 +199,7 @@ export async function updateMatch(matchId, patch) {
     'latitud', 'longitud', 'hora',
     'cupos_totales', 'cupos_disponibles',
     'precio_cuota', 'nivel', 'descripcion', 'estado', 'foto_url',
-    'duracion_min',
+    'duracion_min', 'aprobacion',
   ];
   const payload = {};
   for (const k of allowed) {
@@ -235,6 +237,45 @@ export async function joinMatch(matchId) {
   const { data, error } = await supabase.rpc('join_match', { p_match_id: matchId });
   if (error) return { ok: false, error };
   return data; // { ok: true } o { ok: false, reason }
+}
+
+/**
+ * Solicita unirse a un partido con aprobación MANUAL.
+ * Crea un attendee en estado 'pendiente' (sin descontar cupo) y
+ * notifica al anfitrión. Usa la RPC request_join.
+ */
+export async function requestJoinMatch(matchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data, error } = await supabase.rpc('request_join', { p_match_id: matchId });
+  if (error) return { ok: false, error };
+  return data; // { ok, reason? }
+}
+
+/**
+ * El anfitrión aprueba una solicitud pendiente.
+ * Pasa al jugador a 'inscrito', descuenta cupo y le notifica.
+ */
+export async function approveJoinRequest(matchId, playerId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data, error } = await supabase.rpc('approve_join', {
+    p_match_id: matchId,
+    p_player_id: playerId,
+  });
+  if (error) return { ok: false, error };
+  return data;
+}
+
+/**
+ * El anfitrión rechaza una solicitud pendiente (la borra) y notifica al jugador.
+ */
+export async function rejectJoinRequest(matchId, playerId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data, error } = await supabase.rpc('reject_join', {
+    p_match_id: matchId,
+    p_player_id: playerId,
+  });
+  if (error) return { ok: false, error };
+  return data;
 }
 
 /**

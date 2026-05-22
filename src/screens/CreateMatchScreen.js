@@ -157,6 +157,7 @@ export default function CreateMatchScreen({ navigation, route }) {
       if (data.precio_cuota != null) setPrecioCuota(String(data.precio_cuota));
       if (data.nivel) setNivel(data.nivel);
       if (data.duracion_min != null) setDuracionMin(data.duracion_min);
+      if (data.aprobacion) setAprobacion(data.aprobacion);
       if (data.descripcion) setDescripcion(data.descripcion);
       if (data.foto_url) setFotoUrl(data.foto_url);
     })();
@@ -254,6 +255,7 @@ export default function CreateMatchScreen({ navigation, route }) {
       precio_cuota: parseInt(precioCuota, 10),
       nivel,
       duracion_min: duracionMin,
+      aprobacion,
       descripcion: descripcion.trim() || null,
     };
     const result = isEditing

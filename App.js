@@ -31,6 +31,9 @@ function handleNotificationTap(response) {
         break;
       case 'match_join':
       case 'match_reminder':
+      case 'join_request':
+      case 'join_approved':
+      case 'join_rejected':
         if (data.matchId) {
           navigationRef.navigate('MatchDetail', { matchId: data.matchId });
         }

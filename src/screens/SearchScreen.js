@@ -32,7 +32,7 @@ import {
 import Logo from '../components/Logo';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
-import { listOpenMatches, applyFilters, joinMatch, deleteMatch } from '../services/matches';
+import { listOpenMatches, applyFilters, joinMatch, requestJoinMatch, deleteMatch } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentLocation } from '../services/location';
 import { getCurrentUser } from '../services/auth';
@@ -253,14 +253,20 @@ export default function SearchScreen({ navigation }) {
 
   const handleJoin = async (matchId) => {
     if (busyMatchId) return;
+    const match = matches.find((m) => m.id === matchId);
+    const manual = match?.aprobacion === 'manual';
     setBusyMatchId(matchId);
     try {
-      const result = await joinMatch(matchId);
+      const result = manual
+        ? await requestJoinMatch(matchId)
+        : await joinMatch(matchId);
       if (!result?.ok) {
-        showBanner('error', 'No pudimos inscribirte', result?.reason || 'Intenta de nuevo');
+        showBanner('error', manual ? 'No pudimos enviar tu solicitud' : 'No pudimos inscribirte', result?.reason || 'Intenta de nuevo');
         return;
       }
-      if (result.already) {
+      if (manual) {
+        showBanner('success', 'Solicitud enviada', 'El anfitrión decidirá si te acepta. Te avisaremos.');
+      } else if (result.already) {
         showBanner('info', 'Ya estabas inscrito', 'Tu cupo en este partido sigue activo.');
       } else {
         showBanner(
@@ -746,7 +752,11 @@ export default function SearchScreen({ navigation }) {
                     ]}
                   >
                     <Text style={styles.joinLabel}>
-                      {m.cupos_disponibles === 0 ? 'Lleno' : 'Unirme'}
+                      {m.cupos_disponibles === 0
+                        ? 'Lleno'
+                        : m.aprobacion === 'manual'
+                        ? 'Solicitar'
+                        : 'Unirme'}
                     </Text>
                   </Pressable>
                     </>

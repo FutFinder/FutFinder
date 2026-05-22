@@ -49,6 +49,12 @@ function NotifIcon({ type }) {
       return <CheckCheck {...props} />;
     case 'match_join':
       return <Users {...props} />;
+    case 'join_request':
+      return <UserPlus {...props} />;
+    case 'join_approved':
+      return <CheckCheck {...props} />;
+    case 'join_rejected':
+      return <Bell {...props} />;
     case 'message_new':
       return <MessageCircle {...props} />;
     case 'match_reminder':
@@ -82,6 +88,9 @@ function navigateForNotif(navigation, n) {
       break;
     case 'match_join':
     case 'match_reminder':
+    case 'join_request':
+    case 'join_approved':
+    case 'join_rejected':
       if (data.matchId) {
         navigation.navigate('MatchDetail', { matchId: data.matchId });
       }

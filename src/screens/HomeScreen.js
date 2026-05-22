@@ -23,7 +23,7 @@ import { colors, radius } from '../theme/colors';
 import Logo from '../components/Logo';
 import Banner from '../components/Banner';
 import { notify } from '../utils/notify';
-import { listOpenMatches, joinMatch, deleteMatch } from '../services/matches';
+import { listOpenMatches, joinMatch, requestJoinMatch, deleteMatch } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { isSupabaseConfigured } from '../services/supabase';
@@ -139,18 +139,24 @@ export default function HomeScreen({ navigation }) {
     }
     setBanner(null);
     setBusyMatchId(matchId);
+    const match = matches.find((m) => m.id === matchId);
+    const manual = match?.aprobacion === 'manual';
     try {
-      const result = await joinMatch(matchId);
-      console.log('[FutFinder] joinMatch result:', result);
+      const result = manual
+        ? await requestJoinMatch(matchId)
+        : await joinMatch(matchId);
+      console.log('[FutFinder] join result:', result);
       if (!result?.ok) {
         showBanner(
           'error',
-          'No pudimos inscribirte',
+          manual ? 'No pudimos enviar tu solicitud' : 'No pudimos inscribirte',
           result?.reason || result?.error?.message || 'Inténtalo de nuevo'
         );
         return;
       }
-      if (result.already) {
+      if (manual) {
+        showBanner('success', 'Solicitud enviada', 'El anfitrión decidirá si te acepta. Te avisaremos.');
+      } else if (result.already) {
         showBanner('info', 'Ya estabas inscrito', 'Tu cupo en este partido sigue activo.');
       } else {
         showBanner(
@@ -431,7 +437,11 @@ export default function HomeScreen({ navigation }) {
                         ]}
                       >
                         <Text style={styles.joinLabel}>
-                          {cuposLeft === 0 ? 'Lleno' : 'Unirme'}
+                          {cuposLeft === 0
+                            ? 'Lleno'
+                            : m.aprobacion === 'manual'
+                            ? 'Solicitar'
+                            : 'Unirme'}
                         </Text>
                       </Pressable>
                     </>
