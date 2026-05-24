@@ -440,29 +440,24 @@ function TabPill({ label, count, active, onPress, highlight = false }) {
       style={({ pressed }) => [
         styles.tabPill,
         active && styles.tabPillActive,
-        pressed && { opacity: 0.8 },
+        pressed && { opacity: 0.7 },
       ]}
     >
       <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>
         {label}
       </Text>
-      <View
-        style={[
-          styles.tabPillCount,
-          active && styles.tabPillCountActive,
-          highlight && !active && styles.tabPillCountHighlight,
-        ]}
-      >
+      {count > 0 && (
         <Text
           style={[
-            styles.tabPillCountText,
-            active && { color: colors.background },
-            highlight && !active && { color: '#FFFFFF' },
+            styles.tabPillCount,
+            active && styles.tabPillCountActive,
+            highlight && !active && styles.tabPillCountHighlight,
           ]}
         >
           {count}
         </Text>
-      </View>
+      )}
+      {highlight && !active && <View style={styles.tabPillDot} />}
     </Pressable>
   );
 }
@@ -545,44 +540,47 @@ const styles = StyleSheet.create({
   tabPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    gap: 6,
+    paddingHorizontal: 16,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderSoft,
   },
   tabPillActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primarySoft,
     borderColor: colors.primary,
   },
   tabPillText: {
-    color: colors.textPrimary,
+    color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   tabPillTextActive: {
-    color: '#0E0E0D',
+    color: colors.primary,
+    fontWeight: '800',
   },
   tabPillCount: {
-    backgroundColor: colors.background,
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-    borderRadius: 10,
-    minWidth: 22,
-    alignItems: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    includeFontPadding: false,
   },
   tabPillCountActive: {
-    backgroundColor: colors.background,
-  },
-  tabPillCountText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
+    color: colors.primary,
   },
   tabPillCountHighlight: {
+    color: colors.error,
+  },
+  tabPillDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
     backgroundColor: colors.error,
+    marginLeft: 1,
   },
   sectionHeading: {
     color: colors.textMuted,
