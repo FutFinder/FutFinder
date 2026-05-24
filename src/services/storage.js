@@ -34,6 +34,7 @@ export async function pickImage({ aspect = [1, 1], quality = 0.7 } = {}) {
       allowsEditing: true,
       aspect,
       quality,
+      base64: true, // necesario para subir bien en nativo (RN no maneja blob de file://)
     });
 
     if (result.canceled) return { ok: false, reason: 'Cancelado' };
@@ -56,18 +57,43 @@ function extFromAsset(asset) {
   return 'jpg';
 }
 
-// Convierte el asset (URI o file) a Blob para subir
-async function assetToBlob(asset) {
-  // En web, el picker devuelve un asset con `file` (File) o un URI blob:
+// Decodifica base64 → Uint8Array (sin dependencias externas).
+function base64ToBytes(base64) {
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const clean = (base64 || '').replace(/[^A-Za-z0-9+/]/g, '');
+  const len = clean.length;
+  const bytes = new Uint8Array((len * 3) >> 2);
+  let p = 0;
+  let buffer = 0;
+  let bits = 0;
+  for (let i = 0; i < len; i++) {
+    const c = B64.indexOf(clean[i]);
+    if (c === -1) continue;
+    buffer = (buffer << 6) | c;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes[p++] = (buffer >> bits) & 0xff;
+    }
+  }
+  return bytes.subarray(0, p);
+}
+
+// Devuelve el cuerpo correcto para subir según la plataforma.
+//  - Web con File → el File directo
+//  - Nativo con base64 → Uint8Array (la forma confiable en RN)
+//  - Fallback → blob vía fetch
+async function getUploadBody(asset) {
   if (Platform.OS === 'web' && asset.file) return asset.file;
+  if (asset.base64) return base64ToBytes(asset.base64);
   const response = await fetch(asset.uri);
   return await response.blob();
 }
 
-async function uploadToBucket(bucket, path, blob, contentType) {
+async function uploadToBucket(bucket, path, body, contentType) {
   const { error } = await supabase.storage
     .from(bucket)
-    .upload(path, blob, {
+    .upload(path, body, {
       upsert: true,
       contentType,
       cacheControl: '3600',
@@ -94,8 +120,8 @@ export async function uploadAvatar(asset) {
   const path = `${user.id}/avatar.${ext}`;
   const contentType = asset.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-  const blob = await assetToBlob(asset);
-  const { error, url } = await uploadToBucket('avatars', path, blob, contentType);
+  const body = await getUploadBody(asset);
+  const { error, url } = await uploadToBucket('avatars', path, body, contentType);
   if (error) {
     console.error('[FutFinder] uploadAvatar:', error);
     return { error };
@@ -122,8 +148,8 @@ export async function uploadMatchCover(matchId, asset) {
   const path = `${matchId}/cover.${ext}`;
   const contentType = asset.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-  const blob = await assetToBlob(asset);
-  const { error, url } = await uploadToBucket('match-covers', path, blob, contentType);
+  const body = await getUploadBody(asset);
+  const { error, url } = await uploadToBucket('match-covers', path, body, contentType);
   if (error) {
     console.error('[FutFinder] uploadMatchCover:', error);
     return { error };
