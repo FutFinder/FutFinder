@@ -219,6 +219,28 @@ export async function markAllAsRead() {
   return { error };
 }
 
+/** Borra una notificación. */
+export async function deleteNotification(notificationId) {
+  if (!isSupabaseConfigured) return { error: null };
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', notificationId);
+  return { error };
+}
+
+/** Borra TODAS las notificaciones del usuario actual. */
+export async function deleteAllNotifications() {
+  if (!isSupabaseConfigured) return { error: null };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: 'No autenticado' } };
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('user_id', user.id);
+  return { error };
+}
+
 /**
  * Suscripción Realtime a notificaciones nuevas del usuario actual.
  * Útil para refrescar el badge en vivo sin recargar.

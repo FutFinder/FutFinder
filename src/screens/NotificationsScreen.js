@@ -19,6 +19,7 @@ import {
   MessageCircle,
   Calendar,
   Star,
+  Trash2,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -27,6 +28,8 @@ import {
   listNotifications,
   markAsRead,
   markAllAsRead,
+  deleteNotification,
+  deleteAllNotifications,
   subscribeToNotifications,
 } from '../services/notifications';
 
@@ -171,6 +174,23 @@ export default function NotificationsScreen({ navigation }) {
     setMarkingAll(false);
   };
 
+  const handleDelete = async (id) => {
+    // Optimistic: la sacamos de la lista al toque
+    setItems((prev) => prev.filter((p) => p.id !== id));
+    await deleteNotification(id);
+  };
+
+  const handleDeleteAll = async () => {
+    if (items.length === 0) return;
+    const ok =
+      typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm('¿Borrar todas las notificaciones? Esta acción no se puede deshacer.')
+        : true;
+    if (!ok) return;
+    setItems([]);
+    await deleteAllNotifications();
+  };
+
   const unreadCount = items.filter((n) => !n.read).length;
 
   const renderItem = ({ item }) => {
@@ -198,6 +218,13 @@ export default function NotificationsScreen({ navigation }) {
           ) : null}
           <Text style={styles.time}>{timeAgo(item.created_at)}</Text>
         </View>
+        <Pressable
+          onPress={() => handleDelete(item.id)}
+          hitSlop={10}
+          style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
+        >
+          <Trash2 color={colors.textMuted} size={16} />
+        </Pressable>
       </Pressable>
     );
   };
@@ -232,6 +259,19 @@ export default function NotificationsScreen({ navigation }) {
             ]}
           >
             <Check color={colors.primary} size={18} />
+          </Pressable>
+
+          <Pressable
+            onPress={handleDeleteAll}
+            disabled={items.length === 0}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.clearAllBtn,
+              pressed && { opacity: 0.6 },
+              items.length === 0 && { opacity: 0.3 },
+            ]}
+          >
+            <Trash2 color={colors.error} size={18} />
           </Pressable>
         </View>
 
@@ -306,6 +346,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  clearAllBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.errorSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
   },
   listContent: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 },
   sep: { height: 8 },
