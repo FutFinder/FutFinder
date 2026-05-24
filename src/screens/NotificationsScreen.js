@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import {
   ArrowLeft,
   Bell,
@@ -193,8 +194,23 @@ export default function NotificationsScreen({ navigation }) {
 
   const unreadCount = items.filter((n) => !n.read).length;
 
+  const renderRightActions = (item) => () => (
+    <Pressable
+      onPress={() => handleDelete(item.id)}
+      style={({ pressed }) => [styles.swipeDelete, pressed && { opacity: 0.8 }]}
+    >
+      <Trash2 color="#FFFFFF" size={20} />
+      <Text style={styles.swipeDeleteText}>Borrar</Text>
+    </Pressable>
+  );
+
   const renderItem = ({ item }) => {
     return (
+      <Swipeable
+        renderRightActions={renderRightActions(item)}
+        overshootRight={false}
+        rightThreshold={40}
+      >
       <Pressable
         onPress={() => handleTap(item)}
         style={({ pressed }) => [
@@ -226,11 +242,12 @@ export default function NotificationsScreen({ navigation }) {
           <Trash2 color={colors.textMuted} size={16} />
         </Pressable>
       </Pressable>
+      </Swipeable>
     );
   };
 
   return (
-    <View style={styles.root}>
+    <GestureHandlerRootView style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.header}>
           <Pressable
@@ -306,7 +323,7 @@ export default function NotificationsScreen({ navigation }) {
           />
         )}
       </SafeAreaView>
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -362,6 +379,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
+  },
+  swipeDelete: {
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 84,
+    borderRadius: radius.lg,
+    marginLeft: 8,
+    gap: 4,
+  },
+  swipeDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
   },
   listContent: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 },
   sep: { height: 8 },
