@@ -12,7 +12,6 @@ import {
   MapPin,
   Clock,
   Users,
-  Search,
   Bell,
   ShieldCheck,
   Edit3,
@@ -294,14 +293,6 @@ export default function HomeScreen({ navigation }) {
               onClose={() => setBanner(null)}
             />
           )}
-
-          <Pressable
-            onPress={() => navigation.navigate('Search')}
-            style={({ pressed }) => [styles.searchBar, pressed && { opacity: 0.7 }]}
-          >
-            <Search color={colors.textMuted} size={18} />
-            <Text style={styles.searchText}>Buscar canchas o partidos…</Text>
-          </Pressable>
 
           {/* Trust Score card */}
           <View style={styles.trustCard}>

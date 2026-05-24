@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  Bell,
   MessageCircle,
   Users,
   User as UserIcon,
@@ -176,21 +175,6 @@ export default function ChatScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <Logo size={28} />
-          <View style={{ position: 'relative' }}>
-            <Pressable
-              hitSlop={8}
-              style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
-            >
-              <Bell color={colors.textSecondary} size={20} />
-            </Pressable>
-            {unreadTotal > 0 && (
-              <View style={styles.unreadDot}>
-                <Text style={styles.unreadDotText}>
-                  {unreadTotal > 9 ? '9+' : unreadTotal}
-                </Text>
-              </View>
-            )}
-          </View>
         </View>
 
         {/* Title */}
