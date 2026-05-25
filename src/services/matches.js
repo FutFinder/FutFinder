@@ -287,6 +287,46 @@ export async function swapMatch(oldMatchId, newMatchId) {
 }
 
 /**
+ * Salir de un partido con penalización por tiempo (jugador).
+ * Devuelve { ok, penalty, freed, reason? }.
+ */
+export async function leaveMatchPenalized(matchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true, penalty: 0 };
+  const { data, error } = await supabase.rpc('leave_match_penalized', {
+    p_match_id: matchId,
+  });
+  if (error) return { ok: false, error };
+  return data;
+}
+
+/**
+ * Cancelar un partido con penalización por tiempo (anfitrión).
+ * Devuelve { ok, penalty, reason? }.
+ */
+export async function cancelMatch(matchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true, penalty: 0 };
+  const { data, error } = await supabase.rpc('cancel_match', {
+    p_match_id: matchId,
+  });
+  if (error) return { ok: false, error };
+  return data;
+}
+
+/**
+ * El anfitrión cancela su partido original (penalización -25) y se une al nuevo.
+ * Devuelve { ok, pending?, reason? }.
+ */
+export async function cancelMatchAndJoin(oldMatchId, newMatchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data, error } = await supabase.rpc('cancel_match_and_join', {
+    p_old: oldMatchId,
+    p_new: newMatchId,
+  });
+  if (error) return { ok: false, reason: translateJoinError(error.message), error };
+  return data;
+}
+
+/**
  * Solicita unirse a un partido con aprobación MANUAL.
  * Crea un attendee en estado 'pendiente' (sin descontar cupo) y
  * notifica al anfitrión. Usa la RPC request_join.

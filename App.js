@@ -49,6 +49,10 @@ function handleNotificationTap(response) {
         // Vamos a la pestaña de perfil — luego puedes crear una pantalla "Notificaciones".
         navigationRef.navigate('Main', { screen: 'ProfileTab' });
         break;
+      case 'match_cancelled':
+        // El partido ya no existe → mandamos a buscar otro
+        navigationRef.navigate('Main', { screen: 'SearchTab' });
+        break;
       default:
         break;
     }

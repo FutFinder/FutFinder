@@ -65,6 +65,8 @@ function NotifIcon({ type }) {
       return <Calendar {...props} />;
     case 'match_rate':
       return <Star {...props} />;
+    case 'match_cancelled':
+      return <Calendar {...props} />;
     default:
       return <Bell {...props} />;
   }
@@ -103,6 +105,9 @@ function navigateForNotif(navigation, n) {
       if (data.matchId) {
         navigation.navigate('RateMatch', { matchId: data.matchId });
       }
+      break;
+    case 'match_cancelled':
+      navigation.navigate('Main', { screen: 'SearchTab' });
       break;
     case 'friend_request':
     case 'friend_accept':

@@ -48,6 +48,9 @@ import {
   rejectJoinRequest,
   getScheduleConflict,
   swapMatch,
+  cancelMatchAndJoin,
+  leaveMatchPenalized,
+  cancelMatch,
 } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentUser } from '../services/auth';
@@ -140,38 +143,62 @@ export default function MatchDetailScreen({ route, navigation }) {
     navigation.navigate('CreateMatch', { matchId });
   };
 
-  const handleDelete = async () => {
-    const ok =
-      typeof window !== 'undefined' && typeof window.confirm === 'function'
-        ? window.confirm('¿Eliminar este partido? Los inscritos perderán acceso al chat y a su cupo.')
-        : true;
-    if (!ok) return;
-    setBusy(true);
-    const { error } = await deleteMatch(matchId);
-    setBusy(false);
-    if (error) {
-      showBanner('error', 'No pude eliminar', error.message || '');
-      return;
+  // Modal de confirmación cross-platform (web → confirm, nativo → Alert destructivo)
+  const confirmAction = (title, msg, confirmLabel) => {
+    if (Platform.OS === 'web') {
+      return Promise.resolve(
+        typeof window !== 'undefined' && window.confirm ? window.confirm(msg) : false
+      );
     }
-    showBanner('success', 'Partido eliminado', '');
-    setTimeout(() => navigation.navigate('Main', { screen: 'HomeTab' }), 700);
+    return new Promise((resolve) => {
+      Alert.alert(title, msg, [
+        { text: 'Volver', style: 'cancel', onPress: () => resolve(false) },
+        { text: confirmLabel, style: 'destructive', onPress: () => resolve(true) },
+      ]);
+    });
   };
 
-  const handleLeave = async () => {
-    const ok =
-      typeof window !== 'undefined' && typeof window.confirm === 'function'
-        ? window.confirm('¿Salirte de este partido? Liberas tu cupo y dejas el chat.')
-        : true;
+  const moreThan2h = () =>
+    match?.hora && new Date(match.hora).getTime() - Date.now() > 2 * 60 * 60 * 1000;
+
+  // Anfitrión cancela el partido
+  const handleDelete = async () => {
+    const early = moreThan2h();
+    const pts = early ? 15 : 25;
+    const msg = early
+      ? `Si cancelas, el partido se borrará para todos los inscritos y perderás ${pts} puntos de Trust Score. ¿Continuar?`
+      : `Estás cancelando con menos de 2 horas de anticipación. El partido se borrará para todos y perderás ${pts} puntos de Trust Score. ¿Continuar?`;
+    const ok = await confirmAction('Cancelar partido', msg, `Cancelar partido (-${pts} pts)`);
     if (!ok) return;
     setBusy(true);
-    const result = await leaveMatch(matchId);
+    const res = await cancelMatch(matchId);
     setBusy(false);
-    if (!result?.ok) {
-      showBanner('error', 'No pude salirme', result?.reason || result?.error?.message || '');
+    if (!res?.ok) {
+      showBanner('error', 'No pude cancelar', res?.reason || res?.error?.message || '');
       return;
     }
-    showBanner('success', 'Te saliste del partido', '');
-    setTimeout(() => navigation.goBack(), 700);
+    showBanner('success', 'Partido cancelado', `Se avisó a los inscritos. (-${res.penalty ?? pts} Trust Score)`);
+    setTimeout(() => navigation.navigate('Main', { screen: 'HomeTab' }), 800);
+  };
+
+  // Jugador sale del partido
+  const handleLeave = async () => {
+    const early = moreThan2h();
+    const pts = early ? 3 : 20;
+    const msg = early
+      ? `Si sales de este partido perderás ${pts} puntos de Trust Score y liberarás tu cupo. ¿Seguro que quieres salir?`
+      : `Falta menos de 2 horas para el partido. Si sales ahora perderás ${pts} puntos de Trust Score. ¿Seguro que quieres salir?`;
+    const ok = await confirmAction('Salir del partido', msg, `Salir (-${pts} pts)`);
+    if (!ok) return;
+    setBusy(true);
+    const res = await leaveMatchPenalized(matchId);
+    setBusy(false);
+    if (!res?.ok) {
+      showBanner('error', 'No pude salirme', res?.reason || res?.error?.message || '');
+      return;
+    }
+    showBanner('success', 'Te saliste del partido', `Se liberó tu cupo. (-${res.penalty ?? pts} Trust Score)`);
+    setTimeout(() => navigation.goBack(), 800);
   };
 
   const handleJoin = async () => {
@@ -253,6 +280,45 @@ export default function MatchDetailScreen({ route, navigation }) {
     } else {
       showBanner('success', 'Te cambiaste de partido', 'Saliste del anterior y entraste a este.');
     }
+    load();
+  };
+
+  const confirmHostCancel = () => {
+    const msg =
+      'No puedes unirte a otro partido a esta hora sin cerrar el tuyo primero. Si decides abandonar tu partido ahora, este se cancelará por completo, y penalizaremos tu Trust Score con -25 puntos.';
+    if (Platform.OS === 'web') {
+      return Promise.resolve(
+        typeof window !== 'undefined' && window.confirm ? window.confirm(msg) : false
+      );
+    }
+    return new Promise((resolve) => {
+      Alert.alert('Cancelar tu partido', msg, [
+        { text: 'Volver', style: 'cancel', onPress: () => resolve(false) },
+        {
+          text: 'Cancelar Partido y Salir (-25 pts)',
+          style: 'destructive',
+          onPress: () => resolve(true),
+        },
+      ]);
+    });
+  };
+
+  const handleHostConflict = async () => {
+    if (!conflict) return;
+    const ok = await confirmHostCancel();
+    if (!ok) return;
+    setBusy(true);
+    const res = await cancelMatchAndJoin(conflict.matchId, matchId);
+    setBusy(false);
+    if (!res?.ok) {
+      showBanner('error', 'No pude procesar el cambio', res?.reason || res?.error?.message || '');
+      return;
+    }
+    showBanner(
+      'success',
+      res.pending ? 'Solicitud enviada' : 'Listo',
+      'Cancelaste tu partido y te uniste a este. (-25 Trust Score)'
+    );
     load();
   };
 
@@ -462,7 +528,9 @@ export default function MatchDetailScreen({ route, navigation }) {
             ) : (
               <Pressable
                 onPress={
-                  conflict && conflict.canSwap
+                  conflict && conflict.canSwap && conflict.iAmHost
+                    ? handleHostConflict
+                    : conflict && conflict.canSwap
                     ? handleConflictJoin
                     : isManual
                     ? handleRequestJoin
