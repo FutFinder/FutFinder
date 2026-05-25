@@ -135,6 +135,7 @@ export async function createMatch({
   region,
   comuna,
   cancha_nombre,
+  direccion = null,
   latitud,
   longitud,
   hora,
@@ -159,6 +160,7 @@ export async function createMatch({
       region,
       comuna,
       cancha_nombre,
+      direccion,
       latitud,
       longitud,
       hora,
@@ -197,7 +199,7 @@ export async function getMatchById(matchId) {
 export async function updateMatch(matchId, patch) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
   const allowed = [
-    'titulo', 'region', 'comuna', 'cancha_nombre',
+    'titulo', 'region', 'comuna', 'cancha_nombre', 'direccion',
     'latitud', 'longitud', 'hora',
     'cupos_totales', 'cupos_disponibles',
     'precio_cuota', 'nivel', 'descripcion', 'estado', 'foto_url',

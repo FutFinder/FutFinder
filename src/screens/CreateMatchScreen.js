@@ -37,7 +37,8 @@ import { getCurrentLocation } from '../services/location';
 import { pickImage, uploadMatchCover } from '../services/storage';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
-import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
+import { REGIONES, getComunasOfRegion, matchComuna } from '../data/regiones-chile';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const REGION_DEFAULT = 'Región Metropolitana de Santiago';
 const COMUNA_DEFAULT = 'Providencia';
@@ -97,6 +98,8 @@ export default function CreateMatchScreen({ navigation, route }) {
   // Cancha
   const [titulo, setTitulo] = useState('');
   const [canchaNombre, setCanchaNombre] = useState('');
+  const [ubicacionText, setUbicacionText] = useState(''); // texto del buscador
+  const [direccion, setDireccion] = useState(null); // dirección exacta elegida
   const [region, setRegion] = useState(REGION_DEFAULT);
   const [comuna, setComuna] = useState(COMUNA_DEFAULT);
   const [regionPickerOpen, setRegionPickerOpen] = useState(false);
@@ -151,6 +154,10 @@ export default function CreateMatchScreen({ navigation, route }) {
       if (error || !data) return;
       setTitulo(data.titulo || '');
       setCanchaNombre(data.cancha_nombre || '');
+      if (data.direccion) {
+        setDireccion(data.direccion);
+        setUbicacionText(data.direccion);
+      }
       if (data.region) setRegion(data.region);
       if (data.comuna) setComuna(data.comuna);
       if (data.latitud != null && data.longitud != null) {
@@ -199,6 +206,21 @@ export default function CreateMatchScreen({ navigation, route }) {
     setFotoUrl(url);
     setBanner({ type: 'success', title: 'Portada actualizada', message: '' });
     setTimeout(() => setBanner(null), 2500);
+  };
+
+  // Al elegir un lugar del buscador: captura coords, dirección y autocompleta región/comuna
+  const handlePickLocation = ({ lat, lng, address, comunaRaw, regionRaw }) => {
+    if (lat != null && lng != null) {
+      setCoords({ latitude: lat, longitude: lng });
+    }
+    setDireccion(address || null);
+    setGpsError(null);
+
+    const match = matchComuna(comunaRaw) || matchComuna(regionRaw);
+    if (match) {
+      setRegion(match.region);
+      setComuna(match.comuna);
+    }
   };
 
   const fetchGPS = async () => {
@@ -261,6 +283,7 @@ export default function CreateMatchScreen({ navigation, route }) {
       region,
       comuna,
       cancha_nombre: canchaNombre.trim(),
+      direccion: direccion || null,
       latitud: coords.latitude,
       longitud: coords.longitude,
       hora: dt.toISOString(),
@@ -440,6 +463,24 @@ export default function CreateMatchScreen({ navigation, route }) {
                     value={canchaNombre}
                     onChangeText={setCanchaNombre}
                   />
+                </Field>
+
+                <Field label="Ubicación de la cancha">
+                  <LocationAutocomplete
+                    value={ubicacionText}
+                    onChangeText={setUbicacionText}
+                    onSelect={handlePickLocation}
+                    placeholder="Busca el complejo o la dirección…"
+                  />
+                  {direccion ? (
+                    <Text style={styles.locationHint}>
+                      📍 {direccion}
+                    </Text>
+                  ) : (
+                    <Text style={styles.locationHint}>
+                      Elige el lugar de la lista para fijar la ubicación exacta.
+                    </Text>
+                  )}
                 </Field>
 
                 <Field label="Región">
@@ -1025,6 +1066,12 @@ const styles = StyleSheet.create({
   pickerText: {
     color: colors.textPrimary,
     fontSize: 14,
+  },
+  locationHint: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 6,
+    lineHeight: 15,
   },
   picker: {
     marginTop: 6,

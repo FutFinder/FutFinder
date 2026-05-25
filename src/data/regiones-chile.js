@@ -205,3 +205,36 @@ export function getRegionOfComuna(comuna) {
   }
   return null;
 }
+
+// Normaliza para comparar (minúsculas, sin tildes)
+function normalizeName(s) {
+  return (s || '')
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim();
+}
+
+/**
+ * Busca una comuna por nombre aproximado (ignora tildes y mayúsculas).
+ * Devuelve { region, comuna } con los nombres EXACTOS de la lista, o null.
+ */
+export function matchComuna(rawName) {
+  const n = normalizeName(rawName);
+  if (!n) return null;
+  // coincidencia exacta normalizada
+  for (const r of REGIONES) {
+    for (const c of r.comunas) {
+      if (normalizeName(c) === n) return { region: r.nombre, comuna: c };
+    }
+  }
+  // coincidencia parcial (uno contiene al otro)
+  for (const r of REGIONES) {
+    for (const c of r.comunas) {
+      const nc = normalizeName(c);
+      if (nc.includes(n) || n.includes(nc)) return { region: r.nombre, comuna: c };
+    }
+  }
+  return null;
+}
