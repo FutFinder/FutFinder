@@ -54,6 +54,13 @@ const DURACIONES = [
   { value: 120, label: '120 min' },
 ];
 
+const TRUST_MINIMOS = [
+  { value: 0, label: 'Cualquiera' },
+  { value: 50, label: '50+' },
+  { value: 70, label: '70+' },
+  { value: 85, label: '85+' },
+];
+
 // Helper: formatea Date a string DD/MM/YYYY
 function formatDate(d) {
   const dd = String(d.getDate()).padStart(2, '0');
@@ -113,6 +120,7 @@ export default function CreateMatchScreen({ navigation, route }) {
   const [precioCuota, setPrecioCuota] = useState('5000');
   const [nivel, setNivel] = useState('intermedio');
   const [duracionMin, setDuracionMin] = useState(90); // duración en minutos
+  const [minTrust, setMinTrust] = useState(0); // trust score mínimo para unirse
   const [descripcion, setDescripcion] = useState('');
 
   // Aprobación (placeholder, no se persiste todavía en DB)
@@ -158,6 +166,7 @@ export default function CreateMatchScreen({ navigation, route }) {
       if (data.nivel) setNivel(data.nivel);
       if (data.duracion_min != null) setDuracionMin(data.duracion_min);
       if (data.aprobacion) setAprobacion(data.aprobacion);
+      if (data.min_trust_score != null) setMinTrust(data.min_trust_score);
       if (data.descripcion) setDescripcion(data.descripcion);
       if (data.foto_url) setFotoUrl(data.foto_url);
     })();
@@ -256,6 +265,7 @@ export default function CreateMatchScreen({ navigation, route }) {
       nivel,
       duracion_min: duracionMin,
       aprobacion,
+      min_trust_score: minTrust,
       descripcion: descripcion.trim() || null,
     };
     const result = isEditing
@@ -682,6 +692,33 @@ export default function CreateMatchScreen({ navigation, route }) {
                       </Pressable>
                     ))}
                   </View>
+                </Field>
+
+                <Field label="Trust Score mínimo para unirse">
+                  <View style={styles.segmented}>
+                    {TRUST_MINIMOS.map((t) => (
+                      <Pressable
+                        key={t.value}
+                        onPress={() => setMinTrust(t.value)}
+                        style={[
+                          styles.segmentBtn,
+                          minTrust === t.value && styles.segmentBtnActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.segmentLabel,
+                            minTrust === t.value && styles.segmentLabelActive,
+                          ]}
+                        >
+                          {t.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.helperText}>
+                    * Los jugadores con Trust Score menor no podrán reservar cupo.
+                  </Text>
                 </Field>
 
                 <Field label="Descripción">

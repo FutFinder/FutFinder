@@ -20,6 +20,29 @@ export async function getMyProfile() {
   return { ...data, email: user.email };
 }
 
+/**
+ * Estado de cuenta del usuario actual para gating de funciones.
+ * Devuelve { suspended, trust_score, suspended_until }.
+ */
+export async function getMyAccountStatus() {
+  if (!isSupabaseConfigured) return { suspended: false, trust_score: 100, suspended_until: null };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { suspended: false, trust_score: 100, suspended_until: null };
+  const { data } = await supabase
+    .from('profiles')
+    .select('trust_score, estado, suspended_until')
+    .eq('id', user.id)
+    .maybeSingle();
+  const suspended =
+    data?.estado === 'suspendido' &&
+    (!data.suspended_until || new Date(data.suspended_until) > new Date());
+  return {
+    suspended,
+    trust_score: data?.trust_score ?? 100,
+    suspended_until: data?.suspended_until || null,
+  };
+}
+
 export async function getProfileById(id) {
   if (!isSupabaseConfigured) return null;
   const { data, error } = await supabase

@@ -27,6 +27,7 @@ import {
   Trash2,
   Star,
   ChevronRight,
+  ShieldCheck,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -36,7 +37,7 @@ import { listOpenMatches, applyFilters, joinMatch, requestJoinMatch, deleteMatch
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentLocation } from '../services/location';
 import { getCurrentUser } from '../services/auth';
-import { searchPlayers } from '../services/profile';
+import { searchPlayers, getMyAccountStatus } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
@@ -150,6 +151,7 @@ export default function SearchScreen({ navigation }) {
   const [posIdx, setPosIdx] = useState(0);
   const [flancoIdx, setFlancoIdx] = useState(0);
   const [edadIdx, setEdadIdx] = useState(0);
+  const [suspendedInfo, setSuspendedInfo] = useState(null); // { suspended, suspended_until }
 
   // Estado de filtros (índices en cada arreglo OPTS)
   const [text, setText] = useState('');
@@ -168,14 +170,16 @@ export default function SearchScreen({ navigation }) {
 
   // Cargar partidos + ubicación + user
   const load = useCallback(async () => {
-    const [{ data }, loc, user] = await Promise.all([
+    const [{ data }, loc, user, status] = await Promise.all([
       listOpenMatches({ limit: 50 }),
       getCurrentLocation(),
       getCurrentUser(),
+      getMyAccountStatus(),
     ]);
     setMatches(data || []);
     if (loc?.ok) setUserCoords({ lat: loc.latitude, lng: loc.longitude });
     setMyUserId(user?.id || null);
+    setSuspendedInfo(status?.suspended ? status : null);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -379,6 +383,19 @@ export default function SearchScreen({ navigation }) {
             />
           }
         >
+          {suspendedInfo ? (
+            <View style={styles.suspendedBox}>
+              <Text style={styles.suspendedTitle}>Cuenta suspendida</Text>
+              <Text style={styles.suspendedText}>
+                Tu Trust Score llegó a 0. No puedes buscar ni unirte a partidos
+                temporalmente.
+                {suspendedInfo.suspended_until
+                  ? ` Se reactiva el ${new Date(suspendedInfo.suspended_until).toLocaleDateString('es-CL', { day: '2-digit', month: 'long' })}.`
+                  : ''}
+              </Text>
+            </View>
+          ) : (
+          <>
           {/* Toggle Partidos / Jugadores */}
           <View style={styles.modeToggle}>
             <Pressable
@@ -683,6 +700,14 @@ export default function SearchScreen({ navigation }) {
                       {nivelLabel(m.nivel)}
                     </Text>
                   </View>
+                  {m.min_trust_score > 0 && (
+                    <View style={styles.metaItem}>
+                      <ShieldCheck color={colors.primary} size={13} />
+                      <Text style={[styles.metaText, { color: colors.primary }]}>
+                        Trust {m.min_trust_score}+
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.divider} />
@@ -923,6 +948,8 @@ export default function SearchScreen({ navigation }) {
           )}
 
           <View style={{ height: 24 }} />
+          </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -1049,6 +1076,27 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
+  suspendedBox: {
+    backgroundColor: colors.errorSoft,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+    padding: 22,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  suspendedTitle: {
+    color: colors.error,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  suspendedText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
   searchRow: { marginBottom: 12 },
   searchBox: {
     flexDirection: 'row',

@@ -144,6 +144,7 @@ export async function createMatch({
   descripcion = null,
   duracion_min = 90,
   aprobacion = 'inmediata',
+  min_trust_score = 0,
 }) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo mode' } };
 
@@ -168,6 +169,7 @@ export async function createMatch({
       descripcion,
       duracion_min,
       aprobacion,
+      min_trust_score,
     })
     .select()
     .single();
@@ -199,7 +201,7 @@ export async function updateMatch(matchId, patch) {
     'latitud', 'longitud', 'hora',
     'cupos_totales', 'cupos_disponibles',
     'precio_cuota', 'nivel', 'descripcion', 'estado', 'foto_url',
-    'duracion_min', 'aprobacion',
+    'duracion_min', 'aprobacion', 'min_trust_score',
   ];
   const payload = {};
   for (const k of allowed) {
@@ -235,8 +237,20 @@ export async function deleteMatch(matchId) {
 export async function joinMatch(matchId) {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const { data, error } = await supabase.rpc('join_match', { p_match_id: matchId });
-  if (error) return { ok: false, error };
+  if (error) return { ok: false, reason: translateJoinError(error.message), error };
   return data; // { ok: true } o { ok: false, reason }
+}
+
+// Traduce las excepciones del trigger tg_enforce_join_rules a mensajes legibles.
+function translateJoinError(msg = '') {
+  if (msg.includes('SUSPENDIDO')) {
+    return 'Tu cuenta está suspendida temporalmente y no puede unirse a partidos.';
+  }
+  const m = msg.match(/TRUST_BAJO:(\d+):(\d+)/);
+  if (m) {
+    return `Trust Score insuficiente: este partido pide ${m[2]} y tú tienes ${m[1]}.`;
+  }
+  return null;
 }
 
 /**
