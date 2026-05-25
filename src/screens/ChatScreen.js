@@ -187,6 +187,7 @@ export default function ChatScreen({ navigation }) {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabsRow}
+          style={styles.tabsScroll}
         >
           <TabPill
             label="Todos"
@@ -531,11 +532,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.5,
   },
+  tabsScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: 16,
+  },
   tabsRow: {
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 20,
-    marginBottom: 16,
   },
   tabPill: {
     flexDirection: 'row',
