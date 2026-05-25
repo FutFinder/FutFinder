@@ -7,6 +7,8 @@ import {
   Pressable,
   RefreshControl,
   Image,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -27,6 +29,7 @@ import {
   UserX,
   MessageCircle,
   Clock,
+  X,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -87,6 +90,7 @@ export default function ProfileScreen({ navigation, route }) {
   const [friendship, setFriendship] = useState(null); // estado de amistad
   const [friendBusy, setFriendBusy] = useState(false);
   const [ratingSummary, setRatingSummary] = useState(null);
+  const [photoViewer, setPhotoViewer] = useState(false);
 
   // ¿Estoy viendo mi propio perfil o el de otro?
   const isMyProfile = !viewUserId || viewUserId === myId;
@@ -289,13 +293,17 @@ export default function ProfileScreen({ navigation, route }) {
 
           {/* Hero card */}
           <View style={styles.heroCard}>
-            <View style={styles.avatar}>
+            <Pressable
+              onPress={() => profile?.foto_url && setPhotoViewer(true)}
+              disabled={!profile?.foto_url}
+              style={styles.avatar}
+            >
               {profile?.foto_url ? (
                 <Image source={{ uri: profile.foto_url }} style={styles.avatarImage} />
               ) : (
                 <UserIcon color={colors.primary} size={42} strokeWidth={1.5} />
               )}
-            </View>
+            </Pressable>
             <View style={{ flex: 1 }}>
               <Text style={styles.username}>
                 @{profile?.username || 'jugador'}
@@ -573,6 +581,31 @@ export default function ProfileScreen({ navigation, route }) {
           <View style={{ height: 32 }} />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Visor de foto a pantalla completa */}
+      <Modal
+        visible={photoViewer}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoViewer(false)}
+      >
+        <Pressable style={styles.viewerBackdrop} onPress={() => setPhotoViewer(false)}>
+          <Pressable
+            onPress={() => setPhotoViewer(false)}
+            hitSlop={12}
+            style={styles.viewerClose}
+          >
+            <X color="#FFFFFF" size={26} />
+          </Pressable>
+          {profile?.foto_url && (
+            <Image
+              source={{ uri: profile.foto_url }}
+              style={styles.viewerImage}
+              resizeMode="contain"
+            />
+          )}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -843,6 +876,28 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarImage: { width: '100%', height: '100%' },
+  viewerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').width,
+  },
+  viewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   username: {
     color: colors.textPrimary,
     fontSize: 20,
