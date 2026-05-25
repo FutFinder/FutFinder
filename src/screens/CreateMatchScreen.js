@@ -226,7 +226,11 @@ export default function CreateMatchScreen({ navigation, route }) {
     if (!coords) return 'Falta capturar la ubicación GPS de la cancha';
     const dt = parseDateTime(fechaStr, horaStr);
     if (!dt) return 'Fecha u hora con formato inválido (usa DD/MM/YYYY y HH:MM)';
-    if (dt.getTime() < Date.now() - 60 * 1000) return 'La fecha/hora ya pasó';
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dtDay = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    if (dtDay < startToday) return 'La fecha ya pasó. Elige hoy o un día futuro.';
+    if (dt.getTime() <= now.getTime()) return 'La hora ya pasó. Elige una hora futura.';
     const cupos = parseInt(cuposTotales, 10);
     if (Number.isNaN(cupos) || cupos < 1 || cupos > 30) return 'Los cupos disponibles deben estar entre 1 y 30';
     const precio = parseInt(precioCuota, 10);
