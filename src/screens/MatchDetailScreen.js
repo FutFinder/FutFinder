@@ -10,6 +10,8 @@ import {
   Image,
   Modal,
   Dimensions,
+  Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -44,6 +46,8 @@ import {
   requestJoinMatch,
   approveJoinRequest,
   rejectJoinRequest,
+  getScheduleConflict,
+  swapMatch,
 } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentUser } from '../services/auth';
@@ -83,15 +87,18 @@ export default function MatchDetailScreen({ route, navigation }) {
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState(null);
   const [photoViewer, setPhotoViewer] = useState(false);
+  const [conflict, setConflict] = useState(null);
 
   const load = useCallback(async () => {
-    const [{ data, match: m }, user] = await Promise.all([
+    const [{ data, match: m }, user, conf] = await Promise.all([
       getMatchAttendees(matchId),
       getCurrentUser(),
+      getScheduleConflict(matchId),
     ]);
     setMatch(m || null);
     setAttendees(data || []);
     setMyId(user?.id || null);
+    setConflict(conf?.conflict ? conf : null);
     setLoading(false);
     setRefreshing(false);
   }, [matchId]);
@@ -212,6 +219,40 @@ export default function MatchDetailScreen({ route, navigation }) {
       return;
     }
     showBanner('info', 'Solicitud rechazada', '');
+    load();
+  };
+
+  const confirmSwap = (title) => {
+    const msg = `Ya estás inscrito en un partido a esta hora. ¿Quieres salirte del partido "${title}" para unirte a este?`;
+    if (Platform.OS === 'web') {
+      return Promise.resolve(
+        typeof window !== 'undefined' && window.confirm ? window.confirm(msg) : true
+      );
+    }
+    return new Promise((resolve) => {
+      Alert.alert('Cambiar de partido', msg, [
+        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Sí, cambiarme', onPress: () => resolve(true) },
+      ]);
+    });
+  };
+
+  const handleConflictJoin = async () => {
+    if (!conflict) return;
+    const ok = await confirmSwap(conflict.titulo);
+    if (!ok) return;
+    setBusy(true);
+    const res = await swapMatch(conflict.matchId, matchId);
+    setBusy(false);
+    if (!res?.ok) {
+      showBanner('error', 'No pude cambiarte', res?.reason || res?.error?.message || '');
+      return;
+    }
+    if (res.pending) {
+      showBanner('success', 'Solicitud enviada', 'Saliste del partido anterior. El anfitrión debe aceptarte.');
+    } else {
+      showBanner('success', 'Te cambiaste de partido', 'Saliste del anterior y entraste a este.');
+    }
     load();
   };
 
@@ -412,9 +453,21 @@ export default function MatchDetailScreen({ route, navigation }) {
                 <ClockIcon color={colors.primary} size={15} />
                 <Text style={styles.actionPendingLabel}>Solicitud enviada</Text>
               </View>
+            ) : conflict && !conflict.canSwap ? (
+              <View style={[styles.actionPrimary, styles.actionDisabled]}>
+                <Text style={styles.actionDisabledLabel}>
+                  Ya tienes un partido a esta hora
+                </Text>
+              </View>
             ) : (
               <Pressable
-                onPress={isManual ? handleRequestJoin : handleJoin}
+                onPress={
+                  conflict && conflict.canSwap
+                    ? handleConflictJoin
+                    : isManual
+                    ? handleRequestJoin
+                    : handleJoin
+                }
                 disabled={busy || match.cupos_disponibles === 0}
                 style={({ pressed }) => [styles.actionPrimary, pressed && { opacity: 0.85 }, (busy || match.cupos_disponibles === 0) && { opacity: 0.5 }]}
               >
@@ -759,6 +812,12 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   actionPendingLabel: { color: colors.primary, fontWeight: '800', fontSize: 13 },
+  actionDisabled: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  actionDisabledLabel: { color: colors.textMuted, fontWeight: '700', fontSize: 13 },
   pendingRow: {
     flexDirection: 'row',
     alignItems: 'center',

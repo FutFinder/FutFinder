@@ -246,11 +246,44 @@ function translateJoinError(msg = '') {
   if (msg.includes('SUSPENDIDO')) {
     return 'Tu cuenta está suspendida temporalmente y no puede unirse a partidos.';
   }
+  if (msg.includes('CHOQUE_HORARIO')) {
+    return 'Ya tienes un partido a esta hora.';
+  }
   const m = msg.match(/TRUST_BAJO:(\d+):(\d+)/);
   if (m) {
     return `Trust Score insuficiente: este partido pide ${m[2]} y tú tienes ${m[1]}.`;
   }
   return null;
+}
+
+/**
+ * Devuelve si el partido choca con otro en el que el usuario ya está inscrito.
+ *   { conflict: false } | { conflict: true, matchId, titulo, hora, canSwap }
+ */
+export async function getScheduleConflict(matchId) {
+  if (!isSupabaseConfigured) return { conflict: false };
+  const { data, error } = await supabase.rpc('get_schedule_conflict', {
+    p_match_id: matchId,
+  });
+  if (error) {
+    console.warn('[FutFinder] getScheduleConflict:', error);
+    return { conflict: false };
+  }
+  return data || { conflict: false };
+}
+
+/**
+ * Sale del partido viejo e inscribe en el nuevo en un solo flujo.
+ * Devuelve { ok, pending?, reason? }.
+ */
+export async function swapMatch(oldMatchId, newMatchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data, error } = await supabase.rpc('swap_match', {
+    p_old: oldMatchId,
+    p_new: newMatchId,
+  });
+  if (error) return { ok: false, reason: translateJoinError(error.message), error };
+  return data;
 }
 
 /**
@@ -261,7 +294,7 @@ function translateJoinError(msg = '') {
 export async function requestJoinMatch(matchId) {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const { data, error } = await supabase.rpc('request_join', { p_match_id: matchId });
-  if (error) return { ok: false, error };
+  if (error) return { ok: false, reason: translateJoinError(error.message), error };
   return data; // { ok, reason? }
 }
 
