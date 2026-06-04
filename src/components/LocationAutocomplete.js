@@ -8,9 +8,10 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { MapPin, Search as SearchIcon } from 'lucide-react-native';
+import { MapPin, Search as SearchIcon, Star } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
+import { searchCanchas } from '../services/canchas';
 
 /**
  * Buscador de lugares con autocompletado.
@@ -151,17 +152,35 @@ export default function LocationAutocomplete({
   const doSearch = async (q) => {
     setLoading(true);
     try {
-      let items = [];
+      // 1) Primero canchas del directorio de FutFinder (registradas por otros usuarios)
+      const { data: canchas } = await searchCanchas(q, { limit: 4 });
+      const futItems = (canchas || []).map((c) => ({
+        id: `fut:${c.id}`,
+        label: c.nombre + (c.comuna ? ` · ${c.comuna}` : ''),
+        provider: 'futfinder',
+        _direct: {
+          lat: c.latitud,
+          lng: c.longitud,
+          address: c.direccion || c.nombre,
+          comunaRaw: c.comuna,
+          regionRaw: c.region,
+          canchaName: c.nombre,
+        },
+        _usos: c.usos_count,
+      }));
+
+      // 2) Después Mapbox (o OSM como fallback)
+      let extItems = [];
       if (USE_MAPBOX) {
-        items = await suggestMapbox(q, proximity, sessionToken.current);
-        if (items.length === 0) {
-          // Fallback: si Mapbox no encuentra, probamos OSM
-          items = await searchNominatim(q);
+        extItems = await suggestMapbox(q, proximity, sessionToken.current);
+        if (extItems.length === 0) {
+          extItems = await searchNominatim(q);
         }
       } else {
-        items = await searchNominatim(q);
+        extItems = await searchNominatim(q);
       }
-      setResults(items);
+
+      setResults([...futItems, ...extItems]);
     } catch (e) {
       console.warn('[FutFinder] location search:', e?.message || e);
       setResults([]);
@@ -176,7 +195,6 @@ export default function LocationAutocomplete({
       let payload;
       if (item.provider === 'mapbox') {
         payload = await retrieveMapbox(item.id, sessionToken.current);
-        // Renovamos el session token tras una selección exitosa
         sessionToken.current = newSessionToken();
       } else if (item._direct) {
         payload = item._direct;
@@ -188,6 +206,7 @@ export default function LocationAutocomplete({
           address: payload.address,
           comunaRaw: payload.comunaRaw,
           regionRaw: payload.regionRaw,
+          canchaName: payload.canchaName || null,
         });
         onChangeText?.(payload.address);
       }
@@ -217,18 +236,41 @@ export default function LocationAutocomplete({
 
       {open && results.length > 0 && (
         <View style={styles.dropdown}>
-          {results.map((item, i) => (
-            <Pressable
-              key={item.id || String(i)}
-              onPress={() => pick(item)}
-              style={({ pressed }) => [styles.option, pressed && { opacity: 0.7 }]}
-            >
-              <MapPin color={colors.primary} size={14} style={{ marginTop: 2 }} />
-              <Text style={styles.optionText} numberOfLines={2}>
-                {item.label}
-              </Text>
-            </Pressable>
-          ))}
+          {results.map((item, i) => {
+            const isFut = item.provider === 'futfinder';
+            return (
+              <Pressable
+                key={item.id || String(i)}
+                onPress={() => pick(item)}
+                style={({ pressed }) => [
+                  styles.option,
+                  isFut && styles.optionFut,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                {isFut ? (
+                  <Star
+                    color={colors.primary}
+                    size={14}
+                    fill={colors.primary}
+                    style={{ marginTop: 2 }}
+                  />
+                ) : (
+                  <MapPin color={colors.primary} size={14} style={{ marginTop: 2 }} />
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.optionText} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                  {isFut && (
+                    <Text style={styles.optionBadge}>
+                      Cancha FutFinder · {item._usos} {item._usos === 1 ? 'uso' : 'usos'}
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       )}
 
@@ -280,6 +322,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
+  },
+  optionFut: {
+    backgroundColor: colors.primarySoft,
+  },
+  optionBadge: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    marginTop: 2,
+    textTransform: 'uppercase',
   },
   optionText: {
     flex: 1,

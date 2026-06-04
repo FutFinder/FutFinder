@@ -208,8 +208,17 @@ export default function CreateMatchScreen({ navigation, route }) {
     setTimeout(() => setBanner(null), 2500);
   };
 
-  // Al elegir un lugar del buscador: captura coords, dirección y autocompleta región/comuna
-  const handlePickLocation = ({ lat, lng, address, comunaRaw, regionRaw }) => {
+  // Al elegir un lugar del buscador: captura coords, dirección y autocompleta región/comuna.
+  // Si la opción elegida es una cancha del directorio de FutFinder, también
+  // autocompleta el "Nombre de la cancha".
+  const handlePickLocation = ({
+    lat,
+    lng,
+    address,
+    comunaRaw,
+    regionRaw,
+    canchaName,
+  }) => {
     if (lat != null && lng != null) {
       setCoords({ latitude: lat, longitude: lng });
     }
@@ -220,6 +229,11 @@ export default function CreateMatchScreen({ navigation, route }) {
     if (match) {
       setRegion(match.region);
       setComuna(match.comuna);
+    }
+
+    // Cancha del directorio FutFinder → autollena el nombre si está vacío
+    if (canchaName && !canchaNombre.trim()) {
+      setCanchaNombre(canchaName);
     }
   };
 
