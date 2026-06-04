@@ -470,15 +470,16 @@ export default function CreateMatchScreen({ navigation, route }) {
                     value={ubicacionText}
                     onChangeText={setUbicacionText}
                     onSelect={handlePickLocation}
-                    placeholder="Busca el complejo o la dirección…"
+                    placeholder="Busca por dirección o sector (ej. Av. Las Condes 12000)"
+                    proximity={coords ? { lat: coords.latitude, lng: coords.longitude } : null}
                   />
                   {direccion ? (
-                    <Text style={styles.locationHint}>
-                      📍 {direccion}
-                    </Text>
+                    <Text style={styles.locationHint}>📍 {direccion}</Text>
                   ) : (
                     <Text style={styles.locationHint}>
-                      Elige el lugar de la lista para fijar la ubicación exacta.
+                      Escribe la dirección o el sector cercano. Si estás en la
+                      cancha, puedes usar el botón "Usar mi ubicación actual"
+                      más abajo.
                     </Text>
                   )}
                 </Field>
