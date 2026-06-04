@@ -510,7 +510,14 @@ export default function CreateMatchScreen({ navigation, route }) {
                 <Field label="Ubicación de la cancha">
                   <LocationAutocomplete
                     value={ubicacionText}
-                    onChangeText={setUbicacionText}
+                    onChangeText={(t) => {
+                      setUbicacionText(t);
+                      // Si limpias el campo, volvemos al estado inicial para que
+                      // reaparezca el link "Estoy en la cancha".
+                      if (!t || !t.trim()) {
+                        setDireccion(null);
+                      }
+                    }}
                     onSelect={handlePickLocation}
                     placeholder="Busca por dirección o sector (ej. Av. Las Condes 12000)"
                     proximity={coords ? { lat: coords.latitude, lng: coords.longitude } : null}
