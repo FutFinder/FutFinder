@@ -489,12 +489,27 @@ export default function CreateMatchScreen({ navigation, route }) {
                   />
                   {direccion ? (
                     <Text style={styles.locationHint}>📍 {direccion}</Text>
+                  ) : coords ? (
+                    <View style={styles.locationHintRow}>
+                      <Text style={styles.locationHint}>
+                        ✓ Ubicación GPS capturada ({coords.latitude.toFixed(4)},{' '}
+                        {coords.longitude.toFixed(4)})
+                      </Text>
+                      <Pressable onPress={fetchGPS} hitSlop={6}>
+                        <Text style={styles.locationLink}>📍 Volver a capturar</Text>
+                      </Pressable>
+                    </View>
                   ) : (
-                    <Text style={styles.locationHint}>
-                      Escribe la dirección o el sector cercano. Si estás en la
-                      cancha, puedes usar el botón "Usar mi ubicación actual"
-                      más abajo.
-                    </Text>
+                    <View style={styles.locationHintRow}>
+                      <Text style={styles.locationHint}>
+                        Escribe la dirección o el sector cercano.
+                      </Text>
+                      <Pressable onPress={fetchGPS} hitSlop={6}>
+                        <Text style={styles.locationLink}>
+                          📍 Usar mi ubicación actual
+                        </Text>
+                      </Pressable>
+                    </View>
                   )}
                 </Field>
 
@@ -1087,6 +1102,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 6,
     lineHeight: 15,
+  },
+  locationHintRow: {
+    marginTop: 6,
+    gap: 6,
+  },
+  locationLink: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   picker: {
     marginTop: 6,
