@@ -38,7 +38,7 @@ import { pickImage, uploadMatchCover } from '../services/storage';
 import { isSupabaseConfigured } from '../services/supabase';
 import { notify } from '../utils/notify';
 import { REGIONES, getComunasOfRegion, matchComuna } from '../data/regiones-chile';
-import LocationAutocomplete from '../components/LocationAutocomplete';
+import LocationAutocomplete, { reverseGeocode } from '../components/LocationAutocomplete';
 
 const REGION_DEFAULT = 'Región Metropolitana de Santiago';
 const COMUNA_DEFAULT = 'Providencia';
@@ -246,6 +246,34 @@ export default function CreateMatchScreen({ navigation, route }) {
       setCoords({ latitude: r.latitude, longitude: r.longitude });
     } else {
       setGpsError(r.reason || 'No pude leer tu ubicación');
+    }
+  };
+
+  // "Estoy en la cancha" → captura GPS y autocompleta ubicación, dirección,
+  // región y comuna usando geocoding inverso.
+  const handleIAmHere = async () => {
+    setGpsLoading(true);
+    setGpsError(null);
+    try {
+      const r = await getCurrentLocation();
+      if (!r?.ok) {
+        setGpsError(r?.reason || 'No pude leer tu ubicación');
+        return;
+      }
+      setCoords({ latitude: r.latitude, longitude: r.longitude });
+
+      const rev = await reverseGeocode({ lat: r.latitude, lng: r.longitude });
+      if (rev?.address) {
+        setDireccion(rev.address);
+        setUbicacionText(rev.address);
+      }
+      const m = matchComuna(rev?.comunaRaw) || matchComuna(rev?.regionRaw);
+      if (m) {
+        setRegion(m.region);
+        setComuna(m.comuna);
+      }
+    } finally {
+      setGpsLoading(false);
     }
   };
 
@@ -489,24 +517,18 @@ export default function CreateMatchScreen({ navigation, route }) {
                   />
                   {direccion ? (
                     <Text style={styles.locationHint}>📍 {direccion}</Text>
-                  ) : coords ? (
-                    <View style={styles.locationHintRow}>
-                      <Text style={styles.locationHint}>
-                        ✓ Ubicación GPS capturada ({coords.latitude.toFixed(4)},{' '}
-                        {coords.longitude.toFixed(4)})
-                      </Text>
-                      <Pressable onPress={fetchGPS} hitSlop={6}>
-                        <Text style={styles.locationLink}>📍 Volver a capturar</Text>
-                      </Pressable>
-                    </View>
                   ) : (
                     <View style={styles.locationHintRow}>
                       <Text style={styles.locationHint}>
                         Escribe la dirección o el sector cercano.
                       </Text>
-                      <Pressable onPress={fetchGPS} hitSlop={6}>
+                      <Pressable
+                        onPress={handleIAmHere}
+                        disabled={gpsLoading}
+                        hitSlop={6}
+                      >
                         <Text style={styles.locationLink}>
-                          📍 Usar mi ubicación actual
+                          {gpsLoading ? '📍 Capturando…' : '📍 Estoy en la cancha'}
                         </Text>
                       </Pressable>
                     </View>
@@ -600,48 +622,6 @@ export default function CreateMatchScreen({ navigation, route }) {
                     </View>
                   )}
                 </Field>
-
-                {/* GPS capture */}
-                <View style={styles.gpsBox}>
-                  {coords ? (
-                    <View style={styles.gpsRow}>
-                      <CheckCircle2 color={colors.primary} size={18} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.gpsTitle}>Ubicación capturada ✓</Text>
-                        <Text style={styles.gpsCoords}>
-                          {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
-                        </Text>
-                      </View>
-                      <Pressable onPress={fetchGPS} hitSlop={8}>
-                        <Text style={styles.gpsRefresh}>Refrescar</Text>
-                      </Pressable>
-                    </View>
-                  ) : gpsError ? (
-                    <View style={styles.gpsRow}>
-                      <AlertCircle color={colors.error} size={18} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.gpsTitle}>No pude leer tu ubicación</Text>
-                        <Text style={styles.gpsCoords}>{gpsError}</Text>
-                      </View>
-                      <Pressable onPress={fetchGPS} hitSlop={8}>
-                        <Text style={styles.gpsRefresh}>Reintentar</Text>
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <Pressable
-                      onPress={fetchGPS}
-                      style={({ pressed }) => [
-                        styles.gpsBtn,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <Locate color={colors.primary} size={18} />
-                      <Text style={styles.gpsBtnLabel}>
-                        {gpsLoading ? 'Capturando…' : 'Usar mi ubicación actual'}
-                      </Text>
-                    </Pressable>
-                  )}
-                </View>
 
                 <View style={styles.row2}>
                   <View style={{ flex: 1 }}>

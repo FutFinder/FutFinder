@@ -91,6 +91,58 @@ async function retrieveMapbox(mapboxId, sessionToken) {
   };
 }
 
+/**
+ * Geocoding inverso: dada una coordenada devuelve dirección + comuna + región.
+ * Usa Mapbox si hay token; cae a Nominatim si no.
+ */
+export async function reverseGeocode({ lat, lng }) {
+  if (lat == null || lng == null) return null;
+  if (MAPBOX_TOKEN) {
+    try {
+      const url =
+        'https://api.mapbox.com/search/searchbox/v1/reverse?' +
+        `longitude=${lng}&latitude=${lat}&access_token=${MAPBOX_TOKEN}` +
+        '&country=cl&language=es&limit=1' +
+        '&types=address,place,locality,neighborhood,poi';
+      const resp = await fetch(url);
+      const data = await resp.json();
+      const f = data?.features?.[0];
+      if (f) {
+        const p = f.properties || {};
+        const ctx = p.context || {};
+        return {
+          address: p.full_address || p.place_formatted || p.name,
+          comunaRaw:
+            ctx.place?.name ||
+            ctx.locality?.name ||
+            ctx.neighborhood?.name ||
+            null,
+          regionRaw: ctx.region?.name || null,
+        };
+      }
+    } catch (e) {
+      console.warn('[FutFinder] reverse mapbox:', e?.message || e);
+    }
+  }
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}` +
+      '&format=jsonv2&addressdetails=1&accept-language=es';
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+    const data = await resp.json();
+    const a = data?.address || {};
+    return {
+      address: data?.display_name || null,
+      comunaRaw:
+        a.city || a.town || a.village || a.suburb || a.municipality || a.county || null,
+      regionRaw: a.state || a.region || null,
+    };
+  } catch (e) {
+    console.warn('[FutFinder] reverse osm:', e?.message || e);
+    return null;
+  }
+}
+
 async function searchNominatim(q) {
   const url =
     'https://nominatim.openstreetmap.org/search?' +
