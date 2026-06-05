@@ -14,9 +14,66 @@ function fmtHora(iso) {
   }
 }
 
+/**
+ * Estilo dark/green minimalista para Google Maps (Android / iOS con
+ * PROVIDER_GOOGLE). En iOS con Apple Maps por defecto, este JSON se ignora
+ * pero `userInterfaceStyle="dark"` + `mapType="mutedStandard"` igual da una
+ * estética dark sutil.
+ */
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#201F1D' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#201F1D' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#A7A7A5' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  {
+    featureType: 'administrative.locality',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#71B533' }],
+  },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  {
+    featureType: 'poi.park',
+    elementType: 'geometry',
+    stylers: [{ color: '#2A2927' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#2A2927' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry.stroke',
+    stylers: [{ color: '#3A3936' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#6F6E6C' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#3A3936' }],
+  },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#1A1918' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#6F6E6C' }],
+  },
+];
+
 function MarkerPill({ m, selected, onPress }) {
-  const cupos = m.cupos_disponibles ?? 0;
-  const label = cupos === 0 ? 'Lleno' : `Falta ${cupos}`;
+  const total = m.cupos_totales ?? 0;
+  const disponibles = m.cupos_disponibles ?? 0;
+  const ocupados = Math.max(0, total - disponibles);
+  const label = `${ocupados}/${total} · ${fmtHora(m.hora)}`;
   return (
     <Marker
       coordinate={{ latitude: m.latitud, longitude: m.longitud }}
@@ -25,7 +82,7 @@ function MarkerPill({ m, selected, onPress }) {
     >
       <View style={[styles.pill, selected && styles.pillSelected]}>
         <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
-          {label} · {fmtHora(m.hora)}
+          {label}
         </Text>
         <View style={[styles.pillTip, selected && styles.pillTipSelected]} />
       </View>
@@ -33,19 +90,6 @@ function MarkerPill({ m, selected, onPress }) {
   );
 }
 
-/**
- * Mapa con marcadores Airbnb-like (Falta N · HH:MM).
- *
- * Props:
- *   initialRegion: { latitude, longitude, latitudeDelta, longitudeDelta }
- *   matches: array de partidos con lat/lng
- *   selectedId: id del marker seleccionado (opcional)
- *   onSelectMarker(match)
- *   onRegionChange(region): se llama cuando el usuario detiene el gesto
- *   onSearchHere(): se llama al tocar el botón "Buscar en esta zona"
- *   showSearchHere: bool — controla la visibilidad del botón
- *   onTouchStart / onTouchEnd: opcional, para que el padre desactive scroll
- */
 export default function MatchMap({
   initialRegion,
   matches = [],
@@ -60,10 +104,7 @@ export default function MatchMap({
   const mapRef = useRef(null);
 
   return (
-    <View
-      style={styles.wrap}
-      onStartShouldSetResponderCapture={() => false}
-    >
+    <View style={styles.wrap}>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -74,7 +115,13 @@ export default function MatchMap({
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
+        showsPointsOfInterest={false}
+        showsTraffic={false}
+        showsBuildings={false}
         toolbarEnabled={false}
+        userInterfaceStyle="dark"
+        mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
+        customMapStyle={DARK_MAP_STYLE}
       >
         {matches.map((m) =>
           m.latitud != null && m.longitud != null ? (
@@ -93,7 +140,7 @@ export default function MatchMap({
           onPress={onSearchHere}
           style={({ pressed }) => [styles.searchHere, pressed && { opacity: 0.85 }]}
         >
-          <SearchIcon color={colors.primary} size={14} />
+          <SearchIcon color={colors.primary} size={13} />
           <Text style={styles.searchHereText}>Buscar en esta zona</Text>
         </Pressable>
       )}
@@ -109,25 +156,26 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.borderSoft,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.background,
     marginBottom: 12,
   },
   map: { ...StyleSheet.absoluteFillObject },
 
+  // Burbuja Airbnb-like, compacta y oscura
   pill: {
     backgroundColor: colors.background,
     borderColor: colors.primary,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
     ...Platform.select({
-      android: { elevation: 4 },
+      android: { elevation: 3 },
       default: {
         shadowColor: '#000',
-        shadowOpacity: 0.35,
+        shadowOpacity: 0.4,
         shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
+        shadowRadius: 3,
       },
     }),
   },
@@ -137,21 +185,21 @@ const styles = StyleSheet.create({
   },
   pillText: {
     color: colors.primary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.2,
   },
   pillTextSelected: { color: '#0E0E0D' },
   pillTip: {
     position: 'absolute',
-    bottom: -5,
+    bottom: -4,
     left: '50%',
-    marginLeft: -4,
-    width: 8,
-    height: 8,
+    marginLeft: -3,
+    width: 6,
+    height: 6,
     backgroundColor: colors.background,
-    borderRightWidth: 1.5,
-    borderBottomWidth: 1.5,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
     borderColor: colors.primary,
     transform: [{ rotate: '45deg' }],
   },
@@ -167,14 +215,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 999,
     ...Platform.select({
       android: { elevation: 4 },
       default: {
         shadowColor: '#000',
-        shadowOpacity: 0.35,
+        shadowOpacity: 0.4,
         shadowOffset: { width: 0, height: 3 },
         shadowRadius: 5,
       },
@@ -182,7 +230,7 @@ const styles = StyleSheet.create({
   },
   searchHereText: {
     color: colors.primary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
