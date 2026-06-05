@@ -79,12 +79,31 @@ function MarkerPill({ m, selected, onPress }) {
       coordinate={{ latitude: m.latitud, longitude: m.longitud }}
       onPress={onPress}
       anchor={{ x: 0.5, y: 1 }}
+      zIndex={selected ? 1000 : 100}
     >
       <View style={[styles.pill, selected && styles.pillSelected]}>
         <Text style={[styles.pillText, selected && styles.pillTextSelected]}>
           {label}
         </Text>
         <View style={[styles.pillTip, selected && styles.pillTipSelected]} />
+      </View>
+    </Marker>
+  );
+}
+
+// Marker propio para "tú estás aquí" — con zIndex bajo para que NUNCA
+// tape las burbujas de los partidos.
+function UserDotMarker({ coords }) {
+  if (!coords?.lat || !coords?.lng) return null;
+  return (
+    <Marker
+      coordinate={{ latitude: coords.lat, longitude: coords.lng }}
+      anchor={{ x: 0.5, y: 0.5 }}
+      zIndex={1}
+      tracksViewChanges={false}
+    >
+      <View style={styles.userDotOuter}>
+        <View style={styles.userDotInner} />
       </View>
     </Marker>
   );
@@ -100,6 +119,7 @@ export default function MatchMap({
   showSearchHere = false,
   onTouchStart,
   onTouchEnd,
+  userCoords,
 }) {
   const mapRef = useRef(null);
 
@@ -112,7 +132,7 @@ export default function MatchMap({
         onRegionChangeComplete={onRegionChange}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        showsUserLocation
+        showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={false}
         showsPointsOfInterest={false}
@@ -123,6 +143,7 @@ export default function MatchMap({
         mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
         customMapStyle={DARK_MAP_STYLE}
       >
+        <UserDotMarker coords={userCoords} />
         {matches.map((m) =>
           m.latitud != null && m.longitud != null ? (
             <MarkerPill
@@ -204,6 +225,25 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   pillTipSelected: { backgroundColor: colors.primary },
+
+  userDotOuter: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(113,181,51,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(113,181,51,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userDotInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
 
   searchHere: {
     position: 'absolute',

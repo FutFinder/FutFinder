@@ -613,6 +613,7 @@ export default function SearchScreen({ navigation }) {
               onRegionChange={handleRegionChange}
               onSearchHere={handleSearchHere}
               showSearchHere={showSearchHere}
+              userCoords={userCoords}
             />
           )}
 
