@@ -33,7 +33,8 @@ import {
 import Logo from '../components/Logo';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
-import { listOpenMatches, applyFilters, joinMatch, requestJoinMatch, deleteMatch } from '../services/matches';
+import { listOpenMatches, applyFilters, joinMatch, requestJoinMatch, deleteMatch, listMatchesInBounds } from '../services/matches';
+import MatchMap from '../components/MatchMap';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentLocation } from '../services/location';
 import { getCurrentUser } from '../services/auth';
@@ -153,6 +154,13 @@ export default function SearchScreen({ navigation }) {
   const [edadIdx, setEdadIdx] = useState(0);
   const [suspendedInfo, setSuspendedInfo] = useState(null); // { suspended, suspended_until }
 
+  // Estado del mapa (modo partidos)
+  const [mapRegion, setMapRegion] = useState(null); // {latitude, longitude, latitudeDelta, longitudeDelta}
+  const [pendingRegion, setPendingRegion] = useState(null);
+  const [showSearchHere, setShowSearchHere] = useState(false);
+  const [selectedMarkerId, setSelectedMarkerId] = useState(null);
+  const [mapBusy, setMapBusy] = useState(false);
+
   // Estado de filtros (índices en cada arreglo OPTS)
   const [text, setText] = useState('');
   const [kmIdx, setKmIdx] = useState(0);
@@ -180,9 +188,51 @@ export default function SearchScreen({ navigation }) {
     if (loc?.ok) setUserCoords({ lat: loc.latitude, lng: loc.longitude });
     setMyUserId(user?.id || null);
     setSuspendedInfo(status?.suspended ? status : null);
+
+    // Región inicial del mapa: centrada en el usuario o en Santiago
+    if (!mapRegion) {
+      const initial = loc?.ok
+        ? {
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            latitudeDelta: 0.08,
+            longitudeDelta: 0.08,
+          }
+        : {
+            latitude: -33.4489,
+            longitude: -70.6693,
+            latitudeDelta: 0.2,
+            longitudeDelta: 0.2,
+          };
+      setMapRegion(initial);
+    }
+
     setLoading(false);
     setRefreshing(false);
+  }, [mapRegion]);
+
+  // Handler de cambio de región del mapa: marca que hay que refrescar
+  const handleRegionChange = useCallback((region) => {
+    setPendingRegion(region);
+    setShowSearchHere(true);
   }, []);
+
+  // "Buscar en esta zona" → fetch por bounding box
+  const handleSearchHere = useCallback(async () => {
+    const r = pendingRegion || mapRegion;
+    if (!r) return;
+    setMapBusy(true);
+    const minLat = r.latitude - r.latitudeDelta / 2;
+    const maxLat = r.latitude + r.latitudeDelta / 2;
+    const minLng = r.longitude - r.longitudeDelta / 2;
+    const maxLng = r.longitude + r.longitudeDelta / 2;
+    const { data } = await listMatchesInBounds({ minLat, maxLat, minLng, maxLng, limit: 200 });
+    setMatches(data || []);
+    setMapRegion(r);
+    setShowSearchHere(false);
+    setSelectedMarkerId(null);
+    setMapBusy(false);
+  }, [pendingRegion, mapRegion]);
 
   useEffect(() => {
     load();
@@ -553,6 +603,62 @@ export default function SearchScreen({ navigation }) {
           {/* ===================== MODO PARTIDOS ===================== */}
           {mode === 'matches' && (
           <View>
+          {/* Mapa estilo Airbnb */}
+          {mapRegion && (
+            <MatchMap
+              initialRegion={mapRegion}
+              matches={filtered}
+              selectedId={selectedMarkerId}
+              onSelectMarker={(m) => setSelectedMarkerId(m.id)}
+              onRegionChange={handleRegionChange}
+              onSearchHere={handleSearchHere}
+              showSearchHere={showSearchHere}
+            />
+          )}
+
+          {/* Resumen del partido seleccionado en el mapa */}
+          {selectedMarkerId && (() => {
+            const sel = filtered.find((x) => x.id === selectedMarkerId);
+            if (!sel) return null;
+            const startsInMin = (new Date(sel.hora) - Date.now()) / 60000;
+            return (
+              <View style={styles.markerCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.markerCardTitle} numberOfLines={1}>
+                    {sel.titulo}
+                  </Text>
+                  <Text style={styles.markerCardSub} numberOfLines={1}>
+                    {sel.cancha_nombre} · {sel.comuna}
+                  </Text>
+                  <Text style={styles.markerCardMeta}>
+                    {formatHora(sel.hora)} · {sel.cupos_disponibles}/{sel.cupos_totales} cupos
+                    {sel.precio_cuota === 0 ? ' · Gratis' : ` · $${sel.precio_cuota.toLocaleString('es-CL')}`}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() =>
+                    navigation
+                      .getParent()
+                      ?.navigate('MatchDetail', { matchId: sel.id })
+                  }
+                  style={({ pressed }) => [
+                    styles.markerCardBtn,
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <Text style={styles.markerCardBtnText}>Ver</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setSelectedMarkerId(null)}
+                  hitSlop={6}
+                  style={styles.markerCardClose}
+                >
+                  <Text style={styles.markerCardCloseText}>×</Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+
           {/* Filter chips */}
           <ScrollView
             horizontal
@@ -1076,6 +1182,60 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
+  markerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: 12,
+    marginBottom: 12,
+  },
+  markerCardTitle: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  markerCardSub: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  markerCardMeta: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  markerCardBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+  },
+  markerCardBtnText: {
+    color: '#0E0E0D',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  markerCardClose: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerCardCloseText: {
+    color: colors.textMuted,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
   suspendedBox: {
     backgroundColor: colors.errorSoft,
     borderRadius: radius.lg,

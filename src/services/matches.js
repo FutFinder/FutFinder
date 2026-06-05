@@ -46,6 +46,41 @@ export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
 }
 
 /**
+ * Trae los partidos abiertos cuyas coordenadas están dentro de un cuadrante
+ * (bounding box) — usado por el mapa de la pestaña Buscar al moverlo.
+ */
+export async function listMatchesInBounds({
+  minLat,
+  maxLat,
+  minLng,
+  maxLng,
+  limit = 100,
+} = {}) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  if ([minLat, maxLat, minLng, maxLng].some((v) => v == null)) {
+    return { data: [], error: null };
+  }
+
+  const dosHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('matches')
+    .select('*')
+    .eq('estado', 'abierto')
+    .gte('hora', dosHorasAtras)
+    .gte('latitud', minLat)
+    .lte('latitud', maxLat)
+    .gte('longitud', minLng)
+    .lte('longitud', maxLng)
+    .not('latitud', 'is', null)
+    .not('longitud', 'is', null)
+    .order('hora', { ascending: true })
+    .limit(limit);
+
+  if (error) console.error('[FutFinder] listMatchesInBounds:', error);
+  return { data: data || [], error };
+}
+
+/**
  * Filtra una lista de partidos por criterios del usuario y los enriquece
  * con la distancia calculada desde sus coordenadas (si vienen).
  *
