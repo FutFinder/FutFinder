@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Users,
   User as UserIcon,
+  Shield,
   Sparkles,
   EyeOff,
   UserPlus,
@@ -51,7 +52,7 @@ function timeAgo(iso) {
 }
 
 export default function ChatScreen({ navigation }) {
-  const [tab, setTab] = useState('all'); // 'all' | 'dm' | 'match' | 'friends'
+  const [tab, setTab] = useState('all'); // 'all' | 'dm' | 'match' | 'club' | 'friends'
   const [threads, setThreads] = useState([]);
   const [friends, setFriends] = useState([]);
   const [incomingReqs, setIncomingReqs] = useState([]);
@@ -206,6 +207,12 @@ export default function ChatScreen({ navigation }) {
             count={threads.filter((t) => t.type === 'match').length}
             active={tab === 'match'}
             onPress={() => setTab('match')}
+          />
+          <TabPill
+            label="Club"
+            count={threads.filter((t) => t.type === 'club').length}
+            active={tab === 'club'}
+            onPress={() => setTab('club')}
           />
           <TabPill
             label="Amigos"
@@ -373,6 +380,8 @@ export default function ChatScreen({ navigation }) {
                   <Image source={{ uri: t.foto_url }} style={styles.avatarImg} />
                 ) : t.type === 'dm' ? (
                   <UserIcon color={colors.primary} size={20} />
+                ) : t.type === 'club' ? (
+                  <Shield color={colors.primary} size={20} />
                 ) : (
                   <Users color={colors.primary} size={20} />
                 )}
@@ -404,6 +413,12 @@ export default function ChatScreen({ navigation }) {
                   <View style={styles.matchTag}>
                     <Sparkles color={colors.primary} size={10} />
                     <Text style={styles.matchTagText}>Chat de partido</Text>
+                  </View>
+                )}
+                {t.type === 'club' && (
+                  <View style={styles.matchTag}>
+                    <Shield color={colors.primary} size={10} />
+                    <Text style={styles.matchTagText}>Chat del club</Text>
                   </View>
                 )}
               </View>
@@ -475,6 +490,8 @@ function EmptyState({ type, onCreate }) {
           ? 'Cuando te inscribas a un partido, el chat grupal aparecerá aquí.'
           : type === 'dm'
           ? 'Los mensajes directos con otros jugadores aparecerán aquí.'
+          : type === 'club'
+          ? 'Cuando te unas a un club, su chat interno aparecerá aquí.'
           : 'Inscríbete a un partido para empezar a chatear con otros jugadores.'}
       </Text>
       <Pressable

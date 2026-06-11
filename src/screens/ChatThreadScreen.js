@@ -85,7 +85,7 @@ export default function ChatThreadScreen({ route, navigation }) {
   const isMountedRef = useRef(true);
 
   const t = parseThreadKey(threadKey);
-  const isGroup = t?.type === 'match';
+  const isGroup = t?.type === 'match' || t?.type === 'club';
 
   // Cargar usuario actual e historial
   useEffect(() => {
@@ -186,7 +186,11 @@ export default function ChatThreadScreen({ route, navigation }) {
       sender_id: myId,
       content,
       _optimistic: true,
-      ...(isGroup ? { match_id: t.id } : { receiver_id: t.id }),
+      ...(t?.type === 'match'
+        ? { match_id: t.id }
+        : t?.type === 'club'
+        ? { club_id: t.id }
+        : { receiver_id: t.id }),
     };
     setMessages((prev) => [...prev, optimistic]);
 
@@ -257,8 +261,10 @@ export default function ChatThreadScreen({ route, navigation }) {
           <Pressable
             onPress={() => {
               if (!t?.id) return;
-              if (isGroup) {
+              if (t.type === 'match') {
                 navigation.navigate('MatchDetail', { matchId: t.id });
+              } else if (t.type === 'club') {
+                navigation.navigate('ClubDetail', { clubId: t.id });
               } else {
                 navigation.navigate('UserProfile', { userId: t.id });
               }
