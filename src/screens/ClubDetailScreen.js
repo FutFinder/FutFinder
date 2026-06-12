@@ -187,12 +187,23 @@ export default function ClubDetailScreen({ navigation, route }) {
         ? 'Eres el último integrante: al salir, el club y su chat se eliminan para siempre.'
         : 'Dejarás de ver el chat y los datos internos del club.',
       async () => {
-        const { error } = await leaveClub();
+        setWorking(true);
+        const { error, clubDeleted } = await leaveClub();
+        setWorking(false);
         if (error) {
+          console.error('[FutFinder] handleLeave:', error);
           setBanner({ type: 'error', title: 'No se pudo salir', message: error.message });
           return;
         }
-        navigation.goBack();
+        navigation.navigate('Main', {
+          screen: 'ClubsTab',
+          params: {
+            successTitle: clubDeleted ? 'Club eliminado' : 'Has salido del club',
+            successMessage: clubDeleted
+              ? 'El club fue eliminado correctamente.'
+              : 'Ya no eres parte de ese club.',
+          },
+        });
       }
     );
   };
@@ -266,10 +277,17 @@ export default function ClubDetailScreen({ navigation, route }) {
         const { error } = await deleteClub(clubId);
         setWorking(false);
         if (error) {
+          console.error('[FutFinder] handleDeleteClub:', error);
           setBanner({ type: 'error', title: 'No se pudo eliminar', message: error.message });
           return;
         }
-        navigation.goBack();
+        navigation.navigate('Main', {
+          screen: 'ClubsTab',
+          params: {
+            successTitle: 'Club eliminado',
+            successMessage: 'El club fue eliminado permanentemente.',
+          },
+        });
       }
     );
   };

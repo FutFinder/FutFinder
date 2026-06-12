@@ -453,11 +453,22 @@ export async function leaveClub() {
     .eq('club_id', membership.club_id);
 
   if (count === 1) {
-    // último miembro: se borra el club entero (cascade borra membresía,
-    // requests y mensajes del chat)
-    const { error } = await supabase.from('clubs').delete().eq('id', membership.club_id);
-    if (error) console.error('[FutFinder] leaveClub deleteClub:', error);
-    return { error, clubDeleted: true };
+    // Último miembro: se borra el club entero.
+    // La RLS clubs_delete permite esto cuando eres el único miembro restante.
+    const { error, count: deleted } = await supabase
+      .from('clubs')
+      .delete({ count: 'exact' })
+      .eq('id', membership.club_id);
+    if (error) {
+      console.error('[FutFinder] leaveClub deleteClub error:', error);
+      return { error };
+    }
+    if (deleted === 0) {
+      const err = { message: 'No se pudo eliminar el club. Inténtalo de nuevo.' };
+      console.error('[FutFinder] leaveClub deleteClub: 0 filas eliminadas (RLS bloqueó la operación)');
+      return { error: err };
+    }
+    return { error: null, clubDeleted: true };
   }
 
   if (membership.rol === 'admin') {
@@ -476,9 +487,20 @@ export async function leaveClub() {
     }
   }
 
-  const { error } = await supabase.from('club_members').delete().eq('id', membership.id);
-  if (error) console.error('[FutFinder] leaveClub:', error);
-  return { error };
+  const { error, count: deleted } = await supabase
+    .from('club_members')
+    .delete({ count: 'exact' })
+    .eq('id', membership.id);
+  if (error) {
+    console.error('[FutFinder] leaveClub delete member error:', error);
+    return { error };
+  }
+  if (deleted === 0) {
+    const err = { message: 'No se pudo salir del club. Inténtalo de nuevo.' };
+    console.error('[FutFinder] leaveClub: 0 filas eliminadas (RLS bloqueó la operación)');
+    return { error: err };
+  }
+  return { error: null };
 }
 
 /**
@@ -536,31 +558,33 @@ export async function transferAdmin(memberId) {
 
 /**
  * Elimina el club completo (solo admins).
- * La FK ON DELETE CASCADE borra club_members, club_join_requests y messages.
+ * Usa la RPC delete_club_as_admin (SECURITY DEFINER) que borra en orden
+ * explícito: messages → club_join_requests → club_members → clubs.
  * Después limpia el logo del Storage si existía.
  */
 export async function deleteClub(clubId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
 
-  // Guardar foto_url antes de que el cascade la borre
   const { data: club } = await supabase
     .from('clubs')
     .select('foto_url')
     .eq('id', clubId)
     .single();
 
-  // RLS clubs_delete exige ser admin del club
-  const { error } = await supabase
-    .from('clubs')
-    .delete()
-    .eq('id', clubId);
+  const { data: rpcResult, error: rpcError } = await supabase.rpc(
+    'delete_club_as_admin',
+    { p_club_id: clubId },
+  );
 
-  if (error) {
-    console.error('[FutFinder] deleteClub:', error);
-    return { error };
+  if (rpcError) {
+    console.error('[FutFinder] deleteClub rpc error:', rpcError);
+    return { error: rpcError };
+  }
+  if (rpcResult?.error) {
+    console.error('[FutFinder] deleteClub rpc rejected:', rpcResult.error);
+    return { error: { message: rpcResult.error } };
   }
 
-  // Limpiar logo del Storage (no bloqueante)
   if (club?.foto_url) {
     try {
       const { data: files } = await supabase.storage

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -44,7 +44,7 @@ import {
  *  - SIN club: buscador de clubes + invitaciones pendientes + crear club
  *  - CON club: vista de mi club con accesos a chat, detalle y planes
  */
-export default function ClubsScreen({ navigation }) {
+export default function ClubsScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [myClub, setMyClub] = useState(null); // { club, miRol, totalMiembros }
@@ -73,6 +73,18 @@ export default function ClubsScreen({ navigation }) {
       load(query);
     }, [load]) // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  // Banner de éxito que viene de ClubDetailScreen al salir/eliminar club
+  useEffect(() => {
+    if (route?.params?.successTitle) {
+      setBanner({
+        type: 'success',
+        title: route.params.successTitle,
+        message: route.params.successMessage || '',
+      });
+      navigation.setParams({ successTitle: undefined, successMessage: undefined });
+    }
+  }, [route?.params?.successTitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onRefresh = async () => {
     setRefreshing(true);
