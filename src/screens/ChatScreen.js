@@ -170,6 +170,10 @@ export default function ChatScreen({ navigation }) {
     navigation.getParent()?.navigate('UserProfile', { userId });
   };
 
+  const openAddFriends = () => {
+    navigation.getParent()?.navigate('Main', { screen: 'SearchTab' });
+  };
+
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
@@ -451,6 +455,15 @@ export default function ChatScreen({ navigation }) {
           )}
         </ScrollView>
       </SafeAreaView>
+
+      {/* FAB: agregar amigos */}
+      <Pressable
+        onPress={openAddFriends}
+        style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
+        hitSlop={6}
+      >
+        <UserPlus color="#0E0E0D" size={20} strokeWidth={2.4} />
+      </Pressable>
     </View>
   );
 }
@@ -803,5 +816,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 18,
     lineHeight: 16,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...require('react-native').Platform.select({
+      web: { boxShadow: '0 4px 16px rgba(113,181,51,0.5)' },
+      default: {
+        shadowColor: colors.primary,
+        shadowOpacity: 0.5,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 10,
+        elevation: 8,
+      },
+    }),
   },
 });

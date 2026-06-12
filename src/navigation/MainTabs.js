@@ -163,7 +163,7 @@ function iconFor(name) {
 function labelFor(name) {
   switch (name) {
     case 'HomeTab': return 'Inicio';
-    case 'SearchTab': return 'Buscar';
+    case 'SearchTab': return 'Partidos';
     case 'ClubsTab': return 'Clubes';
     case 'NotifTab': return 'Avisos';
     case 'ChatTab': return 'Chat';
