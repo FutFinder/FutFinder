@@ -21,6 +21,7 @@ import {
   Calendar,
   Star,
   Trash2,
+  Shield,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -59,6 +60,12 @@ function NotifIcon({ type }) {
       return <CheckCheck {...props} />;
     case 'join_rejected':
       return <Bell {...props} />;
+    case 'club_request':
+      return <Shield {...props} />;
+    case 'club_request_accepted':
+      return <CheckCheck {...props} />;
+    case 'club_request_rejected':
+      return <Shield {...props} />;
     case 'message_new':
       return <MessageCircle {...props} />;
     case 'match_reminder':
@@ -108,6 +115,15 @@ function navigateForNotif(navigation, n) {
       break;
     case 'match_cancelled':
       navigation.navigate('Main', { screen: 'SearchTab' });
+      break;
+    case 'club_request':
+    case 'club_request_accepted':
+      if (data.clubId) {
+        navigation.navigate('ClubDetail', { clubId: data.clubId });
+      }
+      break;
+    case 'club_request_rejected':
+      navigation.navigate('Main', { screen: 'ClubsTab' });
       break;
     case 'friend_request':
     case 'friend_accept':

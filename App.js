@@ -44,6 +44,18 @@ function handleNotificationTap(response) {
           navigationRef.navigate('RateMatch', { matchId: data.matchId });
         }
         break;
+      case 'club_request':
+      case 'club_request_accepted':
+        // Solicitud de club: el admin la resuelve (y el aceptado la ve)
+        // en el detalle del club.
+        if (data.clubId) {
+          navigationRef.navigate('ClubDetail', { clubId: data.clubId });
+        }
+        break;
+      case 'club_request_rejected':
+        // Rechazado: a la pestaña Clubes a buscar otro equipo.
+        navigationRef.navigate('Main', { screen: 'ClubsTab' });
+        break;
       case 'friend_request':
       case 'friend_accept':
         // Vamos a la pestaña de perfil — luego puedes crear una pantalla "Notificaciones".
