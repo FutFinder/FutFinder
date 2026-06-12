@@ -25,6 +25,7 @@ import {
   LogOut,
   MessageCircle,
   UserPlus,
+  Pencil,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -43,6 +44,8 @@ import {
   leaveClub,
   removeMember,
   getMyClub,
+  promoteToAdmin,
+  transferAdmin,
   CLUB_LIMITS,
 } from '../services/clubs';
 
@@ -192,6 +195,51 @@ export default function ClubDetailScreen({ navigation, route }) {
     );
   };
 
+  const handlePromote = (member) => {
+    const limites = CLUB_LIMITS[club?.plan] || CLUB_LIMITS.estandar;
+    const adminCount = members.filter((m) => m.rol === 'admin').length;
+
+    if (adminCount < limites.admins) {
+      // hay cupo: se suma como admin sin que yo deje de serlo
+      confirmAction(
+        `¿Hacer admin a ${member.username}?`,
+        'Podrá aceptar solicitudes, invitar jugadores y expulsar miembros.',
+        async () => {
+          const { error } = await promoteToAdmin(member.member_id);
+          if (error) {
+            setBanner({ type: 'error', title: 'No se pudo promover', message: error.message });
+            return;
+          }
+          setBanner({
+            type: 'success',
+            title: 'Nuevo administrador',
+            message: `${member.username} ahora es admin del club.`,
+          });
+          await load();
+        }
+      );
+    } else {
+      // sin cupo (p.ej. Estándar = 1 admin): ceder mi administración
+      confirmAction(
+        `¿Ceder la administración a ${member.username}?`,
+        `Tu plan permite ${limites.admins} admin${limites.admins > 1 ? 's' : ''}: tú pasarás a ser jugador.`,
+        async () => {
+          const { error } = await transferAdmin(member.member_id);
+          if (error) {
+            setBanner({ type: 'error', title: 'No se pudo ceder', message: error.message });
+            return;
+          }
+          setBanner({
+            type: 'success',
+            title: 'Administración cedida',
+            message: `${member.username} es el nuevo admin del club.`,
+          });
+          await load();
+        }
+      );
+    }
+  };
+
   const handleExpel = (member) => {
     confirmAction(
       `¿Expulsar a ${member.username}?`,
@@ -241,6 +289,15 @@ export default function ClubDetailScreen({ navigation, route }) {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {club.nombre}
         </Text>
+        {soyAdmin && (
+          <Pressable
+            onPress={() => navigation.navigate('EditClub', { club })}
+            hitSlop={8}
+            style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.6 }]}
+          >
+            <Pencil color={colors.primary} size={18} />
+          </Pressable>
+        )}
         {soyMiembro && (
           <Pressable
             onPress={() =>
@@ -331,6 +388,21 @@ export default function ClubDetailScreen({ navigation, route }) {
               />
             )}
 
+            {/* Invitar jugadores (solo admin) */}
+            {soyAdmin && (
+              <Button
+                label="Invitar jugadores"
+                icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
+                onPress={() =>
+                  navigation.navigate('ClubInvite', {
+                    clubId: club.id,
+                    clubNombre: club.nombre,
+                  })
+                }
+                style={styles.inviteBtn}
+              />
+            )}
+
             {/* Solicitudes pendientes (solo admin) */}
             {soyAdmin && requests.length > 0 && (
               <View style={styles.section}>
@@ -400,6 +472,15 @@ export default function ClubDetailScreen({ navigation, route }) {
                 {item.comuna ? ` · ${item.comuna}` : ''}
               </Text>
             </View>
+            {soyAdmin && item.user_id !== me && item.rol !== 'admin' && (
+              <Pressable
+                onPress={() => handlePromote(item)}
+                hitSlop={8}
+                style={({ pressed }) => [styles.promoteBtn, pressed && { opacity: 0.5 }]}
+              >
+                <Crown color={colors.primary} size={16} />
+              </Pressable>
+            )}
             {soyAdmin && item.user_id !== me && (
               <Pressable
                 onPress={() => handleExpel(item)}
@@ -517,6 +598,7 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   joinBtn: { marginBottom: 16 },
+  inviteBtn: { marginBottom: 16 },
 
   section: { marginBottom: 8 },
   sectionTitle: {
@@ -604,6 +686,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.errorSoft,
     borderWidth: 1,
     borderColor: colors.error,
+  },
+  promoteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   expelBtn: {
     width: 32,

@@ -26,6 +26,8 @@ import RateMatchScreen from '../screens/RateMatchScreen';
 import CreateClubScreen from '../screens/CreateClubScreen';
 import ClubDetailScreen from '../screens/ClubDetailScreen';
 import ClubPlansScreen from '../screens/ClubPlansScreen';
+import EditClubScreen from '../screens/EditClubScreen';
+import ClubInviteScreen from '../screens/ClubInviteScreen';
 import MainTabs from './MainTabs';
 
 import { colors } from '../theme/colors';
@@ -130,6 +132,16 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClubPlans"
           component={ClubPlansScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="EditClub"
+          component={EditClubScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="ClubInvite"
+          component={ClubInviteScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   Home as HomeIcon,
-  Search as SearchIcon,
   Plus,
   Shield,
+  Bell,
   MessageCircle,
   User as UserIcon,
 } from 'lucide-react-native';
@@ -16,28 +16,57 @@ import SearchScreen from '../screens/SearchScreen';
 import ClubsScreen from '../screens/ClubsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SearchFootballIcon from '../components/SearchFootballIcon';
 import { colors, radius } from '../theme/colors';
+import { getCurrentUser } from '../services/auth';
+import { countUnread, subscribeToNotifications } from '../services/notifications';
 
 const Tab = createBottomTabNavigator();
 
 /**
- * Componente "vacío" que nunca se monta — la pestaña Crear NO renderiza
- * contenido propio, en vez de eso intercepta el press y navega al stack
- * de CreateMatch (modal sobre las tabs).
+ * Componente "vacío" que nunca se monta — las pestañas Crear y
+ * Notificaciones NO renderizan contenido propio: interceptan el press
+ * y navegan a su pantalla del stack raíz (modal sobre las tabs).
  */
-function CreatePlaceholder() {
+function PlaceholderTab() {
   return null;
 }
 
 /**
  * Tab bar custom con estética luxury-night:
  *   - Fondo negro con borde superior tenue
- *   - Iconos minimalistas Lucide
+ *   - Iconos minimalistas Lucide (+ lupa-balón custom en Buscar)
  *   - Texto pequeño solo en activos
  *   - Botón Crear elevado al centro como un círculo verde flotante
+ *   - Badge rojo de notificaciones no leídas sobre la campana
  */
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
+  const [unread, setUnread] = useState(0);
+
+  // Contador de notificaciones no leídas: carga inicial + realtime +
+  // refresco cuando cambia la navegación (p.ej. al volver del inbox).
+  useEffect(() => {
+    let mounted = true;
+    let unsubscribe = () => {};
+    const reload = async () => {
+      const n = await countUnread();
+      if (mounted) setUnread(n || 0);
+    };
+    reload();
+    (async () => {
+      const u = await getCurrentUser();
+      if (!u?.id || !mounted) return;
+      unsubscribe = subscribeToNotifications(u.id, reload);
+    })();
+    const parentUnsub =
+      navigation.getParent()?.addListener('state', reload) || (() => {});
+    return () => {
+      mounted = false;
+      unsubscribe();
+      parentUnsub();
+    };
+  }, [navigation]);
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
@@ -45,14 +74,18 @@ function CustomTabBar({ state, descriptors, navigation }) {
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
           const isCreate = route.name === 'CreateTab';
+          const isNotif = route.name === 'NotifTab';
 
           const onPress = () => {
             if (isCreate) {
               // Botón especial: no entra a una pestaña, abre CreateMatch
               // como modal sobre las tabs.
-              navigation
-                .getParent()
-                ?.navigate('CreateMatch');
+              navigation.getParent()?.navigate('CreateMatch');
+              return;
+            }
+            if (isNotif) {
+              // Igual que Crear: abre el inbox sobre las tabs.
+              navigation.getParent()?.navigate('Notifications');
               return;
             }
             const event = navigation.emit({
@@ -89,11 +122,20 @@ function CustomTabBar({ state, descriptors, navigation }) {
               style={styles.tabSlot}
               hitSlop={6}
             >
-              <IconCmp
-                color={isFocused ? colors.primary : colors.textMuted}
-                size={22}
-                strokeWidth={isFocused ? 2.3 : 1.8}
-              />
+              <View style={styles.iconWrap}>
+                <IconCmp
+                  color={isFocused ? colors.primary : colors.textMuted}
+                  size={22}
+                  strokeWidth={isFocused ? 2.3 : 1.8}
+                />
+                {isNotif && unread > 0 && (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>
+                      {unread > 9 ? '9+' : String(unread)}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text
                 style={[
                   styles.tabLabel,
@@ -114,8 +156,9 @@ function CustomTabBar({ state, descriptors, navigation }) {
 function iconFor(name) {
   switch (name) {
     case 'HomeTab': return HomeIcon;
-    case 'SearchTab': return SearchIcon;
+    case 'SearchTab': return SearchFootballIcon;
     case 'ClubsTab': return Shield;
+    case 'NotifTab': return Bell;
     case 'ChatTab': return MessageCircle;
     case 'ProfileTab': return UserIcon;
     default: return HomeIcon;
@@ -127,6 +170,7 @@ function labelFor(name) {
     case 'HomeTab': return 'Inicio';
     case 'SearchTab': return 'Buscar';
     case 'ClubsTab': return 'Clubes';
+    case 'NotifTab': return 'Avisos';
     case 'ChatTab': return 'Chat';
     case 'ProfileTab': return 'Perfil';
     default: return '';
@@ -141,8 +185,9 @@ export default function MainTabs() {
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} />
       <Tab.Screen name="SearchTab" component={SearchScreen} />
-      <Tab.Screen name="CreateTab" component={CreatePlaceholder} />
       <Tab.Screen name="ClubsTab" component={ClubsScreen} />
+      <Tab.Screen name="CreateTab" component={PlaceholderTab} />
+      <Tab.Screen name="NotifTab" component={PlaceholderTab} />
       <Tab.Screen name="ChatTab" component={ChatScreen} />
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>
@@ -181,6 +226,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+  },
+  iconWrap: {
+    position: 'relative',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   tabLabel: {
     fontSize: 10,

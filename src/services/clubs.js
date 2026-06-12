@@ -495,6 +495,46 @@ export async function removeMember(memberId) {
 }
 
 /**
+ * Promueve un miembro a admin. El trigger check_club_limits valida en la BD
+ * el límite de admins del plan (1 Estándar, 3 Premium).
+ */
+export async function promoteToAdmin(memberId) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  const { data, error } = await supabase
+    .from('club_members')
+    .update({ rol: 'admin' })
+    .eq('id', memberId)
+    .select()
+    .single();
+  if (error) {
+    console.error('[FutFinder] promoteToAdmin:', error);
+    if (error.message?.includes('límite')) {
+      return {
+        error: {
+          message: 'Tu plan ya alcanzó el límite de administradores. Puedes ceder tu administración o pasar a Premium.',
+        },
+      };
+    }
+  }
+  return { data, error };
+}
+
+/**
+ * Cede MI administración a otro miembro: yo paso a jugador y él a admin.
+ * Es una RPC atómica (transfer_club_admin) porque en plan Estándar no se
+ * puede promover primero (límite de 1 admin) ni degradarse primero (la RLS
+ * exigiría seguir siendo admin para promover al otro).
+ */
+export async function transferAdmin(memberId) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  const { data, error } = await supabase.rpc('transfer_club_admin', {
+    p_member_id: memberId,
+  });
+  if (error) console.error('[FutFinder] transferAdmin:', error);
+  return { data, error };
+}
+
+/**
  * Actualiza datos editables del club (solo admins, lo garantiza la RLS).
  * plan y verificado NO se tocan desde el cliente.
  */
