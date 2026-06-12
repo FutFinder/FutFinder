@@ -20,7 +20,6 @@ import {
   UserPlus,
   UserCheck,
   UserX,
-  Send,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -171,7 +170,7 @@ export default function ChatScreen({ navigation }) {
   };
 
   const openAddFriends = () => {
-    navigation.getParent()?.navigate('Main', { screen: 'SearchTab' });
+    navigation.getParent()?.navigate('Main', { screen: 'SearchTab', params: { initialMode: 'players' } });
   };
 
   return (
@@ -319,7 +318,11 @@ export default function ChatScreen({ navigation }) {
               )}
 
               {friends.map((f) => (
-                <View key={f.friendship_id} style={styles.threadRow}>
+                <Pressable
+                  key={f.friendship_id}
+                  onPress={() => openDM(f.user_id, f.username)}
+                  style={({ pressed }) => [styles.threadRow, pressed && { opacity: 0.85 }]}
+                >
                   <Pressable
                     onPress={() => openUserProfile(f.user_id)}
                     style={styles.avatar}
@@ -332,27 +335,15 @@ export default function ChatScreen({ navigation }) {
                       </Text>
                     )}
                   </Pressable>
-                  <Pressable
-                    onPress={() => openUserProfile(f.user_id)}
-                    style={{ flex: 1 }}
-                  >
+                  <View style={{ flex: 1 }}>
                     <Text style={styles.threadTitle} numberOfLines={1}>
                       @{f.username}
                     </Text>
                     <Text style={styles.threadPreview} numberOfLines={1}>
                       {f.comuna ? f.comuna + ' · ' : ''}Trust {f.trust_score}
                     </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => openDM(f.user_id, f.username)}
-                    style={({ pressed }) => [
-                      styles.dmBtn,
-                      pressed && { opacity: 0.85 },
-                    ]}
-                  >
-                    <Send color={colors.primary} size={14} />
-                  </Pressable>
-                </View>
+                  </View>
+                </Pressable>
               ))}
             </>
           )}

@@ -8,14 +8,16 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, ChevronDown } from 'lucide-react-native';
+import { X, ChevronDown, Shield, Camera } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import Button from '../components/Button';
 import { updateClub } from '../services/clubs';
+import { pickImage, uploadClubLogo } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 
 /**
@@ -34,8 +36,18 @@ export default function EditClubScreen({ navigation, route }) {
   const [showComunas, setShowComunas] = useState(false);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
+  const [newLogoAsset, setNewLogoAsset] = useState(null);
 
   const comunas = region ? getComunasOfRegion(region) : [];
+
+  const handlePickLogo = async () => {
+    const result = await pickImage({ aspect: [1, 1], quality: 0.8 });
+    if (result.ok) {
+      setNewLogoAsset(result.asset);
+    } else if (result.reason !== 'Cancelado') {
+      setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
+    }
+  };
 
   const handleSave = async () => {
     if (nombre.trim().length < 3) {
@@ -47,12 +59,17 @@ export default function EditClubScreen({ navigation, route }) {
       return;
     }
     setSaving(true);
-    const { error } = await updateClub(club.id, {
-      nombre,
-      descripcion,
-      region,
-      comuna,
-    });
+
+    if (newLogoAsset) {
+      const { error: logoErr } = await uploadClubLogo(club.id, newLogoAsset);
+      if (logoErr) {
+        setSaving(false);
+        setBanner({ type: 'error', title: 'No se pudo subir el logo', message: logoErr.message });
+        return;
+      }
+    }
+
+    const { error } = await updateClub(club.id, { nombre, descripcion, region, comuna });
     setSaving(false);
 
     if (error) {
@@ -88,6 +105,27 @@ export default function EditClubScreen({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
         >
           {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
+
+          <Pressable
+            onPress={handlePickLogo}
+            style={({ pressed }) => [styles.logoTap, pressed && { opacity: 0.8 }]}
+          >
+            {newLogoAsset ? (
+              <Image source={{ uri: newLogoAsset.uri }} style={styles.logoImg} />
+            ) : club?.foto_url ? (
+              <Image source={{ uri: club.foto_url }} style={styles.logoImg} />
+            ) : (
+              <View style={styles.logoPlaceholder}>
+                <Shield color={colors.primary} size={40} strokeWidth={1.5} />
+              </View>
+            )}
+            <View style={styles.logoHintRow}>
+              <Camera color={colors.textMuted} size={14} />
+              <Text style={styles.logoHint}>
+                {newLogoAsset || club?.foto_url ? 'Cambiar logo' : 'Subir logo (opcional)'}
+              </Text>
+            </View>
+          </Pressable>
 
           <Text style={styles.label}>Nombre del club</Text>
           <TextInput
@@ -239,6 +277,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: { padding: 16, paddingBottom: 40 },
+  logoTap: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  logoPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  logoImg: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.lg,
+    marginBottom: 8,
+  },
+  logoHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  logoHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
   label: {
     color: colors.textSecondary,
     fontSize: 13,

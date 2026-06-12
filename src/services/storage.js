@@ -162,3 +162,30 @@ export async function uploadMatchCover(matchId, asset) {
 
   return { url };
 }
+
+/**
+ * Sube el logo de un club al bucket `club-logos` y actualiza clubs.foto_url.
+ * RLS valida que el usuario sea admin del club.
+ */
+export async function uploadClubLogo(clubId, asset) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!asset || !clubId) return { error: { message: 'Faltan datos' } };
+
+  const ext = extFromAsset(asset);
+  const path = `${clubId}/logo.${ext}`;
+  const contentType = asset.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const body = await getUploadBody(asset);
+  const { error, url } = await uploadToBucket('club-logos', path, body, contentType);
+  if (error) {
+    console.error('[FutFinder] uploadClubLogo:', error);
+    return { error };
+  }
+
+  await supabase
+    .from('clubs')
+    .update({ foto_url: url })
+    .eq('id', clubId);
+
+  return { url };
+}

@@ -135,7 +135,7 @@ function nivelLabel(n) {
   return ({ recreativo: 'Recreativo', intermedio: 'Intermedio', competitivo: 'Competitivo' })[n] || n;
 }
 
-export default function SearchScreen({ navigation }) {
+export default function SearchScreen({ navigation, route }) {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -145,7 +145,15 @@ export default function SearchScreen({ navigation }) {
   const [myUserId, setMyUserId] = useState(null);
 
   // Modo de búsqueda: 'matches' (partidos) | 'players' (jugadores)
-  const [mode, setMode] = useState('matches');
+  const [mode, setMode] = useState(route.params?.initialMode || 'matches');
+
+  // Cuando el FAB de amigos navega aquí con initialMode, lo aplicamos y limpiamos el param
+  useEffect(() => {
+    if (route.params?.initialMode) {
+      setMode(route.params.initialMode);
+      navigation.setParams({ initialMode: undefined });
+    }
+  }, [route.params?.initialMode]);
   const [players, setPlayers] = useState([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   // Filtros de jugadores (índices en sus OPTS). Región/comuna reusan regionSel/comunaSel.

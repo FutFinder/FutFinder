@@ -8,14 +8,16 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Shield, ChevronDown } from 'lucide-react-native';
+import { X, Shield, ChevronDown, Camera } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import Button from '../components/Button';
 import { createClub } from '../services/clubs';
+import { pickImage, uploadClubLogo } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 
 /**
@@ -31,8 +33,18 @@ export default function CreateClubScreen({ navigation }) {
   const [showComunas, setShowComunas] = useState(false);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
+  const [logoAsset, setLogoAsset] = useState(null);
 
   const comunas = region ? getComunasOfRegion(region) : [];
+
+  const handlePickLogo = async () => {
+    const result = await pickImage({ aspect: [1, 1], quality: 0.8 });
+    if (result.ok) {
+      setLogoAsset(result.asset);
+    } else if (result.reason !== 'Cancelado') {
+      setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
+    }
+  };
 
   const handleCreate = async () => {
     if (nombre.trim().length < 3) {
@@ -44,18 +56,25 @@ export default function CreateClubScreen({ navigation }) {
       return;
     }
     setSaving(true);
-    const { data, error } = await createClub({
-      nombre,
-      descripcion,
-      region,
-      comuna,
-    });
-    setSaving(false);
+    const { data, error } = await createClub({ nombre, descripcion, region, comuna });
 
     if (error) {
+      setSaving(false);
       setBanner({ type: 'error', title: 'No se pudo crear el club', message: error.message });
       return;
     }
+
+    if (logoAsset && data?.id) {
+      const { error: logoErr } = await uploadClubLogo(data.id, logoAsset);
+      if (logoErr) {
+        setBanner({ type: 'error', title: 'Club creado, pero falló el logo', message: logoErr.message });
+        setSaving(false);
+        navigation.goBack();
+        return;
+      }
+    }
+
+    setSaving(false);
     // Volvemos al tab Clubes: el useFocusEffect recarga y muestra el club nuevo
     navigation.goBack();
   };
@@ -86,13 +105,24 @@ export default function CreateClubScreen({ navigation }) {
         >
           {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-          <View style={styles.logoPreview}>
-            <Shield color={colors.primary} size={40} strokeWidth={1.5} />
-            <Text style={styles.logoHint}>
-              El logo personalizado es una función Premium. Tu club partirá con
-              el escudo de FutFinder.
-            </Text>
-          </View>
+          <Pressable
+            onPress={handlePickLogo}
+            style={({ pressed }) => [styles.logoTap, pressed && { opacity: 0.8 }]}
+          >
+            {logoAsset ? (
+              <Image source={{ uri: logoAsset.uri }} style={styles.logoImg} />
+            ) : (
+              <View style={styles.logoPlaceholder}>
+                <Shield color={colors.primary} size={40} strokeWidth={1.5} />
+              </View>
+            )}
+            <View style={styles.logoHintRow}>
+              <Camera color={colors.textMuted} size={14} />
+              <Text style={styles.logoHint}>
+                {logoAsset ? 'Cambiar logo' : 'Subir logo (opcional)'}
+              </Text>
+            </View>
+          </Pressable>
 
           <Text style={styles.label}>Nombre del club</Text>
           <TextInput
@@ -244,20 +274,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: { padding: 16, paddingBottom: 40 },
-  logoPreview: {
-    flexDirection: 'row',
+  logoTap: {
     alignItems: 'center',
-    gap: 14,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.lg,
-    padding: 16,
     marginBottom: 20,
   },
+  logoPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  logoImg: {
+    width: 80,
+    height: 80,
+    borderRadius: radius.lg,
+    marginBottom: 8,
+  },
+  logoHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   logoHint: {
-    flex: 1,
-    color: colors.textSecondary,
+    color: colors.textMuted,
     fontSize: 12,
-    lineHeight: 17,
   },
   label: {
     color: colors.textSecondary,
