@@ -36,6 +36,7 @@ import {
 } from '../services/messages';
 import { getMatchById } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
+import { getFriendshipWith } from '../services/friends';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
 import Banner from '../components/Banner';
@@ -88,6 +89,7 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [errorBanner, setErrorBanner] = useState(null);
   const [matchInfo, setMatchInfo] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
+  const [dmBlocked, setDmBlocked] = useState(false);
 
   const listRef = useRef(null);
   const isMountedRef = useRef(true);
@@ -157,6 +159,21 @@ export default function ChatThreadScreen({ route, navigation }) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (isMountedRef.current) setMyId(user?.id || null);
+
+        // DMs solo entre amigos
+        if (t?.type === 'dm' && t?.id) {
+          const friendship = await getFriendshipWith(t.id);
+          if (!friendship || friendship.status !== 'accepted') {
+            if (isMountedRef.current) {
+              setDmBlocked(true);
+              setErrorBanner({
+                type: 'error',
+                title: 'Solo puedes chatear con amigos',
+                message: 'Envía una solicitud de amistad primero.',
+              });
+            }
+          }
+        }
 
         const result = await listThreadMessages(threadKey, { limit: 60 });
         if (!isMountedRef.current) return;
@@ -447,8 +464,8 @@ export default function ChatThreadScreen({ route, navigation }) {
         ) : (
           <View style={styles.composer}>
             <TextInput
-              style={styles.input}
-              placeholder="Escribe un mensaje…"
+              style={[styles.input, dmBlocked && { opacity: 0.4 }]}
+              placeholder={dmBlocked ? 'Solo amigos pueden chatear' : 'Escribe un mensaje…'}
               placeholderTextColor={colors.textMuted}
               value={draft}
               onChangeText={setDraft}
@@ -457,14 +474,15 @@ export default function ChatThreadScreen({ route, navigation }) {
               onSubmitEditing={handleSend}
               returnKeyType="send"
               blurOnSubmit={false}
+              editable={!dmBlocked}
             />
             <Pressable
               onPress={handleSend}
-              disabled={!draft.trim() || sending}
+              disabled={!draft.trim() || sending || dmBlocked}
               style={({ pressed }) => [
                 styles.sendBtn,
                 pressed && { opacity: 0.85 },
-                (!draft.trim() || sending) && { opacity: 0.4 },
+                (!draft.trim() || sending || dmBlocked) && { opacity: 0.4 },
               ]}
             >
               <Send color="#0E0E0D" size={18} strokeWidth={2.4} />

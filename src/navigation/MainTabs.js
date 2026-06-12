@@ -14,6 +14,7 @@ import {
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import ClubsScreen from '../screens/ClubsScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchFootballIcon from '../components/SearchFootballIcon';
@@ -74,18 +75,12 @@ function CustomTabBar({ state, descriptors, navigation }) {
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
           const isCreate = route.name === 'CreateTab';
-          const isNotif = route.name === 'NotifTab';
 
           const onPress = () => {
             if (isCreate) {
               // Botón especial: no entra a una pestaña, abre CreateMatch
               // como modal sobre las tabs.
               navigation.getParent()?.navigate('CreateMatch');
-              return;
-            }
-            if (isNotif) {
-              // Igual que Crear: abre el inbox sobre las tabs.
-              navigation.getParent()?.navigate('Notifications');
               return;
             }
             const event = navigation.emit({
@@ -128,7 +123,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
                   size={22}
                   strokeWidth={isFocused ? 2.3 : 1.8}
                 />
-                {isNotif && unread > 0 && (
+                {route.name === 'NotifTab' && unread > 0 && (
                   <View style={styles.notifBadge}>
                     <Text style={styles.notifBadgeText}>
                       {unread > 9 ? '9+' : String(unread)}
@@ -187,7 +182,7 @@ export default function MainTabs() {
       <Tab.Screen name="SearchTab" component={SearchScreen} />
       <Tab.Screen name="ClubsTab" component={ClubsScreen} />
       <Tab.Screen name="CreateTab" component={PlaceholderTab} />
-      <Tab.Screen name="NotifTab" component={PlaceholderTab} />
+      <Tab.Screen name="NotifTab" component={NotificationsScreen} />
       <Tab.Screen name="ChatTab" component={ChatScreen} />
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>

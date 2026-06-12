@@ -702,16 +702,18 @@ function FriendActionRow({
         </Pressable>
       )}
 
-      <Pressable
-        onPress={onMessage}
-        style={({ pressed }) => [
-          friendStyles.secondaryBtn,
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <MessageCircle color={colors.primary} size={16} />
-        <Text style={friendStyles.secondaryLabel}>Mensaje</Text>
-      </Pressable>
+      {state === 'friends' && (
+        <Pressable
+          onPress={onMessage}
+          style={({ pressed }) => [
+            friendStyles.secondaryBtn,
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <MessageCircle color={colors.primary} size={16} />
+          <Text style={friendStyles.secondaryLabel}>Mensaje</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

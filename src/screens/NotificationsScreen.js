@@ -11,7 +11,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import {
-  ArrowLeft,
   Bell,
   Check,
   CheckCheck,
@@ -97,10 +96,12 @@ function timeAgo(iso) {
 
 function navigateForNotif(navigation, n) {
   const data = n?.data || {};
+  // Desde una tab, los screens del root stack se alcanzan subiendo al padre.
+  const root = navigation.getParent() || navigation;
   switch (n?.type) {
     case 'message_new':
       if (data.threadId) {
-        navigation.navigate('ChatThread', { threadId: data.threadId });
+        root.navigate('ChatThread', { threadId: data.threadId });
       }
       break;
     case 'match_join':
@@ -109,37 +110,36 @@ function navigateForNotif(navigation, n) {
     case 'join_approved':
     case 'join_rejected':
       if (data.matchId) {
-        navigation.navigate('MatchDetail', { matchId: data.matchId });
+        root.navigate('MatchDetail', { matchId: data.matchId });
       }
       break;
     case 'match_rate':
       if (data.matchId) {
-        navigation.navigate('RateMatch', { matchId: data.matchId });
+        root.navigate('RateMatch', { matchId: data.matchId });
       }
       break;
     case 'match_cancelled':
-      navigation.navigate('Main', { screen: 'SearchTab' });
+      navigation.navigate('SearchTab');
       break;
     case 'club_request':
     case 'club_request_accepted':
       if (data.clubId) {
-        navigation.navigate('ClubDetail', { clubId: data.clubId });
+        root.navigate('ClubDetail', { clubId: data.clubId });
       }
       break;
     case 'club_request_rejected':
-      navigation.navigate('Main', { screen: 'ClubsTab' });
+      navigation.navigate('ClubsTab');
       break;
     case 'club_member_joined':
     case 'club_member_left':
       if (data.clubId) {
-        navigation.navigate('ClubDetail', { clubId: data.clubId });
+        root.navigate('ClubDetail', { clubId: data.clubId });
       }
       break;
     case 'friend_request':
     case 'friend_accept':
-      // Si tienes pantalla de amigos puedes redirigir ahí; por ahora al perfil propio.
       if (data.fromUserId) {
-        navigation.navigate('UserProfile', { userId: data.fromUserId });
+        root.navigate('UserProfile', { userId: data.fromUserId });
       }
       break;
     default:
@@ -281,16 +281,8 @@ export default function NotificationsScreen({ navigation }) {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.header}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-          >
-            <ArrowLeft color={colors.textPrimary} size={22} />
-          </Pressable>
-
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Notificaciones</Text>
+            <Text style={styles.headerTitle}>Avisos</Text>
             {unreadCount > 0 && (
               <Text style={styles.headerSubtitle}>{unreadCount} sin leer</Text>
             )}
@@ -366,14 +358,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 10,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerCenter: { flex: 1 },
   headerTitle: {

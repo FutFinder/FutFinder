@@ -12,7 +12,6 @@ import {
   MapPin,
   Clock,
   Users,
-  Bell,
   ShieldCheck,
   Edit3,
   Trash2,
@@ -26,10 +25,6 @@ import { listOpenMatches, joinMatch, requestJoinMatch, deleteMatch } from '../se
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { isSupabaseConfigured } from '../services/supabase';
-import {
-  countUnread,
-  subscribeToNotifications,
-} from '../services/notifications';
 
 function formatHora(iso) {
   try {
@@ -72,8 +67,6 @@ export default function HomeScreen({ navigation }) {
   const [busyMatchId, setBusyMatchId] = useState(null);
   // banner: { type: 'success'|'error'|'info', title, message } | null
   const [banner, setBanner] = useState(null);
-  const [unread, setUnread] = useState(0);
-
   const showBanner = useCallback((type, title, message = '') => {
     setBanner({ type, title, message });
     notify(title, message);
@@ -104,31 +97,6 @@ export default function HomeScreen({ navigation }) {
     setRefreshing(true);
     load();
   };
-
-  const handleOpenNotifications = () => {
-    navigation.navigate('Notifications');
-  };
-
-  // Cargar y mantener al día el contador de no leídas
-  useEffect(() => {
-    let unsubscribe = () => {};
-    const reload = async () => setUnread(await countUnread());
-    reload();
-    (async () => {
-      const u = await getCurrentUser();
-      if (!u?.id) return;
-      unsubscribe = subscribeToNotifications(u.id, () => {
-        // llega una notif nueva → refrescamos contador
-        reload();
-      });
-    })();
-    // refrescar al volver a la pantalla
-    const focusUnsub = navigation.addListener?.('focus', reload);
-    return () => {
-      unsubscribe();
-      focusUnsub?.();
-    };
-  }, [navigation]);
 
   const handleJoin = async (matchId) => {
     console.log('[FutFinder] >>> handleJoin click', { matchId, busyMatchId });
@@ -248,20 +216,6 @@ export default function HomeScreen({ navigation }) {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.header}>
           <Logo size={28} />
-          <Pressable
-            onPress={handleOpenNotifications}
-            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
-            hitSlop={8}
-          >
-            <Bell color={colors.textSecondary} size={20} />
-            {unread > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unread > 9 ? '9+' : String(unread)}
-                </Text>
-              </View>
-            )}
-          </Pressable>
         </View>
 
         <ScrollView
