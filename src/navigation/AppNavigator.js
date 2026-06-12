@@ -10,6 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 // (la usamos en App.js para reaccionar al tap de una notif push).
 export const navigationRef = createNavigationContainerRef();
 
+import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import VerificationScreen from '../screens/VerificationScreen';
@@ -66,13 +67,14 @@ export default function AppNavigator() {
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator
-        initialRouteName="Welcome"
+        initialRouteName="Splash"
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
           animation: 'slide_from_right',
         }}
       >
+        <Stack.Screen name="Splash" component={SplashScreen} options={{ animation: 'none' }} />
         <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ animation: 'fade' }} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Verification" component={VerificationScreen} />
