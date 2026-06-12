@@ -23,6 +23,9 @@ import ProfileScreen from '../screens/ProfileScreen';
 import MatchDetailScreen from '../screens/MatchDetailScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import RateMatchScreen from '../screens/RateMatchScreen';
+import CreateClubScreen from '../screens/CreateClubScreen';
+import ClubDetailScreen from '../screens/ClubDetailScreen';
+import ClubPlansScreen from '../screens/ClubPlansScreen';
 import MainTabs from './MainTabs';
 
 import { colors } from '../theme/colors';
@@ -113,6 +116,21 @@ export default function AppNavigator() {
           name="RateMatch"
           component={RateMatchScreen}
           options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="CreateClub"
+          component={CreateClubScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="ClubDetail"
+          component={ClubDetailScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ClubPlans"
+          component={ClubPlansScreen}
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

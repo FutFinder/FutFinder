@@ -6,12 +6,14 @@ import {
   Home as HomeIcon,
   Search as SearchIcon,
   Plus,
+  Shield,
   MessageCircle,
   User as UserIcon,
 } from 'lucide-react-native';
 
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
+import ClubsScreen from '../screens/ClubsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { colors, radius } from '../theme/colors';
@@ -113,6 +115,7 @@ function iconFor(name) {
   switch (name) {
     case 'HomeTab': return HomeIcon;
     case 'SearchTab': return SearchIcon;
+    case 'ClubsTab': return Shield;
     case 'ChatTab': return MessageCircle;
     case 'ProfileTab': return UserIcon;
     default: return HomeIcon;
@@ -123,6 +126,7 @@ function labelFor(name) {
   switch (name) {
     case 'HomeTab': return 'Inicio';
     case 'SearchTab': return 'Buscar';
+    case 'ClubsTab': return 'Clubes';
     case 'ChatTab': return 'Chat';
     case 'ProfileTab': return 'Perfil';
     default: return '';
@@ -138,6 +142,7 @@ export default function MainTabs() {
       <Tab.Screen name="HomeTab" component={HomeScreen} />
       <Tab.Screen name="SearchTab" component={SearchScreen} />
       <Tab.Screen name="CreateTab" component={CreatePlaceholder} />
+      <Tab.Screen name="ClubsTab" component={ClubsScreen} />
       <Tab.Screen name="ChatTab" component={ChatScreen} />
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>

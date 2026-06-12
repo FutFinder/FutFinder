@@ -6,6 +6,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
  * Tipos de hilo (thread):
  *  - DM (1-a-1):    threadKey = 'dm:<userId>'   target = { receiver_id }
  *  - Match grupal:  threadKey = 'match:<matchId>' target = { match_id }
+ *  - Club:          threadKey = 'club:<clubId>'  target = { club_id }
  */
 
 export function threadKey({ type, id }) {
@@ -149,11 +150,49 @@ export async function listMyThreads() {
       })
       .filter(Boolean);
 
+    // 3b) Chat de mi club (si pertenezco a uno)
+    const clubThreads = [];
+    const { data: myMembership } = await supabase
+      .from('club_members')
+      .select('club_id, joined_at')
+      .eq('user_id', me)
+      .maybeSingle();
+    if (myMembership) {
+      const { data: myClubData } = await supabase
+        .from('clubs')
+        .select('id, nombre, foto_url, comuna')
+        .eq('id', myMembership.club_id)
+        .single();
+      if (myClubData) {
+        const { data: clubMsgs } = await supabase
+          .from('messages')
+          .select('id, content, created_at, sender_id, club_id')
+          .eq('club_id', myClubData.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        const lastClub = clubMsgs?.[0] || null;
+        clubThreads.push({
+          key: threadKey({ type: 'club', id: myClubData.id }),
+          type: 'club',
+          club_id: myClubData.id,
+          title: myClubData.nombre,
+          subtitle: 'Chat del club' + (myClubData.comuna ? ` · ${myClubData.comuna}` : ''),
+          foto_url: myClubData.foto_url || null,
+          last_message: lastClub,
+          last_at: lastClub?.created_at || myMembership.joined_at,
+          unread: 0,
+        });
+      }
+    }
+
     // 4) DMs — query simple, agrupamos en JS
     const { data: dms, error: dmErr } = await supabase
       .from('messages')
       .select('id, created_at, sender_id, receiver_id, content, read_at')
       .is('match_id', null)
+      // OJO: no filtramos club_id aquí para no romper si la migración 09
+      // aún no se aplica; los mensajes de club igual se descartan abajo
+      // porque su receiver_id es null.
       .or(`sender_id.eq.${me},receiver_id.eq.${me}`)
       .order('created_at', { ascending: false })
       .limit(200);
@@ -239,9 +278,12 @@ export async function listThreadMessages(threadKeyStr, { limit = 50 } = {}) {
     if (!user) return { data: [], error: { message: 'No autenticado' } };
     const me = user.id;
 
+    // club_id sólo se pide en hilos de club para no romper si la
+    // migración 09 aún no está aplicada
+    const baseCols = 'id, created_at, sender_id, receiver_id, match_id, content, read_at';
     let q = supabase
       .from('messages')
-      .select('id, created_at, sender_id, receiver_id, match_id, content, read_at')
+      .select(t.type === 'club' ? `${baseCols}, club_id` : baseCols)
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -254,6 +296,8 @@ export async function listThreadMessages(threadKeyStr, { limit = 50 } = {}) {
         );
     } else if (t.type === 'match') {
       q = q.eq('match_id', t.id);
+    } else if (t.type === 'club') {
+      q = q.eq('club_id', t.id);
     } else {
       return { data: [], error: { message: 'Tipo de hilo desconocido' } };
     }
@@ -267,7 +311,7 @@ export async function listThreadMessages(threadKeyStr, { limit = 50 } = {}) {
     const messages = (data || []).reverse(); // antiguo → nuevo
 
     // Resolver senders en una sola query (para mostrar @username en grupos)
-    if (t.type === 'match' && messages.length > 0) {
+    if ((t.type === 'match' || t.type === 'club') && messages.length > 0) {
       const senderIds = Array.from(
         new Set(messages.map((m) => m.sender_id).filter(Boolean))
       );
@@ -311,11 +355,13 @@ export async function sendMessage(threadKeyStr, content) {
   };
   if (t.type === 'dm') payload.receiver_id = t.id;
   else if (t.type === 'match') payload.match_id = t.id;
+  else if (t.type === 'club') payload.club_id = t.id;
 
+  const baseCols = 'id, created_at, sender_id, receiver_id, match_id, content, read_at';
   const { data, error } = await supabase
     .from('messages')
     .insert(payload)
-    .select('id, created_at, sender_id, receiver_id, match_id, content, read_at')
+    .select(t.type === 'club' ? `${baseCols}, club_id` : baseCols)
     .single();
 
   if (error) console.error('[FutFinder] sendMessage:', error);
@@ -407,8 +453,9 @@ export function messageBelongsToThread(message, threadKeyStr, myUserId) {
   const t = parseThreadKey(threadKeyStr);
   if (!t || !message) return false;
   if (t.type === 'match') return message.match_id === t.id;
+  if (t.type === 'club') return message.club_id === t.id;
   if (t.type === 'dm') {
-    if (message.match_id) return false;
+    if (message.match_id || message.club_id) return false;
     const pair = [message.sender_id, message.receiver_id].filter(Boolean);
     return pair.includes(myUserId) && pair.includes(t.id);
   }
