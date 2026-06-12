@@ -25,15 +25,17 @@ export function haversineKm(a, b) {
 export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), error: null };
 
-  // Mostramos partidos abiertos cuya hora oficial sea hace ≤ 2 horas
-  // (siguen siendo válidos para confirmar asistencia hasta 90 min después).
-  const dosHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  // Mostramos solo partidos cuya hora oficial todavía NO haya pasado.
+  // Una vez que `hora` pasa, el partido desaparece de Buscar y de Inicio.
+  // El chat sigue activo para los inscritos (ChatThreadScreen maneja el
+  // estado post-partido).
+  const ahora = new Date().toISOString();
 
   let q = supabase
     .from('matches')
     .select('*')
     .eq('estado', 'abierto')
-    .gte('hora', dosHorasAtras)
+    .gt('hora', ahora)
     .order('hora', { ascending: true })
     .limit(limit);
 
@@ -61,12 +63,12 @@ export async function listMatchesInBounds({
     return { data: [], error: null };
   }
 
-  const dosHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  const ahora = new Date().toISOString();
   const { data, error } = await supabase
     .from('matches')
     .select('*')
     .eq('estado', 'abierto')
-    .gte('hora', dosHorasAtras)
+    .gt('hora', ahora)
     .gte('latitud', minLat)
     .lte('latitud', maxLat)
     .gte('longitud', minLng)

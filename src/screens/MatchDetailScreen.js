@@ -132,11 +132,13 @@ export default function MatchDetailScreen({ route, navigation }) {
 
   // Calificación post-partido:
   //  - tengo que haber confirmado por GPS
-  //  - el partido tiene que haber empezado hace al menos 90 min
+  //  - el partido tiene que haber terminado (hora + duración real)
   const myAttendance = attendees.find((a) => a.user_id === myId);
   const iAmConfirmedGps = myAttendance?.estado === 'confirmado_gps';
   const matchHasPassed =
-    match?.hora && Date.now() - new Date(match.hora).getTime() >= 90 * 60 * 1000;
+    match?.hora &&
+    Date.now() >=
+      new Date(match.hora).getTime() + (match.duracion_min ?? 90) * 60 * 1000;
   const canRateMatch = iAmConfirmedGps && matchHasPassed;
 
   const handleEdit = () => {

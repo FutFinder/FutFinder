@@ -56,6 +56,13 @@ create table if not exists public.matches (
     descripcion text,
     estado text not null default 'abierto'
         check (estado in ('abierto','lleno','en_curso','finalizado','cancelado')),
+    -- Duración del partido en minutos (define la ventana de confirmación GPS, ver migración 09)
+    duracion_min integer default 90,
+    -- 'inmediata' = cualquiera entra; 'manual' = el organizador aprueba cada inscripción
+    aprobacion text default 'inmediata'
+        check (aprobacion in ('inmediata','manual')),
+    -- Trust score mínimo exigido para inscribirse (0 = sin requisito)
+    min_trust_score integer default 0,
     created_at timestamptz not null default now()
 );
 
@@ -150,6 +157,7 @@ declare
     v_attendance record;
     v_distance numeric;
     v_within_window boolean;
+    v_window_end timestamptz;
     v_user_id uuid := auth.uid();
 begin
     if v_user_id is null then
@@ -177,8 +185,12 @@ begin
         v_match.latitud, v_match.longitud, p_user_lat, p_user_lng
     );
 
+    -- Fin de ventana = fin real del partido + 30 min de gracia.
+    v_window_end := v_match.hora
+        + (coalesce(v_match.duracion_min, 90) || ' minutes')::interval
+        + interval '30 minutes';
     v_within_window := now() between (v_match.hora - interval '30 minutes')
-                                 and (v_match.hora + interval '90 minutes');
+                                 and v_window_end;
 
     if v_distance > 200 then
         return json_build_object(
@@ -191,7 +203,7 @@ begin
     if not v_within_window then
         return json_build_object(
             'ok', false,
-            'reason', 'Fuera de la ventana de confirmación (30 min antes / 90 min después)',
+            'reason', 'Fuera de la ventana de confirmación (30 min antes / hasta 30 min después de terminar)',
             'distance', v_distance
         );
     end if;
