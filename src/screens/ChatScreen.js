@@ -197,12 +197,6 @@ export default function ChatScreen({ navigation }) {
             onPress={() => setTab('all')}
           />
           <TabPill
-            label="Directos"
-            count={threads.filter((t) => t.type === 'dm').length}
-            active={tab === 'dm'}
-            onPress={() => setTab('dm')}
-          />
-          <TabPill
             label="Partidos"
             count={threads.filter((t) => t.type === 'match').length}
             active={tab === 'match'}
@@ -262,7 +256,13 @@ export default function ChatScreen({ navigation }) {
                         onPress={() => openUserProfile(r.user_id)}
                         style={styles.avatar}
                       >
-                        <UserIcon color={colors.primary} size={20} />
+                        {r.foto_url ? (
+                          <Image source={{ uri: r.foto_url }} style={styles.avatarImg} />
+                        ) : (
+                          <Text style={styles.avatarInitial}>
+                            {(r.username || '?')[0].toUpperCase()}
+                          </Text>
+                        )}
                       </Pressable>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.threadTitle} numberOfLines={1}>
@@ -320,7 +320,13 @@ export default function ChatScreen({ navigation }) {
                     onPress={() => openUserProfile(f.user_id)}
                     style={styles.avatar}
                   >
-                    <UserIcon color={colors.primary} size={20} />
+                    {f.foto_url ? (
+                      <Image source={{ uri: f.foto_url }} style={styles.avatarImg} />
+                    ) : (
+                      <Text style={styles.avatarInitial}>
+                        {(f.username || '?')[0].toUpperCase()}
+                      </Text>
+                    )}
                   </Pressable>
                   <Pressable
                     onPress={() => openUserProfile(f.user_id)}
@@ -488,8 +494,6 @@ function EmptyState({ type, onCreate }) {
       <Text style={styles.emptyText}>
         {type === 'match'
           ? 'Cuando te inscribas a un partido, el chat grupal aparecerá aquí.'
-          : type === 'dm'
-          ? 'Los mensajes directos con otros jugadores aparecerán aquí.'
           : type === 'club'
           ? 'Cuando te unas a un club, su chat interno aparecerá aquí.'
           : 'Inscríbete a un partido para empezar a chatear con otros jugadores.'}
@@ -686,6 +690,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarImg: { width: '100%', height: '100%' },
+  avatarInitial: {
+    color: colors.primary,
+    fontSize: 17,
+    fontWeight: '800',
+  },
   avatarMatch: {
     backgroundColor: colors.background,
     borderColor: colors.primary,
