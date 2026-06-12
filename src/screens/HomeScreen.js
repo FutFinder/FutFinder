@@ -20,6 +20,7 @@ import {
 import { colors, radius } from '../theme/colors';
 import Logo from '../components/Logo';
 import Banner from '../components/Banner';
+import MatchPreviewSheet from '../components/MatchPreviewSheet';
 import { notify } from '../utils/notify';
 import { listOpenMatches, joinMatch, requestJoinMatch, deleteMatch } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
@@ -65,6 +66,7 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState(null);
+  const [previewMatchId, setPreviewMatchId] = useState(null);
   // banner: { type: 'success'|'error'|'info', title, message } | null
   const [banner, setBanner] = useState(null);
   const showBanner = useCallback((type, title, message = '') => {
@@ -284,7 +286,11 @@ export default function HomeScreen({ navigation }) {
             const isBusy = busyMatchId === m.id;
             const isMine = myUserId && m.id_organizador === myUserId;
             return (
-              <View key={m.id} style={styles.matchCard}>
+              <Pressable
+                key={m.id}
+                style={({ pressed }) => [styles.matchCard, pressed && { opacity: 0.93 }]}
+                onPress={() => setPreviewMatchId(m.id)}
+              >
                 <View style={styles.matchTopRow}>
                   <Text style={styles.matchTitle} numberOfLines={1}>
                     {m.titulo}
@@ -392,7 +398,7 @@ export default function HomeScreen({ navigation }) {
                     </>
                   )}
                 </View>
-              </View>
+              </Pressable>
             );
           })}
 
@@ -406,6 +412,15 @@ export default function HomeScreen({ navigation }) {
           <View style={{ height: 24 }} />
         </ScrollView>
       </SafeAreaView>
+
+      <MatchPreviewSheet
+        matchId={previewMatchId}
+        myUserId={myUserId}
+        busyMatchId={busyMatchId}
+        onClose={() => setPreviewMatchId(null)}
+        onJoin={handleJoin}
+        onNavigateToDetail={(id) => navigation.navigate('MatchDetail', { matchId: id })}
+      />
     </View>
   );
 }
