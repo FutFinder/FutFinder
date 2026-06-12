@@ -26,6 +26,7 @@ import {
   MessageCircle,
   UserPlus,
   Pencil,
+  Trash2,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -46,6 +47,7 @@ import {
   getMyClub,
   promoteToAdmin,
   transferAdmin,
+  deleteClub,
   CLUB_LIMITS,
 } from '../services/clubs';
 
@@ -251,6 +253,23 @@ export default function ClubDetailScreen({ navigation, route }) {
           return;
         }
         await load();
+      }
+    );
+  };
+
+  const handleDeleteClub = () => {
+    confirmAction(
+      '¿Eliminar este club?',
+      'Esta acción no se puede deshacer. Se eliminarán todos los miembros, mensajes e historial del club.',
+      async () => {
+        setWorking(true);
+        const { error } = await deleteClub(clubId);
+        setWorking(false);
+        if (error) {
+          setBanner({ type: 'error', title: 'No se pudo eliminar', message: error.message });
+          return;
+        }
+        navigation.goBack();
       }
     );
   };
@@ -494,15 +513,27 @@ export default function ClubDetailScreen({ navigation, route }) {
         )}
         ListFooterComponent={
           soyMiembro ? (
-            <Pressable
-              onPress={handleLeave}
-              style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
-            >
-              <LogOut color={colors.error} size={16} />
-              <Text style={styles.leaveText}>
-                {members.length === 1 ? 'Eliminar club' : 'Salir del club'}
-              </Text>
-            </Pressable>
+            <View>
+              <Pressable
+                onPress={handleLeave}
+                style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
+              >
+                <LogOut color={colors.error} size={16} />
+                <Text style={styles.leaveText}>
+                  {members.length === 1 ? 'Eliminar club' : 'Salir del club'}
+                </Text>
+              </Pressable>
+              {soyAdmin && (
+                <Pressable
+                  onPress={handleDeleteClub}
+                  disabled={working}
+                  style={({ pressed }) => [styles.deleteClubBtn, pressed && { opacity: 0.7 }]}
+                >
+                  <Trash2 color={colors.error} size={16} />
+                  <Text style={styles.leaveText}>Eliminar club permanentemente</Text>
+                </Pressable>
+              )}
+            </View>
           ) : null
         }
       />
@@ -719,5 +750,17 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 14,
     fontWeight: '700',
+  },
+  deleteClubBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 14,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+    backgroundColor: colors.errorSoft,
   },
 });

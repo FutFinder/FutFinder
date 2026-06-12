@@ -535,6 +535,51 @@ export async function transferAdmin(memberId) {
 }
 
 /**
+ * Elimina el club completo (solo admins).
+ * La FK ON DELETE CASCADE borra club_members, club_join_requests y messages.
+ * Después limpia el logo del Storage si existía.
+ */
+export async function deleteClub(clubId) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+
+  // Guardar foto_url antes de que el cascade la borre
+  const { data: club } = await supabase
+    .from('clubs')
+    .select('foto_url')
+    .eq('id', clubId)
+    .single();
+
+  // RLS clubs_delete exige ser admin del club
+  const { error } = await supabase
+    .from('clubs')
+    .delete()
+    .eq('id', clubId);
+
+  if (error) {
+    console.error('[FutFinder] deleteClub:', error);
+    return { error };
+  }
+
+  // Limpiar logo del Storage (no bloqueante)
+  if (club?.foto_url) {
+    try {
+      const { data: files } = await supabase.storage
+        .from('club-logos')
+        .list(clubId);
+      if (files && files.length > 0) {
+        await supabase.storage
+          .from('club-logos')
+          .remove(files.map((f) => `${clubId}/${f.name}`));
+      }
+    } catch (e) {
+      console.warn('[FutFinder] deleteClub logo cleanup:', e);
+    }
+  }
+
+  return { data: { deleted: true }, error: null };
+}
+
+/**
  * Actualiza datos editables del club (solo admins, lo garantiza la RLS).
  * plan y verificado NO se tocan desde el cliente.
  */

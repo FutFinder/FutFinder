@@ -9,6 +9,7 @@ import {
   Image,
   RefreshControl,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -28,7 +29,6 @@ import {
 
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
 import ClubCard from '../components/ClubCard';
 import PremiumBadge, { premiumGold } from '../components/PremiumBadge';
 import {
@@ -212,7 +212,6 @@ export default function ClubsScreen({ navigation }) {
       <FlatList
         data={clubs}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -303,15 +302,14 @@ export default function ClubsScreen({ navigation }) {
             </Text>
           </View>
         }
-        ListFooterComponent={
-          <Button
-            label="Crear mi club"
-            icon={<Plus color="#0E0E0D" size={18} strokeWidth={2.6} />}
-            onPress={() => navigation.navigate('CreateClub')}
-            style={styles.createBtn}
-          />
-        }
+        contentContainerStyle={[styles.listContent, { paddingBottom: 96 }]}
       />
+      <Pressable
+        onPress={() => navigation.navigate('CreateClub')}
+        style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
+      >
+        <Plus color="#0E0E0D" size={22} strokeWidth={2.8} />
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -509,5 +507,26 @@ const styles = StyleSheet.create({
     maxWidth: 260,
     lineHeight: 18,
   },
-  createBtn: { marginTop: 16 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    ...Platform.select({
+      web: { boxShadow: '0 4px 16px rgba(113,181,51,0.5)' },
+      default: {
+        shadowColor: colors.primary,
+        shadowOpacity: 0.5,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 10,
+        elevation: 8,
+      },
+    }),
+  },
 });
