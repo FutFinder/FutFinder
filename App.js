@@ -56,6 +56,12 @@ function handleNotificationTap(response) {
         // Rechazado: a la pestaña Clubes a buscar otro equipo.
         navigationRef.navigate('Main', { screen: 'ClubsTab' });
         break;
+      case 'club_member_joined':
+      case 'club_member_left':
+        if (data.clubId) {
+          navigationRef.navigate('ClubDetail', { clubId: data.clubId });
+        }
+        break;
       case 'friend_request':
       case 'friend_accept':
         // Vamos a la pestaña de perfil — luego puedes crear una pantalla "Notificaciones".

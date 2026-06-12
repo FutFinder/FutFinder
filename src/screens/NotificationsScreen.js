@@ -66,6 +66,10 @@ function NotifIcon({ type }) {
       return <CheckCheck {...props} />;
     case 'club_request_rejected':
       return <Shield {...props} />;
+    case 'club_member_joined':
+      return <Users {...props} />;
+    case 'club_member_left':
+      return <Shield {...props} />;
     case 'message_new':
       return <MessageCircle {...props} />;
     case 'match_reminder':
@@ -124,6 +128,12 @@ function navigateForNotif(navigation, n) {
       break;
     case 'club_request_rejected':
       navigation.navigate('Main', { screen: 'ClubsTab' });
+      break;
+    case 'club_member_joined':
+    case 'club_member_left':
+      if (data.clubId) {
+        navigation.navigate('ClubDetail', { clubId: data.clubId });
+      }
       break;
     case 'friend_request':
     case 'friend_accept':
