@@ -19,6 +19,9 @@ import {
   Check,
   Users,
   User as UserIcon,
+  Star,
+  MapPin,
+  Trash2,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -29,7 +32,10 @@ import {
   subscribeToMessages,
   messageBelongsToThread,
   parseThreadKey,
+  hideThread,
 } from '../services/messages';
+import { getMatchById } from '../services/matches';
+import { confirmAttendanceWithGPS } from '../services/attendance';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
 import Banner from '../components/Banner';
@@ -80,12 +86,69 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [draft, setDraft] = useState('');
   const [myId, setMyId] = useState(null);
   const [errorBanner, setErrorBanner] = useState(null);
+  const [matchInfo, setMatchInfo] = useState(null);
+  const [busyAction, setBusyAction] = useState(false);
 
   const listRef = useRef(null);
   const isMountedRef = useRef(true);
 
   const t = parseThreadKey(threadKey);
   const isGroup = t?.type === 'match';
+
+  // Si es un chat de partido, traer la info del partido para saber si ya terminó
+  useEffect(() => {
+    if (!isGroup || !t?.id) return;
+    (async () => {
+      const { data } = await getMatchById(t.id);
+      if (isMountedRef.current) setMatchInfo(data || null);
+    })();
+  }, [isGroup, t?.id]);
+
+  // Partido terminado: hora + duracion ya pasó (default 90 min si no hay duración)
+  const matchEnded =
+    matchInfo?.hora &&
+    Date.now() >=
+      new Date(matchInfo.hora).getTime() +
+        (matchInfo.duracion_min ?? 90) * 60 * 1000;
+
+  const handleRateMatch = () => {
+    if (!t?.id) return;
+    navigation.navigate('RateMatch', { matchId: t.id });
+  };
+
+  const handleConfirmGPS = async () => {
+    if (!t?.id || busyAction) return;
+    setBusyAction(true);
+    const r = await confirmAttendanceWithGPS(t.id);
+    setBusyAction(false);
+    if (r?.ok) {
+      setErrorBanner({
+        type: 'success',
+        title: '✓ Asistencia confirmada',
+        message: r.distance
+          ? `Estás a ${Math.round(r.distance)} m. +1 a tu Trust Score.`
+          : 'Tu asistencia quedó registrada.',
+      });
+    } else {
+      setErrorBanner({
+        type: 'error',
+        title: 'No pude confirmar',
+        message: r?.reason || 'Intenta de nuevo',
+      });
+    }
+  };
+
+  const handleDeleteChat = async () => {
+    const ok =
+      typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm('¿Eliminar este chat? Podrás recuperarlo si llega un mensaje nuevo.')
+        : true;
+    if (!ok) return;
+    setBusyAction(true);
+    await hideThread(threadKey);
+    setBusyAction(false);
+    navigation.goBack();
+  };
 
   // Cargar usuario actual e historial
   useEffect(() => {
@@ -335,32 +398,73 @@ export default function ChatThreadScreen({ route, navigation }) {
           />
         )}
 
-        {/* Input */}
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Escribe un mensaje…"
-            placeholderTextColor={colors.textMuted}
-            value={draft}
-            onChangeText={setDraft}
-            multiline
-            maxLength={1000}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-            blurOnSubmit={false}
-          />
-          <Pressable
-            onPress={handleSend}
-            disabled={!draft.trim() || sending}
-            style={({ pressed }) => [
-              styles.sendBtn,
-              pressed && { opacity: 0.85 },
-              (!draft.trim() || sending) && { opacity: 0.4 },
-            ]}
-          >
-            <Send color="#0E0E0D" size={18} strokeWidth={2.4} />
-          </Pressable>
-        </View>
+        {/* Composer activo durante el partido, panel de acciones cuando terminó */}
+        {isGroup && matchEnded ? (
+          <View style={styles.endedBar}>
+            <Pressable
+              onPress={handleRateMatch}
+              disabled={busyAction}
+              style={({ pressed }) => [
+                styles.endedBtn,
+                pressed && { opacity: 0.8 },
+                busyAction && { opacity: 0.5 },
+              ]}
+            >
+              <Star color={colors.primary} size={16} fill={colors.primary} />
+              <Text style={styles.endedBtnText}>Calificar</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleConfirmGPS}
+              disabled={busyAction}
+              style={({ pressed }) => [
+                styles.endedBtn,
+                pressed && { opacity: 0.8 },
+                busyAction && { opacity: 0.5 },
+              ]}
+            >
+              <MapPin color={colors.primary} size={16} />
+              <Text style={styles.endedBtnText}>GPS</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleDeleteChat}
+              disabled={busyAction}
+              style={({ pressed }) => [
+                styles.endedBtnDanger,
+                pressed && { opacity: 0.7 },
+                busyAction && { opacity: 0.5 },
+              ]}
+            >
+              <Trash2 color={colors.error} size={16} />
+              <Text style={styles.endedBtnDangerText}>Eliminar chat</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.composer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Escribe un mensaje…"
+              placeholderTextColor={colors.textMuted}
+              value={draft}
+              onChangeText={setDraft}
+              multiline
+              maxLength={1000}
+              onSubmitEditing={handleSend}
+              returnKeyType="send"
+              blurOnSubmit={false}
+            />
+            <Pressable
+              onPress={handleSend}
+              disabled={!draft.trim() || sending}
+              style={({ pressed }) => [
+                styles.sendBtn,
+                pressed && { opacity: 0.85 },
+                (!draft.trim() || sending) && { opacity: 0.4 },
+              ]}
+            >
+              <Send color="#0E0E0D" size={18} strokeWidth={2.4} />
+            </Pressable>
+          </View>
+        )}
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -657,5 +761,54 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 19,
+  },
+
+  // Barra de acciones cuando el partido ya terminó (reemplaza al composer)
+  endedBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  endedBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  endedBtnText: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  endedBtnDanger: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  endedBtnDangerText: {
+    color: colors.error,
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
