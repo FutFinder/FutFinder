@@ -82,13 +82,38 @@ function NotifIcon({ type }) {
   }
 }
 
-function timeAgo(iso) {
+function formatNotifTime(iso) {
   try {
-    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    const date = new Date(iso);
+    const diff = (Date.now() - date.getTime()) / 1000;
     if (diff < 60) return 'ahora';
     if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
-    if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
-    return `hace ${Math.floor(diff / 86400)} d`;
+
+    const hhmm = date.toLocaleTimeString('es-CL', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+    if (isToday) return `hoy ${hhmm}`;
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+    if (isYesterday) return `ayer ${hhmm}`;
+
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    if (date.getFullYear() === now.getFullYear()) return `${dd}/${mm} ${hhmm}`;
+    const yy = String(date.getFullYear()).slice(2);
+    return `${dd}/${mm}/${yy} ${hhmm}`;
   } catch {
     return '';
   }
@@ -100,8 +125,8 @@ function navigateForNotif(navigation, n) {
   const root = navigation.getParent() || navigation;
   switch (n?.type) {
     case 'message_new':
-      if (data.threadId) {
-        root.navigate('ChatThread', { threadId: data.threadId });
+      if (data.threadKey || data.threadId) {
+        root.navigate('ChatThread', { threadKey: data.threadKey || data.threadId });
       }
       break;
     case 'match_join':
@@ -172,9 +197,15 @@ export default function NotificationsScreen({ navigation }) {
       const user = await getCurrentUser();
       if (!user?.id) return;
       unsubscribe = subscribeToNotifications(user.id, (notif) => {
-        // Si ya está en la lista (por race condition), no la duplicamos
         setItems((prev) => {
-          if (prev.some((p) => p.id === notif.id)) return prev;
+          const idx = prev.findIndex((p) => p.id === notif.id);
+          if (idx >= 0) {
+            // UPDATE: reemplazar la fila existente (agrupación de mensajes)
+            const next = [...prev];
+            next[idx] = notif;
+            return next;
+          }
+          // INSERT: agregar arriba
           return [notif, ...prev];
         });
       });
@@ -263,7 +294,7 @@ export default function NotificationsScreen({ navigation }) {
               {item.body}
             </Text>
           ) : null}
-          <Text style={styles.time}>{timeAgo(item.created_at)}</Text>
+          <Text style={styles.time}>{formatNotifTime(item.created_at)}</Text>
         </View>
         <Pressable
           onPress={() => handleDelete(item.id)}

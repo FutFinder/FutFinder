@@ -242,12 +242,12 @@ export async function deleteAllNotifications() {
 }
 
 /**
- * Suscripción Realtime a notificaciones nuevas del usuario actual.
- * Útil para refrescar el badge en vivo sin recargar.
- * onInsert(notif) se llama cada vez que insertan una row para este user.
+ * Suscripción Realtime a notificaciones del usuario actual.
+ * Escucha INSERT (notif nueva) y UPDATE (agrupación de mensajes).
+ * onEvent(notif) recibe la row actualizada en ambos casos.
  * Devuelve función para unsubscribe.
  */
-export function subscribeToNotifications(userId, onInsert) {
+export function subscribeToNotifications(userId, onEvent) {
   if (!isSupabaseConfigured || !userId) return () => {};
   const channel = supabase
     .channel(`notif-${userId}`)
@@ -259,7 +259,17 @@ export function subscribeToNotifications(userId, onInsert) {
         table: 'notifications',
         filter: `user_id=eq.${userId}`,
       },
-      (payload) => onInsert?.(payload.new)
+      (payload) => onEvent?.(payload.new)
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => onEvent?.(payload.new)
     )
     .subscribe();
   return () => {

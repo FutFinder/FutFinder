@@ -25,8 +25,8 @@ function handleNotificationTap(response) {
     if (!navigationRef.isReady()) return;
     switch (data.type) {
       case 'message_new':
-        if (data.threadId) {
-          navigationRef.navigate('ChatThread', { threadId: data.threadId });
+        if (data.threadKey || data.threadId) {
+          navigationRef.navigate('ChatThread', { threadKey: data.threadKey || data.threadId });
         }
         break;
       case 'match_join':
