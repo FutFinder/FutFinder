@@ -244,7 +244,7 @@ export async function listMyThreads() {
       }
     }
 
-    const all = [...matchThreads, ...dmMap.values()]
+    const all = [...matchThreads, ...clubThreads, ...dmMap.values()]
       // Filtrar hilos escondidos cuando no hay actividad posterior
       .filter((t) => {
         const hiddenAt = hiddenMap.get(t.key);
