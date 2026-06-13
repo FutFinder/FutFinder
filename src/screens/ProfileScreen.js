@@ -386,6 +386,7 @@ export default function ProfileScreen({ navigation, route }) {
           <GalleryCard
             photos={galleryPhotos}
             isMyProfile={isMyProfile}
+            username={profile?.username || 'jugador'}
             onTap={(index) => setGalleryViewerIndex(index)}
             onShowAll={() => setGalleryOpen(true)}
             onNavigateEdit={() => navigation.navigate('EditProfile')}
@@ -918,11 +919,11 @@ function KV({ label, value }) {
 const SCREEN_W = Dimensions.get('window').width;
 // Vista completa (3 cols, gap 4): se usa en FullGalleryModal
 const THUMB_SIZE = Math.floor((SCREEN_W - 40 - 4 * 2) / 3);
-// Vista colapsada en perfil (2 cols, gap 4): max 3 celdas
-const THUMB_SIZE_2COL = Math.floor((SCREEN_W - 40 - 4) / 2);
+// Vista colapsada en perfil (3 celdas iguales en fila, gap 4)
+const THUMB_SIZE_3ROW = Math.floor((SCREEN_W - 40 - 4 * 2) / 3);
 
-// Muestra máx 2 fotos visibles + celda overlay "+X fotos" si hay más de 2.
-function GalleryCard({ photos, isMyProfile, onTap, onShowAll, onNavigateEdit }) {
+// Muestra 3 celdas en fila horizontal: foto[0], foto[1], foto[2] con overlay "+X".
+function GalleryCard({ photos, isMyProfile, username, onTap, onShowAll, onNavigateEdit }) {
   const previewPhotos = photos.slice(0, 3);
   const remaining = photos.length - 2; // fotos no visibles completamente
 
@@ -930,7 +931,9 @@ function GalleryCard({ photos, isMyProfile, onTap, onShowAll, onNavigateEdit }) 
     <View style={styles.card}>
       <View style={styles.cardTitleRow}>
         <Images color={colors.primary} size={16} />
-        <Text style={styles.cardTitle}>Galería</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          Galería de {username}
+        </Text>
         {isMyProfile && photos.length > 0 && (
           <Pressable onPress={onNavigateEdit} hitSlop={10} style={{ marginLeft: 'auto' }}>
             <Text style={styles.galleryEditLink}>Gestionar</Text>
@@ -962,7 +965,7 @@ function GalleryCard({ photos, isMyProfile, onTap, onShowAll, onNavigateEdit }) 
               <Pressable
                 key={photo.id}
                 onPress={showOverlay ? onShowAll : () => onTap(idx)}
-                style={({ pressed }) => [styles.galleryThumb2Col, pressed && { opacity: 0.82 }]}
+                style={({ pressed }) => [styles.galleryThumb3Row, pressed && { opacity: 0.82 }]}
               >
                 <Image
                   source={{ uri: photo.photo_url }}
@@ -1492,15 +1495,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Galería colapsada en perfil (2 columnas, max 3 celdas)
+  // Galería colapsada en perfil (3 celdas en fila horizontal)
   galleryGridPreview: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 4,
   },
-  galleryThumb2Col: {
-    width: THUMB_SIZE_2COL,
-    height: THUMB_SIZE_2COL,
+  galleryThumb3Row: {
+    flex: 1,
+    height: THUMB_SIZE_3ROW,
     borderRadius: radius.sm,
     overflow: 'hidden',
     backgroundColor: colors.background,
