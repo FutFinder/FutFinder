@@ -35,7 +35,9 @@ import {
   getMyClub,
   searchClubs,
   listMyInvitations,
+  listPendingRequests,
   respondToRequest,
+  subscribeToPendingRequests,
   CLUB_LIMITS,
 } from '../services/clubs';
 
@@ -52,6 +54,27 @@ export default function ClubsScreen({ navigation, route }) {
   const [invitations, setInvitations] = useState([]);
   const [query, setQuery] = useState('');
   const [banner, setBanner] = useState(null); // { type, title, message }
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Suscripción Realtime a solicitudes pendientes (solo admins)
+  useEffect(() => {
+    if (!myClub || myClub.miRol !== 'admin') {
+      setPendingCount(0);
+      return;
+    }
+    const clubId = myClub.club.id;
+
+    listPendingRequests(clubId).then(({ data }) => {
+      setPendingCount((data || []).length);
+    });
+
+    const unsub = subscribeToPendingRequests(clubId, async () => {
+      const { data } = await listPendingRequests(clubId);
+      setPendingCount((data || []).length);
+    });
+
+    return unsub;
+  }, [myClub]);
 
   const load = useCallback(async (q = '') => {
     const [{ data: mine }, { data: found }] = await Promise.all([
@@ -206,6 +229,7 @@ export default function ClubsScreen({ navigation, route }) {
                 title="Integrantes"
                 subtitle={`${totalMiembros} de ${limites.miembros}`}
                 onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+                badge={miRol === 'admin' ? pendingCount : 0}
               />
               <RowAction
                 icon={<MessageCircle color={colors.primary} size={20} strokeWidth={2} />}
@@ -394,13 +418,20 @@ function Header() {
   );
 }
 
-function RowAction({ icon, title, subtitle, onPress }) {
+function RowAction({ icon, title, subtitle, onPress, badge = 0 }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [styles.rowAction, pressed && { opacity: 0.85 }]}
     >
-      <View style={styles.rowIconWrap}>{icon}</View>
+      <View style={styles.rowIconWrap}>
+        {icon}
+        {badge > 0 && (
+          <View style={styles.badgeCircle}>
+            <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+          </View>
+        )}
+      </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowSubtitle}>{subtitle}</Text>
@@ -505,6 +536,28 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.borderSoft,
     marginVertical: 20,
+  },
+
+  // badge de solicitudes pendientes
+  badgeCircle: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 13,
   },
 
   // accesos

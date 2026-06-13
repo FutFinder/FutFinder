@@ -604,6 +604,25 @@ export async function deleteClub(clubId) {
 }
 
 /**
+ * Suscripción Realtime a cambios en solicitudes de un club.
+ * Llama a onChange() cada vez que se inserta, actualiza o elimina una fila
+ * en club_join_requests para ese club.
+ * Devuelve una función de limpieza para cancelar la suscripción.
+ */
+export function subscribeToPendingRequests(clubId, onChange) {
+  if (!isSupabaseConfigured || !clubId) return () => {};
+  const channel = supabase
+    .channel(`club-requests-${clubId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'club_join_requests', filter: `club_id=eq.${clubId}` },
+      () => onChange()
+    )
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
+/**
  * Actualiza datos editables del club (solo admins, lo garantiza la RLS).
  * plan y verificado NO se tocan desde el cliente.
  */
