@@ -260,7 +260,7 @@ export default function ProfileScreen({ navigation, route }) {
           {!isMyProfile && <Logo size={26} />}
           {isMyProfile ? (
             <Pressable
-              onPress={() => navigation.navigate('EditProfile')}
+              onPress={() => navigation.navigate('Settings')}
               hitSlop={12}
               style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
             >

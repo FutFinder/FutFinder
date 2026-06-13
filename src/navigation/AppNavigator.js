@@ -29,6 +29,7 @@ import ClubDetailScreen from '../screens/ClubDetailScreen';
 import ClubPlansScreen from '../screens/ClubPlansScreen';
 import EditClubScreen from '../screens/EditClubScreen';
 import ClubInviteScreen from '../screens/ClubInviteScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import MainTabs from './MainTabs';
 
 import { colors } from '../theme/colors';
@@ -144,6 +145,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClubInvite"
           component={ClubInviteScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Settings"
+          component={SettingsScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

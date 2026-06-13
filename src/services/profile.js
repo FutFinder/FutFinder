@@ -134,6 +134,9 @@ export async function updateMyProfile(patch) {
     'edad', 'bio', 'region', 'comuna',
     'latitud', 'longitud', 'location_updated_at',
     'onboarding_completed',
+    'privacy_friend_requests', 'privacy_visible_in_search',
+    'notif_matches', 'notif_clubs', 'notif_chat', 'notif_friends',
+    'pref_region', 'pref_comuna',
   ];
   const payload = {};
   for (const k of allowed) {
