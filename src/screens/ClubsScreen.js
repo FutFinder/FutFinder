@@ -54,15 +54,17 @@ export default function ClubsScreen({ navigation, route }) {
   const [banner, setBanner] = useState(null); // { type, title, message }
 
   const load = useCallback(async (q = '') => {
-    const { data: mine } = await getMyClub();
+    const [{ data: mine }, { data: found }] = await Promise.all([
+      getMyClub(),
+      searchClubs(q),
+    ]);
     setMyClub(mine);
+    setClubs(found || []);
     if (!mine) {
-      const [{ data: found }, { data: invs }] = await Promise.all([
-        searchClubs(q),
-        listMyInvitations(),
-      ]);
-      setClubs(found || []);
+      const { data: invs } = await listMyInvitations();
       setInvitations(invs || []);
+    } else {
+      setInvitations([]);
     }
     setLoading(false);
   }, []);
@@ -129,90 +131,148 @@ export default function ClubsScreen({ navigation, route }) {
   if (myClub) {
     const { club, miRol, totalMiembros } = myClub;
     const limites = CLUB_LIMITS[club.plan] || CLUB_LIMITS.estandar;
+    const otrosClubs = clubs.filter((c) => c.id !== club.id);
+
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
         <Header />
-        <View style={styles.content}>
-          {banner && (
-            <Banner {...banner} onClose={() => setBanner(null)} />
-          )}
+        <FlatList
+          data={otrosClubs}
+          keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ListHeaderComponent={
+            <View style={styles.content}>
+              {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-          {/* Tarjeta del club */}
-          <Pressable
-            onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
-            style={({ pressed }) => [styles.myClubCard, pressed && { opacity: 0.9 }]}
-          >
-            {club.foto_url ? (
-              <Image source={{ uri: club.foto_url }} style={styles.myClubLogo} />
-            ) : (
-              <View style={[styles.myClubLogo, styles.logoFallback]}>
-                <Shield color={colors.primary} size={36} strokeWidth={1.6} />
+              {/* Etiqueta sección Mi Club */}
+              <Text style={styles.sectionTitle}>Mi Club</Text>
+
+              {/* Tarjeta del club */}
+              <Pressable
+                onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+                style={({ pressed }) => [styles.myClubCard, pressed && { opacity: 0.9 }]}
+              >
+                {club.foto_url ? (
+                  <Image source={{ uri: club.foto_url }} style={styles.myClubLogo} />
+                ) : (
+                  <View style={[styles.myClubLogo, styles.logoFallback]}>
+                    <Shield color={colors.primary} size={36} strokeWidth={1.6} />
+                  </View>
+                )}
+                <View style={styles.myClubNameRow}>
+                  <Text style={styles.myClubName} numberOfLines={1}>
+                    {club.nombre}
+                  </Text>
+                  {club.verificado ? (
+                    <BadgeCheck color={premiumGold} size={20} strokeWidth={2.2} />
+                  ) : null}
+                </View>
+                {club.comuna ? (
+                  <View style={styles.myClubMeta}>
+                    <MapPin color={colors.textMuted} size={13} />
+                    <Text style={styles.myClubMetaText}>
+                      {club.comuna}{club.region ? `, ${club.region}` : ''}
+                    </Text>
+                  </View>
+                ) : null}
+                <View style={styles.badgeRow}>
+                  {club.plan === 'premium' ? (
+                    <PremiumBadge variant="badge" />
+                  ) : (
+                    <View style={styles.planChip}>
+                      <Text style={styles.planChipText}>PLAN ESTÁNDAR</Text>
+                    </View>
+                  )}
+                  {miRol === 'admin' && (
+                    <View style={styles.adminChip}>
+                      <Crown color={colors.primary} size={11} strokeWidth={2.4} />
+                      <Text style={styles.adminChipText}>Admin</Text>
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+
+              {/* Accesos */}
+              <RowAction
+                icon={<Users color={colors.primary} size={20} strokeWidth={2} />}
+                title="Integrantes"
+                subtitle={`${totalMiembros} de ${limites.miembros}`}
+                onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+              />
+              <RowAction
+                icon={<MessageCircle color={colors.primary} size={20} strokeWidth={2} />}
+                title="Chat del club"
+                subtitle="Conversa con tu equipo"
+                onPress={() =>
+                  navigation.navigate('ChatThread', {
+                    threadKey: `club:${club.id}`,
+                    title: club.nombre,
+                    subtitle: 'Chat del club',
+                    fotoUrl: club.foto_url || null,
+                  })
+                }
+              />
+              <RowAction
+                icon={<Crown color={premiumGold} size={20} strokeWidth={2} />}
+                title="Planes del club"
+                subtitle={
+                  club.plan === 'premium'
+                    ? 'Tu club es Premium'
+                    : 'Conoce las ventajas Premium'
+                }
+                onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
+              />
+
+              {/* Divisor + buscador */}
+              <View style={styles.divider} />
+              <View style={styles.searchBox}>
+                <SearchIcon color={colors.textMuted} size={18} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Buscar clubes por nombre..."
+                  placeholderTextColor={colors.textMuted}
+                  value={query}
+                  onChangeText={onSearch}
+                  autoCapitalize="none"
+                />
               </View>
-            )}
-            <View style={styles.myClubNameRow}>
-              <Text style={styles.myClubName} numberOfLines={1}>
-                {club.nombre}
+              <Text style={styles.sectionTitle}>
+                {query.trim() ? 'Resultados' : 'Explorar clubes'}
               </Text>
-              {club.verificado ? (
-                <BadgeCheck color={premiumGold} size={20} strokeWidth={2.2} />
-              ) : null}
             </View>
-            {club.comuna ? (
-              <View style={styles.myClubMeta}>
-                <MapPin color={colors.textMuted} size={13} />
-                <Text style={styles.myClubMetaText}>
-                  {club.comuna}{club.region ? `, ${club.region}` : ''}
-                </Text>
-              </View>
-            ) : null}
-            <View style={styles.badgeRow}>
-              {club.plan === 'premium' ? (
-                <PremiumBadge variant="badge" />
-              ) : (
-                <View style={styles.planChip}>
-                  <Text style={styles.planChipText}>PLAN ESTÁNDAR</Text>
-                </View>
-              )}
-              {miRol === 'admin' && (
-                <View style={styles.adminChip}>
-                  <Crown color={colors.primary} size={11} strokeWidth={2.4} />
-                  <Text style={styles.adminChipText}>Admin</Text>
-                </View>
-              )}
+          }
+          renderItem={({ item }) => (
+            <View style={styles.content}>
+              <ClubCard
+                club={item}
+                onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
+                right={<ChevronRight color={colors.textMuted} size={18} />}
+              />
             </View>
-          </Pressable>
-
-          {/* Accesos */}
-          <RowAction
-            icon={<Users color={colors.primary} size={20} strokeWidth={2} />}
-            title="Integrantes"
-            subtitle={`${totalMiembros} de ${limites.miembros}`}
-            onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
-          />
-          <RowAction
-            icon={<MessageCircle color={colors.primary} size={20} strokeWidth={2} />}
-            title="Chat del club"
-            subtitle="Conversa con tu equipo"
-            onPress={() =>
-              navigation.navigate('ChatThread', {
-                threadKey: `club:${club.id}`,
-                title: club.nombre,
-                subtitle: 'Chat del club',
-                fotoUrl: club.foto_url || null,
-              })
-            }
-          />
-          <RowAction
-            icon={<Crown color={premiumGold} size={20} strokeWidth={2} />}
-            title="Planes del club"
-            subtitle={
-              club.plan === 'premium'
-                ? 'Tu club es Premium'
-                : 'Conoce las ventajas Premium'
-            }
-            onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
-          />
-        </View>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Shield color={colors.textMuted} size={34} strokeWidth={1.5} />
+              <Text style={styles.emptyTitle}>
+                {query.trim() ? 'Sin resultados' : 'No hay más clubes'}
+              </Text>
+              <Text style={styles.emptyText}>
+                {query.trim()
+                  ? 'Intenta con otro nombre.'
+                  : 'Eres parte de los primeros clubes de FutFinder.'}
+              </Text>
+            </View>
+          }
+          contentContainerStyle={{ paddingBottom: 40 }}
+        />
       </SafeAreaView>
     );
   }
@@ -439,6 +499,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.3,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: colors.borderSoft,
+    marginVertical: 20,
   },
 
   // accesos

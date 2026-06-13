@@ -420,7 +420,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             {!soyMiembro && tengoOtroClub && (
               <Banner
                 type="info"
-                title="Ya tienes club"
+                title="Ya perteneces a un club"
                 message="Para unirte a este club primero debes salir del tuyo."
               />
             )}
