@@ -96,6 +96,7 @@ export default function ProfileScreen({ navigation, route }) {
   const [photoViewer, setPhotoViewer] = useState(false);
   const [galleryPhotos, setGalleryPhotos] = useState([]);
   const [galleryViewerIndex, setGalleryViewerIndex] = useState(null); // null = cerrado
+  const [galleryOpen, setGalleryOpen] = useState(false); // galería completa
 
   // ¿Estoy viendo mi propio perfil o el de otro?
   const isMyProfile = !viewUserId || viewUserId === myId;
@@ -386,6 +387,7 @@ export default function ProfileScreen({ navigation, route }) {
             photos={galleryPhotos}
             isMyProfile={isMyProfile}
             onTap={(index) => setGalleryViewerIndex(index)}
+            onShowAll={() => setGalleryOpen(true)}
             onNavigateEdit={() => navigation.navigate('EditProfile')}
           />
 
@@ -602,6 +604,14 @@ export default function ProfileScreen({ navigation, route }) {
           <View style={{ height: 32 }} />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Galería completa */}
+      <FullGalleryModal
+        visible={galleryOpen}
+        photos={galleryPhotos}
+        onClose={() => setGalleryOpen(false)}
+        onTapPhoto={(idx) => setGalleryViewerIndex(idx)}
+      />
 
       {/* Visor de foto de perfil (avatar) */}
       <Modal
@@ -906,11 +916,16 @@ function KV({ label, value }) {
 
 // ── Galería de fotos ─────────────────────────────────────────────
 const SCREEN_W = Dimensions.get('window').width;
-// scroll tiene paddingHorizontal: 20 → ancho útil = screenW - 40
-// 3 columnas con gap de 4 entre ellas → 2 gaps totales
+// Vista completa (3 cols, gap 4): se usa en FullGalleryModal
 const THUMB_SIZE = Math.floor((SCREEN_W - 40 - 4 * 2) / 3);
+// Vista colapsada en perfil (2 cols, gap 4): max 3 celdas
+const THUMB_SIZE_2COL = Math.floor((SCREEN_W - 40 - 4) / 2);
 
-function GalleryCard({ photos, isMyProfile, onTap, onNavigateEdit }) {
+// Muestra máx 2 fotos visibles + celda overlay "+X fotos" si hay más de 2.
+function GalleryCard({ photos, isMyProfile, onTap, onShowAll, onNavigateEdit }) {
+  const previewPhotos = photos.slice(0, 3);
+  const remaining = photos.length - 2; // fotos no visibles completamente
+
   return (
     <View style={styles.card}>
       <View style={styles.cardTitleRow}>
@@ -940,23 +955,82 @@ function GalleryCard({ photos, isMyProfile, onTap, onNavigateEdit }) {
           )}
         </View>
       ) : (
-        <View style={styles.galleryGrid}>
-          {photos.map((photo, index) => (
-            <Pressable
-              key={photo.id}
-              onPress={() => onTap(index)}
-              style={({ pressed }) => [styles.galleryThumb, pressed && { opacity: 0.8 }]}
-            >
-              <Image
-                source={{ uri: photo.photo_url }}
-                style={styles.galleryThumbImg}
-                resizeMode="cover"
-              />
-            </Pressable>
-          ))}
+        <View style={styles.galleryGridPreview}>
+          {previewPhotos.map((photo, idx) => {
+            const showOverlay = idx === 2 && photos.length > 2;
+            return (
+              <Pressable
+                key={photo.id}
+                onPress={showOverlay ? onShowAll : () => onTap(idx)}
+                style={({ pressed }) => [styles.galleryThumb2Col, pressed && { opacity: 0.82 }]}
+              >
+                <Image
+                  source={{ uri: photo.photo_url }}
+                  style={styles.galleryThumbImg}
+                  resizeMode="cover"
+                />
+                {showOverlay && (
+                  <View style={styles.galleryOverlay}>
+                    <Text style={styles.galleryOverlayCount}>+{remaining}</Text>
+                    <Text style={styles.galleryOverlayLabel}>fotos</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
         </View>
       )}
     </View>
+  );
+}
+
+// Modal con la galería completa desplazable.
+function FullGalleryModal({ visible, photos, onClose, onTapPhoto }) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={styles.fullGalleryRoot}>
+        <SafeAreaView edges={['top']} style={styles.fullGalleryHeaderWrap}>
+          <View style={styles.fullGalleryHeader}>
+            <Text style={styles.fullGalleryTitle}>
+              Galería · {photos.length} {photos.length === 1 ? 'foto' : 'fotos'}
+            </Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={12}
+              style={({ pressed }) => [styles.fullGalleryClose, pressed && { opacity: 0.6 }]}
+            >
+              <X color={colors.textPrimary} size={22} />
+            </Pressable>
+          </View>
+        </SafeAreaView>
+
+        <ScrollView
+          contentContainerStyle={styles.fullGalleryScroll}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.galleryGrid}>
+            {photos.map((photo, idx) => (
+              <Pressable
+                key={photo.id}
+                onPress={() => onTapPhoto(idx)}
+                style={({ pressed }) => [styles.galleryThumb, pressed && { opacity: 0.8 }]}
+              >
+                <Image
+                  source={{ uri: photo.photo_url }}
+                  style={styles.galleryThumbImg}
+                  resizeMode="cover"
+                />
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -1416,6 +1490,75 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  // Galería colapsada en perfil (2 columnas, max 3 celdas)
+  galleryGridPreview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  galleryThumb2Col: {
+    width: THUMB_SIZE_2COL,
+    height: THUMB_SIZE_2COL,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+  },
+  galleryOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.60)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  galleryOverlayCount: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  galleryOverlayLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+
+  // Modal galería completa
+  fullGalleryRoot: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  fullGalleryHeaderWrap: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  fullGalleryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  fullGalleryTitle: {
+    color: colors.textPrimary,
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  fullGalleryClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullGalleryScroll: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
 
   // Visor de galería
