@@ -366,14 +366,6 @@ export default function ProfileScreen({ navigation, route }) {
             </Pressable>
           ) : null}
 
-          {/* Card: Galería de fotos */}
-          <GalleryCard
-            photos={galleryPhotos}
-            isMyProfile={isMyProfile}
-            onTap={(index) => setGalleryViewerIndex(index)}
-            onNavigateEdit={() => navigation.navigate('EditProfile')}
-          />
-
           {/* Botones de acción para perfil ajeno */}
           {!isMyProfile && (
             <FriendActionRow
@@ -388,6 +380,14 @@ export default function ProfileScreen({ navigation, route }) {
               onMessage={handleSendMessage}
             />
           )}
+
+          {/* Card: Galería de fotos */}
+          <GalleryCard
+            photos={galleryPhotos}
+            isMyProfile={isMyProfile}
+            onTap={(index) => setGalleryViewerIndex(index)}
+            onNavigateEdit={() => navigation.navigate('EditProfile')}
+          />
 
           {/* Card: Historial Deportivo */}
           <View style={styles.card}>
