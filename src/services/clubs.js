@@ -48,14 +48,13 @@ export async function createClub({ nombre, descripcion, region, comuna }) {
     return { error: { message: 'El nombre debe tener entre 3 y 40 caracteres' } };
   }
 
-  // Un jugador, un club
-  const { data: existing } = await supabase
+  // Máximo 3 clubes por jugador
+  const { count: myClubCount } = await supabase
     .from('club_members')
-    .select('id')
-    .eq('user_id', me)
-    .maybeSingle();
-  if (existing) {
-    return { error: { message: 'Ya perteneces a un club. Debes salir antes de crear otro.' } };
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', me);
+  if ((myClubCount || 0) >= 3) {
+    return { error: { message: 'Ya perteneces al máximo de 3 clubes permitidos' } };
   }
 
   const { data: club, error } = await supabase
@@ -95,44 +94,57 @@ export async function createClub({ nombre, descripcion, region, comuna }) {
 }
 
 /**
- * Mi club actual (o null si no pertenezco a ninguno).
- * Devuelve { club, miRol, totalMiembros }.
+ * Todos los clubes a los que pertenezco (máximo 3).
+ * Cada elemento: { club, miRol, totalMiembros }.
  */
-export async function getMyClub() {
-  if (!isSupabaseConfigured) return { data: null, error: null };
+export async function getMyClubs() {
+  if (!isSupabaseConfigured) return { data: [], error: null };
   const me = await getMe();
-  if (!me) return { data: null, error: null };
+  if (!me) return { data: [], error: null };
 
-  const { data: membership, error } = await supabase
+  const { data: memberships, error } = await supabase
     .from('club_members')
     .select('club_id, rol, joined_at')
     .eq('user_id', me)
-    .maybeSingle();
+    .order('joined_at', { ascending: true });
   if (error) {
-    console.error('[FutFinder] getMyClub:', error);
-    return { data: null, error };
+    console.error('[FutFinder] getMyClubs:', error);
+    return { data: [], error };
   }
-  if (!membership) return { data: null, error: null };
+  if (!memberships || memberships.length === 0) return { data: [], error: null };
 
-  const { data: club, error: clubError } = await supabase
-    .from('clubs')
-    .select('*')
-    .eq('id', membership.club_id)
-    .single();
-  if (clubError) {
-    console.error('[FutFinder] getMyClub club:', clubError);
-    return { data: null, error: clubError };
+  const clubIds = memberships.map((m) => m.club_id);
+
+  const [{ data: clubsData }, { data: membersData }] = await Promise.all([
+    supabase.from('clubs').select('*').in('id', clubIds),
+    supabase.from('club_members').select('club_id').in('club_id', clubIds),
+  ]);
+
+  const countById = new Map();
+  for (const m of membersData || []) {
+    countById.set(m.club_id, (countById.get(m.club_id) || 0) + 1);
   }
-
-  const { count } = await supabase
-    .from('club_members')
-    .select('id', { count: 'exact', head: true })
-    .eq('club_id', club.id);
+  const clubById = new Map((clubsData || []).map((c) => [c.id, c]));
 
   return {
-    data: { club, miRol: membership.rol, totalMiembros: count || 1 },
+    data: memberships
+      .map((m) => ({
+        club: clubById.get(m.club_id),
+        miRol: m.rol,
+        totalMiembros: countById.get(m.club_id) || 1,
+      }))
+      .filter((m) => m.club),
     error: null,
   };
+}
+
+/**
+ * Compat: primer club del usuario o null.
+ * Usar getMyClubs() cuando se necesiten todos.
+ */
+export async function getMyClub() {
+  const { data, error } = await getMyClubs();
+  return { data: (data || [])[0] || null, error };
 }
 
 /**
@@ -236,13 +248,22 @@ export async function requestToJoin(clubId) {
   const me = await getMe();
   if (!me) return { error: { message: 'No autenticado' } };
 
-  const { data: existing } = await supabase
+  const { data: alreadyMember } = await supabase
     .from('club_members')
     .select('id')
     .eq('user_id', me)
+    .eq('club_id', clubId)
     .maybeSingle();
-  if (existing) {
-    return { error: { message: 'Ya perteneces a un club' } };
+  if (alreadyMember) {
+    return { error: { message: 'Ya eres miembro de este club' } };
+  }
+
+  const { count: myClubCount } = await supabase
+    .from('club_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', me);
+  if ((myClubCount || 0) >= 3) {
+    return { error: { message: 'Ya perteneces al máximo de 3 clubes permitidos' } };
   }
 
   const { data, error } = await supabase
@@ -268,13 +289,22 @@ export async function inviteToClub(clubId, userId) {
   const me = await getMe();
   if (!me) return { error: { message: 'No autenticado' } };
 
-  const { data: alreadyMember } = await supabase
+  const { data: alreadyInThisClub } = await supabase
     .from('club_members')
     .select('id')
     .eq('user_id', userId)
+    .eq('club_id', clubId)
     .maybeSingle();
-  if (alreadyMember) {
-    return { error: { message: 'Ese jugador ya pertenece a un club' } };
+  if (alreadyInThisClub) {
+    return { error: { message: 'Ese jugador ya es miembro de este club' } };
+  }
+
+  const { count: theirClubCount } = await supabase
+    .from('club_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+  if ((theirClubCount || 0) >= 3) {
+    return { error: { message: 'Ese jugador ya pertenece al máximo de 3 clubes' } };
   }
 
   const { data, error } = await supabase
@@ -309,12 +339,12 @@ export async function respondToRequest(requestId, approve) {
     .single();
   if (error) {
     console.error('[FutFinder] respondToRequest:', error);
-    // el trigger lanza excepción si el club está lleno o el jugador ya tiene club
-    if (error.message?.includes('límite')) {
+    // los triggers lanzan excepciones con mensajes descriptivos
+    if (error.message?.includes('límite') || error.message?.includes('máximo de 3 clubes')) {
       return { error: { message: error.message } };
     }
     if (error.code === '23505') {
-      return { error: { message: 'El jugador ya pertenece a un club' } };
+      return { error: { message: 'El jugador ya es miembro de este club' } };
     }
   }
   return { data, error };
@@ -435,8 +465,9 @@ export async function getMyRequestTo(clubId) {
  *  - Si soy admin y quedan otros miembros, no puedo salir (debo
  *    expulsarlos primero o ceder la administración — Premium).
  */
-export async function leaveClub() {
+export async function leaveClub(clubId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!clubId) return { error: { message: 'clubId requerido' } };
   const me = await getMe();
   if (!me) return { error: { message: 'No autenticado' } };
 
@@ -444,8 +475,9 @@ export async function leaveClub() {
     .from('club_members')
     .select('id, club_id, rol')
     .eq('user_id', me)
+    .eq('club_id', clubId)
     .maybeSingle();
-  if (!membership) return { error: { message: 'No perteneces a ningún club' } };
+  if (!membership) return { error: { message: 'No perteneces a este club' } };
 
   const { count } = await supabase
     .from('club_members')

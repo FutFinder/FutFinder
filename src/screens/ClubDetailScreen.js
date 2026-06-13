@@ -44,7 +44,7 @@ import {
   cancelRequest,
   leaveClub,
   removeMember,
-  getMyClub,
+  getMyClubs,
   promoteToAdmin,
   transferAdmin,
   deleteClub,
@@ -82,14 +82,15 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [requests, setRequests] = useState([]);
   const [myRequest, setMyRequest] = useState(null);
   const [me, setMe] = useState(null);
-  const [myClubInfo, setMyClubInfo] = useState(null);
+  const [myClubs, setMyClubs] = useState([]);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
 
   const miMembresia = members.find((m) => m.user_id === me);
   const soyMiembro = Boolean(miMembresia);
   const soyAdmin = miMembresia?.rol === 'admin';
-  const tengoOtroClub = Boolean(myClubInfo && myClubInfo.club.id !== clubId);
+  // Usuario con 3 clubes no puede unirse a otro (sin importar cuáles sean)
+  const tengoMaxClubs = myClubs.length >= 3;
 
   const load = useCallback(async () => {
     const user = await getCurrentUser();
@@ -99,11 +100,11 @@ export default function ClubDetailScreen({ navigation, route }) {
     const [{ data: c }, { data: ms }, { data: mine }] = await Promise.all([
       getClubById(clubId),
       listMembers(clubId),
-      getMyClub(),
+      getMyClubs(),
     ]);
     setClub(c);
     setMembers(ms || []);
-    setMyClubInfo(mine);
+    setMyClubs(mine || []);
 
     const amMember = (ms || []).some((m) => m.user_id === myId);
     const amAdmin = (ms || []).some((m) => m.user_id === myId && m.rol === 'admin');
@@ -188,7 +189,7 @@ export default function ClubDetailScreen({ navigation, route }) {
         : 'Dejarás de ver el chat y los datos internos del club.',
       async () => {
         setWorking(true);
-        const { error, clubDeleted } = await leaveClub();
+        const { error, clubDeleted } = await leaveClub(clubId);
         setWorking(false);
         if (error) {
           console.error('[FutFinder] handleLeave:', error);
@@ -398,7 +399,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             </View>
 
             {/* Acción principal para visitantes */}
-            {!soyMiembro && !tengoOtroClub && (
+            {!soyMiembro && !tengoMaxClubs && (
               myRequest ? (
                 <Button
                   label="Cancelar solicitud"
@@ -417,11 +418,11 @@ export default function ClubDetailScreen({ navigation, route }) {
                 />
               )
             )}
-            {!soyMiembro && tengoOtroClub && (
+            {!soyMiembro && tengoMaxClubs && (
               <Banner
                 type="info"
-                title="Ya perteneces a un club"
-                message="Para unirte a este club primero debes salir del tuyo."
+                title="Ya perteneces al máximo de 3 clubes"
+                message="Para unirte a este club primero debes salir de uno de tus clubes."
               />
             )}
 

@@ -32,7 +32,7 @@ import Banner from '../components/Banner';
 import ClubCard from '../components/ClubCard';
 import PremiumBadge, { premiumGold } from '../components/PremiumBadge';
 import {
-  getMyClub,
+  getMyClubs,
   searchClubs,
   listMyInvitations,
   listPendingRequests,
@@ -49,41 +49,52 @@ import {
 export default function ClubsScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [myClub, setMyClub] = useState(null); // { club, miRol, totalMiembros }
+  const [myClubs, setMyClubs] = useState([]); // [{ club, miRol, totalMiembros }]
   const [clubs, setClubs] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [query, setQuery] = useState('');
   const [banner, setBanner] = useState(null); // { type, title, message }
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingCounts, setPendingCounts] = useState({}); // { [clubId]: number }
 
-  // Suscripción Realtime a solicitudes pendientes (solo admins)
+  // Suscripciones Realtime a solicitudes pendientes para todos los clubs donde soy admin
   useEffect(() => {
-    if (!myClub || myClub.miRol !== 'admin') {
-      setPendingCount(0);
+    const adminClubs = myClubs.filter((m) => m.miRol === 'admin');
+    if (adminClubs.length === 0) {
+      setPendingCounts({});
       return;
     }
-    const clubId = myClub.club.id;
 
-    listPendingRequests(clubId).then(({ data }) => {
-      setPendingCount((data || []).length);
-    });
+    const fetchCounts = async () => {
+      const updates = {};
+      await Promise.all(
+        adminClubs.map(async ({ club }) => {
+          const { data } = await listPendingRequests(club.id);
+          updates[club.id] = (data || []).length;
+        })
+      );
+      setPendingCounts(updates);
+    };
+    fetchCounts();
 
-    const unsub = subscribeToPendingRequests(clubId, async () => {
-      const { data } = await listPendingRequests(clubId);
-      setPendingCount((data || []).length);
-    });
+    const unsubs = adminClubs.map(({ club }) =>
+      subscribeToPendingRequests(club.id, async () => {
+        const { data } = await listPendingRequests(club.id);
+        setPendingCounts((prev) => ({ ...prev, [club.id]: (data || []).length }));
+      })
+    );
 
-    return unsub;
-  }, [myClub]);
+    return () => unsubs.forEach((u) => u());
+  }, [myClubs]);
 
   const load = useCallback(async (q = '') => {
-    const [{ data: mine }, { data: found }] = await Promise.all([
-      getMyClub(),
+    const [{ data: mines }, { data: found }] = await Promise.all([
+      getMyClubs(),
       searchClubs(q),
     ]);
-    setMyClub(mine);
+    const myClubsData = mines || [];
+    setMyClubs(myClubsData);
     setClubs(found || []);
-    if (!mine) {
+    if (myClubsData.length < 3) {
       const { data: invs } = await listMyInvitations();
       setInvitations(invs || []);
     } else {
@@ -150,11 +161,14 @@ export default function ClubsScreen({ navigation, route }) {
     );
   }
 
-  // ---------- CON CLUB ----------
-  if (myClub) {
-    const { club, miRol, totalMiembros } = myClub;
+  // ---------- CON CLUB (1, 2 o 3 clubes) ----------
+  if (myClubs.length > 0) {
+    const myClubIds = new Set(myClubs.map((m) => m.club.id));
+    const otrosClubs = clubs.filter((c) => !myClubIds.has(c.id));
+    const hasMaxClubs = myClubs.length >= 3;
+    const hasSingleClub = myClubs.length === 1;
+    const { club, miRol, totalMiembros } = myClubs[0];
     const limites = CLUB_LIMITS[club.plan] || CLUB_LIMITS.estandar;
-    const otrosClubs = clubs.filter((c) => c.id !== club.id);
 
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
@@ -175,87 +189,148 @@ export default function ClubsScreen({ navigation, route }) {
             <View style={styles.content}>
               {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-              {/* Etiqueta sección Mi Club */}
-              <Text style={styles.sectionTitle}>Mi Club</Text>
+              {/* ── 1 club: tarjeta grande + accesos rápidos ── */}
+              {hasSingleClub && (
+                <>
+                  <Text style={styles.sectionTitle}>Mi Club</Text>
+                  <Pressable
+                    onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+                    style={({ pressed }) => [styles.myClubCard, pressed && { opacity: 0.9 }]}
+                  >
+                    {club.foto_url ? (
+                      <Image source={{ uri: club.foto_url }} style={styles.myClubLogo} />
+                    ) : (
+                      <View style={[styles.myClubLogo, styles.logoFallback]}>
+                        <Shield color={colors.primary} size={36} strokeWidth={1.6} />
+                      </View>
+                    )}
+                    <View style={styles.myClubNameRow}>
+                      <Text style={styles.myClubName} numberOfLines={1}>{club.nombre}</Text>
+                      {club.verificado ? (
+                        <BadgeCheck color={premiumGold} size={20} strokeWidth={2.2} />
+                      ) : null}
+                    </View>
+                    {club.comuna ? (
+                      <View style={styles.myClubMeta}>
+                        <MapPin color={colors.textMuted} size={13} />
+                        <Text style={styles.myClubMetaText}>
+                          {club.comuna}{club.region ? `, ${club.region}` : ''}
+                        </Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.badgeRow}>
+                      {club.plan === 'premium' ? (
+                        <PremiumBadge variant="badge" />
+                      ) : (
+                        <View style={styles.planChip}>
+                          <Text style={styles.planChipText}>PLAN ESTÁNDAR</Text>
+                        </View>
+                      )}
+                      {miRol === 'admin' && (
+                        <View style={styles.adminChip}>
+                          <Crown color={colors.primary} size={11} strokeWidth={2.4} />
+                          <Text style={styles.adminChipText}>Admin</Text>
+                        </View>
+                      )}
+                    </View>
+                  </Pressable>
+                  <RowAction
+                    icon={<Users color={colors.primary} size={20} strokeWidth={2} />}
+                    title="Integrantes"
+                    subtitle={`${totalMiembros} de ${limites.miembros}`}
+                    onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+                    badge={miRol === 'admin' ? (pendingCounts[club.id] || 0) : 0}
+                  />
+                  <RowAction
+                    icon={<MessageCircle color={colors.primary} size={20} strokeWidth={2} />}
+                    title="Chat del club"
+                    subtitle="Conversa con tu equipo"
+                    onPress={() =>
+                      navigation.navigate('ChatThread', {
+                        threadKey: `club:${club.id}`,
+                        title: club.nombre,
+                        subtitle: 'Chat del club',
+                        fotoUrl: club.foto_url || null,
+                      })
+                    }
+                  />
+                  <RowAction
+                    icon={<Crown color={premiumGold} size={20} strokeWidth={2} />}
+                    title="Planes del club"
+                    subtitle={club.plan === 'premium' ? 'Tu club es Premium' : 'Conoce las ventajas Premium'}
+                    onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
+                  />
+                </>
+              )}
 
-              {/* Tarjeta del club */}
-              <Pressable
-                onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
-                style={({ pressed }) => [styles.myClubCard, pressed && { opacity: 0.9 }]}
-              >
-                {club.foto_url ? (
-                  <Image source={{ uri: club.foto_url }} style={styles.myClubLogo} />
-                ) : (
-                  <View style={[styles.myClubLogo, styles.logoFallback]}>
-                    <Shield color={colors.primary} size={36} strokeWidth={1.6} />
-                  </View>
-                )}
-                <View style={styles.myClubNameRow}>
-                  <Text style={styles.myClubName} numberOfLines={1}>
-                    {club.nombre}
+              {/* ── 2-3 clubes: tarjetas compactas ── */}
+              {!hasSingleClub && (
+                <>
+                  <Text style={styles.sectionTitle}>
+                    Mis Clubes ({myClubs.length}/3)
                   </Text>
-                  {club.verificado ? (
-                    <BadgeCheck color={premiumGold} size={20} strokeWidth={2.2} />
-                  ) : null}
-                </View>
-                {club.comuna ? (
-                  <View style={styles.myClubMeta}>
-                    <MapPin color={colors.textMuted} size={13} />
-                    <Text style={styles.myClubMetaText}>
-                      {club.comuna}{club.region ? `, ${club.region}` : ''}
-                    </Text>
-                  </View>
-                ) : null}
-                <View style={styles.badgeRow}>
-                  {club.plan === 'premium' ? (
-                    <PremiumBadge variant="badge" />
-                  ) : (
-                    <View style={styles.planChip}>
-                      <Text style={styles.planChipText}>PLAN ESTÁNDAR</Text>
-                    </View>
-                  )}
-                  {miRol === 'admin' && (
-                    <View style={styles.adminChip}>
-                      <Crown color={colors.primary} size={11} strokeWidth={2.4} />
-                      <Text style={styles.adminChipText}>Admin</Text>
-                    </View>
-                  )}
-                </View>
-              </Pressable>
+                  {myClubs.map(({ club: c, miRol: rol, totalMiembros: total }) => (
+                    <ClubCard
+                      key={c.id}
+                      club={c}
+                      totalMiembros={total}
+                      onPress={() => navigation.navigate('ClubDetail', { clubId: c.id })}
+                      right={
+                        <View style={styles.multiClubRight}>
+                          {rol === 'admin' && (pendingCounts[c.id] || 0) > 0 && (
+                            <View style={styles.badgeCircle}>
+                              <Text style={styles.badgeText}>
+                                {(pendingCounts[c.id] || 0) > 9 ? '9+' : pendingCounts[c.id]}
+                              </Text>
+                            </View>
+                          )}
+                          {rol === 'admin' && (
+                            <View style={styles.adminChip}>
+                              <Crown color={colors.primary} size={10} strokeWidth={2.4} />
+                              <Text style={styles.adminChipText}>Admin</Text>
+                            </View>
+                          )}
+                          <ChevronRight color={colors.textMuted} size={18} />
+                        </View>
+                      }
+                    />
+                  ))}
+                </>
+              )}
 
-              {/* Accesos */}
-              <RowAction
-                icon={<Users color={colors.primary} size={20} strokeWidth={2} />}
-                title="Integrantes"
-                subtitle={`${totalMiembros} de ${limites.miembros}`}
-                onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
-                badge={miRol === 'admin' ? pendingCount : 0}
-              />
-              <RowAction
-                icon={<MessageCircle color={colors.primary} size={20} strokeWidth={2} />}
-                title="Chat del club"
-                subtitle="Conversa con tu equipo"
-                onPress={() =>
-                  navigation.navigate('ChatThread', {
-                    threadKey: `club:${club.id}`,
-                    title: club.nombre,
-                    subtitle: 'Chat del club',
-                    fotoUrl: club.foto_url || null,
-                  })
-                }
-              />
-              <RowAction
-                icon={<Crown color={premiumGold} size={20} strokeWidth={2} />}
-                title="Planes del club"
-                subtitle={
-                  club.plan === 'premium'
-                    ? 'Tu club es Premium'
-                    : 'Conoce las ventajas Premium'
-                }
-                onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
-              />
+              {/* Invitaciones (solo si el usuario aún puede unirse a más clubes) */}
+              {invitations.length > 0 && (
+                <View style={[styles.section, { marginTop: 16 }]}>
+                  <Text style={styles.sectionTitle}>Invitaciones</Text>
+                  {invitations.map((inv) => (
+                    <ClubCard
+                      key={inv.request_id}
+                      club={inv.club}
+                      onPress={() => navigation.navigate('ClubDetail', { clubId: inv.club_id })}
+                      right={
+                        <View style={styles.invActions}>
+                          <Pressable
+                            onPress={() => handleInvitation(inv, true)}
+                            hitSlop={6}
+                            style={({ pressed }) => [styles.invBtn, styles.invAccept, pressed && { opacity: 0.7 }]}
+                          >
+                            <Check color="#0E0E0D" size={16} strokeWidth={2.6} />
+                          </Pressable>
+                          <Pressable
+                            onPress={() => handleInvitation(inv, false)}
+                            hitSlop={6}
+                            style={({ pressed }) => [styles.invBtn, styles.invReject, pressed && { opacity: 0.7 }]}
+                          >
+                            <X color={colors.error} size={16} strokeWidth={2.6} />
+                          </Pressable>
+                        </View>
+                      }
+                    />
+                  ))}
+                </View>
+              )}
 
-              {/* Divisor + buscador */}
+              {/* Divisor + buscador + explorar */}
               <View style={styles.divider} />
               <View style={styles.searchBox}>
                 <SearchIcon color={colors.textMuted} size={18} />
@@ -289,14 +364,21 @@ export default function ClubsScreen({ navigation, route }) {
                 {query.trim() ? 'Sin resultados' : 'No hay más clubes'}
               </Text>
               <Text style={styles.emptyText}>
-                {query.trim()
-                  ? 'Intenta con otro nombre.'
-                  : 'Eres parte de los primeros clubes de FutFinder.'}
+                {query.trim() ? 'Intenta con otro nombre.' : 'Ya formas parte de todos los clubes existentes.'}
               </Text>
             </View>
           }
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 96 }}
         />
+        {/* FAB: crear club si aún hay cupo (< 3 clubes) */}
+        {!hasMaxClubs && (
+          <Pressable
+            onPress={() => navigation.navigate('CreateClub')}
+            style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
+          >
+            <Plus color="#0E0E0D" size={22} strokeWidth={2.8} />
+          </Pressable>
+        )}
       </SafeAreaView>
     );
   }
@@ -610,6 +692,11 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.textPrimary,
     fontSize: 14,
+  },
+  multiClubRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   invActions: { flexDirection: 'row', gap: 8 },
   invBtn: {
