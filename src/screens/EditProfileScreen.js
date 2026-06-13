@@ -10,6 +10,8 @@ import {
   Platform,
   Image,
   ActivityIndicator,
+  Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -17,6 +19,9 @@ import {
   User as UserIcon,
   Camera,
   Save,
+  Plus,
+  X as XIcon,
+  Images,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -25,6 +30,12 @@ import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
 import { getMyProfile, updateMyProfile } from '../services/profile';
 import { pickImage, uploadAvatar } from '../services/storage';
+import {
+  getProfilePhotos,
+  uploadGalleryPhoto,
+  deleteProfilePhoto,
+  MAX_PHOTOS,
+} from '../services/gallery';
 import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 
@@ -62,14 +73,19 @@ export default function EditProfileScreen({ navigation }) {
   const [regionOpen, setRegionOpen] = useState(false);
   const [comunaOpen, setComunaOpen] = useState(false);
 
+  // Galería
+  const [userId, setUserId] = useState(null);
+  const [galleryPhotos, setGalleryPhotos] = useState([]);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+
   useEffect(() => {
     (async () => {
       const p = await getMyProfile();
       if (p) {
+        setUserId(p.id);
         setUsername(p.username || '');
         setEdad(p.edad ? String(p.edad) : '');
         setBio(p.bio || '');
-        // posicion_preferida ahora es array. Soportamos también string viejo.
         if (Array.isArray(p.posicion_preferida) && p.posicion_preferida.length) {
           setPosiciones(p.posicion_preferida);
         } else if (typeof p.posicion_preferida === 'string') {
@@ -81,6 +97,10 @@ export default function EditProfileScreen({ navigation }) {
         setRegion(p.region || '');
         setComuna(p.comuna || '');
         setFotoUrl(p.foto_url || null);
+
+        // Cargar galería
+        const { data: photos } = await getProfilePhotos(p.id);
+        setGalleryPhotos(photos || []);
       }
       setLoading(false);
     })();
@@ -106,6 +126,54 @@ export default function EditProfileScreen({ navigation }) {
     setFotoUrl(url);
     setBanner({ type: 'success', title: 'Foto actualizada', message: 'Tu nueva foto de perfil ya está guardada.' });
     setTimeout(() => setBanner(null), 3000);
+  };
+
+  // ---- Galería ----
+  const handleAddGalleryPhoto = async () => {
+    if (uploadingGallery || !userId) return;
+    if (galleryPhotos.length >= MAX_PHOTOS) {
+      setBanner({ type: 'info', title: 'Límite alcanzado', message: `Máximo ${MAX_PHOTOS} fotos por perfil.` });
+      return;
+    }
+    const { ok, asset, reason } = await pickImage({ aspect: [1, 1], quality: 0.8 });
+    if (!ok) {
+      if (reason && reason !== 'Cancelado') {
+        setBanner({ type: 'error', title: 'No pude abrir tus fotos', message: reason });
+      }
+      return;
+    }
+    setUploadingGallery(true);
+    const { data, error } = await uploadGalleryPhoto(asset, userId);
+    setUploadingGallery(false);
+    if (error) {
+      setBanner({ type: 'error', title: 'No pude subir la foto', message: error.message || '' });
+      return;
+    }
+    setGalleryPhotos((prev) => [data, ...prev]);
+    setBanner({ type: 'success', title: 'Foto agregada', message: '' });
+    setTimeout(() => setBanner(null), 2500);
+  };
+
+  const handleDeleteGalleryPhoto = (photo) => {
+    const doDelete = async () => {
+      const { error } = await deleteProfilePhoto(photo.id, photo.photo_url, userId);
+      if (error) {
+        setBanner({ type: 'error', title: 'No pude eliminar la foto', message: error.message || '' });
+        return;
+      }
+      setGalleryPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('¿Eliminar esta foto de tu galería?')) {
+        doDelete();
+      }
+    } else {
+      Alert.alert('Eliminar foto', '¿Seguro que quieres eliminar esta foto de tu galería?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: doDelete },
+      ]);
+    }
   };
 
   const comunasOfRegion = region ? getComunasOfRegion(region) : [];
@@ -433,6 +501,65 @@ export default function EditProfileScreen({ navigation }) {
             )}
           </View>
 
+          {/* Card 3: Galería de fotos */}
+          <View style={styles.card}>
+            <View style={editGalleryStyles.header}>
+              <Images color={colors.primary} size={16} />
+              <Text style={styles.sectionTitle}>Galería de fotos</Text>
+            </View>
+            <Text style={styles.sectionSub}>
+              Hasta {MAX_PHOTOS} fotos · {galleryPhotos.length}/{MAX_PHOTOS} usadas
+            </Text>
+
+            {/* Grid de fotos existentes */}
+            {galleryPhotos.length > 0 && (
+              <View style={editGalleryStyles.grid}>
+                {galleryPhotos.map((photo) => (
+                  <View key={photo.id} style={editGalleryStyles.thumbWrap}>
+                    <Image
+                      source={{ uri: photo.photo_url }}
+                      style={editGalleryStyles.thumb}
+                      resizeMode="cover"
+                    />
+                    <Pressable
+                      onPress={() => handleDeleteGalleryPhoto(photo)}
+                      style={editGalleryStyles.deleteBtn}
+                      hitSlop={4}
+                    >
+                      <XIcon color="#fff" size={12} strokeWidth={2.8} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Botón añadir */}
+            {galleryPhotos.length < MAX_PHOTOS ? (
+              <Pressable
+                onPress={handleAddGalleryPhoto}
+                disabled={uploadingGallery}
+                style={({ pressed }) => [
+                  editGalleryStyles.addBtn,
+                  pressed && { opacity: 0.7 },
+                  uploadingGallery && { opacity: 0.5 },
+                ]}
+              >
+                {uploadingGallery ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : (
+                  <Plus color={colors.primary} size={18} />
+                )}
+                <Text style={editGalleryStyles.addLabel}>
+                  {uploadingGallery ? 'Subiendo…' : 'Añadir foto'}
+                </Text>
+              </Pressable>
+            ) : (
+              <Text style={editGalleryStyles.limitMsg}>
+                Límite de {MAX_PHOTOS} fotos alcanzado
+              </Text>
+            )}
+          </View>
+
           {/* Save */}
           <Button
             label={saving ? 'Guardando…' : 'Guardar cambios'}
@@ -689,5 +816,70 @@ const styles = StyleSheet.create({
   pickerOptionTextActive: {
     color: colors.primary,
     fontWeight: '700',
+  },
+});
+
+// Constantes y estilos para la galería de edición
+const EDIT_SCREEN_W = Dimensions.get('window').width;
+// scroll paddingHorizontal: 20 → card padding: 18 → útil = screenW - 40 - 36
+// 3 columnas con gap de 6
+const EDIT_THUMB = Math.floor((EDIT_SCREEN_W - 40 - 36 - 6 * 2) / 3);
+
+const editGalleryStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  thumbWrap: {
+    width: EDIT_THUMB,
+    height: EDIT_THUMB,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+    position: 'relative',
+  },
+  thumb: { width: '100%', height: '100%' },
+  deleteBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 44,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    backgroundColor: colors.primarySoft,
+  },
+  addLabel: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  limitMsg: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 8,
   },
 });

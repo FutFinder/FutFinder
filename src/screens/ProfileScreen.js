@@ -23,6 +23,7 @@ import {
   Edit3,
   LogOut,
   ChevronRight,
+  ChevronLeft,
   ArrowLeft,
   UserPlus,
   UserCheck,
@@ -30,6 +31,7 @@ import {
   MessageCircle,
   Clock,
   X,
+  Images,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -52,6 +54,7 @@ import {
   removeFriend,
 } from '../services/friends';
 import { isSupabaseConfigured } from '../services/supabase';
+import { getProfilePhotos } from '../services/gallery';
 
 const POSICION_LABEL = {
   arquero: 'Arquero',
@@ -91,6 +94,8 @@ export default function ProfileScreen({ navigation, route }) {
   const [friendBusy, setFriendBusy] = useState(false);
   const [ratingSummary, setRatingSummary] = useState(null);
   const [photoViewer, setPhotoViewer] = useState(false);
+  const [galleryPhotos, setGalleryPhotos] = useState([]);
+  const [galleryViewerIndex, setGalleryViewerIndex] = useState(null); // null = cerrado
 
   // ¿Estoy viendo mi propio perfil o el de otro?
   const isMyProfile = !viewUserId || viewUserId === myId;
@@ -119,10 +124,14 @@ export default function ProfileScreen({ navigation, route }) {
       setFriendship(f);
     }
 
-    // Resumen de calificaciones del perfil mostrado
+    // Resumen de calificaciones + galería del perfil mostrado
     if (targetId) {
-      const summary = await getUserRatingSummary(targetId);
+      const [summary, gallery] = await Promise.all([
+        getUserRatingSummary(targetId),
+        getProfilePhotos(targetId),
+      ]);
       setRatingSummary(summary);
+      setGalleryPhotos(gallery.data || []);
     }
 
     setLoading(false);
@@ -544,6 +553,14 @@ export default function ProfileScreen({ navigation, route }) {
             </Pressable>
           </View>
 
+          {/* Card: Galería de fotos */}
+          <GalleryCard
+            photos={galleryPhotos}
+            isMyProfile={isMyProfile}
+            onTap={(index) => setGalleryViewerIndex(index)}
+            onNavigateEdit={() => navigation.navigate('EditProfile')}
+          />
+
           {/* Acciones — solo en mi perfil */}
           {isMyProfile && (
             <>
@@ -586,7 +603,7 @@ export default function ProfileScreen({ navigation, route }) {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Visor de foto a pantalla completa */}
+      {/* Visor de foto de perfil (avatar) */}
       <Modal
         visible={photoViewer}
         transparent
@@ -594,11 +611,7 @@ export default function ProfileScreen({ navigation, route }) {
         onRequestClose={() => setPhotoViewer(false)}
       >
         <Pressable style={styles.viewerBackdrop} onPress={() => setPhotoViewer(false)}>
-          <Pressable
-            onPress={() => setPhotoViewer(false)}
-            hitSlop={12}
-            style={styles.viewerClose}
-          >
+          <Pressable onPress={() => setPhotoViewer(false)} hitSlop={12} style={styles.viewerClose}>
             <X color="#FFFFFF" size={26} />
           </Pressable>
           {profile?.foto_url && (
@@ -609,6 +622,57 @@ export default function ProfileScreen({ navigation, route }) {
             />
           )}
         </Pressable>
+      </Modal>
+
+      {/* Visor de galería con navegación */}
+      <Modal
+        visible={galleryViewerIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGalleryViewerIndex(null)}
+      >
+        <View style={styles.viewerBackdrop}>
+          <Pressable
+            onPress={() => setGalleryViewerIndex(null)}
+            hitSlop={12}
+            style={styles.viewerClose}
+          >
+            <X color="#FFFFFF" size={26} />
+          </Pressable>
+
+          {galleryViewerIndex !== null && galleryPhotos[galleryViewerIndex] && (
+            <Image
+              source={{ uri: galleryPhotos[galleryViewerIndex].photo_url }}
+              style={styles.viewerImage}
+              resizeMode="contain"
+            />
+          )}
+
+          {/* Contador */}
+          {galleryPhotos.length > 1 && galleryViewerIndex !== null && (
+            <Text style={styles.viewerCounter}>
+              {galleryViewerIndex + 1} / {galleryPhotos.length}
+            </Text>
+          )}
+
+          {/* Botones prev / next */}
+          <View style={styles.viewerNavRow}>
+            <Pressable
+              onPress={() => setGalleryViewerIndex((i) => Math.max(0, i - 1))}
+              disabled={galleryViewerIndex === 0}
+              style={[styles.viewerNavBtn, galleryViewerIndex === 0 && { opacity: 0 }]}
+            >
+              <ChevronLeft color="#fff" size={30} />
+            </Pressable>
+            <Pressable
+              onPress={() => setGalleryViewerIndex((i) => Math.min(galleryPhotos.length - 1, i + 1))}
+              disabled={galleryViewerIndex === galleryPhotos.length - 1}
+              style={[styles.viewerNavBtn, galleryViewerIndex === galleryPhotos.length - 1 && { opacity: 0 }]}
+            >
+              <ChevronRight color="#fff" size={30} />
+            </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -836,6 +900,62 @@ function KV({ label, value }) {
     <View style={styles.kv}>
       <Text style={styles.kvLabel}>{label}</Text>
       <Text style={styles.kvValue}>{value}</Text>
+    </View>
+  );
+}
+
+// ── Galería de fotos ─────────────────────────────────────────────
+const SCREEN_W = Dimensions.get('window').width;
+// scroll tiene paddingHorizontal: 20 → ancho útil = screenW - 40
+// 3 columnas con gap de 4 entre ellas → 2 gaps totales
+const THUMB_SIZE = Math.floor((SCREEN_W - 40 - 4 * 2) / 3);
+
+function GalleryCard({ photos, isMyProfile, onTap, onNavigateEdit }) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTitleRow}>
+        <Images color={colors.primary} size={16} />
+        <Text style={styles.cardTitle}>Galería</Text>
+        {isMyProfile && photos.length > 0 && (
+          <Pressable onPress={onNavigateEdit} hitSlop={10} style={{ marginLeft: 'auto' }}>
+            <Text style={styles.galleryEditLink}>Gestionar</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {photos.length === 0 ? (
+        <View style={styles.galleryEmpty}>
+          {isMyProfile ? (
+            <Pressable onPress={onNavigateEdit} style={styles.galleryAddHint}>
+              <Images color={colors.textMuted} size={28} />
+              <Text style={styles.galleryEmptyText}>
+                Añade fotos desde «Editar perfil»
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={styles.galleryAddHint}>
+              <Images color={colors.textMuted} size={28} />
+              <Text style={styles.galleryEmptyText}>Sin fotos aún</Text>
+            </View>
+          )}
+        </View>
+      ) : (
+        <View style={styles.galleryGrid}>
+          {photos.map((photo, index) => (
+            <Pressable
+              key={photo.id}
+              onPress={() => onTap(index)}
+              style={({ pressed }) => [styles.galleryThumb, pressed && { opacity: 0.8 }]}
+            >
+              <Image
+                source={{ uri: photo.photo_url }}
+                style={styles.galleryThumbImg}
+                resizeMode="cover"
+              />
+            </Pressable>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -1263,6 +1383,68 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 18,
     lineHeight: 16,
+  },
+
+  // Galería
+  galleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  galleryThumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+  },
+  galleryThumbImg: { width: '100%', height: '100%' },
+  galleryEmpty: {
+    paddingVertical: 8,
+  },
+  galleryAddHint: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  galleryEmptyText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  galleryEditLink: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // Visor de galería
+  viewerCounter: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  viewerNavRow: {
+    position: 'absolute',
+    bottom: 60,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  viewerNavBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
