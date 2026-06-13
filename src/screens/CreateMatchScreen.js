@@ -110,7 +110,8 @@ export default function CreateMatchScreen({ navigation, route }) {
 
   // GPS
   const [coords, setCoords] = useState(null); // {latitude, longitude}
-  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false); // solo para el auto-fetch inicial
+  const [iAmHereLoading, setIAmHereLoading] = useState(false); // solo para el botón
   const [gpsError, setGpsError] = useState(null);
 
   // Fecha/hora — defaults: hoy + 2 horas
@@ -251,8 +252,9 @@ export default function CreateMatchScreen({ navigation, route }) {
 
   // "Estoy en la cancha" → captura GPS y autocompleta ubicación, dirección,
   // región y comuna usando geocoding inverso.
+  // Usa iAmHereLoading (no gpsLoading) para no quedar disabled durante el auto-fetch inicial.
   const handleIAmHere = async () => {
-    setGpsLoading(true);
+    setIAmHereLoading(true);
     setGpsError(null);
     try {
       const r = await getCurrentLocation();
@@ -273,7 +275,7 @@ export default function CreateMatchScreen({ navigation, route }) {
         setComuna(m.comuna);
       }
     } finally {
-      setGpsLoading(false);
+      setIAmHereLoading(false);
     }
   };
 
@@ -531,11 +533,11 @@ export default function CreateMatchScreen({ navigation, route }) {
                       </Text>
                       <Pressable
                         onPress={handleIAmHere}
-                        disabled={gpsLoading}
+                        disabled={iAmHereLoading}
                         hitSlop={6}
                       >
                         <Text style={styles.locationLink}>
-                          {gpsLoading ? '📍 Capturando…' : '📍 Estoy en la cancha'}
+                          {iAmHereLoading ? '📍 Capturando…' : '📍 Estoy en la cancha'}
                         </Text>
                       </Pressable>
                     </View>

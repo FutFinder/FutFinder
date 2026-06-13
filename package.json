@@ -33,7 +33,8 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^2.0.0",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.0",
+    "rn-emoji-keyboard": "^1.7.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

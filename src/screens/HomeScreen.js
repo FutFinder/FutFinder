@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -15,6 +16,8 @@ import {
   ShieldCheck,
   Edit3,
   Trash2,
+  Shield,
+  ChevronRight,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -25,7 +28,8 @@ import { notify } from '../utils/notify';
 import { listOpenMatches, joinMatch, requestJoinMatch, deleteMatch, applyFilters } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
-import { isSupabaseConfigured } from '../services/supabase';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { getMyClub } from '../services/clubs';
 
 function formatHora(iso) {
   try {
@@ -67,6 +71,8 @@ export default function HomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState(null);
   const [previewMatchId, setPreviewMatchId] = useState(null);
+  const [myClubData, setMyClubData] = useState(undefined); // undefined = loading, null = no club
+  const [nextMatch, setNextMatch] = useState(null);
   // banner: { type: 'success'|'error'|'info', title, message } | null
   const [banner, setBanner] = useState(null);
   const showBanner = useCallback((type, title, message = '') => {
@@ -79,11 +85,14 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [{ data: list }, prof, user] = await Promise.all([
+    const [{ data: list }, prof, user, clubResult] = await Promise.all([
       listOpenMatches({ limit: 20 }),
       getCurrentProfile(),
       getCurrentUser(),
+      getMyClub(),
     ]);
+
+    const userId = user?.id || null;
     const userCoords = prof?.latitud ? { lat: prof.latitud, lng: prof.longitud } : null;
     const radiusKm = prof?.search_radius_km ?? 10;
     const filtered = userCoords
@@ -91,7 +100,39 @@ export default function HomeScreen({ navigation }) {
       : list || [];
     setMatches(filtered);
     setProfile(prof);
-    setMyUserId(user?.id || null);
+    setMyUserId(userId);
+    setMyClubData(clubResult?.data ?? null);
+
+    // Próximo partido registrado
+    if (userId && isSupabaseConfigured) {
+      try {
+        const now = new Date().toISOString();
+        const { data: attRows } = await supabase
+          .from('attendees')
+          .select('match_id')
+          .eq('user_id', userId)
+          .in('estado', ['inscrito', 'confirmado_gps']);
+
+        const matchIds = (attRows || []).map((r) => r.match_id);
+        if (matchIds.length > 0) {
+          const { data: upcoming } = await supabase
+            .from('matches')
+            .select('id, titulo, hora, cancha_nombre, comuna')
+            .in('id', matchIds)
+            .gt('hora', now)
+            .neq('estado', 'cancelado')
+            .order('hora', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          setNextMatch(upcoming || null);
+        } else {
+          setNextMatch(null);
+        }
+      } catch {
+        setNextMatch(null);
+      }
+    }
+
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -254,6 +295,80 @@ export default function HomeScreen({ navigation }) {
               onClose={() => setBanner(null)}
             />
           )}
+
+          {/* ── Próximo partido ── */}
+          {nextMatch && (
+            <View style={styles.nextMatchCard}>
+              <View style={styles.nextMatchLeft}>
+                <Text style={styles.nextMatchLabel}>PRÓXIMO PARTIDO</Text>
+                <Text style={styles.nextMatchTitle} numberOfLines={1}>{nextMatch.titulo}</Text>
+                <View style={styles.nextMatchMeta}>
+                  <Clock color={colors.primary} size={12} />
+                  <Text style={styles.nextMatchMetaText}>{formatHora(nextMatch.hora)}</Text>
+                  <MapPin color={colors.textMuted} size={12} />
+                  <Text style={styles.nextMatchMetaText} numberOfLines={1}>
+                    {nextMatch.cancha_nombre}{nextMatch.comuna ? ` · ${nextMatch.comuna}` : ''}
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => navigation.navigate('MatchDetail', { matchId: nextMatch.id })}
+                style={({ pressed }) => [styles.nextMatchBtn, pressed && { opacity: 0.8 }]}
+              >
+                <Text style={styles.nextMatchBtnText}>Ver</Text>
+                <ChevronRight color="#0E0E0D" size={14} strokeWidth={2.5} />
+              </Pressable>
+            </View>
+          )}
+
+          {/* ── Sección Club ── */}
+          {myClubData === null ? (
+            /* CASE A: sin club */
+            <View style={styles.clubPromoCard}>
+              <View style={styles.clubPromoIcon}>
+                <Shield color={colors.primary} size={22} strokeWidth={2} />
+              </View>
+              <Text style={styles.clubPromoTitle}>Encuentra tu equipo</Text>
+              <Text style={styles.clubPromoSub}>Únete a un club o crea el tuyo propio</Text>
+              <View style={styles.clubPromoBtns}>
+                <Pressable
+                  onPress={() => navigation.navigate('CreateClub')}
+                  style={({ pressed }) => [styles.clubPromoBtn, pressed && { opacity: 0.85 }]}
+                >
+                  <Text style={styles.clubPromoBtnText}>Crear club</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => navigation.navigate('Main', { screen: 'ClubsTab' })}
+                  style={({ pressed }) => [styles.clubPromoBtnOutline, pressed && { opacity: 0.85 }]}
+                >
+                  <Text style={styles.clubPromoBtnOutlineText}>Buscar club</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : myClubData ? (
+            /* CASE B: tiene club */
+            <Pressable
+              onPress={() => navigation.navigate('ClubDetail', { clubId: myClubData.club.id })}
+              style={({ pressed }) => [styles.clubCard, pressed && { opacity: 0.92 }]}
+            >
+              <View style={styles.clubCardLeft}>
+                {myClubData.club.foto_url ? (
+                  <Image source={{ uri: myClubData.club.foto_url }} style={styles.clubLogo} />
+                ) : (
+                  <View style={styles.clubLogoPlaceholder}>
+                    <Shield color={colors.primary} size={20} />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.clubCardName} numberOfLines={1}>{myClubData.club.nombre}</Text>
+                  <Text style={styles.clubCardMeta}>
+                    {myClubData.totalMiembros} miembros · {myClubData.miRol === 'admin' ? 'Admin' : 'Miembro'}
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight color={colors.textMuted} size={16} />
+            </Pressable>
+          ) : null /* undefined = loading, no renderizar */}
 
           {/* Trust Score card */}
           <View style={styles.trustCard}>
@@ -657,4 +772,122 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     lineHeight: 16,
   },
+
+  // Próximo partido
+  nextMatchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    padding: 14,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: colors.primary + '55',
+  },
+  nextMatchLeft: { flex: 1, marginRight: 10 },
+  nextMatchLabel: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+  nextMatchTitle: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  nextMatchMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  nextMatchMetaText: { color: colors.textSecondary, fontSize: 11 },
+  nextMatchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+  },
+  nextMatchBtnText: { color: '#0E0E0D', fontSize: 12, fontWeight: '800' },
+
+  // Club promo (sin club)
+  clubPromoCard: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    padding: 18,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    alignItems: 'center',
+  },
+  clubPromoIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  clubPromoTitle: {
+    color: colors.textPrimary,
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  clubPromoSub: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  clubPromoBtns: { flexDirection: 'row', gap: 10, width: '100%' },
+  clubPromoBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  clubPromoBtnText: { color: '#0E0E0D', fontSize: 13, fontWeight: '800' },
+  clubPromoBtnOutline: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  clubPromoBtnOutlineText: { color: colors.primary, fontSize: 13, fontWeight: '800' },
+
+  // Club card (tiene club)
+  clubCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    padding: 14,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  clubCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  clubLogo: { width: 44, height: 44, borderRadius: 22 },
+  clubLogoPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clubCardName: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  clubCardMeta: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
 });

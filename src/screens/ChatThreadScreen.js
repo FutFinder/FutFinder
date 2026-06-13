@@ -22,7 +22,9 @@ import {
   Star,
   MapPin,
   Trash2,
+  Smile,
 } from 'lucide-react-native';
+import EmojiPicker from 'rn-emoji-keyboard';
 
 import { colors, radius } from '../theme/colors';
 import {
@@ -90,9 +92,11 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [matchInfo, setMatchInfo] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
   const [dmBlocked, setDmBlocked] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   const listRef = useRef(null);
   const isMountedRef = useRef(true);
+  const selectionRef = useRef({ start: 0, end: 0 });
 
   const t = parseThreadKey(threadKey);
   const isGroup = t?.type === 'match' || t?.type === 'club';
@@ -292,6 +296,18 @@ export default function ChatThreadScreen({ route, navigation }) {
     }
   }, [draft, sending, myId, isGroup, t?.id, threadKey]);
 
+  const handleEmojiSelected = useCallback((emojiObj) => {
+    const emoji = emojiObj.emoji;
+    const { start, end } = selectionRef.current;
+    setDraft((prev) => {
+      const newText = prev.substring(0, start) + emoji + prev.substring(end);
+      // Actualiza la posición del cursor después del emoji
+      const newPos = start + emoji.length;
+      selectionRef.current = { start: newPos, end: newPos };
+      return newText;
+    });
+  }, []);
+
   // Cuando tocan el avatar o @username de un mensaje ajeno
   const handlePressSender = useCallback(
     (userId) => {
@@ -462,32 +478,55 @@ export default function ChatThreadScreen({ route, navigation }) {
             </Pressable>
           </View>
         ) : (
-          <View style={styles.composer}>
-            <TextInput
-              style={[styles.input, dmBlocked && { opacity: 0.4 }]}
-              placeholder={dmBlocked ? 'Solo amigos pueden chatear' : 'Escribe un mensaje…'}
-              placeholderTextColor={colors.textMuted}
-              value={draft}
-              onChangeText={setDraft}
-              multiline
-              maxLength={1000}
-              onSubmitEditing={handleSend}
-              returnKeyType="send"
-              blurOnSubmit={false}
-              editable={!dmBlocked}
+          <>
+            <View style={styles.composer}>
+              <Pressable
+                onPress={() => !dmBlocked && setEmojiPickerOpen(true)}
+                disabled={dmBlocked}
+                hitSlop={6}
+                style={({ pressed }) => [
+                  styles.emojiBtn,
+                  pressed && { opacity: 0.6 },
+                  dmBlocked && { opacity: 0.3 },
+                ]}
+              >
+                <Smile color={colors.textMuted} size={22} />
+              </Pressable>
+              <TextInput
+                style={[styles.input, dmBlocked && { opacity: 0.4 }]}
+                placeholder={dmBlocked ? 'Solo amigos pueden chatear' : 'Escribe un mensaje…'}
+                placeholderTextColor={colors.textMuted}
+                value={draft}
+                onChangeText={setDraft}
+                multiline
+                maxLength={1000}
+                onSubmitEditing={handleSend}
+                returnKeyType="send"
+                blurOnSubmit={false}
+                editable={!dmBlocked}
+                onSelectionChange={(e) => {
+                  selectionRef.current = e.nativeEvent.selection;
+                }}
+              />
+              <Pressable
+                onPress={handleSend}
+                disabled={!draft.trim() || sending || dmBlocked}
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  pressed && { opacity: 0.85 },
+                  (!draft.trim() || sending || dmBlocked) && { opacity: 0.4 },
+                ]}
+              >
+                <Send color="#0E0E0D" size={18} strokeWidth={2.4} />
+              </Pressable>
+            </View>
+            <EmojiPicker
+              onEmojiSelected={handleEmojiSelected}
+              open={emojiPickerOpen}
+              onClose={() => setEmojiPickerOpen(false)}
+              theme={{ backdrop: 'rgba(0,0,0,0.5)', knob: colors.primary, container: colors.surface, header: colors.textPrimary, category: { icon: colors.textMuted, iconActive: colors.primary, container: colors.surfaceAlt, containerActive: colors.primarySoft }, search: { background: colors.surfaceAlt, placeholder: colors.textMuted, text: colors.textPrimary, icon: colors.textMuted } }}
             />
-            <Pressable
-              onPress={handleSend}
-              disabled={!draft.trim() || sending || dmBlocked}
-              style={({ pressed }) => [
-                styles.sendBtn,
-                pressed && { opacity: 0.85 },
-                (!draft.trim() || sending || dmBlocked) && { opacity: 0.4 },
-              ]}
-            >
-              <Send color="#0E0E0D" size={18} strokeWidth={2.4} />
-            </Pressable>
-          </View>
+          </>
         )}
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -726,13 +765,19 @@ const styles = StyleSheet.create({
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 8 : 12,
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
+  },
+  emojiBtn: {
+    width: 36,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,
