@@ -37,6 +37,8 @@ import {
   FileLock,
 } from 'lucide-react-native';
 
+import { useActionSheet } from '@expo/react-native-action-sheet';
+
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import Button from '../components/Button';
@@ -65,23 +67,6 @@ function confirmAction(title, message, onConfirm) {
     { text: 'Cancelar', style: 'cancel' },
     { text: 'Confirmar', style: 'destructive', onPress: onConfirm },
   ]);
-}
-
-function pickOption(title, options, onPick) {
-  if (Platform.OS === 'web') {
-    const labels = options.map((o) => o.label).join(' / ');
-    const idx = window.confirm(`${title}\n\n${labels}\n\n(OK = ${options[0].label}, Cancelar = ${options[1]?.label})`)
-      ? 0 : 1;
-    onPick(options[idx]?.value);
-    return;
-  }
-  Alert.alert(
-    title, '',
-    [
-      ...options.map((o) => ({ text: o.label, onPress: () => onPick(o.value) })),
-      { text: 'Cancelar', style: 'cancel' },
-    ],
-  );
 }
 
 // ── Custom slider (no deps externos) ─────────────────────────────
@@ -173,6 +158,8 @@ function RadiusSlider({ value, onValueChange, onValueCommit }) {
 // ── Pantalla principal ────────────────────────────────────────────
 
 export default function SettingsScreen({ navigation }) {
+  const { showActionSheetWithOptions } = useActionSheet();
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -196,6 +183,16 @@ export default function SettingsScreen({ navigation }) {
 
   // Preferences
   const [radiusKm, setRadiusKm] = useState(10);
+
+  // Forgot password cooldown (seconds remaining)
+  const [forgotCooldown, setForgotCooldown] = useState(0);
+  const forgotTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
+    };
+  }, []);
 
   const load = useCallback(async () => {
     const p = await getMyProfile();
@@ -305,14 +302,33 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleForgotPassword = async () => {
-    if (!profile?.email) return;
-    const { error } = await requestPasswordReset(profile.email);
+    if (forgotCooldown > 0) return;
+
+    const { error, email } = await requestPasswordReset();
+
+    // Siempre mostrar feedback (Supabase no revela si el email existe)
     if (error) {
-      showBanner('error', 'No se pudo enviar', error.message);
-    } else {
-      setModal(null);
-      showBanner('success', 'Email enviado', `Revisa ${profile.email} para restablecer tu contraseña.`);
+      showBanner('error', 'No se pudo enviar el email', error.message);
+      return;
     }
+    showBanner(
+      'success',
+      'Email de recuperación enviado',
+      `Revisá la bandeja de ${email || 'tu email registrado'}. Si no llega, revisa el spam.`
+    );
+
+    // Cooldown de 60 segundos para evitar rebotes
+    let remaining = 60;
+    setForgotCooldown(remaining);
+    if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
+    forgotTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setForgotCooldown(remaining);
+      if (remaining <= 0) {
+        clearInterval(forgotTimerRef.current);
+        forgotTimerRef.current = null;
+      }
+    }, 1000);
   };
 
   const handleSaveLocation = async () => {
@@ -350,13 +366,27 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const openFriendRequestPicker = () => {
-    pickOption(
-      '¿Quién puede enviarte solicitudes de amistad?',
-      [
-        { label: 'Todos', value: 'everyone' },
-        { label: 'Nadie', value: 'nobody' },
-      ],
-      (value) => value && toggleField('privacy_friend_requests', value),
+    const current = profile?.privacy_friend_requests === 'nobody' ? 'nobody' : 'everyone';
+    const check = ' ✓';
+    const options = [
+      `Todos${current === 'everyone' ? check : ''}`,
+      `Nadie${current === 'nobody' ? check : ''}`,
+      'Cancelar',
+    ];
+    showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex: 2,
+        title: '¿Quién puede enviarte solicitudes de amistad?',
+        containerStyle: { backgroundColor: colors.surface },
+        textStyle: { color: colors.textPrimary, fontSize: 15, fontWeight: '500' },
+        titleTextStyle: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+        separatorStyle: { backgroundColor: colors.borderSoft },
+      },
+      (index) => {
+        if (index === 0) toggleField('privacy_friend_requests', 'everyone');
+        else if (index === 1) toggleField('privacy_friend_requests', 'nobody');
+      },
     );
   };
 
@@ -635,8 +665,16 @@ export default function SettingsScreen({ navigation }) {
           secureTextEntry
           autoFocus
         />
-        <Pressable onPress={handleForgotPassword} style={{ marginTop: 6, marginBottom: 4 }}>
-          <Text style={styles.forgotLink}>¿Olvidaste tu contraseña?</Text>
+        <Pressable
+          onPress={forgotCooldown > 0 ? undefined : handleForgotPassword}
+          style={{ marginTop: 6, marginBottom: 4 }}
+          disabled={forgotCooldown > 0}
+        >
+          <Text style={[styles.forgotLink, forgotCooldown > 0 && { color: colors.textMuted }]}>
+            {forgotCooldown > 0
+              ? `Reenviar en ${forgotCooldown}s...`
+              : '¿Olvidaste tu contraseña?'}
+          </Text>
         </Pressable>
         <TextInput
           style={[styles.input, { marginTop: 10 }]}

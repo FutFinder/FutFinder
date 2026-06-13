@@ -7,11 +7,16 @@ export async function verifyPassword(email, password) {
   return { error: null };
 }
 
-export async function requestPasswordReset(email) {
-  if (!isSupabaseConfigured) return { error: null };
+export async function requestPasswordReset() {
+  if (!isSupabaseConfigured) return { error: null, email: 'demo@example.com' };
+  const { data: { session } } = await supabase.auth.getSession();
+  const email = session?.user?.email;
+  if (!email) {
+    return { error: { message: 'No hay sesión activa con email registrado' }, email: null };
+  }
   const { error } = await supabase.auth.resetPasswordForEmail(email);
   if (error) console.error('[FutFinder] requestPasswordReset:', error);
-  return { error };
+  return { error, email };
 }
 
 export async function changeEmail(newEmail) {
