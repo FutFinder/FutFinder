@@ -455,10 +455,14 @@ export default function ProfileScreen({ navigation, route }) {
                     : 'Sin evaluaciones aún'}
                 </Text>
               </View>
-              <View style={styles.trustBlock}>
+              <Pressable
+                style={({ pressed }) => [styles.trustBlock, pressed && { opacity: 0.7 }]}
+                onPress={() => navigation.navigate('TrustScoreHistory')}
+              >
                 <Text style={styles.trustValue}>{stats?.trust_score ?? 100}</Text>
                 <Text style={styles.trustLabel}>Trust Score</Text>
-              </View>
+                <Text style={styles.trustTap}>Ver historial</Text>
+              </Pressable>
             </View>
 
             <Text style={styles.subSectionTitle}>CALIFICACIONES DE COMPAÑEROS</Text>
@@ -1120,6 +1124,12 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     marginTop: 2,
+  },
+  trustTap: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 3,
   },
   tagsCloud: {
     backgroundColor: colors.background,

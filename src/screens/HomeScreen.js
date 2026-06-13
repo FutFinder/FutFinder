@@ -22,7 +22,7 @@ import Logo from '../components/Logo';
 import Banner from '../components/Banner';
 import MatchPreviewSheet from '../components/MatchPreviewSheet';
 import { notify } from '../utils/notify';
-import { listOpenMatches, joinMatch, requestJoinMatch, deleteMatch } from '../services/matches';
+import { listOpenMatches, joinMatch, requestJoinMatch, deleteMatch, applyFilters } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { isSupabaseConfigured } from '../services/supabase';
@@ -84,7 +84,12 @@ export default function HomeScreen({ navigation }) {
       getCurrentProfile(),
       getCurrentUser(),
     ]);
-    setMatches(list || []);
+    const userCoords = prof?.latitud ? { lat: prof.latitud, lng: prof.longitud } : null;
+    const radiusKm = prof?.search_radius_km ?? 10;
+    const filtered = userCoords
+      ? applyFilters(list || [], { maxKm: radiusKm }, userCoords)
+      : list || [];
+    setMatches(filtered);
     setProfile(prof);
     setMyUserId(user?.id || null);
     setLoading(false);

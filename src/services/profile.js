@@ -136,7 +136,7 @@ export async function updateMyProfile(patch) {
     'onboarding_completed',
     'privacy_friend_requests', 'privacy_visible_in_search',
     'notif_matches', 'notif_clubs', 'notif_chat', 'notif_friends',
-    'pref_region', 'pref_comuna',
+    'pref_region', 'pref_comuna', 'search_radius_km',
   ];
   const payload = {};
   for (const k of allowed) {

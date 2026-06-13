@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -32,6 +33,8 @@ import {
   Crown,
   ChevronRight,
   X,
+  SlidersHorizontal,
+  FileLock,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -39,7 +42,13 @@ import Banner from '../components/Banner';
 import Button from '../components/Button';
 import { getMyProfile, updateMyProfile } from '../services/profile';
 import { signOut } from '../services/auth';
-import { changeEmail, changePassword, deleteAccount } from '../services/settings';
+import {
+  changeEmail,
+  changePassword,
+  deleteAccount,
+  verifyPassword,
+  requestPasswordReset,
+} from '../services/settings';
 
 const SUPPORT_EMAIL = 'futfindercl@gmail.com';
 const TERMS_URL = 'https://futfinder.cl/terminos';
@@ -67,14 +76,101 @@ function pickOption(title, options, onPick) {
     return;
   }
   Alert.alert(
-    title,
-    '',
+    title, '',
     [
       ...options.map((o) => ({ text: o.label, onPress: () => onPick(o.value) })),
       { text: 'Cancelar', style: 'cancel' },
     ],
   );
 }
+
+// ── Custom slider (no deps externos) ─────────────────────────────
+// onValueChange: llama en cada movimiento (UI en tiempo real)
+// onValueCommit: llama solo al soltar (persistir en DB)
+function RadiusSlider({ value, onValueChange, onValueCommit }) {
+  const MIN = 1, MAX = 50, THUMB = 24;
+  const [width, setWidth] = useState(0);
+  const widthRef = useRef(0);
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onValueChange);
+  const onCommitRef = useRef(onValueCommit);
+  const startXRef = useRef(0);
+
+  useEffect(() => { valueRef.current = value; }, [value]);
+  useEffect(() => { onChangeRef.current = onValueChange; }, [onValueChange]);
+  useEffect(() => { onCommitRef.current = onValueCommit; }, [onValueCommit]);
+
+  const getInner = () => Math.max(1, widthRef.current - THUMB);
+  const valToX = (v) => ((v - MIN) / (MAX - MIN)) * getInner();
+  const xToVal = (x) => {
+    const clamped = Math.max(0, Math.min(x, getInner()));
+    return Math.round(MIN + (clamped / getInner()) * (MAX - MIN));
+  };
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startXRef.current = valToX(valueRef.current);
+      },
+      onPanResponderMove: (_, { dx }) => {
+        const x = Math.max(0, Math.min(startXRef.current + dx, getInner()));
+        onChangeRef.current(xToVal(x));
+      },
+      onPanResponderRelease: (_, { dx }) => {
+        const x = Math.max(0, Math.min(startXRef.current + dx, getInner()));
+        const v = xToVal(x);
+        onChangeRef.current(v);
+        onCommitRef.current?.(v);
+      },
+    })
+  ).current;
+
+  const thumbX = width > 0 ? valToX(value) : 0;
+
+  return (
+    <View
+      style={{ height: THUMB, justifyContent: 'center', marginVertical: 6 }}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        widthRef.current = w;
+        setWidth(w);
+      }}
+    >
+      {/* Track background */}
+      <View style={{
+        position: 'absolute', left: 0, right: 0,
+        height: 4, backgroundColor: colors.borderSoft, borderRadius: 2,
+        top: (THUMB - 4) / 2,
+      }} />
+      {/* Fill */}
+      <View style={{
+        position: 'absolute', left: 0,
+        width: Math.max(0, thumbX + THUMB / 2),
+        height: 4, backgroundColor: colors.primary, borderRadius: 2,
+        top: (THUMB - 4) / 2,
+      }} />
+      {/* Thumb */}
+      <View
+        {...pan.panHandlers}
+        style={{
+          position: 'absolute',
+          left: thumbX, top: 0,
+          width: THUMB, height: THUMB,
+          borderRadius: THUMB / 2,
+          backgroundColor: colors.primary,
+          borderWidth: 2.5, borderColor: '#fff',
+          shadowColor: '#000', shadowOpacity: 0.3,
+          shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+          elevation: 4,
+        }}
+      />
+    </View>
+  );
+}
+
+// ── Pantalla principal ────────────────────────────────────────────
 
 export default function SettingsScreen({ navigation }) {
   const [profile, setProfile] = useState(null);
@@ -84,15 +180,27 @@ export default function SettingsScreen({ navigation }) {
 
   // Modal state
   const [modal, setModal] = useState(null); // 'email' | 'password' | 'location'
+
+  // Email modal
   const [emailInput, setEmailInput] = useState('');
+  const [currentPwdForEmail, setCurrentPwdForEmail] = useState('');
+
+  // Password modal
+  const [currentPwdInput, setCurrentPwdInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [password2Input, setPassword2Input] = useState('');
+
+  // Location modal
   const [regionInput, setRegionInput] = useState('');
   const [comunaInput, setComunaInput] = useState('');
+
+  // Preferences
+  const [radiusKm, setRadiusKm] = useState(10);
 
   const load = useCallback(async () => {
     const p = await getMyProfile();
     setProfile(p);
+    setRadiusKm(p?.search_radius_km ?? 10);
     setLoading(false);
   }, []);
 
@@ -109,7 +217,6 @@ export default function SettingsScreen({ navigation }) {
     nav.reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
 
-  // ── Guardado de campo único ───────────────────────────────
   const save = async (patch, successMsg = 'Guardado') => {
     setSaving(true);
     const { error } = await updateMyProfile(patch);
@@ -123,7 +230,6 @@ export default function SettingsScreen({ navigation }) {
     return true;
   };
 
-  // ── Toggle notificación / privacidad ─────────────────────
   const toggleField = async (field, value) => {
     setProfile((p) => ({ ...p, [field]: value }));
     const { error } = await updateMyProfile({ [field]: value });
@@ -133,26 +239,46 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
-  // ── Acciones de cuenta ────────────────────────────────────
+  const handleRadiusRelease = async (km) => {
+    setRadiusKm(km);
+    const { error } = await updateMyProfile({ search_radius_km: km });
+    if (error) showBanner('error', 'No se pudo guardar el radio', error.message);
+    else setProfile((p) => ({ ...p, search_radius_km: km }));
+  };
+
+  // ── Cambiar email (FIX 2) ─────────────────────────────────────
   const handleChangeEmail = async () => {
     const email = emailInput.trim();
     if (!email.includes('@')) {
       showBanner('error', 'Email inválido', 'Introduce un email válido.');
       return;
     }
-    setSaving(true);
-    const { error } = await changeEmail(email);
-    setSaving(false);
-    if (error) {
-      showBanner('error', 'No se pudo cambiar', error.message);
+    if (!currentPwdForEmail) {
+      showBanner('error', 'Falta la contraseña actual', 'Ingrésala para confirmar el cambio.');
       return;
     }
+    setSaving(true);
+    const { error: verifyErr } = await verifyPassword(profile?.email, currentPwdForEmail);
+    if (verifyErr) {
+      setSaving(false);
+      showBanner('error', 'Contraseña incorrecta', verifyErr.message);
+      return;
+    }
+    const { error } = await changeEmail(email);
+    setSaving(false);
+    if (error) { showBanner('error', 'No se pudo cambiar', error.message); return; }
     setModal(null);
     setEmailInput('');
+    setCurrentPwdForEmail('');
     showBanner('success', 'Revisa tu bandeja', 'Te enviamos un link de confirmación al nuevo email.');
   };
 
+  // ── Cambiar contraseña (FIX 1) ────────────────────────────────
   const handleChangePassword = async () => {
+    if (!currentPwdInput) {
+      showBanner('error', 'Falta la contraseña actual', 'Ingrésala para continuar.');
+      return;
+    }
     if (passwordInput.length < 6) {
       showBanner('error', 'Contraseña muy corta', 'Mínimo 6 caracteres.');
       return;
@@ -162,16 +288,31 @@ export default function SettingsScreen({ navigation }) {
       return;
     }
     setSaving(true);
-    const { error } = await changePassword(passwordInput);
-    setSaving(false);
-    if (error) {
-      showBanner('error', 'No se pudo cambiar', error.message);
+    const { error: verifyErr } = await verifyPassword(profile?.email, currentPwdInput);
+    if (verifyErr) {
+      setSaving(false);
+      showBanner('error', 'Contraseña incorrecta', verifyErr.message);
       return;
     }
+    const { error } = await changePassword(passwordInput);
+    setSaving(false);
+    if (error) { showBanner('error', 'No se pudo cambiar', error.message); return; }
     setModal(null);
+    setCurrentPwdInput('');
     setPasswordInput('');
     setPassword2Input('');
     showBanner('success', 'Contraseña actualizada');
+  };
+
+  const handleForgotPassword = async () => {
+    if (!profile?.email) return;
+    const { error } = await requestPasswordReset(profile.email);
+    if (error) {
+      showBanner('error', 'No se pudo enviar', error.message);
+    } else {
+      setModal(null);
+      showBanner('success', 'Email enviado', `Revisa ${profile.email} para restablecer tu contraseña.`);
+    }
   };
 
   const handleSaveLocation = async () => {
@@ -186,10 +327,7 @@ export default function SettingsScreen({ navigation }) {
     confirmAction(
       'Cerrar sesión',
       '¿Seguro que quieres salir de tu cuenta?',
-      async () => {
-        await signOut();
-        navigateToAuth();
-      },
+      async () => { await signOut(); navigateToAuth(); },
     );
   };
 
@@ -247,8 +385,7 @@ export default function SettingsScreen({ navigation }) {
     );
   }
 
-  const friendRequestLabel =
-    profile?.privacy_friend_requests === 'nobody' ? 'Nadie' : 'Todos';
+  const friendRequestLabel = profile?.privacy_friend_requests === 'nobody' ? 'Nadie' : 'Todos';
   const planLabel = profile?.plan === 'premium' ? 'Premium' : 'Estándar';
 
   return (
@@ -259,42 +396,9 @@ export default function SettingsScreen({ navigation }) {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {banner && (
-          <Banner {...banner} onClose={() => setBanner(null)} />
-        )}
+        {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-        {/* ── CUENTA ─────────────────────────────────────── */}
-        <SectionHeader title="Cuenta" />
-
-        <View style={styles.card}>
-          <ArrowRow
-            icon={<Mail color={colors.primary} size={18} />}
-            label="Cambiar email"
-            onPress={() => setModal('email')}
-          />
-          <Divider />
-          <ArrowRow
-            icon={<Lock color={colors.primary} size={18} />}
-            label="Cambiar contraseña"
-            onPress={() => setModal('password')}
-          />
-          <Divider />
-          <ArrowRow
-            icon={<LogOut color={colors.error} size={18} />}
-            label="Cerrar sesión"
-            labelStyle={{ color: colors.error }}
-            onPress={handleLogout}
-          />
-          <Divider />
-          <ArrowRow
-            icon={<Trash2 color={colors.error} size={18} />}
-            label="Eliminar cuenta"
-            labelStyle={{ color: colors.error }}
-            onPress={handleDeleteAccount}
-          />
-        </View>
-
-        {/* ── PRIVACIDAD ──────────────────────────────────── */}
+        {/* ── PRIVACIDAD (FIX 3: ahora es primero) ─────────── */}
         <SectionHeader title="Privacidad" />
 
         <View style={styles.card}>
@@ -346,7 +450,7 @@ export default function SettingsScreen({ navigation }) {
           />
         </View>
 
-        {/* ── PREFERENCIAS ────────────────────────────────── */}
+        {/* ── PREFERENCIAS (FIX 4 + FIX 5) ───────────────── */}
         <SectionHeader title="Preferencias" />
 
         <View style={styles.card}>
@@ -354,16 +458,37 @@ export default function SettingsScreen({ navigation }) {
             icon={<MapPin color={colors.primary} size={18} />}
             label="Región y comuna de búsqueda"
             value={
-              profile?.pref_comuna
-                ? `${profile.pref_comuna}${profile.pref_region ? `, ${profile.pref_region}` : ''}`
+              profile?.pref_comuna || profile?.comuna
+                ? `${profile.pref_comuna || profile.comuna}${(profile.pref_region || profile.region) ? `, ${profile.pref_region || profile.region}` : ''}`
                 : 'No definida'
             }
             onPress={() => {
-              setRegionInput(profile?.pref_region || '');
-              setComunaInput(profile?.pref_comuna || '');
+              // FIX 4: fallback a profile.region / profile.comuna
+              setRegionInput(profile?.pref_region || profile?.region || '');
+              setComunaInput(profile?.pref_comuna || profile?.comuna || '');
               setModal('location');
             }}
           />
+          <Divider />
+          {/* FIX 5: Slider de radio */}
+          <View style={styles.sliderRow}>
+            <View style={styles.sliderHeader}>
+              <View style={styles.rowLeft}>
+                <SlidersHorizontal color={colors.primary} size={18} />
+                <Text style={styles.rowLabel}>Radio de búsqueda</Text>
+              </View>
+              <Text style={styles.radiusLabel}>{radiusKm} km</Text>
+            </View>
+            <RadiusSlider
+              value={radiusKm}
+              onValueChange={setRadiusKm}
+              onValueCommit={handleRadiusRelease}
+            />
+            <View style={styles.sliderTicks}>
+              <Text style={styles.tickLabel}>1 km</Text>
+              <Text style={styles.tickLabel}>50 km</Text>
+            </View>
+          </View>
         </View>
 
         {/* ── SOPORTE ─────────────────────────────────────── */}
@@ -380,16 +505,14 @@ export default function SettingsScreen({ navigation }) {
             icon={<FileText color={colors.primary} size={18} />}
             label="Términos y condiciones"
             onPress={() => {
-              if (Platform.OS === 'web') {
-                openURL(TERMS_URL);
-              } else {
-                navigation.navigate('Terms');
-              }
+              if (Platform.OS === 'web') { openURL(TERMS_URL); }
+              else { navigation.navigate('Terms'); }
             }}
           />
           <Divider />
+          {/* FIX 7: FileLock en lugar de Shield */}
           <ArrowRow
-            icon={<Shield color={colors.primary} size={18} />}
+            icon={<FileLock color={colors.primary} size={18} />}
             label="Política de privacidad"
             onPress={() => openURL(PRIVACY_URL)}
           />
@@ -401,16 +524,10 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.card}>
           <View style={styles.planRow}>
             <View style={styles.rowLeft}>
-              <Crown
-                color={planLabel === 'Premium' ? '#F2C94C' : colors.textMuted}
-                size={18}
-              />
+              <Crown color={planLabel === 'Premium' ? '#F2C94C' : colors.textMuted} size={18} />
               <Text style={styles.rowLabel}>Plan actual</Text>
             </View>
-            <Text style={[
-              styles.planBadge,
-              planLabel === 'Premium' && { color: '#F2C94C' },
-            ]}>
+            <Text style={[styles.planBadge, planLabel === 'Premium' && { color: '#F2C94C' }]}>
               {planLabel}
             </Text>
           </View>
@@ -419,6 +536,38 @@ export default function SettingsScreen({ navigation }) {
             icon={<Crown color={colors.primary} size={18} />}
             label="Ver planes"
             onPress={() => navigation.navigate('ClubPlans', { clubId: profile?.club_id })}
+          />
+        </View>
+
+        {/* ── CUENTA (FIX 3: movida al final) ─────────────── */}
+        <SectionHeader title="Cuenta" />
+
+        <View style={styles.card}>
+          <ArrowRow
+            icon={<Mail color={colors.primary} size={18} />}
+            label="Cambiar email"
+            onPress={() => setModal('email')}
+          />
+          <Divider />
+          <ArrowRow
+            icon={<Lock color={colors.primary} size={18} />}
+            label="Cambiar contraseña"
+            onPress={() => setModal('password')}
+          />
+          <Divider />
+          {/* FIX 3: LogOut en gris, no rojo */}
+          <ArrowRow
+            icon={<LogOut color={colors.textSecondary} size={18} />}
+            label="Cerrar sesión"
+            labelStyle={{ color: colors.textSecondary }}
+            onPress={handleLogout}
+          />
+          <Divider />
+          <ArrowRow
+            icon={<Trash2 color={colors.error} size={18} />}
+            label="Eliminar cuenta"
+            labelStyle={{ color: colors.error }}
+            onPress={handleDeleteAccount}
           />
         </View>
 
@@ -431,24 +580,32 @@ export default function SettingsScreen({ navigation }) {
         </View>
       )}
 
-      {/* ── Modal: Cambiar email ─────────────────────────── */}
+      {/* ── Modal: Cambiar email (FIX 2) ─────────────────── */}
       <SettingsModal
         visible={modal === 'email'}
         title="Cambiar email"
-        onClose={() => { setModal(null); setEmailInput(''); }}
+        onClose={() => { setModal(null); setEmailInput(''); setCurrentPwdForEmail(''); }}
       >
         <Text style={styles.modalHint}>
           Recibirás un enlace de confirmación en el nuevo email antes del cambio.
         </Text>
         <TextInput
           style={styles.input}
+          placeholder="Contraseña actual"
+          placeholderTextColor={colors.textMuted}
+          value={currentPwdForEmail}
+          onChangeText={setCurrentPwdForEmail}
+          secureTextEntry
+          autoFocus
+        />
+        <TextInput
+          style={[styles.input, { marginTop: 10 }]}
           placeholder="Nuevo email"
           placeholderTextColor={colors.textMuted}
           value={emailInput}
           onChangeText={setEmailInput}
           keyboardType="email-address"
           autoCapitalize="none"
-          autoFocus
         />
         <Button
           label="Cambiar email"
@@ -458,20 +615,36 @@ export default function SettingsScreen({ navigation }) {
         />
       </SettingsModal>
 
-      {/* ── Modal: Cambiar contraseña ────────────────────── */}
+      {/* ── Modal: Cambiar contraseña (FIX 1) ───────────── */}
       <SettingsModal
         visible={modal === 'password'}
         title="Cambiar contraseña"
-        onClose={() => { setModal(null); setPasswordInput(''); setPassword2Input(''); }}
+        onClose={() => {
+          setModal(null);
+          setCurrentPwdInput('');
+          setPasswordInput('');
+          setPassword2Input('');
+        }}
       >
         <TextInput
           style={styles.input}
+          placeholder="Contraseña actual"
+          placeholderTextColor={colors.textMuted}
+          value={currentPwdInput}
+          onChangeText={setCurrentPwdInput}
+          secureTextEntry
+          autoFocus
+        />
+        <Pressable onPress={handleForgotPassword} style={{ marginTop: 6, marginBottom: 4 }}>
+          <Text style={styles.forgotLink}>¿Olvidaste tu contraseña?</Text>
+        </Pressable>
+        <TextInput
+          style={[styles.input, { marginTop: 10 }]}
           placeholder="Nueva contraseña"
           placeholderTextColor={colors.textMuted}
           value={passwordInput}
           onChangeText={setPasswordInput}
           secureTextEntry
-          autoFocus
         />
         <TextInput
           style={[styles.input, { marginTop: 10 }]}
@@ -524,7 +697,7 @@ export default function SettingsScreen({ navigation }) {
   );
 }
 
-// ── Subcomponentes ────────────────────────────────────────────
+// ── Subcomponentes ────────────────────────────────────────────────
 
 function Header({ navigation }) {
   return (
@@ -609,7 +782,7 @@ function SettingsModal({ visible, title, onClose, children }) {
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────
+// ── Estilos ───────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
@@ -622,18 +795,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 40, height: 40, borderRadius: 20,
     backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
     color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    fontSize: 18, fontWeight: '800', letterSpacing: -0.3,
   },
 
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -642,12 +810,8 @@ const styles = StyleSheet.create({
 
   sectionHeader: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginTop: 20,
-    marginBottom: 8,
-    marginLeft: 4,
+    fontSize: 11, fontWeight: '700', letterSpacing: 0.8,
+    marginTop: 20, marginBottom: 8, marginLeft: 4,
   },
 
   card: {
@@ -658,98 +822,64 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  divider: {
-    height: 1,
-    backgroundColor: colors.borderSoft,
-    marginLeft: 48,
-  },
+  divider: { height: 1, backgroundColor: colors.borderSoft, marginLeft: 48 },
 
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 14,
   },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
+  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  rowLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rowValue: { color: colors.textMuted, fontSize: 13 },
+
+  // Slider row
+  sliderRow: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12 },
+  sliderHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 10,
   },
-  rowLabel: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
+  radiusLabel: {
+    color: colors.primary, fontSize: 14, fontWeight: '700',
   },
-  rowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  sliderTicks: {
+    flexDirection: 'row', justifyContent: 'space-between', marginTop: 4,
   },
-  rowValue: {
-    color: colors.textMuted,
-    fontSize: 13,
-  },
+  tickLabel: { color: colors.textMuted, fontSize: 11 },
 
   planRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 14,
   },
-  planBadge: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  planBadge: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
 
   savingOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
   },
 
-  // Modales
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: 20,
-    paddingBottom: 36,
+    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+    padding: 20, paddingBottom: 36,
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: 16,
   },
-  modalTitle: {
-    color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '800',
-  },
+  modalTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '800' },
   modalHint: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 12,
+    color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 12,
+  },
+  forgotLink: {
+    color: colors.primary, fontSize: 13, fontWeight: '600',
   },
   input: {
     backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1, borderColor: colors.border,
     borderRadius: radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: colors.textPrimary,
-    fontSize: 14,
+    paddingHorizontal: 14, paddingVertical: 12,
+    color: colors.textPrimary, fontSize: 14,
   },
 });
