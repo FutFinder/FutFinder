@@ -25,6 +25,8 @@ import {
   LogOut,
   MessageCircle,
   UserPlus,
+  UserCheck,
+  Clock,
   Pencil,
   Trash2,
 } from 'lucide-react-native';
@@ -34,6 +36,11 @@ import Banner from '../components/Banner';
 import Button from '../components/Button';
 import { premiumGold } from '../components/PremiumBadge';
 import { getCurrentUser } from '../services/auth';
+import {
+  getFriendshipStatuses,
+  sendFriendRequest,
+  acceptFriendRequest,
+} from '../services/friends';
 import {
   getClubById,
   listMembers,
@@ -83,6 +90,7 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [myRequest, setMyRequest] = useState(null);
   const [me, setMe] = useState(null);
   const [myClubs, setMyClubs] = useState([]);
+  const [friendStatus, setFriendStatus] = useState(new Map()); // user_id -> { status, friendshipId }
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
 
@@ -105,6 +113,15 @@ export default function ClubDetailScreen({ navigation, route }) {
     setClub(c);
     setMembers(ms || []);
     setMyClubs(mine || []);
+
+    // Estado de amistad con cada integrante (para el botón "Agregar amigo")
+    if (myId && ms && ms.length > 0) {
+      const otherIds = ms.map((m) => m.user_id).filter((id) => id !== myId);
+      const { data: statuses } = await getFriendshipStatuses(otherIds);
+      setFriendStatus(statuses || new Map());
+    } else {
+      setFriendStatus(new Map());
+    }
 
     const amMember = (ms || []).some((m) => m.user_id === myId);
     const amAdmin = (ms || []).some((m) => m.user_id === myId && m.rol === 'admin');
@@ -252,6 +269,60 @@ export default function ClubDetailScreen({ navigation, route }) {
         }
       );
     }
+  };
+
+  const handleAddFriend = async (member) => {
+    // Optimista: marcamos "enviada" de inmediato
+    setFriendStatus((prev) => {
+      const next = new Map(prev);
+      next.set(member.user_id, { status: 'sent', friendshipId: null });
+      return next;
+    });
+    const { data, error } = await sendFriendRequest(member.user_id);
+    if (error) {
+      // revertir
+      setFriendStatus((prev) => {
+        const next = new Map(prev);
+        next.set(member.user_id, { status: 'none', friendshipId: null });
+        return next;
+      });
+      setBanner({ type: 'error', title: 'No se pudo enviar', message: error.message });
+      return;
+    }
+    setFriendStatus((prev) => {
+      const next = new Map(prev);
+      // si ya existía relación aceptada, getFriendshipWith la devolvió
+      const isAccepted = data?.status === 'accepted';
+      next.set(member.user_id, {
+        status: isAccepted ? 'friends' : 'sent',
+        friendshipId: data?.id || null,
+      });
+      return next;
+    });
+    setBanner({
+      type: 'success',
+      title: 'Solicitud enviada',
+      message: `Le enviaste una solicitud de amistad a ${member.username}.`,
+    });
+  };
+
+  const handleAcceptFriend = async (member, friendshipId) => {
+    if (!friendshipId) return;
+    const { error } = await acceptFriendRequest(friendshipId);
+    if (error) {
+      setBanner({ type: 'error', title: 'No se pudo aceptar', message: error.message });
+      return;
+    }
+    setFriendStatus((prev) => {
+      const next = new Map(prev);
+      next.set(member.user_id, { status: 'friends', friendshipId });
+      return next;
+    });
+    setBanner({
+      type: 'success',
+      title: '¡Nuevo amigo!',
+      message: `Ahora tú y ${member.username} son amigos.`,
+    });
   };
 
   const handleExpel = (member) => {
@@ -510,6 +581,15 @@ export default function ClubDetailScreen({ navigation, route }) {
                 {item.comuna ? ` · ${item.comuna}` : ''}
               </Text>
             </View>
+            {item.user_id !== me && (
+              <FriendControl
+                status={friendStatus.get(item.user_id)?.status || 'none'}
+                onAdd={() => handleAddFriend(item)}
+                onAccept={() =>
+                  handleAcceptFriend(item, friendStatus.get(item.user_id)?.friendshipId)
+                }
+              />
+            )}
             {soyAdmin && item.user_id !== me && item.rol !== 'admin' && (
               <Pressable
                 onPress={() => handlePromote(item)}
@@ -568,6 +648,53 @@ function MemberAvatar({ foto }) {
     <View style={[styles.avatar, styles.avatarFallback]}>
       <Shield color={colors.textMuted} size={18} strokeWidth={1.8} />
     </View>
+  );
+}
+
+/**
+ * Control de amistad junto a cada integrante:
+ *  - friends  → ícono de amigos (sin acción)
+ *  - sent     → "Solicitud enviada" (deshabilitado)
+ *  - received → "Aceptar" (acepta la solicitud que me mandaron)
+ *  - none     → "Agregar amigo"
+ */
+function FriendControl({ status, onAdd, onAccept }) {
+  if (status === 'friends') {
+    return (
+      <View style={styles.friendIconBox} accessibilityLabel="Ya son amigos">
+        <UserCheck color={colors.primary} size={16} strokeWidth={2.2} />
+      </View>
+    );
+  }
+  if (status === 'sent') {
+    return (
+      <View style={styles.friendPillMuted} accessibilityLabel="Solicitud enviada">
+        <Clock color={colors.textMuted} size={12} strokeWidth={2.2} />
+        <Text style={styles.friendPillMutedText}>Solicitud enviada</Text>
+      </View>
+    );
+  }
+  if (status === 'received') {
+    return (
+      <Pressable
+        onPress={onAccept}
+        hitSlop={6}
+        style={({ pressed }) => [styles.friendPill, pressed && { opacity: 0.7 }]}
+      >
+        <Check color={colors.primary} size={12} strokeWidth={2.6} />
+        <Text style={styles.friendPillText}>Aceptar</Text>
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable
+      onPress={onAdd}
+      hitSlop={6}
+      style={({ pressed }) => [styles.friendPill, pressed && { opacity: 0.7 }]}
+    >
+      <UserPlus color={colors.primary} size={12} strokeWidth={2.4} />
+      <Text style={styles.friendPillText}>Agregar amigo</Text>
+    </Pressable>
   );
 }
 
@@ -736,6 +863,44 @@ const styles = StyleSheet.create({
     backgroundColor: colors.errorSoft,
     borderWidth: 1,
     borderColor: colors.error,
+  },
+  friendIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  friendPillText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  friendPillMuted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  friendPillMutedText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
   },
   promoteBtn: {
     width: 32,

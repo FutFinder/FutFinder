@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   TextInput,
   FlatList,
   Pressable,
@@ -25,12 +26,19 @@ import {
   BadgeCheck,
   Check,
   X,
+  Compass,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import ClubCard from '../components/ClubCard';
 import PremiumBadge, { premiumGold } from '../components/PremiumBadge';
+import { getCurrentUser } from '../services/auth';
+import {
+  getClubUnreadCount,
+  markClubChatRead,
+  subscribeToClubMessages,
+} from '../services/messages';
 import {
   getMyClubs,
   searchClubs,
@@ -55,6 +63,8 @@ export default function ClubsScreen({ navigation, route }) {
   const [query, setQuery] = useState('');
   const [banner, setBanner] = useState(null); // { type, title, message }
   const [pendingCounts, setPendingCounts] = useState({}); // { [clubId]: number }
+  const [chatUnread, setChatUnread] = useState({}); // { [clubId]: number }
+  const [me, setMe] = useState(null);
 
   // Suscripciones Realtime a solicitudes pendientes para todos los clubs donde soy admin
   useEffect(() => {
@@ -86,11 +96,46 @@ export default function ClubsScreen({ navigation, route }) {
     return () => unsubs.forEach((u) => u());
   }, [myClubs]);
 
+  // Badge de mensajes no leídos del chat de cada club + Realtime
+  useEffect(() => {
+    if (myClubs.length === 0) {
+      setChatUnread({});
+      return;
+    }
+    const myClubIds = myClubs.map((m) => m.club.id);
+
+    const fetchUnread = async () => {
+      const updates = {};
+      await Promise.all(
+        myClubIds.map(async (clubId) => {
+          const { data } = await getClubUnreadCount(clubId);
+          updates[clubId] = data || 0;
+        })
+      );
+      setChatUnread(updates);
+    };
+    fetchUnread();
+
+    // Realtime: un mensaje nuevo en uno de mis clubes (que no sea mío) suma 1
+    const unsub = subscribeToClubMessages((row) => {
+      if (!myClubIds.includes(row.club_id)) return;
+      if (me && row.sender_id === me) return;
+      setChatUnread((prev) => ({
+        ...prev,
+        [row.club_id]: (prev[row.club_id] || 0) + 1,
+      }));
+    });
+
+    return unsub;
+  }, [myClubs, me]);
+
   const load = useCallback(async (q = '') => {
-    const [{ data: mines }, { data: found }] = await Promise.all([
+    const [user, { data: mines }, { data: found }] = await Promise.all([
+      getCurrentUser(),
       getMyClubs(),
       searchClubs(q),
     ]);
+    setMe(user?.id || null);
     const myClubsData = mines || [];
     setMyClubs(myClubsData);
     setClubs(found || []);
@@ -128,6 +173,18 @@ export default function ClubsScreen({ navigation, route }) {
     setRefreshing(false);
   };
 
+  // Abrir el chat de un club: marca leído y limpia su badge antes de navegar
+  const openClubChat = async (club) => {
+    setChatUnread((prev) => ({ ...prev, [club.id]: 0 }));
+    await markClubChatRead(club.id);
+    navigation.navigate('ChatThread', {
+      threadKey: `club:${club.id}`,
+      title: club.nombre,
+      subtitle: 'Chat del club',
+      fotoUrl: club.foto_url || null,
+    });
+  };
+
   const onSearch = async (text) => {
     setQuery(text);
     const { data } = await searchClubs(text);
@@ -163,8 +220,6 @@ export default function ClubsScreen({ navigation, route }) {
 
   // ---------- CON CLUB (1, 2 o 3 clubes) ----------
   if (myClubs.length > 0) {
-    const myClubIds = new Set(myClubs.map((m) => m.club.id));
-    const otrosClubs = clubs.filter((c) => !myClubIds.has(c.id));
     const hasMaxClubs = myClubs.length >= 3;
     const hasSingleClub = myClubs.length === 1;
     const { club, miRol, totalMiembros } = myClubs[0];
@@ -173,10 +228,8 @@ export default function ClubsScreen({ navigation, route }) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
         <Header />
-        <FlatList
-          data={otrosClubs}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="handled"
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -185,191 +238,160 @@ export default function ClubsScreen({ navigation, route }) {
               colors={[colors.primary]}
             />
           }
-          ListHeaderComponent={
-            <View style={styles.content}>
-              {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
+        >
+          {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-              {/* ── 1 club: tarjeta grande + accesos rápidos ── */}
-              {hasSingleClub && (
-                <>
-                  <Text style={styles.sectionTitle}>Mi Club</Text>
-                  <Pressable
-                    onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
-                    style={({ pressed }) => [styles.myClubCard, pressed && { opacity: 0.9 }]}
-                  >
-                    {club.foto_url ? (
-                      <Image source={{ uri: club.foto_url }} style={styles.myClubLogo} />
-                    ) : (
-                      <View style={[styles.myClubLogo, styles.logoFallback]}>
-                        <Shield color={colors.primary} size={36} strokeWidth={1.6} />
-                      </View>
-                    )}
-                    <View style={styles.myClubNameRow}>
-                      <Text style={styles.myClubName} numberOfLines={1}>{club.nombre}</Text>
-                      {club.verificado ? (
-                        <BadgeCheck color={premiumGold} size={20} strokeWidth={2.2} />
-                      ) : null}
+          {/* ── 1 club: tarjeta grande + accesos rápidos ── */}
+          {hasSingleClub && (
+            <>
+              <Text style={styles.sectionTitle}>Mi Club</Text>
+              <Pressable
+                onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+                style={({ pressed }) => [styles.myClubCard, pressed && { opacity: 0.9 }]}
+              >
+                {club.foto_url ? (
+                  <Image source={{ uri: club.foto_url }} style={styles.myClubLogo} />
+                ) : (
+                  <View style={[styles.myClubLogo, styles.logoFallback]}>
+                    <Shield color={colors.primary} size={36} strokeWidth={1.6} />
+                  </View>
+                )}
+                <View style={styles.myClubNameRow}>
+                  <Text style={styles.myClubName} numberOfLines={1}>{club.nombre}</Text>
+                  {club.verificado ? (
+                    <BadgeCheck color={premiumGold} size={20} strokeWidth={2.2} />
+                  ) : null}
+                </View>
+                {club.comuna ? (
+                  <View style={styles.myClubMeta}>
+                    <MapPin color={colors.textMuted} size={13} />
+                    <Text style={styles.myClubMetaText}>
+                      {club.comuna}{club.region ? `, ${club.region}` : ''}
+                    </Text>
+                  </View>
+                ) : null}
+                <View style={styles.badgeRow}>
+                  {club.plan === 'premium' ? (
+                    <PremiumBadge variant="badge" />
+                  ) : (
+                    <View style={styles.planChip}>
+                      <Text style={styles.planChipText}>PLAN ESTÁNDAR</Text>
                     </View>
-                    {club.comuna ? (
-                      <View style={styles.myClubMeta}>
-                        <MapPin color={colors.textMuted} size={13} />
-                        <Text style={styles.myClubMetaText}>
-                          {club.comuna}{club.region ? `, ${club.region}` : ''}
-                        </Text>
-                      </View>
-                    ) : null}
-                    <View style={styles.badgeRow}>
-                      {club.plan === 'premium' ? (
-                        <PremiumBadge variant="badge" />
-                      ) : (
-                        <View style={styles.planChip}>
-                          <Text style={styles.planChipText}>PLAN ESTÁNDAR</Text>
+                  )}
+                  {miRol === 'admin' && (
+                    <View style={styles.adminChip}>
+                      <Crown color={colors.primary} size={11} strokeWidth={2.4} />
+                      <Text style={styles.adminChipText}>Admin</Text>
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+              <RowAction
+                icon={<Users color={colors.primary} size={20} strokeWidth={2} />}
+                title="Integrantes"
+                subtitle={`${totalMiembros} de ${limites.miembros}`}
+                onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
+                badge={miRol === 'admin' ? (pendingCounts[club.id] || 0) : 0}
+              />
+              <RowAction
+                icon={<MessageCircle color={colors.primary} size={20} strokeWidth={2} />}
+                title="Chat del club"
+                subtitle="Conversa con tu equipo"
+                onPress={() => openClubChat(club)}
+                badge={chatUnread[club.id] || 0}
+              />
+              <RowAction
+                icon={<Crown color={premiumGold} size={20} strokeWidth={2} />}
+                title="Plan del club"
+                subtitle={club.plan === 'premium' ? 'Plan Premium' : 'Plan Gratuito'}
+                onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
+              />
+            </>
+          )}
+
+          {/* ── 2-3 clubes: tarjetas compactas ── */}
+          {!hasSingleClub && (
+            <>
+              <Text style={styles.sectionTitle}>
+                Mis Clubes ({myClubs.length}/3)
+              </Text>
+              {myClubs.map(({ club: c, miRol: rol, totalMiembros: total }) => (
+                <ClubCard
+                  key={c.id}
+                  club={c}
+                  totalMiembros={total}
+                  onPress={() => navigation.navigate('ClubDetail', { clubId: c.id })}
+                  right={
+                    <View style={styles.multiClubRight}>
+                      {((rol === 'admin' && (pendingCounts[c.id] || 0) > 0) ||
+                        (chatUnread[c.id] || 0) > 0) && (
+                        <View style={styles.badgeCircle}>
+                          <Text style={styles.badgeText}>
+                            {(() => {
+                              const n =
+                                (rol === 'admin' ? pendingCounts[c.id] || 0 : 0) +
+                                (chatUnread[c.id] || 0);
+                              return n > 9 ? '9+' : n;
+                            })()}
+                          </Text>
                         </View>
                       )}
-                      {miRol === 'admin' && (
+                      {rol === 'admin' && (
                         <View style={styles.adminChip}>
-                          <Crown color={colors.primary} size={11} strokeWidth={2.4} />
+                          <Crown color={colors.primary} size={10} strokeWidth={2.4} />
                           <Text style={styles.adminChipText}>Admin</Text>
                         </View>
                       )}
+                      <ChevronRight color={colors.textMuted} size={18} />
                     </View>
-                  </Pressable>
-                  <RowAction
-                    icon={<Users color={colors.primary} size={20} strokeWidth={2} />}
-                    title="Integrantes"
-                    subtitle={`${totalMiembros} de ${limites.miembros}`}
-                    onPress={() => navigation.navigate('ClubDetail', { clubId: club.id })}
-                    badge={miRol === 'admin' ? (pendingCounts[club.id] || 0) : 0}
-                  />
-                  <RowAction
-                    icon={<MessageCircle color={colors.primary} size={20} strokeWidth={2} />}
-                    title="Chat del club"
-                    subtitle="Conversa con tu equipo"
-                    onPress={() =>
-                      navigation.navigate('ChatThread', {
-                        threadKey: `club:${club.id}`,
-                        title: club.nombre,
-                        subtitle: 'Chat del club',
-                        fotoUrl: club.foto_url || null,
-                      })
-                    }
-                  />
-                  <RowAction
-                    icon={<Crown color={premiumGold} size={20} strokeWidth={2} />}
-                    title="Planes del club"
-                    subtitle={club.plan === 'premium' ? 'Tu club es Premium' : 'Conoce las ventajas Premium'}
-                    onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
-                  />
-                </>
-              )}
-
-              {/* ── 2-3 clubes: tarjetas compactas ── */}
-              {!hasSingleClub && (
-                <>
-                  <Text style={styles.sectionTitle}>
-                    Mis Clubes ({myClubs.length}/3)
-                  </Text>
-                  {myClubs.map(({ club: c, miRol: rol, totalMiembros: total }) => (
-                    <ClubCard
-                      key={c.id}
-                      club={c}
-                      totalMiembros={total}
-                      onPress={() => navigation.navigate('ClubDetail', { clubId: c.id })}
-                      right={
-                        <View style={styles.multiClubRight}>
-                          {rol === 'admin' && (pendingCounts[c.id] || 0) > 0 && (
-                            <View style={styles.badgeCircle}>
-                              <Text style={styles.badgeText}>
-                                {(pendingCounts[c.id] || 0) > 9 ? '9+' : pendingCounts[c.id]}
-                              </Text>
-                            </View>
-                          )}
-                          {rol === 'admin' && (
-                            <View style={styles.adminChip}>
-                              <Crown color={colors.primary} size={10} strokeWidth={2.4} />
-                              <Text style={styles.adminChipText}>Admin</Text>
-                            </View>
-                          )}
-                          <ChevronRight color={colors.textMuted} size={18} />
-                        </View>
-                      }
-                    />
-                  ))}
-                </>
-              )}
-
-              {/* Invitaciones (solo si el usuario aún puede unirse a más clubes) */}
-              {invitations.length > 0 && (
-                <View style={[styles.section, { marginTop: 16 }]}>
-                  <Text style={styles.sectionTitle}>Invitaciones</Text>
-                  {invitations.map((inv) => (
-                    <ClubCard
-                      key={inv.request_id}
-                      club={inv.club}
-                      onPress={() => navigation.navigate('ClubDetail', { clubId: inv.club_id })}
-                      right={
-                        <View style={styles.invActions}>
-                          <Pressable
-                            onPress={() => handleInvitation(inv, true)}
-                            hitSlop={6}
-                            style={({ pressed }) => [styles.invBtn, styles.invAccept, pressed && { opacity: 0.7 }]}
-                          >
-                            <Check color="#0E0E0D" size={16} strokeWidth={2.6} />
-                          </Pressable>
-                          <Pressable
-                            onPress={() => handleInvitation(inv, false)}
-                            hitSlop={6}
-                            style={({ pressed }) => [styles.invBtn, styles.invReject, pressed && { opacity: 0.7 }]}
-                          >
-                            <X color={colors.error} size={16} strokeWidth={2.6} />
-                          </Pressable>
-                        </View>
-                      }
-                    />
-                  ))}
-                </View>
-              )}
-
-              {/* Divisor + buscador + explorar */}
-              <View style={styles.divider} />
-              <View style={styles.searchBox}>
-                <SearchIcon color={colors.textMuted} size={18} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Buscar clubes por nombre..."
-                  placeholderTextColor={colors.textMuted}
-                  value={query}
-                  onChangeText={onSearch}
-                  autoCapitalize="none"
+                  }
                 />
-              </View>
-              <Text style={styles.sectionTitle}>
-                {query.trim() ? 'Resultados' : 'Explorar clubes'}
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.content}>
-              <ClubCard
-                club={item}
-                onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
-                right={<ChevronRight color={colors.textMuted} size={18} />}
-              />
+              ))}
+            </>
+          )}
+
+          {/* Invitaciones (solo si el usuario aún puede unirse a más clubes) */}
+          {invitations.length > 0 && (
+            <View style={[styles.section, { marginTop: 16 }]}>
+              <Text style={styles.sectionTitle}>Invitaciones</Text>
+              {invitations.map((inv) => (
+                <ClubCard
+                  key={inv.request_id}
+                  club={inv.club}
+                  onPress={() => navigation.navigate('ClubDetail', { clubId: inv.club_id })}
+                  right={
+                    <View style={styles.invActions}>
+                      <Pressable
+                        onPress={() => handleInvitation(inv, true)}
+                        hitSlop={6}
+                        style={({ pressed }) => [styles.invBtn, styles.invAccept, pressed && { opacity: 0.7 }]}
+                      >
+                        <Check color="#0E0E0D" size={16} strokeWidth={2.6} />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleInvitation(inv, false)}
+                        hitSlop={6}
+                        style={({ pressed }) => [styles.invBtn, styles.invReject, pressed && { opacity: 0.7 }]}
+                      >
+                        <X color={colors.error} size={16} strokeWidth={2.6} />
+                      </Pressable>
+                    </View>
+                  }
+                />
+              ))}
             </View>
           )}
-          ListEmptyComponent={
-            <View style={styles.emptyBox}>
-              <Shield color={colors.textMuted} size={34} strokeWidth={1.5} />
-              <Text style={styles.emptyTitle}>
-                {query.trim() ? 'Sin resultados' : 'No hay más clubes'}
-              </Text>
-              <Text style={styles.emptyText}>
-                {query.trim() ? 'Intenta con otro nombre.' : 'Ya formas parte de todos los clubes existentes.'}
-              </Text>
-            </View>
-          }
-          contentContainerStyle={{ paddingBottom: 96 }}
-        />
+        </ScrollView>
+
+        {/* Botón gris "Explorar clubes" (abajo a la izquierda) */}
+        <Pressable
+          onPress={() => navigation.navigate('ExploreClubs')}
+          style={({ pressed }) => [styles.exploreBtn, pressed && { opacity: 0.85 }]}
+        >
+          <Compass color={colors.textPrimary} size={18} strokeWidth={2.2} />
+          <Text style={styles.exploreBtnText}>Explorar clubes</Text>
+        </Pressable>
+
         {/* FAB: crear club si aún hay cupo (< 3 clubes) */}
         {!hasMaxClubs && (
           <Pressable
@@ -537,6 +559,7 @@ const styles = StyleSheet.create({
   },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { flex: 1, paddingHorizontal: 16 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 96 },
   listContent: { paddingHorizontal: 16, paddingBottom: 40 },
 
   // mi club
@@ -746,5 +769,36 @@ const styles = StyleSheet.create({
         elevation: 8,
       },
     }),
+  },
+  // botón gris "Explorar clubes" (abajo a la izquierda)
+  exploreBtn: {
+    position: 'absolute',
+    left: 20,
+    bottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 48,
+    paddingHorizontal: 18,
+    borderRadius: 24,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    zIndex: 100,
+    ...Platform.select({
+      web: { boxShadow: '0 4px 16px rgba(0,0,0,0.35)' },
+      default: {
+        shadowColor: '#000',
+        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 10,
+        elevation: 8,
+      },
+    }),
+  },
+  exploreBtnText: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

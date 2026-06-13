@@ -26,6 +26,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import RateMatchScreen from '../screens/RateMatchScreen';
 import CreateClubScreen from '../screens/CreateClubScreen';
 import ClubDetailScreen from '../screens/ClubDetailScreen';
+import ExploreClubsScreen from '../screens/ExploreClubsScreen';
 import ClubPlansScreen from '../screens/ClubPlansScreen';
 import EditClubScreen from '../screens/EditClubScreen';
 import ClubInviteScreen from '../screens/ClubInviteScreen';
@@ -131,6 +132,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClubDetail"
           component={ClubDetailScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ExploreClubs"
+          component={ExploreClubsScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

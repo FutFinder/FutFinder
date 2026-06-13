@@ -255,3 +255,52 @@ export async function countPendingRequests() {
   if (error) return 0;
   return data || 0;
 }
+
+/**
+ * Estado de amistad con varios usuarios a la vez (1 sola query).
+ * Devuelve { data, error } donde data es un Map<userId, {
+ *   status: 'none' | 'friends' | 'sent' | 'received',
+ *   friendshipId: string | null,
+ * }>.
+ * Útil para pintar el botón correcto junto a cada integrante de un club.
+ */
+export async function getFriendshipStatuses(otherIds = []) {
+  const result = new Map();
+  if (!isSupabaseConfigured) return { data: result, error: null };
+  const me = await getMe();
+  if (!me) return { data: result, error: null };
+
+  const ids = otherIds.filter((id) => id && id !== me);
+  for (const id of ids) result.set(id, { status: 'none', friendshipId: null });
+  if (ids.length === 0) return { data: result, error: null };
+
+  const idList = ids.join(',');
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('id, requester_id, addressee_id, status')
+    .in('status', ['pending', 'accepted'])
+    .or(
+      `and(requester_id.eq.${me},addressee_id.in.(${idList})),` +
+      `and(addressee_id.eq.${me},requester_id.in.(${idList}))`
+    );
+  if (error) {
+    console.error('[FutFinder] getFriendshipStatuses:', error);
+    return { data: result, error };
+  }
+
+  for (const f of data || []) {
+    const otherId = f.requester_id === me ? f.addressee_id : f.requester_id;
+    if (!result.has(otherId)) continue;
+    if (f.status === 'accepted') {
+      result.set(otherId, { status: 'friends', friendshipId: f.id });
+    } else {
+      // pending: 'sent' si yo soy el requester, 'received' si me lo enviaron
+      result.set(otherId, {
+        status: f.requester_id === me ? 'sent' : 'received',
+        friendshipId: f.id,
+      });
+    }
+  }
+
+  return { data: result, error: null };
+}

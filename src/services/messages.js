@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 /**
@@ -150,27 +151,36 @@ export async function listMyThreads() {
       })
       .filter(Boolean);
 
-    // 3b) Chat de mi club (si pertenezco a uno)
+    // 3b) Chats de mis clubes (puedo pertenecer hasta a 3)
     const clubThreads = [];
-    const { data: myMembership } = await supabase
+    const { data: myMemberships } = await supabase
       .from('club_members')
       .select('club_id, joined_at')
-      .eq('user_id', me)
-      .maybeSingle();
-    if (myMembership) {
-      const { data: myClubData } = await supabase
+      .eq('user_id', me);
+    if (myMemberships && myMemberships.length > 0) {
+      const joinedById = new Map(
+        myMemberships.map((m) => [m.club_id, m.joined_at])
+      );
+      const myClubIds = myMemberships.map((m) => m.club_id);
+      const { data: myClubsData } = await supabase
         .from('clubs')
         .select('id, nombre, foto_url, comuna')
-        .eq('id', myMembership.club_id)
-        .single();
-      if (myClubData) {
-        const { data: clubMsgs } = await supabase
-          .from('messages')
-          .select('id, content, created_at, sender_id, club_id')
-          .eq('club_id', myClubData.id)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        const lastClub = clubMsgs?.[0] || null;
+        .in('id', myClubIds);
+
+      // Último mensaje por club, en una sola query
+      const lastByClub = new Map();
+      const { data: clubMsgs } = await supabase
+        .from('messages')
+        .select('id, content, created_at, sender_id, club_id')
+        .in('club_id', myClubIds)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      for (const msg of clubMsgs || []) {
+        if (!lastByClub.has(msg.club_id)) lastByClub.set(msg.club_id, msg);
+      }
+
+      for (const myClubData of myClubsData || []) {
+        const lastClub = lastByClub.get(myClubData.id) || null;
         clubThreads.push({
           key: threadKey({ type: 'club', id: myClubData.id }),
           type: 'club',
@@ -179,7 +189,7 @@ export async function listMyThreads() {
           subtitle: 'Chat del club' + (myClubData.comuna ? ` · ${myClubData.comuna}` : ''),
           foto_url: myClubData.foto_url || null,
           last_message: lastClub,
-          last_at: lastClub?.created_at || myMembership.joined_at,
+          last_at: lastClub?.created_at || joinedById.get(myClubData.id),
           unread: 0,
         });
       }
@@ -374,12 +384,65 @@ export async function sendMessage(threadKeyStr, content) {
 export async function markThreadAsRead(threadKeyStr) {
   if (!isSupabaseConfigured) return;
   const t = parseThreadKey(threadKeyStr);
-  if (!t || t.type !== 'dm') return;
+  if (!t) return;
+
+  // El chat de club se rastrea localmente (no tiene read_at en BD)
+  if (t.type === 'club') {
+    await markClubChatRead(t.id);
+    return;
+  }
+  if (t.type !== 'dm') return;
 
   await supabase.rpc('mark_thread_as_read', {
     p_other_user_id: t.id,
     p_match_id: null,
   });
+}
+
+// ============================================================
+// CHAT DE CLUB — no leídos (el chat grupal no tiene read_at en BD,
+// así que guardamos localmente la última vez que abrí cada chat)
+// ============================================================
+
+const clubReadKey = (clubId) => `club_chat_read:${clubId}`;
+
+/** Marca el chat de un club como leído (guarda timestamp local = ahora). */
+export async function markClubChatRead(clubId) {
+  if (!clubId) return;
+  try {
+    await AsyncStorage.setItem(clubReadKey(clubId), new Date().toISOString());
+  } catch (e) {
+    console.warn('[FutFinder] markClubChatRead:', e?.message || e);
+  }
+}
+
+/**
+ * Cuenta mensajes del chat de un club posteriores a mi última lectura,
+ * excluyendo los míos. Devuelve { data: number, error }.
+ */
+export async function getClubUnreadCount(clubId) {
+  if (!isSupabaseConfigured || !clubId) return { data: 0, error: null };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: 0, error: null };
+
+  let lastRead = null;
+  try {
+    lastRead = await AsyncStorage.getItem(clubReadKey(clubId));
+  } catch {}
+
+  let q = supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('club_id', clubId)
+    .neq('sender_id', user.id);
+  if (lastRead) q = q.gt('created_at', lastRead);
+
+  const { count, error } = await q;
+  if (error) {
+    console.error('[FutFinder] getClubUnreadCount:', error);
+    return { data: 0, error };
+  }
+  return { data: count || 0, error: null };
 }
 
 /**
@@ -442,6 +505,35 @@ export function subscribeToMessages(onChange) {
     } catch (e) {
       // noop
     }
+  };
+}
+
+/**
+ * Suscribe SOLO a inserts de mensajes de club (para badges de no leídos).
+ * Usa un canal con nombre propio para no colisionar con 'public:messages'
+ * que usa ChatThreadScreen. Llama a onInsert(row) por cada mensaje de club.
+ * Devuelve función de limpieza.
+ */
+export function subscribeToClubMessages(onInsert) {
+  if (!isSupabaseConfigured) return () => {};
+  const channel = supabase
+    .channel('public:messages:club-badges')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages' },
+      (payload) => {
+        try {
+          if (payload?.new?.club_id) onInsert(payload.new);
+        } catch (e) {
+          console.error('[FutFinder] club badge handler error:', e);
+        }
+      }
+    )
+    .subscribe();
+  return () => {
+    try {
+      supabase.removeChannel(channel);
+    } catch {}
   };
 }
 

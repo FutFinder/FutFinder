@@ -554,12 +554,16 @@ export async function removeMember(memberId) {
  */
 export async function promoteToAdmin(memberId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!memberId) return { error: { message: 'memberId requerido' } };
+
+  // .select() (array) en vez de .single() para no lanzar PGRST116 cuando
+  // el trigger de límites bloquea el update o RLS filtra la fila devuelta.
   const { data, error } = await supabase
     .from('club_members')
     .update({ rol: 'admin' })
     .eq('id', memberId)
-    .select()
-    .single();
+    .select('id, rol');
+
   if (error) {
     console.error('[FutFinder] promoteToAdmin:', error);
     if (error.message?.includes('límite')) {
@@ -569,8 +573,17 @@ export async function promoteToAdmin(memberId) {
         },
       };
     }
+    return { data: null, error };
   }
-  return { data, error };
+
+  // Update sin error pero 0 filas: RLS lo bloqueó (no eres admin del club)
+  if (!data || data.length === 0) {
+    return {
+      error: { message: 'No se pudo promover. Solo un administrador del club puede hacerlo.' },
+    };
+  }
+
+  return { data: data[0], error: null };
 }
 
 /**
@@ -581,10 +594,19 @@ export async function promoteToAdmin(memberId) {
  */
 export async function transferAdmin(memberId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!memberId) return { error: { message: 'memberId requerido' } };
   const { data, error } = await supabase.rpc('transfer_club_admin', {
     p_member_id: memberId,
   });
-  if (error) console.error('[FutFinder] transferAdmin:', error);
+  if (error) {
+    console.error('[FutFinder] transferAdmin:', error);
+    // La función RPC no existe (migración 12 sin aplicar)
+    if (error.code === 'PGRST202' || error.message?.includes('does not exist')) {
+      return {
+        error: { message: 'La función para ceder administración no está disponible. Aplica la migración 12 en Supabase.' },
+      };
+    }
+  }
   return { data, error };
 }
 
