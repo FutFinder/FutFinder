@@ -28,7 +28,7 @@ import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import { getCurrentUser } from '../services/auth';
 import { listMembers } from '../services/clubs';
-import { pickImage } from '../services/storage';
+import { pickImages } from '../services/storage';
 import {
   getClubPhotos,
   uploadClubPhoto,
@@ -88,7 +88,8 @@ export default function ClubGalleryScreen({ navigation, route }) {
   );
 
   const handleAdd = async () => {
-    if (photos.length >= MAX_PHOTOS) {
+    const restantes = MAX_PHOTOS - photos.length;
+    if (restantes <= 0) {
       setBanner({
         type: 'info',
         title: 'Límite alcanzado',
@@ -96,21 +97,50 @@ export default function ClubGalleryScreen({ navigation, route }) {
       });
       return;
     }
-    const result = await pickImage({ aspect: [4, 3], quality: 0.8 });
+
+    const result = await pickImages({ quality: 0.8, selectionLimit: restantes });
     if (!result.ok) {
       if (result.reason !== 'Cancelado') {
         setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
       }
       return;
     }
+
+    // Respetamos el tope aunque la plataforma no aplique selectionLimit.
+    const seleccionadas = result.assets.slice(0, restantes);
+    const excedente = result.assets.length - seleccionadas.length;
+
     setUploading(true);
-    const { error } = await uploadClubPhoto(result.asset, clubId);
+    let subidas = 0;
+    let fallo = null;
+    for (const asset of seleccionadas) {
+      const { error } = await uploadClubPhoto(asset, clubId);
+      if (error) {
+        fallo = error;
+        break;
+      }
+      subidas += 1;
+    }
     setUploading(false);
-    if (error) {
-      setBanner({ type: 'error', title: 'No se pudo subir', message: error.message });
+    await load();
+
+    if (fallo) {
+      setBanner({
+        type: 'error',
+        title: subidas > 0 ? `Se subieron ${subidas}, pero una falló` : 'No se pudo subir',
+        message: fallo.message,
+      });
       return;
     }
-    await load();
+    if (subidas > 0) {
+      setBanner({
+        type: 'success',
+        title: subidas === 1 ? 'Foto agregada' : `${subidas} fotos agregadas`,
+        message: excedente > 0
+          ? `Se omitieron ${excedente} porque superaban el límite de ${MAX_PHOTOS}.`
+          : undefined,
+      });
+    }
   };
 
   const handleDelete = (photo) => {

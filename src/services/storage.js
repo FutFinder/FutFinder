@@ -46,6 +46,38 @@ export async function pickImage({ aspect = [1, 1], quality = 0.7 } = {}) {
   }
 }
 
+/**
+ * Igual que pickImage pero permite elegir VARIAS fotos a la vez.
+ * La selección múltiple desactiva el recorte por imagen (allowsEditing).
+ * Devuelve { ok, assets?, reason? } con assets = array.
+ *   selectionLimit: tope de fotos (0 = sin tope en iOS).
+ */
+export async function pickImages({ quality = 0.7, selectionLimit = 0 } = {}) {
+  try {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        return { ok: false, reason: 'Permiso de fotos denegado' };
+      }
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit, // iOS respeta el límite; en otras plataformas lo validamos aparte
+      quality,
+      base64: true, // necesario para subir bien en nativo
+    });
+
+    if (result.canceled) return { ok: false, reason: 'Cancelado' };
+    const assets = result.assets || [];
+    if (assets.length === 0) return { ok: false, reason: 'No se pudo leer la imagen' };
+    return { ok: true, assets };
+  } catch (e) {
+    return { ok: false, reason: e?.message || 'Error abriendo el picker' };
+  }
+}
+
 // Saca una extensión razonable del asset
 function extFromAsset(asset) {
   const fromMime = (asset.mimeType || '').split('/').pop();
