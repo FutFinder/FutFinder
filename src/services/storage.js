@@ -189,3 +189,31 @@ export async function uploadClubLogo(clubId, asset) {
 
   return { url };
 }
+
+/**
+ * Sube el banner (portada) de un club. Reutiliza el bucket `club-logos`
+ * en <clubId>/banner.<ext> y actualiza clubs.banner_url.
+ * RLS valida que el usuario sea admin del club.
+ */
+export async function uploadClubBanner(clubId, asset) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!asset || !clubId) return { error: { message: 'Faltan datos' } };
+
+  const ext = extFromAsset(asset);
+  const path = `${clubId}/banner.${ext}`;
+  const contentType = asset.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const body = await getUploadBody(asset);
+  const { error, url } = await uploadToBucket('club-logos', path, body, contentType);
+  if (error) {
+    console.error('[FutFinder] uploadClubBanner:', error);
+    return { error };
+  }
+
+  await supabase
+    .from('clubs')
+    .update({ banner_url: url })
+    .eq('id', clubId);
+
+  return { url };
+}

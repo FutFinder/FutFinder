@@ -17,7 +17,7 @@ import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import Button from '../components/Button';
 import { updateClub } from '../services/clubs';
-import { pickImage, uploadClubLogo } from '../services/storage';
+import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 
 /**
@@ -37,6 +37,7 @@ export default function EditClubScreen({ navigation, route }) {
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
   const [newLogoAsset, setNewLogoAsset] = useState(null);
+  const [newBannerAsset, setNewBannerAsset] = useState(null);
 
   const comunas = region ? getComunasOfRegion(region) : [];
 
@@ -44,6 +45,15 @@ export default function EditClubScreen({ navigation, route }) {
     const result = await pickImage({ aspect: [1, 1], quality: 0.8 });
     if (result.ok) {
       setNewLogoAsset(result.asset);
+    } else if (result.reason !== 'Cancelado') {
+      setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
+    }
+  };
+
+  const handlePickBanner = async () => {
+    const result = await pickImage({ aspect: [16, 9], quality: 0.8 });
+    if (result.ok) {
+      setNewBannerAsset(result.asset);
     } else if (result.reason !== 'Cancelado') {
       setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
     }
@@ -65,6 +75,15 @@ export default function EditClubScreen({ navigation, route }) {
       if (logoErr) {
         setSaving(false);
         setBanner({ type: 'error', title: 'No se pudo subir el logo', message: logoErr.message });
+        return;
+      }
+    }
+
+    if (newBannerAsset) {
+      const { error: bannerErr } = await uploadClubBanner(club.id, newBannerAsset);
+      if (bannerErr) {
+        setSaving(false);
+        setBanner({ type: 'error', title: 'No se pudo subir el banner', message: bannerErr.message });
         return;
       }
     }
@@ -105,6 +124,28 @@ export default function EditClubScreen({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
         >
           {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
+
+          <Pressable
+            onPress={handlePickBanner}
+            style={({ pressed }) => [styles.bannerTap, pressed && { opacity: 0.85 }]}
+          >
+            {newBannerAsset ? (
+              <Image source={{ uri: newBannerAsset.uri }} style={styles.bannerImg} resizeMode="cover" />
+            ) : club?.banner_url ? (
+              <Image source={{ uri: club.banner_url }} style={styles.bannerImg} resizeMode="cover" />
+            ) : (
+              <View style={styles.bannerPlaceholder}>
+                <Camera color={colors.textMuted} size={20} />
+                <Text style={styles.bannerHint}>Subir banner (opcional)</Text>
+              </View>
+            )}
+            {(newBannerAsset || club?.banner_url) && (
+              <View style={styles.bannerEditChip}>
+                <Camera color={colors.textPrimary} size={13} />
+                <Text style={styles.bannerEditChipText}>Cambiar banner</Text>
+              </View>
+            )}
+          </Pressable>
 
           <Pressable
             onPress={handlePickLogo}
@@ -277,6 +318,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: { padding: 16, paddingBottom: 40 },
+  bannerTap: {
+    width: '100%',
+    height: 130,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  bannerImg: {
+    width: '100%',
+    height: '100%',
+  },
+  bannerPlaceholder: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    borderRadius: radius.lg,
+  },
+  bannerHint: { color: colors.textMuted, fontSize: 13 },
+  bannerEditChip: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  bannerEditChipText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
   logoTap: {
     alignItems: 'center',
     marginBottom: 20,

@@ -38,6 +38,7 @@ import {
   requestToJoin,
   cancelRequest,
 } from '../services/clubs';
+import { getClubPhotos } from '../services/clubGallery';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PLACEHOLDERS (fase ①, maqueta visual).
@@ -64,9 +65,6 @@ const HISTORIAL_PLACEHOLDER = [
   { id: 'h3', rivalNombre: 'Rival C', miLogoUrl: null, rivalLogoUrl: null, miMarcador: 7, suMarcador: 3 },
 ];
 
-const FOTOS_PLACEHOLDER = []; // la fase ② lo llena desde club_photos
-const FOTOS_TOTAL_PLACEHOLDER = 7; // total de ejemplo para el overlay "+X"
-
 /**
  * Dashboard de un club (boceto): header con editar + plan, banner con logo,
  * récord V-E-P, nombre + verificado, contador de integrantes, "buscar rivales",
@@ -85,6 +83,7 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [me, setMe] = useState(null);
   const [myClubs, setMyClubs] = useState([]);
   const [myRequest, setMyRequest] = useState(null);
+  const [photos, setPhotos] = useState([]);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
 
@@ -97,14 +96,16 @@ export default function ClubDetailScreen({ navigation, route }) {
     const myId = user?.id || null;
     setMe(myId);
 
-    const [{ data: c }, { data: ms }, { data: mine }] = await Promise.all([
+    const [{ data: c }, { data: ms }, { data: mine }, { data: ph }] = await Promise.all([
       getClubById(clubId),
       listMembers(clubId),
       getMyClubs(),
+      getClubPhotos(clubId),
     ]);
     setClub(c);
     setMembers(ms || []);
     setMyClubs(mine || []);
+    setPhotos(ph || []);
 
     const amMember = (ms || []).some((m) => m.user_id === myId);
     if (!amMember && myId) {
@@ -388,7 +389,10 @@ export default function ClubDetailScreen({ navigation, route }) {
 
         {/* FOTOS DEL CLUB */}
         <Text style={styles.sectionTitle}>Fotos del club</Text>
-        <PhotoGrid photos={FOTOS_PLACEHOLDER} total={FOTOS_TOTAL_PLACEHOLDER} />
+        <PhotoGrid
+          photos={photos}
+          onPress={() => navigation.navigate('ClubGallery', { clubId: club.id })}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -412,27 +416,36 @@ function ClubCircle({ uri, size }) {
 }
 
 /**
- * Grid de 4 celdas: 3 fotos + overlay "+X" en la última (mismo patrón que la
- * galería de perfil). En fase ① las celdas van vacías cuando no hay fotos.
+ * Grid de 4 celdas: hasta 3 fotos + overlay "+X" en la última (mismo patrón que
+ * la galería de perfil). Toca cualquier celda para abrir la galería completa.
+ * Si todavía no hay fotos, muestra celdas vacías de marcador.
  */
-function PhotoGrid({ photos, total }) {
+function PhotoGrid({ photos, onPress }) {
+  // En la 4ª celda mostramos "+X": fotos que no se ven (total - 3 visibles).
   const visibles = photos.slice(0, 3);
-  const restantes = total - 3;
+  const restantes = photos.length - 3;
   const cells = [0, 1, 2, 3];
 
   return (
-    <View style={styles.photoGrid}>
+    <Pressable onPress={onPress} style={styles.photoGrid}>
       {cells.map((idx) => {
-        const esOverlay = idx === 3;
+        const esCuarta = idx === 3;
         const foto = visibles[idx];
+        // 4ª celda con más fotos detrás → overlay "+X" sobre la 4ª imagen real
+        const cuartaFoto = esCuarta ? photos[3] : null;
         return (
           <View key={idx} style={styles.photoCell}>
-            {foto?.photo_url ? (
-              <Image source={{ uri: foto.photo_url }} style={styles.photoImg} resizeMode="cover" />
-            ) : esOverlay && restantes > 0 ? (
-              <View style={styles.photoOverlay}>
-                <Text style={styles.photoOverlayText}>+{restantes}</Text>
+            {esCuarta && restantes > 0 ? (
+              <View style={styles.photoImgWrap}>
+                {cuartaFoto?.photo_url && (
+                  <Image source={{ uri: cuartaFoto.photo_url }} style={styles.photoImg} resizeMode="cover" />
+                )}
+                <View style={styles.photoOverlay}>
+                  <Text style={styles.photoOverlayText}>+{restantes}</Text>
+                </View>
               </View>
+            ) : foto?.photo_url ? (
+              <Image source={{ uri: foto.photo_url }} style={styles.photoImg} resizeMode="cover" />
             ) : (
               <View style={styles.photoEmpty}>
                 <ImageIcon color={colors.textMuted} size={20} />
@@ -441,7 +454,7 @@ function PhotoGrid({ photos, total }) {
           </View>
         );
       })}
-    </View>
+    </Pressable>
   );
 }
 
@@ -699,6 +712,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   photoImg: { width: '100%', height: '100%' },
+  photoImgWrap: { flex: 1, backgroundColor: colors.surfaceAlt },
   photoEmpty: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -708,10 +722,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   photoOverlay: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
