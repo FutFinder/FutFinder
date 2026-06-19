@@ -83,18 +83,19 @@ export default function ClubChallengesScreen({ navigation, route }) {
     setRefreshing(false);
   };
 
-  const abrirChatCon = (userId, titulo) => {
+  const abrirChatCon = (userId, titulo, challengeId) => {
     if (!userId) return;
     navigation.navigate('ChatThread', {
       threadKey: `dm:${userId}`,
       title: titulo || 'Coordinar partido',
       subtitle: 'Coordinar partido de clubes',
+      challengeId, // habilita el chat sin ser amigos + botón de crear partido
     });
   };
 
   const handleRespond = async (challenge, accept) => {
     setWorking(true);
-    const { data, error } = await respondChallenge(challenge.id, accept);
+    const { error } = await respondChallenge(challenge.id, accept);
     setWorking(false);
     if (error) {
       setBanner({ type: 'error', title: 'No se pudo responder', message: error.message });
@@ -107,8 +108,8 @@ export default function ClubChallengesScreen({ navigation, route }) {
         title: 'Desafío aceptado',
         message: 'Abre el chat con el otro admin para coordinar los detalles.',
       });
-      // Abrir DM con el admin que creó el desafío
-      abrirChatCon(data?.creado_por, challenge.otroClub?.nombre);
+      // Abrir DM con el admin que creó el desafío (creado_por ya viene en la fila)
+      abrirChatCon(challenge.creado_por, challenge.otroClub?.nombre, challenge.id);
     }
   };
 
@@ -187,7 +188,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                   </View>
                 ) : c.estado === 'aceptado' ? (
                   <Pressable
-                    onPress={() => abrirChatCon(c.creado_por, c.otroClub?.nombre)}
+                    onPress={() => abrirChatCon(c.creado_por, c.otroClub?.nombre, c.id)}
                     hitSlop={6}
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
@@ -214,6 +215,14 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
                   >
                     <Text style={styles.cancelText}>Cancelar</Text>
+                  </Pressable>
+                ) : c.estado === 'aceptado' ? (
+                  <Pressable
+                    onPress={() => abrirChatCon(c.respondido_por, c.otroClub?.nombre, c.id)}
+                    hitSlop={6}
+                    style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <MessageCircle color={colors.primary} size={16} />
                   </Pressable>
                 ) : (
                   <EstadoPill estado={c.estado} />

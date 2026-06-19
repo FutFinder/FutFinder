@@ -137,11 +137,13 @@ export async function countPendingForClub(clubId) {
  */
 export async function respondChallenge(challengeId, accept) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  const me = await getMe();
   const { data, error } = await supabase
     .from('club_challenges')
     .update({
       estado: accept ? 'aceptado' : 'rechazado',
       responded_at: new Date().toISOString(),
+      respondido_por: me,
     })
     .eq('id', challengeId)
     .eq('estado', 'pendiente')
@@ -160,6 +162,21 @@ export async function cancelChallenge(challengeId) {
     .eq('id', challengeId)
     .eq('estado', 'pendiente');
   if (error) console.error('[FutFinder] cancelChallenge:', error);
+  return { error };
+}
+
+/**
+ * Vincula el desafío con el partido de club recién creado (challenge.match_id).
+ * Lo llama CreateMatchScreen tras crear el partido en modo club.
+ */
+export async function linkChallengeMatch(challengeId, matchId) {
+  if (!isSupabaseConfigured) return { error: null };
+  if (!challengeId || !matchId) return { error: { message: 'Faltan datos' } };
+  const { error } = await supabase
+    .from('club_challenges')
+    .update({ match_id: matchId })
+    .eq('id', challengeId);
+  if (error) console.error('[FutFinder] linkChallengeMatch:', error);
   return { error };
 }
 

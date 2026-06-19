@@ -28,6 +28,7 @@ import {
   Star,
   ChevronRight,
   ShieldCheck,
+  Swords,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
@@ -754,8 +755,15 @@ export default function SearchScreen({ navigation, route }) {
                   styles.matchCard,
                   isSpontaneous && styles.matchCardSpontaneous,
                   isMine && styles.matchCardMine,
+                  m.club_local_id && styles.matchCardClub,
                 ]}
               >
+                {m.club_local_id && (
+                  <View style={styles.clubMatchBadge}>
+                    <Swords color="#0E0E0D" size={13} strokeWidth={2.6} />
+                    <Text style={styles.clubMatchBadgeText}>PARTIDO DE CLUBES</Text>
+                  </View>
+                )}
                 {isSpontaneous && (
                   <View style={styles.spontaneousTag}>
                     <Zap color={colors.primary} size={14} />
@@ -1395,6 +1403,23 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderWidth: 1.5,
   },
+  matchCardClub: {
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+    backgroundColor: colors.primarySoft,
+  },
+  clubMatchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    marginBottom: 10,
+  },
+  clubMatchBadgeText: { color: '#0E0E0D', fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   matchCardMine: {
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,

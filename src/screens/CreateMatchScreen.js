@@ -33,6 +33,7 @@ import Button from '../components/Button';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
 import { createMatch, getMatchById, updateMatch } from '../services/matches';
+import { getChallenge, linkChallengeMatch } from '../services/clubChallenges';
 import { getCurrentLocation } from '../services/location';
 import { pickImage, uploadMatchCover } from '../services/storage';
 import { isSupabaseConfigured } from '../services/supabase';
@@ -92,6 +93,9 @@ export default function CreateMatchScreen({ navigation, route }) {
   // Si llega matchId, estamos editando un partido existente
   const editingId = route?.params?.matchId || null;
   const isEditing = Boolean(editingId);
+  // Modo "partido de club": viene de un desafío aceptado (challengeId).
+  const clubChallengeId = route?.params?.clubChallengeId || null;
+  const [clubChallenge, setClubChallenge] = useState(null);
   // Tabs
   const [tab, setTab] = useState('falta_uno'); // 'falta_uno' | 'retos'
 
@@ -146,6 +150,33 @@ export default function CreateMatchScreen({ navigation, route }) {
   useEffect(() => {
     if (!isEditing) fetchGPS();
   }, [isEditing]);
+
+  // Modo club: cargar el desafío y prefijar fecha/zona acordadas.
+  useEffect(() => {
+    if (!clubChallengeId) return;
+    (async () => {
+      const { data } = await getChallenge(clubChallengeId);
+      if (!data) return;
+      setClubChallenge(data);
+      if (data.fecha_propuesta) {
+        const d = new Date(data.fecha_propuesta);
+        if (!Number.isNaN(d.getTime())) {
+          setFechaStr(formatDate(d));
+          setHoraStr(formatTime(d));
+        }
+      }
+      if (data.zona) {
+        setCanchaNombre((prev) => prev || data.zona);
+        setUbicacionText((prev) => prev || data.zona);
+      }
+      setTitulo((prev) => prev || 'Partido de Clubes');
+      setBanner({
+        type: 'info',
+        title: 'Partido de Clubes',
+        message: 'Completa la cancha, hora y cupos acordados. Al publicarlo aparecerá en el feed con ambos clubes.',
+      });
+    })();
+  }, [clubChallengeId]);
 
   // Si estamos editando, precargar los datos del partido
   useEffect(() => {
@@ -339,6 +370,12 @@ export default function CreateMatchScreen({ navigation, route }) {
       min_trust_score: minTrust,
       descripcion: descripcion.trim() || null,
     };
+    // Modo club: asignar ambos clubes (retador = local) y el desafío origen.
+    if (clubChallenge) {
+      payload.club_local_id = clubChallenge.club_retador_id;
+      payload.club_visitante_id = clubChallenge.club_retado_id;
+      payload.challenge_id = clubChallenge.id;
+    }
     const result = isEditing
       ? await updateMatch(editingId, payload)
       : await createMatch(payload);
@@ -353,10 +390,17 @@ export default function CreateMatchScreen({ navigation, route }) {
       return;
     }
 
+    // Modo club: vincular el desafío con el partido recién creado.
+    if (clubChallenge && !isEditing && result.data?.id) {
+      await linkChallengeMatch(clubChallenge.id, result.data.id);
+    }
+
     const okTitle = isEditing ? '¡Partido actualizado!' : '¡Partido publicado!';
     const okMsg = isEditing
       ? 'Los cambios ya están visibles para los inscritos.'
-      : 'Aparecerá en el feed de partidos cercanos.';
+      : clubChallenge
+        ? 'El Partido de Clubes ya aparece en el feed para ambos equipos.'
+        : 'Aparecerá en el feed de partidos cercanos.';
     setBanner({ type: 'success', title: okTitle, message: okMsg });
     notify(okTitle, okMsg);
 

@@ -183,6 +183,10 @@ export async function createMatch({
   duracion_min = 90,
   aprobacion = 'inmediata',
   min_trust_score = 0,
+  // Partido de clubes (null = partido normal)
+  club_local_id = null,
+  club_visitante_id = null,
+  challenge_id = null,
 }) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo mode' } };
 
@@ -209,6 +213,9 @@ export async function createMatch({
       duracion_min,
       aprobacion,
       min_trust_score,
+      club_local_id,
+      club_visitante_id,
+      challenge_id,
     })
     .select()
     .single();

@@ -23,6 +23,7 @@ import {
   MapPin,
   Trash2,
   Smile,
+  Swords,
 } from 'lucide-react-native';
 import EmojiPicker from 'rn-emoji-keyboard';
 
@@ -39,6 +40,7 @@ import {
 import { getMatchById } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getFriendshipWith } from '../services/friends';
+import { getChallenge } from '../services/clubChallenges';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
 import Banner from '../components/Banner';
@@ -82,6 +84,9 @@ export default function ChatThreadScreen({ route, navigation }) {
   const title = route?.params?.title || 'Chat';
   const subtitle = route?.params?.subtitle || '';
   const fotoUrl = route?.params?.fotoUrl || null;
+  // Si el DM viene de un desafío de club aceptado, habilita el chat (aunque no
+  // sean amigos) y muestra el botón para crear el partido.
+  const challengeId = route?.params?.challengeId || null;
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +98,7 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [busyAction, setBusyAction] = useState(false);
   const [dmBlocked, setDmBlocked] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [clubChallenge, setClubChallenge] = useState(null);
 
   const listRef = useRef(null);
   const isMountedRef = useRef(true);
@@ -109,6 +115,15 @@ export default function ChatThreadScreen({ route, navigation }) {
       if (isMountedRef.current) setMatchInfo(data || null);
     })();
   }, [isGroup, t?.id]);
+
+  // Chat de desafío de club: traer el desafío para el botón "Crear partido".
+  useEffect(() => {
+    if (!challengeId) return;
+    (async () => {
+      const { data } = await getChallenge(challengeId);
+      if (isMountedRef.current) setClubChallenge(data || null);
+    })();
+  }, [challengeId]);
 
   // Partido terminado: hora + duracion ya pasó (default 90 min si no hay duración)
   const matchEnded =
@@ -164,8 +179,9 @@ export default function ChatThreadScreen({ route, navigation }) {
         const { data: { user } } = await supabase.auth.getUser();
         if (isMountedRef.current) setMyId(user?.id || null);
 
-        // DMs solo entre amigos
-        if (t?.type === 'dm' && t?.id) {
+        // DMs solo entre amigos — EXCEPCIÓN: los chats de desafío de club
+        // (administrador vs administrador) siempre se permiten.
+        if (t?.type === 'dm' && t?.id && !challengeId) {
           const friendship = await getFriendshipWith(t.id);
           if (!friendship || friendship.status !== 'accepted') {
             if (isMountedRef.current) {
@@ -479,6 +495,25 @@ export default function ChatThreadScreen({ route, navigation }) {
           </View>
         ) : (
           <>
+            {challengeId && clubChallenge?.estado === 'aceptado' && (
+              clubChallenge.match_id ? (
+                <Pressable
+                  onPress={() => navigation.navigate('MatchDetail', { matchId: clubChallenge.match_id })}
+                  style={({ pressed }) => [styles.challengeBar, pressed && { opacity: 0.85 }]}
+                >
+                  <Swords color={colors.primary} size={18} />
+                  <Text style={styles.challengeBarText}>Ver el partido de club creado</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={() => navigation.navigate('CreateMatch', { clubChallengeId: challengeId })}
+                  style={({ pressed }) => [styles.challengeBar, styles.challengeBarCreate, pressed && { opacity: 0.85 }]}
+                >
+                  <Swords color="#0E0E0D" size={18} strokeWidth={2.4} />
+                  <Text style={styles.challengeBarCreateText}>Crear partido de club</Text>
+                </Pressable>
+              )
+            )}
             <View style={styles.composer}>
               <Pressable
                 onPress={() => !dmBlocked && setEmojiPickerOpen(true)}
@@ -762,6 +797,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  challengeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginBottom: 6,
+    paddingVertical: 12,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  challengeBarText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  challengeBarCreate: { backgroundColor: colors.primary, borderColor: colors.primary },
+  challengeBarCreateText: { color: '#0E0E0D', fontSize: 14, fontWeight: '800' },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

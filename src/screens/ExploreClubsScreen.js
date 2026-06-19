@@ -16,11 +16,12 @@ import {
   Shield,
   Search as SearchIcon,
   ChevronRight,
+  Swords,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
 import ClubCard from '../components/ClubCard';
-import { searchClubs } from '../services/clubs';
+import { searchClubs, getMyClubs } from '../services/clubs';
 
 /**
  * Exploración de clubes: buscador + listado de TODOS los clubes de FutFinder.
@@ -33,10 +34,17 @@ export default function ExploreClubsScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [clubs, setClubs] = useState([]);
   const [query, setQuery] = useState('');
+  const [soyAdminDeAlgo, setSoyAdminDeAlgo] = useState(false);
+  const [misClubIds, setMisClubIds] = useState(new Set());
 
   const load = useCallback(async (q = '') => {
-    const { data } = await searchClubs(q);
+    const [{ data }, { data: mine }] = await Promise.all([
+      searchClubs(q),
+      getMyClubs(),
+    ]);
     setClubs(data || []);
+    setSoyAdminDeAlgo((mine || []).some((m) => m.miRol === 'admin'));
+    setMisClubIds(new Set((mine || []).map((m) => m.club?.id).filter(Boolean)));
     setLoading(false);
   }, []);
 
@@ -106,13 +114,35 @@ export default function ExploreClubsScreen({ navigation }) {
               </Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <ClubCard
-              club={item}
-              onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
-              right={<ChevronRight color={colors.textMuted} size={18} />}
-            />
-          )}
+          renderItem={({ item }) => {
+            const puedoDesafiar = soyAdminDeAlgo && !misClubIds.has(item.id);
+            return (
+              <ClubCard
+                club={item}
+                onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
+                right={
+                  puedoDesafiar ? (
+                    <Pressable
+                      onPress={() =>
+                        navigation.navigate('ClubChallenge', {
+                          rivalClubId: item.id,
+                          rivalNombre: item.nombre,
+                          rivalFotoUrl: item.foto_url || null,
+                        })
+                      }
+                      hitSlop={6}
+                      style={({ pressed }) => [styles.desafiarBtn, pressed && { opacity: 0.7 }]}
+                    >
+                      <Swords color="#0E0E0D" size={14} strokeWidth={2.4} />
+                      <Text style={styles.desafiarText}>Desafiar</Text>
+                    </Pressable>
+                  ) : (
+                    <ChevronRight color={colors.textMuted} size={18} />
+                  )
+                }
+              />
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Shield color={colors.textMuted} size={42} strokeWidth={1.5} />
@@ -158,6 +188,16 @@ const styles = StyleSheet.create({
   },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: 16, paddingBottom: 40 },
+  desafiarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  desafiarText: { color: '#0E0E0D', fontSize: 12, fontWeight: '800' },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
