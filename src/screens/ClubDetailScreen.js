@@ -536,7 +536,7 @@ const styles = StyleSheet.create({
   // Identidad: récord · nombre · integrantes
   identityRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 10,
     marginBottom: 16,
