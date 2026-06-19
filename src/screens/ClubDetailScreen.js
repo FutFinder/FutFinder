@@ -3,32 +3,26 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   Pressable,
   Image,
   RefreshControl,
   ActivityIndicator,
-  Platform,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowLeft,
   Shield,
-  MapPin,
   Crown,
   BadgeCheck,
-  Check,
-  X,
-  UserMinus,
-  LogOut,
-  MessageCircle,
-  UserPlus,
-  UserCheck,
-  Clock,
   Pencil,
-  Trash2,
+  Users,
+  MapPin,
+  Search,
+  Star,
+  UserPlus,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -37,47 +31,49 @@ import Button from '../components/Button';
 import { premiumGold } from '../components/PremiumBadge';
 import { getCurrentUser } from '../services/auth';
 import {
-  getFriendshipStatuses,
-  sendFriendRequest,
-  acceptFriendRequest,
-} from '../services/friends';
-import {
   getClubById,
   listMembers,
-  listPendingRequests,
-  requestToJoin,
-  respondToRequest,
-  getMyRequestTo,
-  cancelRequest,
-  leaveClub,
-  removeMember,
   getMyClubs,
-  promoteToAdmin,
-  transferAdmin,
-  deleteClub,
-  CLUB_LIMITS,
+  getMyRequestTo,
+  requestToJoin,
+  cancelRequest,
 } from '../services/clubs';
 
-/** Confirmación multiplataforma (web usa confirm, native usa Alert). */
-function confirmAction(title, message, onConfirm) {
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.confirm(`${title}\n${message}`)) {
-      onConfirm();
-    }
-    return;
-  }
-  Alert.alert(title, message, [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: 'Confirmar', style: 'destructive', onPress: onConfirm },
-  ]);
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// PLACEHOLDERS (fase ①, maqueta visual).
+// Estas constantes imitan el boceto con datos de ejemplo. En la fase ③
+// (subsistema de competencia) se reemplazan por datos reales con ESTAS MISMAS
+// formas, así que conectar el servicio no obliga a tocar el render.
+//
+//   récord   → { v, e, p }
+//   zona     → [{ id, nombre, logoUrl, rating }]
+//   historial→ [{ id, rivalNombre, miLogoUrl, rivalLogoUrl, miMarcador, suMarcador }]
+//   fotos    → [{ id, photo_url }]  (igual que profile_photos; lo conecta la fase ②)
+// ─────────────────────────────────────────────────────────────────────────────
+const RECORD_PLACEHOLDER = { v: 0, e: 0, p: 0 };
+
+const ZONA_PLACEHOLDER = [
+  { id: 'z1', nombre: 'Rival A', logoUrl: null, rating: 3.0 },
+  { id: 'z2', nombre: 'Rival B', logoUrl: null, rating: 4.2 },
+  { id: 'z3', nombre: 'Rival C', logoUrl: null, rating: 5.0 },
+];
+
+const HISTORIAL_PLACEHOLDER = [
+  { id: 'h1', rivalNombre: 'Rival A', miLogoUrl: null, rivalLogoUrl: null, miMarcador: 1, suMarcador: 0 },
+  { id: 'h2', rivalNombre: 'Rival B', miLogoUrl: null, rivalLogoUrl: null, miMarcador: 2, suMarcador: 3 },
+  { id: 'h3', rivalNombre: 'Rival C', miLogoUrl: null, rivalLogoUrl: null, miMarcador: 7, suMarcador: 3 },
+];
+
+const FOTOS_PLACEHOLDER = []; // la fase ② lo llena desde club_photos
+const FOTOS_TOTAL_PLACEHOLDER = 7; // total de ejemplo para el overlay "+X"
 
 /**
- * Detalle de un club: header con escudo, integrantes con reputación,
- * y acciones según quién mire:
- *  - visitante sin club  → "Solicitar unirme" / "Cancelar solicitud"
- *  - miembro             → chat + salir del club
- *  - admin               → además: solicitudes pendientes, expulsar
+ * Dashboard de un club (boceto): header con editar + plan, banner con logo,
+ * récord V-E-P, nombre + verificado, contador de integrantes, "buscar rivales",
+ * historial de partidos y fotos del club.
+ *
+ * La gestión de integrantes / admin vive en ClubMembersScreen, a la que se
+ * llega tocando el contador de integrantes.
  */
 export default function ClubDetailScreen({ navigation, route }) {
   const { clubId } = route.params || {};
@@ -86,18 +82,14 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [club, setClub] = useState(null);
   const [members, setMembers] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [myRequest, setMyRequest] = useState(null);
   const [me, setMe] = useState(null);
   const [myClubs, setMyClubs] = useState([]);
-  const [friendStatus, setFriendStatus] = useState(new Map()); // user_id -> { status, friendshipId }
+  const [myRequest, setMyRequest] = useState(null);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
 
-  const miMembresia = members.find((m) => m.user_id === me);
-  const soyMiembro = Boolean(miMembresia);
-  const soyAdmin = miMembresia?.rol === 'admin';
-  // Usuario con 3 clubes no puede unirse a otro (sin importar cuáles sean)
+  const soyMiembro = members.some((m) => m.user_id === me);
+  const soyAdmin = members.some((m) => m.user_id === me && m.rol === 'admin');
   const tengoMaxClubs = myClubs.length >= 3;
 
   const load = useCallback(async () => {
@@ -114,24 +106,7 @@ export default function ClubDetailScreen({ navigation, route }) {
     setMembers(ms || []);
     setMyClubs(mine || []);
 
-    // Estado de amistad con cada integrante (para el botón "Agregar amigo")
-    if (myId && ms && ms.length > 0) {
-      const otherIds = ms.map((m) => m.user_id).filter((id) => id !== myId);
-      const { data: statuses } = await getFriendshipStatuses(otherIds);
-      setFriendStatus(statuses || new Map());
-    } else {
-      setFriendStatus(new Map());
-    }
-
     const amMember = (ms || []).some((m) => m.user_id === myId);
-    const amAdmin = (ms || []).some((m) => m.user_id === myId && m.rol === 'admin');
-
-    if (amAdmin) {
-      const { data: reqs } = await listPendingRequests(clubId);
-      setRequests(reqs || []);
-    } else {
-      setRequests([]);
-    }
     if (!amMember && myId) {
       const { data: mr } = await getMyRequestTo(clubId);
       setMyRequest(mr);
@@ -181,197 +156,14 @@ export default function ClubDetailScreen({ navigation, route }) {
     setMyRequest(null);
   };
 
-  const handleRespond = async (req, approve) => {
-    const { error } = await respondToRequest(req.request_id, approve);
-    if (error) {
-      setBanner({ type: 'error', title: 'No se pudo responder', message: error.message });
-      return;
-    }
-    if (approve) {
-      setBanner({
-        type: 'success',
-        title: 'Jugador aceptado',
-        message: `${req.username} ya es parte del club.`,
-      });
-    }
-    await load();
-  };
-
-  const handleLeave = () => {
-    const ultimoMiembro = members.length === 1;
-    confirmAction(
-      ultimoMiembro ? '¿Eliminar el club?' : '¿Salir del club?',
-      ultimoMiembro
-        ? 'Eres el último integrante: al salir, el club y su chat se eliminan para siempre.'
-        : 'Dejarás de ver el chat y los datos internos del club.',
-      async () => {
-        setWorking(true);
-        const { error, clubDeleted } = await leaveClub(clubId);
-        setWorking(false);
-        if (error) {
-          console.error('[FutFinder] handleLeave:', error);
-          setBanner({ type: 'error', title: 'No se pudo salir', message: error.message });
-          return;
-        }
-        navigation.navigate('Main', {
-          screen: 'ClubsTab',
-          params: {
-            successTitle: clubDeleted ? 'Club eliminado' : 'Has salido del club',
-            successMessage: clubDeleted
-              ? 'El club fue eliminado correctamente.'
-              : 'Ya no eres parte de ese club.',
-          },
-        });
-      }
-    );
-  };
-
-  const handlePromote = (member) => {
-    const limites = CLUB_LIMITS[club?.plan] || CLUB_LIMITS.estandar;
-    const adminCount = members.filter((m) => m.rol === 'admin').length;
-
-    if (adminCount < limites.admins) {
-      // hay cupo: se suma como admin sin que yo deje de serlo
-      confirmAction(
-        `¿Hacer admin a ${member.username}?`,
-        'Podrá aceptar solicitudes, invitar jugadores y expulsar miembros.',
-        async () => {
-          const { error } = await promoteToAdmin(member.member_id);
-          if (error) {
-            setBanner({ type: 'error', title: 'No se pudo promover', message: error.message });
-            return;
-          }
-          setBanner({
-            type: 'success',
-            title: 'Nuevo administrador',
-            message: `${member.username} ahora es admin del club.`,
-          });
-          await load();
-        }
-      );
-    } else {
-      // sin cupo (p.ej. Estándar = 1 admin): ceder mi administración
-      confirmAction(
-        `¿Ceder la administración a ${member.username}?`,
-        `Tu plan permite ${limites.admins} admin${limites.admins > 1 ? 's' : ''}: tú pasarás a ser jugador.`,
-        async () => {
-          const { error } = await transferAdmin(member.member_id);
-          if (error) {
-            setBanner({ type: 'error', title: 'No se pudo ceder', message: error.message });
-            return;
-          }
-          setBanner({
-            type: 'success',
-            title: 'Administración cedida',
-            message: `${member.username} es el nuevo admin del club.`,
-          });
-          await load();
-        }
-      );
-    }
-  };
-
-  const handleAddFriend = async (member) => {
-    // Optimista: marcamos "enviada" de inmediato
-    setFriendStatus((prev) => {
-      const next = new Map(prev);
-      next.set(member.user_id, { status: 'sent', friendshipId: null });
-      return next;
-    });
-    const { data, error } = await sendFriendRequest(member.user_id);
-    if (error) {
-      // revertir
-      setFriendStatus((prev) => {
-        const next = new Map(prev);
-        next.set(member.user_id, { status: 'none', friendshipId: null });
-        return next;
-      });
-      setBanner({ type: 'error', title: 'No se pudo enviar', message: error.message });
-      return;
-    }
-    setFriendStatus((prev) => {
-      const next = new Map(prev);
-      // si ya existía relación aceptada, getFriendshipWith la devolvió
-      const isAccepted = data?.status === 'accepted';
-      next.set(member.user_id, {
-        status: isAccepted ? 'friends' : 'sent',
-        friendshipId: data?.id || null,
-      });
-      return next;
-    });
-    setBanner({
-      type: 'success',
-      title: 'Solicitud enviada',
-      message: `Le enviaste una solicitud de amistad a ${member.username}.`,
-    });
-  };
-
-  const handleAcceptFriend = async (member, friendshipId) => {
-    if (!friendshipId) return;
-    const { error } = await acceptFriendRequest(friendshipId);
-    if (error) {
-      setBanner({ type: 'error', title: 'No se pudo aceptar', message: error.message });
-      return;
-    }
-    setFriendStatus((prev) => {
-      const next = new Map(prev);
-      next.set(member.user_id, { status: 'friends', friendshipId });
-      return next;
-    });
-    setBanner({
-      type: 'success',
-      title: '¡Nuevo amigo!',
-      message: `Ahora tú y ${member.username} son amigos.`,
-    });
-  };
-
-  const handleExpel = (member) => {
-    confirmAction(
-      `¿Expulsar a ${member.username}?`,
-      'Perderá acceso al chat y dejará de ser parte del club.',
-      async () => {
-        const { error } = await removeMember(member.member_id);
-        if (error) {
-          setBanner({ type: 'error', title: 'No se pudo expulsar', message: error.message });
-          return;
-        }
-        await load();
-      }
-    );
-  };
-
-  const handleDeleteClub = () => {
-    confirmAction(
-      '¿Eliminar este club?',
-      'Esta acción no se puede deshacer. Se eliminarán todos los miembros, mensajes e historial del club.',
-      async () => {
-        setWorking(true);
-        const { error } = await deleteClub(clubId);
-        setWorking(false);
-        if (error) {
-          console.error('[FutFinder] handleDeleteClub:', error);
-          setBanner({ type: 'error', title: 'No se pudo eliminar', message: error.message });
-          return;
-        }
-        navigation.navigate('Main', {
-          screen: 'ClubsTab',
-          params: {
-            successTitle: 'Club eliminado',
-            successMessage: 'El club fue eliminado permanentemente.',
-          },
-        });
-      }
-    );
-  };
-
   if (loading || !club) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
-        <View style={styles.header}>
+        <View style={styles.topBar}>
           <Pressable
             onPress={() => navigation.goBack()}
             hitSlop={12}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
           >
             <ArrowLeft color={colors.textPrimary} size={22} />
           </Pressable>
@@ -383,52 +175,65 @@ export default function ClubDetailScreen({ navigation, route }) {
     );
   }
 
-  const limites = CLUB_LIMITS[club.plan] || CLUB_LIMITS.estandar;
+  const esPremium = club.plan === 'premium';
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <View style={styles.header}>
+      {/* HEADER SUPERIOR: editar (admin) · separador · plan del club */}
+      <View style={styles.topBar}>
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={12}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
         >
           <ArrowLeft color={colors.textPrimary} size={22} />
         </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {club.nombre}
-        </Text>
+
         {soyAdmin && (
           <Pressable
             onPress={() => navigation.navigate('EditClub', { club })}
             hitSlop={8}
-            style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.6 }]}
           >
-            <Pencil color={colors.primary} size={18} />
+            <Pencil color={colors.primary} size={16} />
+            <Text style={styles.editLabel}>Editar</Text>
           </Pressable>
         )}
-        {soyMiembro && (
-          <Pressable
-            onPress={() =>
-              navigation.navigate('ChatThread', {
-                threadKey: `club:${club.id}`,
-                title: club.nombre,
-                subtitle: 'Chat del club',
-                fotoUrl: club.foto_url || null,
-              })
-            }
-            hitSlop={8}
-            style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.6 }]}
-          >
-            <MessageCircle color={colors.primary} size={18} />
-          </Pressable>
-        )}
+
+        <View style={{ flex: 1 }} />
+
+        <View style={styles.topDivider} />
+
+        <Pressable
+          onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
+          hitSlop={8}
+          style={({ pressed }) => [styles.planChip, pressed && { opacity: 0.7 }]}
+        >
+          <Crown color={esPremium ? premiumGold : colors.textSecondary} size={16} />
+          <View>
+            <Text style={styles.planChipLabel}>Plan del club</Text>
+            <View
+              style={[
+                styles.planBadge,
+                esPremium ? styles.planBadgePremium : styles.planBadgeFree,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.planBadgeText,
+                  { color: esPremium ? premiumGold : colors.textSecondary },
+                ]}
+              >
+                {esPremium ? 'Premium' : 'Gratuito'}
+              </Text>
+            </View>
+          </View>
+        </Pressable>
       </View>
 
-      <FlatList
-        data={members}
-        keyExtractor={(item) => item.member_id}
-        contentContainerStyle={styles.listContent}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -437,277 +242,222 @@ export default function ClubDetailScreen({ navigation, route }) {
             colors={[colors.primary]}
           />
         }
-        ListHeaderComponent={
-          <View>
-            {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
+      >
+        {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-            {/* Header del club */}
-            <View style={styles.clubHeader}>
-              {club.foto_url ? (
-                <Image source={{ uri: club.foto_url }} style={styles.logo} />
-              ) : (
-                <View style={[styles.logo, styles.logoFallback]}>
-                  <Shield color={colors.primary} size={34} strokeWidth={1.6} />
-                </View>
-              )}
-              <View style={styles.clubNameRow}>
-                <Text style={styles.clubName}>{club.nombre}</Text>
-                {club.verificado ? (
-                  <BadgeCheck color={premiumGold} size={18} strokeWidth={2.2} />
-                ) : null}
-              </View>
-              {club.comuna ? (
-                <View style={styles.metaRow}>
-                  <MapPin color={colors.textMuted} size={13} />
-                  <Text style={styles.metaText}>
-                    {club.comuna}{club.region ? `, ${club.region}` : ''}
-                  </Text>
-                </View>
-              ) : null}
-              {club.descripcion ? (
-                <Text style={styles.descripcion}>{club.descripcion}</Text>
-              ) : null}
+        {/* BANNER + LOGO superpuesto */}
+        <View style={styles.bannerWrap}>
+          {club.banner_url ? (
+            <Image source={{ uri: club.banner_url }} style={styles.banner} resizeMode="cover" />
+          ) : (
+            <View style={[styles.banner, styles.bannerFallback]} />
+          )}
+          {club.foto_url ? (
+            <Image source={{ uri: club.foto_url }} style={styles.logo} />
+          ) : (
+            <View style={[styles.logo, styles.logoFallback]}>
+              <Shield color={colors.primary} size={34} strokeWidth={1.6} />
             </View>
+          )}
+        </View>
 
-            {/* Acción principal para visitantes */}
-            {!soyMiembro && !tengoMaxClubs && (
-              myRequest ? (
-                <Button
-                  label="Cancelar solicitud"
-                  variant="secondary"
-                  loading={working}
-                  onPress={handleCancelRequest}
-                  style={styles.joinBtn}
-                />
-              ) : (
-                <Button
-                  label="Solicitar unirme"
-                  icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
-                  loading={working}
-                  onPress={handleJoin}
-                  style={styles.joinBtn}
-                />
-              )
-            )}
-            {!soyMiembro && tengoMaxClubs && (
-              <Banner
-                type="info"
-                title="Ya perteneces al máximo de 3 clubes"
-                message="Para unirte a este club primero debes salir de uno de tus clubes."
-              />
-            )}
-
-            {/* Invitar jugadores (solo admin) */}
-            {soyAdmin && (
-              <Button
-                label="Invitar jugadores"
-                icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
-                onPress={() =>
-                  navigation.navigate('ClubInvite', {
-                    clubId: club.id,
-                    clubNombre: club.nombre,
-                  })
-                }
-                style={styles.inviteBtn}
-              />
-            )}
-
-            {/* Solicitudes pendientes (solo admin) */}
-            {soyAdmin && requests.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                  Solicitudes pendientes ({requests.length})
-                </Text>
-                {requests.map((req) => (
-                  <View key={req.request_id} style={styles.requestRow}>
-                    <MemberAvatar foto={req.foto_url} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.memberName}>{req.username}</Text>
-                      <Text style={styles.memberMeta}>
-                        Reputación {req.trust_score}
-                        {req.comuna ? ` · ${req.comuna}` : ''}
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => handleRespond(req, true)}
-                      hitSlop={6}
-                      style={({ pressed }) => [
-                        styles.reqBtn,
-                        styles.reqAccept,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <Check color="#0E0E0D" size={16} strokeWidth={2.6} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleRespond(req, false)}
-                      hitSlop={6}
-                      style={({ pressed }) => [
-                        styles.reqBtn,
-                        styles.reqReject,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <X color={colors.error} size={16} strokeWidth={2.6} />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <Text style={styles.sectionTitle}>
-              Integrantes ({members.length}/{limites.miembros})
+        {/* RÉCORD · NOMBRE+VERIFICADO · INTEGRANTES */}
+        <View style={styles.identityRow}>
+          <View style={styles.recordBox}>
+            <Text style={styles.recordNumbers}>
+              {RECORD_PLACEHOLDER.v} - {RECORD_PLACEHOLDER.e} - {RECORD_PLACEHOLDER.p}
             </Text>
+            <Text style={styles.recordLetters}>V   E   P</Text>
           </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => navigation.navigate('UserProfile', { userId: item.user_id })}
-            style={({ pressed }) => [styles.memberRow, pressed && { opacity: 0.85 }]}
-          >
-            <MemberAvatar foto={item.foto_url} />
-            <View style={{ flex: 1 }}>
-              <View style={styles.memberNameRow}>
-                <Text style={styles.memberName}>{item.username}</Text>
-                {item.rol === 'admin' && (
-                  <View style={styles.adminChip}>
-                    <Crown color={colors.primary} size={10} strokeWidth={2.4} />
-                    <Text style={styles.adminChipText}>Admin</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.memberMeta}>
-                Reputación {item.trust_score}
-                {item.comuna ? ` · ${item.comuna}` : ''}
+
+          <View style={styles.nameCol}>
+            <View style={styles.nameRow}>
+              <Text style={styles.clubName} numberOfLines={2}>
+                {club.nombre}
               </Text>
-            </View>
-            {item.user_id !== me && (
-              <FriendControl
-                status={friendStatus.get(item.user_id)?.status || 'none'}
-                onAdd={() => handleAddFriend(item)}
-                onAccept={() =>
-                  handleAcceptFriend(item, friendStatus.get(item.user_id)?.friendshipId)
-                }
-              />
-            )}
-            {soyAdmin && item.user_id !== me && item.rol !== 'admin' && (
-              <Pressable
-                onPress={() => handlePromote(item)}
-                hitSlop={8}
-                style={({ pressed }) => [styles.promoteBtn, pressed && { opacity: 0.5 }]}
-              >
-                <Crown color={colors.primary} size={16} />
-              </Pressable>
-            )}
-            {soyAdmin && item.user_id !== me && (
-              <Pressable
-                onPress={() => handleExpel(item)}
-                hitSlop={8}
-                style={({ pressed }) => [styles.expelBtn, pressed && { opacity: 0.5 }]}
-              >
-                <UserMinus color={colors.error} size={16} />
-              </Pressable>
-            )}
-          </Pressable>
-        )}
-        ListFooterComponent={
-          soyMiembro ? (
-            <View>
-              <Pressable
-                onPress={handleLeave}
-                style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
-              >
-                <LogOut color={colors.error} size={16} />
-                <Text style={styles.leaveText}>
-                  {members.length === 1 ? 'Eliminar club' : 'Salir del club'}
-                </Text>
-              </Pressable>
-              {soyAdmin && (
-                <Pressable
-                  onPress={handleDeleteClub}
-                  disabled={working}
-                  style={({ pressed }) => [styles.deleteClubBtn, pressed && { opacity: 0.7 }]}
-                >
-                  <Trash2 color={colors.error} size={16} />
-                  <Text style={styles.leaveText}>Eliminar club permanentemente</Text>
-                </Pressable>
+              {club.verificado && (
+                <BadgeCheck color={premiumGold} size={18} strokeWidth={2.2} />
               )}
             </View>
-          ) : null
-        }
-      />
+            {club.comuna ? (
+              <View style={styles.metaRow}>
+                <MapPin color={colors.textMuted} size={12} />
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {club.comuna}{club.region ? `, ${club.region}` : ''}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Pressable
+            onPress={() => navigation.navigate('ClubMembers', { clubId: club.id })}
+            style={({ pressed }) => [styles.membersBox, pressed && { opacity: 0.7 }]}
+          >
+            <Users color={colors.textPrimary} size={18} />
+            <Text style={styles.membersCount}>{members.length}</Text>
+          </Pressable>
+        </View>
+
+        {/* Acción para visitantes (no rompe el flujo de unirse) */}
+        {!soyMiembro && !tengoMaxClubs && (
+          myRequest ? (
+            <Button
+              label="Cancelar solicitud"
+              variant="secondary"
+              loading={working}
+              onPress={handleCancelRequest}
+              style={styles.joinBtn}
+            />
+          ) : (
+            <Button
+              label="Solicitar unirme"
+              icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
+              loading={working}
+              onPress={handleJoin}
+              style={styles.joinBtn}
+            />
+          )
+        )}
+
+        {/* BUSCAR RIVALES */}
+        <Text style={styles.sectionTitle}>Buscar rivales</Text>
+        <View style={styles.rivalsCard}>
+          <View style={styles.rivalsColLeft}>
+            <View style={styles.rivalsColHeader}>
+              <Text style={styles.rivalsColTitle}>Equipos en tu zona</Text>
+              <MapPin color={colors.textMuted} size={13} />
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.zonaRow}
+            >
+              {ZONA_PLACEHOLDER.map((eq) => (
+                <View key={eq.id} style={styles.zonaItem}>
+                  <ClubCircle uri={eq.logoUrl} size={40} />
+                  <View style={styles.ratingRow}>
+                    <Text style={styles.ratingText}>{eq.rating.toFixed(1)}</Text>
+                    <Star color={premiumGold} size={11} fill={premiumGold} />
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={styles.rivalsDivider} />
+
+          <Pressable
+            onPress={() => navigation.navigate('ExploreClubs')}
+            style={({ pressed }) => [styles.rivalsColRight, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.rivalsColTitle}>Buscar equipos</Text>
+            <View style={styles.searchCircle}>
+              <Search color={colors.primary} size={22} />
+            </View>
+          </Pressable>
+        </View>
+
+        {/* HISTORIAL DE PARTIDOS */}
+        <Text style={styles.sectionTitle}>Historial de partidos</Text>
+        <View style={styles.historyCard}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.historyRow}
+          >
+            {HISTORIAL_PLACEHOLDER.map((h, idx) => (
+              <React.Fragment key={h.id}>
+                {idx > 0 && <View style={styles.historyDivider} />}
+                <View style={styles.historyItem}>
+                  <View style={styles.historySide}>
+                    <ClubCircle uri={h.miLogoUrl} size={36} />
+                    <Text style={styles.historySideLabel}>(tu club)</Text>
+                  </View>
+                  <Text style={styles.historyScore}>
+                    {h.miMarcador} - {h.suMarcador}
+                  </Text>
+                  <View style={styles.historySide}>
+                    <ClubCircle uri={h.rivalLogoUrl} size={36} />
+                    <Text style={styles.historySideLabel}>(rival)</Text>
+                  </View>
+                </View>
+              </React.Fragment>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* FOTOS DEL CLUB */}
+        <Text style={styles.sectionTitle}>Fotos del club</Text>
+        <PhotoGrid photos={FOTOS_PLACEHOLDER} total={FOTOS_TOTAL_PLACEHOLDER} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-function MemberAvatar({ foto }) {
-  if (foto) {
-    return <Image source={{ uri: foto }} style={styles.avatar} />;
+/** Círculo de logo de club con fallback a escudo. */
+function ClubCircle({ uri, size }) {
+  if (uri) {
+    return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   }
   return (
-    <View style={[styles.avatar, styles.avatarFallback]}>
-      <Shield color={colors.textMuted} size={18} strokeWidth={1.8} />
+    <View
+      style={[
+        styles.clubCircleFallback,
+        { width: size, height: size, borderRadius: size / 2 },
+      ]}
+    >
+      <Shield color={colors.textMuted} size={size * 0.45} strokeWidth={1.8} />
     </View>
   );
 }
 
 /**
- * Control de amistad junto a cada integrante:
- *  - friends  → ícono de amigos (sin acción)
- *  - sent     → "Solicitud enviada" (deshabilitado)
- *  - received → "Aceptar" (acepta la solicitud que me mandaron)
- *  - none     → "Agregar amigo"
+ * Grid de 4 celdas: 3 fotos + overlay "+X" en la última (mismo patrón que la
+ * galería de perfil). En fase ① las celdas van vacías cuando no hay fotos.
  */
-function FriendControl({ status, onAdd, onAccept }) {
-  if (status === 'friends') {
-    return (
-      <View style={styles.friendIconBox} accessibilityLabel="Ya son amigos">
-        <UserCheck color={colors.primary} size={16} strokeWidth={2.2} />
-      </View>
-    );
-  }
-  if (status === 'sent') {
-    return (
-      <View style={styles.friendPillMuted} accessibilityLabel="Solicitud enviada">
-        <Clock color={colors.textMuted} size={12} strokeWidth={2.2} />
-        <Text style={styles.friendPillMutedText}>Solicitud enviada</Text>
-      </View>
-    );
-  }
-  if (status === 'received') {
-    return (
-      <Pressable
-        onPress={onAccept}
-        hitSlop={6}
-        style={({ pressed }) => [styles.friendPill, pressed && { opacity: 0.7 }]}
-      >
-        <Check color={colors.primary} size={12} strokeWidth={2.6} />
-        <Text style={styles.friendPillText}>Aceptar</Text>
-      </Pressable>
-    );
-  }
+function PhotoGrid({ photos, total }) {
+  const visibles = photos.slice(0, 3);
+  const restantes = total - 3;
+  const cells = [0, 1, 2, 3];
+
   return (
-    <Pressable
-      onPress={onAdd}
-      hitSlop={6}
-      style={({ pressed }) => [styles.friendPill, pressed && { opacity: 0.7 }]}
-    >
-      <UserPlus color={colors.primary} size={12} strokeWidth={2.4} />
-      <Text style={styles.friendPillText}>Agregar amigo</Text>
-    </Pressable>
+    <View style={styles.photoGrid}>
+      {cells.map((idx) => {
+        const esOverlay = idx === 3;
+        const foto = visibles[idx];
+        return (
+          <View key={idx} style={styles.photoCell}>
+            {foto?.photo_url ? (
+              <Image source={{ uri: foto.photo_url }} style={styles.photoImg} resizeMode="cover" />
+            ) : esOverlay && restantes > 0 ? (
+              <View style={styles.photoOverlay}>
+                <Text style={styles.photoOverlayText}>+{restantes}</Text>
+              </View>
+            ) : (
+              <View style={styles.photoEmpty}>
+                <ImageIcon color={colors.textMuted} size={20} />
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: {
+  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // Header superior
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    gap: 12,
+    gap: 10,
   },
-  backBtn: {
+  iconBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -715,49 +465,120 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chatBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { paddingHorizontal: 16, paddingBottom: 40 },
-
-  clubHeader: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  logo: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.lg,
-    marginBottom: 10,
-  },
-  logoFallback: {
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clubNameRow: {
+  editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  editLabel: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  topDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: colors.border,
+    marginHorizontal: 4,
+  },
+  planChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  planChipLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' },
+  planBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  planBadgePremium: { borderColor: premiumGold, backgroundColor: 'rgba(212,175,55,0.10)' },
+  planBadgeFree: { borderColor: colors.border, backgroundColor: colors.surfaceAlt },
+  planBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
+
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
+
+  // Banner + logo
+  bannerWrap: { marginTop: 4, marginBottom: 48 },
+  banner: {
+    width: '100%',
+    height: 140,
+    borderRadius: radius.lg,
+  },
+  bannerFallback: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+  },
+  logo: {
+    position: 'absolute',
+    bottom: -36,
+    alignSelf: 'center',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 3,
+    borderColor: colors.background,
+    backgroundColor: colors.surface,
+  },
+  logoFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Identidad: récord · nombre · integrantes
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 16,
+  },
+  recordBox: {
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  recordNumbers: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  recordLetters: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  nameCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
   },
   clubName: {
     color: colors.textPrimary,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
+    textAlign: 'center',
   },
   metaRow: {
     flexDirection: 'row',
@@ -765,186 +586,146 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 4,
   },
-  metaText: { color: colors.textMuted, fontSize: 13 },
-  descripcion: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
-    marginTop: 10,
-    maxWidth: 320,
-  },
-  joinBtn: { marginBottom: 16 },
-  inviteBtn: { marginBottom: 16 },
-
-  section: { marginBottom: 8 },
-  sectionTitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    marginTop: 8,
-  },
-  requestRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary + '55',
-    padding: 12,
-    marginBottom: 8,
-  },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    padding: 12,
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-  },
-  avatarFallback: {
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-  },
-  memberNameRow: {
+  metaText: { color: colors.textMuted, fontSize: 12 },
+  membersBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  memberName: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  memberMeta: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  adminChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  adminChipText: {
-    color: colors.primary,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  reqBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reqAccept: { backgroundColor: colors.primary },
-  reqReject: {
-    backgroundColor: colors.errorSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.error,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  friendIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  membersCount: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  joinBtn: { marginBottom: 16 },
+
+  // Secciones
+  sectionTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+
+  // Buscar rivales
+  rivalsCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    padding: 14,
+    marginBottom: 8,
+  },
+  rivalsColLeft: { flex: 1, paddingRight: 12 },
+  rivalsColHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginBottom: 12,
+  },
+  rivalsColTitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  zonaRow: { gap: 14, alignItems: 'center', paddingHorizontal: 2 },
+  zonaItem: { alignItems: 'center', gap: 5 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  ratingText: { color: colors.textPrimary, fontSize: 12, fontWeight: '700' },
+  rivalsDivider: { width: 1, backgroundColor: colors.border },
+  rivalsColRight: {
+    width: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingLeft: 12,
+  },
+  searchCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  friendPill: {
+
+  // Historial
+  historyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    padding: 14,
+    marginBottom: 8,
+  },
+  historyRow: { alignItems: 'center', gap: 14 },
+  historyItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    gap: 10,
   },
-  friendPillText: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: '700',
+  historySide: { alignItems: 'center', gap: 3 },
+  historySideLabel: { color: colors.textMuted, fontSize: 10 },
+  historyScore: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  friendPillMuted: {
+  historyDivider: { width: 1, height: 56, backgroundColor: colors.border },
+
+  // Fotos
+  photoGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    gap: 8,
+  },
+  photoCell: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  photoImg: { width: '100%', height: '100%' },
+  photoEmpty: {
+    flex: 1,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.borderSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  friendPillMutedText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  promoteBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  expelBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.errorSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  leaveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 16,
-    paddingVertical: 14,
-    borderRadius: radius.lg,
+  photoOverlay: {
+    flex: 1,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: colors.error,
-    backgroundColor: colors.errorSoft,
-  },
-  leaveText: {
-    color: colors.error,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  deleteClubBtn: {
-    flexDirection: 'row',
+    borderColor: colors.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 10,
-    paddingVertical: 14,
-    borderRadius: radius.lg,
+  },
+  photoOverlayText: {
+    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+
+  clubCircleFallback: {
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: colors.error,
-    backgroundColor: colors.errorSoft,
+    borderColor: colors.borderSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
