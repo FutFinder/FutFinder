@@ -22,6 +22,7 @@ import {
   Search,
   Star,
   UserPlus,
+  Swords,
   Image as ImageIcon,
 } from 'lucide-react-native';
 
@@ -39,6 +40,7 @@ import {
   cancelRequest,
 } from '../services/clubs';
 import { getClubPhotos } from '../services/clubGallery';
+import { countPendingForClub } from '../services/clubChallenges';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PLACEHOLDERS (fase ①, maqueta visual).
@@ -84,28 +86,34 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [myClubs, setMyClubs] = useState([]);
   const [myRequest, setMyRequest] = useState(null);
   const [photos, setPhotos] = useState([]);
+  const [pendingChallenges, setPendingChallenges] = useState(0);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
 
   const soyMiembro = members.some((m) => m.user_id === me);
   const soyAdmin = members.some((m) => m.user_id === me && m.rol === 'admin');
   const tengoMaxClubs = myClubs.length >= 3;
+  // Puedo desafiar a este club si soy admin de OTRO club distinto.
+  const puedoDesafiar =
+    !soyMiembro && (myClubs || []).some((c) => c.miRol === 'admin' && c.club?.id !== clubId);
 
   const load = useCallback(async () => {
     const user = await getCurrentUser();
     const myId = user?.id || null;
     setMe(myId);
 
-    const [{ data: c }, { data: ms }, { data: mine }, { data: ph }] = await Promise.all([
+    const [{ data: c }, { data: ms }, { data: mine }, { data: ph }, pending] = await Promise.all([
       getClubById(clubId),
       listMembers(clubId),
       getMyClubs(),
       getClubPhotos(clubId),
+      countPendingForClub(clubId),
     ]);
     setClub(c);
     setMembers(ms || []);
     setMyClubs(mine || []);
     setPhotos(ph || []);
+    setPendingChallenges(pending || 0);
 
     const amMember = (ms || []).some((m) => m.user_id === myId);
     if (!amMember && myId) {
@@ -318,6 +326,38 @@ export default function ClubDetailScreen({ navigation, route }) {
               style={styles.joinBtn}
             />
           )
+        )}
+
+        {/* Desafiar a este club (si soy admin de otro club) */}
+        {puedoDesafiar && (
+          <Button
+            label="Desafiar a este club"
+            icon={<Swords color="#0E0E0D" size={18} strokeWidth={2.4} />}
+            onPress={() =>
+              navigation.navigate('ClubChallenge', {
+                rivalClubId: club.id,
+                rivalNombre: club.nombre,
+                rivalFotoUrl: club.foto_url || null,
+              })
+            }
+            style={styles.joinBtn}
+          />
+        )}
+
+        {/* Acceso a la bandeja de desafíos (miembros del club) */}
+        {soyMiembro && (
+          <Pressable
+            onPress={() => navigation.navigate('ClubChallenges', { clubId: club.id })}
+            style={({ pressed }) => [styles.challengesBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Swords color={colors.primary} size={18} />
+            <Text style={styles.challengesBtnText}>Desafíos</Text>
+            {pendingChallenges > 0 && (
+              <View style={styles.challengesBadge}>
+                <Text style={styles.challengesBadgeText}>{pendingChallenges}</Text>
+              </View>
+            )}
+          </Pressable>
         )}
 
         {/* BUSCAR RIVALES */}
@@ -618,6 +658,29 @@ const styles = StyleSheet.create({
   },
 
   joinBtn: { marginBottom: 16 },
+  challengesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    marginBottom: 16,
+  },
+  challengesBtnText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  challengesBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  challengesBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 
   // Secciones
   sectionTitle: {

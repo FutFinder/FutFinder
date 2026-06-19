@@ -28,6 +28,8 @@ import CreateClubScreen from '../screens/CreateClubScreen';
 import ClubDetailScreen from '../screens/ClubDetailScreen';
 import ClubMembersScreen from '../screens/ClubMembersScreen';
 import ClubGalleryScreen from '../screens/ClubGalleryScreen';
+import ClubChallengeScreen from '../screens/ClubChallengeScreen';
+import ClubChallengesScreen from '../screens/ClubChallengesScreen';
 import ExploreClubsScreen from '../screens/ExploreClubsScreen';
 import ClubPlansScreen from '../screens/ClubPlansScreen';
 import EditClubScreen from '../screens/EditClubScreen';
@@ -144,6 +146,16 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClubGallery"
           component={ClubGalleryScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ClubChallenge"
+          component={ClubChallengeScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="ClubChallenges"
+          component={ClubChallengesScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

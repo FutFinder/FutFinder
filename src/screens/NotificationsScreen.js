@@ -161,6 +161,19 @@ function navigateForNotif(navigation, n) {
         root.navigate('ClubDetail', { clubId: data.clubId });
       }
       break;
+    case 'club_challenge':
+      // Recibido: abre la bandeja de desafíos de mi club (el retado)
+      if (data.clubRetadoId) {
+        root.navigate('ClubChallenges', { clubId: data.clubRetadoId });
+      }
+      break;
+    case 'club_challenge_accepted':
+    case 'club_challenge_rejected':
+      // Respondido: abre la bandeja de desafíos de mi club (el retador)
+      if (data.clubRetadorId) {
+        root.navigate('ClubChallenges', { clubId: data.clubRetadorId });
+      }
+      break;
     case 'friend_request':
     case 'friend_accept':
       if (data.fromUserId) {
