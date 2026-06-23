@@ -10,7 +10,7 @@ import {
   Image,
   RefreshControl,
   ActivityIndicator,
-  
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -396,9 +396,10 @@ export default function ClubsScreen({ navigation, route }) {
         {!hasMaxClubs && (
           <Pressable
             onPress={() => navigation.navigate('CreateClub')}
-            style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.createClubFab, pressed && { opacity: 0.85 }]}
           >
-            <Plus color="#0E0E0D" size={22} strokeWidth={2.8} />
+            <Plus color="#0E0E0D" size={16} strokeWidth={2.8} />
+            <Text style={styles.createClubFabText}>Crear club</Text>
           </Pressable>
         )}
       </SafeAreaView>
@@ -424,15 +425,6 @@ export default function ClubsScreen({ navigation, route }) {
         ListHeaderComponent={
           <View>
             {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
-
-            {/* Crear club */}
-            <Pressable
-              onPress={() => navigation.navigate('CreateClub')}
-              style={({ pressed }) => [styles.createClubBtn, pressed && { opacity: 0.85 }]}
-            >
-              <Plus color="#0E0E0D" size={16} strokeWidth={2.8} />
-              <Text style={styles.createClubBtnText}>Crear club</Text>
-            </Pressable>
 
             {/* Invitaciones pendientes */}
             {invitations.length > 0 && (
@@ -511,9 +503,17 @@ export default function ClubsScreen({ navigation, route }) {
             </Text>
           </View>
         }
-        contentContainerStyle={[styles.listContent, { paddingBottom: 24 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 96 }]}
       />
 
+      {/* Botón pill "Crear club" — esquina inferior derecha */}
+      <Pressable
+        onPress={() => navigation.navigate('CreateClub')}
+        style={({ pressed }) => [styles.createClubFab, pressed && { opacity: 0.85 }]}
+      >
+        <Plus color="#0E0E0D" size={16} strokeWidth={2.8} />
+        <Text style={styles.createClubFabText}>Crear club</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -752,19 +752,32 @@ const styles = StyleSheet.create({
     maxWidth: 260,
     lineHeight: 18,
   },
-  createClubBtn: {
+  createClubFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 8,
-    borderRadius: radius.pill,
+    height: 48,
+    paddingHorizontal: 18,
+    borderRadius: 24,
     backgroundColor: colors.primary,
-    paddingVertical: 13,
-    marginBottom: 14,
+    zIndex: 100,
+    ...Platform.select({
+      web: { boxShadow: '0 4px 16px rgba(113,181,51,0.45)' },
+      default: {
+        shadowColor: colors.primary,
+        shadowOpacity: 0.45,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 10,
+        elevation: 8,
+      },
+    }),
   },
-  createClubBtnText: {
+  createClubFabText: {
     color: '#0E0E0D',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
   // botón gris "Explorar clubes" (abajo a la izquierda)
