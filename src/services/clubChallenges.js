@@ -19,6 +19,18 @@ async function getMe() {
 }
 
 /**
+ * Marca como 'expirado' los desafíos pendientes de más de 7 días.
+ * Best-effort: si la RPC aún no existe (migración 28 sin correr), se ignora.
+ */
+async function expireOld() {
+  try {
+    await supabase.rpc('expire_old_challenges');
+  } catch (e) {
+    // noop
+  }
+}
+
+/**
  * Crea un desafío. retadorClubId debe ser un club donde soy admin.
  * fechaPropuesta: Date | ISO string | null.
  */
@@ -38,6 +50,9 @@ export async function createChallenge({
   if (retadorClubId === retadoClubId) {
     return { error: { message: 'Un club no puede desafiarse a sí mismo' } };
   }
+
+  // Libera desafíos vencidos para no chocar con el índice único de pendiente.
+  await expireOld();
 
   const fechaIso =
     fechaPropuesta instanceof Date ? fechaPropuesta.toISOString() : fechaPropuesta || null;
@@ -72,6 +87,8 @@ export async function createChallenge({
 export async function listChallengesForClub(clubId) {
   const vacio = { recibidos: [], enviados: [] };
   if (!isSupabaseConfigured || !clubId) return { data: vacio, error: null };
+
+  await expireOld();
 
   const { data, error } = await supabase
     .from('club_challenges')

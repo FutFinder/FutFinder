@@ -17,6 +17,7 @@ import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import { getCurrentUser } from '../services/auth';
 import { listMembers } from '../services/clubs';
+import { sendMessage } from '../services/messages';
 import {
   listChallengesForClub,
   respondChallenge,
@@ -28,6 +29,7 @@ const ESTADO_LABEL = {
   aceptado: { text: 'Aceptado', color: colors.primary },
   rechazado: { text: 'Rechazado', color: colors.error },
   cancelado: { text: 'Cancelado', color: colors.textMuted },
+  expirado: { text: 'Expirado', color: colors.textMuted },
 };
 
 function fmtFecha(iso) {
@@ -102,11 +104,17 @@ export default function ClubChallengesScreen({ navigation, route }) {
       return;
     }
     await load();
-    if (accept) {
+    if (accept && challenge.creado_por) {
+      // Mensaje inicial automático: deja el DM creado y visible en la lista de
+      // chats (un DM vacío no aparece) y le da contexto al otro admin.
+      await sendMessage(
+        `dm:${challenge.creado_por}`,
+        '⚔️ ¡Desafío aceptado! Coordinemos aquí la cancha, la hora y los detalles del partido.'
+      );
       setBanner({
         type: 'success',
         title: 'Desafío aceptado',
-        message: 'Abre el chat con el otro admin para coordinar los detalles.',
+        message: 'Se abrió el chat con el otro admin para coordinar los detalles.',
       });
       // Abrir DM con el admin que creó el desafío (creado_por ya viene en la fila)
       abrirChatCon(challenge.creado_por, challenge.otroClub?.nombre, challenge.id);

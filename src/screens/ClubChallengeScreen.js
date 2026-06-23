@@ -65,6 +65,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
   const [mensaje, setMensaje] = useState('');
   const [banner, setBanner] = useState(null);
   const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -106,13 +107,16 @@ export default function ClubChallengeScreen({ navigation, route }) {
       setBanner({ type: 'error', title: 'No se pudo enviar', message: error.message });
       return;
     }
-    navigation.navigate('Main', {
-      screen: 'ClubsTab',
-      params: {
-        successTitle: 'Desafío enviado',
-        successMessage: `Se avisó a ${rivalNombre || 'el club rival'}. Te notificaremos cuando respondan.`,
-      },
+    // Feedback en la propia pantalla y volvemos atrás (sin navegación cruzada).
+    setSent(true);
+    setBanner({
+      type: 'success',
+      title: 'Desafío enviado',
+      message: `Se avisó a ${rivalNombre || 'el club rival'}. Te notificaremos cuando respondan.`,
     });
+    setTimeout(() => {
+      if (navigation.canGoBack()) navigation.goBack();
+    }, 1200);
   };
 
   return (
@@ -249,10 +253,11 @@ export default function ClubChallengeScreen({ navigation, route }) {
             />
 
             <Button
-              label="Enviar desafío"
+              label={sent ? 'Desafío enviado' : 'Enviar desafío'}
               icon={<Swords color="#0E0E0D" size={18} strokeWidth={2.4} />}
               onPress={handleSend}
               loading={sending}
+              disabled={sent}
               style={styles.submitBtn}
             />
           </ScrollView>
