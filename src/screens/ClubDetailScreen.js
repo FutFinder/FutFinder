@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Image,
+  Modal,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
@@ -20,10 +21,13 @@ import {
   Users,
   MapPin,
   Search,
-  Star,
   UserPlus,
   Swords,
   Image as ImageIcon,
+  ImagePlus,
+  Trophy,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
@@ -38,43 +42,17 @@ import {
   getMyRequestTo,
   requestToJoin,
   cancelRequest,
+  searchClubs,
 } from '../services/clubs';
 import { getClubPhotos } from '../services/clubGallery';
 import { countPendingForClub } from '../services/clubChallenges';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PLACEHOLDERS (fase ①, maqueta visual).
-// Estas constantes imitan el boceto con datos de ejemplo. En la fase ③
-// (subsistema de competencia) se reemplazan por datos reales con ESTAS MISMAS
-// formas, así que conectar el servicio no obliga a tocar el render.
-//
-//   récord   → { v, e, p }
-//   zona     → [{ id, nombre, logoUrl, rating }]
-//   historial→ [{ id, rivalNombre, miLogoUrl, rivalLogoUrl, miMarcador, suMarcador }]
-//   fotos    → [{ id, photo_url }]  (igual que profile_photos; lo conecta la fase ②)
-// ─────────────────────────────────────────────────────────────────────────────
-const RECORD_PLACEHOLDER = { v: 0, e: 0, p: 0 };
+// El récord V-E-D no tiene backend real todavía (no existe marcador en
+// `matches` ni agregación de resultados por club); se muestra en 0 hasta que
+// se implemente el subsistema de competencia. La calificación de clubes
+// tampoco existe como campo, por eso se muestra "—".
+const RECORD_PLACEHOLDER = { v: 0, e: 0, d: 0 };
 
-const ZONA_PLACEHOLDER = [
-  { id: 'z1', nombre: 'Rival A', logoUrl: null, rating: 3.0 },
-  { id: 'z2', nombre: 'Rival B', logoUrl: null, rating: 4.2 },
-  { id: 'z3', nombre: 'Rival C', logoUrl: null, rating: 5.0 },
-];
-
-const HISTORIAL_PLACEHOLDER = [
-  { id: 'h1', rivalNombre: 'Rival A', miLogoUrl: null, rivalLogoUrl: null, miMarcador: 1, suMarcador: 0 },
-  { id: 'h2', rivalNombre: 'Rival B', miLogoUrl: null, rivalLogoUrl: null, miMarcador: 2, suMarcador: 3 },
-  { id: 'h3', rivalNombre: 'Rival C', miLogoUrl: null, rivalLogoUrl: null, miMarcador: 7, suMarcador: 3 },
-];
-
-/**
- * Dashboard de un club (boceto): header con editar + plan, banner con logo,
- * récord V-E-P, nombre + verificado, contador de integrantes, "buscar rivales",
- * historial de partidos y fotos del club.
- *
- * La gestión de integrantes / admin vive en ClubMembersScreen, a la que se
- * llega tocando el contador de integrantes.
- */
 export default function ClubDetailScreen({ navigation, route }) {
   const { clubId } = route.params || {};
 
@@ -86,9 +64,11 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [myClubs, setMyClubs] = useState([]);
   const [myRequest, setMyRequest] = useState(null);
   const [photos, setPhotos] = useState([]);
+  const [rivals, setRivals] = useState([]);
   const [pendingChallenges, setPendingChallenges] = useState(0);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
+  const [challengeSheetOpen, setChallengeSheetOpen] = useState(false);
 
   const soyMiembro = members.some((m) => m.user_id === me);
   const soyAdmin = members.some((m) => m.user_id === me && m.rol === 'admin');
@@ -102,18 +82,27 @@ export default function ClubDetailScreen({ navigation, route }) {
     const myId = user?.id || null;
     setMe(myId);
 
-    const [{ data: c }, { data: ms }, { data: mine }, { data: ph }, pending] = await Promise.all([
-      getClubById(clubId),
-      listMembers(clubId),
-      getMyClubs(),
-      getClubPhotos(clubId),
-      countPendingForClub(clubId),
-    ]);
+    const [{ data: c }, { data: ms }, { data: mine }, { data: ph }, { data: candidatos }, pending] =
+      await Promise.all([
+        getClubById(clubId),
+        listMembers(clubId),
+        getMyClubs(),
+        getClubPhotos(clubId),
+        searchClubs(''),
+        countPendingForClub(clubId),
+      ]);
     setClub(c);
     setMembers(ms || []);
     setMyClubs(mine || []);
     setPhotos(ph || []);
     setPendingChallenges(pending || 0);
+
+    // "Equipos en tu zona": otros clubes, priorizando la misma comuna.
+    const misClubIds = new Set((mine || []).map((m) => m.club?.id).filter(Boolean));
+    const otros = (candidatos || []).filter((r) => r.id !== clubId && !misClubIds.has(r.id));
+    const misma = otros.filter((r) => c && r.comuna && r.comuna === c.comuna);
+    const resto = otros.filter((r) => !misma.includes(r));
+    setRivals([...misma, ...resto].slice(0, 10));
 
     const amMember = (ms || []).some((m) => m.user_id === myId);
     if (!amMember && myId) {
@@ -165,6 +154,14 @@ export default function ClubDetailScreen({ navigation, route }) {
     setMyRequest(null);
   };
 
+  const goToChallenge = (rival) => {
+    navigation.navigate('ClubChallenge', {
+      rivalClubId: rival.id,
+      rivalNombre: rival.nombre,
+      rivalFotoUrl: rival.foto_url || null,
+    });
+  };
+
   if (loading || !club) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
@@ -188,7 +185,7 @@ export default function ClubDetailScreen({ navigation, route }) {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      {/* HEADER SUPERIOR: editar (admin) · separador · plan del club */}
+      {/* HEADER */}
       <View style={styles.topBar}>
         <Pressable
           onPress={() => navigation.goBack()}
@@ -197,6 +194,10 @@ export default function ClubDetailScreen({ navigation, route }) {
         >
           <ArrowLeft color={colors.textPrimary} size={22} />
         </Pressable>
+
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {soyMiembro ? 'Mi club' : club.nombre}
+        </Text>
 
         {soyAdmin && (
           <Pressable
@@ -209,34 +210,15 @@ export default function ClubDetailScreen({ navigation, route }) {
           </Pressable>
         )}
 
-        <View style={{ flex: 1 }} />
-
-        <View style={styles.topDivider} />
-
         <Pressable
           onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
           hitSlop={8}
           style={({ pressed }) => [styles.planChip, pressed && { opacity: 0.7 }]}
         >
-          <Crown color={esPremium ? premiumGold : colors.textSecondary} size={16} />
-          <View>
-            <Text style={styles.planChipLabel}>Plan del club</Text>
-            <View
-              style={[
-                styles.planBadge,
-                esPremium ? styles.planBadgePremium : styles.planBadgeFree,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.planBadgeText,
-                  { color: esPremium ? premiumGold : colors.textSecondary },
-                ]}
-              >
-                {esPremium ? 'Premium' : 'Gratuito'}
-              </Text>
-            </View>
-          </View>
+          <Crown color={esPremium ? premiumGold : colors.textSecondary} size={15} />
+          <Text style={[styles.planChipText, { color: esPremium ? premiumGold : colors.textSecondary }]}>
+            {esPremium ? 'Premium' : 'Gratis'}
+          </Text>
         </Pressable>
       </View>
 
@@ -254,187 +236,312 @@ export default function ClubDetailScreen({ navigation, route }) {
       >
         {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-        {/* BANNER + LOGO superpuesto */}
-        <View style={styles.bannerWrap}>
-          {club.banner_url ? (
-            <Image source={{ uri: club.banner_url }} style={styles.banner} resizeMode="cover" />
-          ) : (
-            <View style={[styles.banner, styles.bannerFallback]} />
-          )}
-          {club.foto_url ? (
-            <Image source={{ uri: club.foto_url }} style={styles.logo} />
-          ) : (
-            <View style={[styles.logo, styles.logoFallback]}>
-              <Shield color={colors.primary} size={34} strokeWidth={1.6} />
+        {/* TARJETA DE IDENTIDAD: banner + logo + nombre + stats */}
+        <View style={styles.card}>
+          <View style={styles.bannerBox}>
+            {club.banner_url ? (
+              <Image source={{ uri: club.banner_url }} style={styles.bannerImg} resizeMode="cover" />
+            ) : (
+              <View style={styles.bannerFallback}>
+                <View style={styles.bannerGlow} />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.cardBody}>
+            <View style={styles.identityRow}>
+              {club.foto_url ? (
+                <Image source={{ uri: club.foto_url }} style={styles.logo} />
+              ) : (
+                <View style={[styles.logo, styles.logoFallback]}>
+                  <Shield color={colors.primary} size={30} strokeWidth={1.6} />
+                </View>
+              )}
+              <View style={styles.nameCol}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.clubName} numberOfLines={1}>
+                    {club.nombre}
+                  </Text>
+                  {club.verificado && <BadgeCheck color={premiumGold} size={17} strokeWidth={2.2} />}
+                </View>
+                <Pressable
+                  onPress={() => navigation.navigate('ClubMembers', { clubId: club.id })}
+                  style={({ pressed }) => [styles.metaRow, pressed && { opacity: 0.7 }]}
+                  hitSlop={6}
+                >
+                  <MapPin color={colors.textMuted} size={12} />
+                  <Text style={styles.metaText} numberOfLines={1}>
+                    {club.comuna ? `${club.comuna} · ` : ''}
+                    {members.length} {members.length === 1 ? 'miembro' : 'miembros'}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-          )}
+
+            <View style={styles.statsGrid}>
+              <View style={[styles.statCell, styles.statCellWin]}>
+                <Text style={[styles.statNumber, { color: colors.primary }]}>{RECORD_PLACEHOLDER.v}</Text>
+                <Text style={[styles.statLabel, { color: colors.primary }]}>V</Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statNumber}>{RECORD_PLACEHOLDER.e}</Text>
+                <Text style={styles.statLabel}>E</Text>
+              </View>
+              <View style={[styles.statCell, styles.statCellLoss]}>
+                <Text style={[styles.statNumber, { color: colors.error }]}>{RECORD_PLACEHOLDER.d}</Text>
+                <Text style={[styles.statLabel, { color: colors.error }]}>D</Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statNumber}>—</Text>
+                <Text style={styles.statLabel}>RATING</Text>
+              </View>
+            </View>
+          </View>
         </View>
 
-        {/* RÉCORD · NOMBRE+VERIFICADO · INTEGRANTES */}
-        <View style={styles.identityRow}>
-          <View style={styles.recordBox}>
-            <Text style={styles.recordNumbers}>
-              {RECORD_PLACEHOLDER.v} - {RECORD_PLACEHOLDER.e} - {RECORD_PLACEHOLDER.p}
-            </Text>
-            <Text style={styles.recordLetters}>V   E   P</Text>
-          </View>
-
-          <View style={styles.nameCol}>
-            <View style={styles.nameRow}>
-              <Text style={styles.clubName} numberOfLines={2}>
-                {club.nombre}
-              </Text>
-              {club.verificado && (
-                <BadgeCheck color={premiumGold} size={18} strokeWidth={2.2} />
-              )}
-            </View>
-            {club.comuna ? (
-              <View style={styles.metaRow}>
-                <MapPin color={colors.textMuted} size={12} />
-                <Text style={styles.metaText} numberOfLines={1}>
-                  {club.comuna}{club.region ? `, ${club.region}` : ''}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
+        {/* ACCIÓN PRINCIPAL + BUSCAR */}
+        <View style={styles.actionRow}>
+          {soyMiembro && soyAdmin ? (
+            <Button
+              label="Crear desafío"
+              icon={<Swords color="#0E0E0D" size={18} strokeWidth={2.4} />}
+              onPress={() => setChallengeSheetOpen(true)}
+              style={{ flex: 1 }}
+            />
+          ) : puedoDesafiar ? (
+            <Button
+              label="Desafiar a este club"
+              icon={<Swords color="#0E0E0D" size={18} strokeWidth={2.4} />}
+              onPress={() => goToChallenge({ id: club.id, nombre: club.nombre, foto_url: club.foto_url })}
+              style={{ flex: 1 }}
+            />
+          ) : !soyMiembro && !tengoMaxClubs ? (
+            myRequest ? (
+              <Button
+                label="Cancelar solicitud"
+                variant="secondary"
+                loading={working}
+                onPress={handleCancelRequest}
+                style={{ flex: 1 }}
+              />
+            ) : (
+              <Button
+                label="Solicitar unirme"
+                icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
+                loading={working}
+                onPress={handleJoin}
+                style={{ flex: 1 }}
+              />
+            )
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
           <Pressable
-            onPress={() => navigation.navigate('ClubMembers', { clubId: club.id })}
-            style={({ pressed }) => [styles.membersBox, pressed && { opacity: 0.7 }]}
+            onPress={() => navigation.navigate('ExploreClubs')}
+            style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}
           >
-            <Users color={colors.textPrimary} size={18} />
-            <Text style={styles.membersCount}>{members.length}</Text>
+            <Search color={colors.textPrimary} size={20} />
           </Pressable>
         </View>
 
-        {/* Acción para visitantes (no rompe el flujo de unirse) */}
-        {!soyMiembro && !tengoMaxClubs && (
-          myRequest ? (
-            <Button
-              label="Cancelar solicitud"
-              variant="secondary"
-              loading={working}
-              onPress={handleCancelRequest}
-              style={styles.joinBtn}
-            />
-          ) : (
-            <Button
-              label="Solicitar unirme"
-              icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
-              loading={working}
-              onPress={handleJoin}
-              style={styles.joinBtn}
-            />
-          )
-        )}
-
-        {/* Desafiar a este club (si soy admin de otro club) */}
-        {puedoDesafiar && (
-          <Button
-            label="Desafiar a este club"
-            icon={<Swords color="#0E0E0D" size={18} strokeWidth={2.4} />}
-            onPress={() =>
-              navigation.navigate('ClubChallenge', {
-                rivalClubId: club.id,
-                rivalNombre: club.nombre,
-                rivalFotoUrl: club.foto_url || null,
-              })
-            }
-            style={styles.joinBtn}
-          />
-        )}
-
-        {/* Acceso a la bandeja de desafíos (miembros del club) */}
+        {/* Bandeja de desafíos (miembros del club) */}
         {soyMiembro && (
           <Pressable
             onPress={() => navigation.navigate('ClubChallenges', { clubId: club.id })}
-            style={({ pressed }) => [styles.challengesBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.rowItem, pressed && { opacity: 0.7 }]}
           >
-            <Swords color={colors.primary} size={18} />
-            <Text style={styles.challengesBtnText}>Desafíos</Text>
+            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Swords color={colors.primary} size={17} />
+            </View>
+            <Text style={styles.rowLabel}>Desafíos</Text>
             {pendingChallenges > 0 && (
-              <View style={styles.challengesBadge}>
-                <Text style={styles.challengesBadgeText}>{pendingChallenges}</Text>
+              <View style={styles.rowBadge}>
+                <Text style={styles.rowBadgeText}>{pendingChallenges}</Text>
               </View>
             )}
+            <ChevronRight color={colors.textMuted} size={18} />
           </Pressable>
         )}
 
         {/* BUSCAR RIVALES */}
-        <Text style={styles.sectionTitle}>Buscar rivales</Text>
-        <View style={styles.rivalsCard}>
-          <View style={styles.rivalsColLeft}>
-            <View style={styles.rivalsColHeader}>
-              <Text style={styles.rivalsColTitle}>Equipos en tu zona</Text>
-              <MapPin color={colors.textMuted} size={13} />
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.zonaRow}
-            >
-              {ZONA_PLACEHOLDER.map((eq) => (
-                <View key={eq.id} style={styles.zonaItem}>
-                  <ClubCircle uri={eq.logoUrl} size={40} />
-                  <View style={styles.ratingRow}>
-                    <Text style={styles.ratingText}>{eq.rating.toFixed(1)}</Text>
-                    <Star color={premiumGold} size={11} fill={premiumGold} />
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-
-          <View style={styles.rivalsDivider} />
-
-          <Pressable
-            onPress={() => navigation.navigate('ExploreClubs')}
-            style={({ pressed }) => [styles.rivalsColRight, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={styles.rivalsColTitle}>Buscar equipos</Text>
-            <View style={styles.searchCircle}>
-              <Search color={colors.primary} size={22} />
-            </View>
-          </Pressable>
-        </View>
-
-        {/* HISTORIAL DE PARTIDOS */}
-        <Text style={styles.sectionTitle}>Historial de partidos</Text>
-        <View style={styles.historyCard}>
+        <SectionHeader
+          title="Buscar rivales"
+          actionLabel="Ver todos"
+          onAction={() => navigation.navigate('ExploreClubs')}
+        />
+        {rivals.length === 0 ? (
+          <EmptyCard
+            icon={<Search color={colors.textSecondary} size={18} strokeWidth={2} />}
+            title="Sin rivales cerca"
+            subtitle="Amplía tu búsqueda para encontrar más clubes"
+            actionLabel="Buscar clubes"
+            onAction={() => navigation.navigate('ExploreClubs')}
+          />
+        ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.historyRow}
+            contentContainerStyle={styles.rivalsRow}
           >
-            {HISTORIAL_PLACEHOLDER.map((h, idx) => (
-              <React.Fragment key={h.id}>
-                {idx > 0 && <View style={styles.historyDivider} />}
-                <View style={styles.historyItem}>
-                  <View style={styles.historySide}>
-                    <ClubCircle uri={h.miLogoUrl} size={36} />
-                    <Text style={styles.historySideLabel}>(tu club)</Text>
+            {rivals.map((r) => (
+              <View key={r.id} style={styles.rivalCard}>
+                <Pressable
+                  onPress={() => navigation.navigate('ClubDetail', { clubId: r.id })}
+                  style={({ pressed }) => [styles.rivalTop, pressed && { opacity: 0.7 }]}
+                >
+                  <ClubCircle uri={r.foto_url} size={42} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.rivalName} numberOfLines={1}>
+                      {r.nombre}
+                    </Text>
+                    <Text style={styles.rivalMeta} numberOfLines={1}>
+                      {r.comuna || 'Sin comuna'} · {r.total_miembros}{' '}
+                      {r.total_miembros === 1 ? 'miembro' : 'miembros'}
+                    </Text>
                   </View>
-                  <Text style={styles.historyScore}>
-                    {h.miMarcador} - {h.suMarcador}
-                  </Text>
-                  <View style={styles.historySide}>
-                    <ClubCircle uri={h.rivalLogoUrl} size={36} />
-                    <Text style={styles.historySideLabel}>(rival)</Text>
-                  </View>
-                </View>
-              </React.Fragment>
+                </Pressable>
+                {puedoDesafiar ? (
+                  <Pressable
+                    onPress={() => goToChallenge(r)}
+                    style={({ pressed }) => [styles.rivalChallengeBtn, pressed && { opacity: 0.75 }]}
+                  >
+                    <Text style={styles.rivalChallengeText}>Desafiar</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ))}
           </ScrollView>
-        </View>
+        )}
+
+        {/* HISTORIAL DE PARTIDOS */}
+        <SectionHeader title="Historial de partidos" />
+        <EmptyCard
+          icon={<Trophy color={colors.textSecondary} size={18} strokeWidth={2} />}
+          title="Sin partidos"
+          subtitle="Tu club todavía no ha disputado partidos contra otros clubes"
+          actionLabel={soyAdmin ? 'Buscar un rival' : null}
+          onAction={soyAdmin ? () => navigation.navigate('ExploreClubs') : null}
+        />
 
         {/* FOTOS DEL CLUB */}
-        <Text style={styles.sectionTitle}>Fotos del club</Text>
+        <SectionHeader
+          title="Fotos del club"
+          actionLabel={photos.length > 0 ? 'Ver todas' : null}
+          onAction={photos.length > 0 ? () => navigation.navigate('ClubGallery', { clubId: club.id }) : null}
+        />
         <PhotoGrid
           photos={photos}
           onPress={() => navigation.navigate('ClubGallery', { clubId: club.id })}
         />
+
+        {/* UPSELL PREMIUM */}
+        {!esPremium && (
+          <Pressable
+            onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
+            style={({ pressed }) => [styles.upsellCard, pressed && { opacity: 0.85 }]}
+          >
+            <View style={styles.upsellIcon}>
+              <Sparkles color={premiumGold} size={18} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.upsellTitle}>Desbloquea Premium</Text>
+              <Text style={styles.upsellSubtitle}>Más integrantes, más admins y verificación</Text>
+            </View>
+            <ChevronRight color={colors.textMuted} size={18} />
+          </Pressable>
+        )}
+
+        {/* ACCIONES DE ADMIN */}
+        {soyAdmin && (
+          <View style={styles.adminList}>
+            <Pressable
+              onPress={() => navigation.navigate('ClubMembers', { clubId: club.id })}
+              style={({ pressed }) => [styles.adminRow, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.adminRowText}>Gestionar miembros</Text>
+              <ChevronRight color={colors.textMuted} size={18} />
+            </Pressable>
+            <View style={styles.adminDivider} />
+            <Pressable
+              onPress={() => navigation.navigate('EditClub', { club })}
+              style={({ pressed }) => [styles.adminRow, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.adminRowText}>Ajustes del club</Text>
+              <ChevronRight color={colors.textMuted} size={18} />
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
+
+      {/* HOJA: crear desafío */}
+      <Modal
+        visible={challengeSheetOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setChallengeSheetOpen(false)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setChallengeSheetOpen(false)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Crear desafío</Text>
+            <Text style={styles.sheetSubtitle}>Elige cómo quieres encontrar rival</Text>
+
+            <Button
+              label="Elegir un club"
+              onPress={() => {
+                setChallengeSheetOpen(false);
+                navigation.navigate('ExploreClubs');
+              }}
+              style={{ marginTop: 16 }}
+            />
+            <Pressable
+              onPress={() =>
+                setBanner({
+                  type: 'info',
+                  title: 'Próximamente',
+                  message: 'El desafío abierto a cualquier club todavía no está disponible.',
+                })
+              }
+              style={({ pressed }) => [styles.sheetSecondaryBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.sheetSecondaryText}>Desafío abierto</Text>
+              <Text style={styles.sheetSecondaryHint}>Próximamente</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+function SectionHeader({ title, actionLabel, onAction }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {actionLabel ? (
+        <Pressable onPress={onAction} hitSlop={8}>
+          <Text style={styles.sectionAction}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function EmptyCard({ icon, title, subtitle, actionLabel, onAction }) {
+  return (
+    <View style={styles.emptyCard}>
+      <View style={styles.emptyIcon}>{icon}</View>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptySubtitle}>{subtitle}</Text>
+      {actionLabel ? (
+        <Pressable
+          onPress={onAction}
+          style={({ pressed }) => [styles.emptyBtn, pressed && { opacity: 0.75 }]}
+        >
+          <Text style={styles.emptyBtnText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -444,57 +551,49 @@ function ClubCircle({ uri, size }) {
     return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   }
   return (
-    <View
-      style={[
-        styles.clubCircleFallback,
-        { width: size, height: size, borderRadius: size / 2 },
-      ]}
-    >
+    <View style={[styles.clubCircleFallback, { width: size, height: size, borderRadius: size / 2 }]}>
       <Shield color={colors.textMuted} size={size * 0.45} strokeWidth={1.8} />
     </View>
   );
 }
 
 /**
- * Grid de 4 celdas: hasta 3 fotos + overlay "+X" en la última (mismo patrón que
- * la galería de perfil). Toca cualquier celda para abrir la galería completa.
- * Si todavía no hay fotos, muestra celdas vacías de marcador.
+ * Grid de fotos: celda "Añadir" + hasta 5 fotos, con overlay "+N" en la
+ * última si hay más. Toca cualquier celda para abrir la galería completa.
  */
 function PhotoGrid({ photos, onPress }) {
-  // En la 4ª celda mostramos "+X": fotos que no se ven (total - 3 visibles).
-  const visibles = photos.slice(0, 3);
-  const restantes = photos.length - 3;
-  const cells = [0, 1, 2, 3];
+  const visibles = photos.slice(0, 5);
+  const restantes = photos.length - 5;
 
   return (
-    <Pressable onPress={onPress} style={styles.photoGrid}>
-      {cells.map((idx) => {
-        const esCuarta = idx === 3;
-        const foto = visibles[idx];
-        // 4ª celda con más fotos detrás → overlay "+X" sobre la 4ª imagen real
-        const cuartaFoto = esCuarta ? photos[3] : null;
-        return (
-          <View key={idx} style={styles.photoCell}>
-            {esCuarta && restantes > 0 ? (
-              <View style={styles.photoImgWrap}>
-                {cuartaFoto?.photo_url && (
-                  <Image source={{ uri: cuartaFoto.photo_url }} style={styles.photoImg} resizeMode="cover" />
-                )}
+    <View style={styles.photoGrid}>
+      <Pressable onPress={onPress} style={[styles.photoCell, styles.photoAddCell]}>
+        <ImagePlus color={colors.primary} size={20} strokeWidth={2} />
+        <Text style={styles.photoAddLabel}>Añadir</Text>
+      </Pressable>
+      {visibles.length === 0 ? (
+        <Pressable onPress={onPress} style={[styles.photoCell, styles.photoCellSpan2]}>
+          <View style={styles.photoEmpty}>
+            <ImageIcon color={colors.textMuted} size={18} />
+            <Text style={styles.photoEmptyText}>Aún no hay fotos</Text>
+          </View>
+        </Pressable>
+      ) : (
+        visibles.map((foto, idx) => {
+          const esUltima = idx === visibles.length - 1;
+          return (
+            <Pressable key={foto.id} onPress={onPress} style={styles.photoCell}>
+              <Image source={{ uri: foto.photo_url }} style={styles.photoImg} resizeMode="cover" />
+              {esUltima && restantes > 0 && (
                 <View style={styles.photoOverlay}>
                   <Text style={styles.photoOverlayText}>+{restantes}</Text>
                 </View>
-              </View>
-            ) : foto?.photo_url ? (
-              <Image source={{ uri: foto.photo_url }} style={styles.photoImg} resizeMode="cover" />
-            ) : (
-              <View style={styles.photoEmpty}>
-                <ImageIcon color={colors.textMuted} size={20} />
-              </View>
-            )}
-          </View>
-        );
-      })}
-    </Pressable>
+              )}
+            </Pressable>
+          );
+        })
+      )}
+    </View>
   );
 }
 
@@ -502,21 +601,28 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Header superior
+  // Header
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    gap: 10,
+    gap: 8,
   },
   iconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   editBtn: {
     flexDirection: 'row',
@@ -528,150 +634,113 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   editLabel: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-  topDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: colors.border,
-    marginHorizontal: 4,
-  },
   planChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.md,
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     backgroundColor: colors.surface,
   },
-  planChipLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '600' },
-  planBadge: {
-    alignSelf: 'flex-start',
-    marginTop: 2,
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  planBadgePremium: { borderColor: premiumGold, backgroundColor: 'rgba(212,175,55,0.10)' },
-  planBadgeFree: { borderColor: colors.border, backgroundColor: colors.surfaceAlt },
-  planBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
+  planChipText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.2, textTransform: 'uppercase' },
 
   scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  // Banner + logo
-  bannerWrap: { marginTop: 4, marginBottom: 48 },
-  banner: {
-    width: '100%',
-    height: 140,
-    borderRadius: radius.lg,
+  // Tarjeta de identidad
+  card: {
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    marginTop: 4,
+    marginBottom: 16,
   },
+  bannerBox: { height: 100 },
+  bannerImg: { width: '100%', height: '100%' },
   bannerFallback: {
+    flex: 1,
+    backgroundColor: colors.surfaceAlt,
+    overflow: 'hidden',
+  },
+  bannerGlow: {
+    position: 'absolute',
+    right: -40,
+    top: -50,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: colors.primarySoft,
+  },
+  cardBody: {
     backgroundColor: colors.surface,
+    padding: 14,
+  },
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+    marginTop: -30,
+  },
+  logo: {
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
+  },
+  logoFallback: { alignItems: 'center', justifyContent: 'center' },
+  nameCol: { flex: 1, minWidth: 0, paddingBottom: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  clubName: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: -0.3, flexShrink: 1 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  metaText: { color: colors.textMuted, fontSize: 12.5 },
+
+  statsGrid: { flexDirection: 'row', gap: 6, marginTop: 14 },
+  statCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.borderSoft,
   },
-  logo: {
-    position: 'absolute',
-    bottom: -36,
-    alignSelf: 'center',
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 3,
-    borderColor: colors.background,
-    backgroundColor: colors.surface,
-  },
-  logoFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  statCellWin: { backgroundColor: colors.primarySoft, borderColor: 'rgba(113,181,51,0.24)' },
+  statCellLoss: { backgroundColor: 'rgba(229,72,77,0.10)', borderColor: 'rgba(229,72,77,0.24)' },
+  statNumber: { color: colors.textPrimary, fontSize: 18, fontWeight: '800' },
+  statLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 3 },
 
-  // Identidad: récord · nombre · integrantes
-  identityRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 16,
-  },
-  recordBox: {
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  recordNumbers: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  recordLetters: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginTop: 2,
-  },
-  nameCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  clubName: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    textAlign: 'center',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  metaText: { color: colors.textMuted, fontSize: 12 },
-  membersBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  membersCount: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  joinBtn: { marginBottom: 16 },
-  challengesBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
+  // Acción principal
+  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  searchBtn: {
+    width: 54,
+    height: 54,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Fila genérica (desafíos)
+  rowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     marginBottom: 16,
   },
-  challengesBtnText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
-  challengesBadge: {
+  rowIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  rowLabel: { flex: 1, color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  rowBadge: {
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -680,121 +749,199 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  challengesBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  rowBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 
   // Secciones
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 12,
-  },
-
-  // Buscar rivales
-  rivalsCard: {
+  sectionHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  sectionAction: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+
+  // Rivales (carrusel)
+  rivalsRow: { gap: 10, paddingBottom: 4 },
+  rivalCard: {
+    width: 196,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.borderSoft,
-    padding: 14,
-    marginBottom: 8,
+    padding: 12,
+    gap: 10,
   },
-  rivalsColLeft: { flex: 1, paddingRight: 12 },
-  rivalsColHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    marginBottom: 12,
-  },
-  rivalsColTitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  zonaRow: { gap: 14, alignItems: 'center', paddingHorizontal: 2 },
-  zonaItem: { alignItems: 'center', gap: 5 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  ratingText: { color: colors.textPrimary, fontSize: 12, fontWeight: '700' },
-  rivalsDivider: { width: 1, backgroundColor: colors.border },
-  rivalsColRight: {
-    width: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingLeft: 12,
-  },
-  searchCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  rivalTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  rivalName: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  rivalMeta: { color: colors.textMuted, fontSize: 11.5, marginTop: 2 },
+  rivalChallengeBtn: {
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(113,181,51,0.35)',
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  rivalChallengeText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 
-  // Historial
-  historyCard: {
+  // Estado vacío
+  emptyCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.borderSoft,
-    padding: 14,
-    marginBottom: 8,
-  },
-  historyRow: { alignItems: 'center', gap: 14 },
-  historyItem: {
-    flexDirection: 'row',
+    padding: 18,
     alignItems: 'center',
-    gap: 10,
+    marginBottom: 16,
   },
-  historySide: { alignItems: 'center', gap: 3 },
-  historySideLabel: { color: colors.textMuted, fontSize: 10 },
-  historyScore: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  emptyIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 9,
   },
-  historyDivider: { width: 1, height: 56, backgroundColor: colors.border },
+  emptyTitle: { color: colors.textPrimary, fontSize: 13.5, fontWeight: '700' },
+  emptySubtitle: {
+    color: colors.textMuted,
+    fontSize: 11.5,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  emptyBtn: {
+    marginTop: 12,
+    height: 36,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(113,181,51,0.35)',
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyBtnText: { color: colors.primary, fontSize: 12.5, fontWeight: '700' },
 
   // Fotos
-  photoGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   photoCell: {
-    flex: 1,
+    width: '31%',
     aspectRatio: 1,
     borderRadius: radius.md,
     overflow: 'hidden',
   },
-  photoImg: { width: '100%', height: '100%' },
-  photoImgWrap: { flex: 1, backgroundColor: colors.surfaceAlt },
-  photoEmpty: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
+  photoCellSpan2: { width: '65.5%' },
+  photoAddCell: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(113,181,51,0.4)',
+    borderStyle: 'dashed',
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 5,
   },
+  photoAddLabel: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  photoImg: { width: '100%', height: '100%' },
+  photoEmpty: {
+    flex: 1,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  photoEmptyText: { color: colors.textMuted, fontSize: 11 },
   photoOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoOverlayText: {
-    color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
+  photoOverlayText: { color: colors.textPrimary, fontSize: 18, fontWeight: '800' },
+
+  // Upsell Premium
+  upsellCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    padding: 13,
+    marginBottom: 16,
   },
+  upsellIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(212,164,55,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upsellTitle: { color: colors.textPrimary, fontSize: 13.5, fontWeight: '700' },
+  upsellSubtitle: { color: colors.textMuted, fontSize: 11.5, marginTop: 2 },
+
+  // Acciones de admin
+  adminList: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    overflow: 'hidden',
+  },
+  adminRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  adminRowText: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+  adminDivider: { height: 1, backgroundColor: colors.borderSoft },
+
+  // Hoja "Crear desafío"
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 30,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  sheetTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  sheetSubtitle: { color: colors.textMuted, fontSize: 12.5, marginTop: 4 },
+  sheetSecondaryBtn: {
+    height: 54,
+    marginTop: 8,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetSecondaryText: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  sheetSecondaryHint: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
 
   clubCircleFallback: {
     backgroundColor: colors.surfaceAlt,
