@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
 
 /**
  * Estado vacío de una sección (sin rivales, sin partidos).
@@ -44,31 +44,31 @@ export default function EmptyStateCard({
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: clubSizes.gutter,
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.lg,
+    marginHorizontal: dsSizes.gutter,
+    backgroundColor: dsColors.surface,
+    borderRadius: dsRadius.lg,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: dsColors.borderSoft,
     padding: 16,
     alignItems: 'center',
   },
   icon: {
     width: 38,
     height: 38,
-    borderRadius: clubRadius.sm,
-    backgroundColor: clubColors.chip,
+    borderRadius: dsRadius.sm,
+    backgroundColor: dsColors.chip,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 9,
   },
   title: {
-    color: clubColors.textPrimary,
+    color: dsColors.textPrimary,
     fontSize: 13.5,
     fontWeight: '700',
     textAlign: 'center',
   },
   subtitle: {
-    color: clubColors.textSecondary,
+    color: dsColors.textSecondary,
     fontSize: 11.5,
     lineHeight: 16,
     textAlign: 'center',
@@ -79,16 +79,16 @@ const styles = StyleSheet.create({
     minWidth: 140,
     paddingHorizontal: 16,
     marginTop: 11,
-    borderRadius: clubRadius.sm,
+    borderRadius: dsRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnGhost: {
     borderWidth: 1,
-    borderColor: clubColors.greenBorder,
-    backgroundColor: clubColors.greenSoft,
+    borderColor: dsColors.greenBorder,
+    backgroundColor: dsColors.greenSoft,
   },
-  btnGhostText: { color: clubColors.green, fontSize: 12.5, fontWeight: '700' },
-  btnSolid: { backgroundColor: clubColors.green },
-  btnSolidText: { color: clubColors.greenInk, fontSize: 12.5, fontWeight: '800' },
+  btnGhostText: { color: dsColors.green, fontSize: 12.5, fontWeight: '700' },
+  btnSolid: { backgroundColor: dsColors.green },
+  btnSolidText: { color: dsColors.greenInk, fontSize: 12.5, fontWeight: '800' },
 });

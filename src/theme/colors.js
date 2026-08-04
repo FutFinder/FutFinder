@@ -26,14 +26,17 @@ export const colors = {
 };
 
 /**
- * Tokens del rediseño de club (extraídos del diseño de referencia).
+ * Tokens del rediseño (extraídos del diseño de referencia).
  *
- * Es un set ACOTADO a las pantallas de club: el fondo es más oscuro y con
- * matiz verde, y el verde de acción es más brillante que `colors.primary`.
- * Se mantiene aparte a propósito para no restilizar de golpe las ~20
- * pantallas que dependen de la paleta global.
+ * Nació con el rediseño de Clubes y ahora también lo usa el perfil de
+ * jugador, así que es el sistema visual "nuevo" de la app: fondo más oscuro
+ * con matiz verde y un verde de acción más brillante que `colors.primary`.
+ *
+ * Sigue conviviendo con `colors` a propósito: las pantallas que aún no se
+ * rediseñan (Inicio, Partidos, Chat, Avisos…) usan la paleta global, y
+ * cambiarla de golpe restilizaría toda la app.
  */
-export const clubColors = {
+export const dsColors = {
   // Fondos
   background: '#0B0D0C',
   surface: '#141715',
@@ -81,7 +84,7 @@ export const clubColors = {
 };
 
 /** Radios, alturas y espaciados del rediseño de club. */
-export const clubRadius = {
+export const dsRadius = {
   chip: 9,
   icon: 10,
   sm: 12,
@@ -92,13 +95,19 @@ export const clubRadius = {
   sheet: 28,
 };
 
-export const clubSizes = {
+export const dsSizes = {
   gutter: 16, // margen lateral de la pantalla
-  iconBtn: 40, // botones cuadrados de la barra superior (con hitSlop → ≥44)
+  iconBtn: 40, // botones cuadrados de la barra de club (con hitSlop → ≥44)
+  tapBtn: 44, // botones que ya cumplen el mínimo táctil sin hitSlop
   actionBtn: 58, // botón "Crear desafío" y lupa
   logo: 72,
   rivalCard: 196,
 };
+
+// Alias retrocompatibles: los componentes de club ya importan estos nombres.
+export const clubColors = dsColors;
+export const clubRadius = dsRadius;
+export const clubSizes = dsSizes;
 
 export const fonts = {
   regular: 'System',

@@ -1,50 +1,56 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
-  RefreshControl,
   Image,
   Modal,
-  Dimensions,
+  Share,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  Settings,
-  Bell,
-  User as UserIcon,
-  Calendar,
-  MapPin,
-  Star,
-  ShieldCheck,
-  FileText,
-  Edit3,
+  Pencil,
   LogOut,
-  ChevronRight,
-  ChevronLeft,
-  ArrowLeft,
-  UserPlus,
-  UserCheck,
-  UserX,
-  MessageCircle,
   Clock,
+  AlertCircle,
+  UserX,
+  ChevronLeft,
+  ChevronRight,
   X,
-  Images,
 } from 'lucide-react-native';
 
-import Logo from '../components/Logo';
+import { dsColors, dsRadius, dsSizes } from '../theme/colors';
 import Banner from '../components/Banner';
-import { colors, radius } from '../theme/colors';
+import SectionHeader from '../components/ds/SectionHeader';
+import EmptyStateCard from '../components/ds/EmptyStateCard';
+import PlayerProfileTopBar from '../components/player/PlayerProfileTopBar';
+import PlayerHeroCard from '../components/player/PlayerHeroCard';
+import PlayerBioSection from '../components/player/PlayerBioSection';
+import PlayerStatsCard from '../components/player/PlayerStatsCard';
+import ParticipationCard from '../components/player/ParticipationCard';
+import PlayerPhotoGallery from '../components/player/PlayerPhotoGallery';
+import ReputationCard from '../components/player/ReputationCard';
+import AccountStatusCard from '../components/player/AccountStatusCard';
+import AuditSupportCard from '../components/player/AuditSupportCard';
+import ProfileActionRow from '../components/player/ProfileActionRow';
+import PlayerPublicActions from '../components/player/PlayerPublicActions';
+import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
+import ProfileSkeleton from '../components/player/ProfileSkeleton';
+
+import { signOut, getCurrentUser } from '../services/auth';
 import {
   getMyProfile,
   getProfileById,
-  getMyAttendanceHistory,
+  getAttendanceHistoryFor,
+  getAccountStatusFor,
   deriveStats,
 } from '../services/profile';
-import { signOut, getCurrentUser } from '../services/auth';
 import { getUserRatingSummary } from '../services/ratings';
+import { getProfilePhotos } from '../services/gallery';
+import { getMyClubs } from '../services/clubs';
 import {
   getFriendshipWith,
   sendFriendRequest,
@@ -53,1609 +59,750 @@ import {
   cancelFriendRequest,
   removeFriend,
 } from '../services/friends';
+import { reportUser, countReportsAgainst, getMyPendingReportFor } from '../services/reports';
 import { isSupabaseConfigured } from '../services/supabase';
-import { getProfilePhotos } from '../services/gallery';
+import {
+  playerBadges,
+  ratingDisplay,
+  trustDisplay,
+  attendanceDisplay,
+  participacionEstado,
+  metaParticipacion,
+  metaJugador,
+  inicialDe,
+  perfilIncompleto,
+} from '../utils/playerMeta';
+import {
+  usarPerfilDemo,
+  getDemoProfile,
+  getDemoHistory,
+  getDemoRatingSummary,
+} from '../services/playerDemo';
 
-const POSICION_LABEL = {
-  arquero: 'Arquero',
-  defensa: 'Defensa',
-  medio: 'Mediocampista',
-  delantero: 'Delantero',
-  lateral: 'Lateral',
-  volante: 'Volante',
-  sin_definir: 'Sin definir',
-};
+/** Participaciones visibles en la muestra. */
+const MAX_PARTICIPACIONES = 3;
+/** Cuántas filas de historial pedimos para calcular la tasa de asistencia. */
+const HISTORIAL_LIMITE = 20;
 
-const FLANCO_LABEL = {
-  derecho: 'Flanco Der.',
-  izquierdo: 'Flanco Izq.',
-  ambos: 'Ambos flancos',
-};
-
-function fmtFecha(iso) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }) +
-      ` ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-  } catch {
-    return iso;
-  }
-}
-
+/**
+ * Perfil de jugador. Una sola pantalla para tres contextos, decididos por
+ * datos reales y nunca por una bandera visual:
+ *
+ *   1. Perfil propio completo   → isOwnProfile && hay datos
+ *   2. Perfil propio recién creado → isOwnProfile && sin datos (mismos
+ *      componentes, alimentados con estados vacíos)
+ *   3. Perfil público de otro   → !isOwnProfile
+ *
+ * `isOwnProfile` se resuelve comparando IDs de usuario, no nombres.
+ *
+ * QUÉ ES REAL: username, foto, portada, comuna, bio, posiciones, modalidad,
+ * nivel, club, galería, valoraciones (tabla `ratings`), Trust Score,
+ * participaciones (tabla `attendees`, lectura pública), sanción activa
+ * (`profiles.estado`) y conteo de reportes recibidos.
+ *
+ * QUÉ NO EXISTE EN EL BACKEND y por eso se muestra honestamente:
+ *  - MVPs: la columna existe pero nada la incrementa → 0 real.
+ *  - Moderación y apelaciones: no hay panel de soporte, así que "Auditoría y
+ *    soporte" es informativo y "Apelar" está deshabilitado (ver reports.js).
+ *
+ * FIXTURES DE DESARROLLO: services/playerDemo.js, solo con __DEV__ y su
+ * interruptor en true. Nunca tocan la base de datos.
+ */
 export default function ProfileScreen({ navigation, route }) {
   const viewUserId = route?.params?.userId || null;
+
   const [myId, setMyId] = useState(null);
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState([]);
+  const [photos, setPhotos] = useState([]);
+  const [ratingSummary, setRatingSummary] = useState(null);
+  const [accountStatus, setAccountStatus] = useState({ suspended: false, suspended_until: null });
+  const [reportesRecibidos, setReportesRecibidos] = useState(0);
+  const [friendship, setFriendship] = useState(null);
+  const [misClubs, setMisClubs] = useState([]);
+  const [yaReportado, setYaReportado] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const [banner, setBanner] = useState(null);
-  const [friendship, setFriendship] = useState(null); // estado de amistad
   const [friendBusy, setFriendBusy] = useState(false);
-  const [ratingSummary, setRatingSummary] = useState(null);
-  const [photoViewer, setPhotoViewer] = useState(false);
-  const [galleryPhotos, setGalleryPhotos] = useState([]);
-  const [galleryViewerIndex, setGalleryViewerIndex] = useState(null); // null = cerrado
-  const [galleryOpen, setGalleryOpen] = useState(false); // galería completa
 
-  // ¿Estoy viendo mi propio perfil o el de otro?
-  const isMyProfile = !viewUserId || viewUserId === myId;
+  const [reportOpen, setReportOpen] = useState(false);
+  const [avatarViewer, setAvatarViewer] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(null);
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
+
+  // Contexto único: se compara por identificador, nunca por nombre.
+  const isOwnProfile = !viewUserId || (myId !== null && viewUserId === myId);
+
+  const showBanner = useCallback((type, title, message = '') => {
+    setBanner({ type, title, message });
+  }, []);
 
   const load = useCallback(async () => {
-    const user = await getCurrentUser();
-    setMyId(user?.id || null);
+    setLoadError(null);
+    try {
+      const user = await getCurrentUser();
+      const uid = user?.id || null;
+      setMyId(uid);
 
-    const targetId = !viewUserId || viewUserId === user?.id ? user?.id : viewUserId;
+      const propio = !viewUserId || viewUserId === uid;
+      const targetId = propio ? uid : viewUserId;
 
-    if (!viewUserId || viewUserId === user?.id) {
-      const [p, h] = await Promise.all([
-        getMyProfile(),
-        getMyAttendanceHistory(8),
-      ]);
-      setProfile(p);
-      setHistory(h);
-      setFriendship(null);
-    } else {
-      const [p, f] = await Promise.all([
-        getProfileById(viewUserId),
-        getFriendshipWith(viewUserId),
-      ]);
-      setProfile(p);
-      setHistory([]); // no exponemos historial ajeno en V1
-      setFriendship(f);
-    }
+      if (!targetId) {
+        setLoadError('sin-sesion');
+        setLoading(false);
+        return;
+      }
 
-    // Resumen de calificaciones + galería del perfil mostrado
-    if (targetId) {
-      const [summary, gallery] = await Promise.all([
-        getUserRatingSummary(targetId),
+      const [p, h, ph, rs, acc, reportes] = await Promise.all([
+        propio ? getMyProfile() : getProfileById(viewUserId),
+        getAttendanceHistoryFor(targetId, HISTORIAL_LIMITE),
         getProfilePhotos(targetId),
+        getUserRatingSummary(targetId),
+        getAccountStatusFor(targetId),
+        countReportsAgainst(targetId),
       ]);
-      setRatingSummary(summary);
-      setGalleryPhotos(gallery.data || []);
-    }
 
-    setLoading(false);
-    setRefreshing(false);
+      if (!p) {
+        setLoadError(propio ? 'perfil' : 'no-existe');
+        setLoading(false);
+        return;
+      }
+
+      // Fixtures de desarrollo: solo rellenan lo que está vacío y solo con el
+      // interruptor activado. Los datos reales siempre ganan.
+      const demo = usarPerfilDemo();
+      setProfile(demo ? getDemoProfile(p) : p);
+      setHistory(demo && h.length === 0 ? getDemoHistory() : h);
+      setPhotos(ph.data || []);
+      setRatingSummary(demo && (rs?.count ?? 0) === 0 ? getDemoRatingSummary() : rs);
+      setAccountStatus(acc);
+      setReportesRecibidos(reportes.data || 0);
+
+      if (propio) {
+        setFriendship(null);
+        setYaReportado(false);
+        const clubs = await getMyClubs();
+        setMisClubs(clubs.data || []);
+      } else {
+        const [f, clubs, reporteMio] = await Promise.all([
+          getFriendshipWith(viewUserId),
+          getMyClubs(),
+          getMyPendingReportFor(viewUserId),
+        ]);
+        setFriendship(f);
+        setMisClubs(clubs.data || []);
+        setYaReportado(Boolean(reporteMio.data));
+      }
+    } catch (e) {
+      console.error('[FutFinder] ProfileScreen load:', e?.message || e);
+      setLoadError('perfil');
+    } finally {
+      setLoading(false);
+    }
   }, [viewUserId]);
 
   useEffect(() => {
+    const unsub = navigation.addListener('focus', load);
     load();
-    // Refrescar al volver a esta pantalla
-    const unsubscribe = navigation.addListener('focus', load);
-    return unsubscribe;
-  }, [load, navigation]);
+    return unsub;
+  }, [navigation, load]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    load();
+    await load();
+    setRefreshing(false);
+  };
+
+  // ── Derivados ──
+  const stats = useMemo(() => deriveStats(profile, history), [profile, history]);
+  const rating = useMemo(() => ratingDisplay(ratingSummary), [ratingSummary]);
+  const trust = useMemo(() => trustDisplay(profile), [profile]);
+  const attendance = useMemo(() => attendanceDisplay(history), [history]);
+  const badges = useMemo(() => playerBadges(profile), [profile]);
+
+  const participaciones = useMemo(
+    () => history.filter((h) => h.match).slice(0, MAX_PARTICIPACIONES),
+    [history]
+  );
+
+  // ── Acciones propias ──
+  const goEdit = () => navigation.navigate('EditProfile');
+  const goSettings = () => navigation.navigate('Settings');
+  const goTrustHistory = () => navigation.navigate('TrustScoreHistory');
+
+  const handleShare = async () => {
+    if (!profile) return;
+    try {
+      await Share.share({
+        message: `Mira el perfil de @${profile.username || 'jugador'} en FutFinder${
+          profile.comuna ? ` · ${profile.comuna}` : ''
+        }`,
+      });
+    } catch {
+      showBanner('error', 'No se pudo compartir', 'Inténtalo de nuevo en unos segundos.');
+    }
   };
 
   const handleLogout = async () => {
+    setLogoutConfirm(false);
     await signOut();
-    // El logout sale del tab navigator y vuelve al stack raíz (Welcome)
     const parent = navigation.getParent();
-    if (parent) {
-      parent.reset({ index: 0, routes: [{ name: 'Welcome' }] });
-    } else {
-      navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
-    }
+    (parent || navigation).reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
 
-  const showBanner = (type, title, message = '') => {
-    setBanner({ type, title, message });
-    if (type === 'success') setTimeout(() => setBanner(null), 4000);
-  };
-
-  // ---- Acciones de amistad (cuando estoy viendo otro perfil) ----
-  const handleAddFriend = async () => {
+  // ── Acciones sobre otro jugador ──
+  const runFriendAction = async (fn, okTitle, okMsg, errTitle) => {
     if (friendBusy) return;
     setFriendBusy(true);
-    const { error } = await sendFriendRequest(viewUserId);
+    const { error } = (await fn()) || {};
     setFriendBusy(false);
     if (error) {
-      showBanner('error', 'No pude enviar la solicitud', error.message || '');
+      showBanner('error', errTitle, error.message || '');
       return;
     }
-    showBanner('success', 'Solicitud enviada', '@' + (profile?.username || 'jugador') + ' decidirá si te acepta.');
+    if (okTitle) showBanner('success', okTitle, okMsg || '');
     load();
   };
 
-  const handleAcceptFriend = async () => {
-    if (!friendship || friendBusy) return;
-    setFriendBusy(true);
-    const { error } = await acceptFriendRequest(friendship.id);
-    setFriendBusy(false);
-    if (error) {
-      showBanner('error', 'No pude aceptar', error.message || '');
-      return;
-    }
-    showBanner('success', '¡Amistad confirmada!', 'Ya puedes mandarle mensajes.');
-    load();
-  };
+  const handleAddFriend = () =>
+    runFriendAction(
+      () => sendFriendRequest(viewUserId),
+      'Solicitud enviada',
+      `@${profile?.username || 'jugador'} decidirá si te acepta.`,
+      'No pude enviar la solicitud'
+    );
 
-  const handleRejectFriend = async () => {
-    if (!friendship || friendBusy) return;
-    setFriendBusy(true);
-    const { error } = await rejectFriendRequest(friendship.id);
-    setFriendBusy(false);
-    if (error) {
-      showBanner('error', 'No pude rechazar', error.message || '');
-      return;
-    }
-    showBanner('info', 'Solicitud rechazada', '');
-    load();
-  };
+  const handleAcceptFriend = () =>
+    friendship &&
+    runFriendAction(
+      () => acceptFriendRequest(friendship.id),
+      '¡Amistad confirmada!',
+      'Ya puedes mandarle mensajes.',
+      'No pude aceptar'
+    );
 
-  const handleCancelRequest = async () => {
-    if (!friendship || friendBusy) return;
-    setFriendBusy(true);
-    const { error } = await cancelFriendRequest(friendship.id);
-    setFriendBusy(false);
-    if (error) {
-      showBanner('error', 'No pude cancelar', error.message || '');
-      return;
-    }
-    showBanner('info', 'Solicitud cancelada', '');
-    load();
-  };
+  const handleRejectFriend = () =>
+    friendship &&
+    runFriendAction(() => rejectFriendRequest(friendship.id), null, null, 'No pude rechazar');
 
-  const handleRemoveFriend = async () => {
-    if (friendBusy || !viewUserId) return;
-    const ok =
-      typeof window !== 'undefined' && typeof window.confirm === 'function'
-        ? window.confirm('¿Eliminar amistad con @' + (profile?.username || 'jugador') + '?')
-        : true;
-    if (!ok) return;
-    setFriendBusy(true);
-    const { error } = await removeFriend(viewUserId);
-    setFriendBusy(false);
-    if (error) {
-      showBanner('error', 'No pude eliminar', error.message || '');
-      return;
-    }
-    showBanner('info', 'Amistad eliminada', '');
-    load();
-  };
+  const handleCancelRequest = () =>
+    friendship &&
+    runFriendAction(() => cancelFriendRequest(friendship.id), null, null, 'No pude cancelar');
+
+  const handleRemoveFriend = () =>
+    runFriendAction(() => removeFriend(viewUserId), null, null, 'No pude eliminar');
 
   const handleSendMessage = () => {
     if (!viewUserId || !profile) return;
     const parent = navigation.getParent();
-    const nav = parent || navigation;
-    nav.navigate('ChatThread', {
-      threadKey: 'dm:' + viewUserId,
-      title: '@' + (profile.username || 'jugador'),
+    (parent || navigation).navigate('ChatThread', {
+      threadKey: `dm:${viewUserId}`,
+      title: `@${profile.username || 'jugador'}`,
       subtitle: 'Mensaje directo',
     });
   };
 
-  const stats = deriveStats(profile, history);
+  const handleInviteClub = () => {
+    const club = misClubs.find((c) => c.miRol === 'admin');
+    if (!club?.club?.id) return;
+    navigation.navigate('ClubInvite', { clubId: club.club.id });
+  };
+
+  const handleSubmitReport = async ({ motivo, descripcion }) => {
+    const { error } = await reportUser({ reportedId: viewUserId, motivo, descripcion });
+    if (error) {
+      showBanner('error', 'No se pudo enviar el reporte', error.message || '');
+      return { error };
+    }
+    setReportOpen(false);
+    setYaReportado(true);
+    showBanner(
+      'success',
+      'Reporte enviado',
+      'Lo revisaremos. No le avisamos a esa persona quién lo envió.'
+    );
+    return {};
+  };
+
+  // ── Estados de carga / error ──
+  if (loading) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <PlayerProfileTopBar
+          isOwnProfile={isOwnProfile}
+          title={isOwnProfile ? 'Mi perfil' : 'Perfil'}
+          onBack={() => navigation.goBack()}
+          onShare={() => {}}
+          onEdit={goEdit}
+          onSettings={goSettings}
+          onMore={() => {}}
+        />
+        <ProfileSkeleton />
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError || !profile) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <PlayerProfileTopBar
+          isOwnProfile={isOwnProfile}
+          title={isOwnProfile ? 'Mi perfil' : 'Perfil'}
+          onBack={() => navigation.goBack()}
+          onShare={() => {}}
+          onEdit={goEdit}
+          onSettings={goSettings}
+          onMore={() => {}}
+        />
+        <View style={styles.errorWrap}>
+          <EmptyStateCard
+            icon={
+              loadError === 'no-existe' ? (
+                <UserX color={dsColors.loss} size={18} strokeWidth={2} />
+              ) : (
+                <AlertCircle color={dsColors.loss} size={18} strokeWidth={2} />
+              )
+            }
+            title={
+              loadError === 'no-existe'
+                ? 'Este jugador no existe'
+                : loadError === 'sin-sesion'
+                  ? 'Inicia sesión para ver tu perfil'
+                  : 'No pudimos cargar el perfil'
+            }
+            subtitle={
+              loadError === 'no-existe'
+                ? 'La cuenta pudo haberse eliminado.'
+                : 'Revisa tu conexión e inténtalo otra vez.'
+            }
+            actionLabel={loadError === 'no-existe' ? 'Volver' : 'Reintentar'}
+            onAction={
+              loadError === 'no-existe'
+                ? () => navigation.goBack()
+                : () => {
+                    setLoading(true);
+                    load();
+                  }
+            }
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // La ficha "Club" muestra mi club sea cual sea mi rol; invitar exige ser admin.
+  const clubActual = isOwnProfile ? misClubs[0]?.club?.nombre || null : null;
+  const puedeInvitarAClub =
+    !isOwnProfile && misClubs.some((c) => c.miRol === 'admin');
+  // El estado "perfil nuevo" sale de los datos reales, no de una bandera visual.
+  const perfilVacio = perfilIncompleto({ profile, history, photos });
 
   return (
-    <View style={styles.root}>
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        {/* Header — distinto si es mi perfil o el de otro */}
-        <View style={styles.header}>
-          {isMyProfile ? (
-            <Logo size={28} />
-          ) : (
-            <Pressable
-              onPress={() => navigation.goBack()}
-              hitSlop={12}
-              style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
-            >
-              <ArrowLeft color={colors.textPrimary} size={20} />
-            </Pressable>
-          )}
-          {!isMyProfile && <Logo size={26} />}
-          {isMyProfile ? (
-            <Pressable
-              onPress={() => navigation.navigate('Settings')}
-              hitSlop={12}
-              style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
-            >
-              <Settings color={colors.textPrimary} size={20} />
-            </Pressable>
-          ) : (
-            <View style={{ width: 40 }} />
-          )}
-        </View>
+    <SafeAreaView edges={['top']} style={styles.root}>
+      <PlayerProfileTopBar
+        isOwnProfile={isOwnProfile}
+        title={isOwnProfile ? 'Mi perfil' : `@${profile.username || 'jugador'}`}
+        onBack={() => navigation.goBack()}
+        onShare={handleShare}
+        onEdit={goEdit}
+        onSettings={goSettings}
+        onMore={() => setReportOpen(true)}
+      />
 
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.primary}
-            />
-          }
-        >
-          {banner && (
-            <Banner
-              type={banner.type}
-              title={banner.title}
-              message={banner.message}
-              onClose={() => setBanner(null)}
-            />
-          )}
-
-          {/* Hero card */}
-          <View style={styles.heroCard}>
-            <Pressable
-              onPress={() => profile?.foto_url && setPhotoViewer(true)}
-              disabled={!profile?.foto_url}
-              style={styles.avatar}
-            >
-              {profile?.foto_url ? (
-                <Image source={{ uri: profile.foto_url }} style={styles.avatarImage} />
-              ) : (
-                <UserIcon color={colors.primary} size={42} strokeWidth={1.5} />
-              )}
-            </Pressable>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.username}>
-                @{profile?.username || 'jugador'}
-              </Text>
-              <View style={styles.metaRow}>
-                {profile?.edad ? (
-                  <View style={styles.metaItem}>
-                    <Calendar color={colors.textSecondary} size={12} />
-                    <Text style={styles.metaText}>{profile.edad} años</Text>
-                  </View>
-                ) : null}
-                {profile?.comuna ? (
-                  <View style={styles.metaItem}>
-                    <MapPin color={colors.textSecondary} size={12} />
-                    <Text style={styles.metaText}>
-                      {profile.comuna}
-                      {profile.region ? `, CL` : ''}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <View style={styles.tagsRow}>
-                {renderPosiciones(profile?.posicion_preferida)}
-                {profile?.flanco && (
-                  <View style={styles.smallTag}>
-                    <Text style={styles.smallTagText}>{FLANCO_LABEL[profile.flanco]}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={dsColors.green}
+            colors={[dsColors.green]}
+          />
+        }
+      >
+        {banner && (
+          <View style={styles.bannerWrap}>
+            <Banner {...banner} onClose={() => setBanner(null)} />
           </View>
+        )}
 
-          {/* Bio */}
-          {profile?.bio ? (
-            <View style={styles.bioCard}>
-              <Text style={styles.bioText}>{profile.bio}</Text>
-            </View>
-          ) : isMyProfile ? (
-            <Pressable
-              onPress={() => navigation.navigate('EditProfile')}
-              style={({ pressed }) => [
-                styles.bioCard,
-                styles.bioCardEmpty,
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Edit3 color={colors.primary} size={14} />
-              <Text style={styles.bioEmptyText}>
-                Agrega una descripción sobre tu trayectoria
-              </Text>
-            </Pressable>
-          ) : null}
+        <PlayerHeroCard
+          profile={profile}
+          badges={badges}
+          metaLabel={metaJugador(profile, stats?.partidos_jugados ?? 0)}
+          clubNombre={clubActual}
+          rating={rating}
+          inicial={inicialDe(profile)}
+          perfilVacio={perfilVacio}
+          onPressAvatar={profile.foto_url ? () => setAvatarViewer(true) : undefined}
+          onPressBanner={isOwnProfile ? goEdit : undefined}
+          onPressClub={isOwnProfile && clubActual ? () => navigation.navigate('ClubsTab') : undefined}
+          onPressRating={rating.hasRatings ? goTrustHistory : undefined}
+        />
 
-          {/* Botones de acción para perfil ajeno */}
-          {!isMyProfile && (
-            <FriendActionRow
+        {/* Acciones sobre otro jugador (amistad, contactar, invitar, reportar) */}
+        {!isOwnProfile && (
+          <View style={styles.publicActions}>
+            <PlayerPublicActions
               friendship={friendship}
               myId={myId}
               busy={friendBusy}
+              puedeInvitarAClub={puedeInvitarAClub}
+              yaReportado={yaReportado}
               onAdd={handleAddFriend}
               onAccept={handleAcceptFriend}
               onReject={handleRejectFriend}
               onCancel={handleCancelRequest}
               onRemove={handleRemoveFriend}
               onMessage={handleSendMessage}
+              onInviteClub={handleInviteClub}
+              onReport={() => setReportOpen(true)}
             />
-          )}
-
-          {/* Card: Galería de fotos */}
-          <GalleryCard
-            photos={galleryPhotos}
-            isMyProfile={isMyProfile}
-            username={profile?.username || 'jugador'}
-            onTap={(index) => setGalleryViewerIndex(index)}
-            onShowAll={() => setGalleryOpen(true)}
-            onNavigateEdit={() => navigation.navigate('EditProfile')}
-          />
-
-          {/* Card: Historial Deportivo */}
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <FileText color={colors.primary} size={16} />
-              <Text style={styles.cardTitle}>Historial Deportivo</Text>
-            </View>
-
-            <View style={styles.statsRow}>
-              <StatBlock value={stats?.partidos_jugados ?? 0} label="Partidos Jugados" />
-              <StatBlock value={history.filter(h => h.match).length} label="Inscritos" />
-              <StatBlock value={stats?.mvps ?? 0} label="MVPs" highlighted />
-            </View>
-
-            <View style={{ height: 14 }} />
-            <View style={styles.attRow}>
-              <Text style={styles.attLabel}>Tasa de Asistencia</Text>
-              <Text style={styles.attValue}>{stats?.tasa_asistencia ?? 100}%</Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${stats?.tasa_asistencia ?? 100}%` },
-                ]}
-              />
-            </View>
-
-            <Text style={styles.subSectionTitle}>ÚLTIMAS PARTICIPACIONES</Text>
-            {history.length === 0 ? (
-              <View style={styles.emptyMini}>
-                <Text style={styles.emptyMiniText}>
-                  Aún no te has inscrito a partidos. Cuando lo hagas, aparecerán aquí.
-                </Text>
-              </View>
-            ) : (
-              history.slice(0, 4).map((h) => (
-                <View key={h.id} style={styles.histRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.histTitle} numberOfLines={1}>
-                      {h.match?.titulo || 'Partido eliminado'}
-                    </Text>
-                    {h.match?.hora ? (
-                      <Text style={styles.histDate}>{fmtFecha(h.match.hora)}</Text>
-                    ) : null}
-                  </View>
-                  <StatusBadge estado={h.estado} />
-                </View>
-              ))
-            )}
           </View>
-
-          {/* Card: Reputación */}
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <Star color={colors.primary} size={16} />
-              <Text style={styles.cardTitle}>Reputación</Text>
-            </View>
-
-            <View style={styles.repRow}>
-              <View>
-                <View style={styles.starsRow}>
-                  {[1, 2, 3, 4, 5].map((i) => {
-                    const score =
-                      ratingSummary?.count > 0
-                        ? ratingSummary.overall
-                        : (stats?.stars ?? 5);
-                    const filled = i <= Math.round(score);
-                    return (
-                      <Star
-                        key={i}
-                        color={filled ? '#F2C94C' : colors.borderSoft}
-                        fill={filled ? '#F2C94C' : 'transparent'}
-                        size={20}
-                      />
-                    );
-                  })}
-                </View>
-                <Text style={styles.repSubtext}>
-                  {ratingSummary?.count > 0
-                    ? `${ratingSummary.overall.toFixed(1)} / 5.0 · ${ratingSummary.count} evaluación${ratingSummary.count === 1 ? '' : 'es'}`
-                    : 'Sin evaluaciones aún'}
-                </Text>
-              </View>
-              <Pressable
-                style={({ pressed }) => [styles.trustBlock, pressed && { opacity: 0.7 }]}
-                onPress={() => navigation.navigate('TrustScoreHistory')}
-              >
-                <Text style={styles.trustValue}>{stats?.trust_score ?? 100}</Text>
-                <Text style={styles.trustLabel}>Trust Score</Text>
-                <Text style={styles.trustTap}>Ver historial</Text>
-              </Pressable>
-            </View>
-
-            <Text style={styles.subSectionTitle}>CALIFICACIONES DE COMPAÑEROS</Text>
-            {ratingSummary?.count > 0 ? (
-              <>
-                <RatingDimension label="Puntualidad" value={ratingSummary.avg_puntualidad} />
-                <RatingDimension label="Fair play" value={ratingSummary.avg_fairplay} />
-                <RatingDimension label="Nivel" value={ratingSummary.avg_nivel} />
-              </>
-            ) : (
-              <View style={styles.tagsCloud}>
-                <Text style={styles.placeholderText}>
-                  Las calificaciones aparecerán cuando otros jugadores te
-                  evalúen después de partidos confirmados por GPS. ⚡
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Card: Asistencia y Penalizaciones */}
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <ShieldCheck color={colors.primary} size={16} />
-              <Text style={styles.cardTitle}>Asistencia y Penalizaciones</Text>
-            </View>
-
-            <View style={styles.bigStatsRow}>
-              <BigStat
-                value={stats?.confirmados_historial ?? 0}
-                label="Confirmadas por ubicación"
-              />
-              <BigStat
-                value={stats?.asistencias_confirmadas ?? 0}
-                label="Confirmadas totales"
-                icon={UserIcon}
-              />
-            </View>
-
-            <KV label="Ausencias acumuladas" value="0" />
-            <KV label="Sanciones activas" value="0" />
-            <KV label="Reportes recibidos" value="0" />
-            <KV label="Estado de apelaciones" value="Sin apelaciones" />
-
-            <View style={styles.statusGood}>
-              <ShieldCheck color={colors.primary} size={16} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.statusGoodTitle}>{stats?.estado_cuenta || 'Cuenta en buen estado'}</Text>
-                <Text style={styles.statusGoodSub}>
-                  Sin sanciones ni restricciones activas
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Card: Auditoria y Soporte */}
-          <View style={styles.card}>
-            <View style={styles.cardTitleRow}>
-              <FileText color={colors.primary} size={16} />
-              <Text style={styles.cardTitle}>Auditoría y Soporte</Text>
-            </View>
-            <KV label="Última revisión de soporte" value="Sin revisiones" />
-            <KV label="Resultado" value="—" />
-            <KV label="Próxima auditoría" value="Automática" />
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.appealBtn,
-                pressed && { opacity: 0.7 },
-              ]}
-              onPress={() =>
-                setBanner({
-                  type: 'info',
-                  title: 'Próximamente',
-                  message: 'El sistema de apelaciones se habilitará cuando lances la beta pública.',
-                })
-              }
-            >
-              <Text style={styles.appealLabel}>Apelar una decisión</Text>
-            </Pressable>
-          </View>
-
-          {/* Acciones — solo en mi perfil */}
-          {isMyProfile && (
-            <>
-              <Pressable
-                onPress={() => navigation.navigate('EditProfile')}
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Edit3 color={colors.primary} size={16} />
-                <Text style={styles.actionLabel}>Editar mi perfil</Text>
-                <ChevronRight color={colors.textMuted} size={16} />
-              </Pressable>
-
-              <Pressable
-                onPress={handleLogout}
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  { borderColor: colors.error },
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <LogOut color={colors.error} size={16} />
-                <Text style={[styles.actionLabel, { color: colors.error }]}>
-                  Cerrar sesión
-                </Text>
-                <ChevronRight color={colors.error} size={16} />
-              </Pressable>
-            </>
-          )}
-
-          {!isSupabaseConfigured && (
-            <Text style={styles.demoNotice}>
-              ⚠️ Modo demo — los datos arriba son de ejemplo.
-            </Text>
-          )}
-
-          <View style={{ height: 32 }} />
-        </ScrollView>
-      </SafeAreaView>
-
-      {/* Galería completa */}
-      <FullGalleryModal
-        visible={galleryOpen}
-        photos={galleryPhotos}
-        onClose={() => setGalleryOpen(false)}
-        onTapPhoto={(idx) => setGalleryViewerIndex(idx)}
-      />
-
-      {/* Visor de foto de perfil (avatar) */}
-      <Modal
-        visible={photoViewer}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPhotoViewer(false)}
-      >
-        <Pressable style={styles.viewerBackdrop} onPress={() => setPhotoViewer(false)}>
-          <Pressable onPress={() => setPhotoViewer(false)} hitSlop={12} style={styles.viewerClose}>
-            <X color="#FFFFFF" size={26} />
-          </Pressable>
-          {profile?.foto_url && (
-            <Image
-              source={{ uri: profile.foto_url }}
-              style={styles.viewerImage}
-              resizeMode="contain"
-            />
-          )}
-        </Pressable>
-      </Modal>
-
-      {/* Visor de galería con navegación */}
-      <Modal
-        visible={galleryViewerIndex !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setGalleryViewerIndex(null)}
-      >
-        <View style={styles.viewerBackdrop}>
-          <Pressable
-            onPress={() => setGalleryViewerIndex(null)}
-            hitSlop={12}
-            style={styles.viewerClose}
-          >
-            <X color="#FFFFFF" size={26} />
-          </Pressable>
-
-          {galleryViewerIndex !== null && galleryPhotos[galleryViewerIndex] && (
-            <Image
-              source={{ uri: galleryPhotos[galleryViewerIndex].photo_url }}
-              style={styles.viewerImage}
-              resizeMode="contain"
-            />
-          )}
-
-          {/* Contador */}
-          {galleryPhotos.length > 1 && galleryViewerIndex !== null && (
-            <Text style={styles.viewerCounter}>
-              {galleryViewerIndex + 1} / {galleryPhotos.length}
-            </Text>
-          )}
-
-          {/* Botones prev / next */}
-          <View style={styles.viewerNavRow}>
-            <Pressable
-              onPress={() => setGalleryViewerIndex((i) => Math.max(0, i - 1))}
-              disabled={galleryViewerIndex === 0}
-              style={[styles.viewerNavBtn, galleryViewerIndex === 0 && { opacity: 0 }]}
-            >
-              <ChevronLeft color="#fff" size={30} />
-            </Pressable>
-            <Pressable
-              onPress={() => setGalleryViewerIndex((i) => Math.min(galleryPhotos.length - 1, i + 1))}
-              disabled={galleryViewerIndex === galleryPhotos.length - 1}
-              style={[styles.viewerNavBtn, galleryViewerIndex === galleryPhotos.length - 1 && { opacity: 0 }]}
-            >
-              <ChevronRight color="#fff" size={30} />
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
-// ---- Botonera de amistad ----
-function FriendActionRow({
-  friendship, myId, busy,
-  onAdd, onAccept, onReject, onCancel, onRemove, onMessage,
-}) {
-  let state = 'none';
-  if (friendship) {
-    if (friendship.status === 'accepted') state = 'friends';
-    else if (friendship.status === 'pending') {
-      state = friendship.requester_id === myId ? 'sent' : 'received';
-    } else if (friendship.status === 'rejected' || friendship.status === 'blocked') {
-      state = 'none'; // permite reintentar
-    }
-  }
-
-  return (
-    <View style={friendStyles.row}>
-      {state === 'none' && (
-        <Pressable
-          onPress={onAdd}
-          disabled={busy}
-          style={({ pressed }) => [
-            friendStyles.primaryBtn,
-            pressed && { opacity: 0.85 },
-            busy && { opacity: 0.5 },
-          ]}
-        >
-          <UserPlus color="#0E0E0D" size={16} strokeWidth={2.4} />
-          <Text style={friendStyles.primaryLabel}>Agregar amigo</Text>
-        </Pressable>
-      )}
-
-      {state === 'sent' && (
-        <Pressable
-          onPress={onCancel}
-          disabled={busy}
-          style={({ pressed }) => [
-            friendStyles.outlineBtn,
-            pressed && { opacity: 0.7 },
-            busy && { opacity: 0.5 },
-          ]}
-        >
-          <Clock color={colors.textSecondary} size={14} />
-          <Text style={friendStyles.outlineLabel}>Solicitud enviada · cancelar</Text>
-        </Pressable>
-      )}
-
-      {state === 'received' && (
-        <>
-          <Pressable
-            onPress={onAccept}
-            disabled={busy}
-            style={({ pressed }) => [
-              friendStyles.primaryBtn,
-              pressed && { opacity: 0.85 },
-              busy && { opacity: 0.5 },
-            ]}
-          >
-            <UserCheck color="#0E0E0D" size={16} strokeWidth={2.4} />
-            <Text style={friendStyles.primaryLabel}>Aceptar</Text>
-          </Pressable>
-          <Pressable
-            onPress={onReject}
-            disabled={busy}
-            style={({ pressed }) => [
-              friendStyles.dangerBtn,
-              pressed && { opacity: 0.7 },
-              busy && { opacity: 0.5 },
-            ]}
-          >
-            <UserX color={colors.error} size={16} />
-          </Pressable>
-        </>
-      )}
-
-      {state === 'friends' && (
-        <Pressable
-          onPress={onRemove}
-          disabled={busy}
-          style={({ pressed }) => [
-            friendStyles.outlineBtn,
-            pressed && { opacity: 0.7 },
-            busy && { opacity: 0.5 },
-          ]}
-        >
-          <UserCheck color={colors.primary} size={14} />
-          <Text style={[friendStyles.outlineLabel, { color: colors.primary }]}>
-            Amigos · quitar
-          </Text>
-        </Pressable>
-      )}
-
-      {state === 'friends' && (
-        <Pressable
-          onPress={onMessage}
-          style={({ pressed }) => [
-            friendStyles.secondaryBtn,
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <MessageCircle color={colors.primary} size={16} />
-          <Text style={friendStyles.secondaryLabel}>Mensaje</Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
-// ---- Helpers internos ----
-
-function renderPosiciones(pref) {
-  // pref puede ser array (nuevo schema), string (legacy) o null
-  let arr = [];
-  if (Array.isArray(pref)) arr = pref;
-  else if (typeof pref === 'string' && pref) arr = [pref];
-  if (arr.length === 0) return null;
-  return arr
-    .filter((p) => p !== 'sin_definir')
-    .map((p) => (
-      <View key={p} style={styles.smallTag}>
-        <Text style={styles.smallTagText}>{POSICION_LABEL[p] || p}</Text>
-      </View>
-    ));
-}
-
-function signalFromTrust(score) {
-  if (score == null) return 'Excelente';
-  if (score >= 85) return 'Excelente';
-  if (score >= 70) return 'Alta';
-  if (score >= 50) return 'Media';
-  return 'Baja';
-}
-
-// ---- Subcomponentes ----
-
-function RatingDimension({ label, value }) {
-  const v = Number(value || 0);
-  return (
-    <View style={styles.ratingDimRow}>
-      <Text style={styles.ratingDimLabel}>{label}</Text>
-      <View style={styles.ratingDimRight}>
-        <View style={styles.ratingDimStars}>
-          {[1, 2, 3, 4, 5].map((i) => {
-            const filled = i <= Math.round(v);
-            return (
-              <Star
-                key={i}
-                color={filled ? '#F2C94C' : colors.borderSoft}
-                fill={filled ? '#F2C94C' : 'transparent'}
-                size={14}
-              />
-            );
-          })}
-        </View>
-        <Text style={styles.ratingDimValue}>{v.toFixed(1)}</Text>
-      </View>
-    </View>
-  );
-}
-
-function StatBlock({ value, label, highlighted }) {
-  return (
-    <View style={[styles.statBlock, highlighted && styles.statBlockHi]}>
-      <Text style={[styles.statValue, highlighted && { color: colors.primary }]}>
-        {value}
-      </Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function BigStat({ value, label, icon: Icon = MapPin }) {
-  return (
-    <View style={styles.bigStat}>
-      <View style={styles.bigStatIcon}>
-        <Icon color={colors.primary} size={18} />
-      </View>
-      <Text style={styles.bigStatValue}>{value}</Text>
-      <Text style={styles.bigStatLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function StatusBadge({ estado }) {
-  const palette = {
-    inscrito: { bg: colors.surface, fg: colors.textSecondary, label: 'Inscrito' },
-    confirmado_gps: { bg: colors.primarySoft, fg: colors.primary, label: '✓ Asistió' },
-    no_asistio: { bg: colors.errorSoft, fg: colors.error, label: 'No asistió' },
-    cancelado: { bg: colors.surface, fg: colors.textMuted, label: 'Cancelado' },
-  }[estado] || { bg: colors.surface, fg: colors.textSecondary, label: estado };
-  return (
-    <View style={[styles.statusBadge, { backgroundColor: palette.bg }]}>
-      <Text style={[styles.statusBadgeText, { color: palette.fg }]}>{palette.label}</Text>
-    </View>
-  );
-}
-
-function SignalRow({ label, value, inverse = false }) {
-  const goodLabels = inverse
-    ? new Set(['Ninguna', 'Baja'])
-    : new Set(['Excelente', 'Alta']);
-  const isGood = goodLabels.has(value);
-  return (
-    <View style={styles.signalRow}>
-      <Text style={styles.signalLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.signalValue,
-          isGood ? { color: colors.primary } : { color: colors.textSecondary },
-        ]}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function KV({ label, value }) {
-  return (
-    <View style={styles.kv}>
-      <Text style={styles.kvLabel}>{label}</Text>
-      <Text style={styles.kvValue}>{value}</Text>
-    </View>
-  );
-}
-
-// ── Galería de fotos ─────────────────────────────────────────────
-const SCREEN_W = Dimensions.get('window').width;
-// Vista completa (3 cols, gap 4): se usa en FullGalleryModal
-const THUMB_SIZE = Math.floor((SCREEN_W - 40 - 4 * 2) / 3);
-// Vista colapsada en perfil (3 celdas iguales en fila, gap 4)
-const THUMB_SIZE_3ROW = Math.floor((SCREEN_W - 40 - 4 * 2) / 3);
-
-// Muestra 3 celdas en fila horizontal: foto[0], foto[1], foto[2] con overlay "+X".
-function GalleryCard({ photos, isMyProfile, username, onTap, onShowAll, onNavigateEdit }) {
-  const previewPhotos = photos.slice(0, 3);
-  const remaining = photos.length - 2; // fotos no visibles completamente
-
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardTitleRow}>
-        <Images color={colors.primary} size={16} />
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          Galería de {username}
-        </Text>
-        {isMyProfile && photos.length > 0 && (
-          <Pressable onPress={onNavigateEdit} hitSlop={10} style={{ marginLeft: 'auto' }}>
-            <Text style={styles.galleryEditLink}>Gestionar</Text>
-          </Pressable>
         )}
-      </View>
 
-      {photos.length === 0 ? (
-        <View style={styles.galleryEmpty}>
-          {isMyProfile ? (
-            <Pressable onPress={onNavigateEdit} style={styles.galleryAddHint}>
-              <Images color={colors.textMuted} size={28} />
-              <Text style={styles.galleryEmptyText}>
-                Añade fotos desde «Editar perfil»
-              </Text>
-            </Pressable>
-          ) : (
-            <View style={styles.galleryAddHint}>
-              <Images color={colors.textMuted} size={28} />
-              <Text style={styles.galleryEmptyText}>Sin fotos aún</Text>
-            </View>
-          )}
-        </View>
-      ) : (
-        <View style={styles.galleryGridPreview}>
-          {previewPhotos.map((photo, idx) => {
-            const showOverlay = idx === 2 && photos.length > 2;
-            return (
-              <Pressable
-                key={photo.id}
-                onPress={showOverlay ? onShowAll : () => onTap(idx)}
-                style={({ pressed }) => [styles.galleryThumb3Row, pressed && { opacity: 0.82 }]}
-              >
-                <Image
-                  source={{ uri: photo.photo_url }}
-                  style={styles.galleryThumbImg}
-                  resizeMode="cover"
-                />
-                {showOverlay && (
-                  <View style={styles.galleryOverlay}>
-                    <Text style={styles.galleryOverlayCount}>+{remaining}</Text>
-                    <Text style={styles.galleryOverlayLabel}>fotos</Text>
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
-}
+        {/* ── Sobre mí ── */}
+        {(profile.bio?.trim() || isOwnProfile) && (
+          <>
+            <SectionHeader
+              title="Sobre mí"
+              actionLabel={isOwnProfile && profile.bio?.trim() ? 'Editar' : null}
+              onAction={isOwnProfile && profile.bio?.trim() ? goEdit : null}
+            />
+            <PlayerBioSection bio={profile.bio} isOwnProfile={isOwnProfile} onEdit={goEdit} />
+          </>
+        )}
 
-// Modal con la galería completa desplazable.
-function FullGalleryModal({ visible, photos, onClose, onTapPhoto }) {
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <View style={styles.fullGalleryRoot}>
-        <SafeAreaView edges={['top']} style={styles.fullGalleryHeaderWrap}>
-          <View style={styles.fullGalleryHeader}>
-            <Text style={styles.fullGalleryTitle}>
-              Galería · {photos.length} {photos.length === 1 ? 'foto' : 'fotos'}
-            </Text>
-            <Pressable
-              onPress={onClose}
-              hitSlop={12}
-              style={({ pressed }) => [styles.fullGalleryClose, pressed && { opacity: 0.6 }]}
-            >
-              <X color={colors.textPrimary} size={22} />
-            </Pressable>
-          </View>
-        </SafeAreaView>
+        {/* ── Rendimiento ── */}
+        <SectionHeader title="Rendimiento" />
+        <PlayerStatsCard stats={stats} attendance={attendance} />
 
-        <ScrollView
-          contentContainerStyle={styles.fullGalleryScroll}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.galleryGrid}>
-            {photos.map((photo, idx) => (
-              <Pressable
-                key={photo.id}
-                onPress={() => onTapPhoto(idx)}
-                style={({ pressed }) => [styles.galleryThumb, pressed && { opacity: 0.8 }]}
-              >
-                <Image
-                  source={{ uri: photo.photo_url }}
-                  style={styles.galleryThumbImg}
-                  resizeMode="cover"
-                />
-              </Pressable>
+        {/* ── Últimas participaciones ── */}
+        <SectionHeader
+          title="Últimas participaciones"
+          actionLabel={participaciones.length > 0 ? 'Ver todo' : null}
+          onAction={
+            participaciones.length > 0 ? () => navigation.navigate('SearchTab') : null
+          }
+        />
+        {participaciones.length === 0 ? (
+          <EmptyStateCard
+            icon={<Clock color={dsColors.textSecondary} size={18} strokeWidth={1.9} />}
+            title={isOwnProfile ? 'Aún no te has inscrito a partidos' : 'Sin participaciones'}
+            subtitle={
+              isOwnProfile
+                ? 'Cuando lo hagas, aparecerán aquí'
+                : 'Este jugador todavía no ha jugado partidos'
+            }
+            actionLabel={isOwnProfile ? 'Buscar partidos' : null}
+            onAction={isOwnProfile ? () => navigation.navigate('SearchTab') : null}
+            variant="solid"
+          />
+        ) : (
+          <View style={styles.participaciones}>
+            {participaciones.map((p) => (
+              <ParticipationCard
+                key={p.id}
+                titulo={p.match.titulo || 'Partido'}
+                meta={metaParticipacion(p)}
+                estado={participacionEstado(p)}
+                esMvp={false}
+                onPress={() =>
+                  p.id.startsWith?.('demo-')
+                    ? showBanner(
+                        'info',
+                        'Partido de ejemplo',
+                        'Es una maqueta de desarrollo, no existe en la base de datos.'
+                      )
+                    : navigation.navigate('MatchDetail', { matchId: p.match.id })
+                }
+              />
             ))}
           </View>
-        </ScrollView>
-      </View>
-    </Modal>
+        )}
+
+        {/* ── Galería ── */}
+        <SectionHeader
+          title={isOwnProfile ? 'Mi galería' : 'Galería'}
+          actionLabel={photos.length > 0 ? 'Ver todas' : null}
+          onAction={photos.length > 0 ? () => setGalleryIndex(0) : null}
+        />
+        <PlayerPhotoGallery
+          photos={photos}
+          isOwnProfile={isOwnProfile}
+          onAdd={goEdit}
+          onOpenPhoto={(idx) => setGalleryIndex(idx)}
+        />
+
+        {/* ── Reputación ── */}
+        <SectionHeader
+          title="Reputación"
+          actionLabel={isOwnProfile ? 'Ver historial' : null}
+          onAction={isOwnProfile ? goTrustHistory : null}
+        />
+        <ReputationCard rating={rating} trust={trust} />
+
+        {/* ── Estado de la cuenta ── */}
+        <SectionHeader title="Estado de la cuenta" />
+        <AccountStatusCard
+          suspended={accountStatus.suspended}
+          suspendedUntil={accountStatus.suspended_until}
+          stats={stats}
+          reportesRecibidos={reportesRecibidos}
+          isOwnProfile={isOwnProfile}
+        />
+
+        {/* ── Auditoría y acciones: solo el dueño de la cuenta ── */}
+        {isOwnProfile && (
+          <>
+            <AuditSupportCard reportesRecibidos={reportesRecibidos} />
+
+            <ProfileActionRow
+              icon={<Pencil color={dsColors.green} size={17} strokeWidth={2} />}
+              label="Editar mi perfil"
+              onPress={goEdit}
+              style={styles.actionSpaced}
+            />
+
+            <Pressable
+              onPress={() => setLogoutConfirm(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar sesión"
+              style={({ pressed }) => [styles.logout, pressed && { opacity: 0.8 }]}
+            >
+              <LogOut color={dsColors.loss} size={17} strokeWidth={2} />
+              <Text style={styles.logoutText}>Cerrar sesión</Text>
+            </Pressable>
+          </>
+        )}
+
+        {!isSupabaseConfigured && (
+          <Text style={styles.demoNote}>
+            Modo demo · configura Supabase para ver datos reales
+          </Text>
+        )}
+      </ScrollView>
+
+      {/* Hoja de reporte */}
+      <ReportPlayerSheet
+        visible={reportOpen && !isOwnProfile}
+        username={profile.username || 'jugador'}
+        onClose={() => setReportOpen(false)}
+        onSubmit={handleSubmitReport}
+      />
+
+      {/* Confirmación de cierre de sesión */}
+      <Modal
+        visible={logoutConfirm}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setLogoutConfirm(false)}
+      >
+        <Pressable style={styles.dialogBackdrop} onPress={() => setLogoutConfirm(false)}>
+          <Pressable style={styles.dialog} onPress={() => {}}>
+            <Text style={styles.dialogTitle}>¿Cerrar sesión?</Text>
+            <Text style={styles.dialogText}>
+              Tendrás que volver a iniciar sesión para entrar a tu cuenta.
+            </Text>
+            <Pressable
+              onPress={handleLogout}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar cerrar sesión"
+              style={({ pressed }) => [styles.dialogDanger, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.dialogDangerText}>Cerrar sesión</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setLogoutConfirm(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar"
+              style={({ pressed }) => [styles.dialogCancel, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.dialogCancelText}>Cancelar</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Visor del avatar */}
+      <Modal
+        visible={avatarViewer}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setAvatarViewer(false)}
+      >
+        <Pressable style={styles.viewer} onPress={() => setAvatarViewer(false)}>
+          {profile.foto_url && (
+            <Image source={{ uri: profile.foto_url }} style={styles.viewerImg} resizeMode="contain" />
+          )}
+          <Text style={styles.viewerHint}>Toca para cerrar</Text>
+        </Pressable>
+      </Modal>
+
+      {/* Visor de la galería con navegación */}
+      <Modal
+        visible={galleryIndex !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setGalleryIndex(null)}
+      >
+        <View style={styles.viewer}>
+          <Pressable
+            onPress={() => setGalleryIndex(null)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar la galería"
+            style={styles.viewerClose}
+          >
+            <X color={dsColors.textPrimary} size={22} strokeWidth={2.2} />
+          </Pressable>
+
+          {galleryIndex !== null && photos[galleryIndex] && (
+            <Image
+              source={{ uri: photos[galleryIndex].photo_url }}
+              style={styles.viewerImg}
+              resizeMode="contain"
+              accessibilityLabel={`Foto ${galleryIndex + 1} de ${photos.length}`}
+            />
+          )}
+
+          <View style={styles.viewerNav}>
+            <Pressable
+              onPress={() => setGalleryIndex((i) => Math.max(0, (i ?? 0) - 1))}
+              disabled={galleryIndex === 0}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Foto anterior"
+              style={({ pressed }) => [
+                styles.viewerNavBtn,
+                galleryIndex === 0 && styles.viewerNavOff,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <ChevronLeft color={dsColors.textPrimary} size={22} strokeWidth={2.2} />
+            </Pressable>
+            <Text style={styles.viewerCounter}>
+              {(galleryIndex ?? 0) + 1} / {photos.length}
+            </Text>
+            <Pressable
+              onPress={() => setGalleryIndex((i) => Math.min(photos.length - 1, (i ?? 0) + 1))}
+              disabled={galleryIndex === photos.length - 1}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Foto siguiente"
+              style={({ pressed }) => [
+                styles.viewerNavBtn,
+                galleryIndex === photos.length - 1 && styles.viewerNavOff,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <ChevronRight color={dsColors.textPrimary} size={22} strokeWidth={2.2} />
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
+  root: { flex: 1, backgroundColor: dsColors.background },
+  scroll: { paddingBottom: 36 },
+  bannerWrap: { paddingHorizontal: dsSizes.gutter, paddingBottom: 12 },
+  errorWrap: { paddingTop: 8 },
 
-  heroCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginBottom: 12,
-  },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: { width: '100%', height: '100%' },
-  viewerBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewerImage: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').width,
-  },
-  viewerClose: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  username: {
-    color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-    flexWrap: 'wrap',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    gap: 6,
+  publicActions: { marginTop: 14 },
+  participaciones: { paddingHorizontal: dsSizes.gutter, gap: 8 },
+
+  actionSpaced: { marginTop: 10 },
+  logout: {
+    minHeight: 50,
+    marginHorizontal: dsSizes.gutter,
     marginTop: 8,
-    flexWrap: 'wrap',
-  },
-  smallTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: colors.background,
-    borderRadius: radius.sm,
+    borderRadius: dsRadius.md,
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  smallTagText: {
-    color: colors.textPrimary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-
-  bioCard: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginBottom: 12,
-  },
-  bioCardEmpty: {
+    borderColor: 'rgba(232, 115, 123, 0.35)',
+    backgroundColor: 'rgba(232, 115, 123, 0.07)',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    borderStyle: 'dashed',
   },
-  bioText: {
-    color: colors.textPrimary,
+  logoutText: { color: dsColors.loss, fontSize: 14, fontWeight: '700' },
+  demoNote: {
+    color: dsColors.textMuted,
+    fontSize: 11.5,
+    textAlign: 'center',
+    marginTop: 16,
+    paddingHorizontal: dsSizes.gutter,
+  },
+
+  // Diálogo de confirmación
+  dialogBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  dialog: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: dsColors.surface,
+    borderRadius: dsRadius.xl,
+    borderWidth: 1,
+    borderColor: dsColors.border,
+    padding: 18,
+  },
+  dialogTitle: { color: dsColors.textPrimary, fontSize: 17, fontWeight: '800' },
+  dialogText: {
+    color: dsColors.textSecondary,
     fontSize: 13,
     lineHeight: 19,
-  },
-  bioEmptyText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    flex: 1,
-  },
-
-  card: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginBottom: 12,
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 14,
-  },
-  cardTitle: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  statBlock: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  statBlockHi: {},
-  statValue: {
-    color: colors.primary,
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  statLabel: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-
-  attRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  attLabel: { color: colors.textSecondary, fontSize: 12 },
-  attValue: { color: colors.primary, fontSize: 14, fontWeight: '800' },
-  progressBar: {
-    height: 8,
-    backgroundColor: colors.background,
-    borderRadius: 4,
     marginTop: 6,
-    marginBottom: 14,
-    overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 4,
-  },
-
-  subSectionTitle: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  histRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-  },
-  histTitle: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
-  histDate: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-  emptyMini: {
-    padding: 14,
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
+  dialogDanger: {
+    minHeight: 48,
+    marginTop: 16,
+    borderRadius: dsRadius.md,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-  },
-  emptyMiniText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 17,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-
-  repRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  starsRow: { flexDirection: 'row', gap: 2 },
-  repSubtext: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  ratingDimRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 7,
-  },
-  ratingDimLabel: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  ratingDimRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  ratingDimStars: { flexDirection: 'row', gap: 1 },
-  ratingDimValue: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '800',
-    minWidth: 26,
-    textAlign: 'right',
-  },
-  trustBlock: {
-    alignItems: 'flex-end',
-  },
-  trustValue: {
-    color: colors.primary,
-    fontSize: 30,
-    fontWeight: '800',
-    lineHeight: 32,
-  },
-  trustLabel: {
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  trustTap: {
-    color: colors.primary,
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 3,
-  },
-  tagsCloud: {
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginBottom: 4,
-  },
-  placeholderText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-
-  signalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  signalLabel: { color: colors.textPrimary, fontSize: 13 },
-  signalValue: { fontSize: 13, fontWeight: '700' },
-
-  bigStatsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 6,
-  },
-  bigStat: {
-    flex: 1,
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    alignItems: 'center',
-  },
-  bigStatIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  bigStatValue: {
-    color: colors.textPrimary,
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  bigStatLabel: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-
-  kv: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-  },
-  kvLabel: { color: colors.textPrimary, fontSize: 13 },
-  kvValue: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-
-  statusGood: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.md,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    marginTop: 12,
-  },
-  statusGoodTitle: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  statusGoodSub: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 2,
-  },
-
-  appealBtn: {
-    marginTop: 12,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(232, 115, 123, 0.35)',
+    backgroundColor: 'rgba(232, 115, 123, 0.10)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  appealLabel: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  dialogDangerText: { color: dsColors.loss, fontSize: 14.5, fontWeight: '700' },
+  dialogCancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  dialogCancelText: { color: dsColors.textSecondary, fontSize: 14, fontWeight: '600' },
 
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginTop: 8,
-  },
-  actionLabel: {
+  // Visores de imagen
+  viewer: {
     flex: 1,
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  demoNotice: {
-    color: colors.textMuted,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 18,
-    lineHeight: 16,
-  },
-
-  // Galería
-  galleryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  galleryThumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    backgroundColor: colors.background,
-  },
-  galleryThumbImg: { width: '100%', height: '100%' },
-  galleryEmpty: {
-    paddingVertical: 8,
-  },
-  galleryAddHint: {
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-  },
-  galleryEmptyText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  galleryEditLink: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  // Galería colapsada en perfil (3 celdas en fila horizontal)
-  galleryGridPreview: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  galleryThumb3Row: {
-    flex: 1,
-    height: THUMB_SIZE_3ROW,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    backgroundColor: colors.background,
-  },
-  galleryOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.60)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    padding: 24,
+    gap: 14,
   },
-  galleryOverlayCount: {
-    color: '#FFFFFF',
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  galleryOverlayLabel: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-
-  // Modal galería completa
-  fullGalleryRoot: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  fullGalleryHeaderWrap: {
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  fullGalleryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  fullGalleryTitle: {
-    color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  fullGalleryClose: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fullGalleryScroll: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-
-  // Visor de galería
-  viewerCounter: {
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  viewerNavRow: {
-    position: 'absolute',
-    bottom: 60,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
+  viewerImg: { width: '100%', flex: 1, borderRadius: dsRadius.xl },
+  viewerHint: { color: dsColors.textSecondary, fontSize: 12.5 },
+  viewerClose: { position: 'absolute', top: 44, right: 20, zIndex: 2, padding: 6 },
+  viewerNav: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   viewerNavBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 44,
+    height: 44,
+    borderRadius: dsRadius.md,
+    backgroundColor: dsColors.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
-
-const friendStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  primaryBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 46,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-  },
-  primaryLabel: {
-    color: '#0E0E0D',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  outlineBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 46,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  outlineLabel: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  secondaryBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 46,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
-  },
-  secondaryLabel: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  dangerBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.error,
-    backgroundColor: colors.errorSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  viewerNavOff: { opacity: 0.3 },
+  viewerCounter: { color: dsColors.textPrimary, fontSize: 13, fontWeight: '700', minWidth: 56, textAlign: 'center' },
 });

@@ -249,3 +249,50 @@ export async function uploadClubBanner(clubId, asset) {
 
   return { url };
 }
+
+/**
+ * Sube la portada del perfil del jugador y guarda la URL en
+ * `profiles.banner_url` (migración 30).
+ *
+ * Reutiliza el bucket `avatars`, en `<user_id>/banner.<ext>`: es el mismo
+ * espacio del avatar, así que hereda sus políticas de acceso.
+ */
+export async function uploadProfileBanner(asset) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!asset) return { error: { message: 'Falta la imagen' } };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: 'No autenticado' } };
+
+  const ext = extFromAsset(asset);
+  const path = `${user.id}/banner.${ext}`;
+  const contentType = asset.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const body = await getUploadBody(asset);
+  const { error, url } = await uploadToBucket('avatars', path, body, contentType);
+  if (error) {
+    console.error('[FutFinder] uploadProfileBanner:', error);
+    return { error };
+  }
+
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ banner_url: url, updated_at: new Date().toISOString() })
+    .eq('id', user.id);
+
+  if (updateError) {
+    // Sin migración 30 la columna no existe: la imagen sí quedó subida, pero
+    // no se puede referenciar todavía.
+    console.error('[FutFinder] uploadProfileBanner update:', updateError);
+    if (updateError.code === '42703') {
+      return {
+        error: {
+          message: 'Las portadas de perfil aún no están disponibles. Aplica la migración 30 en Supabase.',
+        },
+      };
+    }
+    return { error: updateError };
+  }
+
+  return { url };
+}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
-import { clubColors, clubSizes } from '../../theme/colors';
+import { dsColors, dsSizes } from '../../theme/colors';
 
 /**
  * Cabecera de sección: título a la izquierda y acción verde a la derecha
@@ -32,12 +32,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: dsSizes.gutter,
     paddingTop: 26,
     paddingBottom: 10,
   },
   title: {
-    color: clubColors.textPrimary,
+    color: dsColors.textPrimary,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   },
   action: { paddingVertical: 6, paddingLeft: 10 },
   actionText: {
-    color: clubColors.green,
+    color: dsColors.green,
     fontSize: 13,
     fontWeight: '700',
   },

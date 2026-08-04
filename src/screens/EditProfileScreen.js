@@ -29,7 +29,7 @@ import Button from '../components/Button';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
 import { getMyProfile, updateMyProfile } from '../services/profile';
-import { pickImage, uploadAvatar } from '../services/storage';
+import { pickImage, uploadAvatar, uploadProfileBanner } from '../services/storage';
 import {
   getProfilePhotos,
   uploadGalleryPhoto,
@@ -38,6 +38,7 @@ import {
 } from '../services/gallery';
 import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
+import { OPCIONES_MODALIDAD, OPCIONES_NIVEL } from '../utils/playerMeta';
 
 const POSICIONES = [
   { value: 'arquero', label: 'Arquero' },
@@ -68,7 +69,11 @@ export default function EditProfileScreen({ navigation }) {
   const [region, setRegion] = useState('');
   const [comuna, setComuna] = useState('');
   const [fotoUrl, setFotoUrl] = useState(null);
+  const [bannerUrl, setBannerUrl] = useState(null);
+  const [modalidad, setModalidad] = useState(null);
+  const [nivel, setNivel] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
   const [regionOpen, setRegionOpen] = useState(false);
   const [comunaOpen, setComunaOpen] = useState(false);
@@ -97,6 +102,9 @@ export default function EditProfileScreen({ navigation }) {
         setRegion(p.region || '');
         setComuna(p.comuna || '');
         setFotoUrl(p.foto_url || null);
+        setBannerUrl(p.banner_url || null);
+        setModalidad(p.modalidad || null);
+        setNivel(p.nivel || null);
 
         // Cargar galería
         const { data: photos } = await getProfilePhotos(p.id);
@@ -105,6 +113,32 @@ export default function EditProfileScreen({ navigation }) {
       setLoading(false);
     })();
   }, []);
+
+  // ---- Subida de portada del perfil ----
+  const handlePickBanner = async () => {
+    if (uploadingBanner) return;
+    const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.7 });
+    if (!ok) {
+      if (reason && reason !== 'Cancelado') {
+        setBanner({ type: 'error', title: 'No pude abrir tus fotos', message: reason });
+      }
+      return;
+    }
+    setUploadingBanner(true);
+    const { url, error } = await uploadProfileBanner(asset);
+    setUploadingBanner(false);
+    if (error) {
+      setBanner({ type: 'error', title: 'No pude subir la portada', message: error.message || '' });
+      return;
+    }
+    setBannerUrl(url);
+    setBanner({
+      type: 'success',
+      title: 'Portada actualizada',
+      message: 'Ya se ve en tu perfil.',
+    });
+    setTimeout(() => setBanner(null), 3000);
+  };
 
   // ---- Subida de foto de perfil ----
   const handlePickAvatar = async () => {
@@ -233,6 +267,8 @@ export default function EditProfileScreen({ navigation }) {
       flanco,
       region: region || null,
       comuna: comuna || null,
+      modalidad: modalidad || null,
+      nivel: nivel || null,
     });
     setSaving(false);
 
@@ -328,6 +364,34 @@ export default function EditProfileScreen({ navigation }) {
               {uploadingPhoto ? 'Subiendo foto…' : 'Toca el avatar para cambiar tu foto'}
             </Text>
 
+            <Label>Portada del perfil</Label>
+            <Pressable
+              onPress={handlePickBanner}
+              disabled={uploadingBanner}
+              accessibilityRole="button"
+              accessibilityLabel={bannerUrl ? 'Cambiar la portada' : 'Subir una portada'}
+              style={({ pressed }) => [styles.bannerTap, pressed && { opacity: 0.85 }]}
+            >
+              {bannerUrl ? (
+                <Image source={{ uri: bannerUrl }} style={styles.bannerImg} resizeMode="cover" />
+              ) : (
+                <View style={styles.bannerPlaceholder}>
+                  <Camera color={colors.textMuted} size={20} />
+                  <Text style={styles.bannerHint}>
+                    {uploadingBanner ? 'Subiendo portada…' : 'Subir portada (opcional)'}
+                  </Text>
+                </View>
+              )}
+              {bannerUrl && (
+                <View style={styles.bannerEditChip}>
+                  <Camera color={colors.textPrimary} size={13} />
+                  <Text style={styles.bannerEditChipText}>
+                    {uploadingBanner ? 'Subiendo…' : 'Cambiar portada'}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+
             <Label>@username</Label>
             <TextInput
               style={styles.input}
@@ -391,6 +455,55 @@ export default function EditProfileScreen({ navigation }) {
             </View>
             <Text style={styles.fieldHint}>
               Seleccionadas: {posiciones.length} · máx. 4
+            </Text>
+
+            <Label>Modalidad que juegas</Label>
+            <View style={styles.posGrid}>
+              {OPCIONES_MODALIDAD.map((op) => {
+                const selected = modalidad === op.value;
+                return (
+                  <Pressable
+                    key={op.value}
+                    // Volver a tocar la opción activa la deselecciona.
+                    onPress={() => setModalidad(selected ? null : op.value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Modalidad ${op.label}`}
+                    style={[styles.posChip, selected && styles.posChipActive]}
+                  >
+                    <Text style={[styles.posChipLabel, selected && styles.posChipLabelActive]}>
+                      {selected ? '✓ ' : ''}{op.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.fieldHint}>
+              Se muestra en tu perfil. Sin elegir aparece como “Fútbol N.A.”.
+            </Text>
+
+            <Label>Tu nivel</Label>
+            <View style={styles.posGrid}>
+              {OPCIONES_NIVEL.map((op) => {
+                const selected = nivel === op.value;
+                return (
+                  <Pressable
+                    key={op.value}
+                    onPress={() => setNivel(selected ? null : op.value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${op.label}, ${op.hint}`}
+                    style={[styles.posChip, selected && styles.posChipActive]}
+                  >
+                    <Text style={[styles.posChipLabel, selected && styles.posChipLabelActive]}>
+                      {selected ? '✓ ' : ''}{op.label} · {op.hint}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.fieldHint}>
+              Lo declaras tú; no es un ranking calculado. Sin elegir aparece como “Nivel N.A.”.
             </Text>
 
             <Label>Descripción (bio)</Label>
@@ -694,6 +807,40 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginBottom: 18,
   },
+  bannerTap: {
+    width: '100%',
+    height: 120,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  bannerImg: { width: '100%', height: '100%' },
+  bannerPlaceholder: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+  },
+  bannerHint: { color: colors.textMuted, fontSize: 13 },
+  bannerEditChip: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  bannerEditChipText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
 
   label: {
     color: colors.textSecondary,

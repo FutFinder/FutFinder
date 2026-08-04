@@ -26,12 +26,12 @@ import Banner from '../components/Banner';
 import ClubHeaderBar from '../components/club/ClubHeaderBar';
 import ClubHeroCard from '../components/club/ClubHeroCard';
 import CreateChallengeButton from '../components/club/CreateChallengeButton';
-import SectionHeader from '../components/club/SectionHeader';
+import SectionHeader from '../components/ds/SectionHeader';
 import RivalClubCard from '../components/club/RivalClubCard';
 import MatchHistoryCard from '../components/club/MatchHistoryCard';
 import ClubPhotoGallery from '../components/club/ClubPhotoGallery';
 import PremiumUpsellCard from '../components/club/PremiumUpsellCard';
-import EmptyStateCard from '../components/club/EmptyStateCard';
+import EmptyStateCard from '../components/ds/EmptyStateCard';
 import { getCurrentUser } from '../services/auth';
 import {
   getClubById,
