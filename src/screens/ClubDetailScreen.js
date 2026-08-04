@@ -5,8 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Image,
   Modal,
+  Share,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
@@ -14,26 +14,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowLeft,
-  Shield,
-  Crown,
-  BadgeCheck,
-  Pencil,
-  Users,
-  MapPin,
   Search,
-  UserPlus,
   Swords,
-  Image as ImageIcon,
-  ImagePlus,
+  UserPlus,
   Trophy,
   ChevronRight,
-  Sparkles,
 } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { clubColors, clubRadius, clubSizes } from '../theme/colors';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
-import { premiumGold } from '../components/PremiumBadge';
+import ClubHeaderBar from '../components/club/ClubHeaderBar';
+import ClubHeroCard from '../components/club/ClubHeroCard';
+import CreateChallengeButton from '../components/club/CreateChallengeButton';
+import SectionHeader from '../components/club/SectionHeader';
+import RivalClubCard from '../components/club/RivalClubCard';
+import MatchHistoryCard from '../components/club/MatchHistoryCard';
+import ClubPhotoGallery from '../components/club/ClubPhotoGallery';
+import PremiumUpsellCard from '../components/club/PremiumUpsellCard';
+import EmptyStateCard from '../components/club/EmptyStateCard';
 import { getCurrentUser } from '../services/auth';
 import {
   getClubById,
@@ -46,13 +44,42 @@ import {
 } from '../services/clubs';
 import { getClubPhotos } from '../services/clubGallery';
 import { countPendingForClub } from '../services/clubChallenges';
+import {
+  getClubMatchHistory,
+  getDemoMatchHistory,
+  calcularRecord,
+  formatFechaCorta,
+  usarHistorialDemo,
+} from '../services/clubMatches';
+import {
+  modalidadBadges,
+  nivelBadge,
+  nivelInline,
+  ratingLabel as fmtRating,
+  distanciaEntreClubesKm,
+  metaRival,
+} from '../utils/clubMeta';
 
-// El récord V-E-D no tiene backend real todavía (no existe marcador en
-// `matches` ni agregación de resultados por club); se muestra en 0 hasta que
-// se implemente el subsistema de competencia. La calificación de clubes
-// tampoco existe como campo, por eso se muestra "—".
-const RECORD_PLACEHOLDER = { v: 0, e: 0, d: 0 };
+/** Máximo de rivales sugeridos en el carrusel. */
+const MAX_RIVALES = 10;
+/** Partidos visibles en la muestra del historial. */
+const MAX_HISTORIAL = 3;
 
+/**
+ * Detalle del club ("Mi club").
+ *
+ * DATOS REALES: club, miembros, fotos, desafíos pendientes, rivales sugeridos
+ * (con distancia calculada desde la comuna) y partidos de club de la BD.
+ *
+ * DATOS AÚN NO EXISTENTES EN EL BACKEND, mostrados como N.A. sin inventarse:
+ *  - nivel del club        → "NIVEL N.A."
+ *  - valoración del club   → "N.A." con estrella
+ *  - marcador de partidos  → "vs" en lugar de un score
+ *
+ * FIXTURES DE DESARROLLO (solo con __DEV__, ver services/clubMatches.js):
+ *  - 3 partidos de ejemplo (V/D/E) y su récord 1-1-1 coherente
+ *  - placeholders de la galería cuando no hay fotos reales
+ */
 export default function ClubDetailScreen({ navigation, route }) {
   const { clubId } = route.params || {};
 
@@ -65,6 +92,7 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [myRequest, setMyRequest] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [rivals, setRivals] = useState([]);
+  const [historial, setHistorial] = useState([]);
   const [pendingChallenges, setPendingChallenges] = useState(0);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
@@ -76,33 +104,56 @@ export default function ClubDetailScreen({ navigation, route }) {
   // Puedo desafiar a este club si soy admin de OTRO club distinto.
   const puedoDesafiar =
     !soyMiembro && (myClubs || []).some((c) => c.miRol === 'admin' && c.club?.id !== clubId);
+  // Soy admin de algún club → puedo desafiar a los rivales del carrusel.
+  const puedoDesafiarRivales = (myClubs || []).some((c) => c.miRol === 'admin');
 
   const load = useCallback(async () => {
     const user = await getCurrentUser();
     const myId = user?.id || null;
     setMe(myId);
 
-    const [{ data: c }, { data: ms }, { data: mine }, { data: ph }, { data: candidatos }, pending] =
-      await Promise.all([
-        getClubById(clubId),
-        listMembers(clubId),
-        getMyClubs(),
-        getClubPhotos(clubId),
-        searchClubs(''),
-        countPendingForClub(clubId),
-      ]);
+    const [
+      { data: c },
+      { data: ms },
+      { data: mine },
+      { data: ph },
+      { data: candidatos },
+      { data: partidos },
+      pending,
+    ] = await Promise.all([
+      getClubById(clubId),
+      listMembers(clubId),
+      getMyClubs(),
+      getClubPhotos(clubId),
+      searchClubs(''),
+      getClubMatchHistory(clubId),
+      countPendingForClub(clubId),
+    ]);
+
     setClub(c);
     setMembers(ms || []);
     setMyClubs(mine || []);
     setPhotos(ph || []);
     setPendingChallenges(pending || 0);
 
-    // "Equipos en tu zona": otros clubes, priorizando la misma comuna.
+    // Historial: real si existe; si no y estamos en desarrollo, fixtures.
+    const reales = partidos || [];
+    setHistorial(reales.length > 0 ? reales : usarHistorialDemo() ? getDemoMatchHistory() : []);
+
+    // Rivales sugeridos: otros clubes, ordenados por distancia real cuando
+    // se puede calcular; los que no tienen comuna conocida van al final.
     const misClubIds = new Set((mine || []).map((m) => m.club?.id).filter(Boolean));
     const otros = (candidatos || []).filter((r) => r.id !== clubId && !misClubIds.has(r.id));
-    const misma = otros.filter((r) => c && r.comuna && r.comuna === c.comuna);
-    const resto = otros.filter((r) => !misma.includes(r));
-    setRivals([...misma, ...resto].slice(0, 10));
+    const conDistancia = otros.map((r) => ({
+      ...r,
+      distanciaKm: c ? distanciaEntreClubesKm(c, r) : null,
+    }));
+    conDistancia.sort((a, b) => {
+      if (a.distanciaKm === null) return 1;
+      if (b.distanciaKm === null) return -1;
+      return a.distanciaKm - b.distanciaKm;
+    });
+    setRivals(conDistancia.slice(0, MAX_RIVALES));
 
     const amMember = (ms || []).some((m) => m.user_id === myId);
     if (!amMember && myId) {
@@ -154,6 +205,23 @@ export default function ClubDetailScreen({ navigation, route }) {
     setMyRequest(null);
   };
 
+  const handleShare = async () => {
+    if (!club) return;
+    try {
+      await Share.share({
+        message: `Mira el club ${club.nombre} en FutFinder${
+          club.comuna ? ` · ${club.comuna}` : ''
+        }`,
+      });
+    } catch {
+      setBanner({
+        type: 'error',
+        title: 'No se pudo compartir',
+        message: 'Inténtalo de nuevo en unos segundos.',
+      });
+    }
+  };
+
   const goToChallenge = (rival) => {
     navigation.navigate('ClubChallenge', {
       rivalClubId: rival.id,
@@ -162,65 +230,54 @@ export default function ClubDetailScreen({ navigation, route }) {
     });
   };
 
+  const goToGallery = () => navigation.navigate('ClubGallery', { clubId });
+  const goToExplore = () => navigation.navigate('ExploreClubs');
+
   if (loading || !club) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
-        <View style={styles.topBar}>
+        <View style={styles.loadingBar}>
           <Pressable
             onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Volver"
+            style={({ pressed }) => [styles.loadingBackBtn, pressed && { opacity: 0.6 }]}
           >
-            <ArrowLeft color={colors.textPrimary} size={22} />
+            <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
           </Pressable>
         </View>
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={clubColors.green} />
         </View>
       </SafeAreaView>
     );
   }
 
   const esPremium = club.plan === 'premium';
+  const historialVisible = historial.slice(0, MAX_HISTORIAL);
+  const esHistorialDemo = historialVisible.some((p) => p.esDemo);
+  // El récord se deriva del historial: real con datos reales, 1-1-1 con fixtures.
+  const record = calcularRecord(historial);
+
+  const miembrosLabel = [
+    club.comuna || null,
+    `${members.length} ${members.length === 1 ? 'miembro' : 'miembros'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      {/* HEADER */}
-      <View style={styles.topBar}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
-        >
-          <ArrowLeft color={colors.textPrimary} size={22} />
-        </Pressable>
-
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {soyMiembro ? 'Mi club' : club.nombre}
-        </Text>
-
-        {soyAdmin && (
-          <Pressable
-            onPress={() => navigation.navigate('EditClub', { club })}
-            hitSlop={8}
-            style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.6 }]}
-          >
-            <Pencil color={colors.primary} size={16} />
-            <Text style={styles.editLabel}>Editar</Text>
-          </Pressable>
-        )}
-
-        <Pressable
-          onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
-          hitSlop={8}
-          style={({ pressed }) => [styles.planChip, pressed && { opacity: 0.7 }]}
-        >
-          <Crown color={esPremium ? premiumGold : colors.textSecondary} size={15} />
-          <Text style={[styles.planChipText, { color: esPremium ? premiumGold : colors.textSecondary }]}>
-            {esPremium ? 'Premium' : 'Gratis'}
-          </Text>
-        </Pressable>
-      </View>
+      <ClubHeaderBar
+        title={soyMiembro ? 'Mi club' : club.nombre}
+        esPremium={esPremium}
+        puedeEditar={soyAdmin}
+        onBack={() => navigation.goBack()}
+        onShare={handleShare}
+        onEdit={() => navigation.navigate('EditClub', { club })}
+        onPlan={() => navigation.navigate('ClubPlans', { clubId: club.id })}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -229,129 +286,76 @@ export default function ClubDetailScreen({ navigation, route }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+            tintColor={clubColors.green}
+            colors={[clubColors.green]}
           />
         }
       >
-        {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
-
-        {/* TARJETA DE IDENTIDAD: banner + logo + nombre + stats */}
-        <View style={styles.card}>
-          <View style={styles.bannerBox}>
-            {club.banner_url ? (
-              <Image source={{ uri: club.banner_url }} style={styles.bannerImg} resizeMode="cover" />
-            ) : (
-              <View style={styles.bannerFallback}>
-                <View style={styles.bannerGlow} />
-              </View>
-            )}
+        {banner && (
+          <View style={styles.bannerWrap}>
+            <Banner {...banner} onClose={() => setBanner(null)} />
           </View>
+        )}
 
-          <View style={styles.cardBody}>
-            <View style={styles.identityRow}>
-              {club.foto_url ? (
-                <Image source={{ uri: club.foto_url }} style={styles.logo} />
-              ) : (
-                <View style={[styles.logo, styles.logoFallback]}>
-                  <Shield color={colors.primary} size={30} strokeWidth={1.6} />
-                </View>
-              )}
-              <View style={styles.nameCol}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.clubName} numberOfLines={1}>
-                    {club.nombre}
-                  </Text>
-                  {club.verificado && <BadgeCheck color={premiumGold} size={17} strokeWidth={2.2} />}
-                </View>
-                <Pressable
-                  onPress={() => navigation.navigate('ClubMembers', { clubId: club.id })}
-                  style={({ pressed }) => [styles.metaRow, pressed && { opacity: 0.7 }]}
-                  hitSlop={6}
-                >
-                  <MapPin color={colors.textMuted} size={12} />
-                  <Text style={styles.metaText} numberOfLines={1}>
-                    {club.comuna ? `${club.comuna} · ` : ''}
-                    {members.length} {members.length === 1 ? 'miembro' : 'miembros'}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+        <ClubHeroCard
+          club={club}
+          badges={modalidadBadges(club.modalidad)}
+          nivelLabel={nivelBadge(club.nivel)}
+          miembrosLabel={miembrosLabel}
+          record={record}
+          ratingLabel={fmtRating(club.rating)}
+          onPressMiembros={() => navigation.navigate('ClubMembers', { clubId: club.id })}
+        />
 
-            <View style={styles.statsGrid}>
-              <View style={[styles.statCell, styles.statCellWin]}>
-                <Text style={[styles.statNumber, { color: colors.primary }]}>{RECORD_PLACEHOLDER.v}</Text>
-                <Text style={[styles.statLabel, { color: colors.primary }]}>V</Text>
-              </View>
-              <View style={styles.statCell}>
-                <Text style={styles.statNumber}>{RECORD_PLACEHOLDER.e}</Text>
-                <Text style={styles.statLabel}>E</Text>
-              </View>
-              <View style={[styles.statCell, styles.statCellLoss]}>
-                <Text style={[styles.statNumber, { color: colors.error }]}>{RECORD_PLACEHOLDER.d}</Text>
-                <Text style={[styles.statLabel, { color: colors.error }]}>D</Text>
-              </View>
-              <View style={styles.statCell}>
-                <Text style={styles.statNumber}>—</Text>
-                <Text style={styles.statLabel}>RATING</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* ACCIÓN PRINCIPAL + BUSCAR */}
-        <View style={styles.actionRow}>
-          {soyMiembro && soyAdmin ? (
-            <Button
-              label="Crear desafío"
-              icon={<Swords color="#0E0E0D" size={18} strokeWidth={2.4} />}
-              onPress={() => setChallengeSheetOpen(true)}
-              style={{ flex: 1 }}
-            />
-          ) : puedoDesafiar ? (
-            <Button
-              label="Desafiar a este club"
-              icon={<Swords color="#0E0E0D" size={18} strokeWidth={2.4} />}
-              onPress={() => goToChallenge({ id: club.id, nombre: club.nombre, foto_url: club.foto_url })}
-              style={{ flex: 1 }}
-            />
-          ) : !soyMiembro && !tengoMaxClubs ? (
-            myRequest ? (
-              <Button
-                label="Cancelar solicitud"
-                variant="secondary"
-                loading={working}
-                onPress={handleCancelRequest}
-                style={{ flex: 1 }}
-              />
-            ) : (
-              <Button
-                label="Solicitar unirme"
-                icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
-                loading={working}
-                onPress={handleJoin}
-                style={{ flex: 1 }}
-              />
-            )
-          ) : (
-            <View style={{ flex: 1 }} />
-          )}
-          <Pressable
-            onPress={() => navigation.navigate('ExploreClubs')}
-            style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}
-          >
-            <Search color={colors.textPrimary} size={20} />
-          </Pressable>
-        </View>
+        {/* Acción principal, según mi relación con el club */}
+        {soyAdmin ? (
+          <CreateChallengeButton
+            label="Crear desafío"
+            onPress={() => setChallengeSheetOpen(true)}
+            onSearch={goToExplore}
+          />
+        ) : puedoDesafiar ? (
+          <CreateChallengeButton
+            label="Desafiar a este club"
+            accessibilityLabel={`Desafiar a ${club.nombre}`}
+            onPress={() => goToChallenge(club)}
+            onSearch={goToExplore}
+          />
+        ) : !soyMiembro && !tengoMaxClubs ? (
+          <CreateChallengeButton
+            label={myRequest ? 'Cancelar solicitud' : 'Solicitar unirme'}
+            icon={
+              myRequest ? null : (
+                <UserPlus color={clubColors.greenInk} size={20} strokeWidth={2.4} />
+              )
+            }
+            disabled={working}
+            onPress={myRequest ? handleCancelRequest : handleJoin}
+            onSearch={goToExplore}
+          />
+        ) : (
+          <CreateChallengeButton
+            label="Buscar rivales"
+            icon={<Search color={clubColors.greenInk} size={20} strokeWidth={2.2} />}
+            onPress={goToExplore}
+            onSearch={goToExplore}
+          />
+        )}
 
         {/* Bandeja de desafíos (miembros del club) */}
         {soyMiembro && (
           <Pressable
             onPress={() => navigation.navigate('ClubChallenges', { clubId: club.id })}
-            style={({ pressed }) => [styles.rowItem, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              pendingChallenges > 0
+                ? `Desafíos. ${pendingChallenges} pendientes`
+                : 'Desafíos del club'
+            }
+            style={({ pressed }) => [styles.rowItem, pressed && styles.rowPressed]}
           >
-            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <Swords color={colors.primary} size={17} />
+            <View style={styles.rowIcon}>
+              <Swords color={clubColors.green} size={17} strokeWidth={2} />
             </View>
             <Text style={styles.rowLabel}>Desafíos</Text>
             {pendingChallenges > 0 && (
@@ -359,125 +363,148 @@ export default function ClubDetailScreen({ navigation, route }) {
                 <Text style={styles.rowBadgeText}>{pendingChallenges}</Text>
               </View>
             )}
-            <ChevronRight color={colors.textMuted} size={18} />
+            <ChevronRight color={clubColors.textMuted} size={18} strokeWidth={2.2} />
           </Pressable>
         )}
 
-        {/* BUSCAR RIVALES */}
-        <SectionHeader
-          title="Buscar rivales"
-          actionLabel="Ver todos"
-          onAction={() => navigation.navigate('ExploreClubs')}
-        />
+        {/* ── Buscar rivales ── */}
+        <SectionHeader title="Buscar rivales" actionLabel="Ver todos" onAction={goToExplore} />
         {rivals.length === 0 ? (
-          <EmptyCard
-            icon={<Search color={colors.textSecondary} size={18} strokeWidth={2} />}
+          <EmptyStateCard
+            icon={<Search color={clubColors.textSecondary} size={18} strokeWidth={2} />}
             title="Sin rivales cerca"
-            subtitle="Amplía tu búsqueda para encontrar más clubes"
+            subtitle="Amplía la búsqueda para encontrar más clubes"
             actionLabel="Buscar clubes"
-            onAction={() => navigation.navigate('ExploreClubs')}
+            onAction={goToExplore}
           />
         ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            snapToInterval={clubSizes.rivalCard + 10}
             contentContainerStyle={styles.rivalsRow}
           >
             {rivals.map((r) => (
-              <View key={r.id} style={styles.rivalCard}>
-                <Pressable
-                  onPress={() => navigation.navigate('ClubDetail', { clubId: r.id })}
-                  style={({ pressed }) => [styles.rivalTop, pressed && { opacity: 0.7 }]}
-                >
-                  <ClubCircle uri={r.foto_url} size={42} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.rivalName} numberOfLines={1}>
-                      {r.nombre}
-                    </Text>
-                    <Text style={styles.rivalMeta} numberOfLines={1}>
-                      {r.comuna || 'Sin comuna'} · {r.total_miembros}{' '}
-                      {r.total_miembros === 1 ? 'miembro' : 'miembros'}
-                    </Text>
-                  </View>
-                </Pressable>
-                {puedoDesafiar ? (
-                  <Pressable
-                    onPress={() => goToChallenge(r)}
-                    style={({ pressed }) => [styles.rivalChallengeBtn, pressed && { opacity: 0.75 }]}
-                  >
-                    <Text style={styles.rivalChallengeText}>Desafiar</Text>
-                  </Pressable>
-                ) : null}
-              </View>
+              <RivalClubCard
+                key={r.id}
+                club={r}
+                meta={metaRival({ distanciaKm: r.distanciaKm, modalidad: r.modalidad })}
+                ratingLabel={fmtRating(r.rating)}
+                nivelLabel={nivelInline(r.nivel)}
+                puedeDesafiar={puedoDesafiarRivales}
+                onPress={() => navigation.navigate('ClubDetail', { clubId: r.id })}
+                onChallenge={() => goToChallenge(r)}
+              />
             ))}
           </ScrollView>
         )}
 
-        {/* HISTORIAL DE PARTIDOS */}
-        <SectionHeader title="Historial de partidos" />
-        <EmptyCard
-          icon={<Trophy color={colors.textSecondary} size={18} strokeWidth={2} />}
-          title="Sin partidos"
-          subtitle="Tu club todavía no ha disputado partidos contra otros clubes"
-          actionLabel={soyAdmin ? 'Buscar un rival' : null}
-          onAction={soyAdmin ? () => navigation.navigate('ExploreClubs') : null}
-        />
-
-        {/* FOTOS DEL CLUB */}
+        {/* ── Historial de partidos ── */}
         <SectionHeader
-          title="Fotos del club"
-          actionLabel={photos.length > 0 ? 'Ver todas' : null}
-          onAction={photos.length > 0 ? () => navigation.navigate('ClubGallery', { clubId: club.id }) : null}
+          title="Historial de partidos"
+          actionLabel={historialVisible.length > 0 ? 'Ver todo' : null}
+          onAction={
+            historialVisible.length > 0
+              ? () => navigation.navigate('ClubChallenges', { clubId: club.id })
+              : null
+          }
         />
-        <PhotoGrid
-          photos={photos}
-          onPress={() => navigation.navigate('ClubGallery', { clubId: club.id })}
-        />
-
-        {/* UPSELL PREMIUM */}
-        {!esPremium && (
-          <Pressable
-            onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
-            style={({ pressed }) => [styles.upsellCard, pressed && { opacity: 0.85 }]}
-          >
-            <View style={styles.upsellIcon}>
-              <Sparkles color={premiumGold} size={18} strokeWidth={2} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.upsellTitle}>Desbloquea Premium</Text>
-              <Text style={styles.upsellSubtitle}>Más integrantes, más admins y verificación</Text>
-            </View>
-            <ChevronRight color={colors.textMuted} size={18} />
-          </Pressable>
+        {historialVisible.length === 0 ? (
+          <EmptyStateCard
+            icon={<Trophy color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+            title="Sin partidos"
+            subtitle="Tu club todavía no ha disputado partidos contra otros clubes"
+            actionLabel={soyAdmin ? 'Buscar un rival' : null}
+            onAction={soyAdmin ? goToExplore : null}
+            variant="solid"
+          />
+        ) : (
+          <View style={styles.historyList}>
+            {historialVisible.map((p) => (
+              <MatchHistoryCard
+                key={p.id}
+                miNombre={club.nombre}
+                rivalNombre={p.rivalNombre}
+                miMarcador={p.miMarcador}
+                suMarcador={p.suMarcador}
+                fechaLabel={formatFechaCorta(p)}
+                estado={p.estado}
+                resultado={p.resultado}
+                onPress={() =>
+                  p.esDemo
+                    ? setBanner({
+                        type: 'info',
+                        title: 'Partido de ejemplo',
+                        message:
+                          'Este partido es una maqueta de desarrollo, todavía no existe en la base de datos.',
+                      })
+                    : navigation.navigate('MatchDetail', { matchId: p.id })
+                }
+              />
+            ))}
+            {esHistorialDemo && (
+              <Text style={styles.demoNote}>
+                Partidos de ejemplo · solo visibles en desarrollo
+              </Text>
+            )}
+          </View>
         )}
 
-        {/* ACCIONES DE ADMIN */}
+        {/* ── Fotos del club ── */}
+        <SectionHeader
+          title="Fotos del club"
+          actionLabel={photos.length > 0 || usarHistorialDemo() ? 'Ver todas' : null}
+          onAction={photos.length > 0 || usarHistorialDemo() ? goToGallery : null}
+        />
+        <ClubPhotoGallery
+          photos={photos}
+          showDemo={usarHistorialDemo()}
+          puedeAñadir={soyAdmin}
+          onAdd={goToGallery}
+          onOpenPhoto={goToGallery}
+        />
+
+        {/* ── Premium ── */}
+        {!esPremium && (
+          <PremiumUpsellCard
+            onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
+          />
+        )}
+
+        {/* ── Acciones de admin ── */}
         {soyAdmin && (
           <View style={styles.adminList}>
             <Pressable
               onPress={() => navigation.navigate('ClubMembers', { clubId: club.id })}
-              style={({ pressed }) => [styles.adminRow, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Gestionar miembros del club"
+              style={({ pressed }) => [styles.adminRow, pressed && styles.rowPressed]}
             >
               <Text style={styles.adminRowText}>Gestionar miembros</Text>
-              <ChevronRight color={colors.textMuted} size={18} />
+              <ChevronRight color={clubColors.textMuted} size={18} strokeWidth={2.2} />
             </Pressable>
             <View style={styles.adminDivider} />
             <Pressable
               onPress={() => navigation.navigate('EditClub', { club })}
-              style={({ pressed }) => [styles.adminRow, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Ajustes del club"
+              style={({ pressed }) => [styles.adminRow, pressed && styles.rowPressed]}
             >
               <Text style={styles.adminRowText}>Ajustes del club</Text>
-              <ChevronRight color={colors.textMuted} size={18} />
+              <ChevronRight color={clubColors.textMuted} size={18} strokeWidth={2.2} />
             </Pressable>
           </View>
         )}
       </ScrollView>
 
-      {/* HOJA: crear desafío */}
+      {/* Hoja: crear desafío */}
       <Modal
         visible={challengeSheetOpen}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setChallengeSheetOpen(false)}
       >
         <Pressable style={styles.sheetBackdrop} onPress={() => setChallengeSheetOpen(false)}>
@@ -486,23 +513,30 @@ export default function ClubDetailScreen({ navigation, route }) {
             <Text style={styles.sheetTitle}>Crear desafío</Text>
             <Text style={styles.sheetSubtitle}>Elige cómo quieres encontrar rival</Text>
 
-            <Button
-              label="Elegir un club"
+            <Pressable
               onPress={() => {
                 setChallengeSheetOpen(false);
-                navigation.navigate('ExploreClubs');
+                goToExplore();
               }}
-              style={{ marginTop: 16 }}
-            />
+              accessibilityRole="button"
+              accessibilityLabel="Elegir un club para desafiar"
+              style={({ pressed }) => [styles.sheetPrimary, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.sheetPrimaryText}>Elegir un club</Text>
+            </Pressable>
+
             <Pressable
-              onPress={() =>
+              onPress={() => {
+                setChallengeSheetOpen(false);
                 setBanner({
                   type: 'info',
                   title: 'Próximamente',
                   message: 'El desafío abierto a cualquier club todavía no está disponible.',
-                })
-              }
-              style={({ pressed }) => [styles.sheetSecondaryBtn, pressed && { opacity: 0.7 }]}
+                });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Desafío abierto. Próximamente"
+              style={({ pressed }) => [styles.sheetSecondary, pressed && { opacity: 0.7 }]}
             >
               <Text style={styles.sheetSecondaryText}>Desafío abierto</Text>
               <Text style={styles.sheetSecondaryHint}>Próximamente</Text>
@@ -514,387 +548,90 @@ export default function ClubDetailScreen({ navigation, route }) {
   );
 }
 
-function SectionHeader({ title, actionLabel, onAction }) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {actionLabel ? (
-        <Pressable onPress={onAction} hitSlop={8}>
-          <Text style={styles.sectionAction}>{actionLabel}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-function EmptyCard({ icon, title, subtitle, actionLabel, onAction }) {
-  return (
-    <View style={styles.emptyCard}>
-      <View style={styles.emptyIcon}>{icon}</View>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptySubtitle}>{subtitle}</Text>
-      {actionLabel ? (
-        <Pressable
-          onPress={onAction}
-          style={({ pressed }) => [styles.emptyBtn, pressed && { opacity: 0.75 }]}
-        >
-          <Text style={styles.emptyBtnText}>{actionLabel}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-/** Círculo de logo de club con fallback a escudo. */
-function ClubCircle({ uri, size }) {
-  if (uri) {
-    return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
-  }
-  return (
-    <View style={[styles.clubCircleFallback, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Shield color={colors.textMuted} size={size * 0.45} strokeWidth={1.8} />
-    </View>
-  );
-}
-
-/**
- * Grid de fotos: celda "Añadir" + hasta 5 fotos, con overlay "+N" en la
- * última si hay más. Toca cualquier celda para abrir la galería completa.
- */
-function PhotoGrid({ photos, onPress }) {
-  const visibles = photos.slice(0, 5);
-  const restantes = photos.length - 5;
-
-  return (
-    <View style={styles.photoGrid}>
-      <Pressable onPress={onPress} style={[styles.photoCell, styles.photoAddCell]}>
-        <ImagePlus color={colors.primary} size={20} strokeWidth={2} />
-        <Text style={styles.photoAddLabel}>Añadir</Text>
-      </Pressable>
-      {visibles.length === 0 ? (
-        <Pressable onPress={onPress} style={[styles.photoCell, styles.photoCellSpan2]}>
-          <View style={styles.photoEmpty}>
-            <ImageIcon color={colors.textMuted} size={18} />
-            <Text style={styles.photoEmptyText}>Aún no hay fotos</Text>
-          </View>
-        </Pressable>
-      ) : (
-        visibles.map((foto, idx) => {
-          const esUltima = idx === visibles.length - 1;
-          return (
-            <Pressable key={foto.id} onPress={onPress} style={styles.photoCell}>
-              <Image source={{ uri: foto.photo_url }} style={styles.photoImg} resizeMode="cover" />
-              {esUltima && restantes > 0 && (
-                <View style={styles.photoOverlay}>
-                  <Text style={styles.photoOverlayText}>+{restantes}</Text>
-                </View>
-              )}
-            </Pressable>
-          );
-        })
-      )}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: clubColors.background },
+  scrollContent: { paddingBottom: 40 },
+
+  // Carga
+  loadingBar: { paddingHorizontal: clubSizes.gutter, paddingTop: 4, paddingBottom: 12 },
+  loadingBackBtn: {
+    width: clubSizes.iconBtn,
+    height: clubSizes.iconBtn,
+    borderRadius: clubRadius.md,
+    borderWidth: 1,
+    borderColor: clubColors.border,
+    backgroundColor: clubColors.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Header
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
-  },
-  editLabel: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-  planChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 36,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-  },
-  planChipText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.2, textTransform: 'uppercase' },
+  bannerWrap: { paddingHorizontal: clubSizes.gutter, paddingBottom: 12 },
 
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
-
-  // Tarjeta de identidad
-  card: {
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  bannerBox: { height: 100 },
-  bannerImg: { width: '100%', height: '100%' },
-  bannerFallback: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    overflow: 'hidden',
-  },
-  bannerGlow: {
-    position: 'absolute',
-    right: -40,
-    top: -50,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: colors.primarySoft,
-  },
-  cardBody: {
-    backgroundColor: colors.surface,
-    padding: 14,
-  },
-  identityRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-    marginTop: -30,
-  },
-  logo: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: colors.surface,
-    backgroundColor: colors.surfaceAlt,
-  },
-  logoFallback: { alignItems: 'center', justifyContent: 'center' },
-  nameCol: { flex: 1, minWidth: 0, paddingBottom: 2 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  clubName: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: -0.3, flexShrink: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  metaText: { color: colors.textMuted, fontSize: 12.5 },
-
-  statsGrid: { flexDirection: 'row', gap: 6, marginTop: 14 },
-  statCell: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 9,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-  },
-  statCellWin: { backgroundColor: colors.primarySoft, borderColor: 'rgba(113,181,51,0.24)' },
-  statCellLoss: { backgroundColor: 'rgba(229,72,77,0.10)', borderColor: 'rgba(229,72,77,0.24)' },
-  statNumber: { color: colors.textPrimary, fontSize: 18, fontWeight: '800' },
-  statLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 3 },
-
-  // Acción principal
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  searchBtn: {
-    width: 54,
-    height: 54,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Fila genérica (desafíos)
+  // Fila genérica (Desafíos)
   rowItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    marginHorizontal: clubSizes.gutter,
+    marginTop: 10,
+    backgroundColor: clubColors.surface,
+    borderRadius: clubRadius.lg,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: clubColors.borderSoft,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    marginBottom: 16,
   },
-  rowIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { flex: 1, color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  rowPressed: { backgroundColor: clubColors.surfaceHover },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: clubRadius.icon,
+    backgroundColor: clubColors.greenSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowLabel: {
+    flex: 1,
+    color: clubColors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   rowBadge: {
     minWidth: 20,
     height: 20,
-    borderRadius: 10,
     paddingHorizontal: 6,
-    backgroundColor: colors.error,
+    borderRadius: 10,
+    backgroundColor: clubColors.loss,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  rowBadgeText: { color: '#2A0C0F', fontSize: 11, fontWeight: '800' },
 
-  // Secciones
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-    marginBottom: 10,
-  },
-  sectionTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
-  sectionAction: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-
-  // Rivales (carrusel)
-  rivalsRow: { gap: 10, paddingBottom: 4 },
-  rivalCard: {
-    width: 196,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    padding: 12,
+  // Rivales
+  rivalsRow: {
     gap: 10,
+    paddingHorizontal: clubSizes.gutter,
+    paddingBottom: 4,
   },
-  rivalTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  rivalName: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  rivalMeta: { color: colors.textMuted, fontSize: 11.5, marginTop: 2 },
-  rivalChallengeBtn: {
-    height: 36,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(113,181,51,0.35)',
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rivalChallengeText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 
-  // Estado vacío
-  emptyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    padding: 18,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 9,
-  },
-  emptyTitle: { color: colors.textPrimary, fontSize: 13.5, fontWeight: '700' },
-  emptySubtitle: {
-    color: colors.textMuted,
-    fontSize: 11.5,
+  // Historial
+  historyList: { paddingHorizontal: clubSizes.gutter, gap: 8 },
+  demoNote: {
+    color: clubColors.textFaint,
+    fontSize: 11,
     textAlign: 'center',
-    marginTop: 4,
-    lineHeight: 16,
+    marginTop: 2,
   },
-  emptyBtn: {
-    marginTop: 12,
-    height: 36,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(113,181,51,0.35)',
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyBtnText: { color: colors.primary, fontSize: 12.5, fontWeight: '700' },
-
-  // Fotos
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  photoCell: {
-    width: '31%',
-    aspectRatio: 1,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-  },
-  photoCellSpan2: { width: '65.5%' },
-  photoAddCell: {
-    borderWidth: 1.5,
-    borderColor: 'rgba(113,181,51,0.4)',
-    borderStyle: 'dashed',
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  photoAddLabel: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  photoImg: { width: '100%', height: '100%' },
-  photoEmpty: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  photoEmptyText: { color: colors.textMuted, fontSize: 11 },
-  photoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoOverlayText: { color: colors.textPrimary, fontSize: 18, fontWeight: '800' },
-
-  // Upsell Premium
-  upsellCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    padding: 13,
-    marginBottom: 16,
-  },
-  upsellIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: 'rgba(212,164,55,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  upsellTitle: { color: colors.textPrimary, fontSize: 13.5, fontWeight: '700' },
-  upsellSubtitle: { color: colors.textMuted, fontSize: 11.5, marginTop: 2 },
 
   // Acciones de admin
   adminList: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    marginHorizontal: clubSizes.gutter,
+    marginTop: 10,
+    backgroundColor: clubColors.surface,
+    borderRadius: clubRadius.lg,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: clubColors.borderSoft,
     overflow: 'hidden',
   },
   adminRow: {
@@ -904,50 +641,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  adminRowText: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
-  adminDivider: { height: 1, backgroundColor: colors.borderSoft },
+  adminRowText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  adminDivider: { height: 1, backgroundColor: clubColors.divider },
 
   // Hoja "Crear desafío"
   sheetBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    backgroundColor: clubColors.surface,
+    borderTopLeftRadius: clubRadius.sheet,
+    borderTopRightRadius: clubRadius.sheet,
+    borderTopWidth: 1,
+    borderColor: clubColors.border,
+    paddingHorizontal: clubSizes.gutter,
+    paddingTop: 14,
     paddingBottom: 30,
   },
   sheetHandle: {
     width: 40,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignSelf: 'center',
     marginBottom: 14,
   },
-  sheetTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
-  sheetSubtitle: { color: colors.textMuted, fontSize: 12.5, marginTop: 4 },
-  sheetSecondaryBtn: {
-    height: 54,
-    marginTop: 8,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+  sheetTitle: {
+    color: clubColors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  sheetSubtitle: {
+    color: clubColors.textSecondary,
+    fontSize: 12.5,
+    marginTop: 4,
+  },
+  sheetPrimary: {
+    height: 52,
+    marginTop: 14,
+    borderRadius: clubRadius.md,
+    backgroundColor: clubColors.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetSecondaryText: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
-  sheetSecondaryHint: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-
-  clubCircleFallback: {
-    backgroundColor: colors.surfaceAlt,
+  sheetPrimaryText: {
+    color: clubColors.greenInk,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  sheetSecondary: {
+    height: 52,
+    marginTop: 8,
+    borderRadius: clubRadius.md,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: clubColors.border,
+    backgroundColor: clubColors.chip,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sheetSecondaryText: {
+    color: clubColors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  sheetSecondaryHint: {
+    color: clubColors.textMuted,
+    fontSize: 11,
+    marginTop: 2,
   },
 });

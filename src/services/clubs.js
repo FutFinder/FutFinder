@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { esModalidadValida } from '../utils/clubMeta';
 
 /**
  * Servicio de clubes.
@@ -19,6 +20,24 @@ export const CLUB_LIMITS = {
   premium: { miembros: 26, admins: 3 },
 };
 
+/**
+ * Compatibilidad con la migración 29 (columna `clubs.modalidad`).
+ *
+ * Si la migración todavía no se aplicó en Supabase, Postgres responde 42703
+ * ("column does not exist"). En vez de romper la pantalla, marcamos la
+ * columna como ausente y reintentamos sin ella: la UI mostrará
+ * "FÚTBOL N.A." hasta que se aplique la migración.
+ *
+ * Esta bandera se puede borrar una vez que la migración 29 esté aplicada
+ * en todos los entornos.
+ */
+let modalidadDisponible = true;
+
+/** `true` si el error de Postgres es "la columna no existe". */
+function esColumnaInexistente(error) {
+  return error?.code === '42703' && /modalidad/i.test(error?.message || '');
+}
+
 async function getMe() {
   const { data: { user } } = await supabase.auth.getUser();
   return user?.id || null;
@@ -38,7 +57,7 @@ function slugify(nombre) {
 /**
  * Crea un club y deja al creador como admin.
  */
-export async function createClub({ nombre, descripcion, region, comuna }) {
+export async function createClub({ nombre, descripcion, region, comuna, modalidad }) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   const me = await getMe();
   if (!me) return { error: { message: 'No autenticado' } };
@@ -46,6 +65,9 @@ export async function createClub({ nombre, descripcion, region, comuna }) {
   const nombreClean = (nombre || '').trim();
   if (nombreClean.length < 3 || nombreClean.length > 40) {
     return { error: { message: 'El nombre debe tener entre 3 y 40 caracteres' } };
+  }
+  if (modalidad != null && !esModalidadValida(modalidad)) {
+    return { error: { message: 'Modalidad no válida' } };
   }
 
   // Máximo 3 clubes por jugador
@@ -57,18 +79,28 @@ export async function createClub({ nombre, descripcion, region, comuna }) {
     return { error: { message: 'Ya perteneces al máximo de 3 clubes permitidos' } };
   }
 
-  const { data: club, error } = await supabase
-    .from('clubs')
-    .insert({
-      nombre: nombreClean,
-      slug: slugify(nombreClean),
-      descripcion: descripcion?.trim() || null,
-      region: region || null,
-      comuna: comuna || null,
-      created_by: me,
-    })
-    .select()
-    .single();
+  const baseRow = {
+    nombre: nombreClean,
+    slug: slugify(nombreClean),
+    descripcion: descripcion?.trim() || null,
+    region: region || null,
+    comuna: comuna || null,
+    created_by: me,
+  };
+
+  const insertar = (row) =>
+    supabase.from('clubs').insert(row).select().single();
+
+  let { data: club, error } = await insertar(
+    modalidadDisponible ? { ...baseRow, modalidad: modalidad || null } : baseRow
+  );
+
+  // Migración 29 sin aplicar: reintentamos sin `modalidad`.
+  if (error && esColumnaInexistente(error)) {
+    console.warn('[FutFinder] clubs.modalidad no existe: aplica la migración 29.');
+    modalidadDisponible = false;
+    ({ data: club, error } = await insertar(baseRow));
+  }
 
   if (error) {
     console.error('[FutFinder] createClub:', error);
@@ -166,16 +198,32 @@ export async function getClubById(clubId) {
  */
 export async function searchClubs(query = '') {
   if (!isSupabaseConfigured) return { data: [], error: null };
-  let q = supabase
-    .from('clubs')
-    .select('id, nombre, slug, descripcion, foto_url, region, comuna, plan, verificado')
-    // los verificados (Premium) tienen prioridad en búsquedas
-    .order('verificado', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(30);
-  if (query.trim()) q = q.ilike('nombre', `%${query.trim()}%`);
 
-  const { data, error } = await q;
+  const BASE_COLS = 'id, nombre, slug, descripcion, foto_url, region, comuna, plan, verificado';
+
+  const buscar = (cols) => {
+    let q = supabase
+      .from('clubs')
+      .select(cols)
+      // los verificados (Premium) tienen prioridad en búsquedas
+      .order('verificado', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (query.trim()) q = q.ilike('nombre', `%${query.trim()}%`);
+    return q;
+  };
+
+  let { data, error } = await buscar(
+    modalidadDisponible ? `${BASE_COLS}, modalidad` : BASE_COLS
+  );
+
+  // Migración 29 sin aplicar: reintentamos sin `modalidad`.
+  if (error && esColumnaInexistente(error)) {
+    console.warn('[FutFinder] clubs.modalidad no existe: aplica la migración 29.');
+    modalidadDisponible = false;
+    ({ data, error } = await buscar(BASE_COLS));
+  }
+
   if (error) {
     console.error('[FutFinder] searchClubs:', error);
     return { data: [], error };
@@ -680,7 +728,7 @@ export function subscribeToPendingRequests(clubId, onChange) {
  * Actualiza datos editables del club (solo admins, lo garantiza la RLS).
  * plan y verificado NO se tocan desde el cliente.
  */
-export async function updateClub(clubId, { nombre, descripcion, region, comuna }) {
+export async function updateClub(clubId, { nombre, descripcion, region, comuna, modalidad }) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   const patch = {};
   if (nombre !== undefined) {
@@ -694,13 +742,26 @@ export async function updateClub(clubId, { nombre, descripcion, region, comuna }
   if (descripcion !== undefined) patch.descripcion = descripcion?.trim() || null;
   if (region !== undefined) patch.region = region;
   if (comuna !== undefined) patch.comuna = comuna;
+  if (modalidad !== undefined && modalidadDisponible) {
+    if (modalidad != null && !esModalidadValida(modalidad)) {
+      return { error: { message: 'Modalidad no válida' } };
+    }
+    patch.modalidad = modalidad || null;
+  }
 
-  const { data, error } = await supabase
-    .from('clubs')
-    .update(patch)
-    .eq('id', clubId)
-    .select()
-    .single();
+  const actualizar = (p) =>
+    supabase.from('clubs').update(p).eq('id', clubId).select().single();
+
+  let { data, error } = await actualizar(patch);
+
+  // Migración 29 sin aplicar: reintentamos sin `modalidad`.
+  if (error && esColumnaInexistente(error)) {
+    console.warn('[FutFinder] clubs.modalidad no existe: aplica la migración 29.');
+    modalidadDisponible = false;
+    const { modalidad: _omitida, ...resto } = patch;
+    ({ data, error } = await actualizar(resto));
+  }
+
   if (error) {
     console.error('[FutFinder] updateClub:', error);
     if (error.code === '23505') {

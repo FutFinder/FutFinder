@@ -19,6 +19,7 @@ import Button from '../components/Button';
 import { createClub } from '../services/clubs';
 import { pickImage, uploadClubLogo } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
+import { OPCIONES_MODALIDAD } from '../utils/clubMeta';
 
 /**
  * Crear un club nuevo (modal sobre las tabs, como CreateMatch).
@@ -29,6 +30,7 @@ export default function CreateClubScreen({ navigation }) {
   const [descripcion, setDescripcion] = useState('');
   const [region, setRegion] = useState(null);
   const [comuna, setComuna] = useState(null);
+  const [modalidad, setModalidad] = useState(null);
   const [showRegiones, setShowRegiones] = useState(false);
   const [showComunas, setShowComunas] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -56,7 +58,7 @@ export default function CreateClubScreen({ navigation }) {
       return;
     }
     setSaving(true);
-    const { data, error } = await createClub({ nombre, descripcion, region, comuna });
+    const { data, error } = await createClub({ nombre, descripcion, region, comuna, modalidad });
 
     if (error) {
       setSaving(false);
@@ -144,6 +146,32 @@ export default function CreateClubScreen({ navigation }) {
             multiline
             maxLength={500}
           />
+
+          <Text style={styles.label}>Modalidad (opcional)</Text>
+          <View style={styles.modalidadRow}>
+            {OPCIONES_MODALIDAD.map((op) => {
+              const activa = modalidad === op.value;
+              return (
+                <Pressable
+                  key={op.value}
+                  // Volver a tocar la opción activa la deselecciona.
+                  onPress={() => setModalidad(activa ? null : op.value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: activa }}
+                  accessibilityLabel={`Modalidad ${op.label}`}
+                  style={({ pressed }) => [
+                    styles.modalidadChip,
+                    activa && styles.modalidadChipActive,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Text style={[styles.modalidadText, activa && styles.modalidadTextActive]}>
+                    {op.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           <Text style={styles.label}>Región (opcional)</Text>
           <Pressable
@@ -359,5 +387,26 @@ const styles = StyleSheet.create({
   optionActive: { backgroundColor: colors.primarySoft },
   optionText: { color: colors.textPrimary, fontSize: 14 },
   optionTextActive: { color: colors.primary, fontWeight: '700' },
+  modalidadRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  modalidadChip: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+  },
+  modalidadChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  modalidadText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  modalidadTextActive: { color: colors.primary, fontWeight: '700' },
   submitBtn: { marginTop: 8 },
 });
