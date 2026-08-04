@@ -109,6 +109,31 @@ export const clubColors = dsColors;
 export const clubRadius = dsRadius;
 export const clubSizes = dsSizes;
 
+/**
+ * Tokens del rediseño "Dark Tactical Pitch" de Inicio (HomeTab).
+ *
+ * Paleta propia (negro puro + verde flúor), independiente de `dsColors`
+ * (Clubes/Perfil) porque el mockup de referencia la define así a propósito:
+ * Inicio se ve más "cancha nocturna" que el resto de la app.
+ */
+export const tactical = {
+  bg: '#000000',
+  surface: '#0E130F',
+  surfaceAlt: '#080A09',
+  metal: ['#161B17', '#0B0E0C', '#121813'],
+  headerGradient: ['#0D3D1E', '#0A2B16', '#04120A'],
+  neon: '#00FF66',
+  neonInk: '#04120A',
+  danger: '#FF6B6B',
+  border: 'rgba(255,255,255,0.08)',
+  borderStrong: 'rgba(255,255,255,0.12)',
+  neonSoft: 'rgba(0,255,102,0.12)',
+  neonBorder: 'rgba(0,255,102,0.32)',
+  text: '#FFFFFF',
+  textDim: 'rgba(255,255,255,0.55)',
+  textFaint: 'rgba(255,255,255,0.42)',
+};
+
 export const fonts = {
   regular: 'System',
   medium: 'System',

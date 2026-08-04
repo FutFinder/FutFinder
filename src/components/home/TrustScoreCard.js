@@ -1,118 +1,54 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { ShieldCheck, ChevronRight } from 'lucide-react-native';
-import { colors, radius } from '../../theme/colors';
+import { View, Text, Pressable } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ShieldCheck } from 'lucide-react-native';
+import { tactical as t } from '../../theme/colors';
 
-const TIER_COLORS = {
-  'ÉLITE':    colors.primary,
-  'SÓLIDO':   '#E8B84B',
-  'EN PRUEBA': colors.textMuted,
-};
-
-export default function TrustScoreCard({ score, matchesPlayed, reports, verified, tierLabel, onPress }) {
-  const tierColor = TIER_COLORS[tierLabel] ?? colors.textMuted;
-
+export default function TrustScoreCard({
+  score, max = 100, matchesPlayed, reports = 0, verified, tierLabel = 'ÉLITE', onPress,
+}) {
+  const pct = Math.max(0, Math.min(100, (score / max) * 100));
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [s.root, pressed && { opacity: 0.88 }]}
-    >
-      <View style={s.left}>
-        <Text style={s.label}>Trust Score</Text>
-        <View style={s.scoreRow}>
-          <Text style={s.score}>{score}</Text>
-          <Text style={s.max}>/100</Text>
-        </View>
-        <Text style={s.played}>{matchesPlayed} partidos jugados</Text>
-        {reports > 0 && (
-          <Text style={s.reports}>{reports} reporte{reports > 1 ? 's' : ''}</Text>
-        )}
-      </View>
-
-      <View style={s.right}>
-        {verified && (
-          <View style={s.verifiedRow}>
-            <ShieldCheck color={colors.primary} size={13} />
-            <Text style={s.verifiedText}>Verificado</Text>
+    <Pressable onPress={onPress}>
+      <LinearGradient
+        colors={t.metal}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        className="overflow-hidden rounded-[20px] border border-white/10 p-4"
+      >
+        <View className="flex-row items-start justify-between">
+          <View>
+            <Text className="text-[10.5px] font-bold uppercase tracking-[0.22em] text-white/50">Tu Trust Score</Text>
+            <View className="mt-1 flex-row items-end gap-1">
+              <Text className="text-[42px] font-black leading-none tracking-tighter text-white">{score}</Text>
+              <Text className="mb-1.5 text-[17px] font-semibold text-white/35">/ {max}</Text>
+            </View>
           </View>
-        )}
-        <View style={[s.tierBadge, { borderColor: tierColor, backgroundColor: tierColor + '1A' }]}>
-          <Text style={[s.tierText, { color: tierColor }]}>{tierLabel}</Text>
+          {verified ? (
+            <View
+              className="flex-row items-center gap-1.5 rounded-full bg-[#00FF66] px-3 py-1.5"
+              style={{ shadowColor: t.neon, shadowOpacity: 0.4, shadowRadius: 12 }}
+            >
+              <ShieldCheck size={13} color={t.neonInk} strokeWidth={2.6} />
+              <Text className="text-[10.5px] font-bold tracking-[0.15em] text-[#04120A]">VERIFICADO</Text>
+            </View>
+          ) : null}
         </View>
-        <ChevronRight color={colors.textMuted} size={16} style={{ marginTop: 4 }} />
-      </View>
+
+        <View className="mt-4 h-[7px] overflow-hidden rounded-full bg-white/8">
+          <LinearGradient
+            colors={['#0A7A3C', t.neon]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ width: `${pct}%`, height: '100%', borderRadius: 999 }}
+          />
+        </View>
+
+        <View className="mt-3 flex-row items-center justify-between">
+          <Text className="text-[12.5px] text-white/45">{matchesPlayed} partidos jugados · {reports} reportes</Text>
+          <Text className="text-[10.5px] font-bold tracking-[0.15em] text-[#00FF66]">{tierLabel}</Text>
+        </View>
+      </LinearGradient>
     </Pressable>
   );
 }
-
-const s = StyleSheet.create({
-  root: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary + '50',
-    padding: 16,
-  },
-  left: { flex: 1 },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-    marginBottom: 4,
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 3,
-  },
-  score: {
-    color: colors.textPrimary,
-    fontSize: 32,
-    fontWeight: '800',
-    lineHeight: 36,
-  },
-  max: {
-    color: colors.textMuted,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  played: {
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 4,
-  },
-  reports: {
-    color: colors.error,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  right: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  verifiedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  verifiedText: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  tierBadge: {
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tierText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-});

@@ -12,7 +12,7 @@ import SectionHeader from '../components/home/SectionHeader';
 import Banner from '../components/Banner';
 import MatchPreviewSheet from '../components/MatchPreviewSheet';
 
-import { colors } from '../theme/colors';
+import { tactical } from '../theme/colors';
 import { notify } from '../utils/notify';
 import {
   listOpenMatches,
@@ -66,20 +66,17 @@ export default function HomeScreen({ navigation }) {
       ? applyFilters(list || [], { maxKm: radiusKm }, userCoords)
       : list || [];
 
-    setMatches(filtered);
-    setProfile(prof);
-    setMyUserId(userId);
-    setMyClubData(clubResult?.data ?? null);
-
+    let joinedIds = new Set();
     if (userId && isSupabaseConfigured) {
       try {
         const now = new Date().toISOString();
         const { data: attRows } = await supabase
           .from('attendees')
-          .select('match_id')
-          .eq('user_id', userId)
+          .select('id_partido')
+          .eq('id_jugador', userId)
           .in('estado', ['inscrito', 'confirmado_gps']);
-        const matchIds = (attRows || []).map((r) => r.match_id);
+        const matchIds = (attRows || []).map((r) => r.id_partido);
+        joinedIds = new Set(matchIds);
         if (matchIds.length > 0) {
           const { data: upcoming } = await supabase
             .from('matches')
@@ -98,6 +95,11 @@ export default function HomeScreen({ navigation }) {
         setNextMatch(null);
       }
     }
+
+    setMatches(filtered.map((m) => ({ ...m, _joined: joinedIds.has(m.id) })));
+    setProfile(prof);
+    setMyUserId(userId);
+    setMyClubData(clubResult?.data ?? null);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -182,6 +184,7 @@ export default function HomeScreen({ navigation }) {
         foto_url: myClubData.club.foto_url,
         role: myClubData.miRol,           // 'admin' | 'member'
         totalMiembros: myClubData.totalMiembros,
+        modalidad: myClubData.club.modalidad,
       }
     : null;
 
@@ -214,18 +217,18 @@ export default function HomeScreen({ navigation }) {
   // ── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: tactical.bg }}>
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: tactical.bg }}>
         <ScrollView
-          style={{ backgroundColor: colors.background }}
+          style={{ backgroundColor: tactical.bg }}
           contentContainerStyle={{ paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
+              tintColor={tactical.neon}
+              colors={[tactical.neon]}
             />
           }
         >

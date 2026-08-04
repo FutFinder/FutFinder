@@ -1,36 +1,15 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
+import { View, Text, Pressable } from 'react-native';
 
 export default function SectionHeader({ title, actionLabel, onAction }) {
   return (
-    <View style={s.root}>
-      <Text style={s.title}>{title}</Text>
+    <View className="mb-2.5 flex-row items-baseline justify-between">
+      <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/42">{title}</Text>
       {actionLabel ? (
         <Pressable onPress={onAction} hitSlop={8}>
-          <Text style={s.action}>{actionLabel}</Text>
+          <Text className="text-[13px] font-semibold text-[#00FF66]">{actionLabel}</Text>
         </Pressable>
       ) : null}
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  root: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: -0.1,
-  },
-  action: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-});
