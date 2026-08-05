@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   Home as HomeIcon,
+  CircleDot,
   Plus,
   Shield,
   Bell,
@@ -17,12 +18,16 @@ import ClubsScreen from '../screens/ClubsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import SearchFootballIcon from '../components/SearchFootballIcon';
-import { colors, radius } from '../theme/colors';
+import { tactical } from '../theme/colors';
 import { getCurrentUser } from '../services/auth';
 import { countUnread, subscribeToNotifications } from '../services/notifications';
 
 const Tab = createBottomTabNavigator();
+
+const ICON_SIZE = 21;
+const ICON_STROKE = 1.9;
+const LEFT_TABS = ['HomeTab', 'SearchTab', 'ClubsTab'];
+const RIGHT_TABS = ['NotifTab', 'ChatTab', 'ProfileTab'];
 
 /**
  * Componente "vacío" que nunca se monta — las pestañas Crear y
@@ -34,14 +39,13 @@ function PlaceholderTab() {
 }
 
 /**
- * Tab bar custom con estética luxury-night:
- *   - Fondo negro con borde superior tenue
- *   - Iconos minimalistas Lucide (+ lupa-balón custom en Buscar)
- *   - Texto pequeño solo en activos
- *   - Botón Crear elevado al centro como un círculo verde flotante
+ * Tab bar custom estilo "Dark Tactical Pitch":
+ *   - Fondo negro puro con borde superior tenue
+ *   - Iconos Lucide con peso óptico uniforme, verde flúor cuando activos
+ *   - Botón Crear flotante circular verde flúor en el centro
  *   - Badge rojo de notificaciones no leídas sobre la campana
  */
-function CustomTabBar({ state, descriptors, navigation }) {
+function CustomTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
   const [unread, setUnread] = useState(0);
 
@@ -69,81 +73,73 @@ function CustomTabBar({ state, descriptors, navigation }) {
     };
   }, [navigation]);
 
-  return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-      <View style={styles.barInner}>
-        {state.routes.map((route, index) => {
-          const isFocused = state.index === index;
-          const isCreate = route.name === 'CreateTab';
+  const renderTab = (route) => {
+    const index = state.routes.indexOf(route);
+    const isFocused = state.index === index;
+    const color = isFocused ? tactical.neon : 'rgba(255,255,255,0.42)';
+    const Icon = iconFor(route.name);
+    const badge = route.name === 'NotifTab' ? unread : 0;
 
-          const onPress = () => {
-            if (isCreate) {
-              // Botón especial: no entra a una pestaña, abre CreateMatch
-              // como modal sobre las tabs.
-              navigation.getParent()?.navigate('CreateMatch');
-              return;
-            }
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name, route.params);
-            }
-          };
+    const onPress = () => {
+      const event = navigation.emit({
+        type: 'tabPress',
+        target: route.key,
+        canPreventDefault: true,
+      });
+      if (!isFocused && !event.defaultPrevented) {
+        navigation.navigate(route.name, route.params);
+      }
+    };
 
-          if (isCreate) {
-            return (
-              <Pressable
-                key={route.key}
-                onPress={onPress}
-                style={styles.createSlot}
-                hitSlop={6}
-              >
-                <View style={styles.createBtn}>
-                  <Plus color="#0E0E0D" size={26} strokeWidth={2.8} />
-                </View>
-                <Text style={styles.createLabel}>Crear</Text>
-              </Pressable>
-            );
-          }
-
-          const IconCmp = iconFor(route.name);
-          return (
-            <Pressable
-              key={route.key}
-              onPress={onPress}
-              style={styles.tabSlot}
-              hitSlop={6}
-            >
-              <View style={styles.iconWrap}>
-                <IconCmp
-                  color={isFocused ? colors.primary : colors.textMuted}
-                  size={22}
-                  strokeWidth={isFocused ? 2.3 : 1.8}
-                />
-                {route.name === 'NotifTab' && unread > 0 && (
-                  <View style={styles.notifBadge}>
-                    <Text style={styles.notifBadgeText}>
-                      {unread > 9 ? '9+' : String(unread)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text
-                style={[
-                  styles.tabLabel,
-                  { color: isFocused ? colors.primary : colors.textMuted,
-                    fontWeight: isFocused ? '800' : '600' },
-                ]}
-              >
-                {labelFor(route.name)}
+    return (
+      <Pressable
+        key={route.key}
+        onPress={onPress}
+        hitSlop={6}
+        className="flex-1 items-center gap-1 active:opacity-70"
+      >
+        <View>
+          <Icon size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE} />
+          {badge > 0 ? (
+            <View className="absolute -right-2 -top-1.5 min-w-[15px] items-center justify-center rounded-full bg-[#FF6B6B] px-1">
+              <Text className="text-[9.5px] font-bold text-white">
+                {badge > 9 ? '9+' : String(badge)}
               </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+            </View>
+          ) : null}
+        </View>
+        <Text className="text-[10.5px] font-semibold" style={{ color }}>
+          {labelFor(route.name)}
+        </Text>
+      </Pressable>
+    );
+  };
+
+  const leftRoutes = LEFT_TABS.map((name) => state.routes.find((r) => r.name === name)).filter(Boolean);
+  const rightRoutes = RIGHT_TABS.map((name) => state.routes.find((r) => r.name === name)).filter(Boolean);
+
+  return (
+    <View
+      className="absolute inset-x-0 bottom-0 flex-row items-start border-t border-white/8 bg-[#050605] px-3.5 pt-3"
+      style={{ height: 88 + insets.bottom, paddingBottom: insets.bottom }}
+    >
+      {leftRoutes.map(renderTab)}
+      <View className="flex-1" />
+      {rightRoutes.map(renderTab)}
+
+      <Pressable
+        onPress={() => navigation.getParent()?.navigate('CreateMatch')}
+        hitSlop={6}
+        className="absolute -top-5 left-1/2 h-[58px] w-[58px] -translate-x-[29px] items-center justify-center rounded-full border-4 border-[#050605] bg-[#00FF66] active:opacity-85"
+        style={{
+          shadowColor: tactical.neon,
+          shadowOpacity: 0.45,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 8 },
+        }}
+      >
+        <Plus size={28} color={tactical.neonInk} strokeWidth={3} />
+      </Pressable>
     </View>
   );
 }
@@ -151,7 +147,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
 function iconFor(name) {
   switch (name) {
     case 'HomeTab': return HomeIcon;
-    case 'SearchTab': return SearchFootballIcon;
+    case 'SearchTab': return CircleDot;
     case 'ClubsTab': return Shield;
     case 'NotifTab': return Bell;
     case 'ChatTab': return MessageCircle;
@@ -188,104 +184,3 @@ export default function MainTabs() {
     </Tab.Navigator>
   );
 }
-
-const BAR_HEIGHT = 64;
-const CREATE_SIZE = 56;
-
-const styles = StyleSheet.create({
-  bar: {
-    backgroundColor: colors.background,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
-      },
-      default: {
-        shadowColor: '#000',
-        shadowOpacity: 0.5,
-        shadowOffset: { width: 0, height: -8 },
-        shadowRadius: 16,
-        elevation: 12,
-      },
-    }),
-  },
-  barInner: {
-    height: BAR_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tabSlot: {
-    flex: 1,
-    height: BAR_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  iconWrap: {
-    position: 'relative',
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.background,
-  },
-  notifBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-  tabLabel: {
-    fontSize: 10,
-    letterSpacing: 0.3,
-  },
-  createSlot: {
-    flex: 1,
-    height: BAR_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 6,
-    gap: 4,
-  },
-  createBtn: {
-    position: 'absolute',
-    top: -CREATE_SIZE / 2 + 4, // sobresale del bar
-    width: CREATE_SIZE,
-    height: CREATE_SIZE,
-    borderRadius: CREATE_SIZE / 2,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: colors.background,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 6px 20px rgba(113,181,51,0.45)',
-      },
-      default: {
-        shadowColor: colors.primary,
-        shadowOpacity: 0.45,
-        shadowOffset: { width: 0, height: 6 },
-        shadowRadius: 12,
-        elevation: 8,
-      },
-    }),
-  },
-  createLabel: {
-    fontSize: 10,
-    color: colors.primary,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-    marginTop: CREATE_SIZE / 2 + 2, // espacio para que no choque con el botón
-  },
-});
