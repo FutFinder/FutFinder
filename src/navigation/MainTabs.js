@@ -4,11 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   Home as HomeIcon,
-  CircleDot,
   Plus,
   Shield,
   Bell,
-  MessageCircle,
+  MessageSquare,
   User as UserIcon,
 } from 'lucide-react-native';
 
@@ -18,6 +17,7 @@ import ClubsScreen from '../screens/ClubsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SearchFootballIcon from '../components/SearchFootballIcon';
 import { tactical } from '../theme/colors';
 import { getCurrentUser } from '../services/auth';
 import { countUnread, subscribeToNotifications } from '../services/notifications';
@@ -147,10 +147,10 @@ function CustomTabBar({ state, navigation }) {
 function iconFor(name) {
   switch (name) {
     case 'HomeTab': return HomeIcon;
-    case 'SearchTab': return CircleDot;
+    case 'SearchTab': return SearchFootballIcon;
     case 'ClubsTab': return Shield;
     case 'NotifTab': return Bell;
-    case 'ChatTab': return MessageCircle;
+    case 'ChatTab': return MessageSquare;
     case 'ProfileTab': return UserIcon;
     default: return HomeIcon;
   }
