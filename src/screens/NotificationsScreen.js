@@ -1,30 +1,24 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  FlatList,
+  SectionList,
   Pressable,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
-import {
-  Bell,
-  Check,
-  CheckCheck,
-  UserPlus,
-  Users,
-  MessageCircle,
-  Calendar,
-  Star,
-  Trash2,
-  Shield,
-} from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Check, Trash2, BellOff } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { tactical as t } from '../theme/colors';
+import Banner from '../components/Banner';
+import NotificationCard, { CATEGORY } from '../components/notifications/NotificationCard';
+import FilterChips from '../components/notifications/FilterChips';
 import { getCurrentUser } from '../services/auth';
+import { getMyClub, respondToRequest } from '../services/clubs';
+import { respondChallenge } from '../services/clubChallenges';
+import { acceptFriendRequest, rejectFriendRequest } from '../services/friends';
 import {
   listNotifications,
   markAsRead,
@@ -35,52 +29,20 @@ import {
 } from '../services/notifications';
 
 /**
- * Pantalla de inbox de notificaciones.
- * - Carga las últimas 50 al entrar.
- * - Realtime: si llega una notif nueva mientras está abierta, se agrega arriba.
- * - Pull-to-refresh.
- * - Tap: marca como leída + navega a la pantalla relacionada (mismo destino
- *   que el tap de la push).
- * - Botón "Marcar todas" en el header.
+ * Pantalla de inbox de notificaciones — "Avisos".
+ * - Carga las últimas 50 al entrar, agrupadas por fecha (Hoy / Esta semana / Anteriores).
+ * - Filtro por categoría (Todos / Clubes / Partidos / Social).
+ * - Realtime: INSERT/UPDATE del usuario se refleja en caliente.
+ * - Acciones inline (Aceptar/Rechazar) para desafíos de club, solicitudes de
+ *   club y solicitudes de amistad — el resto solo navega al tocar, igual que antes.
  */
 
-function NotifIcon({ type }) {
-  const props = { size: 18, color: colors.primary, strokeWidth: 2.2 };
-  switch (type) {
-    case 'friend_request':
-      return <UserPlus {...props} />;
-    case 'friend_accept':
-      return <CheckCheck {...props} />;
-    case 'match_join':
-      return <Users {...props} />;
-    case 'join_request':
-      return <UserPlus {...props} />;
-    case 'join_approved':
-      return <CheckCheck {...props} />;
-    case 'join_rejected':
-      return <Bell {...props} />;
-    case 'club_request':
-      return <Shield {...props} />;
-    case 'club_request_accepted':
-      return <CheckCheck {...props} />;
-    case 'club_request_rejected':
-      return <Shield {...props} />;
-    case 'club_member_joined':
-      return <Users {...props} />;
-    case 'club_member_left':
-      return <Shield {...props} />;
-    case 'message_new':
-      return <MessageCircle {...props} />;
-    case 'match_reminder':
-      return <Calendar {...props} />;
-    case 'match_rate':
-      return <Star {...props} />;
-    case 'match_cancelled':
-      return <Calendar {...props} />;
-    default:
-      return <Bell {...props} />;
-  }
-}
+const FILTERS = [
+  { key: 'todos', label: 'TODOS' },
+  { key: 'clubes', label: 'CLUBES' },
+  { key: 'partidos', label: 'PARTIDOS' },
+  { key: 'social', label: 'SOCIAL' },
+];
 
 function formatNotifTime(iso) {
   try {
@@ -117,6 +79,38 @@ function formatNotifTime(iso) {
   } catch {
     return '';
   }
+}
+
+function groupFor(iso) {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+    if (diffDays <= 0) return 'Hoy';
+    if (diffDays < 7) return 'Esta semana';
+    return 'Anteriores';
+  } catch {
+    return 'Anteriores';
+  }
+}
+
+const GROUP_ORDER = ['Hoy', 'Esta semana', 'Anteriores'];
+
+/** Acciones inline disponibles para este aviso, o null si solo navega al tocar. */
+function actionsFor(n, myClub) {
+  const data = n?.data || {};
+  if (n.type === 'club_challenge' && data.challengeId) {
+    const isAdminOfRetado = myClub?.role === 'admin' && myClub?.id === data.clubRetadoId;
+    return isAdminOfRetado ? ['Aceptar reto', 'Rechazar'] : null;
+  }
+  if (n.type === 'club_request' && data.requestId) {
+    return ['Aceptar', 'Rechazar'];
+  }
+  if (n.type === 'friend_request' && data.friendshipId) {
+    return ['Aceptar', 'Rechazar'];
+  }
+  return null;
 }
 
 function navigateForNotif(navigation, n) {
@@ -187,23 +181,29 @@ function navigateForNotif(navigation, n) {
 
 export default function NotificationsScreen({ navigation }) {
   const [items, setItems] = useState([]);
+  const [myClub, setMyClub] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [markingAll, setMarkingAll] = useState(false);
+  const [filter, setFilter] = useState('todos');
+  const [banner, setBanner] = useState(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const { data } = await listNotifications({ limit: 50 });
+    const [{ data }, clubResult] = await Promise.all([
+      listNotifications({ limit: 50 }),
+      getMyClub(),
+    ]);
     setItems(data || []);
+    const mc = clubResult?.data;
+    setMyClub(mc ? { id: mc.club.id, role: mc.miRol } : null);
     setLoading(false);
   }, []);
 
-  // Cargar al montar
   useEffect(() => {
+    setLoading(true);
     load();
   }, [load]);
 
-  // Realtime: subscribirse a INSERTs nuevos del usuario
+  // Realtime: subscribirse a INSERTs/UPDATEs del usuario
   useEffect(() => {
     let unsubscribe = () => {};
     (async () => {
@@ -213,12 +213,10 @@ export default function NotificationsScreen({ navigation }) {
         setItems((prev) => {
           const idx = prev.findIndex((p) => p.id === notif.id);
           if (idx >= 0) {
-            // UPDATE: reemplazar la fila existente (agrupación de mensajes)
             const next = [...prev];
             next[idx] = notif;
             return next;
           }
-          // INSERT: agregar arriba
           return [notif, ...prev];
         });
       });
@@ -232,31 +230,25 @@ export default function NotificationsScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  const handleTap = async (n) => {
+  const handlePress = async (n) => {
     if (!n.read) {
-      // Optimistic: marcar visualmente como leída ya
-      setItems((prev) =>
-        prev.map((p) => (p.id === n.id ? { ...p, read: true } : p))
-      );
+      setItems((prev) => prev.map((p) => (p.id === n.id ? { ...p, read: true } : p)));
       markAsRead(n.id);
     }
     navigateForNotif(navigation, n);
   };
 
-  const handleMarkAll = async () => {
-    setMarkingAll(true);
-    setItems((prev) => prev.map((p) => ({ ...p, read: true })));
-    await markAllAsRead();
-    setMarkingAll(false);
-  };
-
   const handleDelete = async (id) => {
-    // Optimistic: la sacamos de la lista al toque
     setItems((prev) => prev.filter((p) => p.id !== id));
     await deleteNotification(id);
   };
 
-  const handleDeleteAll = async () => {
+  const handleMarkAll = async () => {
+    setItems((prev) => prev.map((p) => ({ ...p, read: true })));
+    await markAllAsRead();
+  };
+
+  const handleClearAll = async () => {
     if (items.length === 0) return;
     const ok =
       typeof window !== 'undefined' && typeof window.confirm === 'function'
@@ -267,263 +259,147 @@ export default function NotificationsScreen({ navigation }) {
     await deleteAllNotifications();
   };
 
-  const unreadCount = items.filter((n) => !n.read).length;
-
-  const renderRightActions = (item) => () => (
-    <Pressable
-      onPress={() => handleDelete(item.id)}
-      style={({ pressed }) => [styles.swipeDelete, pressed && { opacity: 0.8 }]}
-    >
-      <Trash2 color="#FFFFFF" size={20} />
-      <Text style={styles.swipeDeleteText}>Borrar</Text>
-    </Pressable>
-  );
-
-  const renderItem = ({ item }) => {
-    return (
-      <Swipeable
-        renderRightActions={renderRightActions(item)}
-        overshootRight={false}
-        rightThreshold={40}
-      >
-      <Pressable
-        onPress={() => handleTap(item)}
-        style={({ pressed }) => [
-          styles.row,
-          !item.read && styles.rowUnread,
-          pressed && { opacity: 0.85 },
-        ]}
-      >
-        <View style={styles.iconWrap}>
-          <NotifIcon type={item.type} />
-          {!item.read && <View style={styles.unreadDot} />}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title} numberOfLines={2}>
-            {item.title}
-          </Text>
-          {item.body ? (
-            <Text style={styles.body} numberOfLines={2}>
-              {item.body}
-            </Text>
-          ) : null}
-          <Text style={styles.time}>{formatNotifTime(item.created_at)}</Text>
-        </View>
-        <Pressable
-          onPress={() => handleDelete(item.id)}
-          hitSlop={10}
-          style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
-        >
-          <Trash2 color={colors.textMuted} size={16} />
-        </Pressable>
-      </Pressable>
-      </Swipeable>
+  const respond = async (n, accept) => {
+    const data = n.data || {};
+    let error = null;
+    if (n.type === 'club_challenge') {
+      ({ error } = await respondChallenge(data.challengeId, accept));
+    } else if (n.type === 'club_request') {
+      ({ error } = await respondToRequest(data.requestId, accept));
+    } else if (n.type === 'friend_request') {
+      ({ error } = accept
+        ? await acceptFriendRequest(data.friendshipId)
+        : await rejectFriendRequest(data.friendshipId));
+    }
+    if (error) {
+      setBanner({ type: 'error', title: 'No pudimos procesar tu respuesta', message: error.message || '' });
+      return;
+    }
+    setItems((prev) =>
+      prev.map((p) => (p.id === n.id ? { ...p, read: true, _actionsResolved: true } : p))
     );
+    markAsRead(n.id);
   };
 
+  const chips = useMemo(
+    () =>
+      FILTERS.map((f) => ({
+        ...f,
+        count:
+          f.key === 'todos'
+            ? items.length
+            : items.filter((n) => CATEGORY[n.type] === f.key).length,
+      })),
+    [items]
+  );
+
+  const sections = useMemo(() => {
+    const visible = items.filter((n) => filter === 'todos' || CATEGORY[n.type] === filter);
+    const buckets = new Map();
+    visible.forEach((n) => {
+      const g = groupFor(n.created_at);
+      buckets.set(g, [...(buckets.get(g) || []), n]);
+    });
+    return GROUP_ORDER.filter((g) => buckets.get(g)?.length).map((title) => ({
+      title,
+      data: buckets.get(title).map((n) => ({
+        ...n,
+        timeLabel: formatNotifTime(n.created_at),
+        actions: n._actionsResolved ? null : actionsFor(n, myClub),
+      })),
+    }));
+  }, [items, filter, myClub]);
+
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <View style={styles.header}>
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Avisos</Text>
-            {unreadCount > 0 && (
-              <Text style={styles.headerSubtitle}>{unreadCount} sin leer</Text>
-            )}
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: t.bg }}>
+        <LinearGradient
+          colors={t.headerGradient}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          className="px-5 pb-4 pt-3"
+        >
+          <View className="mt-2 flex-row items-end justify-between">
+            <View>
+              <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00FF66]/75">Centro de actividad</Text>
+              <Text className="mt-1 text-[30px] font-extrabold tracking-tight text-white">Avisos</Text>
+            </View>
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={handleMarkAll}
+                disabled={items.length === 0}
+                className="h-[34px] flex-row items-center gap-1.5 rounded-xl border border-white/12 bg-black/45 px-3 active:opacity-70"
+                style={items.length === 0 ? { opacity: 0.3 } : null}
+              >
+                <Check size={14} color={t.neon} strokeWidth={2.6} />
+                <Text className="text-[10.5px] font-bold tracking-[0.14em] text-white/85">LEER TODO</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleClearAll}
+                disabled={items.length === 0}
+                className="h-[34px] w-[34px] items-center justify-center rounded-xl border border-[#FF6B6B]/28 bg-[#FF6B6B]/10 active:opacity-70"
+                style={items.length === 0 ? { opacity: 0.3 } : null}
+              >
+                <Trash2 size={15} color={t.danger} strokeWidth={1.9} />
+              </Pressable>
+            </View>
           </View>
 
-          <Pressable
-            onPress={unreadCount > 0 ? handleMarkAll : undefined}
-            disabled={unreadCount === 0 || markingAll}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.markAllBtn,
-              pressed && { opacity: 0.6 },
-              unreadCount === 0 && { opacity: 0.3 },
-            ]}
-          >
-            <Check color={colors.primary} size={18} />
-          </Pressable>
+          <View className="mt-4">
+            <FilterChips chips={chips} active={filter} onChange={setFilter} />
+          </View>
+        </LinearGradient>
 
-          <Pressable
-            onPress={handleDeleteAll}
-            disabled={items.length === 0}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.clearAllBtn,
-              pressed && { opacity: 0.6 },
-              items.length === 0 && { opacity: 0.3 },
-            ]}
-          >
-            <Trash2 color={colors.error} size={18} />
-          </Pressable>
-        </View>
+        {banner && (
+          <View style={{ paddingHorizontal: 18, paddingTop: 10 }}>
+            <Banner type={banner.type} title={banner.title} message={banner.message} onClose={() => setBanner(null)} />
+          </View>
+        )}
 
         {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : items.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Bell color={colors.textMuted} size={42} strokeWidth={1.5} />
-            <Text style={styles.emptyTitle}>Sin notificaciones</Text>
-            <Text style={styles.emptyText}>
-              Cuando alguien se una a tu partido, te mande mensaje o solicitud
-              de amistad, lo verás acá.
-            </Text>
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator color={t.neon} />
           </View>
         ) : (
-          <FlatList
-            data={items}
+          <SectionList
+            sections={sections}
             keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => <View style={styles.sep} />}
+            style={{ backgroundColor: t.bg }}
+            contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 120 }}
+            stickySectionHeadersEnabled={false}
+            showsVerticalScrollIndicator={false}
+            ItemSeparatorComponent={() => <View style={{ height: 9 }} />}
+            SectionSeparatorComponent={() => <View style={{ height: 9 }} />}
             refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={colors.primary}
-                colors={[colors.primary]}
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.neon} colors={[t.neon]} />
+            }
+            renderSectionHeader={({ section }) => (
+              <View className="mb-1 mt-2 flex-row items-center gap-2.5">
+                <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/42">{section.title}</Text>
+                <View className="h-px flex-1 bg-white/8" />
+              </View>
+            )}
+            renderItem={({ item }) => (
+              <NotificationCard
+                notification={item}
+                onPress={handlePress}
+                onDelete={handleDelete}
+                onPrimary={(n) => respond(n, true)}
+                onSecondary={(n) => respond(n, false)}
               />
+            )}
+            ListEmptyComponent={
+              <View className="mt-10 items-center gap-3 rounded-[20px] border border-dashed border-[#00FF66]/28 bg-[#00FF66]/5 px-5 py-7">
+                <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-[#00FF66]/30 bg-[#00FF66]/8">
+                  <BellOff size={21} color={t.neon} strokeWidth={1.9} />
+                </View>
+                <Text className="text-[16px] font-bold text-white">Todo al día</Text>
+                <Text className="text-center text-[13.5px] leading-5 text-white/45">No tienes avisos pendientes en este filtro.</Text>
+              </View>
             }
           />
         )}
       </SafeAreaView>
-    </GestureHandlerRootView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  headerCenter: { flex: 1 },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  headerSubtitle: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  markAllBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearAllBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.errorSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
-  swipeDelete: {
-    backgroundColor: colors.error,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 84,
-    borderRadius: radius.lg,
-    marginLeft: 8,
-    gap: 4,
-  },
-  swipeDeleteText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  listContent: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 },
-  sep: { height: 8 },
-  row: {
-    flexDirection: 'row',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    padding: 14,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-  },
-  rowUnread: {
-    backgroundColor: colors.surface,
-    borderColor: colors.primary + '55',
-  },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  unreadDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.background,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  body: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  time: {
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 6,
-  },
-  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyBox: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    gap: 12,
-  },
-  emptyTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
-    marginTop: 6,
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 280,
-  },
-});
