@@ -366,15 +366,19 @@ security definer
 set search_path = public
 as $$
 declare
-    v_confirmados integer;
+    v_ocupadas integer;
 begin
-    select count(*) into v_confirmados
+    -- `cupos_totales` son las plazas ofrecidas a OTROS jugadores: el
+    -- organizador está en `attendees` pero no consume una. Si se lo contara,
+    -- un partido de 1 cupo con solo el organizador quedaría bloqueado.
+    select count(*) into v_ocupadas
     from public.attendees
     where id_partido = new.id
-      and estado in ('inscrito', 'confirmado_gps', 'no_asistio');
+      and estado in ('inscrito', 'confirmado_gps', 'no_asistio')
+      and id_jugador <> new.id_organizador;
 
-    if new.cupos_totales < v_confirmados then
-        raise exception 'CUPOS_MENOR_QUE_CONFIRMADOS:%:%', new.cupos_totales, v_confirmados;
+    if new.cupos_totales < v_ocupadas then
+        raise exception 'CUPOS_MENOR_QUE_CONFIRMADOS:%:%', new.cupos_totales, v_ocupadas;
     end if;
     if new.cupos_disponibles > new.cupos_totales then
         new.cupos_disponibles := new.cupos_totales;

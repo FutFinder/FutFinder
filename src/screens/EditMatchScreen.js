@@ -54,6 +54,7 @@ import { pickImage, uploadMatchCover } from '../services/storage';
 import { getCurrentUser } from '../services/auth';
 import { getCurrentLocation } from '../services/location';
 import { useOnline, isNetworkError } from '../services/connectivity';
+import { goBackOrPartidos } from '../utils/navigation';
 import { REGIONES, getComunasOfRegion, matchComuna } from '../data/regiones-chile';
 import { shorten } from '../components/partidos/FiltersSheet';
 import {
@@ -88,6 +89,10 @@ export default function EditMatchScreen({ route, navigation }) {
   const [original, setOriginal] = useState(null);
   const [form, setForm] = useState(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
+  // Confirmados que SÍ ocupan un cupo. En este backend `cupos_totales` son las
+  // plazas ofrecidas a otros jugadores y el organizador no consume ninguna, así
+  // que hay que excluirlo de toda la aritmética de cupos.
+  const [ocupadas, setOcupadas] = useState(0);
   const [requestCount, setRequestCount] = useState(0);
   const [isOrganizer, setIsOrganizer] = useState(false);
 
@@ -116,6 +121,7 @@ export default function EditMatchScreen({ route, navigation }) {
       (a) => a.estado !== 'pendiente' && a.estado !== 'cancelado'
     );
     setConfirmedCount(confirmados.length);
+    setOcupadas(confirmados.filter((a) => a.user_id !== m.id_organizador).length);
     setRequestCount((reqRes.data || []).length);
     setIsOrganizer(user?.id === m.id_organizador);
     setOriginal(m);
@@ -142,8 +148,8 @@ export default function EditMatchScreen({ route, navigation }) {
 
   const comunas = useMemo(() => (form?.region ? getComunasOfRegion(form.region) : []), [form?.region]);
 
-  // Cupos totales mínimos: los que ya están confirmados.
-  const minCupos = Math.max(CUPOS.min, confirmedCount);
+  // Cupos totales mínimos: los que ya están tomados por otros jugadores.
+  const minCupos = Math.max(CUPOS.min, ocupadas);
 
   const dirty = useMemo(() => {
     if (!form || !original) return false;
@@ -180,8 +186,8 @@ export default function EditMatchScreen({ route, navigation }) {
     const cupos = Number(form.cupos);
     if (!Number.isFinite(cupos) || cupos < CUPOS.min) e.cupos = 'Necesitas al menos 1 cupo';
     else if (cupos > CUPOS.max) e.cupos = `El máximo es ${CUPOS.max} cupos`;
-    else if (cupos < confirmedCount) {
-      e.cupos = `Ya tienes ${confirmedCount} ${confirmedCount === 1 ? 'jugador confirmado' : 'jugadores confirmados'}: no puedes bajar de ahí sin sacar a alguien.`;
+    else if (cupos < ocupadas) {
+      e.cupos = `Ya hay ${ocupadas} ${ocupadas === 1 ? 'cupo tomado' : 'cupos tomados'}: no puedes bajar de ahí sin sacar a alguien del plantel.`;
     }
 
     const cuota = form.cuota === '' ? 0 : Number(form.cuota);
@@ -238,9 +244,11 @@ export default function EditMatchScreen({ route, navigation }) {
     const dt = combineDateTime(form.fecha, form.hora);
     const edad = resolveEdad(form);
     const nuevosTotales = Number(form.cupos);
-    // Los cupos disponibles se recalculan desde los confirmados: así subir el
-    // total abre cupos sin tocar a nadie, y nunca queda un número imposible.
-    const nuevosDisponibles = Math.max(0, nuevosTotales - confirmedCount);
+    // `cupos_disponibles` solo se recalcula si el total cambió, y siempre
+    // descontando a los jugadores que realmente ocupan un cupo (sin contar al
+    // organizador). Si el total no cambió no se toca: recalcularlo a ciegas
+    // hacía desaparecer un cupo cada vez que se guardaba.
+    const totalCambio = nuevosTotales !== (original.cupos_totales ?? nuevosTotales);
 
     const { error } = await updateMatch(matchId, {
       titulo: form.titulo.trim(),
@@ -253,7 +261,7 @@ export default function EditMatchScreen({ route, navigation }) {
       comuna: form.comuna,
       hora: dt.toISOString(),
       cupos_totales: nuevosTotales,
-      cupos_disponibles: nuevosDisponibles,
+      ...(totalCambio ? { cupos_disponibles: Math.max(0, nuevosTotales - ocupadas) } : {}),
       precio_cuota: form.cuota === '' ? 0 : Number(form.cuota),
       nivel: form.nivel,
       duracion_min: Number(form.duracion),
@@ -282,16 +290,18 @@ export default function EditMatchScreen({ route, navigation }) {
       tone: 'success',
       title: 'Cambios guardados',
       text:
-        notifyChanges.length > 0
-          ? `Avisamos a los ${confirmedCount} confirmados del cambio.`
-          : 'El partido ya está actualizado.',
+        notifyChanges.length === 0
+          ? 'El partido ya está actualizado.'
+          : confirmedCount === 1
+          ? 'Avisamos al jugador confirmado del cambio.'
+          : `Avisamos a los ${confirmedCount} confirmados del cambio.`,
     });
-    setTimeout(() => navigation.goBack(), 900);
+    setTimeout(() => goBackOrPartidos(navigation), 900);
   };
 
   const discard = () => {
     if (!dirty) {
-      navigation.goBack();
+      goBackOrPartidos(navigation);
       return;
     }
     setSheet('descartar');
@@ -341,7 +351,7 @@ export default function EditMatchScreen({ route, navigation }) {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-          <TopBar onBack={() => navigation.goBack()} title="Editar partido" />
+          <TopBar onBack={() => goBackOrPartidos(navigation)} title="Editar partido" />
           <View style={{ paddingHorizontal: 16 }}>
             <LoadingList count={2} />
           </View>
@@ -354,7 +364,7 @@ export default function EditMatchScreen({ route, navigation }) {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-          <TopBar onBack={() => navigation.goBack()} title="Editar partido" />
+          <TopBar onBack={() => goBackOrPartidos(navigation)} title="Editar partido" />
           <ErrorState onRetry={load} detail={loadError?.message} />
         </SafeAreaView>
       </View>
@@ -365,7 +375,7 @@ export default function EditMatchScreen({ route, navigation }) {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-          <TopBar onBack={() => navigation.goBack()} title="Editar partido" />
+          <TopBar onBack={() => goBackOrPartidos(navigation)} title="Editar partido" />
           <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
             <Callout
               tone="danger"
@@ -373,7 +383,7 @@ export default function EditMatchScreen({ route, navigation }) {
               title="Solo el organizador puede editar este partido"
               text="Estos cambios también los valida el backend, así que no basta con abrir esta pantalla."
             />
-            <GhostButton label="Volver" onPress={() => navigation.goBack()} height={48} style={{ marginTop: 14 }} />
+            <GhostButton label="Volver" onPress={() => goBackOrPartidos(navigation)} height={48} style={{ marginTop: 14 }} />
           </View>
         </SafeAreaView>
       </View>
@@ -531,9 +541,9 @@ export default function EditMatchScreen({ route, navigation }) {
               </Card>
               <ErrorHint>{errors.cupos}</ErrorHint>
               <Note>
-                {confirmedCount > 0
-                  ? `El mínimo es ${minCupos} porque ya hay ${confirmedCount} ${confirmedCount === 1 ? 'jugador confirmado' : 'jugadores confirmados'}. Subir el total abre cupos nuevos sin tocar a nadie.`
-                  : 'Todavía no hay jugadores confirmados, puedes ajustar el total libremente.'}
+                {ocupadas > 0
+                  ? `El mínimo es ${minCupos} porque ya hay ${ocupadas} ${ocupadas === 1 ? 'cupo tomado' : 'cupos tomados'}. Subir el total abre cupos nuevos sin tocar a nadie.`
+                  : 'Nadie ha tomado un cupo todavía, así que puedes ajustar el total libremente. Tú, como organizador, no ocupas uno.'}
               </Note>
             </Field>
 
@@ -826,7 +836,13 @@ export default function EditMatchScreen({ route, navigation }) {
         <Card style={{ gap: 10 }} radius={16}>
           <SectionLabel>Qué va a pasar</SectionLabel>
           <Bullet tone="gold" text={`Cambias ${notifyChanges.join(', ')}`} />
-          <Bullet text={`Avisamos a los ${confirmedCount} confirmados con los datos nuevos`} />
+          <Bullet
+            text={
+              confirmedCount === 1
+                ? 'Avisamos al jugador confirmado con los datos nuevos'
+                : `Avisamos a los ${confirmedCount} confirmados con los datos nuevos`
+            }
+          />
           <Bullet text="Nadie pierde su cupo y las solicitudes pendientes se mantienen" />
           <Bullet text="Quien ya no pueda ir tendrá que salirse, con las reglas normales de Trust Score" />
         </Card>
@@ -844,7 +860,7 @@ export default function EditMatchScreen({ route, navigation }) {
               tone="danger"
               onPress={() => {
                 setSheet(null);
-                navigation.goBack();
+                goBackOrPartidos(navigation);
               }}
               height={52}
             />

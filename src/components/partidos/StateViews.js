@@ -66,18 +66,32 @@ export function LoadingDetail() {
   );
 }
 
-export function ErrorState({ onRetry, onOpenSaved, savedCount = 0, detail }) {
+export function ErrorState({
+  onRetry,
+  onOpenSaved,
+  savedCount = 0,
+  detail,
+  /** Permite especializar el estado: un partido que ya no existe no es «no
+   *  pudimos cargar», y ahí reintentar no sirve de nada. */
+  title,
+  icon: Icon = ServerCrash,
+  actionLabel = 'Reintentar',
+  onAction,
+}) {
+  const primary = onAction || onRetry;
   return (
     <View style={styles.box}>
       <View style={styles.icon}>
-        <ServerCrash color={P.textPlaceholder} size={26} strokeWidth={1.8} />
+        <Icon color={P.textPlaceholder} size={26} strokeWidth={1.8} />
       </View>
-      <Text style={styles.title}>No pudimos cargar los partidos</Text>
+      <Text style={styles.title}>{title || 'No pudimos cargar los partidos'}</Text>
       <Text style={styles.text}>
         {detail ||
           'El servidor no respondió. No es tu conexión: vuelve a intentarlo en unos segundos.'}
       </Text>
-      <PrimaryButton label="Reintentar" onPress={onRetry} height={48} style={{ alignSelf: 'stretch', marginTop: 14 }} />
+      {primary ? (
+        <PrimaryButton label={actionLabel} onPress={primary} height={48} style={{ alignSelf: 'stretch', marginTop: 14 }} />
+      ) : null}
       {savedCount > 0 && onOpenSaved ? (
         <GhostButton
           label={`Ver los ${savedCount} partidos guardados`}

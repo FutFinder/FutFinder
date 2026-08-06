@@ -33,6 +33,7 @@ import { getMatchAttendees, leaveMatchPenalized } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentUser } from '../services/auth';
 import { useOnline } from '../services/connectivity';
+import { goBackOrPartidos } from '../utils/navigation';
 import {
   GPS_RADIUS_METERS,
   cuotaLabel,
@@ -101,7 +102,7 @@ export default function MatchSpotScreen({ route, navigation }) {
       return;
     }
     setSheet(null);
-    navigation.goBack();
+    goBackOrPartidos(navigation);
   };
 
   const confirmGps = async () => {
@@ -139,14 +140,14 @@ export default function MatchSpotScreen({ route, navigation }) {
 
   if (loading) {
     return (
-      <Shell onBack={() => navigation.goBack()}>
+      <Shell onBack={() => goBackOrPartidos(navigation)}>
         <LoadingList count={2} />
       </Shell>
     );
   }
   if (!match) {
     return (
-      <Shell onBack={() => navigation.goBack()}>
+      <Shell onBack={() => goBackOrPartidos(navigation)}>
         <ErrorState onRetry={load} detail={loadError?.message} />
       </Shell>
     );
@@ -159,7 +160,7 @@ export default function MatchSpotScreen({ route, navigation }) {
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.topBar}>
-          <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} tone="surface" accessibilityLabel="Volver" />
+          <IconButton icon={ArrowLeft} onPress={() => goBackOrPartidos(navigation)} tone="surface" accessibilityLabel="Volver" />
           <Text style={styles.topTitle}>Mi cupo</Text>
         </View>
 
@@ -234,7 +235,7 @@ export default function MatchSpotScreen({ route, navigation }) {
 
           {/* Equipo */}
           <View style={{ gap: 9, marginTop: 16 }}>
-            <SectionLabel right={`${squad.length} de ${match.cupos_totales}`}>
+            <SectionLabel right={`${squad.length} en el plantel`}>
               Tu equipo para este partido
             </SectionLabel>
             <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>

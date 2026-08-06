@@ -57,6 +57,7 @@ import { getChallenge, linkChallengeMatch } from '../services/clubChallenges';
 import { getCurrentLocation } from '../services/location';
 import { isSupabaseConfigured } from '../services/supabase';
 import { isNetworkError, useOnline } from '../services/connectivity';
+import { goBackOrPartidos } from '../utils/navigation';
 import { REGIONES, getComunasOfRegion, matchComuna } from '../data/regiones-chile';
 import {
   CUPOS,
@@ -241,7 +242,7 @@ export default function PublishMatchScreen({ navigation, route }) {
 
   const goBack = () => {
     if (step === 1) {
-      navigation.goBack();
+      goBackOrPartidos(navigation);
       return;
     }
     setTouchedStep(null);

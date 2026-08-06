@@ -53,6 +53,7 @@ import {
 } from '../services/matches';
 import { getCurrentUser } from '../services/auth';
 import { useOnline } from '../services/connectivity';
+import { goBackOrPartidos } from '../utils/navigation';
 import {
   ATTENDANCE_WINDOW_HOURS,
   attendanceOpen,
@@ -100,6 +101,10 @@ export default function ManageMatchScreen({ route, navigation }) {
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [reason, setReason] = useState('');
   const [canceling, setCanceling] = useState(false);
+  // Si la RPC preexistente `cancel_match` borra la fila en vez de dejarla como
+  // 'cancelado', el partido deja de existir. Guardamos el resultado para
+  // mostrar un cierre claro en vez del error genérico de «no encontramos».
+  const [canceledGone, setCanceledGone] = useState(false);
 
   const load = useCallback(async () => {
     const [attRes, reqRes, wlRes, user] = await Promise.all([
@@ -137,9 +142,11 @@ export default function ManageMatchScreen({ route, navigation }) {
     [attendees]
   );
   const isOrganizer = !!(match && myId && match.id_organizador === myId);
+  // Ver la nota de MatchDetailScreen: `cupos_totales` son las plazas ofrecidas
+  // a otros jugadores; el plantel (`confirmed`) incluye al organizador.
   const total = match?.cupos_totales ?? 0;
   const libres = match?.cupos_disponibles ?? 0;
-  const ocupados = Math.max(0, total - libres);
+  const tomados = Math.max(0, total - libres);
   const full = libres <= 0;
 
   const say = (tone, title, text = '') => {
@@ -212,11 +219,16 @@ export default function ManageMatchScreen({ route, navigation }) {
       return;
     }
     setSheet(null);
-    say(
-      'success',
-      'Partido cancelado',
-      `Avisamos a los ${confirmed.length} confirmados y a quienes tenían solicitud.`
-    );
+    const aviso =
+      confirmed.length === 1
+        ? 'Avisamos al jugador confirmado y a quienes tenían solicitud.'
+        : `Avisamos a los ${confirmed.length} confirmados y a quienes tenían solicitud.`;
+    if (res.survived === false) {
+      // El registro no quedó en el historial: cerramos con un mensaje honesto.
+      setCanceledGone(true);
+      return;
+    }
+    say('success', 'Partido cancelado', aviso);
     await load();
   };
 
@@ -233,9 +245,37 @@ export default function ManageMatchScreen({ route, navigation }) {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-          <TopBar onBack={() => navigation.goBack()} title="Gestionar partido" />
+          <TopBar onBack={() => goBackOrPartidos(navigation)} title="Gestionar partido" />
           <View style={{ paddingHorizontal: 16 }}>
             <LoadingList count={2} />
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (canceledGone) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+          <TopBar onBack={() => navigation.navigate('Main', { screen: 'SearchTab' })} title="Partido cancelado" />
+          <View style={{ paddingHorizontal: 16, paddingTop: 20, gap: 14 }}>
+            <Callout
+              tone="danger"
+              icon={Ban}
+              title="Ya no se juega"
+              text="Avisamos a los jugadores confirmados y a quienes tenían una solicitud pendiente. El partido ya no aparece en Partidos."
+            />
+            <Note>
+              En esta base de datos `cancel_match` elimina el registro, así que el partido no
+              queda en tu historial. Para conservarlo como «cancelado» —con su chat y su
+              motivo— hay que aplicar la migración 34 en Supabase.
+            </Note>
+            <PrimaryButton
+              label="Volver a Partidos"
+              onPress={() => navigation.navigate('Main', { screen: 'SearchTab' })}
+              height={52}
+            />
           </View>
         </SafeAreaView>
       </View>
@@ -246,7 +286,7 @@ export default function ManageMatchScreen({ route, navigation }) {
     return (
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-          <TopBar onBack={() => navigation.goBack()} title="Gestionar partido" />
+          <TopBar onBack={() => goBackOrPartidos(navigation)} title="Gestionar partido" />
           {match && !isOrganizer ? (
             <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
               <Callout
@@ -257,7 +297,7 @@ export default function ManageMatchScreen({ route, navigation }) {
               />
               <GhostButton
                 label="Volver al partido"
-                onPress={() => navigation.goBack()}
+                onPress={() => goBackOrPartidos(navigation)}
                 height={48}
                 style={{ marginTop: 14 }}
               />
@@ -283,7 +323,7 @@ export default function ManageMatchScreen({ route, navigation }) {
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <TopBar
-          onBack={() => navigation.goBack()}
+          onBack={() => goBackOrPartidos(navigation)}
           title="Gestionar partido"
           subtitle={`${match.titulo} · ${formatFechaCorta(match.hora)} ${timeOf(match.hora)}`}
         />
@@ -331,7 +371,7 @@ export default function ManageMatchScreen({ route, navigation }) {
           <View style={styles.summary}>
             <SummaryCell value={libres} label="CUPOS LIBRES" tone="green" />
             <View style={styles.summaryDivider} />
-            <SummaryCell value={confirmed.length} label="CONFIRMADOS" />
+            <SummaryCell value={confirmed.length} label="EN EL PLANTEL" />
             <View style={styles.summaryDivider} />
             <SummaryCell value={requests.length} label="SOLICITUDES" tone="gold" />
           </View>
@@ -497,9 +537,10 @@ export default function ManageMatchScreen({ route, navigation }) {
                     {libres > 0 ? `${libres} ${libres === 1 ? 'cupo libre' : 'cupos libres'}` : 'Completo'}
                   </Text>
                 </View>
-                <ProgressBar ratio={total ? ocupados / total : 0} height={7} />
+                <ProgressBar ratio={total ? tomados / total : 0} height={7} />
                 <Text style={styles.metaText}>
-                  {ocupados} de {total} confirmados
+                  {confirmed.length} {confirmed.length === 1 ? 'jugador' : 'jugadores'} ·{' '}
+                  {tomados} de {total} cupos tomados
                   {requests.length > 0 ? ` · ${requests.length} en revisión` : ''}
                 </Text>
               </Card>
@@ -652,7 +693,7 @@ export default function ManageMatchScreen({ route, navigation }) {
               {markedCount === 0 ? (
                 <Note>Marca al menos un jugador para poder guardar.</Note>
               ) : null}
-              <GhostButton label="Terminar después" onPress={() => navigation.goBack()} height={46} />
+              <GhostButton label="Terminar después" onPress={() => goBackOrPartidos(navigation)} height={46} />
             </View>
           ) : null}
         </ScrollView>
@@ -699,7 +740,16 @@ export default function ManageMatchScreen({ route, navigation }) {
           <Bullet tone="danger" text="El partido deja de aparecer en Partidos" />
           <Bullet
             tone="gold"
-            text={`Avisamos a los ${confirmed.length} ${confirmed.length === 1 ? 'jugador confirmado' : 'jugadores confirmados'}${requests.length ? ` y a las ${requests.length} solicitudes pendientes` : ''}`}
+            text={
+              (confirmed.length === 1
+                ? 'Avisamos al jugador confirmado'
+                : `Avisamos a los ${confirmed.length} jugadores confirmados`) +
+              (requests.length === 0
+                ? ''
+                : requests.length === 1
+                ? ' y a la solicitud pendiente'
+                : ` y a las ${requests.length} solicitudes pendientes`)
+            }
           />
           <Bullet text="El chat del partido queda en solo lectura" />
           <Bullet

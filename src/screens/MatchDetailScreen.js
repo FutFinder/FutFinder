@@ -15,6 +15,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Calendar,
+  CalendarX,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -104,6 +105,7 @@ import {
 } from '../services/matchRules';
 import { haversineKm } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
+import { goBackOrPartidos } from '../utils/navigation';
 
 /**
  * Detalle del partido (sección 2 del handoff).
@@ -162,16 +164,25 @@ export default function MatchDetailScreen({ route, navigation }) {
 
     if (attRes.error || !attRes.match) {
       const net = isNetworkError(attRes.error);
-      if (net) markOffline();
-      const cached = await cacheRead(cacheKey);
+      // El caché es SOLO para fallos de red. Si la consulta llegó bien y el
+      // partido no existe (lo cancelaron o lo borraron), mostrar la copia
+      // guardada haría creer que el partido sigue en pie.
+      const cached = net ? await cacheRead(cacheKey) : null;
       if (cached?.value) {
+        markOffline();
         setMatch(cached.value.match);
         setAttendees(cached.value.attendees || []);
         setFromCache(cached.at);
-        setLoadError(net ? null : attRes.error || { message: 'No encontramos este partido.' });
+        setLoadError(null);
       } else {
+        if (net) markOffline();
         setMatch(null);
-        setLoadError(attRes.error || { message: 'Este partido no existe o fue eliminado.' });
+        setFromCache(null);
+        setLoadError(
+          net
+            ? { message: 'Sin conexión y sin una copia guardada de este partido.' }
+            : attRes.error || { message: 'Este partido no existe o fue cancelado por el organizador.' }
+        );
       }
     } else {
       markOnline();
@@ -231,9 +242,16 @@ export default function MatchDetailScreen({ route, navigation }) {
       ? haversineKm(userCoords, { lat: Number(match.latitud), lng: Number(match.longitud) })
       : null;
 
+  /*
+    Vocabulario de cupos en este backend (verificado contra la base):
+    `cupos_totales` son las plazas OFRECIDAS a otros jugadores, no la capacidad
+    de la cancha, y el organizador no consume una. Por eso el plantel
+    (`confirmed`, que incluye al organizador) y la aritmética de cupos son dos
+    cuentas distintas y no se pueden mezclar.
+  */
   const total = match?.cupos_totales ?? 0;
   const libres = match?.cupos_disponibles ?? 0;
-  const ocupados = Math.max(0, total - libres);
+  const tomados = Math.max(0, total - libres);
   const iAmConfirmedGps = myAttendee?.estado === 'confirmado_gps';
   const canRate = iAmConfirmedGps && hasFinished(match);
   const canConfirmGps =
@@ -448,7 +466,7 @@ export default function MatchDetailScreen({ route, navigation }) {
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
           <View style={styles.topBar}>
-            <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+            <IconButton icon={ArrowLeft} onPress={() => goBackOrPartidos(navigation)} accessibilityLabel="Volver" />
           </View>
           <LoadingDetail />
         </SafeAreaView>
@@ -461,15 +479,27 @@ export default function MatchDetailScreen({ route, navigation }) {
       <View style={styles.root}>
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
           <View style={styles.topBar}>
-            <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+            <IconButton icon={ArrowLeft} onPress={() => goBackOrPartidos(navigation)} accessibilityLabel="Volver" />
           </View>
-          <ErrorState
-            onRetry={() => {
-              setLoading(true);
-              load();
-            }}
-            detail={loadError?.message}
-          />
+          {/* Un partido que ya no existe no es un error de carga: no ofrecemos
+              reintentar, ofrecemos salida. */}
+          {/^Este partido no existe/.test(loadError?.message || '') ? (
+            <ErrorState
+              icon={CalendarX}
+              title="Este partido ya no está disponible"
+              detail={loadError.message}
+              actionLabel="Buscar otros partidos"
+              onAction={() => navigation.navigate('Main', { screen: 'SearchTab' })}
+            />
+          ) : (
+            <ErrorState
+              onRetry={() => {
+                setLoading(true);
+                load();
+              }}
+              detail={loadError?.message}
+            />
+          )}
         </SafeAreaView>
       </View>
     );
@@ -500,7 +530,7 @@ export default function MatchDetailScreen({ route, navigation }) {
         <LinearGradient colors={heroColors} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}>
           <SafeAreaView edges={['top']}>
             <View style={styles.heroBar}>
-              <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+              <IconButton icon={ArrowLeft} onPress={() => goBackOrPartidos(navigation)} accessibilityLabel="Volver" />
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <IconButton icon={Share2} onPress={() => setSheet('share')} accessibilityLabel="Compartir" />
                 {isOrganizer ? (
@@ -761,7 +791,7 @@ export default function MatchDetailScreen({ route, navigation }) {
           {/* Jugadores */}
           <Section
             label="Jugadores"
-            right={`${ocupados} de ${total} confirmados`}
+            right={`${confirmed.length} en el plantel`}
           >
             <Card style={{ gap: 11 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -787,11 +817,11 @@ export default function MatchDetailScreen({ route, navigation }) {
                   </Pressable>
                 ) : null}
               </View>
-              <ProgressBar ratio={total ? ocupados / total : 0} />
+              <ProgressBar ratio={total ? tomados / total : 0} />
               <Text style={styles.metaText}>
                 {libres > 0
-                  ? `Quedan ${libres} ${libres === 1 ? 'cupo' : 'cupos'} por completar`
-                  : 'Plantel completo'}
+                  ? `${tomados} de ${total} cupos tomados · quedan ${libres}`
+                  : `Los ${total} cupos están tomados`}
                 {pendingRequests.length > 0 && (isOrganizer || match.aprobacion === 'manual')
                   ? ` · ${pendingRequests.length} ${pendingRequests.length === 1 ? 'solicitud' : 'solicitudes'} en revisión`
                   : ''}

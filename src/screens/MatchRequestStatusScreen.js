@@ -29,6 +29,7 @@ import { formatFechaLarga } from '../components/partidos/DateTimeSheets';
 import { cancelMyJoinRequest, getMatchAttendees } from '../services/matches';
 import { getCurrentUser } from '../services/auth';
 import { useOnline } from '../services/connectivity';
+import { goBackOrPartidos } from '../utils/navigation';
 import { cuotaLabel } from '../services/matchRules';
 
 /**
@@ -82,19 +83,19 @@ export default function MatchRequestStatusScreen({ route, navigation }) {
       setFeedback({ tone: 'error', title: 'No pudimos cancelar la solicitud', text: res?.error?.message || '' });
       return;
     }
-    navigation.goBack();
+    goBackOrPartidos(navigation);
   };
 
   if (loading) {
     return (
-      <Shell onBack={() => navigation.goBack()} title="Mi solicitud">
+      <Shell onBack={() => goBackOrPartidos(navigation)} title="Mi solicitud">
         <LoadingList count={2} />
       </Shell>
     );
   }
   if (!match) {
     return (
-      <Shell onBack={() => navigation.goBack()} title="Mi solicitud">
+      <Shell onBack={() => goBackOrPartidos(navigation)} title="Mi solicitud">
         <ErrorState onRetry={load} detail={loadError?.message} />
       </Shell>
     );
@@ -104,7 +105,7 @@ export default function MatchRequestStatusScreen({ route, navigation }) {
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.topBar}>
-          <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} tone="surface" accessibilityLabel="Volver" />
+          <IconButton icon={ArrowLeft} onPress={() => goBackOrPartidos(navigation)} tone="surface" accessibilityLabel="Volver" />
           <Text style={styles.topTitle}>Mi solicitud</Text>
         </View>
 
@@ -234,7 +235,7 @@ export default function MatchRequestStatusScreen({ route, navigation }) {
               <Note>Cancelar una solicitud no afecta tu Trust Score.</Note>
             </View>
           ) : (
-            <GhostButton label="Volver al partido" onPress={() => navigation.goBack()} height={50} />
+            <GhostButton label="Volver al partido" onPress={() => goBackOrPartidos(navigation)} height={50} />
           )}
         </View>
       </SafeAreaView>

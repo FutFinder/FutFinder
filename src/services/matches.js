@@ -640,10 +640,15 @@ export async function getMatchAttendees(matchId) {
       return { data: [], error: aErr };
     }
 
-    // 2) Trae datos del match (para saber quién es organizador)
+    // 2) Trae datos del match (para saber quién es organizador).
+    //    Va con `*` a propósito: el detalle, la gestión y la edición necesitan
+    //    todas las columnas (modalidad, rango de edad, coordenadas, duración,
+    //    aprobación, recordatorios, motivo de cancelación…). Con una lista fija
+    //    la pantalla caía en valores por defecto y mostraba datos que no eran
+    //    los del partido.
     const { data: match } = await supabase
       .from('matches')
-      .select('id, titulo, comuna, cancha_nombre, hora, cupos_totales, cupos_disponibles, precio_cuota, nivel, descripcion, estado, id_organizador')
+      .select('*')
       .eq('id', matchId)
       .single();
 
@@ -690,15 +695,32 @@ export async function getMatchAttendees(matchId) {
  * el partido siga en el historial y el chat quede en solo lectura.
  */
 export async function cancelMatchWithReason(matchId, motivo = null) {
-  const res = await cancelMatch(matchId);
-  if (!res?.ok) return res;
+  // El motivo se escribe ANTES de cancelar. La RPC `cancel_match` que está
+  // corriendo en la base es una versión anterior a este repo (la migración 33
+  // no la sobrescribe a propósito) y no sabemos con certeza si cambia el
+  // `estado` o borra la fila. Escribiendo primero, el motivo queda guardado en
+  // el caso en que el registro sobreviva, y no se pierde nada si no.
   if (motivo && isSupabaseConfigured) {
     await supabase
       .from('matches')
       .update({ motivo_cancelacion: motivo })
       .eq('id', matchId);
   }
-  return res;
+
+  const res = await cancelMatch(matchId);
+  if (!res?.ok) return res;
+
+  // ¿Quedó como 'cancelado' en el historial, o desapareció?
+  let survived = true;
+  if (isSupabaseConfigured) {
+    const { data } = await supabase
+      .from('matches')
+      .select('id, estado')
+      .eq('id', matchId)
+      .maybeSingle();
+    survived = !!data;
+  }
+  return { ...res, survived };
 }
 
 /**
