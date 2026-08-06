@@ -83,6 +83,56 @@ export const dsColors = {
   divider: 'rgba(255, 255, 255, 0.07)',
 };
 
+/**
+ * Tokens propios del rediseño de «Chats y amigos».
+ *
+ * Extiende `dsColors` (Clubes/Perfil) en vez de reemplazarlo: comparten fondo
+ * y verde de acción. Lo que agrega son los tonos exactos del handoff de chat
+ * que no existían todavía:
+ *   - tres superficies de tarjeta según el estado (normal / no leída / club)
+ *   - ámbar de aviso `/importante`, que no es ni éxito ni error
+ *   - coral destructivo #FF7A6B (el diseño de chat lo actualizó respecto del
+ *     #E8737B que usa el resto de la app)
+ */
+export const chatColors = {
+  ...dsColors,
+
+  // Superficies de las tarjetas de conversación
+  card: '#111310',
+  cardUnread: '#151815',
+  cardClub: '#101310',
+  composerBar: '#0E100E',
+  inputBg: '#141715',
+  sendIdle: '#1B1F1B',
+
+  // Bordes
+  cardBorder: 'rgba(255,255,255,0.06)',
+  cardBorderUnread: 'rgba(90,224,106,0.16)',
+  cardBorderClub: 'rgba(90,224,106,0.30)',
+
+  // Aviso importante (/importante)
+  warn: '#FFBE5A',
+  warnSoft: 'rgba(255,190,90,0.12)',
+  warnBorder: 'rgba(255,190,90,0.38)',
+
+  // Destructivo del handoff de chat
+  danger: '#FF7A6B',
+  dangerSoft: 'rgba(255,122,107,0.09)',
+  dangerBorder: 'rgba(255,122,107,0.35)',
+
+  // Escudo de club (degradado del avatar)
+  clubShield: ['#5AE06A', '#2C9C3B'],
+  avatarGreenBg: '#1B2A1D',
+  avatarGreenBorder: 'rgba(90,224,106,0.22)',
+  avatarNeutralBg: '#1E231E',
+  avatarNeutralBorder: 'rgba(255,255,255,0.08)',
+
+  // Burbujas
+  bubbleTheirs: '#141715',
+  bubbleTheirsBorder: 'rgba(255,255,255,0.07)',
+  inkOnGreen: '#0B0D0B',
+};
+
 /** Radios, alturas y espaciados del rediseño de club. */
 export const dsRadius = {
   chip: 9,
