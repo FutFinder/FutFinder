@@ -180,6 +180,19 @@ export default function LocationAutocomplete({
   onSelect,
   placeholder,
   proximity,
+  /**
+   * Overrides de estilo opcionales. El rediseño de Partidos necesita el mismo
+   * buscador (canchas de FutFinder + Mapbox/OSM) con su propia paleta, así que
+   * en vez de duplicar la lógica de búsqueda se le pasan los estilos.
+   */
+  inputRowStyle,
+  inputStyle,
+  dropdownStyle,
+  optionStyle,
+  optionTextStyle,
+  placeholderColor,
+  accentColor,
+  spinnerColor,
 }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -273,21 +286,21 @@ export default function LocationAutocomplete({
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.inputRow}>
-        <SearchIcon color={colors.textMuted} size={16} />
+      <View style={[styles.inputRow, inputRowStyle]}>
+        <SearchIcon color={placeholderColor || colors.textMuted} size={16} />
         <TextInput
-          style={styles.input}
+          style={[styles.input, inputStyle]}
           placeholder={placeholder || 'Busca por nombre, dirección o sector…'}
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={placeholderColor || colors.textMuted}
           value={value}
           onChangeText={handleChange}
           onFocus={() => results.length > 0 && setOpen(true)}
         />
-        {loading && <ActivityIndicator color={colors.primary} size="small" />}
+        {loading && <ActivityIndicator color={spinnerColor || colors.primary} size="small" />}
       </View>
 
       {open && results.length > 0 && (
-        <View style={styles.dropdown}>
+        <View style={[styles.dropdown, dropdownStyle]}>
           {results.map((item, i) => {
             const isFut = item.provider === 'futfinder';
             return (
@@ -297,25 +310,26 @@ export default function LocationAutocomplete({
                 style={({ pressed }) => [
                   styles.option,
                   isFut && styles.optionFut,
+                  optionStyle,
                   pressed && { opacity: 0.7 },
                 ]}
               >
                 {isFut ? (
                   <Star
-                    color={colors.primary}
+                    color={accentColor || colors.primary}
                     size={14}
-                    fill={colors.primary}
+                    fill={accentColor || colors.primary}
                     style={{ marginTop: 2 }}
                   />
                 ) : (
-                  <MapPin color={colors.primary} size={14} style={{ marginTop: 2 }} />
+                  <MapPin color={accentColor || colors.primary} size={14} style={{ marginTop: 2 }} />
                 )}
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.optionText} numberOfLines={2}>
+                  <Text style={[styles.optionText, optionTextStyle]} numberOfLines={2}>
                     {item.label}
                   </Text>
                   {isFut && (
-                    <Text style={styles.optionBadge}>
+                    <Text style={[styles.optionBadge, accentColor && { color: accentColor }]}>
                       Cancha FutFinder · {item._usos} {item._usos === 1 ? 'uso' : 'usos'}
                     </Text>
                   )}

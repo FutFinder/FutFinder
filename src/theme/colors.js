@@ -184,6 +184,85 @@ export const tactical = {
   textFaint: 'rgba(255,255,255,0.42)',
 };
 
+/**
+ * Tokens del rediseño del módulo «Partidos» (handoff de Claude Design,
+ * `Partidos.dc.html`).
+ *
+ * Hereda la familia visual de Clubes/Perfil/Chat (`dsColors`) pero fija los
+ * valores exactos del handoff, que agrega escalones de gris y de verde que no
+ * existían: fondo negro con matiz verde, tarjetas #141715, verde brillante
+ * #5AE06A para acciones, ámbar #F0C85A para pendientes y coral #E8737B para
+ * errores y acciones destructivas.
+ *
+ * Radios: 24 en tarjetas de listado, 20 en tarjetas de sección, 14 en
+ * controles, 999 en pills. Altura mínima de botón: 48.
+ */
+export const partidos = {
+  // Superficies
+  bg: '#0B0D0C',
+  bgDeep: '#080A09',
+  surface: '#141715',
+  surfaceAlt: '#0E1110',
+  chip: '#1B1F1C',
+  chipAlt: '#101310',
+
+  // Verde de acción
+  green: '#5AE06A',
+  greenDark: '#3FBF52',
+  greenInk: '#07160B',
+  greenSoft: 'rgba(90,224,106,0.12)',
+  greenSoftStrong: 'rgba(90,224,106,0.16)',
+  greenBorder: 'rgba(90,224,106,0.40)',
+  greenBorderStrong: 'rgba(90,224,106,0.55)',
+  greenGlow: 'rgba(90,224,106,0.24)',
+
+  // Pendiente / advertencia
+  gold: '#F0C85A',
+  goldSoft: 'rgba(240,200,90,0.09)',
+  goldBorder: 'rgba(240,200,90,0.30)',
+
+  // Error / destructivo
+  coral: '#E8737B',
+  coralSoft: 'rgba(232,115,123,0.08)',
+  coralBorder: 'rgba(232,115,123,0.32)',
+
+  // Texto (de más a menos contraste)
+  text: '#FFFFFF',
+  textStrong: '#E3E8E3',
+  textSoft: '#C2C9C2',
+  textDim: '#A0A8A0',
+  textMuted: '#838B83',
+  textFaint: '#747C74',
+  textGhost: '#676F68',
+  textPlaceholder: '#565E57',
+
+  // Líneas y superficies neutras
+  hairline: 'rgba(255,255,255,0.06)',
+  border: 'rgba(255,255,255,0.09)',
+  borderStrong: 'rgba(255,255,255,0.13)',
+  divider: 'rgba(255,255,255,0.05)',
+  track: '#232823',
+  grip: '#31382F',
+  dashed: '#31382F',
+  scrim: 'rgba(6,7,5,0.75)',
+
+  // Degradados del hero del detalle
+  hero: ['#14301B', '#0E1A12', '#0B0D0C'],
+  heroNeutral: ['#191C19', '#111411', '#0B0D0C'],
+  avatar: ['#1F3D27', '#141715'],
+};
+
+export const partidosRadius = {
+  pill: 999,
+  chipSm: 7,
+  chip: 9,
+  control: 11,
+  input: 14,
+  card: 20,
+  list: 24,
+  sheet: 26,
+};
+
 export const fonts = {
   regular: 'System',
   medium: 'System',

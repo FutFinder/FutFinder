@@ -12,7 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import HomeScreen from '../screens/HomeScreen';
-import SearchScreen from '../screens/SearchScreen';
+import PartidosScreen from '../screens/PartidosScreen';
 import ClubsScreen from '../screens/ClubsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ChatScreen from '../screens/ChatScreen';
@@ -225,7 +225,7 @@ export default function MainTabs() {
       tabBar={(props) => <CustomTabBar {...props} />}
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} />
-      <Tab.Screen name="SearchTab" component={SearchScreen} />
+      <Tab.Screen name="SearchTab" component={PartidosScreen} />
       <Tab.Screen name="ClubsTab" component={ClubsScreen} />
       <Tab.Screen name="CreateTab" component={PlaceholderTab} />
       <Tab.Screen name="NotifTab" component={NotificationsScreen} />

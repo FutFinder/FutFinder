@@ -43,8 +43,27 @@ export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
   const { data, error } = await q;
   if (error) {
     console.error('[FutFinder] listOpenMatches error:', error);
+    return { data: [], error };
   }
-  return { data: data || [], error };
+  return { data: await withOrganizers(data), error: null };
+}
+
+/**
+ * Adjunta `organizador: { username, foto_url, trust_score }` a una lista de
+ * partidos con una sola consulta. Las tarjetas del listado necesitan mostrar
+ * quién organiza, y sin esto haría una consulta por tarjeta.
+ */
+export async function withOrganizers(matches) {
+  const list = matches || [];
+  if (!isSupabaseConfigured || list.length === 0) return list;
+  const ids = [...new Set(list.map((m) => m.id_organizador).filter(Boolean))];
+  if (!ids.length) return list;
+  const { data: profs } = await supabase
+    .from('profiles')
+    .select('id, username, foto_url, trust_score')
+    .in('id', ids);
+  const byId = new Map((profs || []).map((p) => [p.id, p]));
+  return list.map((m) => ({ ...m, organizador: byId.get(m.id_organizador) || null }));
 }
 
 /**
@@ -78,8 +97,11 @@ export async function listMatchesInBounds({
     .order('hora', { ascending: true })
     .limit(limit);
 
-  if (error) console.error('[FutFinder] listMatchesInBounds:', error);
-  return { data: data || [], error };
+  if (error) {
+    console.error('[FutFinder] listMatchesInBounds:', error);
+    return { data: [], error };
+  }
+  return { data: await withOrganizers(data), error: null };
 }
 
 /**
@@ -164,6 +186,117 @@ export function applyFilters(matches, filters, userCoords) {
 }
 
 /**
+ * Filtro del listado de Partidos rediseñado.
+ *
+ * Recibe el objeto de filtros de `FiltersSheet` (`EMPTY_FILTERS`) y devuelve la
+ * lista enriquecida con `_distanciaKm`, ya ordenada: por cercanía cuando hay
+ * ubicación y por hora cuando no.
+ *
+ * Reglas de los filtros que dependen de datos opcionales:
+ *   · modalidad: los partidos antiguos sin `modalidad` no se descartan cuando
+ *     el usuario no filtra por modalidad, pero sí quedan fuera si la filtra.
+ *   · rango de edad: un partido «sin restricción» siempre entra, porque acepta
+ *     a cualquiera.
+ */
+export function filterMatches(matches, f = {}, userCoords = null) {
+  const text = (f.text || '').toLowerCase().trim();
+  const enriched = (matches || []).map((m) => ({
+    ...m,
+    _distanciaKm: userCoords
+      ? haversineKm(userCoords, { lat: Number(m.latitud), lng: Number(m.longitud) })
+      : null,
+  }));
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startTomorrow = new Date(startOfDay);
+  startTomorrow.setDate(startTomorrow.getDate() + 1);
+  const endTomorrow = new Date(startTomorrow);
+  endTomorrow.setDate(endTomorrow.getDate() + 1);
+  const daysToSat = (6 - now.getDay() + 7) % 7;
+  const startSat = new Date(startOfDay);
+  startSat.setDate(startSat.getDate() + daysToSat);
+  const endSun = new Date(startSat);
+  endSun.setDate(endSun.getDate() + 2);
+
+  const inWindow = (hora) => {
+    const h = new Date(hora);
+    switch (f.fecha) {
+      case 'hoy':
+        return h >= now && h < startTomorrow;
+      case 'manana':
+        return h >= startTomorrow && h < endTomorrow;
+      case 'finde':
+        return h >= startSat && h < endSun;
+      default:
+        return true;
+    }
+  };
+
+  const edadRange = resolveEdadFilter(f);
+
+  const out = enriched.filter((m) => {
+    if (text) {
+      const hay =
+        (m.titulo || '').toLowerCase().includes(text) ||
+        (m.cancha_nombre || '').toLowerCase().includes(text) ||
+        (m.comuna || '').toLowerCase().includes(text) ||
+        (m.direccion || '').toLowerCase().includes(text);
+      if (!hay) return false;
+    }
+    if (f.region && m.region !== f.region) return false;
+    if (f.comuna && m.comuna !== f.comuna) return false;
+    if (f.modalidad && m.modalidad !== f.modalidad) return false;
+    if (f.nivel && m.nivel !== f.nivel) return false;
+    if (f.disponibilidad === 'con_cupos' && (m.cupos_disponibles ?? 0) <= 0) return false;
+    if (f.cuota) {
+      const p = Number(m.precio_cuota || 0);
+      if (p < f.cuota.min || p > f.cuota.max) return false;
+    }
+    if (edadRange) {
+      const mMin = m.edad_min ?? null;
+      const mMax = m.edad_max ?? null;
+      // Un partido sin restricción acepta a cualquiera → siempre entra.
+      const abierto = mMin == null && mMax == null;
+      if (!abierto) {
+        const noSolapa =
+          (edadRange.max != null && mMin != null && mMin > edadRange.max) ||
+          (edadRange.min != null && mMax != null && mMax < edadRange.min);
+        if (noSolapa) return false;
+      }
+    }
+    if (!inWindow(m.hora)) return false;
+    if (f.maxKm != null && m._distanciaKm != null && m._distanciaKm > f.maxKm) return false;
+    return true;
+  });
+
+  return out.sort((a, b) => {
+    if (userCoords && a._distanciaKm != null && b._distanciaKm != null) {
+      return a._distanciaKm - b._distanciaKm;
+    }
+    return new Date(a.hora) - new Date(b.hora);
+  });
+}
+
+/** Traduce el preset/rango personalizado de edad del filtro a `{min,max}`. */
+function resolveEdadFilter(f) {
+  if (f.edadPreset === -1) {
+    const min = f.edadMin === '' || f.edadMin == null ? null : Number(f.edadMin);
+    const max = f.edadMax === '' || f.edadMax == null ? null : Number(f.edadMax);
+    if (min == null && max == null) return null;
+    return { min, max };
+  }
+  const presets = [
+    null,
+    { min: 18, max: 25 },
+    { min: 18, max: 35 },
+    { min: 25, max: 45 },
+    { min: 35, max: 99 },
+  ];
+  return presets[f.edadPreset ?? 0] || null;
+}
+
+/**
  * Crea un nuevo partido.
  * El organizador es el usuario autenticado.
  */
@@ -183,6 +316,18 @@ export async function createMatch({
   duracion_min = 90,
   aprobacion = 'inmediata',
   min_trust_score = 0,
+  modalidad = null,
+  edad_min = null,
+  edad_max = null,
+  recordatorio_1h = true,
+  pedir_asistencia = true,
+  /**
+   * Token generado por el cliente antes del primer intento. Hace la
+   * publicación idempotente: si el usuario toca dos veces «Publicar» o se
+   * reintenta por timeout, el segundo insert choca con el índice único y
+   * devolvemos el partido que ya existe en vez de crear un duplicado.
+   */
+  client_token = null,
   // Partido de clubes (null = partido normal)
   club_local_id = null,
   club_visitante_id = null,
@@ -193,32 +338,50 @@ export async function createMatch({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: null, error: { message: 'No autenticado' } };
 
+  const payload = {
+    id_organizador: user.id,
+    titulo,
+    region,
+    comuna,
+    cancha_nombre,
+    direccion,
+    latitud,
+    longitud,
+    hora,
+    cupos_totales,
+    cupos_disponibles: cupos_totales,
+    precio_cuota,
+    nivel,
+    descripcion,
+    duracion_min,
+    aprobacion,
+    min_trust_score,
+    modalidad,
+    edad_min,
+    edad_max,
+    recordatorio_1h,
+    pedir_asistencia,
+    club_local_id,
+    club_visitante_id,
+    challenge_id,
+  };
+  if (client_token) payload.client_token = client_token;
+
   const { data, error } = await supabase
     .from('matches')
-    .insert({
-      id_organizador: user.id,
-      titulo,
-      region,
-      comuna,
-      cancha_nombre,
-      direccion,
-      latitud,
-      longitud,
-      hora,
-      cupos_totales,
-      cupos_disponibles: cupos_totales,
-      precio_cuota,
-      nivel,
-      descripcion,
-      duracion_min,
-      aprobacion,
-      min_trust_score,
-      club_local_id,
-      club_visitante_id,
-      challenge_id,
-    })
+    .insert(payload)
     .select()
     .single();
+
+  // 23505 = unique_violation → ya se publicó con este token, lo recuperamos.
+  if (error && client_token && (error.code === '23505' || /duplicate key/i.test(error.message || ''))) {
+    const { data: existing } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('client_token', client_token)
+      .maybeSingle();
+    if (existing) return { data: existing, error: null, duplicate: true };
+  }
 
   return { data, error };
 }
@@ -248,6 +411,8 @@ export async function updateMatch(matchId, patch) {
     'cupos_totales', 'cupos_disponibles',
     'precio_cuota', 'nivel', 'descripcion', 'estado', 'foto_url',
     'duracion_min', 'aprobacion', 'min_trust_score',
+    'modalidad', 'edad_min', 'edad_max',
+    'recordatorio_1h', 'pedir_asistencia', 'motivo_cancelacion',
   ];
   const payload = {};
   for (const k of allowed) {
@@ -285,6 +450,41 @@ export async function joinMatch(matchId) {
   const { data, error } = await supabase.rpc('join_match', { p_match_id: matchId });
   if (error) return { ok: false, reason: translateJoinError(error.message), error };
   return data; // { ok: true } o { ok: false, reason }
+}
+
+/**
+ * Traduce los errores de esquema de PostgREST a algo accionable.
+ *
+ * Si la migración 33 no está aplicada en la base de datos, PostgREST responde
+ * «Could not find the 'modalidad' column of 'matches' in the schema cache»,
+ * que no le dice nada a nadie. Este helper lo convierte en la instrucción real.
+ */
+export function translateSchemaError(error) {
+  if (!error) return null;
+  const msg = String(error.message || '');
+  const m = msg.match(/Could not find the '([^']+)' column of '([^']+)'/i);
+  if (!m) return null;
+  const columnasNuevas = [
+    'modalidad', 'edad_min', 'edad_max', 'recordatorio_1h',
+    'pedir_asistencia', 'motivo_cancelacion', 'client_token',
+  ];
+  if (columnasNuevas.includes(m[1])) {
+    return `Falta aplicar la migración «33_partidos_flujo_completo.sql» en Supabase: la tabla ${m[2]} todavía no tiene la columna ${m[1]}.`;
+  }
+  return `La base de datos no tiene la columna ${m[1]} en ${m[2]}. Revisa las migraciones pendientes.`;
+}
+
+/**
+ * Igual que `translateSchemaError`, pero para las RPC que puede que no existan
+ * todavía (lista de espera, asistencia).
+ */
+export function translateMissingRpcError(error) {
+  if (!error) return null;
+  const msg = String(error.message || '');
+  if (/Could not find the function|does not exist/i.test(msg)) {
+    return 'Esta acción necesita la migración «33_partidos_flujo_completo.sql» aplicada en Supabase.';
+  }
+  return null;
 }
 
 // Traduce las excepciones del trigger tg_enforce_join_rules a mensajes legibles.
@@ -481,6 +681,180 @@ export async function getMatchAttendees(matchId) {
     console.error('[FutFinder] getMatchAttendees exception:', e);
     return { data: [], error: e };
   }
+}
+
+/**
+ * Cancela el partido y deja el motivo visible para los jugadores.
+ *
+ * NO borra el registro: `cancel_match` cambia `estado` a 'cancelado' para que
+ * el partido siga en el historial y el chat quede en solo lectura.
+ */
+export async function cancelMatchWithReason(matchId, motivo = null) {
+  const res = await cancelMatch(matchId);
+  if (!res?.ok) return res;
+  if (motivo && isSupabaseConfigured) {
+    await supabase
+      .from('matches')
+      .update({ motivo_cancelacion: motivo })
+      .eq('id', matchId);
+  }
+  return res;
+}
+
+/**
+ * El jugador retira su propia solicitud pendiente (aprobación manual).
+ * No toca cupos porque una solicitud pendiente nunca reservó uno.
+ */
+export async function cancelMyJoinRequest(matchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, reason: 'No autenticado' };
+  const { error } = await supabase
+    .from('attendees')
+    .delete()
+    .eq('id_partido', matchId)
+    .eq('id_jugador', user.id)
+    .eq('estado', 'pendiente');
+  if (error) return { ok: false, error };
+  return { ok: true };
+}
+
+/**
+ * Solicitudes pendientes de un partido, con la info que el organizador
+ * necesita para decidir: posición, Trust Score e historial disponible.
+ */
+export async function getMatchRequests(matchId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  const { data: atts, error } = await supabase
+    .from('attendees')
+    .select('id, id_jugador, inscrito_at')
+    .eq('id_partido', matchId)
+    .eq('estado', 'pendiente')
+    .order('inscrito_at', { ascending: true });
+  if (error) return { data: [], error };
+  const ids = (atts || []).map((a) => a.id_jugador);
+  if (!ids.length) return { data: [], error: null };
+
+  const { data: profs } = await supabase
+    .from('profiles')
+    .select('id, username, foto_url, trust_score, edad, comuna, posicion_preferida, partidos_jugados, asistencias_confirmadas')
+    .in('id', ids);
+  const byId = new Map((profs || []).map((p) => [p.id, p]));
+
+  return {
+    data: (atts || []).map((a) => {
+      const p = byId.get(a.id_jugador) || {};
+      return {
+        attendee_id: a.id,
+        user_id: a.id_jugador,
+        username: p.username || 'jugador',
+        foto_url: p.foto_url || null,
+        trust_score: p.trust_score ?? null,
+        edad: p.edad ?? null,
+        comuna: p.comuna || null,
+        posicion_preferida: p.posicion_preferida || null,
+        partidos_jugados: p.partidos_jugados ?? 0,
+        asistencias_confirmadas: p.asistencias_confirmadas ?? 0,
+        solicitado_at: a.inscrito_at,
+      };
+    }),
+    error: null,
+  };
+}
+
+// ------------------------------------------------------ lista de espera
+
+/** Cola de espera del partido, en orden de llegada. */
+export async function getWaitlist(matchId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('match_waitlist')
+    .select('id, id_jugador, created_at, avisado_at, confirmar_antes_de')
+    .eq('id_partido', matchId)
+    .order('created_at', { ascending: true });
+  if (error) return { data: [], error };
+  const ids = (data || []).map((w) => w.id_jugador);
+  if (!ids.length) return { data: [], error: null };
+  const { data: profs } = await supabase
+    .from('profiles')
+    .select('id, username, foto_url, trust_score')
+    .in('id', ids);
+  const byId = new Map((profs || []).map((p) => [p.id, p]));
+  return {
+    data: (data || []).map((w, i) => {
+      const p = byId.get(w.id_jugador) || {};
+      return {
+        id: w.id,
+        user_id: w.id_jugador,
+        posicion: i + 1,
+        username: p.username || 'jugador',
+        foto_url: p.foto_url || null,
+        trust_score: p.trust_score ?? null,
+        avisado_at: w.avisado_at,
+        confirmar_antes_de: w.confirmar_antes_de,
+      };
+    }),
+    error: null,
+  };
+}
+
+/** Entra a la lista de espera. Devuelve `{ ok, posicion }`. */
+export async function joinWaitlist(matchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true, posicion: 1 };
+  const { data, error } = await supabase.rpc('join_waitlist', { p_match_id: matchId });
+  if (error) {
+    return {
+      ok: false,
+      reason: translateMissingRpcError(error) || translateJoinError(error.message),
+      error,
+    };
+  }
+  return data;
+}
+
+/** Sale de la lista de espera. No afecta el Trust Score. */
+export async function leaveWaitlist(matchId) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data, error } = await supabase.rpc('leave_waitlist', { p_match_id: matchId });
+  if (error) return { ok: false, reason: translateMissingRpcError(error), error };
+  return data;
+}
+
+// ---------------------------------------------------------- asistencia
+
+/**
+ * El organizador guarda la asistencia del partido.
+ * `marks` = { [userId]: 'presente' | 'ausente' }.
+ *
+ * La RPC valida que quien llama sea el organizador, que el partido haya
+ * terminado y aplica el efecto en el Trust Score de cada jugador.
+ */
+export async function saveMatchAttendance(matchId, marks) {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const { data, error } = await supabase.rpc('save_match_attendance', {
+    p_match_id: matchId,
+    p_marks: marks,
+  });
+  if (error) return { ok: false, reason: translateMissingRpcError(error), error };
+  return data;
+}
+
+/**
+ * Cuántos partidos abiertos cerca no exigen Trust Score mínimo.
+ * Sirve para la alternativa honesta de la pantalla de bloqueo.
+ */
+export async function countMatchesWithoutMinTrust({ region = null } = {}) {
+  if (!isSupabaseConfigured) return 0;
+  let q = supabase
+    .from('matches')
+    .select('id', { count: 'exact', head: true })
+    .eq('estado', 'abierto')
+    .gt('hora', new Date().toISOString())
+    .gt('cupos_disponibles', 0)
+    .or('min_trust_score.is.null,min_trust_score.eq.0');
+  if (region) q = q.eq('region', region);
+  const { count } = await q;
+  return count || 0;
 }
 
 // ----- Datos de demo (cuando Supabase no está configurado todavía) -----

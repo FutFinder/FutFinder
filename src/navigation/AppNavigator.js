@@ -17,7 +17,11 @@ import VerificationScreen from '../screens/VerificationScreen';
 import LocationPermissionScreen from '../screens/LocationPermissionScreen';
 import TermsScreen from '../screens/TermsScreen';
 import SuccessScreen from '../screens/SuccessScreen';
-import CreateMatchScreen from '../screens/CreateMatchScreen';
+import PublishMatchScreen from '../screens/PublishMatchScreen';
+import EditMatchScreen from '../screens/EditMatchScreen';
+import ManageMatchScreen from '../screens/ManageMatchScreen';
+import MatchRequestStatusScreen from '../screens/MatchRequestStatusScreen';
+import MatchSpotScreen from '../screens/MatchSpotScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ChatThreadScreen from '../screens/ChatThreadScreen';
 import ChatDetailsScreen from '../screens/ChatDetailsScreen';
@@ -61,6 +65,38 @@ const navTheme = {
 };
 
 /**
+ * Deep links.
+ *
+ * La hoja de compartir del módulo Partidos genera enlaces
+ * `futfinder.cl/p/<id>`, así que la app tiene que saber abrirlos: sin esto el
+ * enlace compartido caía en la raíz. En web además hace que cada pantalla
+ * tenga una URL propia, así que recargar no pierde el contexto.
+ */
+const linking = {
+  prefixes: ['futfinder://', 'https://futfinder.cl', 'https://www.futfinder.cl'],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          HomeTab: 'inicio',
+          SearchTab: 'partidos',
+          ClubsTab: 'clubes',
+          ChatTab: 'chat',
+          ProfileTab: 'perfil',
+        },
+      },
+      // `p/<id>` es el formato del enlace público que compartimos.
+      MatchDetail: 'p/:matchId',
+      ManageMatch: 'p/:matchId/gestionar',
+      MatchSpot: 'p/:matchId/mi-cupo',
+      MatchRequestStatus: 'p/:matchId/mi-solicitud',
+      EditMatch: 'p/:matchId/editar',
+      CreateMatch: 'publicar',
+    },
+  },
+};
+
+/**
  * Estructura de la app:
  *
  *  RootStack
@@ -74,7 +110,7 @@ const navTheme = {
  */
 export default function AppNavigator() {
   return (
-    <NavigationContainer ref={navigationRef} theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking}>
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{
@@ -95,10 +131,35 @@ export default function AppNavigator() {
         <Stack.Screen name="Main" component={MainTabs} options={{ animation: 'fade' }} />
 
         {/* Detalles que se abren sobre las tabs (la tab bar se oculta) */}
+        {/*
+          Publicar un partido es un wizard de 3 pasos; editar uno publicado es
+          un formulario único. La ruta CreateMatch se mantiene porque la usan
+          Inicio, la tab de crear y el flujo de desafíos entre clubes.
+        */}
         <Stack.Screen
           name="CreateMatch"
-          component={CreateMatchScreen}
+          component={PublishMatchScreen}
           options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="EditMatch"
+          component={EditMatchScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="ManageMatch"
+          component={ManageMatchScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="MatchRequestStatus"
+          component={MatchRequestStatusScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="MatchSpot"
+          component={MatchSpotScreen}
+          options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="EditProfile"
