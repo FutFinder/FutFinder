@@ -2,6 +2,68 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ Regla esencial: sincronización Git (trabajo desde 2 Macs)
+
+Este proyecto se trabaja desde dos computadoras distintas (2 Macs), por lo que es **obligatorio** mantener el repositorio sincronizado en todo momento para evitar conflictos y sobrescribir trabajo del otro. Aplica esta regla en cada tarea que involucre tocar archivos del repo, no solo cuando se te pida explícitamente.
+
+### Antes de empezar a trabajar
+
+1. Ejecutar siempre `git pull` antes de tocar cualquier archivo.
+
+   ```bash
+   git pull
+   ```
+
+2. Nunca empezar a editar código sin haber sincronizado primero.
+
+### Al terminar los cambios
+
+1. Revisar qué archivos cambiaron:
+
+   ```bash
+   git status
+   ```
+
+2. Agregar los cambios:
+
+   ```bash
+   git add .
+   ```
+
+3. Commit con mensaje descriptivo (qué se hizo y por qué, no solo "cambios"):
+
+   ```bash
+   git commit -m "mensaje descriptivo del cambio"
+   ```
+
+4. Subir los cambios de inmediato, no dejar commits sin subir al final de la sesión:
+
+   ```bash
+   git push
+   ```
+
+### Si hay conflictos
+
+- Si `git pull` genera conflictos, no resolverlos automáticamente sin avisar.
+- Detenerse y comunicar al otro desarrollador antes de decidir cómo resolver el conflicto.
+- Preferir hablarlo (mensaje/llamada) antes de hacer `git push --force` o similar — nunca forzar un push sin confirmación explícita.
+
+### Flujo resumido
+
+```bash
+git pull                      # 1. Sincronizar antes de trabajar
+# ... hacer cambios ...
+git add .                     # 2. Agregar cambios
+git commit -m "mensaje"       # 3. Commitear
+git push                      # 4. Subir de inmediato
+```
+
+### Notas adicionales
+
+- Si vas a trabajar en algo que puede tardar varias horas o días, considera crear una rama (`git checkout -b nombre-rama`) para evitar bloquear al otro en `main`.
+- Antes de cambiar de Mac, asegúrate de haber hecho `push` de todo tu trabajo.
+- Al llegar a la otra Mac, lo primero siempre es `git pull`.
+
 ## Commands
 
 ```bash

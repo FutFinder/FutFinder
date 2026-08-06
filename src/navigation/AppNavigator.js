@@ -20,6 +20,8 @@ import SuccessScreen from '../screens/SuccessScreen';
 import CreateMatchScreen from '../screens/CreateMatchScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import ChatThreadScreen from '../screens/ChatThreadScreen';
+import ChatDetailsScreen from '../screens/ChatDetailsScreen';
+import FriendsScreen from '../screens/FriendsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import MatchDetailScreen from '../screens/MatchDetailScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -106,6 +108,16 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ChatThread"
           component={ChatThreadScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ChatDetails"
+          component={ChatDetailsScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Friends"
+          component={FriendsScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

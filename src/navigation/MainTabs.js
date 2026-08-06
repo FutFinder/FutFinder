@@ -21,6 +21,7 @@ import SearchFootballIcon from '../components/SearchFootballIcon';
 import { tactical } from '../theme/colors';
 import { getCurrentUser } from '../services/auth';
 import { countUnread, subscribeToNotifications } from '../services/notifications';
+import { countUnreadTotal, subscribeToMessages } from '../services/messages';
 
 const Tab = createBottomTabNavigator();
 
@@ -48,6 +49,7 @@ function PlaceholderTab() {
 function CustomTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
   const [unread, setUnread] = useState(0);
+  const [chatUnread, setChatUnread] = useState(0);
 
   // Contador de notificaciones no leídas: carga inicial + realtime +
   // refresco cuando cambia la navegación (p.ej. al volver del inbox).
@@ -73,12 +75,45 @@ function CustomTabBar({ state, navigation }) {
     };
   }, [navigation]);
 
+  // Mensajes sin leer del tab Chat. El total lo calcula el servidor
+  // (`get_chat_unread_total`), que ya descuenta las conversaciones
+  // silenciadas salvo que tengan un aviso /importante pendiente.
+  useEffect(() => {
+    let mounted = true;
+    let pending = null;
+
+    const reload = async () => {
+      const n = await countUnreadTotal();
+      if (mounted) setChatUnread(n || 0);
+    };
+    // Una ráfaga de mensajes no debe disparar una consulta por mensaje.
+    const scheduleReload = () => {
+      if (pending) return;
+      pending = setTimeout(() => {
+        pending = null;
+        reload();
+      }, 600);
+    };
+
+    reload();
+    const unsubscribe = subscribeToMessages(scheduleReload);
+    const navUnsub = navigation.addListener('state', scheduleReload);
+
+    return () => {
+      mounted = false;
+      if (pending) clearTimeout(pending);
+      try { unsubscribe(); } catch {}
+      navUnsub();
+    };
+  }, [navigation]);
+
   const renderTab = (route) => {
     const index = state.routes.indexOf(route);
     const isFocused = state.index === index;
     const color = isFocused ? tactical.neon : 'rgba(255,255,255,0.42)';
     const Icon = iconFor(route.name);
-    const badge = route.name === 'NotifTab' ? unread : 0;
+    const badge =
+      route.name === 'NotifTab' ? unread : route.name === 'ChatTab' ? chatUnread : 0;
 
     const onPress = () => {
       const event = navigation.emit({
@@ -96,13 +131,28 @@ function CustomTabBar({ state, navigation }) {
         key={route.key}
         onPress={onPress}
         hitSlop={6}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: isFocused }}
+        accessibilityLabel={
+          badge > 0 ? `${labelFor(route.name)}, ${badge} sin leer` : labelFor(route.name)
+        }
         className="flex-1 items-center gap-1 active:opacity-70"
       >
         <View>
           <Icon size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE} />
           {badge > 0 ? (
-            <View className="absolute -right-2 -top-1.5 min-w-[15px] items-center justify-center rounded-full bg-[#FF6B6B] px-1">
-              <Text className="text-[9.5px] font-bold text-white">
+            // Avisos en coral (alerta) y mensajes en verde (actividad), igual
+            // que en el diseño: el color distingue de qué badge se trata.
+            <View
+              className="absolute -right-2 -top-1.5 min-w-[15px] items-center justify-center rounded-full px-1"
+              style={{
+                backgroundColor: route.name === 'ChatTab' ? tactical.neon : '#FF6B6B',
+              }}
+            >
+              <Text
+                className="text-[9.5px] font-bold"
+                style={{ color: route.name === 'ChatTab' ? tactical.neonInk : '#FFFFFF' }}
+              >
                 {badge > 9 ? '9+' : String(badge)}
               </Text>
             </View>

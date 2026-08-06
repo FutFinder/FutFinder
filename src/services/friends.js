@@ -156,7 +156,9 @@ export async function listMyFriends() {
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username, foto_url, trust_score, comuna, region')
+    .select(
+      'id, username, foto_url, trust_score, comuna, region, posicion_preferida, asistencias_confirmadas'
+    )
     .in('id', otherIds);
   const byId = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -171,6 +173,8 @@ export async function listMyFriends() {
         username: p.username,
         foto_url: p.foto_url,
         trust_score: p.trust_score,
+        asistencias_confirmadas: p.asistencias_confirmadas,
+        posicion_preferida: p.posicion_preferida || [],
         comuna: p.comuna,
         region: p.region,
         friends_since: f.responded_at,
@@ -200,19 +204,29 @@ export async function listIncomingRequests() {
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username, foto_url, trust_score, comuna')
+    .select(
+      'id, username, foto_url, trust_score, comuna, region, posicion_preferida, asistencias_confirmadas'
+    )
     .in('id', ids);
   const byId = new Map((profiles || []).map((p) => [p.id, p]));
 
-  return data.map((f) => ({
-    friendship_id: f.id,
-    user_id: f.requester_id,
-    username: byId.get(f.requester_id)?.username || 'jugador',
-    foto_url: byId.get(f.requester_id)?.foto_url || null,
-    trust_score: byId.get(f.requester_id)?.trust_score || 100,
-    comuna: byId.get(f.requester_id)?.comuna,
-    sent_at: f.created_at,
-  }));
+  return data.map((f) => {
+    const p = byId.get(f.requester_id);
+    return {
+      friendship_id: f.id,
+      user_id: f.requester_id,
+      username: p?.username || 'jugador',
+      foto_url: p?.foto_url || null,
+      // OJO: sin default 100. trust_score es 100 por defecto en la BD, así que
+      // inventarlo aquí haría que un jugador nuevo se vea como confiable.
+      trust_score: p?.trust_score ?? null,
+      asistencias_confirmadas: p?.asistencias_confirmadas,
+      posicion_preferida: p?.posicion_preferida || [],
+      comuna: p?.comuna,
+      region: p?.region,
+      sent_at: f.created_at,
+    };
+  });
 }
 
 /**
@@ -236,17 +250,63 @@ export async function listOutgoingRequests() {
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username, foto_url')
+    .select(
+      'id, username, foto_url, trust_score, comuna, region, posicion_preferida, asistencias_confirmadas'
+    )
     .in('id', ids);
   const byId = new Map((profiles || []).map((p) => [p.id, p]));
 
-  return data.map((f) => ({
-    friendship_id: f.id,
-    user_id: f.addressee_id,
-    username: byId.get(f.addressee_id)?.username || 'jugador',
-    foto_url: byId.get(f.addressee_id)?.foto_url || null,
-    sent_at: f.created_at,
-  }));
+  return data.map((f) => {
+    const p = byId.get(f.addressee_id);
+    return {
+      friendship_id: f.id,
+      user_id: f.addressee_id,
+      username: p?.username || 'jugador',
+      foto_url: p?.foto_url || null,
+      trust_score: p?.trust_score ?? null,
+      asistencias_confirmadas: p?.asistencias_confirmadas,
+      posicion_preferida: p?.posicion_preferida || [],
+      comuna: p?.comuna,
+      region: p?.region,
+      sent_at: f.created_at,
+    };
+  });
+}
+
+/**
+ * Realtime sobre `friendships`: avisa cuando llega, se acepta o se cancela
+ * una solicitud, para refrescar contadores y listas sin recargar a mano.
+ * Devuelve la función de limpieza.
+ *
+ * OJO con el nombre del canal: el cliente de Supabase reutiliza el canal que
+ * ya existe con ese nombre, y agregarle un `.on()` después de `subscribe()`
+ * lanza una excepción. Como la bandeja y la pantalla de amigos pueden estar
+ * montadas a la vez, cada suscripción usa un nombre propio.
+ */
+let friendshipsChannelSeq = 0;
+
+export function subscribeToFriendships(onChange) {
+  if (!isSupabaseConfigured) return () => {};
+  friendshipsChannelSeq += 1;
+  const channel = supabase
+    .channel(`friendships:${friendshipsChannelSeq}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'friendships' },
+      (payload) => {
+        try {
+          onChange(payload);
+        } catch (e) {
+          console.error('[FutFinder] friendships realtime handler:', e);
+        }
+      }
+    )
+    .subscribe();
+  return () => {
+    try {
+      supabase.removeChannel(channel);
+    } catch {}
+  };
 }
 
 export async function countPendingRequests() {

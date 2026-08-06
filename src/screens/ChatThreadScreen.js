@@ -1,33 +1,44 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   Pressable,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ArrowLeft,
-  Send,
-  CheckCheck,
-  Check,
-  Users,
   User as UserIcon,
+  Users,
+  BellOff,
+  Bell,
+  Trash2,
+  Flag,
   Star,
   MapPin,
-  Trash2,
-  Smile,
   Swords,
+  Video,
 } from 'lucide-react-native';
 import EmojiPicker from 'rn-emoji-keyboard';
 
-import { colors, radius } from '../theme/colors';
+import ChatThreadHeader from '../components/chat/ChatThreadHeader';
+import ChatComposer from '../components/chat/ChatComposer';
+import ChatOptionsMenu from '../components/chat/ChatOptionsMenu';
+import MessageBubble from '../components/chat/MessageBubble';
+import {
+  DayDivider,
+  ContextPill,
+  LoadEarlier,
+  ThreadEmpty,
+  ThreadDenied,
+} from '../components/chat/ThreadDecorations';
+import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
+import Banner from '../components/Banner';
+
+import { chatColors } from '../theme/colors';
 import {
   listThreadMessages,
   sendMessage,
@@ -36,256 +47,301 @@ import {
   messageBelongsToThread,
   parseThreadKey,
   hideThread,
+  getThreadAccess,
+  setThreadMuted,
+  isThreadMuted,
+  parseComposerCommand,
+  suggestCommands,
 } from '../services/messages';
-import { getMatchById } from '../services/matches';
+import { getMatchById, getMatchAttendees } from '../services/matches';
+import { getClubById, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
-import { getFriendshipWith } from '../services/friends';
 import { getChallenge } from '../services/clubChallenges';
+import { reportUser } from '../services/reports';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
-import Banner from '../components/Banner';
+import { decorateMessages, canSendDraft } from '../utils/chatMeta';
+import useConnection from '../utils/useConnection';
 
-function formatTime(iso) {
-  try {
-    const d = new Date(iso);
-    return d.getHours().toString().padStart(2, '0') + ':' +
-      d.getMinutes().toString().padStart(2, '0');
-  } catch {
-    return '';
-  }
-}
+const PAGE_SIZE = 40;
 
-function sameDay(a, b) {
-  const da = new Date(a);
-  const db = new Date(b);
-  return (
-    da.getFullYear() === db.getFullYear() &&
-    da.getMonth() === db.getMonth() &&
-    da.getDate() === db.getDate()
-  );
-}
-
-function dayLabel(iso) {
-  const d = new Date(iso);
-  const today = new Date();
-  const yest = new Date();
-  yest.setDate(today.getDate() - 1);
-  if (sameDay(d, today)) return 'Hoy';
-  if (sameDay(d, yest)) return 'Ayer';
-  return d.toLocaleDateString('es-CL', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'short',
-  });
-}
-
+/**
+ * Conversación: chat de partido, de club o mensaje directo.
+ *
+ * Envío
+ * -----
+ * El mensaje se pinta al toque con estado `sending` y se reconcilia con la
+ * fila real que devuelve el servidor (misma clave temporal → se reemplaza,
+ * así que Realtime no puede duplicarlo). Si falla queda como `failed` con
+ * «Reintentar» y «Descartar», y el texto NO se pierde.
+ *
+ * Permisos
+ * --------
+ * `getThreadAccess` decide si se puede leer y escribir. Sin permiso de
+ * escritura el chat no se oculta: se lee y el compositor se reemplaza por
+ * «Solo lectura». Sin permiso de lectura se muestra el estado de acceso
+ * denegado. En los dos casos la protección real es la RLS, no esta pantalla.
+ */
 export default function ChatThreadScreen({ route, navigation }) {
   const threadKey = route?.params?.threadKey;
-  const title = route?.params?.title || 'Chat';
-  const subtitle = route?.params?.subtitle || '';
+  const paramTitle = route?.params?.title || 'Chat';
+  const paramSubtitle = route?.params?.subtitle || '';
   const fotoUrl = route?.params?.fotoUrl || null;
-  // Si el DM viene de un desafío de club aceptado, habilita el chat (aunque no
-  // sean amigos) y muestra el botón para crear el partido.
+  // Un DM abierto desde un desafío de club aceptado se permite aunque los
+  // administradores no sean amigos.
   const challengeId = route?.params?.challengeId || null;
 
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [myId, setMyId] = useState(null);
-  const [errorBanner, setErrorBanner] = useState(null);
-  const [matchInfo, setMatchInfo] = useState(null);
-  const [busyAction, setBusyAction] = useState(false);
-  const [dmBlocked, setDmBlocked] = useState(false);
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const [clubChallenge, setClubChallenge] = useState(null);
-
-  const listRef = useRef(null);
-  const isMountedRef = useRef(true);
-  const selectionRef = useRef({ start: 0, end: 0 });
-
-  const t = parseThreadKey(threadKey);
+  const t = useMemo(() => parseThreadKey(threadKey), [threadKey]);
   const isGroup = t?.type === 'match' || t?.type === 'club';
 
-  // Si es un chat de partido, traer la info del partido para saber si ya terminó
+  const [myId, setMyId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [banner, setBanner] = useState(null);
+  const [access, setAccess] = useState(null);
+  const [muted, setMuted] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [context, setContext] = useState(null); // info del club / partido
+  const [clubChallenge, setClubChallenge] = useState(null);
+  const [busyAction, setBusyAction] = useState(false);
+
+  const listRef = useRef(null);
+  const mountedRef = useRef(true);
+  const selectionRef = useRef({ start: 0, end: 0 });
+  const inputRef = useRef(null);
+
+  const { connection, reportChannelStatus } = useConnection();
+
+  const canWrite = access ? access.canWrite : true;
+  const canRead = access ? access.canRead : true;
+  const isClubAdmin = !!access?.isClubAdmin;
+
+  // ── Carga inicial ────────────────────────────────────────────
   useEffect(() => {
-    if (!isGroup || !t?.id) return;
-    (async () => {
-      const { data } = await getMatchById(t.id);
-      if (isMountedRef.current) setMatchInfo(data || null);
-    })();
-  }, [isGroup, t?.id]);
+    mountedRef.current = true;
 
-  // Chat de desafío de club: traer el desafío para el botón "Crear partido".
-  useEffect(() => {
-    if (!challengeId) return;
-    (async () => {
-      const { data } = await getChallenge(challengeId);
-      if (isMountedRef.current) setClubChallenge(data || null);
-    })();
-  }, [challengeId]);
-
-  // Partido terminado: hora + duracion ya pasó (default 90 min si no hay duración)
-  const matchEnded =
-    matchInfo?.hora &&
-    Date.now() >=
-      new Date(matchInfo.hora).getTime() +
-        (matchInfo.duracion_min ?? 90) * 60 * 1000;
-
-  const handleRateMatch = () => {
-    if (!t?.id) return;
-    navigation.navigate('RateMatch', { matchId: t.id });
-  };
-
-  const handleConfirmGPS = async () => {
-    if (!t?.id || busyAction) return;
-    setBusyAction(true);
-    const r = await confirmAttendanceWithGPS(t.id);
-    setBusyAction(false);
-    if (r?.ok) {
-      setErrorBanner({
-        type: 'success',
-        title: '✓ Asistencia confirmada',
-        message: r.distance
-          ? `Estás a ${Math.round(r.distance)} m. +1 a tu Trust Score.`
-          : 'Tu asistencia quedó registrada.',
-      });
-    } else {
-      setErrorBanner({
-        type: 'error',
-        title: 'No pude confirmar',
-        message: r?.reason || 'Intenta de nuevo',
-      });
-    }
-  };
-
-  const handleDeleteChat = async () => {
-    const ok =
-      typeof window !== 'undefined' && typeof window.confirm === 'function'
-        ? window.confirm('¿Eliminar este chat? Podrás recuperarlo si llega un mensaje nuevo.')
-        : true;
-    if (!ok) return;
-    setBusyAction(true);
-    await hideThread(threadKey);
-    setBusyAction(false);
-    navigation.goBack();
-  };
-
-  // Cargar usuario actual e historial
-  useEffect(() => {
-    isMountedRef.current = true;
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (isMountedRef.current) setMyId(user?.id || null);
+        if (!mountedRef.current) return;
+        setMyId(user?.id || null);
 
-        // DMs solo entre amigos — EXCEPCIÓN: los chats de desafío de club
-        // (administrador vs administrador) siempre se permiten.
-        if (t?.type === 'dm' && t?.id && !challengeId) {
-          const friendship = await getFriendshipWith(t.id);
-          if (!friendship || friendship.status !== 'accepted') {
-            if (isMountedRef.current) {
-              setDmBlocked(true);
-              setErrorBanner({
-                type: 'error',
-                title: 'Solo puedes chatear con amigos',
-                message: 'Envía una solicitud de amistad primero.',
-              });
-            }
-          }
+        const acc = await getThreadAccess(threadKey, { challengeId });
+        if (!mountedRef.current) return;
+        setAccess(acc);
+
+        if (!acc.canRead) {
+          setLoading(false);
+          return;
         }
 
-        const result = await listThreadMessages(threadKey, { limit: 60 });
-        if (!isMountedRef.current) return;
-        const msgs = Array.isArray(result) ? result : (result?.data || []);
-        setMessages(msgs);
-        if (result?.error) {
-          setErrorBanner({
+        const [page, mutedNow] = await Promise.all([
+          listThreadMessages(threadKey, { limit: PAGE_SIZE }),
+          isThreadMuted(threadKey),
+        ]);
+        if (!mountedRef.current) return;
+
+        setMessages(page.data || []);
+        setHasMore(!!page.hasMore);
+        setMuted(mutedNow);
+        if (page.error) {
+          setBanner({
             type: 'error',
-            title: 'No pude cargar los mensajes',
-            message: result.error.message || String(result.error),
+            title: 'No pudimos cargar los mensajes',
+            message: page.error.message || String(page.error),
           });
         }
         setLoading(false);
-        try { await markThreadAsRead(threadKey); } catch {}
+        markThreadAsRead(threadKey).catch(() => {});
       } catch (e) {
-        console.error('[FutFinder] ChatThread load exception:', e);
-        if (isMountedRef.current) {
-          setLoading(false);
-          setErrorBanner({
-            type: 'error',
-            title: 'Error inesperado',
-            message: e?.message || String(e),
-          });
-        }
+        console.error('[FutFinder] ChatThread load:', e);
+        if (!mountedRef.current) return;
+        setLoading(false);
+        setBanner({
+          type: 'error',
+          title: 'Error inesperado',
+          message: e?.message || String(e),
+        });
       }
     })();
+
     return () => {
-      isMountedRef.current = false;
+      mountedRef.current = false;
     };
-  }, [threadKey]);
+  }, [threadKey, challengeId]);
 
-  // Suscripción Realtime (blindada — si falla no crashea la pantalla)
+  // ── Contexto del hilo: nº de jugadores, fecha del partido… ───
   useEffect(() => {
-    let unsubscribe = () => {};
-    try {
-      unsubscribe = subscribeToMessages((payload) => {
-      // payload.eventType: 'INSERT' | 'UPDATE' | 'DELETE'
-      // payload.new: la nueva fila (en INSERT/UPDATE)
-      const row = payload.new || payload.old;
-      if (!row || !myId) return;
+    if (!t?.id) return undefined;
+    let alive = true;
 
-      if (payload.eventType === 'INSERT') {
-        if (!messageBelongsToThread(row, threadKey, myId)) return;
-        setMessages((prev) => {
-          // Dedup: si ya existe (lo insertamos optimisticamente) lo ignoramos
-          if (prev.some((m) => m.id === row.id)) return prev;
-          return [...prev, row];
+    (async () => {
+      if (t.type === 'club') {
+        const [{ data: club }, { data: members }] = await Promise.all([
+          getClubById(t.id),
+          listMembers(t.id),
+        ]);
+        if (!alive) return;
+        setContext({
+          kind: 'club',
+          club,
+          memberCount: (members || []).length,
         });
-        // Marcar como leído si llegó a mí mientras estoy viendo el hilo
-        if (row.receiver_id === myId && !row.read_at) {
-          markThreadAsRead(threadKey);
-        }
-      } else if (payload.eventType === 'UPDATE') {
-        if (!messageBelongsToThread(row, threadKey, myId)) return;
-        setMessages((prev) =>
-          prev.map((m) => (m.id === row.id ? { ...m, ...row } : m))
-        );
+      } else if (t.type === 'match') {
+        const [{ data: match }, attendees] = await Promise.all([
+          getMatchById(t.id),
+          getMatchAttendees(t.id),
+        ]);
+        if (!alive) return;
+        const confirmados = (attendees?.data || []).filter(
+          (a) => a.estado !== 'cancelado'
+        ).length;
+        setContext({ kind: 'match', match, confirmados });
       }
-    });
-    } catch (e) {
-      console.warn('[FutFinder] Realtime subscribe failed:', e?.message || e);
-    }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [t?.id, t?.type]);
+
+  // ── Chat de desafío de club ──────────────────────────────────
+  useEffect(() => {
+    if (!challengeId) return undefined;
+    let alive = true;
+    (async () => {
+      const { data } = await getChallenge(challengeId);
+      if (alive) setClubChallenge(data || null);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [challengeId]);
+
+  // ── Realtime ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!myId || !canRead) return undefined;
+
+    const unsubscribe = subscribeToMessages(
+      (payload) => {
+        const row = payload.new || payload.old;
+        if (!row) return;
+        if (!messageBelongsToThread(row, threadKey, myId)) return;
+
+        if (payload.eventType === 'INSERT') {
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === row.id)) return prev;
+            // Si es el eco de un mensaje propio que estaba en vuelo, se
+            // reemplaza en vez de duplicarse.
+            const pendingIdx = prev.findIndex(
+              (m) => m._status === 'sending' && m.content === row.content && m.sender_id === row.sender_id
+            );
+            if (pendingIdx >= 0) {
+              const next = [...prev];
+              next[pendingIdx] = row;
+              return next;
+            }
+            return [...prev, row];
+          });
+          if (row.sender_id !== myId) markThreadAsRead(threadKey).catch(() => {});
+        } else if (payload.eventType === 'UPDATE') {
+          setMessages((prev) => prev.map((m) => (m.id === row.id ? { ...m, ...row } : m)));
+        }
+      },
+      { onStatus: reportChannelStatus }
+    );
+
     return () => {
       try { unsubscribe(); } catch {}
     };
-  }, [threadKey, myId]);
+  }, [threadKey, myId, canRead, reportChannelStatus]);
 
-  // Auto-scroll al final cuando llegan mensajes
+  // ── Scroll al final cuando llegan mensajes ───────────────────
   useEffect(() => {
-    if (messages.length > 0) {
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd?.({ animated: true });
-      });
-    }
+    if (messages.length === 0) return;
+    requestAnimationFrame(() => listRef.current?.scrollToEnd?.({ animated: true }));
   }, [messages.length]);
 
+  // ── Cargar mensajes anteriores ───────────────────────────────
+  const loadEarlier = useCallback(async () => {
+    if (loadingEarlier || messages.length === 0) return;
+    setLoadingEarlier(true);
+    const oldest = messages[0]?.created_at;
+    const page = await listThreadMessages(threadKey, { limit: PAGE_SIZE, before: oldest });
+    if (!mountedRef.current) return;
+    setLoadingEarlier(false);
+    if (page.error) {
+      notify('No pudimos cargar más', page.error.message || 'Intenta de nuevo');
+      return;
+    }
+    setHasMore(!!page.hasMore);
+    setMessages((prev) => {
+      const known = new Set(prev.map((m) => m.id));
+      return [...(page.data || []).filter((m) => !known.has(m.id)), ...prev];
+    });
+  }, [loadingEarlier, messages, threadKey]);
+
+  // ── Envío ────────────────────────────────────────────────────
+  const deliver = useCallback(
+    async (localId, body, important) => {
+      const { data, error } = await sendMessage(threadKey, body, { important });
+      if (!mountedRef.current) return;
+
+      if (error) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === localId ? { ...m, _status: 'failed' } : m))
+        );
+        return;
+      }
+      setMessages((prev) => {
+        // Si Realtime ya trajo la fila real, se descarta la optimista.
+        if (data && prev.some((m) => m.id === data.id)) {
+          return prev.filter((m) => m.id !== localId);
+        }
+        return prev.map((m) => (m.id === localId ? { ...data, _status: 'sent' } : m));
+      });
+    },
+    [threadKey]
+  );
+
   const handleSend = useCallback(async () => {
-    if (sending) return;
-    const content = draft.trim();
-    if (!content) return;
+    if (!canSendDraft(draft, { sending, canWrite })) return;
+
+    const parsed = parseComposerCommand(draft);
+    const important = parsed.command === '/importante';
+
+    if (important && !isClubAdmin) {
+      notify(
+        'Solo los administradores',
+        'El comando /importante lo puede usar un administrador del club.'
+      );
+      return;
+    }
+    // El cuerpo real del mensaje: sin el comando delante.
+    const body = parsed.command ? parsed.body : parsed.raw.trim();
+    if (!body) {
+      notify('Escribe el aviso', `Después de ${parsed.command} falta el texto del mensaje.`);
+      return;
+    }
 
     setSending(true);
     setDraft('');
 
-    // Optimistic update: agregamos el mensaje localmente al toque
-    const tempId = `temp_${Date.now()}`;
+    const localId = `local_${Date.now()}_${Math.round(Math.random() * 1e6)}`;
     const optimistic = {
-      id: tempId,
+      id: localId,
       created_at: new Date().toISOString(),
       sender_id: myId,
-      content,
-      _optimistic: true,
+      content: body,
+      is_important: important,
+      _status: 'sending',
+      _local: true,
       ...(t?.type === 'match'
         ? { match_id: t.id }
         : t?.type === 'club'
@@ -294,37 +350,83 @@ export default function ChatThreadScreen({ route, navigation }) {
     };
     setMessages((prev) => [...prev, optimistic]);
 
-    const { data, error } = await sendMessage(threadKey, content);
-    setSending(false);
+    await deliver(localId, body, important);
+    if (mountedRef.current) setSending(false);
+  }, [draft, sending, canWrite, isClubAdmin, myId, t?.type, t?.id, deliver]);
 
+  const handleRetry = useCallback(
+    async (message) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === message.id ? { ...m, _status: 'sending' } : m))
+      );
+      await deliver(message.id, message.content, !!message.is_important);
+    },
+    [deliver]
+  );
+
+  const handleDiscard = useCallback((message) => {
+    setMessages((prev) => prev.filter((m) => m.id !== message.id));
+  }, []);
+
+  // ── Acciones del menú ────────────────────────────────────────
+  const handleToggleMute = useCallback(async () => {
+    const next = !muted;
+    setMuted(next); // optimista: el estado es solo mío
+    const { error } = await setThreadMuted(threadKey, next);
     if (error) {
-      notify('No pudimos enviar', error.message || 'Intenta de nuevo');
-      // Revertir el optimistic
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMuted(!next);
+      notify('No pudimos cambiar el silencio', error.message || 'Intenta de nuevo');
+    }
+  }, [muted, threadKey]);
+
+  const handleDeleteChat = useCallback(async () => {
+    setBusyAction(true);
+    const { error } = await hideThread(threadKey);
+    setBusyAction(false);
+    if (error) {
+      notify('No pudimos eliminar la conversación', error.message || 'Intenta de nuevo');
       return;
     }
+    navigation.goBack();
+  }, [threadKey, navigation]);
 
-    // Reemplazar el optimistic por el real
-    if (data) {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? data : m))
-      );
-    }
-  }, [draft, sending, myId, isGroup, t?.id, threadKey]);
+  const openIdentity = useCallback(() => {
+    if (!t?.id) return;
+    if (t.type === 'dm') navigation.navigate('UserProfile', { userId: t.id });
+    else navigation.navigate('ChatDetails', { threadKey, title: paramTitle, fotoUrl });
+  }, [t?.id, t?.type, navigation, threadKey, paramTitle, fotoUrl]);
+
+  const handleRateMatch = () => t?.id && navigation.navigate('RateMatch', { matchId: t.id });
+
+  const handleConfirmGPS = async () => {
+    if (!t?.id || busyAction) return;
+    setBusyAction(true);
+    const r = await confirmAttendanceWithGPS(t.id);
+    setBusyAction(false);
+    setBanner(
+      r?.ok
+        ? {
+            type: 'success',
+            title: 'Asistencia confirmada',
+            message: r.distance
+              ? `Estás a ${Math.round(r.distance)} m. +1 a tu Trust Score.`
+              : 'Tu asistencia quedó registrada.',
+          }
+        : { type: 'error', title: 'No pude confirmar', message: r?.reason || 'Intenta de nuevo' }
+    );
+  };
 
   const handleEmojiSelected = useCallback((emojiObj) => {
     const emoji = emojiObj.emoji;
     const { start, end } = selectionRef.current;
     setDraft((prev) => {
-      const newText = prev.substring(0, start) + emoji + prev.substring(end);
-      // Actualiza la posición del cursor después del emoji
-      const newPos = start + emoji.length;
-      selectionRef.current = { start: newPos, end: newPos };
-      return newText;
+      const next = prev.substring(0, start) + emoji + prev.substring(end);
+      const pos = start + emoji.length;
+      selectionRef.current = { start: pos, end: pos };
+      return next;
     });
   }, []);
 
-  // Cuando tocan el avatar o @username de un mensaje ajeno
   const handlePressSender = useCallback(
     (userId) => {
       if (!userId || userId === myId) return;
@@ -333,164 +435,258 @@ export default function ChatThreadScreen({ route, navigation }) {
     [navigation, myId]
   );
 
-  // Renderiza un mensaje + separador de día si corresponde
-  const renderItem = ({ item, index }) => {
-    const prev = messages[index - 1];
-    const showDay = !prev || !sameDay(prev.created_at, item.created_at);
+  /**
+   * Reporte desde el chat individual. Reutiliza el mismo servicio que el
+   * perfil público, así que no se puede reportar dos veces al mismo jugador
+   * ni reportarse a uno mismo: eso ya lo valida `reportUser`.
+   */
+  const handleSubmitReport = useCallback(
+    async ({ motivo, descripcion }) => {
+      if (t?.type !== 'dm' || !t?.id) return { error: { message: 'Reporte no disponible aquí' } };
+      const { error } = await reportUser({ reportedId: t.id, motivo, descripcion });
+      setBanner(
+        error
+          ? { type: 'error', title: 'No pudimos enviar el reporte', message: error.message }
+          : {
+              type: 'success',
+              title: 'Reporte enviado',
+              message: 'Lo revisaremos. El jugador no sabe quién lo reportó.',
+            }
+      );
+      return { error };
+    },
+    [t?.type, t?.id]
+  );
+
+  // ── Derivados de presentación ────────────────────────────────
+  const decorated = useMemo(
+    () => decorateMessages(messages, { myId, isGroup }),
+    [messages, myId, isGroup]
+  );
+
+  const headerSubtitle = useMemo(() => {
+    if (t?.type === 'club') {
+      const n = context?.memberCount;
+      return n ? `Chat del club · ${n} ${n === 1 ? 'jugador' : 'jugadores'}` : 'Chat del club';
+    }
+    if (t?.type === 'match') {
+      const m = context?.match;
+      if (!m) return paramSubtitle || 'Chat del partido';
+      const fecha = m.hora
+        ? new Date(m.hora)
+            .toLocaleDateString('es-CL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+            .replace('.', '')
+        : null;
+      return [fecha, m.comuna].filter(Boolean).join(' · ') || 'Chat del partido';
+    }
+    return canWrite ? 'Amigos · Ver perfil' : 'Ver perfil';
+  }, [t?.type, context, paramSubtitle, canWrite]);
+
+  const commandSuggestions = useMemo(
+    () => (t?.type === 'club' ? suggestCommands(draft, { isClubAdmin }) : []),
+    [draft, t?.type, isClubAdmin]
+  );
+
+  const matchEnded =
+    context?.kind === 'match' &&
+    context.match?.hora &&
+    Date.now() >=
+      new Date(context.match.hora).getTime() + (context.match.duracion_min ?? 90) * 60 * 1000;
+
+  const menuItems = useMemo(() => {
+    const items = [];
+    if (t?.type === 'dm') {
+      items.push({
+        key: 'profile',
+        label: 'Ver perfil',
+        icon: <UserIcon color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />,
+        onPress: () => navigation.navigate('UserProfile', { userId: t.id }),
+      });
+    } else {
+      items.push({
+        key: 'details',
+        label: 'Detalles y jugadores',
+        icon: <Users color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />,
+        onPress: openIdentity,
+      });
+    }
+
+    items.push({
+      key: 'mute',
+      label: muted ? 'Activar notificaciones' : 'Silenciar conversación',
+      icon: muted ? (
+        <Bell color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />
+      ) : (
+        <BellOff color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />
+      ),
+      onPress: handleToggleMute,
+    });
+
+    // Del chat del club no se puede salir sin abandonar el club: solo se
+    // silencia. Por eso «Eliminar conversación» no aparece ahí.
+    if (t?.type !== 'club') {
+      items.push({
+        key: 'delete',
+        label: 'Eliminar conversación',
+        icon: <Trash2 color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />,
+        onPress: handleDeleteChat,
+      });
+    }
+
+    if (t?.type === 'dm') {
+      items.push({
+        key: 'report',
+        label: 'Reportar cuenta',
+        destructive: true,
+        icon: <Flag color={chatColors.danger} size={17} strokeWidth={1.8} />,
+        onPress: () => setReportOpen(true),
+      });
+    }
+
+    return items;
+  }, [t?.type, t?.id, muted, navigation, openIdentity, handleToggleMute, handleDeleteChat]);
+
+  // ── Render ───────────────────────────────────────────────────
+  if (access && !access.canRead) {
     return (
-      <View>
-        {showDay && (
-          <View style={styles.dayDivider}>
-            <Text style={styles.dayDividerText}>{dayLabel(item.created_at)}</Text>
-          </View>
-        )}
-        <Bubble
-          message={item}
-          isMine={item.sender_id === myId}
-          isGroup={isGroup}
-          onPressSender={handlePressSender}
-        />
+      <View style={styles.root}>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+          <ChatThreadHeader
+            type={t?.type}
+            title={paramTitle}
+            subtitle=""
+            fotoUrl={fotoUrl}
+            connection={connection}
+            onBack={() => navigation.goBack()}
+            onPressIdentity={() => {}}
+            onPressMenu={() => {}}
+          />
+          <ThreadDenied
+            title={access.title || 'No puedes ver esta conversación'}
+            message={access.message}
+            onBack={() => navigation.goBack()}
+          />
+        </SafeAreaView>
       </View>
     );
-  };
+  }
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        {/* Header — tappable en DMs (lleva al perfil del otro) */}
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
-          >
-            <ArrowLeft color={colors.textPrimary} size={20} />
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              if (!t?.id) return;
-              if (t.type === 'match') {
-                navigation.navigate('MatchDetail', { matchId: t.id });
-              } else if (t.type === 'club') {
-                navigation.navigate('ClubDetail', { clubId: t.id });
-              } else {
-                navigation.navigate('UserProfile', { userId: t.id });
-              }
-            }}
-            style={({ pressed }) => [
-              styles.headerCenter,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View style={[styles.headerAvatar, isGroup && styles.headerAvatarGroup]}>
-              {fotoUrl ? (
-                <Image source={{ uri: fotoUrl }} style={styles.headerAvatarImg} />
-              ) : isGroup ? (
-                <Users color={colors.primary} size={16} />
-              ) : (
-                <UserIcon color={colors.primary} size={16} />
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-              {subtitle ? (
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  {subtitle}
-                </Text>
-              ) : null}
-              <Text style={styles.headerHint}>
-                {isGroup ? 'Toca para ver detalles y jugadores →' : 'Toca para ver perfil →'}
-              </Text>
-            </View>
-          </Pressable>
-          <View style={{ width: 40 }} />
-        </View>
+        <ChatThreadHeader
+          type={t?.type}
+          title={paramTitle}
+          subtitle={headerSubtitle}
+          fotoUrl={fotoUrl}
+          muted={muted}
+          connection={connection}
+          onBack={() => navigation.goBack()}
+          onPressIdentity={openIdentity}
+          onPressMenu={() => setMenuOpen(true)}
+        />
 
-        {/* Banner de error si algo falla */}
-        {errorBanner && (
-          <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
+        {banner && (
+          <View style={styles.bannerWrap}>
             <Banner
-              type={errorBanner.type}
-              title={errorBanner.title}
-              message={errorBanner.message}
-              onClose={() => setErrorBanner(null)}
+              type={banner.type}
+              title={banner.title}
+              message={banner.message}
+              onClose={() => setBanner(null)}
             />
           </View>
         )}
 
-        {/* Lista */}
         {loading ? (
-          <View style={styles.loadingFull}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.loadingText}>Cargando mensajes anteriores…</Text>
+          <View style={styles.loading}>
+            <ActivityIndicator color={chatColors.green} />
+            <Text style={styles.loadingText}>Cargando mensajes…</Text>
           </View>
-        ) : messages.length === 0 ? (
-          <View style={styles.emptyFull}>
-            <Text style={styles.emptyTitle}>
-              {isGroup ? 'Sé el primero en saludar 👋' : 'Empieza la conversación'}
-            </Text>
-            <Text style={styles.emptyText}>
-              {isGroup
+        ) : decorated.length === 0 ? (
+          <ThreadEmpty
+            title={isGroup ? 'Sé el primero en saludar' : 'Empieza la conversación'}
+            message={
+              t?.type === 'club'
+                ? 'Coordina con los jugadores del club sin compartir números.'
+                : t?.type === 'match'
                 ? 'Coordina con los jugadores del partido sin compartir números.'
-                : 'Escribe un mensaje al jugador para coordinar el próximo partido.'}
-            </Text>
-          </View>
+                : 'Escríbele para coordinar el próximo partido.'
+            }
+          />
         ) : (
           <FlatList
             ref={listRef}
-            data={messages}
-            keyExtractor={(m) => m.id}
-            renderItem={renderItem}
+            data={decorated}
+            keyExtractor={(item) => String(item.message.id)}
+            renderItem={({ item }) => (
+              <View>
+                {item.startsDay && <DayDivider label={item.dayLabel} />}
+                <MessageBubble
+                  item={item}
+                  isGroup={isGroup}
+                  onPressSender={handlePressSender}
+                  onRetry={handleRetry}
+                  onDiscard={handleDiscard}
+                />
+              </View>
+            )}
             contentContainerStyle={styles.list}
-            onContentSizeChange={() =>
-              listRef.current?.scrollToEnd?.({ animated: false })
+            ListHeaderComponent={
+              <>
+                {hasMore && <LoadEarlier loading={loadingEarlier} onPress={loadEarlier} />}
+                {context?.kind === 'match' && (
+                  <ContextPill
+                    icon={<Video color={chatColors.green} size={13} strokeWidth={2} />}
+                    label={`Chat del partido · ${context.confirmados} ${
+                      context.confirmados === 1 ? 'confirmado' : 'confirmados'
+                    }`}
+                  />
+                )}
+              </>
             }
+            onContentSizeChange={() => listRef.current?.scrollToEnd?.({ animated: false })}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={20}
+            windowSize={11}
           />
         )}
 
-        {/* Composer activo durante el partido, panel de acciones cuando terminó */}
+        {/* Partido terminado: acciones en lugar del compositor */}
         {isGroup && matchEnded ? (
           <View style={styles.endedBar}>
             <Pressable
               onPress={handleRateMatch}
               disabled={busyAction}
-              style={({ pressed }) => [
-                styles.endedBtn,
-                pressed && { opacity: 0.8 },
-                busyAction && { opacity: 0.5 },
-              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Calificar el partido"
+              style={({ pressed }) => [styles.endedBtn, pressed && { opacity: 0.8 }]}
             >
-              <Star color={colors.primary} size={16} fill={colors.primary} />
+              <Star color={chatColors.green} size={16} fill={chatColors.green} />
               <Text style={styles.endedBtnText}>Calificar</Text>
             </Pressable>
             <Pressable
               onPress={handleConfirmGPS}
               disabled={busyAction}
-              style={({ pressed }) => [
-                styles.endedBtn,
-                pressed && { opacity: 0.8 },
-                busyAction && { opacity: 0.5 },
-              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar asistencia con GPS"
+              style={({ pressed }) => [styles.endedBtn, pressed && { opacity: 0.8 }]}
             >
-              <MapPin color={colors.primary} size={16} />
+              <MapPin color={chatColors.green} size={16} />
               <Text style={styles.endedBtnText}>GPS</Text>
             </Pressable>
             <Pressable
               onPress={handleDeleteChat}
               disabled={busyAction}
-              style={({ pressed }) => [
-                styles.endedBtnDanger,
-                pressed && { opacity: 0.7 },
-                busyAction && { opacity: 0.5 },
-              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Eliminar esta conversación"
+              style={({ pressed }) => [styles.endedBtnDanger, pressed && { opacity: 0.75 }]}
             >
-              <Trash2 color={colors.error} size={16} />
-              <Text style={styles.endedBtnDangerText}>Eliminar chat</Text>
+              <Trash2 color={chatColors.danger} size={16} />
+              <Text style={styles.endedBtnDangerText}>Eliminar</Text>
             </Pressable>
           </View>
         ) : (
@@ -498,402 +694,134 @@ export default function ChatThreadScreen({ route, navigation }) {
             {challengeId && clubChallenge?.estado === 'aceptado' && (
               clubChallenge.match_id ? (
                 <Pressable
-                  onPress={() => navigation.navigate('MatchDetail', { matchId: clubChallenge.match_id })}
+                  onPress={() =>
+                    navigation.navigate('MatchDetail', { matchId: clubChallenge.match_id })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Ver el partido de club creado"
                   style={({ pressed }) => [styles.challengeBar, pressed && { opacity: 0.85 }]}
                 >
-                  <Swords color={colors.primary} size={18} />
+                  <Swords color={chatColors.green} size={18} />
                   <Text style={styles.challengeBarText}>Ver el partido de club creado</Text>
                 </Pressable>
               ) : (
                 <Pressable
-                  onPress={() => navigation.navigate('CreateMatch', { clubChallengeId: challengeId })}
-                  style={({ pressed }) => [styles.challengeBar, styles.challengeBarCreate, pressed && { opacity: 0.85 }]}
+                  onPress={() =>
+                    navigation.navigate('CreateMatch', { clubChallengeId: challengeId })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Crear partido de club"
+                  style={({ pressed }) => [
+                    styles.challengeBar,
+                    styles.challengeBarCreate,
+                    pressed && { opacity: 0.85 },
+                  ]}
                 >
-                  <Swords color="#0E0E0D" size={18} strokeWidth={2.4} />
+                  <Swords color={chatColors.inkOnGreen} size={18} strokeWidth={2.4} />
                   <Text style={styles.challengeBarCreateText}>Crear partido de club</Text>
                 </Pressable>
               )
             )}
-            <View style={styles.composer}>
-              <Pressable
-                onPress={() => !dmBlocked && setEmojiPickerOpen(true)}
-                disabled={dmBlocked}
-                hitSlop={6}
-                style={({ pressed }) => [
-                  styles.emojiBtn,
-                  pressed && { opacity: 0.6 },
-                  dmBlocked && { opacity: 0.3 },
-                ]}
-              >
-                <Smile color={colors.textMuted} size={22} />
-              </Pressable>
-              <TextInput
-                style={[styles.input, dmBlocked && { opacity: 0.4 }]}
-                placeholder={dmBlocked ? 'Solo amigos pueden chatear' : 'Escribe un mensaje…'}
-                placeholderTextColor={colors.textMuted}
-                value={draft}
-                onChangeText={setDraft}
-                multiline
-                maxLength={1000}
-                onSubmitEditing={handleSend}
-                returnKeyType="send"
-                blurOnSubmit={false}
-                editable={!dmBlocked}
-                onSelectionChange={(e) => {
-                  selectionRef.current = e.nativeEvent.selection;
-                }}
-              />
-              <Pressable
-                onPress={handleSend}
-                disabled={!draft.trim() || sending || dmBlocked}
-                style={({ pressed }) => [
-                  styles.sendBtn,
-                  pressed && { opacity: 0.85 },
-                  (!draft.trim() || sending || dmBlocked) && { opacity: 0.4 },
-                ]}
-              >
-                <Send color="#0E0E0D" size={18} strokeWidth={2.4} />
-              </Pressable>
-            </View>
+
+            <ChatComposer
+              inputRef={inputRef}
+              value={draft}
+              onChangeText={setDraft}
+              onSelectionChange={(e) => {
+                selectionRef.current = e.nativeEvent.selection;
+              }}
+              onSend={handleSend}
+              onOpenEmoji={() => setEmojiOpen(true)}
+              sending={sending}
+              canWrite={canWrite}
+              readOnlyTitle={access?.title || 'Solo lectura'}
+              readOnlyMessage={access?.message}
+              offline={connection === 'offline'}
+              commandSuggestions={commandSuggestions}
+              onPickCommand={(c) => setDraft(`${c.command} `)}
+            />
+
             <EmojiPicker
+              open={emojiOpen}
+              onClose={() => setEmojiOpen(false)}
               onEmojiSelected={handleEmojiSelected}
-              open={emojiPickerOpen}
-              onClose={() => setEmojiPickerOpen(false)}
-              theme={{ backdrop: 'rgba(0,0,0,0.5)', knob: colors.primary, container: colors.surface, header: colors.textPrimary, category: { icon: colors.textMuted, iconActive: colors.primary, container: colors.surfaceAlt, containerActive: colors.primarySoft }, search: { background: colors.surfaceAlt, placeholder: colors.textMuted, text: colors.textPrimary, icon: colors.textMuted } }}
+              theme={{
+                backdrop: 'rgba(0,0,0,0.55)',
+                knob: chatColors.green,
+                container: chatColors.surface,
+                header: chatColors.textPrimary,
+                category: {
+                  icon: chatColors.textMuted,
+                  iconActive: chatColors.green,
+                  container: chatColors.surfaceAlt,
+                  containerActive: chatColors.greenSoft,
+                },
+                search: {
+                  background: chatColors.surfaceAlt,
+                  placeholder: chatColors.textMuted,
+                  text: chatColors.textPrimary,
+                  icon: chatColors.textMuted,
+                },
+              }}
             />
           </>
         )}
       </SafeAreaView>
+
+      <ChatOptionsMenu
+        visible={menuOpen}
+        items={menuItems}
+        onClose={() => setMenuOpen(false)}
+      />
+
+      {t?.type === 'dm' && (
+        <ReportPlayerSheet
+          visible={reportOpen}
+          username={paramTitle.replace(/^@/, '')}
+          onClose={() => setReportOpen(false)}
+          onSubmit={handleSubmitReport}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
 
-// ============================================================
-// Bubble: la burbujita de chat estilo luxury-night
-// ============================================================
-function Bubble({ message, isMine, isGroup, onPressSender }) {
-  const time = formatTime(message.created_at);
-  const senderName = message.sender?.username
-    ? '@' + message.sender.username
-    : null;
-  const showAvatarColumn = !isMine && isGroup;
-
-  const goToSender = () => {
-    if (onPressSender && message.sender_id) onPressSender(message.sender_id);
-  };
-
-  return (
-    <View style={[styles.row, isMine ? styles.rowMine : styles.rowTheirs]}>
-      {/* Avatar lateral solo en grupos para mensajes ajenos */}
-      {showAvatarColumn && (
-        <Pressable
-          onPress={goToSender}
-          hitSlop={6}
-          style={({ pressed }) => [
-            styles.bubbleAvatar,
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          {message.sender?.foto_url ? (
-            <Image source={{ uri: message.sender.foto_url }} style={styles.bubbleAvatarImg} />
-          ) : (
-            <UserIcon color={colors.primary} size={14} />
-          )}
-        </Pressable>
-      )}
-
-      <View
-        style={[
-          styles.bubble,
-          isMine ? styles.bubbleMine : styles.bubbleTheirs,
-          message._optimistic && { opacity: 0.65 },
-        ]}
-      >
-        {!isMine && isGroup && senderName ? (
-          <Pressable
-            onPress={goToSender}
-            hitSlop={4}
-            style={({ pressed }) => pressed && { opacity: 0.7 }}
-          >
-            <Text style={styles.senderName}>{senderName} ›</Text>
-          </Pressable>
-        ) : null}
-        <Text
-          style={[
-            styles.bubbleText,
-            isMine ? styles.bubbleTextMine : styles.bubbleTextTheirs,
-          ]}
-          selectable
-        >
-          {message.content}
-        </Text>
-        <View style={styles.metaRow}>
-          <Text
-            style={[
-              styles.metaTime,
-              isMine ? { color: 'rgba(14,14,13,0.55)' } : { color: colors.textMuted },
-            ]}
-          >
-            {time}
-          </Text>
-          {isMine && !isGroup && (
-            message.read_at ? (
-              <CheckCheck color="#0E0E0D" size={12} strokeWidth={2.4} />
-            ) : (
-              <Check color="rgba(14,14,13,0.55)" size={12} strokeWidth={2.4} />
-            )
-          )}
-        </View>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 10,
-  },
-  headerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  headerAvatarImg: { width: '100%', height: '100%' },
-  headerAvatarGroup: {
-    backgroundColor: colors.background,
-  },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  headerSubtitle: {
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 1,
-  },
-  headerHint: {
-    color: colors.primary,
-    fontSize: 10,
-    marginTop: 2,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
+  root: { flex: 1, backgroundColor: chatColors.background },
+  bannerWrap: { paddingHorizontal: 14, paddingTop: 10 },
 
-  list: {
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
+  list: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
 
-  dayDivider: {
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  dayDividerText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-  },
-
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-    paddingHorizontal: 4,
-    marginVertical: 3,
-  },
-  rowMine: { justifyContent: 'flex-end' },
-  rowTheirs: { justifyContent: 'flex-start' },
-  bubbleAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-    overflow: 'hidden',
-  },
-  bubbleAvatarImg: { width: '100%', height: '100%' },
-
-  bubble: {
-    maxWidth: '78%',
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 6,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  bubbleMine: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  bubbleTheirs: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.borderSoft,
-    borderBottomLeftRadius: 4,
-  },
-  senderName: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 4,
-    letterSpacing: 0.2,
-  },
-  bubbleText: {
-    fontSize: 14,
-    lineHeight: 19,
-  },
-  bubbleTextMine: { color: '#0E0E0D' },
-  bubbleTextTheirs: { color: colors.textPrimary },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    gap: 4,
-    marginTop: 2,
-  },
-  metaTime: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { color: chatColors.textSecondary, fontSize: 13 },
 
   challengeBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginHorizontal: 12,
-    marginBottom: 6,
-    paddingVertical: 12,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
-  },
-  challengeBarText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
-  challengeBarCreate: { backgroundColor: colors.primary, borderColor: colors.primary },
-  challengeBarCreateText: { color: '#0E0E0D', fontSize: 14, fontWeight: '800' },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
-    backgroundColor: colors.background,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-  },
-  emojiBtn: {
-    width: 36,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  input: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
-    backgroundColor: colors.surfaceAlt,
-    color: colors.textPrimary,
-    fontSize: 14,
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-  },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  loadingFull: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  emptyFull: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
+    marginHorizontal: 14,
     marginBottom: 8,
-    textAlign: 'center',
+    minHeight: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(90,224,106,0.45)',
+    backgroundColor: 'rgba(90,224,106,0.10)',
   },
-  emptyText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 19,
-  },
+  challengeBarText: { color: chatColors.green, fontSize: 14, fontWeight: '800' },
+  challengeBarCreate: { backgroundColor: chatColors.green, borderColor: chatColors.green },
+  challengeBarCreateText: { color: chatColors.inkOnGreen, fontSize: 14, fontWeight: '800' },
 
-  // Barra de acciones cuando el partido ya terminó (reemplaza al composer)
   endedBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
-    backgroundColor: colors.background,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 16,
+    backgroundColor: chatColors.composerBar,
     borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
+    borderTopColor: chatColors.cardBorder,
   },
   endedBtn: {
     flex: 1,
@@ -901,34 +829,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
+    minHeight: 46,
+    paddingHorizontal: 10,
+    borderRadius: 23,
+    backgroundColor: chatColors.card,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: 'rgba(90,224,106,0.35)',
   },
-  endedBtnText: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '800',
-  },
+  endedBtnText: { color: chatColors.textPrimary, fontSize: 13, fontWeight: '800' },
   endedBtnDanger: {
-    flex: 1.2,
+    flex: 1.1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
+    minHeight: 46,
+    paddingHorizontal: 10,
+    borderRadius: 23,
+    backgroundColor: chatColors.dangerSoft,
     borderWidth: 1,
-    borderColor: colors.error,
+    borderColor: chatColors.dangerBorder,
   },
-  endedBtnDangerText: {
-    color: colors.error,
-    fontSize: 13,
-    fontWeight: '800',
-  },
+  endedBtnDangerText: { color: chatColors.danger, fontSize: 13, fontWeight: '800' },
 });
