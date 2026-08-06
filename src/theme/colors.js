@@ -263,6 +263,40 @@ export const partidosRadius = {
   sheet: 26,
 };
 
+/**
+ * Tokens del rediseño «Explorar clubes» (handoff de Claude Design,
+ * `Clubes.dc.html`). Extiende la familia visual de `dsColors` (Clubes/Perfil)
+ * con los valores exactos de este handoff: fondo casi negro con halo verde
+ * radial en la zona superior, tarjetas oscuras de borde discreto y un verde
+ * de acción algo más saturado (#55DF69) que el resto del módulo.
+ */
+export const clubsExplorer = {
+  bg: '#0A0C0A',
+  headerGlowFrom: '#17351E',
+  headerGlowTo: '#0A0C0A',
+  surface: '#131613',
+  surfaceAlt: '#191D1A',
+  border: '#292E2A',
+  green: '#55DF69',
+  greenHover: '#6FE881',
+  greenActive: '#46C959',
+  greenInk: '#0A0C0A',
+  shieldBg: '#17351E',
+  textPrimary: '#F4F6F4',
+  textSecondary: '#969B97',
+  textMuted: '#626762',
+};
+
+export const clubsExplorerRadius = {
+  input: 16,
+  card: 22,
+  icon: 16,
+  panel: 18,
+  empty: 24,
+  pill: 14,
+  fab: 18,
+};
+
 export const fonts = {
   regular: 'System',
   medium: 'System',

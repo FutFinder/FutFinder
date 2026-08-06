@@ -1,44 +1,39 @@
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
-import { Shield, Users, MapPin, BadgeCheck } from 'lucide-react-native';
-import { colors, radius } from '../theme/colors';
-import { premiumGold } from './PremiumBadge';
+import { Shield, MapPin, Users, ChevronRight } from 'lucide-react-native';
+import { clubsExplorer as CE, clubsExplorerRadius as CER } from '../../theme/colors';
 
 /**
- * Tarjeta de club para listas (búsqueda, invitaciones).
- * Muestra logo (o escudo default), nombre, ubicación, miembros y
- * la insignia de verificación si el club es Premium verificado.
+ * Tarjeta de club del explorador (handoff `Clubes.dc.html`): escudo o foto,
+ * nombre, comuna e integrantes, con flecha o un accesorio custom a la derecha
+ * (p.ej. el botón «Desafiar» para admins elegibles).
  */
-export default function ClubCard({ club, totalMiembros, onPress, onPressMembers, right }) {
+export default function ClubExplorerCard({ club, totalMiembros, onPress, onPressMembers, rightAccessory }) {
   const miembros = totalMiembros ?? club.total_miembros ?? 0;
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+      accessibilityRole="button"
+      accessibilityLabel={club.nombre}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       {club.foto_url ? (
         <Image source={{ uri: club.foto_url }} style={styles.logo} />
       ) : (
         <View style={[styles.logo, styles.logoFallback]}>
-          <Shield color={colors.primary} size={26} strokeWidth={1.8} />
+          <Shield color={CE.green} size={26} strokeWidth={2} />
         </View>
       )}
 
       <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {club.nombre}
-          </Text>
-          {club.verificado ? (
-            <BadgeCheck color={premiumGold} size={16} strokeWidth={2.2} />
-          ) : null}
-        </View>
-
+        <Text style={styles.name} numberOfLines={1}>
+          {club.nombre}
+        </Text>
         <View style={styles.metaRow}>
           {club.comuna ? (
             <View style={styles.metaItem}>
-              <MapPin color={colors.textMuted} size={12} />
+              <MapPin color={CE.textSecondary} size={13} strokeWidth={2} />
               <Text style={styles.metaText} numberOfLines={1}>
                 {club.comuna}
               </Text>
@@ -55,19 +50,23 @@ export default function ClubCard({ club, totalMiembros, onPress, onPressMembers,
               accessibilityLabel={`Ver ${miembros} integrantes de ${club.nombre}`}
               style={({ pressed }) => [styles.metaItem, pressed && { opacity: 0.6 }]}
             >
-              <Users color={colors.textMuted} size={12} />
+              <Users color={CE.textSecondary} size={13} strokeWidth={2} />
               <Text style={[styles.metaText, styles.metaTextLink]}>{miembros} integrantes</Text>
             </Pressable>
           ) : (
             <View style={styles.metaItem}>
-              <Users color={colors.textMuted} size={12} />
+              <Users color={CE.textSecondary} size={13} strokeWidth={2} />
               <Text style={styles.metaText}>{miembros} integrantes</Text>
             </View>
           )}
         </View>
       </View>
 
-      {right}
+      {rightAccessory !== undefined ? (
+        rightAccessory
+      ) : (
+        <ChevronRight color={CE.textMuted} size={20} strokeWidth={2.2} />
+      )}
     </Pressable>
   );
 }
@@ -76,41 +75,39 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    gap: 14,
+    backgroundColor: CE.surface,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    padding: 12,
-    marginBottom: 10,
+    borderColor: CE.border,
+    borderRadius: CER.card,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
+  cardPressed: { borderColor: CE.green },
   logo: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.md,
+    width: 56,
+    height: 56,
+    borderRadius: CER.icon,
+    flexShrink: 0,
   },
   logoFallback: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: CE.shieldBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  info: { flex: 1 },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
+  info: { flex: 1, minWidth: 0 },
   name: {
-    color: colors.textPrimary,
-    fontSize: 15,
+    color: CE.textPrimary,
+    fontSize: 17,
     fontWeight: '700',
-    flexShrink: 1,
+    marginBottom: 4,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginTop: 4,
+    flexWrap: 'wrap',
   },
   metaItem: {
     flexDirection: 'row',
@@ -118,8 +115,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    color: colors.textMuted,
-    fontSize: 12,
+    color: CE.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
   },
   metaTextLink: {
     textDecorationLine: 'underline',
