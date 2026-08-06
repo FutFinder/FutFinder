@@ -120,6 +120,7 @@ export default function ExploreClubsScreen({ navigation }) {
               <ClubCard
                 club={item}
                 onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
+                onPressMembers={() => navigation.navigate('ClubMembers', { clubId: item.id })}
                 right={
                   puedoDesafiar ? (
                     <Pressable

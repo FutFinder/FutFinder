@@ -9,7 +9,7 @@ import { premiumGold } from './PremiumBadge';
  * Muestra logo (o escudo default), nombre, ubicación, miembros y
  * la insignia de verificación si el club es Premium verificado.
  */
-export default function ClubCard({ club, totalMiembros, onPress, right }) {
+export default function ClubCard({ club, totalMiembros, onPress, onPressMembers, right }) {
   const miembros = totalMiembros ?? club.total_miembros ?? 0;
 
   return (
@@ -44,10 +44,26 @@ export default function ClubCard({ club, totalMiembros, onPress, right }) {
               </Text>
             </View>
           ) : null}
-          <View style={styles.metaItem}>
-            <Users color={colors.textMuted} size={12} />
-            <Text style={styles.metaText}>{miembros} integrantes</Text>
-          </View>
+          {onPressMembers ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onPressMembers();
+              }}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`Ver ${miembros} integrantes de ${club.nombre}`}
+              style={({ pressed }) => [styles.metaItem, pressed && { opacity: 0.6 }]}
+            >
+              <Users color={colors.textMuted} size={12} />
+              <Text style={[styles.metaText, styles.metaTextLink]}>{miembros} integrantes</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.metaItem}>
+              <Users color={colors.textMuted} size={12} />
+              <Text style={styles.metaText}>{miembros} integrantes</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -104,5 +120,8 @@ const styles = StyleSheet.create({
   metaText: {
     color: colors.textMuted,
     fontSize: 12,
+  },
+  metaTextLink: {
+    textDecorationLine: 'underline',
   },
 });

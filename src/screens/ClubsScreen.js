@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Shield,
@@ -54,7 +54,13 @@ import {
  *  - SIN club: buscador de clubes + invitaciones pendientes + crear club
  *  - CON club: vista de mi club con accesos a chat, detalle y planes
  */
+// Altura de la tab bar flotante custom (MainTabs.js) + su inset inferior:
+// los botones flotantes de esta pantalla deben despejarla, no quedar debajo.
+const TAB_BAR_HEIGHT = 88;
+
 export default function ClubsScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
+  const fabBottom = TAB_BAR_HEIGHT + insets.bottom + 16;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [myClubs, setMyClubs] = useState([]); // [{ club, miRol, totalMiembros }]
@@ -386,7 +392,7 @@ export default function ClubsScreen({ navigation, route }) {
         {/* Botón gris "Explorar clubes" (abajo a la izquierda) */}
         <Pressable
           onPress={() => navigation.navigate('ExploreClubs')}
-          style={({ pressed }) => [styles.exploreBtn, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.exploreBtn, { bottom: fabBottom }, pressed && { opacity: 0.85 }]}
         >
           <Compass color={colors.textPrimary} size={18} strokeWidth={2.2} />
           <Text style={styles.exploreBtnText}>Explorar clubes</Text>
@@ -396,7 +402,7 @@ export default function ClubsScreen({ navigation, route }) {
         {!hasMaxClubs && (
           <Pressable
             onPress={() => navigation.navigate('CreateClub')}
-            style={({ pressed }) => [styles.createClubFab, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.createClubFab, { bottom: fabBottom }, pressed && { opacity: 0.85 }]}
           >
             <Plus color="#0E0E0D" size={16} strokeWidth={2.8} />
             <Text style={styles.createClubFabText}>Crear club</Text>
@@ -489,6 +495,7 @@ export default function ClubsScreen({ navigation, route }) {
           <ClubCard
             club={item}
             onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
+            onPressMembers={() => navigation.navigate('ClubMembers', { clubId: item.id })}
             right={<ChevronRight color={colors.textMuted} size={18} />}
           />
         )}
