@@ -8,6 +8,15 @@ import ClubDetailScreen from './ClubDetailScreen';
 import ClubExplorer from '../components/club/ClubExplorer';
 
 /**
+ * Altura de la tab bar flotante custom (MainTabs.js) + su inset inferior.
+ * Cuando el explorador se embebe aquí como raíz de la pestaña «Clubes», esa
+ * tab bar real sigue dibujándose encima del contenido, así que el botón
+ * «Crear club» necesita despejarla igual que hace ClubDetailScreen — sin
+ * este valor queda oculto detrás, aunque exista en el árbol.
+ */
+const TAB_BAR_HEIGHT = 88;
+
+/**
  * Pestaña «Clubes»: no tiene UI propia, decide a dónde entra el usuario
  * apenas se conoce su membresía real (sin datos ni condiciones de demo):
  *
@@ -91,6 +100,7 @@ export default function ClubsScreen({ navigation, route }) {
       navigation={navigation}
       initialBanner={pendingBanner}
       onMembershipChanged={checkMembership}
+      extraBottomClearance={TAB_BAR_HEIGHT}
     />
   );
 }
