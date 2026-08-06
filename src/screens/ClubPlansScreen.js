@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowLeft,
   Check,
@@ -22,10 +24,13 @@ import {
   BarChart3,
   Award,
   BadgeCheck,
+  Lock,
 } from 'lucide-react-native';
 
 import { colors, radius } from '../theme/colors';
 import PremiumBadge, { premiumGold } from '../components/PremiumBadge';
+import { getCurrentUser } from '../services/auth';
+import { listMembers } from '../services/clubs';
 
 /**
  * Comparativa de planes del club.
@@ -56,7 +61,71 @@ const FEATURES_PREMIUM = [
 ];
 
 export default function ClubPlansScreen({ navigation, route }) {
-  // clubId disponible para cuando exista la pasarela de pagos
+  const { clubId } = route.params || {};
+  const [checking, setChecking] = useState(true);
+  const [soyMiembro, setSoyMiembro] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelado = false;
+      (async () => {
+        setChecking(true);
+        const user = await getCurrentUser();
+        const myId = user?.id || null;
+        const { data: ms } = await listMembers(clubId);
+        if (cancelado) return;
+        setSoyMiembro(!!myId && (ms || []).some((m) => m.user_id === myId));
+        setChecking(false);
+      })();
+      return () => {
+        cancelado = true;
+      };
+    }, [clubId])
+  );
+
+  if (checking) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={12}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          >
+            <ArrowLeft color={colors.textPrimary} size={22} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Planes del club</Text>
+        </View>
+        <View style={styles.loadingBox}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!soyMiembro) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={12}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          >
+            <ArrowLeft color={colors.textPrimary} size={22} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Planes del club</Text>
+        </View>
+        <View style={styles.loadingBox}>
+          <Lock color={colors.textMuted} size={36} strokeWidth={1.5} />
+          <Text style={styles.blockedText}>
+            Solo los integrantes del club pueden ver esta sección.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
@@ -163,6 +232,20 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   content: { padding: 16, paddingBottom: 40, gap: 16 },
+
+  loadingBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 30,
+  },
+  blockedText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 
   planCard: {
     backgroundColor: colors.surface,

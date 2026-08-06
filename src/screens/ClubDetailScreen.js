@@ -276,7 +276,7 @@ export default function ClubDetailScreen({ navigation, route }) {
         onBack={() => navigation.goBack()}
         onShare={handleShare}
         onEdit={() => navigation.navigate('EditClub', { club })}
-        onPlan={() => navigation.navigate('ClubPlans', { clubId: club.id })}
+        onPlan={soyMiembro ? () => navigation.navigate('ClubPlans', { clubId: club.id }) : undefined}
       />
 
       <ScrollView
@@ -333,14 +333,14 @@ export default function ClubDetailScreen({ navigation, route }) {
             onPress={myRequest ? handleCancelRequest : handleJoin}
             onSearch={goToExplore}
           />
-        ) : (
+        ) : soyMiembro ? (
           <CreateChallengeButton
             label="Buscar rivales"
             icon={<Search color={clubColors.greenInk} size={20} strokeWidth={2.2} />}
             onPress={goToExplore}
             onSearch={goToExplore}
           />
-        )}
+        ) : null}
 
         {/* Bandeja de desafíos (miembros del club) */}
         {soyMiembro && (
@@ -367,38 +367,42 @@ export default function ClubDetailScreen({ navigation, route }) {
           </Pressable>
         )}
 
-        {/* ── Buscar rivales ── */}
-        <SectionHeader title="Buscar rivales" actionLabel="Ver todos" onAction={goToExplore} />
-        {rivals.length === 0 ? (
-          <EmptyStateCard
-            icon={<Search color={clubColors.textSecondary} size={18} strokeWidth={2} />}
-            title="Sin rivales cerca"
-            subtitle="Amplía la búsqueda para encontrar más clubes"
-            actionLabel="Buscar clubes"
-            onAction={goToExplore}
-          />
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToAlignment="start"
-            decelerationRate="fast"
-            snapToInterval={clubSizes.rivalCard + 10}
-            contentContainerStyle={styles.rivalsRow}
-          >
-            {rivals.map((r) => (
-              <RivalClubCard
-                key={r.id}
-                club={r}
-                meta={metaRival({ distanciaKm: r.distanciaKm, modalidad: r.modalidad })}
-                ratingLabel={fmtRating(r.rating)}
-                nivelLabel={nivelInline(r.nivel)}
-                puedeDesafiar={puedoDesafiarRivales}
-                onPress={() => navigation.navigate('ClubDetail', { clubId: r.id })}
-                onChallenge={() => goToChallenge(r)}
+        {/* ── Buscar rivales (solo integrantes del club) ── */}
+        {soyMiembro && (
+          <>
+            <SectionHeader title="Buscar rivales" actionLabel="Ver todos" onAction={goToExplore} />
+            {rivals.length === 0 ? (
+              <EmptyStateCard
+                icon={<Search color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+                title="Sin rivales cerca"
+                subtitle="Amplía la búsqueda para encontrar más clubes"
+                actionLabel="Buscar clubes"
+                onAction={goToExplore}
               />
-            ))}
-          </ScrollView>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                snapToInterval={clubSizes.rivalCard + 10}
+                contentContainerStyle={styles.rivalsRow}
+              >
+                {rivals.map((r) => (
+                  <RivalClubCard
+                    key={r.id}
+                    club={r}
+                    meta={metaRival({ distanciaKm: r.distanciaKm, modalidad: r.modalidad })}
+                    ratingLabel={fmtRating(r.rating)}
+                    nivelLabel={nivelInline(r.nivel)}
+                    puedeDesafiar={puedoDesafiarRivales}
+                    onPress={() => navigation.navigate('ClubDetail', { clubId: r.id })}
+                    onChallenge={() => goToChallenge(r)}
+                  />
+                ))}
+              </ScrollView>
+            )}
+          </>
         )}
 
         {/* ── Historial de partidos ── */}
@@ -466,8 +470,8 @@ export default function ClubDetailScreen({ navigation, route }) {
           onOpenPhoto={goToGallery}
         />
 
-        {/* ── Premium ── */}
-        {!esPremium && (
+        {/* ── Premium (solo integrantes del club) ── */}
+        {soyMiembro && !esPremium && (
           <PremiumUpsellCard
             onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
           />
