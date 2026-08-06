@@ -3,7 +3,6 @@ import { View, Text, Pressable } from 'react-native';
 import {
   UserPlus, CheckCheck, Swords, Shield, CalendarDays, MessageCircle, Star, Bell, Users, Trash2,
 } from 'lucide-react-native';
-import { tactical as t } from '../../theme/colors';
 
 /** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
 export const CATEGORY = {
@@ -82,26 +81,30 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
   return (
     <Pressable
       onPress={() => onPress(n)}
-      className={`flex-row items-start gap-3 overflow-hidden rounded-[18px] border p-3.5 active:opacity-80 ${
-        unread ? 'border-[#00FF66]/16 bg-[#00FF66]/5' : 'border-white/7 bg-white/3'
-      }`}
+      className="flex-row items-start gap-3 overflow-hidden rounded-[18px] border p-3.5 active:opacity-80"
+      style={{
+        borderColor: unread ? tag.border : 'rgba(255,255,255,0.07)',
+        backgroundColor: unread ? tag.bg : 'rgba(255,255,255,0.03)',
+      }}
     >
       {unread ? <View className="absolute bottom-0 left-0 top-0 w-[3px]" style={{ backgroundColor: tag.color }} /> : null}
 
       <View
-        className={`h-[38px] w-[38px] items-center justify-center rounded-[13px] border ${
-          unread ? 'border-[#00FF66]/28 bg-[#00FF66]/10' : 'border-white/10 bg-white/5'
-        }`}
+        className="h-[38px] w-[38px] items-center justify-center rounded-[13px] border"
+        style={{
+          borderColor: unread ? tag.border : 'rgba(255,255,255,0.10)',
+          backgroundColor: unread ? tag.bg : 'rgba(255,255,255,0.05)',
+        }}
       >
-        <Icon size={18} color={unread ? t.neon : 'rgba(255,255,255,0.55)'} strokeWidth={1.9} />
+        <Icon size={18} color={unread ? tag.color : 'rgba(255,255,255,0.55)'} strokeWidth={1.9} />
       </View>
 
       <View className="flex-1">
         <View className="flex-row items-center gap-2">
-          <Text numberOfLines={2} className={`flex-1 text-[15px] font-bold leading-5 ${unread ? 'text-white' : 'text-white/82'}`}>
+          <Text numberOfLines={2} className={`flex-1 text-[15px] font-bold leading-5 ${unread ? 'text-white' : 'text-white/80'}`}>
             {n.title}
           </Text>
-          {unread ? <View className="h-[7px] w-[7px] rounded-full bg-[#00FF66]" /> : null}
+          {unread ? <View className="h-[7px] w-[7px] rounded-full" style={{ backgroundColor: tag.color }} /> : null}
         </View>
 
         {n.body ? (

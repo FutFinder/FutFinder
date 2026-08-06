@@ -375,7 +375,7 @@ export default function NotificationsScreen({ navigation }) {
             }
             renderSectionHeader={({ section }) => (
               <View className="mb-1 mt-2 flex-row items-center gap-2.5">
-                <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/42">{section.title}</Text>
+                <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/40">{section.title}</Text>
                 <View className="h-px flex-1 bg-white/8" />
               </View>
             )}
