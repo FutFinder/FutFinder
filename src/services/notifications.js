@@ -28,7 +28,10 @@ import { supabase, isSupabaseConfigured } from './supabase';
 // Por defecto Expo no muestra nada con la app abierta — esto lo cambia.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    // shouldShowAlert quedó obsoleto: ahora se controla por separado el
+    // banner (foreground) y la entrada en el centro de notificaciones.
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),

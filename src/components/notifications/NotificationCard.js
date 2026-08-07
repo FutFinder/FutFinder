@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import {
   UserPlus, CheckCheck, Swords, Shield, CalendarDays, MessageCircle, Star, Bell, Users, Trash2,
+  RefreshCw, LockOpen, ListOrdered, LogOut, UserX,
 } from 'lucide-react-native';
 
 /** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
@@ -16,6 +17,11 @@ export const CATEGORY = {
   join_request: 'partidos',
   join_approved: 'partidos',
   join_rejected: 'partidos',
+  match_updated: 'partidos',
+  match_slot_free: 'partidos',
+  waitlist_turn: 'partidos',
+  match_left: 'partidos',
+  match_attendance: 'partidos',
   club_request: 'clubes',
   club_request_accepted: 'clubes',
   club_request_rejected: 'clubes',
@@ -38,6 +44,11 @@ const ICON = {
   join_request: UserPlus,
   join_approved: CheckCheck,
   join_rejected: Bell,
+  match_updated: RefreshCw,
+  match_slot_free: LockOpen,
+  waitlist_turn: ListOrdered,
+  match_left: LogOut,
+  match_attendance: UserX,
   club_request: Shield,
   club_request_accepted: CheckCheck,
   club_request_rejected: Shield,
@@ -60,6 +71,11 @@ const TAG = {
   join_request: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
   join_approved: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
   join_rejected: { label: 'PARTIDO', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },
+  match_updated: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
+  match_slot_free: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
+  waitlist_turn: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
+  match_left: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
+  match_attendance: { label: 'PARTIDO', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },
   club_request: { label: 'CLUBES', color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' },
   club_request_accepted: { label: 'CLUBES', color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' },
   club_request_rejected: { label: 'CLUBES', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },

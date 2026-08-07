@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import {
   deleteAllNotifications,
   subscribeToNotifications,
 } from '../services/notifications';
+import { navigateToNotification } from '../utils/notificationTargets';
 
 /**
  * Pantalla de inbox de notificaciones — "Avisos".
@@ -113,72 +114,6 @@ function actionsFor(n, myClub) {
   return null;
 }
 
-function navigateForNotif(navigation, n) {
-  const data = n?.data || {};
-  // Desde una tab, los screens del root stack se alcanzan subiendo al padre.
-  const root = navigation.getParent() || navigation;
-  switch (n?.type) {
-    case 'message_new':
-      if (data.threadKey || data.threadId) {
-        root.navigate('ChatThread', { threadKey: data.threadKey || data.threadId });
-      }
-      break;
-    case 'match_join':
-    case 'match_reminder':
-    case 'join_request':
-    case 'join_approved':
-    case 'join_rejected':
-      if (data.matchId) {
-        root.navigate('MatchDetail', { matchId: data.matchId });
-      }
-      break;
-    case 'match_rate':
-      if (data.matchId) {
-        root.navigate('RateMatch', { matchId: data.matchId });
-      }
-      break;
-    case 'match_cancelled':
-      navigation.navigate('SearchTab');
-      break;
-    case 'club_request':
-    case 'club_request_accepted':
-      if (data.clubId) {
-        root.navigate('ClubDetail', { clubId: data.clubId });
-      }
-      break;
-    case 'club_request_rejected':
-      navigation.navigate('ClubsTab');
-      break;
-    case 'club_member_joined':
-    case 'club_member_left':
-      if (data.clubId) {
-        root.navigate('ClubDetail', { clubId: data.clubId });
-      }
-      break;
-    case 'club_challenge':
-      // Recibido: abre la bandeja de desafíos de mi club (el retado)
-      if (data.clubRetadoId) {
-        root.navigate('ClubChallenges', { clubId: data.clubRetadoId });
-      }
-      break;
-    case 'club_challenge_accepted':
-    case 'club_challenge_rejected':
-      // Respondido: abre la bandeja de desafíos de mi club (el retador)
-      if (data.clubRetadorId) {
-        root.navigate('ClubChallenges', { clubId: data.clubRetadorId });
-      }
-      break;
-    case 'friend_request':
-    case 'friend_accept':
-      if (data.fromUserId) {
-        root.navigate('UserProfile', { userId: data.fromUserId });
-      }
-      break;
-    default:
-      break;
-  }
-}
-
 export default function NotificationsScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [myClub, setMyClub] = useState(null);
@@ -186,6 +121,7 @@ export default function NotificationsScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('todos');
   const [banner, setBanner] = useState(null);
+  const navigatingIds = useRef(new Set());
 
   const load = useCallback(async () => {
     const [{ data }, clubResult] = await Promise.all([
@@ -231,11 +167,27 @@ export default function NotificationsScreen({ navigation }) {
   };
 
   const handlePress = async (n) => {
+    // Guarda contra el doble tap: mientras se resuelve el destino de esta
+    // notificación, un segundo tap sobre la misma tarjeta no dispara otra
+    // navegación.
+    if (navigatingIds.current.has(n.id)) return;
+    navigatingIds.current.add(n.id);
+
     if (!n.read) {
       setItems((prev) => prev.map((p) => (p.id === n.id ? { ...p, read: true } : p)));
       markAsRead(n.id);
     }
-    navigateForNotif(navigation, n);
+    // Desde una tab, los screens del root stack se alcanzan subiendo al padre.
+    const root = navigation.getParent() || navigation;
+    try {
+      await navigateToNotification(n, {
+        navigate: (screen, params) => root.navigate(screen, params),
+        onMissing: (copy) => setBanner({ type: 'info', title: copy.title, message: copy.message }),
+        onUnresolved: (copy) => setBanner({ type: 'info', title: copy.title, message: copy.message }),
+      });
+    } finally {
+      navigatingIds.current.delete(n.id);
+    }
   };
 
   const handleDelete = async (id) => {

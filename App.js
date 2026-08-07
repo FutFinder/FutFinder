@@ -1,86 +1,84 @@
 import 'react-native-gesture-handler';
 import './global.css';
 import React, { useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 
-import AppNavigator, { navigationRef } from './src/navigation/AppNavigator';
+import AppNavigator, { navigationRef, navigationReadyPromise } from './src/navigation/AppNavigator';
 import { supabase, isSupabaseConfigured } from './src/services/supabase';
 import {
   registerForPushNotifications,
   unregisterPushToken,
   addNotificationListeners,
 } from './src/services/notifications';
+import { navigateToNotification } from './src/utils/notificationTargets';
+
+// Ids de notificación (fila real de `notifications`, no el id efímero del
+// push) ya procesados en esta sesión de la app. `getLastNotificationResponseAsync`
+// (arranque frío) y `addNotificationResponseReceivedListener` pueden entregar
+// el mismo tap dos veces — sin esto, navegaríamos al mismo destino dos veces.
+const handledNotificationIds = new Set();
 
 /**
- * Cuando el usuario toca una notif (con la app cerrada o en background),
- * la llevamos a la pantalla relacionada.
+ * Espera a que el NavigationContainer haya montado (onReady) y a que ya no
+ * estemos parados en Splash — recién ahí sabemos que la sesión terminó de
+ * resolverse y que la pila de navegación tiene la ruta inicial correcta
+ * (Main / Welcome / LocationPermission). Navegar antes de eso es lo que
+ * causaba el bug: un tap de push podía "adelantarse" a Splash y terminar
+ * pisado por su propio `navigation.reset(...)` un instante después.
  *
- * Esperamos a que el navegador esté listo antes de navegar (a veces el tap
- * pasa antes de que NavigationContainer haya montado).
+ * Reemplaza el reintento único de 600ms: en vez de una espera fija, un push
+ * recibido durante el arranque frío queda pendiente (esta promesa) hasta que
+ * la navegación esté realmente lista, sin cota de tiempo arbitraria — salvo
+ * una red de seguridad generosa para no bloquear el tap para siempre si algo
+ * saliera mal.
  */
-function handleNotificationTap(response) {
+async function waitUntilPastSplash() {
+  await navigationReadyPromise;
+  if (navigationRef.getCurrentRoute()?.name !== 'Splash') return;
+
+  await new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(safety);
+      unsubscribe();
+      resolve();
+    };
+    const unsubscribe = navigationRef.addListener('state', () => {
+      if (navigationRef.getCurrentRoute()?.name !== 'Splash') finish();
+    });
+    const safety = setTimeout(finish, 15000);
+  });
+}
+
+/**
+ * Cuando el usuario toca una notif (con la app cerrada, en background, o
+ * abierta), la llevamos a la pantalla relacionada. Comparte con
+ * NotificationsScreen la misma resolución de destino (ver
+ * `utils/notificationTargets`), así que un tipo nuevo solo se agrega una vez.
+ */
+async function handleNotificationTap(response) {
   const data = response?.notification?.request?.content?.data || {};
+  const id = data.notificationId || response?.notification?.request?.identifier;
+  if (id) {
+    if (handledNotificationIds.has(id)) return;
+    handledNotificationIds.add(id);
+  }
 
-  const go = () => {
-    if (!navigationRef.isReady()) return;
-    switch (data.type) {
-      case 'message_new':
-        if (data.threadKey || data.threadId) {
-          navigationRef.navigate('ChatThread', { threadKey: data.threadKey || data.threadId });
-        }
-        break;
-      case 'match_join':
-      case 'match_reminder':
-      case 'join_request':
-      case 'join_approved':
-      case 'join_rejected':
-        if (data.matchId) {
-          navigationRef.navigate('MatchDetail', { matchId: data.matchId });
-        }
-        break;
-      case 'match_rate':
-        // Recordatorio de calificar → directo a la pantalla de rating
-        if (data.matchId) {
-          navigationRef.navigate('RateMatch', { matchId: data.matchId });
-        }
-        break;
-      case 'club_request':
-      case 'club_request_accepted':
-        // Solicitud de club: el admin la resuelve (y el aceptado la ve)
-        // en el detalle del club.
-        if (data.clubId) {
-          navigationRef.navigate('ClubDetail', { clubId: data.clubId });
-        }
-        break;
-      case 'club_request_rejected':
-        // Rechazado: a la pestaña Clubes a buscar otro equipo.
-        navigationRef.navigate('Main', { screen: 'ClubsTab' });
-        break;
-      case 'club_member_joined':
-      case 'club_member_left':
-        if (data.clubId) {
-          navigationRef.navigate('ClubDetail', { clubId: data.clubId });
-        }
-        break;
-      case 'friend_request':
-      case 'friend_accept':
-        // Vamos a la pestaña de perfil — luego puedes crear una pantalla "Notificaciones".
-        navigationRef.navigate('Main', { screen: 'ProfileTab' });
-        break;
-      case 'match_cancelled':
-        // El partido ya no existe → mandamos a buscar otro
-        navigationRef.navigate('Main', { screen: 'SearchTab' });
-        break;
-      default:
-        break;
+  await waitUntilPastSplash();
+
+  await navigateToNotification(
+    { type: data.type, data },
+    {
+      navigate: (screen, params) => navigationRef.navigate(screen, params),
+      onMissing: (copy) => Alert.alert(copy.title, copy.message),
+      onUnresolved: (copy) => Alert.alert(copy.title, copy.message),
     }
-  };
-
-  // Si el nav aún no está listo, esperamos un poquito
-  if (navigationRef.isReady()) go();
-  else setTimeout(go, 600);
+  );
 }
 
 export default function App() {
