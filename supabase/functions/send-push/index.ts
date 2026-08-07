@@ -23,6 +23,57 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Espejo de `src/utils/notificationPreferences.js` (Deno no puede importar
+// ese archivo directamente). Si se agrega un tipo nuevo a `notifications`,
+// hay que sumarlo en ambos lados. Estas preferencias solo controlan el push
+// externo — el aviso siempre queda guardado y visible en la bandeja in-app.
+const NOTIF_TYPE_TO_PREFERENCE: Record<string, string> = {
+  // Partidos y asistencia
+  match_join: "notif_matches",
+  match_reminder: "notif_matches",
+  match_rate: "notif_matches",
+  join_request: "notif_matches",
+  join_approved: "notif_matches",
+  join_rejected: "notif_matches",
+  match_cancelled: "notif_matches",
+  match_updated: "notif_matches",
+  match_slot_free: "notif_matches",
+  waitlist_turn: "notif_matches",
+  match_left: "notif_matches",
+  match_attendance: "notif_matches",
+
+  // Clubes y desafíos
+  club_request: "notif_clubs",
+  club_request_accepted: "notif_clubs",
+  club_request_rejected: "notif_clubs",
+  club_member_joined: "notif_clubs",
+  club_member_left: "notif_clubs",
+  club_invite_accepted: "notif_clubs",
+  club_challenge: "notif_clubs",
+  club_challenge_accepted: "notif_clubs",
+  club_challenge_rejected: "notif_clubs",
+
+  // Mensajes y menciones
+  message_new: "notif_chat",
+
+  // Amistades y solicitudes
+  friend_request: "notif_friends",
+  friend_accept: "notif_friends",
+};
+
+function getPreferenceColumn(type: string): string | null {
+  return NOTIF_TYPE_TO_PREFERENCE[type] ?? null;
+}
+
+// Falla abierto: un tipo sin mapear o un perfil no encontrado nunca bloquean
+// el push, solo lo bloquea `false` explícito en la columna correspondiente.
+function isPushAllowed(profile: Record<string, any> | null, type: string): boolean {
+  const column = getPreferenceColumn(type);
+  if (!column) return true;
+  if (!profile) return true;
+  return profile[column] !== false;
+}
+
 interface NotificationRow {
   id: string;
   user_id: string;
@@ -74,6 +125,39 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
+
+    // 0) Respetar la preferencia de push del destinatario para esta categoría.
+    // El aviso ya quedó guardado en `notifications` (in-app) antes de llegar
+    // acá — esto solo decide si además se manda el push externo.
+    const preferenceColumn = getPreferenceColumn(notif.type);
+    if (preferenceColumn) {
+      const { data: profile, error: profileErr } = await admin
+        .from("profiles")
+        .select(preferenceColumn)
+        .eq("id", notif.user_id)
+        .maybeSingle();
+
+      if (profileErr) {
+        // No se pudo verificar la preferencia: fallamos abierto y seguimos
+        // con el envío en vez de perder el push por un error transitorio.
+        console.error("[send-push] profile pref error:", profileErr);
+      } else if (!isPushAllowed(profile, notif.type)) {
+        console.log(
+          `[send-push] push omitido por preferencia ${preferenceColumn}=false`,
+          notif.user_id,
+        );
+        // Idempotente: se marca sent_push aunque no se haya enviado, así el
+        // webhook nunca reintenta este INSERT por no ver la marca puesta.
+        await admin
+          .from("notifications")
+          .update({ sent_push: true })
+          .eq("id", notif.id);
+        return new Response(
+          JSON.stringify({ skipped: "preference_disabled", preference: preferenceColumn }),
+          { headers: { "Content-Type": "application/json", ...corsHeaders } },
+        );
+      }
+    }
 
     // 1) Buscar push tokens del usuario destinatario
     const { data: tokens, error: tokensErr } = await admin
