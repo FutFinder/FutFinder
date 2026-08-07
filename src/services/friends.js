@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { describeFriendRequestError } from '../utils/friendRequestPrivacy';
 
 /**
  * Servicio de amistades.
@@ -38,8 +39,16 @@ export async function sendFriendRequest(addresseeId) {
     .select()
     .single();
 
-  if (error) console.error('[FutFinder] sendFriendRequest:', error);
-  return { data, error };
+  if (error) {
+    console.error('[FutFinder] sendFriendRequest:', error);
+    const described = describeFriendRequestError(error);
+    return {
+      data: null,
+      error: { ...error, message: described.message },
+      blockedByPrivacy: described.blockedByPrivacy,
+    };
+  }
+  return { data, error: null };
 }
 
 /**

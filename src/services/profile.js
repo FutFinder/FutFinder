@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { buildSearchPlayersQuery } from '../utils/searchPlayersQuery';
 
 /**
  * Servicio de perfil del jugador.
@@ -76,43 +77,7 @@ export async function searchPlayers(query, { limit = 30, filters = {} } = {}) {
   } = await supabase.auth.getUser();
   const myId = user?.id || null;
 
-  let q = supabase
-    .from('profiles')
-    .select(
-      'id, username, foto_url, comuna, region, edad, flanco, posicion_preferida, trust_score, rating_count, rating_nivel_avg'
-    )
-    .limit(limit);
-
-  const term = (query || '').trim();
-  if (term.length > 0) {
-    q = q.ilike('username', `%${term}%`);
-  } else {
-    q = q.order('trust_score', { ascending: false });
-  }
-
-  // Filtros de ubicación
-  if (filters.region) q = q.eq('region', filters.region);
-  if (filters.comuna) q = q.eq('comuna', filters.comuna);
-
-  // Filtro de posición (posicion_preferida es un array → "contiene")
-  if (filters.posicion) {
-    q = q.contains('posicion_preferida', [filters.posicion]);
-  }
-
-  // Filtro de flanco: derecho/izquierdo incluye a los 'ambos'
-  if (filters.flanco === 'derecho') {
-    q = q.in('flanco', ['derecho', 'ambos']);
-  } else if (filters.flanco === 'izquierdo') {
-    q = q.in('flanco', ['izquierdo', 'ambos']);
-  } else if (filters.flanco === 'ambos') {
-    q = q.eq('flanco', 'ambos');
-  }
-
-  // Filtro de edad (rango)
-  if (filters.edadMin != null) q = q.gte('edad', filters.edadMin);
-  if (filters.edadMax != null) q = q.lte('edad', filters.edadMax);
-
-  const { data, error } = await q;
+  const { data, error } = await buildSearchPlayersQuery(supabase, query, filters, limit);
   if (error) {
     console.error('[FutFinder] searchPlayers:', error);
     return { data: [], error };
