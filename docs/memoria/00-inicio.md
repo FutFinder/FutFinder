@@ -8,7 +8,7 @@ Enrutar cambios hacia la mínima documentación necesaria y mantener esta memori
 
 ## Estado verificado
 
-Esta bóveda parte del repositorio sincronizado en la rama `docs/obsidian-project-memory`. Sus notas describen configuración, código y migraciones versionados; no sustituyen la comprobación segura de un entorno desplegado.
+Esta bóveda documenta la configuración, el código y las migraciones versionados del repositorio actual; no sustituyen la comprobación segura de un entorno desplegado.
 
 ## Cómo usar esta memoria
 
@@ -21,14 +21,21 @@ Esta bóveda parte del repositorio sincronizado en la rama `docs/obsidian-projec
 
 | Tarea | Leer primero | Dependencias solo si aplican |
 |---|---|---|
+| Decisión duradera | [Decisiones duraderas](decisiones/README.md) | Las notas de memoria afectadas por la decisión |
+| Visión, alcance o cambio de producto | [Visión y alcance](producto/vision-y-alcance.md) | [Reglas de negocio](producto/reglas-de-negocio.md) |
 | Sesión, login, rutas privadas | [Autenticación](funcionalidades/autenticacion.md) | [Navegación](arquitectura/navegacion.md), [Seguridad](arquitectura/seguridad-y-privacidad.md) |
+| Navegación, rutas o enlaces profundos | [Navegación](arquitectura/navegacion.md) | [Autenticación](funcionalidades/autenticacion.md) |
 | Partidos | [Partidos](funcionalidades/partidos.md) | [Reglas de negocio](producto/reglas-de-negocio.md), [Base de datos](arquitectura/base-de-datos.md), [Sistema visual](diseno/sistema-visual.md) |
 | Clubes | [Clubes](funcionalidades/clubes.md) | [Base de datos](arquitectura/base-de-datos.md), [Sistema visual](diseno/sistema-visual.md) |
 | Chat | [Chat](funcionalidades/chat.md) | [Seguridad](arquitectura/seguridad-y-privacidad.md), [Base de datos](arquitectura/base-de-datos.md) |
 | Perfil o amigos | [Perfil y amigos](funcionalidades/perfil-y-amigos.md) | [Navegación](arquitectura/navegacion.md), [Seguridad](arquitectura/seguridad-y-privacidad.md), [Sistema visual](diseno/sistema-visual.md) |
 | Avisos o push | [Avisos y push](funcionalidades/avisos-y-push.md) | [Configuración](funcionalidades/configuracion.md), [Despliegue](arquitectura/despliegue-y-entornos.md) |
 | Privacidad o ajustes | [Configuración](funcionalidades/configuracion.md) | [Seguridad](arquitectura/seguridad-y-privacidad.md) |
-| Arquitectura general | [Stack y estructura](arquitectura/stack-y-estructura.md) | La nota específica afectada |
+| Datos, migraciones, RLS o RPC | [Base de datos](arquitectura/base-de-datos.md) | [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) |
+| Seguridad, privacidad o autorización | [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) | [Base de datos](arquitectura/base-de-datos.md) |
+| Despliegue, entornos o secretos | [Despliegue y entornos](arquitectura/despliegue-y-entornos.md) | [Stack y estructura](arquitectura/stack-y-estructura.md) |
+| Sistema visual o componentes compartidos | [Sistema visual](diseno/sistema-visual.md) | Ninguna |
+| Arquitectura general | [Stack y estructura](arquitectura/stack-y-estructura.md) | [Navegación](arquitectura/navegacion.md), [Base de datos](arquitectura/base-de-datos.md), [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) |
 | Estado, pendientes o pruebas | [Estado actual](operacion/estado-actual.md) | [Pendientes](operacion/pendientes.md), [Pruebas](operacion/pruebas.md) |
 
 ## Política de actualización

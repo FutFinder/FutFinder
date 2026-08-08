@@ -21,7 +21,7 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Firebase (credenciales reales; se inyectan por secreto de EAS, ver CLAUDE.md)
+# Firebase (credenciales reales; se inyectan por secreto de EAS, ver docs/memoria/arquitectura/despliegue-y-entornos.md)
 google-services.json
 GoogleService-Info.plist
 
