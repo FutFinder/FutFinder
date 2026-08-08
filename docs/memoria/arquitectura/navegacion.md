@@ -16,7 +16,7 @@ Las rutas operativas del stack (partidos, chat, perfil, clubes, ajustes, avisos 
 
 - `linking` acepta el esquema de la app y los dominios web; enlaza `p/:matchId` a detalle de partido y define rutas de gestión, cupo, solicitud, edición y publicación.
 - `navigationRef` y la promesa de disponibilidad permiten que `App.js` espere el fin de Splash antes de abrir el destino de un push. Los destinos se resuelven una sola vez por identificador de aviso para evitar dobles navegaciones en arranque frío.
-- Las pantallas de Avisos y Chat se abren como rutas del stack sobre las tabs; los badges se actualizan desde las suscripciones de sus dominios.
+- `NotifTab` y `ChatTab` renderizan respectivamente la bandeja de avisos y la bandeja de chat dentro de `Main`. El stack añade la ruta `Notifications` y los detalles `ChatThread` y `ChatDetails`; los badges se actualizan desde las suscripciones de sus dominios.
 
 ## Fuentes principales
 
