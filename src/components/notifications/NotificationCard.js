@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import {
   UserPlus, CheckCheck, Swords, Shield, CalendarDays, MessageCircle, Star, Bell, Users, Trash2,
-  RefreshCw, LockOpen, ListOrdered, LogOut, UserX,
+  RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone,
 } from 'lucide-react-native';
 
 /** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
@@ -10,6 +10,7 @@ export const CATEGORY = {
   friend_request: 'social',
   friend_accept: 'social',
   message_new: 'social',
+  chat_mention_all: 'social',
   match_join: 'partidos',
   match_reminder: 'partidos',
   match_rate: 'partidos',
@@ -37,6 +38,7 @@ const ICON = {
   friend_request: UserPlus,
   friend_accept: CheckCheck,
   message_new: MessageCircle,
+  chat_mention_all: Megaphone,
   match_join: Users,
   match_reminder: CalendarDays,
   match_rate: Star,
@@ -64,6 +66,7 @@ const TAG = {
   friend_request: { label: 'SOCIAL', color: '#7DD3FC', bg: 'rgba(125,211,252,0.10)', border: 'rgba(125,211,252,0.26)' },
   friend_accept: { label: 'SOCIAL', color: '#7DD3FC', bg: 'rgba(125,211,252,0.10)', border: 'rgba(125,211,252,0.26)' },
   message_new: { label: 'MENSAJES', color: '#C4B5FD', bg: 'rgba(196,181,253,0.10)', border: 'rgba(196,181,253,0.26)' },
+  chat_mention_all: { label: 'MENCIÓN', color: '#C4B5FD', bg: 'rgba(196,181,253,0.10)', border: 'rgba(196,181,253,0.26)' },
   match_join: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
   match_reminder: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
   match_rate: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
@@ -89,18 +92,19 @@ const TAG = {
 
 const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
 
-export default function NotificationCard({ notification: n, onPress, onDelete, onPrimary, onSecondary }) {
+export default function NotificationCard({ notification: n, onPress, onDelete, onPrimary, onSecondary, busy }) {
   const Icon = ICON[n.type] || Bell;
   const tag = TAG[n.type] || FALLBACK_TAG;
   const unread = !n.read;
 
   return (
     <Pressable
-      onPress={() => onPress(n)}
+      onPress={() => !busy && onPress(n)}
       className="flex-row items-start gap-3 overflow-hidden rounded-[18px] border p-3.5 active:opacity-80"
       style={{
         borderColor: unread ? tag.border : 'rgba(255,255,255,0.07)',
         backgroundColor: unread ? tag.bg : 'rgba(255,255,255,0.03)',
+        opacity: busy ? 0.6 : 1,
       }}
     >
       {unread ? <View className="absolute bottom-0 left-0 top-0 w-[3px]" style={{ backgroundColor: tag.color }} /> : null}
@@ -138,13 +142,21 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
           <View className="mt-2.5 flex-row gap-2">
             <Pressable
               onPress={() => onPrimary?.(n)}
+              disabled={busy}
               className="h-[38px] flex-1 items-center justify-center rounded-xl bg-[#00FF66] active:opacity-80"
+              style={busy ? { opacity: 0.6 } : null}
             >
-              <Text className="text-[13px] font-bold text-[#04120A]">{n.actions[0]}</Text>
+              {busy ? (
+                <ActivityIndicator size="small" color="#04120A" />
+              ) : (
+                <Text className="text-[13px] font-bold text-[#04120A]">{n.actions[0]}</Text>
+              )}
             </Pressable>
             <Pressable
               onPress={() => onSecondary?.(n)}
+              disabled={busy}
               className="h-[38px] flex-1 items-center justify-center rounded-xl border border-white/12 bg-white/5 active:opacity-70"
+              style={busy ? { opacity: 0.6 } : null}
             >
               <Text className="text-[13px] font-bold text-white/75">{n.actions[1]}</Text>
             </Pressable>
@@ -152,7 +164,12 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
         ) : null}
       </View>
 
-      <Pressable onPress={() => onDelete(n.id)} hitSlop={8} className="h-[30px] w-[30px] items-center justify-center rounded-[10px] active:bg-[#FF6B6B]/14">
+      <Pressable
+        onPress={() => !busy && onDelete(n.id)}
+        disabled={busy}
+        hitSlop={8}
+        className="h-[30px] w-[30px] items-center justify-center rounded-[10px] active:bg-[#FF6B6B]/14"
+      >
         <Trash2 size={14} color="rgba(255,255,255,0.32)" strokeWidth={1.9} />
       </Pressable>
     </Pressable>
