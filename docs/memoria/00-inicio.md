@@ -25,7 +25,7 @@ Esta bóveda parte del repositorio sincronizado en la rama `docs/obsidian-projec
 | Partidos | [Partidos](funcionalidades/partidos.md) | [Reglas de negocio](producto/reglas-de-negocio.md), [Base de datos](arquitectura/base-de-datos.md), [Sistema visual](diseno/sistema-visual.md) |
 | Clubes | [Clubes](funcionalidades/clubes.md) | [Base de datos](arquitectura/base-de-datos.md), [Sistema visual](diseno/sistema-visual.md) |
 | Chat | [Chat](funcionalidades/chat.md) | [Seguridad](arquitectura/seguridad-y-privacidad.md), [Base de datos](arquitectura/base-de-datos.md) |
-| Perfil o amigos | [Perfil y amigos](funcionalidades/perfil-y-amigos.md) | [Seguridad](arquitectura/seguridad-y-privacidad.md), [Sistema visual](diseno/sistema-visual.md) |
+| Perfil o amigos | [Perfil y amigos](funcionalidades/perfil-y-amigos.md) | [Navegación](arquitectura/navegacion.md), [Seguridad](arquitectura/seguridad-y-privacidad.md), [Sistema visual](diseno/sistema-visual.md) |
 | Avisos o push | [Avisos y push](funcionalidades/avisos-y-push.md) | [Configuración](funcionalidades/configuracion.md), [Despliegue](arquitectura/despliegue-y-entornos.md) |
 | Privacidad o ajustes | [Configuración](funcionalidades/configuracion.md) | [Seguridad](arquitectura/seguridad-y-privacidad.md) |
 | Arquitectura general | [Stack y estructura](arquitectura/stack-y-estructura.md) | La nota específica afectada |
