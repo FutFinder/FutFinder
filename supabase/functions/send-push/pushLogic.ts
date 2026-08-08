@@ -39,6 +39,7 @@ export const NOTIF_TYPE_TO_PREFERENCE: Record<string, string> = {
 
   // Mensajes y menciones
   message_new: "notif_chat",
+  chat_mention_all: "notif_chat",
 
   // Amistades y solicitudes
   friend_request: "notif_friends",
