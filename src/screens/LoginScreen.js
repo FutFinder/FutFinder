@@ -18,6 +18,7 @@ import { colors, radius } from '../theme/colors';
 import { signInOrUp } from '../services/auth';
 import { getOnboardingState } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
+import { APP_VERSION } from '../utils/appVersion';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -166,7 +167,7 @@ export default function LoginScreen({ navigation }) {
             )}
           </View>
 
-          <Text style={styles.footer}>FUTFINDER v1.2.0 · © 2026</Text>
+          <Text style={styles.footer}>FUTFINDER{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>

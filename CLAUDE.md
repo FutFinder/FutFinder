@@ -92,6 +92,39 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 
 All env vars must have the `EXPO_PUBLIC_` prefix for Expo to inject them into the client bundle. If these are missing, the app runs in "demo mode" — most service functions return mock data instead of hitting Supabase.
 
+### Firebase / push notifications en Android (`google-services.json`)
+
+`android.googleServicesFile` en `app.config.js` (antes `app.json`) apunta a
+`process.env.GOOGLE_SERVICES_JSON`, con fallback a `./google-services.json`
+en el root del proyecto. **Ese archivo nunca se sube a Git** (está en
+`.gitignore` junto con `GoogleService-Info.plist`) porque contiene
+credenciales reales del proyecto de Firebase — no existe un archivo de
+ejemplo ni ficticio en el repo a propósito.
+
+⚠️ **Pendiente, fuera del repo — hay que hacerlo una vez, manualmente:**
+
+1. En la [Firebase Console](https://console.firebase.google.com/), dentro
+   del proyecto de FutFinder, registrar (o ubicar) la app Android con
+   package `com.futfinder.app` y descargar su `google-services.json`.
+2. Para desarrollo/build local: guardar ese archivo como
+   `./google-services.json` en la raíz del repo (queda ignorado por Git).
+3. Para EAS Build (donde no hay filesystem local persistente): subirlo como
+   secreto de tipo **file** del proyecto EAS —
+   ```bash
+   eas secret:create --scope project --type file \
+     --name GOOGLE_SERVICES_JSON --value ./google-services.json
+   ```
+   EAS inyecta este secreto como la variable de entorno
+   `GOOGLE_SERVICES_JSON` durante el build, con el valor apuntando a la
+   ruta local (en el worker de EAS) del archivo ya descifrado — por eso
+   `app.config.js` lo lee como una ruta de archivo, no como contenido.
+
+Sin este paso, cualquier intento de build nativo de Android (`eas build
+--platform android`, o un `expo prebuild` local) fallará al no encontrar el
+archivo en la ruta configurada — es el comportamiento esperado: no se creó
+un `google-services.json` ficticio para evitarlo. Esto no afecta ni al
+bundle web ni a Expo Go, donde este campo no se usa.
+
 ## Architecture
 
 **Stack:** Expo SDK 54 (React Native + web via Metro), Supabase (Postgres + Auth + Realtime + Edge Functions), React Navigation v7, Lucide icons.

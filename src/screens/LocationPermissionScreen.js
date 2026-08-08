@@ -20,6 +20,7 @@ import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
 import { getCurrentLocation } from '../services/location';
 import { saveMyLocation } from '../services/profile';
+import { APP_VERSION } from '../utils/appVersion';
 
 const REASONS = [
   {
@@ -127,7 +128,7 @@ export default function LocationPermissionScreen({ navigation }) {
             </Pressable>
           </View>
 
-          <Text style={styles.footer}>FUTFINDER v1.2.0 · © 2026</Text>
+          <Text style={styles.footer}>FUTFINDER{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
         </ScrollView>
       </SafeAreaView>
     </View>

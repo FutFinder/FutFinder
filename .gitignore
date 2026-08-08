@@ -21,6 +21,10 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Firebase (credenciales reales; se inyectan por secreto de EAS, ver CLAUDE.md)
+google-services.json
+GoogleService-Info.plist
+
 # Metro
 .metro-health-check*
 
