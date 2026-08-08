@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import Svg, { Path, Circle, G } from 'react-native-svg';
 import { colors } from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
+import { getInitialRouteName } from '../utils/routing';
 
 const ICON_SIZE = 56;
 
@@ -18,9 +19,7 @@ export default function SplashScreen({ navigation }) {
     // Chequeo de sesión en paralelo con la animación
     (async () => {
       const state = await getOnboardingState();
-      if (state === true)  destRef.current = 'Main';
-      else if (state === false) destRef.current = 'LocationPermission';
-      else destRef.current = 'Welcome';
+      destRef.current = getInitialRouteName(state);
     })();
 
     Animated.sequence([

@@ -1,6 +1,3 @@
-import { getMatchById } from '../services/matches';
-import { getClubById } from '../services/clubs';
-
 /**
  * Traduce tipo + `data` de una notificación en un destino de navegación.
  *
@@ -22,7 +19,8 @@ export function resolveNotificationTarget(n) {
   const data = n?.data || {};
 
   switch (type) {
-    case 'message_new': {
+    case 'message_new':
+    case 'chat_mention_all': {
       const threadKey = data.threadKey || data.threadId;
       return threadKey ? { screen: 'ChatThread', params: { threadKey } } : null;
     }
@@ -122,8 +120,15 @@ export const UNRESOLVED_NOTIFICATION_COPY = {
  * Confirma que el recurso al que apunta un destino sigue existiendo.
  * Si el target no trae `resource`, se asume válido (pantallas de pestaña,
  * o destinos cuya propia pantalla ya sabe mostrar el estado "no existe").
+ *
+ * `getMatchById`/`getClubById` se reciben por parámetro (no se importan acá)
+ * a propósito: este archivo no toca Supabase/React Native, así que se puede
+ * probar con fakes sin arrastrar ese árbol de imports — ver
+ * `utils/__tests__/notificationTargets.test.js`. Los llamadores reales
+ * (App.js, NotificationsScreen.js) pasan `getMatchById`/`getClubById` de
+ * `services/matches.js` / `services/clubs.js`.
  */
-export async function verifyTargetExists(target) {
+export async function verifyTargetExists(target, { getMatchById, getClubById } = {}) {
   const resource = target?.resource;
   if (!resource) return { ok: true };
 
@@ -152,15 +157,20 @@ export async function verifyTargetExists(target) {
  *
  * `navigate(screen, params)` es el único punto que difiere entre ambos
  * llamadores (un `navigation` de pantalla vs. el `navigationRef` global).
+ * `getMatchById`/`getClubById` son inyectables por la misma razón que en
+ * `verifyTargetExists`.
  */
-export async function navigateToNotification(n, { navigate, onMissing, onUnresolved }) {
+export async function navigateToNotification(
+  n,
+  { navigate, onMissing, onUnresolved, getMatchById, getClubById }
+) {
   const target = resolveNotificationTarget(n);
   if (!target) {
     onUnresolved?.(UNRESOLVED_NOTIFICATION_COPY);
     return false;
   }
 
-  const { ok, copy } = await verifyTargetExists(target);
+  const { ok, copy } = await verifyTargetExists(target, { getMatchById, getClubById });
   if (!ok) {
     onMissing?.(copy);
     return false;

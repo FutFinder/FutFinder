@@ -14,6 +14,8 @@ import {
   addNotificationListeners,
 } from './src/services/notifications';
 import { navigateToNotification } from './src/utils/notificationTargets';
+import { getMatchById } from './src/services/matches';
+import { getClubById } from './src/services/clubs';
 
 // Ids de notificación (fila real de `notifications`, no el id efímero del
 // push) ya procesados en esta sesión de la app. `getLastNotificationResponseAsync`
@@ -77,6 +79,8 @@ async function handleNotificationTap(response) {
       navigate: (screen, params) => navigationRef.navigate(screen, params),
       onMissing: (copy) => Alert.alert(copy.title, copy.message),
       onUnresolved: (copy) => Alert.alert(copy.title, copy.message),
+      getMatchById,
+      getClubById,
     }
   );
 }
