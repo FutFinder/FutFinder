@@ -42,6 +42,7 @@ yarn-error.*
 .vscode/
 .idea/
 .worktrees/
+docs/memoria/.obsidian/
 
 # Logs
 *.log

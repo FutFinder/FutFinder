@@ -2,6 +2,8 @@
 
 App para buscar y completar partidos de fútbol amateur en Santiago, Chile.
 
+La memoria vigente de producto y técnica está en [docs/memoria/00-inicio.md](docs/memoria/00-inicio.md).
+
 ## Stack
 
 - **Expo SDK 52** (React Native + web)
