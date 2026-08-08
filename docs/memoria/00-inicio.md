@@ -55,7 +55,3 @@ Actualiza la nota afectada cuando cambie comportamiento visible, una regla de ne
 - `src/navigation/` y `src/services/` para clasificar tareas de experiencia, sesión y dominios funcionales.
 - `supabase/migrations/` y `supabase/functions/` para cambios de base de datos, RLS y Edge Functions.
 - `app.config.js`, `.env.example`, `eas.json` y `vercel.json` para entorno y despliegue.
-
-## Limitaciones conocidas
-
-Las notas enlazadas en la tabla de enrutamiento se incorporan por tareas posteriores; hasta entonces, sigue esta base y verifica el código afectado.
