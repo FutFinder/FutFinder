@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 
 import AppNavigator, { navigationRef } from './src/navigation/AppNavigator';
+import { AuthProvider } from './src/contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from './src/services/supabase';
 import {
   registerForPushNotifications,
@@ -152,7 +153,9 @@ export default function App() {
     <ActionSheetProvider>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <AppNavigator />
+        <AuthProvider>
+          <AppNavigator />
+        </AuthProvider>
       </SafeAreaProvider>
     </ActionSheetProvider>
   );

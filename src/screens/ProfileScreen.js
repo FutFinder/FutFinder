@@ -40,7 +40,8 @@ import PlayerPublicActions from '../components/player/PlayerPublicActions';
 import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
 import ProfileSkeleton from '../components/player/ProfileSkeleton';
 
-import { signOut, getCurrentUser } from '../services/auth';
+import { signOut } from '../services/auth';
+import { useAuth } from '../contexts/AuthContext';
 import {
   getMyProfile,
   getProfileById,
@@ -110,6 +111,7 @@ const HISTORIAL_LIMITE = 20;
  */
 export default function ProfileScreen({ navigation, route }) {
   const viewUserId = route?.params?.userId || null;
+  const { isAuthenticated, user: authUser } = useAuth();
 
   const [myId, setMyId] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -143,15 +145,24 @@ export default function ProfileScreen({ navigation, route }) {
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      const user = await getCurrentUser();
-      const uid = user?.id || null;
+      // La sesión sale del contexto global (ya resuelta por el guard antes de
+      // que esta pantalla pudiera montarse), no de una nueva llamada de red:
+      // así "sin sesión" nunca se confunde con un problema de conexión.
+      if (!isAuthenticated && !viewUserId) {
+        setMyId(null);
+        setLoadError('sin-sesion');
+        setLoading(false);
+        return;
+      }
+
+      const uid = authUser?.id || null;
       setMyId(uid);
 
       const propio = !viewUserId || viewUserId === uid;
       const targetId = propio ? uid : viewUserId;
 
       if (!targetId) {
-        setLoadError('sin-sesion');
+        setLoadError(propio ? 'sin-sesion' : 'no-existe');
         setLoading(false);
         return;
       }
@@ -327,6 +338,11 @@ export default function ProfileScreen({ navigation, route }) {
     return {};
   };
 
+  // Sin sesión no hay nada que editar ni configurar (el guard global ya
+  // debería haber sacado de acá a un usuario no autenticado, pero esto cubre
+  // el instante entre un cierre de sesión y esa redirección).
+  const canManageOwnProfile = isOwnProfile && isAuthenticated;
+
   // ── Estados de carga / error ──
   if (loading) {
     return (
@@ -336,8 +352,8 @@ export default function ProfileScreen({ navigation, route }) {
           title={isOwnProfile ? 'Mi perfil' : 'Perfil'}
           onBack={() => navigation.goBack()}
           onShare={() => {}}
-          onEdit={goEdit}
-          onSettings={goSettings}
+          onEdit={canManageOwnProfile ? goEdit : undefined}
+          onSettings={canManageOwnProfile ? goSettings : undefined}
           onMore={() => {}}
         />
         <ProfileSkeleton />
@@ -353,8 +369,8 @@ export default function ProfileScreen({ navigation, route }) {
           title={isOwnProfile ? 'Mi perfil' : 'Perfil'}
           onBack={() => navigation.goBack()}
           onShare={() => {}}
-          onEdit={goEdit}
-          onSettings={goSettings}
+          onEdit={canManageOwnProfile ? goEdit : undefined}
+          onSettings={canManageOwnProfile ? goSettings : undefined}
           onMore={() => {}}
         />
         <View style={styles.errorWrap}>
@@ -376,16 +392,29 @@ export default function ProfileScreen({ navigation, route }) {
             subtitle={
               loadError === 'no-existe'
                 ? 'La cuenta pudo haberse eliminado.'
-                : 'Revisa tu conexión e inténtalo otra vez.'
+                : loadError === 'sin-sesion'
+                  ? 'Tu sesión no está activa. Inicia sesión para continuar.'
+                  : 'Revisa tu conexión e inténtalo otra vez.'
             }
-            actionLabel={loadError === 'no-existe' ? 'Volver' : 'Reintentar'}
+            actionLabel={
+              loadError === 'no-existe'
+                ? 'Volver'
+                : loadError === 'sin-sesion'
+                  ? 'Iniciar sesión'
+                  : 'Reintentar'
+            }
             onAction={
               loadError === 'no-existe'
                 ? () => navigation.goBack()
-                : () => {
-                    setLoading(true);
-                    load();
-                  }
+                : loadError === 'sin-sesion'
+                  ? () => (navigation.getParent() || navigation).reset({
+                      index: 0,
+                      routes: [{ name: 'Login' }],
+                    })
+                  : () => {
+                      setLoading(true);
+                      load();
+                    }
             }
           />
         </View>

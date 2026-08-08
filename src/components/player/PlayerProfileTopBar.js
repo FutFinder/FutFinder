@@ -57,23 +57,28 @@ export default function PlayerProfileTopBar({
 
       {isOwnProfile ? (
         <>
-          <Pressable
-            onPress={onEdit}
-            accessibilityRole="button"
-            accessibilityLabel="Editar mi perfil"
-            style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}
-          >
-            <Pencil color={dsColors.textPrimary} size={15} strokeWidth={2} />
-            <Text style={styles.editLabel}>Editar</Text>
-          </Pressable>
-          <Pressable
-            onPress={onSettings}
-            accessibilityRole="button"
-            accessibilityLabel="Configuración"
-            style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
-          >
-            <Settings color={dsColors.textPrimary} size={17} strokeWidth={1.9} />
-          </Pressable>
+          {/* Sin sesión activa no hay nada que editar ni configurar. */}
+          {onEdit && (
+            <Pressable
+              onPress={onEdit}
+              accessibilityRole="button"
+              accessibilityLabel="Editar mi perfil"
+              style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}
+            >
+              <Pencil color={dsColors.textPrimary} size={15} strokeWidth={2} />
+              <Text style={styles.editLabel}>Editar</Text>
+            </Pressable>
+          )}
+          {onSettings && (
+            <Pressable
+              onPress={onSettings}
+              accessibilityRole="button"
+              accessibilityLabel="Configuración"
+              style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
+            >
+              <Settings color={dsColors.textPrimary} size={17} strokeWidth={1.9} />
+            </Pressable>
+          )}
         </>
       ) : (
         <Pressable

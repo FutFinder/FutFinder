@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import {
   NavigationContainer,
   createNavigationContainerRef,
@@ -43,10 +44,41 @@ import ClubInviteScreen from '../screens/ClubInviteScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
 import MainTabs from './MainTabs';
+import withAuthGuard from './withAuthGuard';
+import { useAuth } from '../contexts/AuthContext';
 
 import { colors } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
+
+// Rutas de onboarding: son las únicas que se pueden ver sin sesión. Todo lo
+// demás en este stack pasa por `withAuthGuard`.
+const GuardedMainTabs = withAuthGuard(MainTabs, 'Main');
+const GuardedPublishMatchScreen = withAuthGuard(PublishMatchScreen, 'CreateMatch');
+const GuardedEditMatchScreen = withAuthGuard(EditMatchScreen, 'EditMatch');
+const GuardedManageMatchScreen = withAuthGuard(ManageMatchScreen, 'ManageMatch');
+const GuardedMatchRequestStatusScreen = withAuthGuard(MatchRequestStatusScreen, 'MatchRequestStatus');
+const GuardedMatchSpotScreen = withAuthGuard(MatchSpotScreen, 'MatchSpot');
+const GuardedEditProfileScreen = withAuthGuard(EditProfileScreen, 'EditProfile');
+const GuardedChatThreadScreen = withAuthGuard(ChatThreadScreen, 'ChatThread');
+const GuardedChatDetailsScreen = withAuthGuard(ChatDetailsScreen, 'ChatDetails');
+const GuardedFriendsScreen = withAuthGuard(FriendsScreen, 'Friends');
+const GuardedProfileScreen = withAuthGuard(ProfileScreen, 'UserProfile');
+const GuardedMatchDetailScreen = withAuthGuard(MatchDetailScreen, 'MatchDetail');
+const GuardedNotificationsScreen = withAuthGuard(NotificationsScreen, 'Notifications');
+const GuardedRateMatchScreen = withAuthGuard(RateMatchScreen, 'RateMatch');
+const GuardedCreateClubScreen = withAuthGuard(CreateClubScreen, 'CreateClub');
+const GuardedClubDetailScreen = withAuthGuard(ClubDetailScreen, 'ClubDetail');
+const GuardedClubMembersScreen = withAuthGuard(ClubMembersScreen, 'ClubMembers');
+const GuardedClubGalleryScreen = withAuthGuard(ClubGalleryScreen, 'ClubGallery');
+const GuardedClubChallengeScreen = withAuthGuard(ClubChallengeScreen, 'ClubChallenge');
+const GuardedClubChallengesScreen = withAuthGuard(ClubChallengesScreen, 'ClubChallenges');
+const GuardedExploreClubsScreen = withAuthGuard(ExploreClubsScreen, 'ExploreClubs');
+const GuardedClubPlansScreen = withAuthGuard(ClubPlansScreen, 'ClubPlans');
+const GuardedEditClubScreen = withAuthGuard(EditClubScreen, 'EditClub');
+const GuardedClubInviteScreen = withAuthGuard(ClubInviteScreen, 'ClubInvite');
+const GuardedSettingsScreen = withAuthGuard(SettingsScreen, 'Settings');
+const GuardedTrustScoreHistoryScreen = withAuthGuard(TrustScoreHistoryScreen, 'TrustScoreHistory');
 
 // Extendemos DarkTheme (que ya trae fonts + colors completos)
 // y le pisamos solo los colores corporativos de FutFinder.
@@ -109,6 +141,15 @@ const linking = {
  *  * CreateTab intercepta el press y navega al stack CreateMatch.
  */
 export default function AppNavigator() {
+  const { isReady } = useAuth();
+
+  // La sesión tiene que quedar resuelta ANTES de montar el NavigationContainer:
+  // es el dueño de `linking`, así que si lo montamos antes, un deep link
+  // (ej. futfinder.cl/p/123) se procesaría sin saber todavía si hay sesión.
+  if (!isReady) {
+    return <View style={styles.authLoading} />;
+  }
+
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking}>
       <Stack.Navigator
@@ -128,7 +169,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Success" component={SuccessScreen} options={{ animation: 'fade' }} />
 
         {/* Una vez logueado, el usuario vive dentro de Main (tabs) */}
-        <Stack.Screen name="Main" component={MainTabs} options={{ animation: 'fade' }} />
+        <Stack.Screen name="Main" component={GuardedMainTabs} options={{ animation: 'fade' }} />
 
         {/* Detalles que se abren sobre las tabs (la tab bar se oculta) */}
         {/*
@@ -138,130 +179,134 @@ export default function AppNavigator() {
         */}
         <Stack.Screen
           name="CreateMatch"
-          component={PublishMatchScreen}
+          component={GuardedPublishMatchScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
           name="EditMatch"
-          component={EditMatchScreen}
+          component={GuardedEditMatchScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
           name="ManageMatch"
-          component={ManageMatchScreen}
+          component={GuardedManageMatchScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="MatchRequestStatus"
-          component={MatchRequestStatusScreen}
+          component={GuardedMatchRequestStatusScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="MatchSpot"
-          component={MatchSpotScreen}
+          component={GuardedMatchSpotScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="EditProfile"
-          component={EditProfileScreen}
+          component={GuardedEditProfileScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
           name="ChatThread"
-          component={ChatThreadScreen}
+          component={GuardedChatThreadScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="ChatDetails"
-          component={ChatDetailsScreen}
+          component={GuardedChatDetailsScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="Friends"
-          component={FriendsScreen}
+          component={GuardedFriendsScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="UserProfile"
-          component={ProfileScreen}
+          component={GuardedProfileScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="MatchDetail"
-          component={MatchDetailScreen}
+          component={GuardedMatchDetailScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="Notifications"
-          component={NotificationsScreen}
+          component={GuardedNotificationsScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="RateMatch"
-          component={RateMatchScreen}
+          component={GuardedRateMatchScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
           name="CreateClub"
-          component={CreateClubScreen}
+          component={GuardedCreateClubScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
           name="ClubDetail"
-          component={ClubDetailScreen}
+          component={GuardedClubDetailScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="ClubMembers"
-          component={ClubMembersScreen}
+          component={GuardedClubMembersScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="ClubGallery"
-          component={ClubGalleryScreen}
+          component={GuardedClubGalleryScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="ClubChallenge"
-          component={ClubChallengeScreen}
+          component={GuardedClubChallengeScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
           name="ClubChallenges"
-          component={ClubChallengesScreen}
+          component={GuardedClubChallengesScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="ExploreClubs"
-          component={ExploreClubsScreen}
+          component={GuardedExploreClubsScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="ClubPlans"
-          component={ClubPlansScreen}
+          component={GuardedClubPlansScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="EditClub"
-          component={EditClubScreen}
+          component={GuardedEditClubScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
           name="ClubInvite"
-          component={ClubInviteScreen}
+          component={GuardedClubInviteScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="Settings"
-          component={SettingsScreen}
+          component={GuardedSettingsScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="TrustScoreHistory"
-          component={TrustScoreHistoryScreen}
+          component={GuardedTrustScoreHistoryScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  authLoading: { flex: 1, backgroundColor: colors.background },
+});

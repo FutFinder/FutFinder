@@ -18,12 +18,14 @@ import { colors, radius } from '../theme/colors';
 import { signInOrUp } from '../services/auth';
 import { getOnboardingState } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const { consumePendingDestination } = useAuth();
 
   const handleLogin = async () => {
     setErrorMsg(null);
@@ -47,7 +49,17 @@ export default function LoginScreen({ navigation }) {
       // ¿Ya completó el onboarding alguna vez? → directo al Home
       const done = await getOnboardingState();
       if (done) {
-        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+        // Si el guard nos mandó acá desde una ruta privada, volvemos a ella
+        // en vez de caer siempre en el Home.
+        const pending = consumePendingDestination();
+        if (pending && pending.name && pending.name !== 'Main') {
+          navigation.reset({
+            index: 1,
+            routes: [{ name: 'Main' }, { name: pending.name, params: pending.params }],
+          });
+        } else {
+          navigation.reset({ index: 0, routes: [{ name: 'Main', params: pending?.params }] });
+        }
       } else {
         navigation.navigate('LocationPermission');
       }

@@ -22,11 +22,14 @@ import {
   Plus,
   X as XIcon,
   Images,
+  AlertCircle,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import Banner from '../components/Banner';
+import EmptyStateCard from '../components/ds/EmptyStateCard';
+import { dsColors } from '../theme/colors';
 import { colors, radius } from '../theme/colors';
 import { getMyProfile, updateMyProfile } from '../services/profile';
 import { pickImage, uploadAvatar, uploadProfileBanner } from '../services/storage';
@@ -58,6 +61,7 @@ const FLANCOS = [
 
 export default function EditProfileScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
 
@@ -83,36 +87,46 @@ export default function EditProfileScreen({ navigation }) {
   const [galleryPhotos, setGalleryPhotos] = useState([]);
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const p = await getMyProfile();
-      if (p) {
-        setUserId(p.id);
-        setUsername(p.username || '');
-        setEdad(p.edad ? String(p.edad) : '');
-        setBio(p.bio || '');
-        if (Array.isArray(p.posicion_preferida) && p.posicion_preferida.length) {
-          setPosiciones(p.posicion_preferida);
-        } else if (typeof p.posicion_preferida === 'string') {
-          setPosiciones([p.posicion_preferida]);
-        } else {
-          setPosiciones(['sin_definir']);
-        }
-        setFlanco(p.flanco || 'derecho');
-        setRegion(p.region || '');
-        setComuna(p.comuna || '');
-        setFotoUrl(p.foto_url || null);
-        setBannerUrl(p.banner_url || null);
-        setModalidad(p.modalidad || null);
-        setNivel(p.nivel || null);
-
-        // Cargar galería
-        const { data: photos } = await getProfilePhotos(p.id);
-        setGalleryPhotos(photos || []);
-      }
+  const loadProfile = React.useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    const p = await getMyProfile();
+    if (!p) {
+      // Sesión sin datos de perfil (no autenticado o fallo de red): mejor
+      // mostrar un estado explícito que dejar el formulario en blanco, como
+      // si el usuario estuviera editando un perfil vacío de verdad.
+      setLoadError(true);
       setLoading(false);
-    })();
+      return;
+    }
+    setUserId(p.id);
+    setUsername(p.username || '');
+    setEdad(p.edad ? String(p.edad) : '');
+    setBio(p.bio || '');
+    if (Array.isArray(p.posicion_preferida) && p.posicion_preferida.length) {
+      setPosiciones(p.posicion_preferida);
+    } else if (typeof p.posicion_preferida === 'string') {
+      setPosiciones([p.posicion_preferida]);
+    } else {
+      setPosiciones(['sin_definir']);
+    }
+    setFlanco(p.flanco || 'derecho');
+    setRegion(p.region || '');
+    setComuna(p.comuna || '');
+    setFotoUrl(p.foto_url || null);
+    setBannerUrl(p.banner_url || null);
+    setModalidad(p.modalidad || null);
+    setNivel(p.nivel || null);
+
+    // Cargar galería
+    const { data: photos } = await getProfilePhotos(p.id);
+    setGalleryPhotos(photos || []);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   // ---- Subida de portada del perfil ----
   const handlePickBanner = async () => {
@@ -297,6 +311,41 @@ export default function EditProfileScreen({ navigation }) {
     });
     setTimeout(() => navigation.goBack(), 800);
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView edges={['top']} style={[styles.root, styles.centered]}>
+        <ActivityIndicator color={colors.primary} size="large" />
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={12}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          >
+            <ArrowLeft color={colors.textPrimary} size={20} />
+          </Pressable>
+          <Logo size={26} />
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.centered}>
+          <EmptyStateCard
+            icon={<AlertCircle color={dsColors.loss} size={18} strokeWidth={2} />}
+            title="No pudimos cargar tu perfil"
+            subtitle="Revisa tu conexión e inténtalo otra vez."
+            actionLabel="Reintentar"
+            onAction={loadProfile}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -721,6 +770,7 @@ function Segmented({ options, value, onChange }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   scroll: { paddingHorizontal: 20, paddingBottom: 32, flexGrow: 1 },
   header: {
     flexDirection: 'row',
