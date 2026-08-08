@@ -28,7 +28,10 @@ import { supabase, isSupabaseConfigured } from './supabase';
 // Por defecto Expo no muestra nada con la app abierta — esto lo cambia.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    // shouldShowAlert quedó obsoleto: ahora se controla por separado el
+    // banner (foreground) y la entrada en el centro de notificaciones.
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
@@ -83,7 +86,7 @@ export async function registerForPushNotifications(userId) {
     if (!projectId) {
       return {
         token: null,
-        error: new Error('Falta projectId en app.json (extra.eas.projectId)'),
+        error: new Error('Falta projectId en app.config.js (extra.eas.projectId)'),
       };
     }
 
@@ -177,9 +180,19 @@ export function addNotificationListeners({ onReceived, onTapped } = {}) {
 // 4. Helpers de inbox (tabla notifications)
 // =========================================================
 
-/** Lista notificaciones del usuario actual (más recientes primero). */
+/**
+ * Lista notificaciones del usuario actual (más recientes primero).
+ *
+ * Sin sesión, RLS devolvería igualmente una lista vacía (no hay
+ * `auth.uid()` con el que calzar `user_id`) — eso se vería como "Todo al
+ * día" en la bandeja, aunque el motivo real sea la falta de sesión. Se
+ * chequea `user` explícitamente para distinguir ambos casos, igual que ya
+ * hace `deleteAllNotifications` en este mismo archivo.
+ */
 export async function listNotifications({ limit = 50 } = {}) {
   if (!isSupabaseConfigured) return { data: [], error: null };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: [], error: { message: 'No autenticado' } };
   const { data, error } = await supabase
     .from('notifications')
     .select('*')

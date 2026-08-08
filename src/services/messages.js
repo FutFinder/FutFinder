@@ -40,7 +40,13 @@ export const MAX_MESSAGE_LENGTH = 1000;
 // Los comandos del compositor viven en `utils/chatMeta` porque son lógica
 // pura y así se pueden probar sin levantar Supabase. Se reexportan para que
 // las pantallas sigan importando todo lo del chat desde este servicio.
-export { CHAT_COMMANDS, parseComposerCommand, suggestCommands } from '../utils/chatMeta';
+export {
+  CHAT_COMMANDS,
+  parseComposerCommand,
+  suggestCommands,
+  canUseMentionAll,
+} from '../utils/chatMeta';
+import { canUseMentionAll, mapThreadRow, createSharedChannel } from '../utils/chatMeta';
 
 // ============================================================
 // TOLERANCIA A MIGRACIONES SIN APLICAR
@@ -72,6 +78,25 @@ async function tieneEsquemaV32() {
     );
   }
   return _v32;
+}
+
+let _v39 = null; // null = sin comprobar | true | false
+
+/** ¿Está aplicada la migración 39 (messages.mention_all / chat_mention_all)? */
+async function tieneEsquemaV39() {
+  if (_v39 !== null) return _v39;
+  if (!isSupabaseConfigured) {
+    _v39 = false;
+    return _v39;
+  }
+  const { error } = await supabase.from('messages').select('mention_all').limit(1);
+  _v39 = !esFaltaDeEsquema(error);
+  if (!_v39) {
+    console.warn(
+      '[FutFinder] Chat: falta la migración 39 (messages.mention_all). El comando /todos no está disponible.'
+    );
+  }
+  return _v39;
 }
 
 async function getMe() {
@@ -479,234 +504,38 @@ export async function getThreadAccess(threadKeyStr, { challengeId = null } = {})
  *
  * Ordenadas por actividad más reciente. Los timestamps son los del servidor
  * (`messages.created_at`), nunca la hora del dispositivo.
+ *
+ * Antes esto eran ~11 idas y vueltas y, para "el último mensaje de cada
+ * conversación", bajaba hasta 300 mensajes de TODOS los partidos (o todos
+ * los clubes, o todos los DMs) juntos y agrupaba en JS quedándose con el
+ * primero de cada uno — un límite arbitrario: una conversación ruidosa
+ * podía dejar a otra sin vista previa. Ahora es una sola RPC
+ * (`get_my_threads`, migración 40) que calcula el último mensaje POR
+ * conversación en el servidor (sin ese tope compartido), reutiliza
+ * `get_chat_unread_counts()` para los no leídos y ya viene ordenada.
  */
 export async function listMyThreads() {
   if (!isSupabaseConfigured) return { data: [], error: null };
   try {
     const me = await getMe();
-    if (!me) return { data: [], error: null };
+    // Sin sesión, esto se vería igual que una bandeja vacía y feliz — hay
+    // que distinguirlo de "no tienes conversaciones" (ChatScreen ya sabe
+    // mostrar InboxError para esto, igual que para cualquier otra falla).
+    if (!me) return { data: [], error: { message: 'No autenticado' } };
 
-    const v32 = await tieneEsquemaV32();
-    const msgCols = v32
-      ? 'id, content, created_at, sender_id, is_important'
-      : 'id, content, created_at, sender_id';
-
-    // 0) Hilos escondidos, silenciados y no leídos (en paralelo)
-    const [{ data: hides }, mutedRes, unreadRes] = await Promise.all([
-      supabase.from('chat_hides').select('thread_key, hidden_at').eq('user_id', me),
-      listMutedThreads(),
-      getUnreadByThread(),
-    ]);
-    const hiddenMap = new Map((hides || []).map((h) => [h.thread_key, h.hidden_at]));
-    const muted = mutedRes.data;
-    const unread = unreadRes.data;
-
-    // 1) Mis inscripciones (sin join, para no depender de la detección de FKs)
-    const { data: myAttendances, error: aErr } = await supabase
-      .from('attendees')
-      .select('id_partido, inscrito_at')
-      .eq('id_jugador', me)
-      .order('inscrito_at', { ascending: false });
-
-    if (aErr) {
-      console.error('[FutFinder] listMyThreads attendances:', aErr);
-      return { data: [], error: aErr };
-    }
-
-    // 2) Datos de los partidos en una sola query
-    const matchIds = (myAttendances || []).map((a) => a.id_partido).filter(Boolean);
-
-    const matchesById = new Map();
-    if (matchIds.length > 0) {
-      const { data: ms, error: mErr } = await supabase
-        .from('matches')
-        .select('id, titulo, comuna, cancha_nombre, hora, estado, id_organizador, foto_url')
-        .in('id', matchIds);
-      if (mErr) {
-        console.error('[FutFinder] listMyThreads matches:', mErr);
-        return { data: [], error: mErr };
+    const { data, error } = await supabase.rpc('get_my_threads');
+    if (error) {
+      if (esFaltaDeEsquema(error)) {
+        console.warn(
+          '[FutFinder] Chat: falta la migración 40 (get_my_threads). La bandeja queda vacía hasta aplicarla.'
+        );
+        return { data: [], error: null };
       }
-      for (const m of ms || []) matchesById.set(m.id, m);
+      console.error('[FutFinder] listMyThreads:', error);
+      return { data: [], error };
     }
 
-    // 3) Último mensaje por partido
-    const lastByMatch = new Map();
-    if (matchIds.length > 0) {
-      const { data: matchMsgs, error: mmErr } = await supabase
-        .from('messages')
-        .select(`${msgCols}, match_id`)
-        .in('match_id', matchIds)
-        .order('created_at', { ascending: false })
-        .limit(300);
-      if (mmErr) {
-        // El chat puede mostrarse sin el último mensaje: no cortamos la carga.
-        console.error('[FutFinder] listMyThreads match msgs:', mmErr);
-      } else {
-        for (const msg of matchMsgs || []) {
-          if (!lastByMatch.has(msg.match_id)) lastByMatch.set(msg.match_id, msg);
-        }
-      }
-    }
-
-    const matchThreads = (myAttendances || [])
-      .map((a) => {
-        const match = matchesById.get(a.id_partido);
-        if (!match) return null;
-        const last = lastByMatch.get(a.id_partido) || null;
-        const key = threadKey({ type: 'match', id: a.id_partido });
-        return {
-          key,
-          type: 'match',
-          match_id: a.id_partido,
-          title: match.titulo || 'Partido',
-          subtitle:
-            (match.cancha_nombre || '') + (match.comuna ? ` · ${match.comuna}` : ''),
-          hora: match.hora || null,
-          estado: match.estado || null,
-          is_organizer: match.id_organizador === me,
-          foto_url: match.foto_url || null,
-          last_message: last,
-          last_at: last?.created_at || match.hora || a.inscrito_at,
-          unread: unread.get(key)?.unread || 0,
-          has_important: unread.get(key)?.hasImportant || false,
-          muted: muted.has(key),
-        };
-      })
-      .filter(Boolean);
-
-    // 4) Chats de mis clubes (hasta 3)
-    const clubThreads = [];
-    const { data: myMemberships } = await supabase
-      .from('club_members')
-      .select('club_id, rol, joined_at')
-      .eq('user_id', me);
-
-    if (myMemberships && myMemberships.length > 0) {
-      const joinedById = new Map(myMemberships.map((m) => [m.club_id, m.joined_at]));
-      const rolById = new Map(myMemberships.map((m) => [m.club_id, m.rol]));
-      const myClubIds = myMemberships.map((m) => m.club_id);
-
-      const [{ data: myClubsData }, { data: clubMsgs }, { data: clubMemberRows }] =
-        await Promise.all([
-          supabase.from('clubs').select('id, nombre, foto_url, comuna').in('id', myClubIds),
-          supabase
-            .from('messages')
-            .select(`${msgCols}, club_id`)
-            .in('club_id', myClubIds)
-            .order('created_at', { ascending: false })
-            .limit(300),
-          supabase.from('club_members').select('club_id').in('club_id', myClubIds),
-        ]);
-
-      const lastByClub = new Map();
-      for (const msg of clubMsgs || []) {
-        if (!lastByClub.has(msg.club_id)) lastByClub.set(msg.club_id, msg);
-      }
-      const countByClub = new Map();
-      for (const row of clubMemberRows || []) {
-        countByClub.set(row.club_id, (countByClub.get(row.club_id) || 0) + 1);
-      }
-
-      for (const club of myClubsData || []) {
-        const last = lastByClub.get(club.id) || null;
-        const key = threadKey({ type: 'club', id: club.id });
-        clubThreads.push({
-          key,
-          type: 'club',
-          club_id: club.id,
-          title: club.nombre,
-          subtitle: 'Chat del club' + (club.comuna ? ` · ${club.comuna}` : ''),
-          member_count: countByClub.get(club.id) || 1,
-          my_role: rolById.get(club.id) || 'jugador',
-          foto_url: club.foto_url || null,
-          last_message: last,
-          last_at: last?.created_at || joinedById.get(club.id),
-          unread: unread.get(key)?.unread || 0,
-          has_important: unread.get(key)?.hasImportant || false,
-          muted: muted.has(key),
-        });
-      }
-    }
-
-    // 5) DMs — query simple, agrupamos en JS
-    const { data: dms, error: dmErr } = await supabase
-      .from('messages')
-      .select(`${msgCols}, receiver_id, read_at`)
-      .is('match_id', null)
-      // No filtramos club_id aquí para no romper si la migración 11 no está
-      // aplicada; los mensajes de club se descartan porque receiver_id es null.
-      .or(`sender_id.eq.${me},receiver_id.eq.${me}`)
-      .order('created_at', { ascending: false })
-      .limit(300);
-
-    if (dmErr) {
-      console.error('[FutFinder] listMyThreads DMs:', dmErr);
-      return { data: [...matchThreads, ...clubThreads], error: dmErr };
-    }
-
-    const dmMap = new Map();
-    for (const m of dms || []) {
-      const otherId = m.sender_id === me ? m.receiver_id : m.sender_id;
-      if (!otherId) continue;
-      const key = threadKey({ type: 'dm', id: otherId });
-      if (dmMap.has(key)) continue;
-      dmMap.set(key, {
-        key,
-        type: 'dm',
-        other_id: otherId,
-        last_message: m,
-        last_at: m.created_at,
-        unread: unread.get(key)?.unread || 0,
-        has_important: false,
-        muted: muted.has(key),
-      });
-    }
-
-    // 6) Resolver perfiles en UNA query: el otro usuario de cada DM y el
-    //    remitente del último mensaje de cada grupo (el diseño muestra
-    //    "Camilo: ..." / "Tú: ...").
-    const needProfiles = new Set();
-    for (const th of dmMap.values()) needProfiles.add(th.other_id);
-    for (const th of [...matchThreads, ...clubThreads]) {
-      if (th.last_message?.sender_id) needProfiles.add(th.last_message.sender_id);
-    }
-    needProfiles.delete(me);
-
-    const profileById = new Map();
-    if (needProfiles.size > 0) {
-      const { data: profs } = await supabase
-        .from('profiles')
-        .select('id, username, foto_url')
-        .in('id', Array.from(needProfiles));
-      for (const p of profs || []) profileById.set(p.id, p);
-    }
-
-    for (const th of dmMap.values()) {
-      const other = profileById.get(th.other_id);
-      th.other_username = other?.username || 'jugador';
-      th.other_foto = other?.foto_url || null;
-      th.foto_url = other?.foto_url || null;
-      th.title = '@' + (other?.username || 'jugador');
-      th.subtitle = 'Amigos';
-    }
-    for (const th of [...matchThreads, ...clubThreads]) {
-      const senderId = th.last_message?.sender_id;
-      if (!senderId) continue;
-      th.last_sender_name =
-        senderId === me ? 'Tú' : profileById.get(senderId)?.username || 'Jugador';
-      th.last_sender_is_me = senderId === me;
-    }
-
-    const all = [...matchThreads, ...clubThreads, ...dmMap.values()]
-      // Filtrar hilos escondidos cuando no hay actividad posterior
-      .filter((t) => {
-        const hiddenAt = hiddenMap.get(t.key);
-        if (!hiddenAt) return true;
-        const lastAt = t.last_at ? new Date(t.last_at).getTime() : 0;
-        return lastAt > new Date(hiddenAt).getTime();
-      })
-      .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
-
+    const all = (data || []).map((row) => mapThreadRow(row, me));
     return { data: all, error: null };
   } catch (e) {
     console.error('[FutFinder] listMyThreads exception:', e);
@@ -735,10 +564,11 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
     const me = await getMe();
     if (!me) return { data: [], hasMore: false, error: { message: 'No autenticado' } };
 
-    const v32 = await tieneEsquemaV32();
+    const [v32, v39] = await Promise.all([tieneEsquemaV32(), tieneEsquemaV39()]);
     const baseCols =
       'id, created_at, sender_id, receiver_id, match_id, content, read_at' +
-      (v32 ? ', is_important' : '');
+      (v32 ? ', is_important' : '') +
+      (v39 ? ', mention_all' : '');
 
     // Pedimos uno de más para saber si quedan mensajes anteriores.
     let q = supabase
@@ -802,10 +632,10 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
  *
  * @param {string} threadKeyStr
  * @param {string} content
- * @param {{ important?: boolean }} opts
+ * @param {{ important?: boolean, mentionAll?: boolean }} opts
  * @returns {{ data, error }}
  */
-export async function sendMessage(threadKeyStr, content, { important = false } = {}) {
+export async function sendMessage(threadKeyStr, content, { important = false, mentionAll = false } = {}) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
 
   const cleaned = (content || '').trim();
@@ -823,7 +653,7 @@ export async function sendMessage(threadKeyStr, content, { important = false } =
   const me = await getMe();
   if (!me) return { data: null, error: { message: 'No autenticado' } };
 
-  const v32 = await tieneEsquemaV32();
+  const [v32, v39] = await Promise.all([tieneEsquemaV32(), tieneEsquemaV39()]);
 
   // Sin la columna `is_important` el aviso se enviaría como un mensaje normal
   // y nadie sabría que no rompió el silencio. Mejor decirlo que fingirlo.
@@ -843,15 +673,37 @@ export async function sendMessage(threadKeyStr, content, { important = false } =
     };
   }
 
+  // La validación real de quién puede mandar /todos y a quién llega vive en
+  // el backend (trigger + fan-out server-side, migración 39): esto es solo
+  // el mismo tipo de chequeo honesto que hace /importante — no fingir que
+  // funciona si la migración no está, y no pretender que un DM tiene "a
+  // todos" a quien mencionar.
+  if (mentionAll && !canUseMentionAll(t.type)) {
+    return {
+      data: null,
+      error: { message: 'El comando /todos solo existe en chats grupales (partido o club).' },
+    };
+  }
+  if (mentionAll && !v39) {
+    return {
+      data: null,
+      error: {
+        message: 'El comando /todos no está disponible todavía: aplica la migración 39 en Supabase.',
+      },
+    };
+  }
+
   const payload = { sender_id: me, content: cleaned };
   if (t.type === 'dm') payload.receiver_id = t.id;
   else if (t.type === 'match') payload.match_id = t.id;
   else if (t.type === 'club') payload.club_id = t.id;
   if (important) payload.is_important = true;
+  if (mentionAll) payload.mention_all = true;
 
   const baseCols =
     'id, created_at, sender_id, receiver_id, match_id, content, read_at' +
-    (v32 ? ', is_important' : '');
+    (v32 ? ', is_important' : '') +
+    (v39 ? ', mention_all' : '');
 
   const { data, error } = await supabase
     .from('messages')
@@ -956,46 +808,41 @@ async function hydrateProfiles(ids) {
  * 'TIMED_OUT', 'CLOSED') para poder pintar "Reconectando…".
  *
  * Filtramos del lado del cliente porque Supabase Realtime solo admite un
- * filtro `eq` por canal y aquí escuchamos varios hilos a la vez.
+ * filtro `eq` por canal y aquí escuchamos varios hilos a la vez (partido,
+ * club y DM no comparten una sola columna que filtrar del lado del server).
  *
- * `channelName` permite que dos pantallas escuchen a la vez sin pisarse: el
- * cliente de Supabase reutiliza el canal que ya existe con ese nombre, y
- * agregarle un `.on()` después de `subscribe()` lanza una excepción. Por eso
- * el nombre por defecto también es único.
+ * MULTIPLEXADO: la bandeja de chats, el badge del tab y una conversación
+ * abierta pueden estar escuchando los tres a la vez — antes cada uno abría
+ * SU PROPIO canal Realtime a la misma tabla (hasta 3 WebSockets duplicados
+ * para la misma pestaña del navegador). Ahora comparten un solo canal: se
+ * abre con el primer suscriptor y se cierra con el último; cada llamador
+ * sigue recibiendo únicamente lo que le interesa porque el filtrado (por
+ * thread, por tipo) ya lo hace cada uno del lado del cliente, como antes.
+ * La firma pública no cambió, así que ningún llamador necesita tocarse.
  */
-let messagesChannelSeq = 0;
-
-export function subscribeToMessages(onChange, { channelName, onStatus } = {}) {
-  if (!isSupabaseConfigured) return () => {};
-
-  messagesChannelSeq += 1;
-  const name = channelName || `messages:${messagesChannelSeq}`;
-  const channel = supabase
-    .channel(name)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'messages' },
-      (payload) => {
-        try {
-          onChange(payload);
-        } catch (e) {
-          console.error('[FutFinder] Realtime handler error:', e);
-        }
-      }
-    )
-    .subscribe((status) => {
-      try {
-        onStatus?.(status);
-      } catch {}
-    });
-
-  return () => {
+// La multiplexación en sí (un solo canal real, fan-out a todos los
+// suscriptores, se cierra solo con el último) es lógica pura — vive en
+// `utils/chatMeta` (`createSharedChannel`) precisamente para poder probarla
+// con un canal falso, sin Supabase real. Acá solo se cablea con el canal
+// verdadero.
+const messagesSharedChannel = createSharedChannel({
+  open: ({ emit, emitStatus }) =>
+    supabase
+      .channel('messages-shared')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, emit)
+      .subscribe(emitStatus),
+  close: (channel) => {
     try {
       supabase.removeChannel(channel);
     } catch {
       // noop
     }
-  };
+  },
+});
+
+export function subscribeToMessages(onChange, { onStatus } = {}) {
+  if (!isSupabaseConfigured) return () => {};
+  return messagesSharedChannel.subscribe(onChange, { onStatus });
 }
 
 /**

@@ -11,6 +11,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 // (la usamos en App.js para reaccionar al tap de una notif push).
 export const navigationRef = createNavigationContainerRef();
 
+// Se resuelve cuando el NavigationContainer terminó de montar (onReady).
+// App.js lo espera antes de tocar navigationRef.addListener/.navigate — antes
+// de eso, el ref existe pero no está "attached" y esas llamadas no son seguras.
+let resolveNavigationReady;
+export const navigationReadyPromise = new Promise((resolve) => {
+  resolveNavigationReady = resolve;
+});
+
 import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -151,7 +159,12 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navTheme}
+      linking={linking}
+      onReady={resolveNavigationReady}
+    >
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Check, Trash2, BellOff } from 'lucide-react-native';
+import { Check, Trash2, BellOff, ServerCrash } from 'lucide-react-native';
 
 import { tactical as t } from '../theme/colors';
 import Banner from '../components/Banner';
 import NotificationCard, { CATEGORY } from '../components/notifications/NotificationCard';
 import FilterChips from '../components/notifications/FilterChips';
 import { getCurrentUser } from '../services/auth';
-import { getMyClub, respondToRequest } from '../services/clubs';
+import { getMyClub, respondToRequest, getClubById } from '../services/clubs';
+import { getMatchById } from '../services/matches';
 import { respondChallenge } from '../services/clubChallenges';
 import { acceptFriendRequest, rejectFriendRequest } from '../services/friends';
 import {
@@ -27,6 +28,15 @@ import {
   deleteAllNotifications,
   subscribeToNotifications,
 } from '../services/notifications';
+import { navigateToNotification } from '../utils/notificationTargets';
+import {
+  getInboxStatus,
+  createRequestGuard,
+  runOptimistic,
+  withAllRead,
+  withoutId,
+  withActionsResolved,
+} from '../utils/notificationInbox';
 
 /**
  * Pantalla de inbox de notificaciones — "Avisos".
@@ -97,6 +107,12 @@ function groupFor(iso) {
 
 const GROUP_ORDER = ['Hoy', 'Esta semana', 'Anteriores'];
 
+// Ids "sintéticos" para las acciones globales — comparten el mismo guard y
+// el mismo set de busyIds que las notificaciones individuales, ya que no
+// hay colisión posible con un uuid real.
+const MARK_ALL_ID = '__markAll__';
+const CLEAR_ALL_ID = '__clearAll__';
+
 /** Acciones inline disponibles para este aviso, o null si solo navega al tocar. */
 function actionsFor(n, myClub) {
   const data = n?.data || {};
@@ -113,95 +129,50 @@ function actionsFor(n, myClub) {
   return null;
 }
 
-function navigateForNotif(navigation, n) {
-  const data = n?.data || {};
-  // Desde una tab, los screens del root stack se alcanzan subiendo al padre.
-  const root = navigation.getParent() || navigation;
-  switch (n?.type) {
-    case 'message_new':
-      if (data.threadKey || data.threadId) {
-        root.navigate('ChatThread', { threadKey: data.threadKey || data.threadId });
-      }
-      break;
-    case 'match_join':
-    case 'match_reminder':
-    case 'join_request':
-    case 'join_approved':
-    case 'join_rejected':
-      if (data.matchId) {
-        root.navigate('MatchDetail', { matchId: data.matchId });
-      }
-      break;
-    case 'match_rate':
-      if (data.matchId) {
-        root.navigate('RateMatch', { matchId: data.matchId });
-      }
-      break;
-    case 'match_cancelled':
-      navigation.navigate('SearchTab');
-      break;
-    case 'club_request':
-    case 'club_request_accepted':
-      if (data.clubId) {
-        root.navigate('ClubDetail', { clubId: data.clubId });
-      }
-      break;
-    case 'club_request_rejected':
-      navigation.navigate('ClubsTab');
-      break;
-    case 'club_member_joined':
-    case 'club_member_left':
-      if (data.clubId) {
-        root.navigate('ClubDetail', { clubId: data.clubId });
-      }
-      break;
-    case 'club_challenge':
-      // Recibido: abre la bandeja de desafíos de mi club (el retado)
-      if (data.clubRetadoId) {
-        root.navigate('ClubChallenges', { clubId: data.clubRetadoId });
-      }
-      break;
-    case 'club_challenge_accepted':
-    case 'club_challenge_rejected':
-      // Respondido: abre la bandeja de desafíos de mi club (el retador)
-      if (data.clubRetadorId) {
-        root.navigate('ClubChallenges', { clubId: data.clubRetadorId });
-      }
-      break;
-    case 'friend_request':
-    case 'friend_accept':
-      if (data.fromUserId) {
-        root.navigate('UserProfile', { userId: data.fromUserId });
-      }
-      break;
-    default:
-      break;
-  }
-}
-
 export default function NotificationsScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [myClub, setMyClub] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('todos');
   const [banner, setBanner] = useState(null);
+  const [busyIds, setBusyIds] = useState(() => new Set());
+  const navigatingIds = useRef(new Set());
+  const actionGuard = useRef(createRequestGuard()).current;
+
+  const setBusy = useCallback((id, isBusy) => {
+    setBusyIds((prev) => {
+      const next = new Set(prev);
+      if (isBusy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async () => {
-    const [{ data }, clubResult] = await Promise.all([
+    const [{ data, error }, clubResult] = await Promise.all([
       listNotifications({ limit: 50 }),
       getMyClub(),
     ]);
+    if (error) {
+      // No pisamos `items`: si ya había una lista cargada, se queda ahí
+      // debajo del estado de error hasta el próximo reintento exitoso.
+      setLoadError(error);
+      return;
+    }
+    setLoadError(null);
     setItems(data || []);
     const mc = clubResult?.data;
     setMyClub(mc ? { id: mc.club.id, role: mc.miRol } : null);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
     setLoading(true);
-    load();
+    load().finally(() => setLoading(false));
   }, [load]);
+
+  const status = getInboxStatus({ loading, loadError });
 
   // Realtime: subscribirse a INSERTs/UPDATEs del usuario
   useEffect(() => {
@@ -230,22 +201,69 @@ export default function NotificationsScreen({ navigation }) {
     setRefreshing(false);
   };
 
+  const handleRetry = async () => {
+    setLoading(true);
+    await load();
+    setLoading(false);
+  };
+
   const handlePress = async (n) => {
+    // Guarda contra el doble tap: mientras se resuelve el destino de esta
+    // notificación, un segundo tap sobre la misma tarjeta no dispara otra
+    // navegación.
+    if (navigatingIds.current.has(n.id)) return;
+    navigatingIds.current.add(n.id);
+
     if (!n.read) {
       setItems((prev) => prev.map((p) => (p.id === n.id ? { ...p, read: true } : p)));
       markAsRead(n.id);
     }
-    navigateForNotif(navigation, n);
+    // Desde una tab, los screens del root stack se alcanzan subiendo al padre.
+    const root = navigation.getParent() || navigation;
+    try {
+      await navigateToNotification(n, {
+        navigate: (screen, params) => root.navigate(screen, params),
+        onMissing: (copy) => setBanner({ type: 'info', title: copy.title, message: copy.message }),
+        onUnresolved: (copy) => setBanner({ type: 'info', title: copy.title, message: copy.message }),
+        getMatchById,
+        getClubById,
+      });
+    } finally {
+      navigatingIds.current.delete(n.id);
+    }
   };
 
   const handleDelete = async (id) => {
-    setItems((prev) => prev.filter((p) => p.id !== id));
-    await deleteNotification(id);
+    if (!actionGuard.begin(id)) return;
+    setBusy(id, true);
+    const { error } = await runOptimistic({
+      items,
+      apply: (list) => withoutId(list, id),
+      action: () => deleteNotification(id),
+      setItems,
+    });
+    actionGuard.end(id);
+    setBusy(id, false);
+    if (error) {
+      setBanner({ type: 'error', title: 'No pudimos eliminar el aviso', message: error.message || '' });
+    }
   };
 
   const handleMarkAll = async () => {
-    setItems((prev) => prev.map((p) => ({ ...p, read: true })));
-    await markAllAsRead();
+    if (items.length === 0) return;
+    if (!actionGuard.begin(MARK_ALL_ID)) return;
+    setBusy(MARK_ALL_ID, true);
+    const { error } = await runOptimistic({
+      items,
+      apply: withAllRead,
+      action: () => markAllAsRead(),
+      setItems,
+    });
+    actionGuard.end(MARK_ALL_ID);
+    setBusy(MARK_ALL_ID, false);
+    if (error) {
+      setBanner({ type: 'error', title: 'No pudimos marcar todo como leído', message: error.message || '' });
+    }
   };
 
   const handleClearAll = async () => {
@@ -255,11 +273,30 @@ export default function NotificationsScreen({ navigation }) {
         ? window.confirm('¿Borrar todas las notificaciones? Esta acción no se puede deshacer.')
         : true;
     if (!ok) return;
-    setItems([]);
-    await deleteAllNotifications();
+    if (!actionGuard.begin(CLEAR_ALL_ID)) return;
+    setBusy(CLEAR_ALL_ID, true);
+    const { error } = await runOptimistic({
+      items,
+      apply: () => [],
+      action: () => deleteAllNotifications(),
+      setItems,
+    });
+    actionGuard.end(CLEAR_ALL_ID);
+    setBusy(CLEAR_ALL_ID, false);
+    if (error) {
+      setBanner({ type: 'error', title: 'No pudimos borrar las notificaciones', message: error.message || '' });
+    }
   };
 
   const respond = async (n, accept) => {
+    const id = n.id;
+    // A diferencia de eliminar/marcar todo, aceptar o rechazar tiene
+    // consecuencias reales (une a un club, confirma una amistad...), así que
+    // no lo aplicamos de forma optimista: se muestra ocupado y solo se
+    // actualiza la tarjeta cuando el servidor confirmó qué pasó.
+    if (!actionGuard.begin(id)) return;
+    setBusy(id, true);
+
     const data = n.data || {};
     let error = null;
     if (n.type === 'club_challenge') {
@@ -271,14 +308,16 @@ export default function NotificationsScreen({ navigation }) {
         ? await acceptFriendRequest(data.friendshipId)
         : await rejectFriendRequest(data.friendshipId));
     }
+
+    actionGuard.end(id);
+    setBusy(id, false);
+
     if (error) {
       setBanner({ type: 'error', title: 'No pudimos procesar tu respuesta', message: error.message || '' });
       return;
     }
-    setItems((prev) =>
-      prev.map((p) => (p.id === n.id ? { ...p, read: true, _actionsResolved: true } : p))
-    );
-    markAsRead(n.id);
+    setItems((prev) => withActionsResolved(prev, id));
+    markAsRead(id);
   };
 
   const chips = useMemo(
@@ -327,20 +366,28 @@ export default function NotificationsScreen({ navigation }) {
             <View className="flex-row gap-2">
               <Pressable
                 onPress={handleMarkAll}
-                disabled={items.length === 0}
+                disabled={items.length === 0 || busyIds.has(MARK_ALL_ID)}
                 className="h-[34px] flex-row items-center gap-1.5 rounded-xl border border-white/12 bg-black/45 px-3 active:opacity-70"
-                style={items.length === 0 ? { opacity: 0.3 } : null}
+                style={items.length === 0 || busyIds.has(MARK_ALL_ID) ? { opacity: 0.3 } : null}
               >
-                <Check size={14} color={t.neon} strokeWidth={2.6} />
+                {busyIds.has(MARK_ALL_ID) ? (
+                  <ActivityIndicator size="small" color={t.neon} />
+                ) : (
+                  <Check size={14} color={t.neon} strokeWidth={2.6} />
+                )}
                 <Text className="text-[10.5px] font-bold tracking-[0.14em] text-white/85">LEER TODO</Text>
               </Pressable>
               <Pressable
                 onPress={handleClearAll}
-                disabled={items.length === 0}
+                disabled={items.length === 0 || busyIds.has(CLEAR_ALL_ID)}
                 className="h-[34px] w-[34px] items-center justify-center rounded-xl border border-[#FF6B6B]/28 bg-[#FF6B6B]/10 active:opacity-70"
-                style={items.length === 0 ? { opacity: 0.3 } : null}
+                style={items.length === 0 || busyIds.has(CLEAR_ALL_ID) ? { opacity: 0.3 } : null}
               >
-                <Trash2 size={15} color={t.danger} strokeWidth={1.9} />
+                {busyIds.has(CLEAR_ALL_ID) ? (
+                  <ActivityIndicator size="small" color={t.danger} />
+                ) : (
+                  <Trash2 size={15} color={t.danger} strokeWidth={1.9} />
+                )}
               </Pressable>
             </View>
           </View>
@@ -356,9 +403,25 @@ export default function NotificationsScreen({ navigation }) {
           </View>
         )}
 
-        {loading ? (
+        {status === 'loading' ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator color={t.neon} />
+          </View>
+        ) : status === 'error' ? (
+          <View className="flex-1 items-center justify-center gap-3 px-8">
+            <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-[#FF6B6B]/30 bg-[#FF6B6B]/8">
+              <ServerCrash size={21} color={t.danger} strokeWidth={1.9} />
+            </View>
+            <Text className="text-[16px] font-bold text-white">No pudimos cargar tus avisos</Text>
+            <Text className="text-center text-[13.5px] leading-5 text-white/45">
+              {loadError?.message || 'El servidor no respondió. Revisa tu conexión e intenta de nuevo.'}
+            </Text>
+            <Pressable
+              onPress={handleRetry}
+              className="mt-1 h-11 items-center justify-center rounded-[13px] bg-[#00FF66] px-6 active:opacity-80"
+            >
+              <Text className="text-[14px] font-bold text-[#04120A]">Reintentar</Text>
+            </Pressable>
           </View>
         ) : (
           <SectionList
@@ -382,6 +445,7 @@ export default function NotificationsScreen({ navigation }) {
             renderItem={({ item }) => (
               <NotificationCard
                 notification={item}
+                busy={busyIds.has(item.id)}
                 onPress={handlePress}
                 onDelete={handleDelete}
                 onPrimary={(n) => respond(n, true)}

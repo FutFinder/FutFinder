@@ -144,3 +144,10 @@ Deno.test("isPushAllowed: falla abierto si no hay perfil o el tipo no está mape
   assert(isPushAllowed(null, "match_join"));
   assert(isPushAllowed({ notif_matches: false }, "tipo_no_mapeado"));
 });
+
+// ── /todos (chat_mention_all) usa la misma preferencia que message_new ──
+Deno.test("isPushAllowed: chat_mention_all respeta notif_chat, igual que message_new", () => {
+  assert(isPushAllowed({ notif_chat: true }, "chat_mention_all"));
+  assertFalse(isPushAllowed({ notif_chat: false }, "chat_mention_all"));
+  assert(isPushAllowed({}, "chat_mention_all"));
+});

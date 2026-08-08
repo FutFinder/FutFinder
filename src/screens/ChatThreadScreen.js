@@ -52,6 +52,7 @@ import {
   isThreadMuted,
   parseComposerCommand,
   suggestCommands,
+  canUseMentionAll,
 } from '../services/messages';
 import { getMatchById, getMatchAttendees } from '../services/matches';
 import { getClubById, listMembers } from '../services/clubs';
@@ -60,7 +61,14 @@ import { getChallenge } from '../services/clubChallenges';
 import { reportUser } from '../services/reports';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
-import { decorateMessages, canSendDraft } from '../utils/chatMeta';
+import {
+  decorateMessages,
+  canSendDraft,
+  mergeOlderMessages,
+  decideAutoScroll,
+  attachCachedSender,
+  needsSenderFetch,
+} from '../utils/chatMeta';
 import useConnection from '../utils/useConnection';
 
 const PAGE_SIZE = 40;
@@ -116,15 +124,43 @@ export default function ChatThreadScreen({ route, navigation }) {
   const selectionRef = useRef({ start: 0, end: 0 });
   const inputRef = useRef(null);
 
+  // ── Perfiles de remitentes para enriquecer mensajes de Realtime ──
+  // La fila cruda que entrega Realtime no trae `sender` (eso lo resuelve
+  // listThreadMessages con un join). Se cachea lo que ya vino con `sender`
+  // en la carga inicial/paginación, y solo se va a buscar a la red lo que
+  // todavía no se vio (alguien que aún no había hablado en el hilo).
+  const profilesRef = useRef(new Map());
+  const fetchingSendersRef = useRef(new Set());
+
+  // ── Scroll: posición al paginar, autoscroll solo si corresponde ──
+  const listHeightRef = useRef(0);
+  const scrollYRef = useRef(0);
+  const nearBottomRef = useRef(true);
+  const isPrependingRef = useRef(false);
+  const didInitialScrollRef = useRef(false);
+
   const { connection, reportChannelStatus } = useConnection();
 
   const canWrite = access ? access.canWrite : true;
   const canRead = access ? access.canRead : true;
   const isClubAdmin = !!access?.isClubAdmin;
 
+  const cacheSenders = useCallback((msgs) => {
+    for (const m of msgs || []) {
+      if (m?.sender && m?.sender_id) profilesRef.current.set(m.sender_id, m.sender);
+    }
+  }, []);
+
   // ── Carga inicial ────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
+    profilesRef.current = new Map();
+    fetchingSendersRef.current = new Set();
+    listHeightRef.current = 0;
+    scrollYRef.current = 0;
+    nearBottomRef.current = true;
+    isPrependingRef.current = false;
+    didInitialScrollRef.current = false;
 
     (async () => {
       try {
@@ -147,6 +183,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         ]);
         if (!mountedRef.current) return;
 
+        cacheSenders(page.data);
         setMessages(page.data || []);
         setHasMore(!!page.hasMore);
         setMuted(mutedNow);
@@ -224,6 +261,29 @@ export default function ChatThreadScreen({ route, navigation }) {
     };
   }, [challengeId]);
 
+  // Trae el perfil (username/foto_url) de un remitente que todavía no
+  // habíamos visto hablar en este hilo, y parcha con él cualquier mensaje
+  // suyo que ya esté en pantalla sin `sender`. El contenido del mensaje ya
+  // se mostró al instante vía Realtime; esto solo completa nombre/avatar en
+  // cuanto llega, sin bloquear la aparición del mensaje.
+  const fetchAndAttachSender = useCallback((senderId) => {
+    if (fetchingSendersRef.current.has(senderId)) return;
+    fetchingSendersRef.current.add(senderId);
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, username, foto_url')
+        .eq('id', senderId)
+        .maybeSingle();
+      fetchingSendersRef.current.delete(senderId);
+      if (!data || !mountedRef.current) return;
+      profilesRef.current.set(senderId, data);
+      setMessages((prev) =>
+        prev.map((m) => (m.sender_id === senderId && !m.sender ? { ...m, sender: data } : m))
+      );
+    })();
+  }, []);
+
   // ── Realtime ─────────────────────────────────────────────────
   useEffect(() => {
     if (!myId || !canRead) return undefined;
@@ -235,21 +295,40 @@ export default function ChatThreadScreen({ route, navigation }) {
         if (!messageBelongsToThread(row, threadKey, myId)) return;
 
         if (payload.eventType === 'INSERT') {
+          const enrichedRow = attachCachedSender(row, {
+            isGroup,
+            myId,
+            profilesById: profilesRef.current,
+          });
           setMessages((prev) => {
-            if (prev.some((m) => m.id === row.id)) return prev;
+            if (prev.some((m) => m.id === enrichedRow.id)) return prev;
             // Si es el eco de un mensaje propio que estaba en vuelo, se
             // reemplaza en vez de duplicarse.
             const pendingIdx = prev.findIndex(
-              (m) => m._status === 'sending' && m.content === row.content && m.sender_id === row.sender_id
+              (m) =>
+                m._status === 'sending' &&
+                m.content === enrichedRow.content &&
+                m.sender_id === enrichedRow.sender_id
             );
             if (pendingIdx >= 0) {
               const next = [...prev];
-              next[pendingIdx] = row;
+              next[pendingIdx] = enrichedRow;
               return next;
             }
-            return [...prev, row];
+            // Un mensaje ajeno que llega mientras el usuario lee historial
+            // no debe arrastrarlo al final: decideAutoScroll ya respeta
+            // nearBottomRef, pero forzarlo aquí para los propios asegura
+            // que enviar SIEMPRE haga scroll aunque se haya scrolleado
+            // hacia arriba justo antes de tocar enviar.
+            if (enrichedRow.sender_id === myId) nearBottomRef.current = true;
+            return [...prev, enrichedRow];
           });
-          if (row.sender_id !== myId) markThreadAsRead(threadKey).catch(() => {});
+          if (row.sender_id !== myId) {
+            markThreadAsRead(threadKey).catch(() => {});
+            if (needsSenderFetch(row, { isGroup, myId, profilesById: profilesRef.current })) {
+              fetchAndAttachSender(row.sender_id);
+            }
+          }
         } else if (payload.eventType === 'UPDATE') {
           setMessages((prev) => prev.map((m) => (m.id === row.id ? { ...m, ...row } : m)));
         }
@@ -260,13 +339,7 @@ export default function ChatThreadScreen({ route, navigation }) {
     return () => {
       try { unsubscribe(); } catch {}
     };
-  }, [threadKey, myId, canRead, reportChannelStatus]);
-
-  // ── Scroll al final cuando llegan mensajes ───────────────────
-  useEffect(() => {
-    if (messages.length === 0) return;
-    requestAnimationFrame(() => listRef.current?.scrollToEnd?.({ animated: true }));
-  }, [messages.length]);
+  }, [threadKey, myId, canRead, isGroup, reportChannelStatus, fetchAndAttachSender]);
 
   // ── Cargar mensajes anteriores ───────────────────────────────
   const loadEarlier = useCallback(async () => {
@@ -280,17 +353,23 @@ export default function ChatThreadScreen({ route, navigation }) {
       notify('No pudimos cargar más', page.error.message || 'Intenta de nuevo');
       return;
     }
+    cacheSenders(page.data);
     setHasMore(!!page.hasMore);
     setMessages((prev) => {
-      const known = new Set(prev.map((m) => m.id));
-      return [...(page.data || []).filter((m) => !known.has(m.id)), ...prev];
+      const merged = mergeOlderMessages(prev, page.data);
+      // No hay scrollToEnd aquí: decideAutoScroll (en onContentSizeChange)
+      // ajusta el offset para que la posición visible del usuario no
+      // salte. Solo se marca "prependiendo" si de verdad se agregó algo
+      // (Realtime pudo haber traído ya todo lo que esta página trajo).
+      isPrependingRef.current = merged.length > prev.length;
+      return merged;
     });
-  }, [loadingEarlier, messages, threadKey]);
+  }, [loadingEarlier, messages, threadKey, cacheSenders]);
 
   // ── Envío ────────────────────────────────────────────────────
   const deliver = useCallback(
-    async (localId, body, important) => {
-      const { data, error } = await sendMessage(threadKey, body, { important });
+    async (localId, body, important, mentionAll) => {
+      const { data, error } = await sendMessage(threadKey, body, { important, mentionAll });
       if (!mountedRef.current) return;
 
       if (error) {
@@ -310,17 +389,24 @@ export default function ChatThreadScreen({ route, navigation }) {
     [threadKey]
   );
 
+  const offline = connection === 'offline';
+
   const handleSend = useCallback(async () => {
-    if (!canSendDraft(draft, { sending, canWrite })) return;
+    if (!canSendDraft(draft, { sending, canWrite, offline })) return;
 
     const parsed = parseComposerCommand(draft);
     const important = parsed.command === '/importante';
+    const mentionAll = parsed.command === '/todos';
 
     if (important && !isClubAdmin) {
       notify(
         'Solo los administradores',
         'El comando /importante lo puede usar un administrador del club.'
       );
+      return;
+    }
+    if (mentionAll && !canUseMentionAll(t?.type)) {
+      notify('No disponible aquí', 'El comando /todos solo existe en chats grupales.');
       return;
     }
     // El cuerpo real del mensaje: sin el comando delante.
@@ -340,6 +426,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       sender_id: myId,
       content: body,
       is_important: important,
+      mention_all: mentionAll,
       _status: 'sending',
       _local: true,
       ...(t?.type === 'match'
@@ -348,18 +435,22 @@ export default function ChatThreadScreen({ route, navigation }) {
         ? { club_id: t.id }
         : { receiver_id: t.id }),
     };
+    // Enviar siempre lleva al final, aunque el usuario estuviera leyendo
+    // mensajes más arriba justo antes de tocar enviar.
+    nearBottomRef.current = true;
     setMessages((prev) => [...prev, optimistic]);
 
-    await deliver(localId, body, important);
+    await deliver(localId, body, important, mentionAll);
     if (mountedRef.current) setSending(false);
-  }, [draft, sending, canWrite, isClubAdmin, myId, t?.type, t?.id, deliver]);
+  }, [draft, sending, canWrite, offline, isClubAdmin, myId, t?.type, t?.id, deliver]);
 
   const handleRetry = useCallback(
     async (message) => {
+      nearBottomRef.current = true;
       setMessages((prev) =>
         prev.map((m) => (m.id === message.id ? { ...m, _status: 'sending' } : m))
       );
-      await deliver(message.id, message.content, !!message.is_important);
+      await deliver(message.id, message.content, !!message.is_important, !!message.mention_all);
     },
     [deliver]
   );
@@ -483,8 +574,8 @@ export default function ChatThreadScreen({ route, navigation }) {
   }, [t?.type, context, paramSubtitle, canWrite]);
 
   const commandSuggestions = useMemo(
-    () => (t?.type === 'club' ? suggestCommands(draft, { isClubAdmin }) : []),
-    [draft, t?.type, isClubAdmin]
+    () => (isGroup ? suggestCommands(draft, { isClubAdmin, threadType: t?.type }) : []),
+    [draft, isGroup, t?.type, isClubAdmin]
   );
 
   const matchEnded =
@@ -647,7 +738,32 @@ export default function ChatThreadScreen({ route, navigation }) {
                 )}
               </>
             }
-            onContentSizeChange={() => listRef.current?.scrollToEnd?.({ animated: false })}
+            onScroll={(e) => {
+              const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+              scrollYRef.current = contentOffset.y;
+              const distanceFromBottom =
+                contentSize.height - contentOffset.y - layoutMeasurement.height;
+              nearBottomRef.current = distanceFromBottom < 120;
+            }}
+            scrollEventThrottle={32}
+            onContentSizeChange={(_w, newHeight) => {
+              const action = decideAutoScroll({
+                isPrepending: isPrependingRef.current,
+                isInitial: !didInitialScrollRef.current,
+                nearBottom: nearBottomRef.current,
+                prevHeight: listHeightRef.current,
+                newHeight,
+                prevScrollY: scrollYRef.current,
+              });
+              if (action.type === 'toOffset') {
+                listRef.current?.scrollToOffset({ offset: action.offset, animated: action.animated });
+              } else if (action.type === 'toEnd') {
+                listRef.current?.scrollToEnd?.({ animated: action.animated });
+                didInitialScrollRef.current = true;
+              }
+              isPrependingRef.current = false;
+              listHeightRef.current = newHeight;
+            }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             initialNumToRender={20}

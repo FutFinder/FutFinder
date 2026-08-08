@@ -42,7 +42,7 @@ const CATEGORIES = {
     'club_challenge_accepted',
     'club_challenge_rejected',
   ],
-  notif_chat: ['message_new'],
+  notif_chat: ['message_new', 'chat_mention_all'],
   notif_friends: ['friend_request', 'friend_accept'],
 };
 

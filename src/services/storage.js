@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { computeTargetDimensions } from '../utils/profileEdit';
 
 /**
  * Servicio de fotos:
@@ -20,7 +22,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
  *   { ok, asset?, reason? }
  *  asset: { uri, base64?, mimeType?, fileSize?, width, height, fileName? }
  */
-export async function pickImage({ aspect = [1, 1], quality = 0.7 } = {}) {
+export async function pickImage({ aspect = [1, 1], quality = 0.7, base64 = true } = {}) {
   try {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -34,7 +36,11 @@ export async function pickImage({ aspect = [1, 1], quality = 0.7 } = {}) {
       allowsEditing: true,
       aspect,
       quality,
-      base64: true, // necesario para subir bien en nativo (RN no maneja blob de file://)
+      // Por defecto true: necesario para subir bien en nativo (RN no maneja
+      // blob de file://). Los llamadores que redimensionan antes de subir
+      // (ver `resizeAndCompress`) pueden pedir base64:false acá y obtener el
+      // base64 recién del resultado ya redimensionado, mucho más liviano.
+      base64,
     });
 
     if (result.canceled) return { ok: false, reason: 'Cancelado' };
@@ -52,7 +58,7 @@ export async function pickImage({ aspect = [1, 1], quality = 0.7 } = {}) {
  * Devuelve { ok, assets?, reason? } con assets = array.
  *   selectionLimit: tope de fotos (0 = sin tope en iOS).
  */
-export async function pickImages({ quality = 0.7, selectionLimit = 0 } = {}) {
+export async function pickImages({ quality = 0.7, selectionLimit = 0, base64 = true } = {}) {
   try {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -66,7 +72,7 @@ export async function pickImages({ quality = 0.7, selectionLimit = 0 } = {}) {
       allowsMultipleSelection: true,
       selectionLimit, // iOS respeta el límite; en otras plataformas lo validamos aparte
       quality,
-      base64: true, // necesario para subir bien en nativo
+      base64, // necesario para subir bien en nativo si no se redimensiona antes
     });
 
     if (result.canceled) return { ok: false, reason: 'Cancelado' };
@@ -137,35 +143,90 @@ async function uploadToBucket(bucket, path, body, contentType) {
   return { url };
 }
 
+async function removeFromBucket(bucket, path) {
+  if (!path) return { error: null };
+  const { error } = await supabase.storage.from(bucket).remove([path]);
+  if (error) console.warn(`[FutFinder] removeFromBucket ${bucket}/${path}:`, error);
+  return { error };
+}
+
 /**
- * Sube mi foto de perfil y actualiza profiles.foto_url.
- * Devuelve { url, error }.
+ * Extrae el path dentro de un bucket a partir de la URL pública que
+ * devuelve Supabase (incluyendo el `?t=` de cache-bust). Devuelve `null`
+ * si la URL no corresponde a ese bucket — no hay como inventar un path
+ * a partir de algo que no calza.
  */
-export async function uploadAvatar(asset) {
+export function pathFromPublicUrl(url, bucket) {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  const path = url.slice(idx + marker.length).split('?')[0];
+  return path ? decodeURIComponent(path) : null;
+}
+
+/**
+ * Redimensiona (si excede el máximo) y comprime una imagen antes de
+ * subirla, para no cargar en memoria ni transferir más de lo necesario.
+ * Reencoda siempre a JPEG: es lo único que necesitamos para avatar/portada
+ * y evita mantener casos especiales por formato de origen.
+ *
+ * Pide base64 solo en nativo (ahí `getUploadBody` lo necesita porque RN no
+ * maneja bien blob de file://); en web el resultado se sube directo por
+ * blob, así que no hace falta cargar un base64 en memoria.
+ *
+ * Si `expo-image-manipulator` falla en alguna plataforma, no bloqueamos la
+ * subida: se sigue con la imagen original sin redimensionar.
+ */
+async function resizeAndCompress(asset, { maxDimension, compress = 0.7 } = {}) {
+  try {
+    const target = computeTargetDimensions(asset.width, asset.height, maxDimension);
+    const actions = target ? [{ resize: target }] : [];
+    const result = await ImageManipulator.manipulateAsync(asset.uri, actions, {
+      compress,
+      format: ImageManipulator.SaveFormat.JPEG,
+      base64: Platform.OS !== 'web',
+    });
+    return {
+      uri: result.uri,
+      base64: result.base64,
+      mimeType: 'image/jpeg',
+      width: result.width,
+      height: result.height,
+    };
+  } catch (e) {
+    console.warn('[FutFinder] resizeAndCompress fallback a original:', e?.message);
+    return asset;
+  }
+}
+
+/**
+ * Redimensiona/comprime y sube mi foto de perfil al bucket `avatars`.
+ * A propósito NO toca `profiles`: quien llama decide cuándo confirmar el
+ * cambio (ver `commitProfileSave` en `utils/profileEdit.js`), para poder
+ * limpiar el archivo huérfano si el guardado del perfil falla después.
+ * Devuelve { url, path, error }.
+ */
+export async function uploadAvatarFile(asset) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   if (!asset) return { error: { message: 'Sin imagen' } };
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: { message: 'No autenticado' } };
 
-  const ext = extFromAsset(asset);
+  const processed = await resizeAndCompress(asset);
+  const ext = extFromAsset(processed);
   const path = `${user.id}/avatar.${ext}`;
-  const contentType = asset.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+  const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-  const body = await getUploadBody(asset);
+  const body = await getUploadBody(processed);
   const { error, url } = await uploadToBucket('avatars', path, body, contentType);
   if (error) {
-    console.error('[FutFinder] uploadAvatar:', error);
+    console.error('[FutFinder] uploadAvatarFile:', error);
     return { error };
   }
 
-  // Guardar URL en mi perfil
-  await supabase
-    .from('profiles')
-    .update({ foto_url: url, updated_at: new Date().toISOString() })
-    .eq('id', user.id);
-
-  return { url };
+  return { url, path };
 }
 
 /**
@@ -251,48 +312,37 @@ export async function uploadClubBanner(clubId, asset) {
 }
 
 /**
- * Sube la portada del perfil del jugador y guarda la URL en
- * `profiles.banner_url` (migración 30).
+ * Redimensiona/comprime y sube la portada del perfil al bucket `avatars`,
+ * en `<user_id>/banner.<ext>` — mismo espacio del avatar, hereda sus
+ * políticas de acceso.
  *
- * Reutiliza el bucket `avatars`, en `<user_id>/banner.<ext>`: es el mismo
- * espacio del avatar, así que hereda sus políticas de acceso.
+ * Igual que `uploadAvatarFile`, NO escribe `profiles.banner_url`: eso lo
+ * hace `commitProfileSave` recién cuando confirma que todo lo demás salió
+ * bien (incluyendo el caso migración-30-no-aplicada, que ahora maneja
+ * `updateMyProfile` en `profile.js`).
+ * Devuelve { url, path, error }.
  */
-export async function uploadProfileBanner(asset) {
+export async function uploadBannerFile(asset) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   if (!asset) return { error: { message: 'Falta la imagen' } };
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: { message: 'No autenticado' } };
 
-  const ext = extFromAsset(asset);
+  const processed = await resizeAndCompress(asset);
+  const ext = extFromAsset(processed);
   const path = `${user.id}/banner.${ext}`;
-  const contentType = asset.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+  const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-  const body = await getUploadBody(asset);
+  const body = await getUploadBody(processed);
   const { error, url } = await uploadToBucket('avatars', path, body, contentType);
   if (error) {
-    console.error('[FutFinder] uploadProfileBanner:', error);
+    console.error('[FutFinder] uploadBannerFile:', error);
     return { error };
   }
 
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ banner_url: url, updated_at: new Date().toISOString() })
-    .eq('id', user.id);
-
-  if (updateError) {
-    // Sin migración 30 la columna no existe: la imagen sí quedó subida, pero
-    // no se puede referenciar todavía.
-    console.error('[FutFinder] uploadProfileBanner update:', updateError);
-    if (updateError.code === '42703') {
-      return {
-        error: {
-          message: 'Las portadas de perfil aún no están disponibles. Aplica la migración 30 en Supabase.',
-        },
-      };
-    }
-    return { error: updateError };
-  }
-
-  return { url };
+  return { url, path };
 }
+
+/** Borra un archivo del bucket `avatars` (avatar o portada) por su path. */
+export const removeAvatarBucketFile = (path) => removeFromBucket('avatars', path);

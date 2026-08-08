@@ -15,6 +15,7 @@ import { ArrowLeft, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
+import { APP_VERSION } from '../utils/appVersion';
 import { verifyEmailOtp, resendOtp } from '../services/auth';
 import { isSupabaseConfigured } from '../services/supabase';
 
@@ -211,7 +212,7 @@ export default function VerificationScreen({ navigation, route }) {
             )}
           </View>
 
-          <Text style={styles.footer}>FUTFINDER v1.2.0 · © 2026</Text>
+          <Text style={styles.footer}>FUTFINDER{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>

@@ -1,5 +1,11 @@
 import { Platform } from 'react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase, isSupabaseConfigured } from './supabase';
+import {
+  computeTargetDimensions,
+  uploadGalleryPhotoWithCleanup,
+  deletePhotoWithCompensation,
+} from '../utils/profileEdit';
 
 const MAX_PHOTOS = 12;
 export { MAX_PHOTOS };
@@ -49,61 +55,110 @@ async function getUploadBody(asset) {
   return await response.blob();
 }
 
+// Igual criterio que `resizeAndCompress` en storage.js: redimensiona si
+// excede el máximo y siempre reencoda/comprime a JPEG antes de subir, así
+// nunca se sube una foto de galería a resolución/tamaño de cámara.
+async function resizeAndCompress(asset) {
+  try {
+    const target = computeTargetDimensions(asset.width, asset.height);
+    const actions = target ? [{ resize: target }] : [];
+    const result = await ImageManipulator.manipulateAsync(asset.uri, actions, {
+      compress: 0.7,
+      format: ImageManipulator.SaveFormat.JPEG,
+      base64: Platform.OS !== 'web',
+    });
+    return {
+      uri: result.uri,
+      base64: result.base64,
+      mimeType: 'image/jpeg',
+      width: result.width,
+      height: result.height,
+    };
+  } catch (e) {
+    console.warn('[FutFinder] resizeAndCompress (galería) fallback a original:', e?.message);
+    return asset;
+  }
+}
+
+async function removeFromGalleryBucket(path) {
+  if (!path) return { error: null };
+  const { error } = await supabase.storage.from('profile-gallery').remove([path]);
+  if (error) console.warn('[FutFinder] removeFromGalleryBucket:', error);
+  return { error };
+}
+
+/**
+ * Sube una foto a la galería. Si Storage funciona pero falla la fila en
+ * `profile_photos`, el archivo recién subido se borra (no queda huérfano)
+ * — orquestado por `uploadGalleryPhotoWithCleanup` en `utils/profileEdit.js`.
+ */
 export async function uploadGalleryPhoto(asset, userId) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
   if (!asset || !userId) return { data: null, error: { message: 'Faltan datos' } };
 
-  const ext = extFromAsset(asset);
-  const filename = `${Date.now()}.${ext}`;
-  const path = `${userId}/${filename}`;
-  const contentType = asset.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+  return uploadGalleryPhotoWithCleanup({
+    uploadFile: async () => {
+      const processed = await resizeAndCompress(asset);
+      const ext = extFromAsset(processed);
+      const path = `${userId}/${Date.now()}.${ext}`;
+      const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+      const body = await getUploadBody(processed);
 
-  const body = await getUploadBody(asset);
-  const { error: uploadError } = await supabase.storage
-    .from('profile-gallery')
-    .upload(path, body, { contentType, cacheControl: '3600' });
+      const { error: uploadError } = await supabase.storage
+        .from('profile-gallery')
+        .upload(path, body, { contentType, cacheControl: '3600' });
+      if (uploadError) {
+        console.error('[FutFinder] uploadGalleryPhoto storage:', uploadError);
+        return { error: uploadError };
+      }
 
-  if (uploadError) {
-    console.error('[FutFinder] uploadGalleryPhoto storage:', uploadError);
-    return { data: null, error: uploadError };
-  }
-
-  const { data: urlData } = supabase.storage
-    .from('profile-gallery')
-    .getPublicUrl(path);
-  const url = `${urlData.publicUrl}?t=${Date.now()}`;
-
-  const { data, error } = await supabase
-    .from('profile_photos')
-    .insert({ user_id: userId, photo_url: url })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('[FutFinder] uploadGalleryPhoto db:', error);
-    return { data: null, error };
-  }
-  return { data, error: null };
+      const { data: urlData } = supabase.storage.from('profile-gallery').getPublicUrl(path);
+      const url = `${urlData.publicUrl}?t=${Date.now()}`;
+      return { url, path };
+    },
+    writeRecord: async ({ url }) => {
+      const { data, error } = await supabase
+        .from('profile_photos')
+        .insert({ user_id: userId, photo_url: url })
+        .select()
+        .single();
+      if (error) console.error('[FutFinder] uploadGalleryPhoto db:', error);
+      return { data, error };
+    },
+    removeFile: removeFromGalleryBucket,
+  });
 }
 
+/**
+ * Borra una foto de la galería. Primero la fila de `profile_photos` (nunca
+ * deja la BD apuntando a un objeto que después no se pudo borrar) y solo si
+ * eso funciona intenta borrar el archivo de Storage, con reintentos — ver
+ * `deletePhotoWithCompensation` en `utils/profileEdit.js`. Si el archivo
+ * queda como huérfano tras los reintentos, no se reporta como error: para
+ * el usuario la foto ya desapareció de su galería.
+ */
 export async function deleteProfilePhoto(id, photoUrl, userId) {
   if (!isSupabaseConfigured) return { error: null };
 
-  // Extraer path del storage desde la URL pública
   const match = (photoUrl || '').match(/profile-gallery\/(.+?)(?:\?|$)/);
-  if (match?.[1]) {
-    const { error: storageErr } = await supabase.storage
-      .from('profile-gallery')
-      .remove([match[1]]);
-    if (storageErr) console.warn('[FutFinder] deleteProfilePhoto storage:', storageErr);
+  const path = match?.[1] || null;
+
+  const { error, orphaned } = await deletePhotoWithCompensation({
+    deleteRecord: async () => {
+      const { error } = await supabase
+        .from('profile_photos')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+      if (error) console.error('[FutFinder] deleteProfilePhoto db:', error);
+      return { error };
+    },
+    removeFile: () => removeFromGalleryBucket(path),
+  });
+
+  if (orphaned) {
+    console.warn('[FutFinder] deleteProfilePhoto: archivo huérfano en profile-gallery:', path);
   }
 
-  const { error } = await supabase
-    .from('profile_photos')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  if (error) console.error('[FutFinder] deleteProfilePhoto db:', error);
   return { error };
 }
