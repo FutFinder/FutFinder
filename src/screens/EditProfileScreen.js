@@ -22,14 +22,21 @@ import {
   Plus,
   X as XIcon,
   Images,
+  AlertTriangle,
 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import Banner from '../components/Banner';
 import { colors, radius } from '../theme/colors';
-import { getMyProfile, updateMyProfile } from '../services/profile';
-import { pickImage, uploadAvatar, uploadProfileBanner } from '../services/storage';
+import { getMyProfileWithStatus, updateMyProfile } from '../services/profile';
+import {
+  pickImage,
+  uploadAvatarFile,
+  uploadBannerFile,
+  removeAvatarBucketFile,
+  pathFromPublicUrl,
+} from '../services/storage';
 import {
   getProfilePhotos,
   uploadGalleryPhoto,
@@ -39,6 +46,7 @@ import {
 import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD, OPCIONES_NIVEL } from '../utils/playerMeta';
+import { validateImageAsset, commitProfileSave, getProfileLoadStatus } from '../utils/profileEdit';
 
 const POSICIONES = [
   { value: 'arquero', label: 'Arquero' },
@@ -57,7 +65,9 @@ const FLANCOS = [
 ];
 
 export default function EditProfileScreen({ navigation }) {
-  const [loading, setLoading] = useState(true);
+  const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
+  const [loadError, setLoadError] = useState(null);
+  const [initialProfile, setInitialProfile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
 
@@ -72,8 +82,11 @@ export default function EditProfileScreen({ navigation }) {
   const [bannerUrl, setBannerUrl] = useState(null);
   const [modalidad, setModalidad] = useState(null);
   const [nivel, setNivel] = useState(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  // Avatar y portada nuevos quedan como cambio LOCAL (solo el asset elegido,
+  // sin subir nada) hasta que se confirme con «Guardar cambios».
+  const [pendingAvatar, setPendingAvatar] = useState(null);
+  const [pendingBanner, setPendingBanner] = useState(null);
 
   const [regionOpen, setRegionOpen] = useState(false);
   const [comunaOpen, setComunaOpen] = useState(false);
@@ -83,97 +96,101 @@ export default function EditProfileScreen({ navigation }) {
   const [galleryPhotos, setGalleryPhotos] = useState([]);
   const [uploadingGallery, setUploadingGallery] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const p = await getMyProfile();
-      if (p) {
-        setUserId(p.id);
-        setUsername(p.username || '');
-        setEdad(p.edad ? String(p.edad) : '');
-        setBio(p.bio || '');
-        if (Array.isArray(p.posicion_preferida) && p.posicion_preferida.length) {
-          setPosiciones(p.posicion_preferida);
-        } else if (typeof p.posicion_preferida === 'string') {
-          setPosiciones([p.posicion_preferida]);
-        } else {
-          setPosiciones(['sin_definir']);
-        }
-        setFlanco(p.flanco || 'derecho');
-        setRegion(p.region || '');
-        setComuna(p.comuna || '');
-        setFotoUrl(p.foto_url || null);
-        setBannerUrl(p.banner_url || null);
-        setModalidad(p.modalidad || null);
-        setNivel(p.nivel || null);
-
-        // Cargar galería
-        const { data: photos } = await getProfilePhotos(p.id);
-        setGalleryPhotos(photos || []);
+  const loadProfile = async () => {
+    setLoadStatus('loading');
+    setLoadError(null);
+    const { data: p, error } = await getMyProfileWithStatus();
+    if (error) {
+      setLoadError(error);
+      setLoadStatus(getProfileLoadStatus({ loading: false, error }));
+      return;
+    }
+    setInitialProfile(p);
+    if (p) {
+      setUserId(p.id);
+      setUsername(p.username || '');
+      setEdad(p.edad ? String(p.edad) : '');
+      setBio(p.bio || '');
+      if (Array.isArray(p.posicion_preferida) && p.posicion_preferida.length) {
+        setPosiciones(p.posicion_preferida);
+      } else if (typeof p.posicion_preferida === 'string') {
+        setPosiciones([p.posicion_preferida]);
+      } else {
+        setPosiciones(['sin_definir']);
       }
-      setLoading(false);
-    })();
+      setFlanco(p.flanco || 'derecho');
+      setRegion(p.region || '');
+      setComuna(p.comuna || '');
+      setFotoUrl(p.foto_url || null);
+      setBannerUrl(p.banner_url || null);
+      setModalidad(p.modalidad || null);
+      setNivel(p.nivel || null);
+      setPendingAvatar(null);
+      setPendingBanner(null);
+
+      const { data: photos } = await getProfilePhotos(p.id);
+      setGalleryPhotos(photos || []);
+    }
+    setLoadStatus('ready');
+  };
+
+  useEffect(() => {
+    loadProfile();
   }, []);
 
-  // ---- Subida de portada del perfil ----
+  // ---- Elegir portada (queda como cambio local, no se sube todavía) ----
   const handlePickBanner = async () => {
-    if (uploadingBanner) return;
-    const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.7 });
+    const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.85, base64: false });
     if (!ok) {
       if (reason && reason !== 'Cancelado') {
         setBanner({ type: 'error', title: 'No pude abrir tus fotos', message: reason });
       }
       return;
     }
-    setUploadingBanner(true);
-    const { url, error } = await uploadProfileBanner(asset);
-    setUploadingBanner(false);
-    if (error) {
-      setBanner({ type: 'error', title: 'No pude subir la portada', message: error.message || '' });
+    const { ok: valid, reason: invalidReason } = validateImageAsset(asset);
+    if (!valid) {
+      setBanner({ type: 'error', title: 'Imagen no válida', message: invalidReason });
       return;
     }
-    setBannerUrl(url);
-    setBanner({
-      type: 'success',
-      title: 'Portada actualizada',
-      message: 'Ya se ve en tu perfil.',
-    });
-    setTimeout(() => setBanner(null), 3000);
+    setPendingBanner(asset);
+    setBanner(null);
   };
 
-  // ---- Subida de foto de perfil ----
+  // ---- Elegir foto de perfil (queda como cambio local, no se sube todavía) ----
   const handlePickAvatar = async () => {
-    if (uploadingPhoto) return;
-    const { ok, asset, reason } = await pickImage({ aspect: [1, 1], quality: 0.7 });
+    const { ok, asset, reason } = await pickImage({ aspect: [1, 1], quality: 0.9, base64: false });
     if (!ok) {
       if (reason && reason !== 'Cancelado') {
         setBanner({ type: 'error', title: 'No pude abrir tus fotos', message: reason });
       }
       return;
     }
-    setUploadingPhoto(true);
-    const { url, error } = await uploadAvatar(asset);
-    setUploadingPhoto(false);
-    if (error) {
-      setBanner({ type: 'error', title: 'No pude subir la foto', message: error.message || '' });
+    const { ok: valid, reason: invalidReason } = validateImageAsset(asset);
+    if (!valid) {
+      setBanner({ type: 'error', title: 'Imagen no válida', message: invalidReason });
       return;
     }
-    setFotoUrl(url);
-    setBanner({ type: 'success', title: 'Foto actualizada', message: 'Tu nueva foto de perfil ya está guardada.' });
-    setTimeout(() => setBanner(null), 3000);
+    setPendingAvatar(asset);
+    setBanner(null);
   };
 
-  // ---- Galería ----
+  // ---- Galería (cada foto se sube de inmediato; es independiente del formulario) ----
   const handleAddGalleryPhoto = async () => {
     if (uploadingGallery || !userId) return;
     if (galleryPhotos.length >= MAX_PHOTOS) {
       setBanner({ type: 'info', title: 'Límite alcanzado', message: `Máximo ${MAX_PHOTOS} fotos por perfil.` });
       return;
     }
-    const { ok, asset, reason } = await pickImage({ aspect: [1, 1], quality: 0.8 });
+    const { ok, asset, reason } = await pickImage({ aspect: [1, 1], quality: 0.9, base64: false });
     if (!ok) {
       if (reason && reason !== 'Cancelado') {
         setBanner({ type: 'error', title: 'No pude abrir tus fotos', message: reason });
       }
+      return;
+    }
+    const { ok: valid, reason: invalidReason } = validateImageAsset(asset);
+    if (!valid) {
+      setBanner({ type: 'error', title: 'Imagen no válida', message: invalidReason });
       return;
     }
     setUploadingGallery(true);
@@ -259,16 +276,32 @@ export default function EditProfileScreen({ navigation }) {
     }
 
     setSaving(true);
-    const { error } = await updateMyProfile({
-      username: username.trim(),
-      edad: edad ? parseInt(edad, 10) : null,
-      bio: bio.trim() || null,
-      posicion_preferida: posiciones,
-      flanco,
-      region: region || null,
-      comuna: comuna || null,
-      modalidad: modalidad || null,
-      nivel: nivel || null,
+    const { error, newAvatarUrl, newBannerUrl } = await commitProfileSave({
+      pendingAvatar,
+      pendingBanner,
+      oldAvatarPath: pathFromPublicUrl(initialProfile?.foto_url, 'avatars'),
+      oldBannerPath: pathFromPublicUrl(initialProfile?.banner_url, 'avatars'),
+      uploadAvatarFile,
+      uploadBannerFile,
+      updateProfile: ({ foto_url, banner_url }) => {
+        const patch = {
+          username: username.trim(),
+          edad: edad ? parseInt(edad, 10) : null,
+          bio: bio.trim() || null,
+          posicion_preferida: posiciones,
+          flanco,
+          region: region || null,
+          comuna: comuna || null,
+          modalidad: modalidad || null,
+          nivel: nivel || null,
+        };
+        // Solo se incluyen si hay una foto/portada nueva: así no se toca la
+        // columna existente cuando el usuario no cambió esa imagen.
+        if (foto_url !== undefined) patch.foto_url = foto_url;
+        if (banner_url !== undefined) patch.banner_url = banner_url;
+        return updateMyProfile(patch);
+      },
+      removeFile: removeAvatarBucketFile,
     });
     setSaving(false);
 
@@ -286,9 +319,23 @@ export default function EditProfileScreen({ navigation }) {
       } else if (msg) {
         userMsg = msg;
       }
+      // El perfil anterior no se tocó y los archivos huérfanos ya se
+      // limpiaron dentro de commitProfileSave; el asset local elegido queda
+      // disponible para reintentar sin tener que elegirlo de nuevo.
       setBanner({ type: 'error', title: 'No pudimos guardar', message: userMsg });
       return;
     }
+
+    // Recién ahora, con el guardado confirmado, se reemplaza lo que se veía.
+    if (newAvatarUrl) {
+      setFotoUrl(newAvatarUrl);
+      setPendingAvatar(null);
+    }
+    if (newBannerUrl) {
+      setBannerUrl(newBannerUrl);
+      setPendingBanner(null);
+    }
+    setInitialProfile((prev) => (prev ? { ...prev, foto_url: newAvatarUrl || prev.foto_url, banner_url: newBannerUrl || prev.banner_url } : prev));
 
     setBanner({
       type: 'success',
@@ -331,6 +378,28 @@ export default function EditProfileScreen({ navigation }) {
             />
           )}
 
+          {loadStatus === 'loading' ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : loadStatus === 'error' ? (
+            <View style={styles.center}>
+              <View style={styles.errorIconWrap}>
+                <AlertTriangle color={colors.error} size={22} strokeWidth={1.8} />
+              </View>
+              <Text style={styles.errorTitle}>No pudimos cargar tu perfil</Text>
+              <Text style={styles.errorMsg}>
+                {loadError?.message || 'Revisa tu conexión e intenta de nuevo.'}
+              </Text>
+              <Pressable
+                onPress={loadProfile}
+                style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.retryLabel}>Reintentar</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
           <Text style={styles.title}>Editar perfil</Text>
           <Text style={styles.subtitle}>
             Mantén tu información al día — otros jugadores la ven al inscribirse
@@ -341,19 +410,21 @@ export default function EditProfileScreen({ navigation }) {
           <View style={styles.card}>
             <Pressable
               onPress={handlePickAvatar}
-              disabled={uploadingPhoto}
+              disabled={saving}
               style={({ pressed }) => [
                 styles.avatarBig,
                 pressed && { opacity: 0.85 },
               ]}
             >
-              {fotoUrl ? (
+              {pendingAvatar ? (
+                <Image source={{ uri: pendingAvatar.uri }} style={styles.avatarImage} />
+              ) : fotoUrl ? (
                 <Image source={{ uri: fotoUrl }} style={styles.avatarImage} />
               ) : (
                 <UserIcon color={colors.primary} size={42} strokeWidth={1.5} />
               )}
               <View style={styles.avatarEditBtn}>
-                {uploadingPhoto ? (
+                {saving && pendingAvatar ? (
                   <ActivityIndicator color="#0E0E0D" size="small" />
                 ) : (
                   <Camera color="#0E0E0D" size={14} strokeWidth={2.2} />
@@ -361,32 +432,34 @@ export default function EditProfileScreen({ navigation }) {
               </View>
             </Pressable>
             <Text style={styles.avatarHint}>
-              {uploadingPhoto ? 'Subiendo foto…' : 'Toca el avatar para cambiar tu foto'}
+              {pendingAvatar
+                ? 'Foto lista — pulsa «Guardar cambios» para aplicarla'
+                : 'Toca el avatar para cambiar tu foto'}
             </Text>
 
             <Label>Portada del perfil</Label>
             <Pressable
               onPress={handlePickBanner}
-              disabled={uploadingBanner}
+              disabled={saving}
               accessibilityRole="button"
-              accessibilityLabel={bannerUrl ? 'Cambiar la portada' : 'Subir una portada'}
+              accessibilityLabel={bannerUrl || pendingBanner ? 'Cambiar la portada' : 'Subir una portada'}
               style={({ pressed }) => [styles.bannerTap, pressed && { opacity: 0.85 }]}
             >
-              {bannerUrl ? (
+              {pendingBanner ? (
+                <Image source={{ uri: pendingBanner.uri }} style={styles.bannerImg} resizeMode="cover" />
+              ) : bannerUrl ? (
                 <Image source={{ uri: bannerUrl }} style={styles.bannerImg} resizeMode="cover" />
               ) : (
                 <View style={styles.bannerPlaceholder}>
                   <Camera color={colors.textMuted} size={20} />
-                  <Text style={styles.bannerHint}>
-                    {uploadingBanner ? 'Subiendo portada…' : 'Subir portada (opcional)'}
-                  </Text>
+                  <Text style={styles.bannerHint}>Subir portada (opcional)</Text>
                 </View>
               )}
-              {bannerUrl && (
+              {(bannerUrl || pendingBanner) && (
                 <View style={styles.bannerEditChip}>
                   <Camera color={colors.textPrimary} size={13} />
                   <Text style={styles.bannerEditChipText}>
-                    {uploadingBanner ? 'Subiendo…' : 'Cambiar portada'}
+                    {pendingBanner ? 'Lista para guardar' : 'Cambiar portada'}
                   </Text>
                 </View>
               )}
@@ -679,10 +752,12 @@ export default function EditProfileScreen({ navigation }) {
             variant="primary"
             onPress={handleSave}
             loading={saving}
-            disabled={saving || loading}
+            disabled={saving}
           />
 
           <View style={{ height: 32 }} />
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -722,6 +797,51 @@ function Segmented({ options, value, onChange }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: 20, paddingBottom: 32, flexGrow: 1 },
+  center: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  errorIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: colors.errorSoft,
+    borderWidth: 1,
+    borderColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  errorTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  errorMsg: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: 6,
+    height: 44,
+    paddingHorizontal: 24,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryLabel: {
+    color: '#0E0E0D',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

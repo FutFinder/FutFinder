@@ -22,6 +22,29 @@ export async function getMyProfile() {
 }
 
 /**
+ * Igual que `getMyProfile()` pero propaga el error en vez de tragárselo
+ * como `null` — para pantallas como Editar perfil, que necesitan
+ * distinguir "sin sesión" de "falló la carga, hay que reintentar" y así
+ * nunca mostrar un formulario vacío por un error de red pasajero.
+ * Devuelve { data, error }.
+ */
+export async function getMyProfileWithStatus() {
+  if (!isSupabaseConfigured) return { data: null, error: null };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: 'No autenticado' } };
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+  if (error) {
+    console.error('[FutFinder] getMyProfileWithStatus:', error);
+    return { data: null, error };
+  }
+  return { data: { ...data, email: user.email }, error: null };
+}
+
+/**
  * Estado de cuenta del usuario actual para gating de funciones.
  * Devuelve { suspended, trust_score, suspended_until }.
  */
