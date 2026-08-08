@@ -4,7 +4,7 @@
 
 ## Alcance verificado en el repositorio
 
-FutFinder contiene flujos de autenticación y onboarding, navegación protegida, partidos, clubes, chat, avisos, perfil, amistades y preferencias. El cliente encapsula sus llamadas a Supabase en `src/services/`; las reglas y límites críticos se complementan con migraciones, RLS, RPC y la Edge Function `send-push`.
+FutFinder contiene flujos de autenticación y onboarding, navegación protegida, partidos, clubes, chat, avisos, perfil, amistades y preferencias. `src/services/` concentra la mayor parte de las llamadas de dominio y los límites principales se complementan con migraciones, RLS, RPC y la Edge Function `send-push`. Aún existen accesos directos puntuales al cliente Supabase: `src/screens/HomeScreen.js` consulta `attendees` y `matches`, y `src/screens/ChatThreadScreen.js` obtiene el usuario actual y perfiles.
 
 - La navegación resuelve sesión antes de montar la aplicación, restringe las rutas privadas y reanuda un destino protegido después de autenticar.
 - Partidos permite descubrimiento, filtros, publicación, cupos/solicitudes, cola, asistencia GPS, gestión y registro final de asistencia.
