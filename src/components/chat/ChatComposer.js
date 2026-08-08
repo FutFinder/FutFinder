@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-native';
-import { Send, Smile, Lock } from 'lucide-react-native';
+import { Send, Smile, Lock, WifiOff } from 'lucide-react-native';
 
 import { chatColors } from '../../theme/colors';
 import { canSendDraft } from '../../utils/chatMeta';
@@ -12,8 +12,11 @@ import { MAX_MESSAGE_LENGTH } from '../../services/messages';
  * Sin permiso de escritura NO se oculta el chat: el compositor se reemplaza
  * por la tarjeta «Solo lectura» que explica por qué, tal como pide el diseño.
  *
- * El botón de enviar se apaga con el campo vacío y mientras hay un envío en
- * curso, así que una pulsación repetida no manda el mensaje dos veces.
+ * El botón de enviar se apaga con el campo vacío, mientras hay un envío en
+ * curso y sin conexión — no existe una cola offline, así que el compositor
+ * no promete una: el aviso de "sin conexión" es permanente (no depende del
+ * placeholder, que desaparece apenas hay texto escrito) y el botón queda
+ * inhabilitado hasta que vuelva la conexión.
  */
 export default function ChatComposer({
   value,
@@ -46,15 +49,24 @@ export default function ChatComposer({
     );
   }
 
-  const enabled = canSendDraft(value, { sending, canWrite, maxLength: MAX_MESSAGE_LENGTH });
+  const enabled = canSendDraft(value, { sending, canWrite, offline, maxLength: MAX_MESSAGE_LENGTH });
   const isCommand = (value || '').trim().startsWith('/');
 
   return (
     <View>
+      {offline && (
+        <View style={styles.offlineWrap}>
+          <View style={styles.offlineCard} accessibilityRole="summary">
+            <WifiOff color={chatColors.warn} size={16} strokeWidth={2} />
+            <Text style={styles.offlineText}>Sin conexión — no puedes enviar mensajes ahora.</Text>
+          </View>
+        </View>
+      )}
+
       {commandSuggestions.length > 0 && (
         <View style={styles.commandsWrap}>
           <View style={styles.commandsCard}>
-            <Text style={styles.commandsTitle}>COMANDOS DEL CLUB</Text>
+            <Text style={styles.commandsTitle}>COMANDOS DEL CHAT</Text>
             {commandSuggestions.map((c, i) => (
               <Pressable
                 key={c.command}
@@ -95,7 +107,7 @@ export default function ChatComposer({
           onSelectionChange={onSelectionChange}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder={offline ? 'Sin conexión · se enviará al reconectar' : 'Escribe un mensaje…'}
+          placeholder={offline ? 'Sin conexión — no puedes enviar' : 'Escribe un mensaje…'}
           placeholderTextColor="rgba(255,255,255,0.35)"
           multiline
           maxLength={MAX_MESSAGE_LENGTH}
@@ -181,6 +193,22 @@ const styles = StyleSheet.create({
   },
   sendBtnOn: { backgroundColor: chatColors.green },
   sendBtnOff: { backgroundColor: chatColors.sendIdle },
+
+  // Sin conexión — visible aunque el compositor tenga texto escrito (a
+  // diferencia del placeholder, que desaparece apenas hay valor).
+  offlineWrap: { paddingHorizontal: 14, paddingTop: 10 },
+  offlineCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: chatColors.warnSoft,
+    borderWidth: 1,
+    borderColor: chatColors.warnBorder,
+  },
+  offlineText: { flex: 1, color: chatColors.warn, fontSize: 12, fontWeight: '700' },
 
   // Solo lectura
   readOnlyBar: {

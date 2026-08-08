@@ -15,30 +15,41 @@
  */
 
 // ============================================================
-// COMANDOS DEL COMPOSITOR (chat de club)
+// COMANDOS DEL COMPOSITOR (chats grupales)
 // ============================================================
 
 /**
- * Comandos disponibles en el chat del club.
+ * Comandos disponibles en chats grupales (club y partido; no existen en DM,
+ * donde no hay a quién más avisar o mencionar).
  *
  * `/importante` rompe el silencio: el aviso llega igual a quien tenga el chat
  * silenciado. Solo lo pueden usar los administradores del club — lo valida un
- * trigger en la BD (migración 32), no solo esta lista.
+ * trigger en la BD (migración 32), no solo esta lista. Es exclusivo del chat
+ * de club: un partido no tiene "administradores" en el mismo sentido.
+ *
+ * `/todos` menciona a todos los participantes reales del hilo (jugadores del
+ * club, o inscritos/organizador del partido) y genera un aviso para cada
+ * uno. Cualquier participante lo puede usar — la autorización real (que
+ * quien lo manda sea de verdad parte del grupo, y que solo se notifique a
+ * quien de verdad pertenece) la impone el backend, no esta lista: ver la
+ * migración 39 y `supabase/tests/39_chat_mention_all_test.sql`.
  *
  * OJO: el diseño menciona un rol «Capitán» que no existe en el modelo de
- * datos (`club_members.rol` es 'admin' | 'jugador'), así que el permiso queda
- * en admin.
+ * datos (`club_members.rol` es 'admin' | 'jugador'), así que el permiso de
+ * /importante queda en admin.
  */
 export const CHAT_COMMANDS = [
   {
     command: '/importante',
     hint: 'Aviso que llega aunque tengan el chat silenciado',
     adminOnly: true,
+    scopes: ['club'],
   },
   {
     command: '/todos',
-    hint: 'Menciona a todos los jugadores del club',
+    hint: 'Menciona a todos los participantes del chat',
     adminOnly: false,
+    scopes: ['club', 'match'],
   },
 ];
 
@@ -63,13 +74,101 @@ export function parseComposerCommand(text) {
   return { command, body: (match[3] || '').trim(), raw };
 }
 
-/** Comandos que calzan con lo que se está escribiendo ('/imp' → /importante). */
-export function suggestCommands(text, { isClubAdmin = false } = {}) {
+/**
+ * Comandos que calzan con lo que se está escribiendo ('/imp' → /importante),
+ * filtrados también por en qué tipo de hilo estás — un DM no ofrece ninguno.
+ */
+export function suggestCommands(text, { isClubAdmin = false, threadType = 'club' } = {}) {
   const trimmed = (text || '').trim();
   if (!trimmed.startsWith('/') || /\s/.test(trimmed)) return [];
   return CHAT_COMMANDS.filter(
-    (c) => c.command.startsWith(trimmed.toLowerCase()) && (!c.adminOnly || isClubAdmin)
+    (c) =>
+      c.command.startsWith(trimmed.toLowerCase()) &&
+      (!c.adminOnly || isClubAdmin) &&
+      (!c.scopes || c.scopes.includes(threadType))
   );
+}
+
+// ============================================================
+// BANDEJA: normaliza una fila de get_my_threads() (RPC, migración 40)
+// ============================================================
+
+/**
+ * Traduce una fila de la RPC `get_my_threads()` — `{ thread_key, thread_type,
+ * last_at, payload }`, con los datos propios de cada tipo empacados en
+ * `payload` — a la forma plana que ya esperaba el resto del chat (misma
+ * forma que armaba `listMyThreads()` a mano antes de la migración 40).
+ *
+ * Pura a propósito: así se puede probar el mapeo exacto sin tocar Supabase.
+ */
+export function mapThreadRow(row, myId) {
+  const p = row?.payload || {};
+  const last = p.last_message;
+  const senderId = last?.sender_id || null;
+
+  const base = {
+    key: row.thread_key,
+    type: row.thread_type,
+    last_message: last
+      ? {
+          id: last.id,
+          content: last.content,
+          created_at: last.created_at,
+          sender_id: last.sender_id,
+          is_important: !!last.is_important,
+          mention_all: !!last.mention_all,
+        }
+      : null,
+    last_at: row.last_at,
+    unread: p.unread || 0,
+    has_important: !!p.has_important,
+    muted: !!p.muted,
+  };
+
+  const senderExtras = senderId
+    ? {
+        last_sender_name: senderId === myId ? 'Tú' : last?.sender_username || 'Jugador',
+        last_sender_is_me: senderId === myId,
+      }
+    : {};
+
+  if (row.thread_type === 'match') {
+    return {
+      ...base,
+      match_id: p.match_id,
+      title: p.titulo || 'Partido',
+      subtitle: (p.cancha_nombre || '') + (p.comuna ? ` · ${p.comuna}` : ''),
+      hora: p.hora || null,
+      estado: p.estado || null,
+      is_organizer: p.id_organizador === myId,
+      foto_url: p.foto_url || null,
+      ...senderExtras,
+    };
+  }
+
+  if (row.thread_type === 'club') {
+    return {
+      ...base,
+      club_id: p.club_id,
+      title: p.nombre,
+      subtitle: 'Chat del club' + (p.comuna ? ` · ${p.comuna}` : ''),
+      member_count: p.member_count || 1,
+      my_role: p.my_role || 'jugador',
+      foto_url: p.foto_url || null,
+      ...senderExtras,
+    };
+  }
+
+  // dm
+  return {
+    ...base,
+    other_id: p.other_id,
+    other_username: p.other_username || 'jugador',
+    other_foto: p.other_foto_url || null,
+    foto_url: p.other_foto_url || null,
+    title: '@' + (p.other_username || 'jugador'),
+    subtitle: 'Amigos',
+  };
 }
 
 /** Filtros de la bandeja, en el orden del diseño. */
@@ -315,15 +414,183 @@ export function decorateMessages(messages, { myId, isGroup, now = new Date() } =
 
 /**
  * ¿Se puede enviar lo que hay escrito?
- * Rechaza vacíos y espacios sueltos, bloquea el doble envío y respeta el
- * permiso de escritura.
+ * Rechaza vacíos y espacios sueltos, bloquea el doble envío, respeta el
+ * permiso de escritura y — sin conexión — no ofrece enviar nada: no existe
+ * una cola offline, así que prometerla sería mentir.
  */
-export function canSendDraft(draft, { sending = false, canWrite = true, maxLength = 1000 } = {}) {
-  if (!canWrite || sending) return false;
+export function canSendDraft(
+  draft,
+  { sending = false, canWrite = true, offline = false, maxLength = 1000 } = {}
+) {
+  if (!canWrite || sending || offline) return false;
   const trimmed = (draft || '').trim();
   if (trimmed.length === 0) return false;
   if (trimmed.length > maxLength) return false;
   return true;
+}
+
+/**
+ * /todos («mencionar a todos») solo tiene sentido en un chat grupal — en un
+ * DM ya está la otra persona, no hay a quién más mencionar. Esta es la
+ * validación del lado del cliente para dar feedback inmediato; la
+ * autorización real (quién es de verdad participante del grupo) la impone
+ * el backend — ver la migración 39 y `supabase/tests/39_chat_mention_all_test.sql`.
+ */
+export function canUseMentionAll(threadType) {
+  return threadType === 'match' || threadType === 'club';
+}
+
+// ============================================================
+// PAGINACIÓN Y SCROLL
+// ============================================================
+
+/**
+ * Combina una página de mensajes más antiguos con los ya cargados, sin
+ * duplicar los que ya estaban (Realtime puede haber traído alguno mientras
+ * se pedía la página anterior).
+ *
+ * @param {object[]} prev       mensajes ya cargados, antiguo → nuevo
+ * @param {object[]} olderPage  página nueva, antiguo → nuevo (ya invertida)
+ */
+export function mergeOlderMessages(prev, olderPage) {
+  const known = new Set((prev || []).map((m) => m.id));
+  return [...(olderPage || []).filter((m) => !known.has(m.id)), ...(prev || [])];
+}
+
+/**
+ * Decide qué hacer con el scroll cuando cambia el contenido de la lista de
+ * mensajes. Nunca hace `scrollToEnd()` al paginar hacia atrás — en ese caso
+ * ajusta el offset para que el mensaje que el usuario estaba mirando se
+ * quede exactamente donde estaba, aunque arriba se hayan agregado N px de
+ * mensajes nuevos.
+ *
+ * @returns {{ type: 'none' }
+ *          | { type: 'toEnd', animated: boolean }
+ *          | { type: 'toOffset', offset: number, animated: boolean }}
+ */
+export function decideAutoScroll({
+  isPrepending,
+  isInitial,
+  nearBottom,
+  prevHeight,
+  newHeight,
+  prevScrollY,
+}) {
+  if (isPrepending) {
+    const delta = newHeight - prevHeight;
+    if (delta <= 0) return { type: 'none' };
+    return { type: 'toOffset', offset: prevScrollY + delta, animated: false };
+  }
+  if (isInitial) return { type: 'toEnd', animated: false };
+  if (nearBottom) return { type: 'toEnd', animated: true };
+  return { type: 'none' };
+}
+
+// ============================================================
+// REALTIME: remitente de un mensaje grupal recién llegado
+// ============================================================
+
+/**
+ * Un mensaje que llega por Realtime es la fila cruda de Postgres: no trae
+ * `sender` (username/foto_url) como sí trae la carga inicial (que lo resuelve
+ * con un join en `listThreadMessages`). Estas dos funciones deciden, sin
+ * tocar la red, si ya se puede completar con lo que hay en caché y si además
+ * hace falta ir a buscarlo.
+ *
+ * `profilesById` puede ser un `Map<string, {username, foto_url}>` o un
+ * objeto plano — se usa lo que haya.
+ */
+function lookupProfile(profilesById, id) {
+  if (!profilesById) return null;
+  if (typeof profilesById.get === 'function') return profilesById.get(id) || null;
+  return profilesById[id] || null;
+}
+
+function hasProfile(profilesById, id) {
+  if (!profilesById) return false;
+  if (typeof profilesById.has === 'function') return profilesById.has(id);
+  return Object.prototype.hasOwnProperty.call(profilesById, id);
+}
+
+/** Devuelve el mensaje con `sender` adjunto si ya lo teníamos en caché. */
+export function attachCachedSender(row, { isGroup, myId, profilesById }) {
+  if (!isGroup || !row || row.sender_id === myId || row.sender) return row;
+  const cached = lookupProfile(profilesById, row.sender_id);
+  return cached ? { ...row, sender: cached } : row;
+}
+
+/** ¿Hace falta ir a buscar el perfil de quien mandó este mensaje? */
+export function needsSenderFetch(row, { isGroup, myId, profilesById }) {
+  if (!isGroup || !row || row.sender_id === myId || row.sender) return false;
+  return !hasProfile(profilesById, row.sender_id);
+}
+
+// ============================================================
+// MULTIPLEXADO DE UN CANAL COMPARTIDO (p.ej. Realtime)
+// ============================================================
+
+/**
+ * Comparte UN solo recurso (típicamente un canal Realtime) entre varios
+ * suscriptores, en vez de que cada uno abra el suyo — la bandeja de chats,
+ * el badge del tab y una conversación abierta necesitan enterarse de los
+ * mismos cambios en `messages`, y antes cada uno abría su propio WebSocket
+ * a la misma tabla.
+ *
+ * Sin nada de Supabase acá a propósito: `open`/`close` son inyectados, así
+ * que esto se prueba con un canal falso — lo que hay que probar es la
+ * MULTIPLEXACIÓN en sí (un solo `open`, fan-out a todos, `close` solo con
+ * el último), no la llamada real a Supabase.
+ *
+ * @param {{
+ *   open: (io: { emit: Function, emitStatus: Function }) => any,
+ *   close: (handle: any) => void,
+ * }} deps
+ *   `open` se llama solo cuando se pasa de 0 a 1 suscriptores y devuelve el
+ *   handle que después recibe `close` (llamado solo al pasar de 1 a 0).
+ * @returns {{ subscribe: (onEvent: Function, opts?: { onStatus?: Function }) => Function }}
+ *   `subscribe` devuelve la función de limpieza (unsubscribe).
+ */
+export function createSharedChannel({ open, close }) {
+  const listeners = new Map(); // onEvent -> { onStatus }
+  let handle = null;
+  let lastStatus = null;
+
+  const safeCall = (fn, arg) => {
+    if (!fn) return;
+    try {
+      fn(arg);
+    } catch (e) {
+      // Un suscriptor que revienta no debe tumbar a los demás ni al canal.
+      console.error('[FutFinder] createSharedChannel listener error:', e);
+    }
+  };
+
+  const emit = (payload) => {
+    for (const onEvent of listeners.keys()) safeCall(onEvent, payload);
+  };
+  const emitStatus = (status) => {
+    lastStatus = status;
+    for (const { onStatus } of listeners.values()) safeCall(onStatus, status);
+  };
+
+  return {
+    subscribe(onEvent, { onStatus } = {}) {
+      listeners.set(onEvent, { onStatus });
+      if (!handle) handle = open({ emit, emitStatus });
+      // Quien se suscribe después de que el canal ya esté abierto no debe
+      // quedarse "sin estado" hasta el próximo cambio real.
+      if (lastStatus !== null) safeCall(onStatus, lastStatus);
+
+      return () => {
+        listeners.delete(onEvent);
+        if (listeners.size === 0 && handle !== null) {
+          close(handle);
+          handle = null;
+          lastStatus = null;
+        }
+      };
+    },
+  };
 }
 
 // ============================================================
