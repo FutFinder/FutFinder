@@ -1,8 +1,9 @@
 /**
  * Config dinámica (en vez de app.json estático) para poder resolver
  * `android.googleServicesFile` desde una variable de entorno en builds de
- * EAS, sin comprometer el archivo real a Git. Ver README/CLAUDE.md para el
- * secreto de EAS que hay que crear (`GOOGLE_SERVICES_JSON`, tipo file).
+ * EAS, sin comprometer el archivo real a Git. Ver
+ * docs/memoria/arquitectura/despliegue-y-entornos.md para el secreto de EAS
+ * que hay que crear (`GOOGLE_SERVICES_JSON`, tipo file).
  *
  * En EAS Build, el secreto de tipo "file" se inyecta como una variable de
  * entorno cuyo valor es la ruta local (en el worker) al archivo ya

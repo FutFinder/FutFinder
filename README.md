@@ -1,40 +1,15 @@
 # FutFinder
 
-App para buscar y completar partidos de fútbol amateur en Santiago, Chile.
+Aplicación móvil y web para descubrir, crear, organizar y completar partidos de fútbol amateur en Chile.
 
-## Stack
+La documentación vigente de producto, arquitectura, diseño, operación y decisiones está en la [memoria de FutFinder](docs/memoria/00-inicio.md). Empieza allí: el índice indica la única nota principal que corresponde a cada tipo de cambio.
 
-- **Expo SDK 52** (React Native + web)
-- **React Navigation v7** (navegación entre pantallas)
-- **Lucide React Native** (íconos)
-- **react-native-svg** (logo vectorial)
-- **Vercel** (hosting de la versión web)
+## Estado del repositorio
 
-## Estructura
-
-```
-FutFinder/
-├── App.js                       # Raíz: SafeAreaProvider + navegador
-├── index.js                     # Entry point de Expo
-├── app.json                     # Configuración de Expo (nombre, splash, web…)
-├── vercel.json                  # Configuración de deploy en Vercel
-├── package.json                 # Dependencias
-└── src/
-    ├── components/              # Componentes reutilizables
-    │   ├── Logo.js              # Logo SVG (pin + balón + texto)
-    │   ├── Button.js            # Botón corporativo
-    │   └── FeatureCard.js       # Card de feature (Welcome)
-    ├── navigation/
-    │   └── AppNavigator.js      # Stack: Welcome → Login → Home
-    ├── screens/
-    │   ├── WelcomeScreen.js     # Pantalla de bienvenida
-    │   ├── LoginScreen.js       # Login / registro
-    │   └── HomeScreen.js        # Home con partidos cercanos
-    ├── services/
-    │   └── auth.js              # Placeholder para Supabase (Fase 2)
-    └── theme/
-        └── colors.js            # Paleta y tokens de diseño
-```
+- Expo SDK 54, React Native 0.81 y React 19, con soporte web.
+- React Navigation 7, Supabase y Edge Functions para los dominios de la aplicación.
+- Módulos de partidos, clubes, chat, avisos, perfil, amistades, privacidad y configuración.
+- Exportación web para Vercel y perfiles de build nativo con EAS.
 
 ## Comandos
 
@@ -49,8 +24,4 @@ npm run web
 npm run build:web
 ```
 
-## Paleta
-
-- Fondo: `#201F1D`
-- Verde principal: `#71B533`
-- Verde secundario: `#3F762F`
+Consulta [Despliegue y entornos](docs/memoria/arquitectura/despliegue-y-entornos.md) antes de configurar variables, servicios de Firebase o builds remotos.
