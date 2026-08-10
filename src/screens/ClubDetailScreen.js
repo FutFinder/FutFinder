@@ -40,7 +40,7 @@ import {
   getMyRequestTo,
   requestToJoin,
   cancelRequest,
-  searchClubs,
+  listRivalCandidates,
 } from '../services/clubs';
 import { getClubPhotos } from '../services/clubGallery';
 import { countPendingForClub } from '../services/clubChallenges';
@@ -133,7 +133,7 @@ export default function ClubDetailScreen({ navigation, route }) {
       listMembers(clubId),
       getMyClubs(),
       getClubPhotos(clubId),
-      searchClubs(''),
+      listRivalCandidates({ retadorClubId: clubId }),
       getClubMatchHistory(clubId),
       countPendingForClub(clubId),
     ]);
@@ -148,11 +148,11 @@ export default function ClubDetailScreen({ navigation, route }) {
     const reales = partidos || [];
     setHistorial(reales.length > 0 ? reales : usarHistorialDemo() ? getDemoMatchHistory() : []);
 
-    // Rivales sugeridos: otros clubes, ordenados por distancia real cuando
-    // se puede calcular; los que no tienen comuna conocida van al final.
-    const misClubIds = new Set((mine || []).map((m) => m.club?.id).filter(Boolean));
-    const otros = (candidatos || []).filter((r) => r.id !== clubId && !misClubIds.has(r.id));
-    const conDistancia = otros.map((r) => ({
+    // Rivales sugeridos: los candidatos ya vienen sin este club ni ninguno
+    // de los míos —la exclusión la hace la consulta, no un filtro de acá—,
+    // ordenados por distancia real cuando se puede calcular; los que no
+    // tienen comuna conocida van al final.
+    const conDistancia = (candidatos || []).map((r) => ({
       ...r,
       distanciaKm: c ? distanciaEntreClubesKm(c, r) : null,
     }));
@@ -241,6 +241,16 @@ export default function ClubDetailScreen({ navigation, route }) {
   const goToGallery = () => navigation.navigate('ClubGallery', { clubId });
   const goToExplore = () => navigation.navigate('ExploreClubs');
 
+  // Explorar para elegir rival es distinto de explorar el catálogo: acá los
+  // clubes propios no deben aparecer siquiera en la lista. Sólo se declara
+  // este club como retador si soy su administrador; si no, el servicio
+  // igualmente excluye todos mis clubes.
+  const goToElegirRival = () =>
+    navigation.navigate('ExploreClubs', {
+      modoRival: true,
+      retadorClubId: soyAdmin ? clubId : null,
+    });
+
   if (loading || !club) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
@@ -323,14 +333,14 @@ export default function ClubDetailScreen({ navigation, route }) {
           <CreateChallengeButton
             label="Crear desafío"
             onPress={() => setChallengeSheetOpen(true)}
-            onSearch={goToExplore}
+            onSearch={goToElegirRival}
           />
         ) : puedoDesafiar ? (
           <CreateChallengeButton
             label="Desafiar a este club"
             accessibilityLabel={`Desafiar a ${club.nombre}`}
             onPress={() => goToChallenge(club)}
-            onSearch={goToExplore}
+            onSearch={goToElegirRival}
           />
         ) : !soyMiembro && !tengoMaxClubs ? (
           <CreateChallengeButton
@@ -348,8 +358,8 @@ export default function ClubDetailScreen({ navigation, route }) {
           <CreateChallengeButton
             label="Buscar rivales"
             icon={<Search color={clubColors.greenInk} size={20} strokeWidth={2.2} />}
-            onPress={goToExplore}
-            onSearch={goToExplore}
+            onPress={goToElegirRival}
+            onSearch={goToElegirRival}
           />
         ) : null}
 
@@ -381,14 +391,18 @@ export default function ClubDetailScreen({ navigation, route }) {
         {/* ── Buscar rivales (solo integrantes del club) ── */}
         {soyMiembro && (
           <>
-            <SectionHeader title="Buscar rivales" actionLabel="Ver todos" onAction={goToExplore} />
+            <SectionHeader
+              title="Buscar rivales"
+              actionLabel="Ver todos"
+              onAction={goToElegirRival}
+            />
             {rivals.length === 0 ? (
               <EmptyStateCard
                 icon={<Search color={clubColors.textSecondary} size={18} strokeWidth={2} />}
                 title="Sin rivales cerca"
                 subtitle="Amplía la búsqueda para encontrar más clubes"
                 actionLabel="Buscar clubes"
-                onAction={goToExplore}
+                onAction={goToElegirRival}
               />
             ) : (
               <ScrollView
@@ -531,7 +545,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             <Pressable
               onPress={() => {
                 setChallengeSheetOpen(false);
-                goToExplore();
+                goToElegirRival();
               }}
               accessibilityRole="button"
               accessibilityLabel="Elegir un club para desafiar"

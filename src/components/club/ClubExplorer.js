@@ -28,7 +28,13 @@ import {
 import { clubsExplorer as CE, clubsExplorerRadius as CER } from '../../theme/colors';
 import Banner from '../Banner';
 import ClubExplorerCard from './ClubExplorerCard';
-import { searchClubs, getMyClubs, listMyInvitations, respondToRequest } from '../../services/clubs';
+import {
+  searchClubs,
+  getMyClubs,
+  listMyInvitations,
+  respondToRequest,
+  listRivalCandidates,
+} from '../../services/clubs';
 import { NOMBRES_REGIONES } from '../../data/regiones-chile';
 
 /**
@@ -49,6 +55,12 @@ export default function ClubExplorer({
   extraBottomClearance = 0,
   initialBanner = null,
   onMembershipChanged,
+  // Modo «elegir rival»: la lista deja de ser el catálogo de clubes y pasa a
+  // ser sólo la de candidatos válidos. Los clubes propios y el que reta no
+  // aparecen — no basta con esconderles el botón «Desafiar», porque entonces
+  // siguen ocupando la lista y el usuario cree que puede desafiarlos.
+  modoRival = false,
+  retadorClubId = null,
 }) {
   const insets = useSafeAreaInsets();
 
@@ -70,7 +82,9 @@ export default function ClubExplorer({
 
   const load = useCallback(async () => {
     const [{ data: found, error: err }, { data: mine }] = await Promise.all([
-      searchClubs(''),
+      // En modo rival la exclusión viaja dentro de la consulta, no como un
+      // filtro posterior: un club propio no debe llegar ni a la respuesta.
+      modoRival ? listRivalCandidates({ retadorClubId }) : searchClubs(''),
       getMyClubs(),
     ]);
     setError(Boolean(err));
@@ -79,14 +93,15 @@ export default function ClubExplorer({
     setMisClubIds(misIds);
     setSoyAdminDeAlgo((mine || []).some((m) => m.miRol === 'admin'));
     setHasMaxClubs((mine || []).length >= 3);
-    if ((mine || []).length < 3) {
+    // Elegir rival no es momento de responder invitaciones a otros clubes.
+    if (!modoRival && (mine || []).length < 3) {
       const { data: invs } = await listMyInvitations();
       setInvitations(invs || []);
     } else {
       setInvitations([]);
     }
     setLoading(false);
-  }, []);
+  }, [modoRival, retadorClubId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -300,12 +315,17 @@ export default function ClubExplorer({
               )}
 
               {!loading && !error && filteredClubs.length > 0 && (
-                <Text style={styles.sectionLabel}>Clubes en FutFinder</Text>
+                <Text style={styles.sectionLabel}>
+                  {modoRival ? 'Clubes que puedes desafiar' : 'Clubes en FutFinder'}
+                </Text>
               )}
             </View>
           }
           renderItem={({ item }) => {
-            const puedoDesafiar = soyAdminDeAlgo && !misClubIds.has(item.id);
+            // En modo rival la lista ya viene depurada por el servicio, así que
+            // todo lo que se ve es desafiable.
+            const puedoDesafiar =
+              modoRival || (soyAdminDeAlgo && !misClubIds.has(item.id));
             return (
               <ClubExplorerCard
                 club={item}

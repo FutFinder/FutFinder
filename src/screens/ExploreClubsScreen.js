@@ -11,14 +11,23 @@ import ClubExplorer from '../components/club/ClubExplorer';
  *
  * Toda la UI vive en `ClubExplorer`, compartida con el estado sin-club de
  * `ClubsScreen` para no duplicar pantallas.
+ *
+ * Con `modoRival` la pantalla deja de ser el catálogo completo y lista sólo
+ * los clubes que el club de `retadorClubId` puede desafiar: los clubes
+ * propios del usuario no aparecen.
  */
-export default function ExploreClubsScreen({ navigation }) {
+export default function ExploreClubsScreen({ navigation, route }) {
+  const modoRival = route?.params?.modoRival === true;
+  const retadorClubId = route?.params?.retadorClubId || null;
+
   return (
     <ClubExplorer
       navigation={navigation}
       showBackButton
       onBack={() => navigation.goBack()}
       extraBottomClearance={0}
+      modoRival={modoRival}
+      retadorClubId={retadorClubId}
     />
   );
 }
