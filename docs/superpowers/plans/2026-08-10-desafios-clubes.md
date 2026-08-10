@@ -87,15 +87,43 @@ el rango real queda en **4 a 15 por club**. **Decisión:** `cupos_por_club` se
 valida entre 4 y 15; `cupos_totales` sigue siendo el total y ningún RPC ni
 trigger existente cambia de significado.
 
-### C5 — `profiles.estado` y `profiles.suspended_until` no existen en el esquema
+### C5 — El esquema desplegado y las migraciones del repositorio no coinciden
 
-`src/services/profile.js:57,270` y `src/services/reports.js:15` leen esas dos
-columnas, y el comentario de `reports.js` afirma que «ya existen». No hay
-migración ni `schema.sql` que las cree (verificado con grep sobre todo
-`supabase/`). El código sobrevive porque `profile.js:274-278` trata su ausencia
-como «cuenta sin sanciones». **Es un defecto preexistente, ajeno a este plan.**
-No lo toco aquí; queda anotado para decidir aparte. Las sanciones de club de este
-plan son una tabla propia y no dependen de esas columnas.
+Comprobado en el proyecto `jvfoendzblkoxvwvommz` el 2026-08-10 con consultas de
+solo lectura al catálogo:
+
+- `profiles.estado` y `profiles.suspended_until` **sí existen** en la base
+  desplegada, pero **ninguna migración ni `schema.sql` las crea**. Se aplicaron a
+  mano. El comentario de `src/services/reports.js:15` que dice «ya existen» es
+  correcto sobre la base real e incorrecto sobre el repositorio.
+- Es el mismo patrón que ya documentó la migración 33 para
+  `request_join`/`approve_join`/`cancel_match`: cambios aplicados por consola sin
+  versionar.
+
+**Decisión:** este plan no depende de esas columnas — las sanciones de club son
+tabla propia. Pero queda registrado que el repositorio no reproduce la base
+desplegada, y eso es lo que hace peligroso aplicar migraciones a ciegas.
+
+### C9 — Las migraciones 39 y 40 NO están aplicadas en el único proyecto
+
+Verificado el 2026-08-10: `get_my_threads()` no existe y `messages.mention_all`
+tampoco. Es decir, las migraciones 39 (`/todos`) y 40 (bandeja por RPC) están en
+el repositorio pero **no** en la base. Sí están aplicadas la 32, 36, 37 y 38
+(`chat_reads`, `chat_mutes`, `mark_chat_read`, `chat_are_friends`,
+`chat_valid_club_challenge_dm`, `push_tickets`, `check_push_receipts`) y la 33/34
+(`partido_reglas`, `save_match_attendance`, `match_waitlist`). `pg_cron` 1.6.4
+está instalado, así que el vencimiento por cron de la Fase 3 es viable.
+
+**Consecuencia directa sobre la Fase 2:** la tarea 2.1 planeaba añadir una cuarta
+rama a `get_my_threads()`. Esa función no existe en la base, así que
+`listMyThreads()` (`src/services/messages.js:517`) hoy no puede funcionar contra
+este proyecto. **Antes de la Fase 2 hay que aplicar las migraciones 39 y 40**, o
+la bandeja del chat —y con ella el hilo de negociación— no tiene dónde apoyarse.
+
+**Además, no existe un proyecto Supabase de desarrollo:** hay uno solo, y es el
+que usa `.env`. Las pruebas SQL de este plan terminan en `rollback` y son seguras,
+pero aplicar una migración ahí es tocar el entorno real. Ninguna migración de este
+plan se aplica sin autorización explícita.
 
 ### C6 — El chat de desafío actual es un DM, no un grupo
 
