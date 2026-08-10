@@ -16,6 +16,16 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 - Un club Estándar admite hasta 15 integrantes y 1 administrador; un club Premium, hasta 26 integrantes y 3 administradores. El trigger `check_club_limits` valida estos topes.
 - Las solicitudes de ingreso y las invitaciones usan estados `pending`, `approved` o `rejected`; al aprobarse se crea la membresía.
 
+## Desafíos entre clubes
+
+- El ciclo formal se centraliza en `src/services/clubChallengeRules.js` y su espejo versionado es `desafio_reglas()` de la migración 41.
+- Plazos: 72 horas de negociación desde que se acepta el desafío, 24 horas de prórroga final si vence sin propuesta, 2 horas antes del inicio como límite para proponer un cambio, y 14 días de sanción al club que cancela con menos de 2 horas. La sanción de club **no** modifica el Trust Score personal de nadie.
+- Cupos: se expresan **por club**, nunca como total del partido, y van de 4 a 15. El máximo no es una preferencia: `matches.cupos_totales` admite hasta 30 y el total de un partido de clubes es el doble de los cupos por club.
+- Métodos de inscripción: `orden_llegada` (se inscriben solos hasta llenar el cupo del club) o `seleccion_admin` (postulan y cada club confirma su nómina).
+- Estados: `pendiente`, `negociacion`, `esperando_aprobacion`, `publicado`, `en_juego`, `esperando_resultado`, `finalizado`, `rechazado`, `sin_acuerdo`, `cancelado`, `resultado_en_disputa`, `bloqueado_sancion` y `expirado`. `aceptado` es legado: no lo produce el código nuevo, pero las filas anteriores a la migración 41 lo conservan junto con su conversación directa.
+- Un club no puede desafiar a otro del que quien crea el desafío es miembro. Se aplica en la interfaz, en `listRivalCandidates()` y —única capa que un cliente modificado no puede saltarse— en el trigger `club_challenges_valida_rival()`.
+- Sólo puede existir un desafío activo por par de clubes, sin importar quién retó a quién.
+
 ## Trust Score
 
 - El puntaje se almacena entre 0 y 100 y puede condicionar el ingreso cuando un partido define `min_trust_score`.

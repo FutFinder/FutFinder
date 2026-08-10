@@ -4,12 +4,17 @@
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
-## P1 — Confirmar migraciones y RLS en el proyecto Supabase objetivo
+## P1 — El esquema desplegado tiene objetos que ninguna migración versiona
 
-- **Dominio afectado:** seguridad, privacidad, chat, avisos y push.
-- **Evidencia:** el repositorio contiene las migraciones 35 a 40 y pruebas SQL asociadas, pero no puede demostrar qué migraciones están aplicadas en un proyecto remoto.
-- **Acción:** contrastar el historial de migraciones del entorno objetivo, aplicar de forma controlada las que falten y ejecutar las pruebas SQL en un Supabase de desarrollo equivalente.
-- **Verificación necesaria:** las cinco pruebas de `supabase/tests/` pasan contra el esquema objetivo de desarrollo y los contratos de RLS/RPC usados por cliente existen.
+- **Dominio afectado:** base de datos, recuperación de entornos y cualquier cambio que toque partidos, asistentes o avisos.
+- **Evidencia (comprobada el 2026-08-10 contra `jvfoendzblkoxvwvommz`):** dieciséis objetos existen en la base y en ninguna migración del repositorio — `canchas`, `search_canchas`, `tg_register_cancha`, `norm_text`, `recalc_user_ratings`, `tg_ratings_recalc`, `create_notification`, `tg_enforce_join_rules`, `tg_match_future_only`, `tg_notify_match_join`, `tg_notify_friend_request`, `tg_notify_message_new`, `reactivate_suspended`, `tg_auto_suspend`, `send_match_reminders`, `send_rating_reminders` — más las columnas `profiles.estado` y `profiles.suspended_until` y los cron `futfinder-match-reminders`, `futfinder-rating-reminders` y `futfinder-reactivate`.
+- **Por qué importa:** tres de ellos condicionan cualquier código nuevo que cree partidos o inscriba jugadores. `tg_match_future_only` rechaza insertar un partido con hora pasada; `tg_enforce_join_rules` valida suspensión, Trust Score y choque de horario antes de aceptar un asistente; `create_notification()` es el ayudante que conviene reutilizar en vez de insertar en `notifications` a mano.
+- **Acción:** volcar esos objetos a una migración de recuperación para que una base nueva pueda reconstruirse desde el repositorio.
+- **Verificación necesaria:** una base creada sólo desde `supabase/` levanta sin objetos ausentes y las pruebas SQL pasan.
+
+## Resuelto el 2026-08-10 — migraciones 39, 40 y 41 aplicadas
+
+Las migraciones 39 (`/todos`) y 40 (bandeja por RPC) estaban versionadas pero **no** aplicadas: `get_my_threads()` no existía, así que `listMyThreads()` no tenía contra qué correr. Se aplicaron junto con la 41 y se verificaron: `get_my_threads()` ejecuta, `messages.mention_all` y los dos triggers de la 39 existen, y la prueba SQL del ciclo de desafíos pasa sin dejar residuos. No existe un proyecto Supabase de desarrollo separado: hay uno solo y es el que usa `.env`.
 
 ## P1 — Validar el envío push de extremo a extremo en dispositivo físico
 

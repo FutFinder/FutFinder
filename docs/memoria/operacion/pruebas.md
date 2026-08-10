@@ -18,7 +18,9 @@ Genera la exportación web de Expo y detecta fallos de empaquetado o compatibili
 
 ## Pruebas SQL de RLS y contratos de base de datos
 
-Los archivos `supabase/tests/35_privacy_test.sql`, `36_chat_security_test.sql`, `38_push_reliability_test.sql`, `39_chat_mention_all_test.sql` y `40_bandeja_chat_rpc_test.sql` requieren un Supabase de desarrollo con el esquema y las migraciones correspondientes. Ejecútalos contra ese entorno, no contra producción, para verificar privacidad, RLS de chat, fiabilidad de push, `/todos` y la RPC de bandeja.
+Los archivos `supabase/tests/35_privacy_test.sql`, `36_chat_security_test.sql`, `38_push_reliability_test.sql`, `39_chat_mention_all_test.sql`, `40_bandeja_chat_rpc_test.sql` y `41_desafio_ciclo_test.sql` verifican privacidad, RLS de chat, fiabilidad de push, `/todos`, la RPC de bandeja y el ciclo de desafíos entre clubes.
+
+Cada archivo se abre con `begin;` y termina en `rollback;`, así que ejecutarlo no deja filas guardadas ni siquiera si se corre contra el proyecto real — que hoy es el único que existe, porque no hay un Supabase de desarrollo separado. Lo que sí exige autorización explícita es **aplicar** una migración, no correr una prueba.
 
 ## Pruebas de Edge Function
 

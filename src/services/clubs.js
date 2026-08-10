@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { esModalidadValida } from '../utils/clubMeta';
+import { buildRivalClubsQuery } from '../utils/rivalClubsQuery';
 
 /**
  * Servicio de clubes.
@@ -12,7 +13,9 @@ import { esModalidadValida } from '../utils/clubMeta';
  *   tipo 'invitacion' → un admin invita, el jugador responde
  * Al aprobarse, un trigger crea la membresía automáticamente.
  *
- * Regla: un jugador pertenece a UN solo club (unique en BD).
+ * Regla: un jugador pertenece como máximo a TRES clubes, y sólo una vez a
+ * cada uno. Lo valida el trigger `check_user_club_limit` de la migración 24,
+ * que reemplazó el límite anterior de un club por persona.
  */
 
 export const CLUB_LIMITS = {
@@ -232,6 +235,60 @@ export async function searchClubs(query = '') {
   // cantidad de miembros por club, en una sola query
   const ids = (data || []).map((c) => c.id);
   let countById = new Map();
+  if (ids.length > 0) {
+    const { data: members } = await supabase
+      .from('club_members')
+      .select('club_id')
+      .in('club_id', ids);
+    for (const m of members || []) {
+      countById.set(m.club_id, (countById.get(m.club_id) || 0) + 1);
+    }
+  }
+
+  return {
+    data: (data || []).map((c) => ({ ...c, total_miembros: countById.get(c.id) || 0 })),
+    error: null,
+  };
+}
+
+/**
+ * Clubes que pueden ser rivales de un desafío.
+ *
+ * Se diferencia de `searchClubs()` en que excluye el club que reta y TODOS
+ * los clubes del usuario, y en que la exclusión viaja dentro de la consulta
+ * (ver src/utils/rivalClubsQuery.js). Un club propio no debe llegar nunca a
+ * la lista: ni con el botón deshabilitado, ni escondido en la respuesta.
+ *
+ * Esta es la segunda de las tres capas que exige la regla. La tercera —y la
+ * única que un cliente modificado no puede saltarse— es el trigger
+ * `club_challenges_valida_rival()` de la migración 41.
+ */
+export async function listRivalCandidates({
+  retadorClubId = null,
+  query = '',
+  limit = 30,
+} = {}) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+
+  const { data: mis } = await getMyClubs();
+  const excludeIds = [
+    retadorClubId,
+    ...(mis || []).map((m) => m.club?.id),
+  ].filter(Boolean);
+
+  const { data, error } = await buildRivalClubsQuery(supabase, {
+    excludeIds,
+    query,
+    limit,
+  });
+
+  if (error) {
+    console.error('[FutFinder] listRivalCandidates:', error);
+    return { data: [], error };
+  }
+
+  const ids = (data || []).map((c) => c.id);
+  const countById = new Map();
   if (ids.length > 0) {
     const { data: members } = await supabase
       .from('club_members')
