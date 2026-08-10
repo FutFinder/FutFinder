@@ -1,0 +1,785 @@
+# Ciclo formal de desafíos y partidos entre clubes — Plan de implementación
+
+> **Para agentes:** ejecutar con `superpowers:subagent-driven-development` o
+> `superpowers:executing-plans`. Los pasos usan `- [ ]` para seguimiento.
+
+**Objetivo:** convertir el desafío entre clubes (hoy: una fila con cinco estados y
+un DM entre dos administradores) en una máquina de estados formal con chat grupal
+de negociación, plazos con vencimiento en servidor, propuesta oficial aprobada por
+el club rival, partido publicado con cupos por club, cambios negociados,
+cancelaciones con sanción, y resultado confirmado que alimenta el historial real.
+
+**Arquitectura:** toda transición de estado vive en una RPC `SECURITY DEFINER`
+sobre PostgreSQL, con hora de servidor y guardas de autorización derivadas de
+`club_members` (nunca de datos del cliente). El cliente sólo lee estado y dibuja.
+Las reglas numéricas se declaran una vez en `src/services/clubChallengeRules.js`
+(puro, testeable con `node:test`) y se espejan en la función SQL
+`desafio_reglas()`. El chat de negociación es un **tipo de hilo nuevo**
+(`challenge:<id>`), no un DM ampliado.
+
+**Stack:** Expo SDK 54 / React Native 0.81, Supabase (Postgres + RLS + RPC +
+Realtime + pg_cron), `node:test` para unitarias, SQL plano transaccional para RLS.
+
+---
+
+## Restricciones globales
+
+Aplican a **todas** las tareas de este plan.
+
+- Texto visible al usuario: **español de Chile**. Sin excepciones.
+- Migraciones **nuevas** (41 en adelante). Nunca editar 01–40.
+- Toda operación crítica es una RPC atómica. El cliente no escribe estados.
+- Ninguna RPC confía en `club_id`, `user_id`, rol ni timestamp enviado por el
+  cliente: se derivan de `auth.uid()` y de `now()` de PostgreSQL.
+- Idempotencia obligatoria en publicación y aprobación (`client_token`,
+  `where estado = <estado esperado>` en el `update`).
+- El aviso interno (`notifications`) se inserta siempre; las preferencias sólo
+  apagan el push externo. Ya es así — mantenerlo.
+- El módulo Partidos usa `partidos`/`partidosRadius`; Clubes usa
+  `dsColors`/`clubColors`. **No mezclar familias** ni sustituir la paleta global.
+- Sin datos demo nuevos. Los fixtures existentes de `clubMatches.js` se apagan en
+  la Fase 6, no antes.
+- Ninguna afirmación de "migración aplicada" sin comprobarlo contra el proyecto.
+- Compatibilidad: los partidos que no vienen de un desafío no cambian de
+  comportamiento en ningún punto.
+
+---
+
+## Contradicciones y decisiones que hay que aprobar
+
+Estas son las discrepancias reales entre el enunciado y el esquema/código
+verificados. Ninguna reduce alcance en silencio.
+
+### C1 — «Propuesta oficial» y «Esperando aprobación» son el mismo instante
+
+El enunciado los lista como dos estados del ciclo, pero la Fase 3 no describe
+ningún paso intermedio: la propuesta se crea y queda esperando al club rival en
+la misma operación. **Decisión:** un solo estado persistido,
+`esperando_aprobacion`, etiquetado en la interfaz como «Propuesta oficial
+enviada». Si más adelante se quiere un borrador editable antes de enviar, se
+agrega `propuesta_borrador` sin tocar el resto de la máquina.
+
+### C2 — «Club sancionado» no es un estado del desafío
+
+Una sanción es del club y dura 14 días; puede alcanzar a varios desafíos a la
+vez. Modelarla como estado del desafío obliga a inventar cómo se sale de él.
+**Decisión:** la sanción vive en `club_sanctions`; el desafío bloqueado por una
+sanción queda en `bloqueado_sancion` (estado real, reversible si la revisión
+retira la sanción). Así «Club sancionado» existe como estado visible del desafío
+sin duplicar la fuente de verdad.
+
+### C3 — Qué pasa con los partidos ya publicados dentro de la ventana de sanción
+
+El enunciado pide «resolver de forma coherente» sin definirlo. Cancelar
+automáticamente todos los partidos del club sancionado castiga al club rival y a
+los jugadores ya inscritos, que no hicieron nada. **Decisión:** el partido que
+originó la sanción se cancela (es la causa). Los demás partidos ya publicados se
+mantienen y se juegan; la sanción bloquea **crear, enviar, aceptar y publicar**
+partidos nuevos durante 14 días. Los administradores del club sancionado ven el
+motivo y la fecha de término. Si se prefiere lo contrario, es un cambio de una
+línea en `aplicar_sancion_club()`.
+
+### C4 — Mínimo de 4 cupos por club contra el techo de 30 de `matches`
+
+`matches.cupos_totales` tiene `check (cupos_totales > 0 and cupos_totales <= 30)`
+en `supabase/schema.sql:51`. Con cupos por club y `cupos_totales = 2 × por_club`,
+el rango real queda en **4 a 15 por club**. **Decisión:** `cupos_por_club` se
+valida entre 4 y 15; `cupos_totales` sigue siendo el total y ningún RPC ni
+trigger existente cambia de significado.
+
+### C5 — `profiles.estado` y `profiles.suspended_until` no existen en el esquema
+
+`src/services/profile.js:57,270` y `src/services/reports.js:15` leen esas dos
+columnas, y el comentario de `reports.js` afirma que «ya existen». No hay
+migración ni `schema.sql` que las cree (verificado con grep sobre todo
+`supabase/`). El código sobrevive porque `profile.js:274-278` trata su ausencia
+como «cuenta sin sanciones». **Es un defecto preexistente, ajeno a este plan.**
+No lo toco aquí; queda anotado para decidir aparte. Las sanciones de club de este
+plan son una tabla propia y no dependen de esas columnas.
+
+### C6 — El chat de desafío actual es un DM, no un grupo
+
+Hoy aceptar un desafío manda un mensaje a `dm:<creado_por>` y la RLS lo permite
+vía `chat_valid_club_challenge_dm()` (migración 37). Eso no puede cumplir «todos
+los administradores actuales de ambos clubes». **Decisión:** se agrega el tipo de
+hilo `challenge:<id>` como grupo real. `chat_valid_club_challenge_dm()` **no se
+borra**: los desafíos ya aceptados (`estado = 'aceptado'`) conservan su DM
+funcionando. Los desafíos nuevos entran a `negociacion` y usan el hilo grupal.
+No se migran filas históricas.
+
+### C8 — No existe infraestructura de pruebas de integración
+
+El enunciado pide «pruebas unitarias, de integración y SQL/RLS». En el repositorio
+hay exactamente dos mecanismos: `npm test` (`node --test` sobre funciones puras de
+`src/**/__tests__`, sin ningún doble de Supabase salvo constructores de consulta
+falsos escritos a mano) y las pruebas SQL de `supabase/tests/`, que **se pegan a
+mano** en el editor de Supabase y no las ejecuta ningún script ni CI. No hay Jest,
+ni `supabase start` local, ni pipeline. **Decisión:** las pruebas de integración
+reales de este plan son las SQL —que sí ejercitan RPC, RLS, concurrencia e
+idempotencia de extremo a extremo dentro de Postgres— y se declaran como tales.
+Montar un arnés de integración en JavaScript es un proyecto aparte, no una
+subtarea escondida dentro de éste.
+
+### C7 — `join_match` permitiría saltarse los cupos por club
+
+Si un jugador llama `join_match` sobre un partido de clubes, entra sin pasar por
+el reparto por club. **Decisión:** `join_match` rechaza los partidos que tengan
+`challenge_proposal_id is not null` (los de este flujo nuevo). Los partidos de
+club creados con el flujo antiguo (`club_local_id` puesto, sin propuesta) siguen
+funcionando igual que hoy.
+
+---
+
+## Máquina de estados
+
+`club_challenges.estado`. Valores existentes en negrita, nuevos en cursiva.
+
+```
+                       ┌─────────────┐
+                       │ **pendiente** │
+                       └──────┬──────┘
+          rechazar │          │ aceptar          │ 7 días
+                   ▼          ▼                  ▼
+          **rechazado**   *negociacion*    **expirado**
+                              │
+              72 h sin propuesta → prórroga 24 h (misma fila,
+              prorroga_vence_at) ──► un "No" o falta respuesta
+                              │                    └──► *sin_acuerdo*
+              crear propuesta │
+                              ▼
+                  *esperando_aprobacion*
+                     │              │ rechazar propuesta
+        aprobar rival │              └──► vuelve a *negociacion*
+                     ▼
+                 *publicado*  ──(hora de inicio)──► *en_juego*
+                     │                                  │
+        cancelar     │                     (fin + duración)
+                     ▼                                  ▼
+              **cancelado**                    *esperando_resultado*
+                                                        │
+                                      confirmar │       │ rechazar
+                                                ▼       ▼
+                                        *finalizado*  *resultado_en_disputa*
+
+Transversal: cualquier estado activo ──(sanción del club)──► *bloqueado_sancion*
+             *bloqueado_sancion* ──(revisión retira la sanción)──► estado previo
+Legado: **aceptado** (sólo filas anteriores a la migración 41; no se produce más)
+```
+
+Transiciones autorizadas, con quién puede dispararlas:
+
+| Desde | Hacia | Quién | RPC |
+|---|---|---|---|
+| `pendiente` | `negociacion` | admin del club retado | `aceptar_desafio` |
+| `pendiente` | `rechazado` | admin del club retado | `rechazar_desafio` |
+| `pendiente` | `cancelado` | admin del club retador | `cancelar_desafio` |
+| `pendiente` | `expirado` | sistema (7 días) | `procesar_vencimientos_desafios` |
+| `negociacion` | `esperando_aprobacion` | admin de cualquiera de los dos | `crear_propuesta_oficial` |
+| `negociacion` | `sin_acuerdo` | sistema (prórroga vencida o un «No») | `procesar_vencimientos_desafios` / `responder_prorroga` |
+| `esperando_aprobacion` | `publicado` | admin del club **contrario** al proponente | `aprobar_propuesta` |
+| `esperando_aprobacion` | `negociacion` | admin del club contrario | `rechazar_propuesta` |
+| `publicado` | `en_juego` | sistema (hora de inicio) | `procesar_vencimientos_desafios` |
+| `publicado` \| `en_juego` | `cancelado` | admin de cualquiera de los dos | `cancelar_encuentro_club` |
+| `en_juego` | `esperando_resultado` | sistema (fin + duración) | `procesar_vencimientos_desafios` |
+| `esperando_resultado` | `finalizado` | admin del club contrario al proponente | `confirmar_resultado` |
+| `esperando_resultado` | `resultado_en_disputa` | admin del club contrario | `confirmar_resultado(false)` |
+| cualquiera activo | `bloqueado_sancion` | sistema | `aplicar_sancion_club` |
+
+---
+
+## Estructura de archivos
+
+### Migraciones nuevas
+
+| Archivo | Contenido |
+|---|---|
+| `supabase/migrations/41_desafios_estados_y_chat.sql` | Estados nuevos, columnas de plazos, `desafio_reglas()`, trigger anti-autodesafío, tipo de hilo `challenge:` (columna, RLS, helpers, `get_my_threads`, `get_chat_unread_counts`), `club_challenge_events`, RPC `aceptar_desafio`/`rechazar_desafio`/`cancelar_desafio`, tipos de notificación |
+| `supabase/migrations/42_desafios_plazos_y_propuesta.sql` | `club_challenge_extension_replies`, `club_challenge_proposals`, RPC `procesar_vencimientos_desafios` (+ `cron.schedule`), `responder_prorroga`, `crear_propuesta_oficial`, `rechazar_propuesta` |
+| `supabase/migrations/43_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda en `join_match` |
+| `supabase/migrations/44_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` |
+| `supabase/migrations/45_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), helper `club_esta_sancionado` |
+| `supabase/migrations/46_resultado_y_historial.sql` | `club_match_results`, RPC `proponer_resultado`, `confirmar_resultado`, `club_record()` |
+
+### Pruebas SQL nuevas
+
+`supabase/tests/41_desafio_chat_rls_test.sql`, `42_desafio_plazos_test.sql`,
+`43_partido_clubes_cupos_test.sql`, `44_cambios_partido_test.sql`,
+`45_sanciones_test.sql`, `46_resultado_test.sql`. Mismo estilo que
+`36_chat_security_test.sql`: `begin; do $$ … raise exception 'FALLÓ (caso N): …' … $$; rollback;`,
+usuarios de prueba insertados en `auth.users`, identidad simulada con
+`set local role authenticated` + `set local request.jwt.claims`.
+
+### Código nuevo
+
+| Archivo | Responsabilidad |
+|---|---|
+| `src/services/clubChallengeRules.js` | Única fuente de reglas del ciclo (plazos, cupos, transiciones, etiquetas, CTA, motivos de bloqueo). Puro, sin React ni Supabase. Espejo de `desafio_reglas()`. |
+| `src/services/clubChallenges.js` | *(existente, se amplía)* llamadas a las RPC nuevas |
+| `src/services/clubProposals.js` | Propuesta oficial, prórroga, cambios post-publicación |
+| `src/services/clubSanctions.js` | Sanciones, incomparecencia, revisiones |
+| `src/services/clubResults.js` | Resultado, asistencia real, récord V/E/D |
+| `src/utils/challengeThread.js` | Puro: `challengeThreadKey`, `parseChallengeThread`, `resolveThreadAccent`, etiquetas de la tarjeta del chat |
+| `src/components/clubes/` | Sistema visual del módulo (ver Fase 1) |
+| `src/screens/ClubChallengeWizardScreen.js` | Crear desafío (propuesta preliminar) |
+| `src/screens/ClubProposalScreen.js` | Crear / revisar propuesta oficial |
+| `src/screens/ClubMatchRosterScreen.js` | Nómina e inscripción por club |
+| `src/screens/ClubResultScreen.js` | Proponer / confirmar resultado |
+
+### Pruebas unitarias nuevas
+
+`src/services/__tests__/clubChallengeRules.test.js`,
+`src/utils/__tests__/challengeThread.test.js`, y ampliaciones de
+`src/utils/__tests__/notificationTargets.test.js` y `chatMeta.test.js`.
+
+---
+
+## FASE 1 — Explorador, creación y desafío
+
+**Entregable:** las cinco superficies de entrada renovadas sobre `dsColors`, con
+los cinco estados obligatorios, y la exclusión de clubes propios aplicada en
+interfaz, servicio y base de datos.
+
+**Riesgo principal:** `CreateClubScreen`, `ClubChallengeScreen` y
+`ClubChallengesScreen` usan hoy la paleta global `colors` (`#201F1D`/`#71B533`),
+distinta de `dsColors` (`#0B0D0C`/`#5AE06A`) que usa el resto de Clubes. Migrarlas
+cambia su aspecto de forma visible. Es exactamente lo que pide el enunciado
+(«sigue el sistema visual actual documentado en la memoria»), pero hay que
+hacerlo pantalla por pantalla y revisar cada una.
+
+### Tarea 1.1 — Reglas del ciclo (núcleo puro y testeable)
+
+**Archivos:** crear `src/services/clubChallengeRules.js`; crear
+`src/services/__tests__/clubChallengeRules.test.js`.
+
+**Produce:** `ESTADOS`, `TRANSICIONES`, `CUPOS_POR_CLUB = {min:4, max:15}`,
+`NEGOCIACION_HORAS = 72`, `PRORROGA_HORAS = 24`, `CAMBIO_LIMITE_HORAS = 2`,
+`SANCION_DIAS = 14`, `METODOS_INSCRIPCION`, `puedeTransicionar(desde, hacia)`,
+`estadoLabel(estado)`, `validarPropuestaPreliminar(draft)`,
+`validarPropuestaOficial(draft)`, `getChallengeCta(ctx)`,
+`getChallengeBlockReason(ctx)`.
+
+- [ ] Escribir las pruebas primero: transiciones válidas/ inválidas, cupos por
+      debajo de 4 y por encima de 15 rechazados, misma cantidad para ambos clubes,
+      etiquetas en español, CTA por estado y por rol (admin del retador, admin del
+      retado, miembro sin rol).
+- [ ] `npm test` → fallan por módulo inexistente.
+- [ ] Implementar el módulo.
+- [ ] `npm test` → pasan.
+- [ ] Commit.
+
+### Tarea 1.2 — Migración 41 (parte de reglas y anti-autodesafío)
+
+**Archivos:** crear `supabase/migrations/41_desafios_estados_y_chat.sql`
+(sección 1 y 2).
+
+- [ ] Ampliar `club_challenges_estado_check` con los estados nuevos, conservando
+      `aceptado` (filas legadas, C6).
+- [ ] Agregar columnas: `negociacion_vence_at`, `prorroga_vence_at`,
+      `prorroga_abierta_at`, `motivo_cierre`, `estado_previo_sancion`,
+      `client_token uuid` con índice único parcial.
+- [ ] Crear `desafio_reglas()` `immutable` devolviendo el JSON espejo de
+      `clubChallengeRules.js`.
+- [ ] Crear trigger `before insert on club_challenges` →
+      `club_challenges_valida_rival()`: rechaza si `creado_por` es miembro de
+      `club_retado_id`, o si los dos clubes comparten cualquier administrador.
+      Este es el cierre de backend pedido en la Fase 1 punto 3.
+- [ ] Escribir `supabase/tests/41_desafio_chat_rls_test.sql` casos 1–3
+      (autodesafío bloqueado, desafío a club propio bloqueado, desafío legítimo
+      permitido).
+- [ ] Commit.
+
+### Tarea 1.3 — Servicio: candidatos rivales con exclusión
+
+**Archivos:** modificar `src/services/clubs.js` (agregar
+`listRivalCandidates({ retadorClubId, query, limit })`); modificar
+`src/services/clubChallenges.js` (`createChallenge` acepta los campos nuevos de la
+propuesta preliminar).
+
+**Consume:** `getMyClubs()`. **Produce:** `listRivalCandidates` devolviendo
+`{ data, error }` con los clubes propios del usuario **y** el club retador
+excluidos en la consulta, no después de traerla.
+
+- [ ] Prueba con el cliente falso encadenable (patrón de
+      `src/utils/__tests__/searchPlayersQuery.test.js`): verificar que la
+      exclusión viaja como filtro `not.in` en la consulta, no como `filter()` en
+      memoria.
+- [ ] Implementar y hacer pasar.
+- [ ] Ampliar `createChallenge` con `modalidad`, `fecha_desde`, `fecha_hasta`,
+      `cupos_por_club`, `metodo_inscripcion`, validando con
+      `validarPropuestaPreliminar`.
+- [ ] Migración 41: columnas correspondientes en `club_challenges`.
+- [ ] Commit.
+
+### Tarea 1.4 — Sistema visual del módulo Clubes
+
+**Archivos:** crear `src/components/clubes/ui.js`, `StateViews.js`, `Sheet.js`,
+`ClubPickerSheet.js`.
+
+Espeja `src/components/partidos/ui.js` y `StateViews.js` (que ya resuelven bien
+loading / vacío / error / sin conexión) pero sobre `dsColors`/`dsRadius`/`dsSizes`,
+que es la familia del módulo Clubes. No se reutilizan los de Partidos para no
+mezclar paletas.
+
+- [ ] `ui.js`: `PrimaryButton` (≥48 px), `GhostButton`, `SurfaceButton`,
+      `IconButton`, `Pill`, `OptionChip`, `Input`, `SelectField`, `Stepper`
+      (con `min`/`max` inyectables — aquí 4/15), `RadioRow`, `FieldLabel`,
+      `SectionLabel`, `Note`, `Callout`, `Divider`.
+- [ ] `StateViews.js`: `LoadingList`, `ErrorState`, `OfflineNotice`, `EmptyState`
+      —usando `services/connectivity.js`, que ya existe.
+- [ ] `Sheet.js` + `ClubPickerSheet.js`: selector de club propio y de club rival,
+      con buscador y exclusión ya aplicada por el servicio.
+- [ ] Commit.
+
+### Tarea 1.5 — Explorador y selector de clubes
+
+**Archivos:** modificar `src/components/club/ClubExplorer.js` (745 líneas) y
+`ClubExplorerCard.js`; modificar `src/screens/ExploreClubsScreen.js`.
+
+- [ ] Migrar de `clubsExplorer`/`clubsExplorerRadius` a `dsColors`/`dsRadius`
+      para unificar el verde (`#55DF69` → `#5AE06A`). Los tokens
+      `clubsExplorer*` quedan en `colors.js` sin uso; **no se borran** en esta
+      fase para no romper nada fuera de la vista.
+- [ ] Reemplazar los estados ad-hoc por `StateViews`.
+- [ ] `puedoDesafiar` deja de sólo ocultar el botón: los clubes propios se
+      excluyen de la lista cuando la vista está en modo «elegir rival».
+- [ ] Commit.
+
+### Tarea 1.6 — Crear club
+
+**Archivos:** modificar `src/screens/CreateClubScreen.js` (412 líneas).
+
+- [ ] Migrar de `colors`/`radius` a `dsColors`/`dsRadius`/`dsSizes`.
+- [ ] Sustituir controles por las primitivas de `components/clubes/ui.js`.
+- [ ] Agregar estado sin conexión y botón deshabilitado con motivo visible.
+- [ ] Commit.
+
+### Tarea 1.7 — Asistente de creación de desafío
+
+**Archivos:** crear `src/screens/ClubChallengeWizardScreen.js`; registrar la ruta
+en `src/navigation/AppNavigator.js` (con `withAuthGuard`, animación
+`slide_from_bottom`); dejar `ClubChallengeScreen.js` como redirección para no
+romper los `navigate('ClubChallenge', …)` existentes de `ClubDetailScreen`.
+
+Paso 1 club retador (sólo donde soy admin) → paso 2 club rival (`ClubPickerSheet`,
+excluye propios) → paso 3 propuesta preliminar: modalidad, fecha o rango
+tentativo, zona aproximada, cupos por equipo (stepper 4–15, etiqueta explícita
+«por club»), método de inscripción (`RadioRow` con las dos descripciones del
+enunciado) y mensaje opcional.
+
+- [ ] Implementar el asistente con los cinco estados.
+- [ ] Verificar que el rival elegido nunca puede ser un club propio ni el retador.
+- [ ] Commit.
+
+**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 41 en el
+Supabase de desarrollo, y repaso manual de que Partidos, Chat y el detalle de club
+siguen intactos.
+
+---
+
+## FASE 2 — Aceptación y chat grupal de negociación
+
+**Entregable:** aceptar un desafío abre un hilo grupal `challenge:<id>` con todos
+los administradores de ambos clubes, protegido por RLS, con aviso de CTA «IR
+AHORA» y tarjeta de acento rojo neón que se apaga por administrador.
+
+**Riesgo principal:** `get_my_threads()` (migración 40) y
+`get_chat_unread_counts()` (migración 36) hay que reescribirlas enteras para
+añadir la cuarta rama. Si sólo se toca una, la bandeja muestra el hilo con 0 no
+leídos para siempre. `chatMeta.test.js` tiene 859 líneas: cambiar
+`TYPE_BY_FILTER` puede romperlas.
+
+### Tarea 2.1 — Migración 41 (parte de chat)
+
+- [ ] `alter table messages add column challenge_id uuid references club_challenges(id) on delete cascade`.
+- [ ] Actualizar `messages_block_content_edits()` para que `challenge_id` también
+      sea inmutable tras el insert.
+- [ ] Helper `chat_puede_ver_desafio(p_challenge_id uuid, p_user uuid)`
+      `security invoker`, `stable`: admin vigente de cualquiera de los dos clubes
+      **y** desafío en un estado activo. Al derivarse de `club_members` en vivo,
+      un cambio de administradores queda coherente sin trabajo extra.
+- [ ] Cuarta rama en las políticas `messages_read` y `messages_insert`.
+- [ ] Cuarta rama en `get_chat_unread_counts()` y cuarta rama `union all` en el
+      CTE `raw` de `get_my_threads()`, con `payload` que incluya
+      `estado`, `club_retador`, `club_retado`, `vence_at` y
+      `abierto_alguna_vez` (= existe fila en `chat_reads` para ese `thread_key`).
+- [ ] `club_challenge_events` + RLS de lectura para los mismos administradores.
+- [ ] RPC `aceptar_desafio(p_challenge_id uuid)`: `update … where estado='pendiente'`
+      (idempotente ante doble pulsación), fija `negociacion_vence_at = now() + 72h`,
+      inserta el evento, inserta el mensaje de sistema y notifica a los
+      administradores de ambos clubes con `type='club_challenge_accepted'` y
+      `data.threadKey='challenge:'||id`.
+- [ ] Tipos nuevos en `notifications_type_check`.
+- [ ] Pruebas SQL 41 casos 4–9: admin de cada club lee y escribe; jugador normal
+      de cualquiera de los dos clubes **no** lee ni escribe; tercero ajeno no lee;
+      degradar a un admin a jugador le quita el acceso; `aceptar_desafio` dos
+      veces deja una sola transición.
+- [ ] Commit.
+
+### Tarea 2.2 — Hilo de desafío en el cliente
+
+**Archivos:** crear `src/utils/challengeThread.js` + su prueba; modificar
+`src/services/messages.js`, `src/utils/chatMeta.js`.
+
+`messages.js` tiene cinco puntos donde se ramifica por tipo de hilo, y todos
+necesitan la rama nueva: `getThreadAccess` (L360), `listThreadMessages` (L558),
+`sendMessage` (L638, columna `challenge_id`), `getThreadParticipants` (L727) y
+`messageBelongsToThread` (L879).
+
+- [ ] Pruebas de `challengeThread.js`: construir y parsear la clave, longitud
+      dentro del rango 3–120 que exige `chat_reads`, y `resolveThreadAccent`
+      devolviendo el acento neón sólo mientras `abierto_alguna_vez` sea falso.
+- [ ] Rama nueva en `mapThreadRow` (título = «Club A vs Club B», subtítulo =
+      etiqueta de estado).
+- [ ] `TYPE_BY_FILTER`: el filtro «Clubes» pasa a aceptar `['club','challenge']`.
+      Ajustar `filterThreads` para admitir valor único o arreglo **sin romper**
+      las pruebas existentes.
+- [ ] `canUseMentionAll`: aceptar `'challenge'` (es un grupo).
+- [ ] `threadKindLabel`: etiqueta «Desafío».
+- [ ] `npm test`, incluida la suite de 859 líneas.
+- [ ] Commit.
+
+### Tarea 2.3 — Tarjeta de chat con acento rojo neón
+
+**Archivos:** modificar `src/theme/colors.js` (agregar `neon` a `chatColors`);
+modificar `src/components/chat/ConversationCard.js` y `ThreadAvatar.js`.
+
+`ConversationCard` ya tiene el punto exacto de inyección: el arreglo `style`
+(L46-53) y el `LinearGradient` condicional (L54-66), hoy gobernados por
+`isClub`.
+
+- [ ] Añadir `isChallenge` y `styles.cardChallenge` con borde rojo neón. Sin
+      animación ni parpadeo, tal como pide el enunciado.
+- [ ] Texto «Nuevo desafío aceptado» mientras no se haya abierto; después,
+      etiqueta discreta «Negociación activa».
+- [ ] El acento se resuelve con `resolveThreadAccent(thread)` — una función, no
+      un color literal en el componente. Ese es el punto donde más adelante
+      entrará el color temático del club, sin implementarlo ahora.
+- [ ] Rama `challenge` en `ThreadAvatar` (escudos cruzados, no la inicial de DM).
+- [ ] Commit.
+
+### Tarea 2.4 — CTA «IR AHORA» de extremo a extremo
+
+**Archivos:** modificar `src/utils/notificationTargets.js` y su prueba;
+modificar `src/components/notifications/NotificationCard.js` (177 líneas);
+modificar `src/utils/notificationPreferences.js` y el espejo Deno
+`supabase/functions/send-push/pushLogic.ts`; modificar `AppNavigator.js`
+(`linking`).
+
+- [ ] `club_challenge_accepted` con `data.threadKey` presente pasa a resolver
+      `{ screen: 'ChatThread', params: { threadKey } }`. Si falta `threadKey`
+      (avisos antiguos), conserva el destino actual `ClubChallenges`. Prueba
+      unitaria para ambas ramas.
+- [ ] Botón verde «IR AHORA» en `NotificationCard` para los tipos de desafío que
+      traigan `threadKey`.
+- [ ] Mapear los tipos nuevos a `notif_clubs` en las **dos** copias del mapa
+      (JS y Deno) — están duplicadas a propósito y desincronizarlas es un fallo
+      silencioso.
+- [ ] Añadir `ChatThread: 'chat/:threadKey'` a `linking.config.screens` para que
+      el destino funcione con la app cerrada. `App.js` ya espera a que pase el
+      Splash y deduplica el arranque en frío: no hay que tocarlo.
+- [ ] `npm test`, `deno test supabase/functions/send-push/pushLogic.test.ts`.
+- [ ] Commit.
+
+### Tarea 2.5 — Cabecera de negociación dentro del hilo
+
+**Archivos:** modificar `src/screens/ChatThreadScreen.js` (la barra fija sobre el
+compositor, L774-840, ya existe para desafíos); crear
+`src/components/clubes/ChallengeHeader.js` y `ChallengeEventBubble.js`.
+
+- [ ] Cabecera con los dos clubes, estado actual, contador de negociación
+      (calculado desde `vence_at` del servidor, nunca desde la hora del
+      dispositivo) y acciones contextuales según `getChallengeCta`.
+- [ ] Los `club_challenge_events` se intercalan como burbujas de sistema en el
+      historial, sin desplazar los mensajes normales entre administradores.
+- [ ] Commit.
+
+**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 41
+completa, y comprobación manual de que los chats de partido, de club y los DM
+siguen funcionando igual.
+
+---
+
+## FASE 3 — Plazos y propuesta oficial
+
+**Entregable:** vencimientos procesados por el servidor de forma idempotente,
+prórroga de 24 h con una respuesta por club, y propuesta oficial que sólo el club
+contrario puede aprobar.
+
+**Riesgo principal:** doble aprobación por doble pulsación, y un administrador
+aprobando en nombre de ambos clubes si pertenece a los dos. La segunda ya está
+cubierta por el trigger de la Tarea 1.2, pero la RPC debe volver a comprobarlo.
+
+### Tarea 3.1 — Vencimientos en servidor
+
+**Archivos:** crear `supabase/migrations/42_desafios_plazos_y_propuesta.sql`
+(secciones 1–2); crear `supabase/tests/42_desafio_plazos_test.sql`.
+
+- [ ] `club_challenge_extension_replies` con `unique (challenge_id, club_id)` —
+      la unicidad es lo que hace idempotente «basta un administrador por club».
+- [ ] `procesar_vencimientos_desafios()`: en una sola pasada, `pendiente`
+      vencido → `expirado`; `negociacion` vencida sin prórroga → abre prórroga de
+      24 h + evento + aviso «¿Este partido se disputará?»; prórroga vencida sin
+      dos «Sí» → `sin_acuerdo` + archivar el hilo como sólo lectura + avisar;
+      `publicado` con hora pasada → `en_juego`; `en_juego` pasado fin+duración →
+      `esperando_resultado`. Todo con `where` sobre el estado esperado, de modo
+      que ejecutarla dos veces seguidas no cambia nada.
+- [ ] `revoke execute … from anon, authenticated` y `cron.schedule('futfinder-desafios','*/5 * * * *', …)`,
+      siguiendo el patrón de `38_push_reliability.sql:174`.
+- [ ] Además, una RPC pública y delgada `refrescar_desafio(p_challenge_id uuid)`
+      que aplique los mismos vencimientos **sólo a esa fila**, para que la
+      pantalla no dependa de esperar al cron. El cron es la fuente fiable; esto
+      es sólo latencia.
+- [ ] Sólo lectura del hilo cuando el desafío está cerrado: la política
+      `messages_insert` consulta el estado vía `chat_puede_ver_desafio`, que ya
+      exige estado activo. Comprobarlo en la prueba SQL.
+- [ ] Prueba SQL: correr `procesar_vencimientos_desafios()` dos veces seguidas y
+      verificar que el segundo pase no produce eventos ni avisos nuevos.
+- [ ] Commit.
+
+### Tarea 3.2 — Respuesta de prórroga
+
+- [ ] RPC `responder_prorroga(p_challenge_id uuid, p_respuesta boolean)`: exige
+      prórroga abierta y no vencida, deriva el club del `auth.uid()`, inserta con
+      `on conflict do nothing` (idempotente). Un «No» cierra el desafío en
+      `sin_acuerdo` de inmediato.
+- [ ] Servicio `src/services/clubProposals.js` + interfaz en `ChallengeHeader`.
+- [ ] Prueba SQL: dos administradores del mismo club responden, queda una fila;
+      un «No» cierra; falta de respuesta al vencer cierra.
+- [ ] Commit.
+
+### Tarea 3.3 — Propuesta oficial
+
+**Archivos:** migración 42 (sección 3); crear `src/screens/ClubProposalScreen.js`.
+
+- [ ] Tabla `club_challenge_proposals` con todos los campos del enunciado:
+      `fecha`, `duracion_min`, `direccion`, `cancha_nombre`, `comuna`, `region`,
+      `latitud`, `longitud`, `modalidad`, `cupos_por_club` (check 4–15),
+      `metodo_inscripcion`, `cuota_por_persona`, `instrucciones`, `estado`,
+      `client_token` con índice único parcial.
+- [ ] Índice único parcial `where estado = 'pendiente'`: **una sola propuesta
+      abierta por desafío**.
+- [ ] `crear_propuesta_oficial(p_challenge_id, p_payload jsonb, p_client_token uuid)`:
+      admin de cualquiera de los dos clubes, desafío en `negociacion`, pasa a
+      `esperando_aprobacion`. Reintento con el mismo `client_token` devuelve la
+      propuesta existente sin crear otra.
+- [ ] `rechazar_propuesta(p_proposal_id, p_motivo)`: sólo admin del club
+      contrario; vuelve a `negociacion` conservando el registro.
+- [ ] Pantalla de creación y de revisión con todos los campos, validados por
+      `validarPropuestaOficial` antes de llamar.
+- [ ] Dirección exacta, cuota e información oficial visibles para **todos** los
+      integrantes de ambos clubes: política de `select` sobre
+      `club_challenge_proposals` para `club_members` de cualquiera de los dos
+      clubes (no sólo administradores).
+- [ ] Prueba SQL: el proponente no puede aprobar su propia propuesta; un miembro
+      no admin no puede crear ni aprobar; un miembro sin rol **sí** puede leer.
+- [ ] Commit.
+
+**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 41 y 42.
+
+---
+
+## FASE 4 — Publicación, convocatoria y cambios
+
+**Entregable:** aprobar la propuesta crea el partido en la misma transacción, con
+cupos separados por club, y todo cambio posterior necesita el visto bueno del
+club contrario.
+
+**Riesgo principal:** partidos duplicados si la aprobación se pulsa dos veces, y
+sobrecupo si dos jugadores del mismo club entran a la vez.
+
+### Tarea 4.1 — Aprobación atómica que publica el partido
+
+**Archivos:** crear `supabase/migrations/43_partido_de_clubes.sql`.
+
+- [ ] Columnas en `matches`: `cupos_por_club integer`, `metodo_inscripcion text`,
+      `challenge_proposal_id uuid unique references club_challenge_proposals(id)`.
+      La unicidad es la garantía **estructural** de que no hay partido duplicado,
+      no una comprobación en código.
+- [ ] Columna `attendees.club_id uuid references clubs(id)`, índice
+      `(id_partido, club_id, estado)`.
+- [ ] `aprobar_propuesta(p_proposal_id uuid)`: una sola transacción que verifica
+      admin del club contrario, `update … where estado='pendiente'` (0 filas →
+      salir sin efecto), inserta el `matches` con `cupos_totales = 2 × cupos_por_club`,
+      `aprobacion = case metodo when 'seleccion_admin' then 'manual' else 'inmediata' end`,
+      `club_local_id`/`club_visitante_id`/`challenge_id`, pasa el desafío a
+      `publicado`, registra el evento y notifica a **todos** los integrantes de
+      ambos clubes.
+- [ ] Verificar que ningún club esté sancionado antes de publicar (la función
+      `club_esta_sancionado` llega en la Fase 5; aquí se declara como *stub* que
+      devuelve `false` y se completa entonces — se deja explícito en el comentario
+      de la migración).
+- [ ] Prueba SQL 43: aprobar dos veces deja un solo partido; el proponente no
+      puede aprobar; la unicidad de `challenge_proposal_id` rechaza el duplicado.
+- [ ] Commit.
+
+### Tarea 4.2 — Inscripción con cupos por club
+
+- [ ] `join_club_match(p_match_id)`: deriva el club del jugador de `club_members`
+      ∩ {local, visitante}; si no pertenece a ninguno, rechaza. Bloquea la fila
+      del partido (`select … for update`) y cuenta los inscritos de ese club
+      antes de insertar: eso es lo que impide el sobrecupo, no un contador
+      global. `orden_llegada` → `inscrito`; `seleccion_admin` → `pendiente`.
+- [ ] `leave_club_match(p_match_id)` y `confirmar_nomina_club(p_match_id, p_player_id, p_aprobar)`
+      (admin del club **del jugador**, no del otro).
+- [ ] Guarda en `join_match`: rechazar si `challenge_proposal_id is not null`
+      (decisión C7).
+- [ ] `src/screens/ClubMatchRosterScreen.js`: cupos disponibles, confirmados y
+      pendientes **por equipo**.
+- [ ] Prueba SQL: dos inscripciones concurrentes al último cupo dejan una sola;
+      un jugador del club A no puede ocupar cupo del club B; un ajeno no entra.
+- [ ] Commit.
+
+### Tarea 4.3 — Partido de clubes visualmente distinto
+
+**Archivos:** modificar `src/components/partidos/PartidoCard.js` (ya tiene la
+píldora «CLUBES» en L63-68, sin escudos), `src/components/home/MatchCard.js`
+(L74), `src/screens/MatchDetailScreen.js` (héroe, L529-584).
+
+- [ ] Sustituir la píldora de texto por escudos + nombres de ambos clubes,
+      manteniendo los tokens `partidos` del módulo.
+- [ ] Sección «Partido de clubes» en el detalle: estado del desafío, cupos por
+      club, fecha, hora y lugar, con enlace al hilo de negociación para quien sea
+      administrador.
+- [ ] Commit.
+
+### Tarea 4.4 — Cambios negociados
+
+**Archivos:** crear `supabase/migrations/44_cambios_de_partido.sql`.
+
+- [ ] `club_match_changes` con `campos jsonb` y estado.
+- [ ] `proponer_cambio_partido`: rechaza si faltan menos de 2 h para el inicio
+      (comparando con `now()` de PostgreSQL). El valor vigente **no** se toca
+      mientras la solicitud está pendiente.
+- [ ] `responder_cambio_partido(p_change_id, p_aceptar)`: sólo admin del club
+      contrario. Al aceptar, actualiza el partido y notifica a todos los
+      inscritos; al rechazar, no cambia nada.
+- [ ] Evento en el chat con el texto exacto del enunciado: «Club A propone
+      cambiar la hora de 17:00 a 18:00».
+- [ ] Prueba SQL 44: fuera de plazo rechazado; el proponente no puede aceptar su
+      propio cambio; rechazar conserva los valores anteriores.
+- [ ] Commit.
+
+**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 43 y 44, y
+comprobación de que publicar/unirse a un partido normal sigue igual.
+
+---
+
+## FASE 5 — Cancelaciones, revisiones y sanciones
+
+**Entregable:** cancelación unilateral con motivo obligatorio, sanción automática
+de 14 días bajo las 2 horas, y trazabilidad completa de revisiones.
+
+**Riesgo principal:** la pieza de moderación no existe. Hay que dejar el estado y
+la trazabilidad correctos **sin** inventar un permiso inseguro.
+
+### Tarea 5.1 — Cancelación y sanción
+
+**Archivos:** crear `supabase/migrations/45_sanciones_y_revisiones.sql`.
+
+- [ ] `club_sanctions` (motivo `not null` con `check (length(trim(motivo)) > 0)`,
+      `inicio_at`, `fin_at = inicio_at + 14 días`, `estado`).
+- [ ] `cancelar_encuentro_club(p_challenge_id, p_motivo)`: motivo no vacío,
+      unilateral, sin aprobación del rival; registra club, administrador, motivo
+      y hora de servidor; cancela el partido reutilizando la lógica de
+      `cancel_match` (migración 34, que ya conserva el historial); notifica a
+      administradores y a los inscritos.
+- [ ] `aplicar_sancion_club`: si faltan menos de 2 h, sanción de 14 días.
+      **No toca `profiles.trust_score`** — comprobado en la prueba SQL.
+- [ ] `club_esta_sancionado(p_club_id)` completa el *stub* de la Tarea 4.1 y se
+      llama desde `createChallenge`, `aceptar_desafio`,
+      `crear_propuesta_oficial` y `aprobar_propuesta`.
+- [ ] Acción «Cancelar encuentro» siempre visible en la parte superior del hilo.
+- [ ] Prueba SQL 45: motivo vacío rechazado; cancelar a 1 h sanciona y a 3 h no;
+      el `trust_score` de los jugadores no cambia; el club sancionado no puede
+      crear ni aceptar desafíos; **sí** puede seguir en los partidos ya
+      publicados (decisión C3).
+- [ ] Commit.
+
+### Tarea 5.2 — Incomparecencia y revisión
+
+- [ ] `club_match_noshow_reports`: sólo después de la hora del partido; sanción
+      provisional de 14 días con `estado='provisional'`.
+- [ ] `club_sanction_reviews`: «Solicitar revisión» visible para el club
+      afectado ante cualquier cancelación o sanción; guarda motivo, historial del
+      partido, tiempos y eventos relevantes.
+- [ ] `resolver_revision_sancion(p_review_id, p_decision, p_nota)` con
+      `revoke execute … from anon, authenticated` — **sólo `service_role`**.
+      Retirar la sanción devuelve el desafío a `estado_previo_sancion`.
+- [ ] Documentar la pieza pendiente en
+      `docs/memoria/operacion/pendientes.md`: no existe interfaz de moderación;
+      hoy la resolución se ejecuta desde el panel de Supabase con `service_role`.
+- [ ] Prueba SQL: un `authenticated` no puede ejecutar la resolución.
+- [ ] Commit.
+
+**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 45.
+
+---
+
+## FASE 6 — Resultado, asistencia e historial
+
+**Entregable:** resultado propuesto y confirmado, récord V/E/D real en ambos
+perfiles de club, y fixtures de demostración apagados.
+
+### Tarea 6.1 — Resultado
+
+**Archivos:** crear `supabase/migrations/46_resultado_y_historial.sql`; crear
+`src/screens/ClubResultScreen.js`, `src/services/clubResults.js`.
+
+- [ ] `club_match_results` con `goles_local`, `goles_visitante`,
+      `estado ('propuesto','confirmado','rechazado')`, único parcial `where estado <> 'rechazado'`.
+- [ ] `proponer_resultado(p_challenge_id, p_goles_local, p_goles_visitante, p_asistencia jsonb)`:
+      admin de cualquiera de los dos; marca la asistencia real sobre `attendees`
+      (`confirmado_gps` / `no_asistio`) reutilizando la semántica existente.
+- [ ] `confirmar_resultado(p_result_id, p_aceptar)`: admin del club contrario.
+      Aceptar → `finalizado` y `matches.estado='finalizado'`. Rechazar →
+      `resultado_en_disputa`, **sin** tocar estadísticas, conservando propuesta y
+      rechazo.
+- [ ] `club_record(p_club_id)` devuelve V/E/D contando sólo resultados
+      confirmados.
+- [ ] Prueba SQL 46: el proponente no confirma su propio resultado; en disputa el
+      récord no cambia.
+- [ ] Commit.
+
+### Tarea 6.2 — Historial real
+
+**Archivos:** modificar `src/services/clubMatches.js`,
+`src/components/club/MatchHistoryCard.js`, `ClubStatsRow.js`,
+`src/screens/ClubDetailScreen.js`.
+
+- [ ] `getClubMatchHistory` lee `club_match_results` y devuelve marcador y
+      resultado reales en lugar de `null`.
+- [ ] `DEMO_HISTORIAL = false` y borrar `getDemoMatchHistory()`/`usarHistorialDemo()`
+      con sus llamadas. Éste es el punto —y no antes— en que se retiran los
+      fixtures, porque hasta aquí no había datos reales que mostrar.
+- [ ] `calcularRecord` pasa a apoyarse en `club_record()` cuando hay sesión.
+- [ ] Commit.
+
+### Tarea 6.3 — Memoria
+
+**Archivos:** modificar `docs/memoria/funcionalidades/clubes.md`,
+`chat.md`, `avisos-y-push.md`, `producto/reglas-de-negocio.md`,
+`arquitectura/base-de-datos.md`, `arquitectura/seguridad-y-privacidad.md`,
+`operacion/pendientes.md`, `operacion/pruebas.md`; crear
+`docs/memoria/decisiones/2026-08-10-ciclo-desafios-clubes.md`.
+
+- [ ] Registrar la máquina de estados, el tipo de hilo nuevo, las reglas de cupos
+      y sanciones, las migraciones 41–46 y sus pruebas, y la decisión C1–C7.
+- [ ] Commit.
+
+**Verificación final:** `npm test`, `npm run build:web`,
+`deno test supabase/functions/send-push/pushLogic.test.ts`, y las seis pruebas SQL
+en un Supabase de desarrollo.
+
+---
+
+## Riesgos transversales
+
+| Riesgo | Mitigación |
+|---|---|
+| Reescribir `get_my_threads()` rompe la bandeja | Prueba SQL 41 reutiliza los casos de `40_bandeja_chat_rpc_test.sql` antes de añadir la cuarta rama |
+| `chatMeta.test.js` (859 líneas) falla al tocar `TYPE_BY_FILTER` | `filterThreads` acepta valor único **y** arreglo; las pruebas viejas no se editan |
+| Doble pulsación crea propuestas o partidos duplicados | `client_token` + índice único parcial + `update … where estado = <esperado>` |
+| Sobrecupo en inscripción concurrente | `select … for update` sobre `matches` y conteo por club dentro de la transacción |
+| El cron no está configurado en el entorno destino | `refrescar_desafio()` cubre la latencia en pantalla; el cron sigue siendo la fuente fiable. No afirmar que está activo sin comprobarlo |
+| Migrar la paleta de tres pantallas cambia su aspecto | Una pantalla por tarea, con revisión visual entre cada una |
+| Las migraciones no están aplicadas en el proyecto remoto | Cada servicio nuevo traduce el error de función/columna ausente a un mensaje de «migración pendiente», como ya hace `matches.js:481` |
