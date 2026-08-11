@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Shield, Video } from 'lucide-react-native';
+import { Shield, Video, Swords } from 'lucide-react-native';
 
 import { chatColors } from '../../theme/colors';
 import { initialOf } from '../../utils/chatMeta';
@@ -9,9 +9,11 @@ import { initialOf } from '../../utils/chatMeta';
 /**
  * Avatar de una conversación. Tres identidades distintas, como en el diseño:
  *
- *   club   → escudo sobre degradado verde (es la conversación destacada)
- *   match  → icono de cancha sobre superficie verde tenue
- *   dm     → foto del jugador o su inicial
+ *   club      → escudo sobre degradado verde (es la conversación destacada)
+ *   match     → icono de cancha sobre superficie verde tenue
+ *   challenge → escudos cruzados sobre degradado rojo neón: son DOS clubes
+ *               enfrentados, así que no puede llevar el escudo de uno solo
+ *   dm        → foto del jugador o su inicial
  *
  * `muted` (una conversación silenciada) NO cambia el avatar: el estado se
  * comunica con la campana tachada de la tarjeta, para no depender del color.
@@ -37,6 +39,19 @@ export default function ThreadAvatar({ type, fotoUrl, name, size = 46, radius = 
         style={[styles.base, box, styles.clubShield]}
       >
         <Shield color={chatColors.inkOnGreen} size={iconSize} strokeWidth={2.2} />
+      </LinearGradient>
+    );
+  }
+
+  if (type === 'challenge') {
+    return (
+      <LinearGradient
+        colors={chatColors.challengeShield}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={[styles.base, box, styles.challengeShield]}
+      >
+        <Swords color="#FFFFFF" size={iconSize} strokeWidth={2.2} />
       </LinearGradient>
     );
   }
@@ -77,6 +92,13 @@ const styles = StyleSheet.create({
   clubShield: {
     borderColor: 'rgba(90,224,106,0.5)',
     shadowColor: chatColors.green,
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  challengeShield: {
+    borderColor: chatColors.neonBorder,
+    shadowColor: chatColors.neon,
     shadowOpacity: 0.22,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },

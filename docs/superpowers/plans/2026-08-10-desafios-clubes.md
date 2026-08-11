@@ -104,7 +104,14 @@ solo lectura al catálogo:
 tabla propia. Pero queda registrado que el repositorio no reproduce la base
 desplegada, y eso es lo que hace peligroso aplicar migraciones a ciegas.
 
-### C9 — Las migraciones 39 y 40 NO están aplicadas en el único proyecto
+### C9 — ~~Las migraciones 39 y 40 NO están aplicadas~~ (resuelto el 2026-08-10)
+
+> **Al día:** verificado contra el catálogo, hoy están aplicadas la **39, 40 y
+> 41**: `get_my_threads()`, `messages.mention_all`, `desafio_reglas()` y
+> `club_challenges_valida_rival()` existen en el proyecto. La consecuencia que
+> este punto anunciaba sobre la Fase 2 ya no aplica. **La 42 está escrita y
+> verificada pero NO aplicada.** Lo que sigue se conserva como registro de lo
+> que se encontró al escribir el plan.
 
 Verificado el 2026-08-10: `get_my_threads()` no existe y `messages.mention_all`
 tampoco. Es decir, las migraciones 39 (`/todos`) y 40 (bandeja por RPC) están en
@@ -219,20 +226,27 @@ Transiciones autorizadas, con quién puede dispararlas:
 
 ### Migraciones nuevas
 
-| Archivo | Contenido |
-|---|---|
-| `supabase/migrations/41_desafios_estados_y_chat.sql` | Estados nuevos, columnas de plazos, `desafio_reglas()`, trigger anti-autodesafío, tipo de hilo `challenge:` (columna, RLS, helpers, `get_my_threads`, `get_chat_unread_counts`), `club_challenge_events`, RPC `aceptar_desafio`/`rechazar_desafio`/`cancelar_desafio`, tipos de notificación |
-| `supabase/migrations/42_desafios_plazos_y_propuesta.sql` | `club_challenge_extension_replies`, `club_challenge_proposals`, RPC `procesar_vencimientos_desafios` (+ `cron.schedule`), `responder_prorroga`, `crear_propuesta_oficial`, `rechazar_propuesta` |
-| `supabase/migrations/43_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda en `join_match` |
-| `supabase/migrations/44_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` |
-| `supabase/migrations/45_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), helper `club_esta_sancionado` |
-| `supabase/migrations/46_resultado_y_historial.sql` | `club_match_results`, RPC `proponer_resultado`, `confirmar_resultado`, `club_record()` |
+> **Renumeración (2026-08-10).** La migración 41 se aplicó en el proyecto real
+> con las secciones de reglas y anti-autodesafío únicamente. El chat grupal NO
+> se le agregó encima —editar una migración ya aplicada es justo lo que prohíbe
+> `CLAUDE.md`—, así que pasó a ser la **42** y todo lo posterior corrió un
+> número. La tabla ya refleja la numeración real.
+
+| Archivo | Contenido | Estado |
+|---|---|---|
+| `supabase/migrations/41_desafios_estados_y_chat.sql` | Estados nuevos, columnas de plazos, `desafio_reglas()`, trigger anti-autodesafío | Aplicada |
+| `supabase/migrations/42_desafios_chat_negociacion.sql` | Tipo de hilo `challenge:` (columna `messages.challenge_id`, CHECK de destino a cuatro ramas, helpers `chat_puede_ver_desafio`/`chat_puede_escribir_desafio`, RLS, `get_my_threads`, `get_chat_unread_counts`, `chat_notify_mention_all`, `messages_block_content_edits`), `club_challenge_events`, RPC `aceptar_desafio` | Escrita y verificada; **sin aplicar** |
+| `supabase/migrations/43_desafios_plazos_y_propuesta.sql` | `club_challenge_extension_replies`, `club_challenge_proposals`, RPC `procesar_vencimientos_desafios` (+ `cron.schedule`), `responder_prorroga`, `crear_propuesta_oficial`, `rechazar_propuesta` | Pendiente |
+| `supabase/migrations/44_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda en `join_match` | Pendiente |
+| `supabase/migrations/45_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` | Pendiente |
+| `supabase/migrations/46_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), helper `club_esta_sancionado` | Pendiente |
+| `supabase/migrations/47_resultado_y_historial.sql` | `club_match_results`, RPC `proponer_resultado`, `confirmar_resultado`, `club_record()` | Pendiente |
 
 ### Pruebas SQL nuevas
 
-`supabase/tests/41_desafio_chat_rls_test.sql`, `42_desafio_plazos_test.sql`,
-`43_partido_clubes_cupos_test.sql`, `44_cambios_partido_test.sql`,
-`45_sanciones_test.sql`, `46_resultado_test.sql`. Mismo estilo que
+`supabase/tests/42_desafio_chat_rls_test.sql`, `43_desafio_plazos_test.sql`,
+`44_partido_clubes_cupos_test.sql`, `45_cambios_partido_test.sql`,
+`46_sanciones_test.sql`, `47_resultado_test.sql`. Mismo estilo que
 `36_chat_security_test.sql`: `begin; do $$ … raise exception 'FALLÓ (caso N): …' … $$; rollback;`,
 usuarios de prueba insertados en `auth.users`, identidad simulada con
 `set local role authenticated` + `set local request.jwt.claims`.
@@ -416,32 +430,56 @@ añadir la cuarta rama. Si sólo se toca una, la bandeja muestra el hilo con 0 n
 leídos para siempre. `chatMeta.test.js` tiene 859 líneas: cambiar
 `TYPE_BY_FILTER` puede romperlas.
 
-### Tarea 2.1 — Migración 41 (parte de chat)
+### Tarea 2.1 — Migración 42 (chat de negociación)
 
-- [ ] `alter table messages add column challenge_id uuid references club_challenges(id) on delete cascade`.
-- [ ] Actualizar `messages_block_content_edits()` para que `challenge_id` también
+- [x] `alter table messages add column challenge_id uuid references club_challenges(id) on delete cascade`.
+- [x] **Ampliar `messages_target_exactly_one` a cuatro alternativas.** No estaba
+      en el plan y es bloqueante: el CHECK desplegado exige que uno de los tres
+      destinos antiguos esté puesto, así que sin esto ningún mensaje de desafío
+      se puede insertar.
+- [x] Actualizar `messages_block_content_edits()` para que `challenge_id` también
       sea inmutable tras el insert.
-- [ ] Helper `chat_puede_ver_desafio(p_challenge_id uuid, p_user uuid)`
-      `security invoker`, `stable`: admin vigente de cualquiera de los dos clubes
-      **y** desafío en un estado activo. Al derivarse de `club_members` en vivo,
-      un cambio de administradores queda coherente sin trabajo extra.
-- [ ] Cuarta rama en las políticas `messages_read` y `messages_insert`.
-- [ ] Cuarta rama en `get_chat_unread_counts()` y cuarta rama `union all` en el
-      CTE `raw` de `get_my_threads()`, con `payload` que incluya
-      `estado`, `club_retador`, `club_retado`, `vence_at` y
-      `abierto_alguna_vez` (= existe fila en `chat_reads` para ese `thread_key`).
-- [ ] `club_challenge_events` + RLS de lectura para los mismos administradores.
-- [ ] RPC `aceptar_desafio(p_challenge_id uuid)`: `update … where estado='pendiente'`
-      (idempotente ante doble pulsación), fija `negociacion_vence_at = now() + 72h`,
-      inserta el evento, inserta el mensaje de sistema y notifica a los
-      administradores de ambos clubes con `type='club_challenge_accepted'` y
-      `data.threadKey='challenge:'||id`.
-- [ ] Tipos nuevos en `notifications_type_check`.
-- [ ] Pruebas SQL 41 casos 4–9: admin de cada club lee y escribe; jugador normal
-      de cualquiera de los dos clubes **no** lee ni escribe; tercero ajeno no lee;
-      degradar a un admin a jugador le quita el acceso; `aceptar_desafio` dos
-      veces deja una sola transición.
-- [ ] Commit.
+- [x] **Dos helpers, no uno.** El plan pedía un `chat_puede_ver_desafio` que
+      exigiera estado activo, pero la tarea 3.1 pide archivar el hilo cerrado
+      *en solo lectura*: con un helper único, cerrar el desafío borraría la
+      conversación de la bandeja. Quedaron `chat_puede_ver_desafio` (leer, en
+      cualquier estado) y `chat_puede_escribir_desafio` (admin + estado activo,
+      leído desde `desafio_reglas()`). Los dos `security invoker` y `stable`,
+      derivados de `club_members` en vivo.
+- [x] Cuarta rama en las políticas `messages_read` y `messages_insert`.
+- [x] Cuarta rama en `get_chat_unread_counts()` y cuarta rama `union all` en el
+      CTE `raw` de `get_my_threads()`, con `payload` que incluye `estado`,
+      `club_retador`, `club_retado`, `mi_club_id`, `vence_at`,
+      `prorroga_abierta` y `abierto_alguna_vez`. Además `dm_peers`/`last_dm_msg`
+      ahora exigen `challenge_id is null`: sin eso un mensaje de desafío propio
+      generaba una fila DM fantasma con `other_id` nulo.
+- [x] **Rama de desafío en `chat_notify_mention_all()`.** Tampoco estaba en el
+      plan: `/todos` habría marcado el mensaje como mención sin avisar a nadie,
+      porque la función salía por el `else`.
+- [x] `club_challenge_events` + RLS de lectura para los mismos administradores.
+- [x] RPC `aceptar_desafio(p_challenge_id uuid)`: `select … for update` +
+      `update … where estado='pendiente'` (idempotente ante doble pulsación),
+      fija `negociacion_vence_at = now() + 72h`, inserta el evento, inserta el
+      mensaje de sistema y notifica a los administradores de ambos clubes con
+      `type='club_challenge_accepted'` y `data.threadKey='challenge:'||id`.
+- [x] Tipos nuevos en `notifications_type_check`: **no hicieron falta**.
+      `club_challenge_accepted` y `chat_mention_all` ya existían, y el trigger
+      antiguo `notify_club_challenge_responded` no se dispara con
+      `negociacion`, así que no hay avisos duplicados.
+- [x] Pruebas SQL (`42_desafio_chat_rls_test.sql`), 12 casos: admin de cada club
+      lee y escribe; jugador sin rol de cualquiera de los dos clubes **no** lee
+      ni escribe; tercero ajeno no lee ni ve la bitácora; degradar a un admin a
+      jugador le quita el acceso; `aceptar_desafio` dos veces deja una sola
+      transición; el hilo cerrado queda legible pero mudo; el DM entre los dos
+      administradores sigue siendo otra conversación; `challenge_id` inmutable.
+      **Corridas contra el esquema desplegado dentro de `begin … rollback`:
+      pasan las 12 y no queda nada en la base.**
+- [x] Commit.
+
+> **Sobre los clubes premium.** `check_club_limits()` permite 1 administrador en
+> el plan estándar y 3 en premium. El hilo grupal es entonces 1+1 hoy y hasta
+> 3+3 en premium; la prueba SQL usa clubes premium a propósito, porque con un
+> solo administrador por club no se estaría probando que el hilo es grupal.
 
 ### Tarea 2.2 — Hilo de desafío en el cliente
 
@@ -453,18 +491,20 @@ necesitan la rama nueva: `getThreadAccess` (L360), `listThreadMessages` (L558),
 `sendMessage` (L638, columna `challenge_id`), `getThreadParticipants` (L727) y
 `messageBelongsToThread` (L879).
 
-- [ ] Pruebas de `challengeThread.js`: construir y parsear la clave, longitud
+- [x] Pruebas de `challengeThread.js`: construir y parsear la clave, longitud
       dentro del rango 3–120 que exige `chat_reads`, y `resolveThreadAccent`
       devolviendo el acento neón sólo mientras `abierto_alguna_vez` sea falso.
-- [ ] Rama nueva en `mapThreadRow` (título = «Club A vs Club B», subtítulo =
+- [x] Rama nueva en `mapThreadRow` (título = «Club A vs Club B», subtítulo =
       etiqueta de estado).
-- [ ] `TYPE_BY_FILTER`: el filtro «Clubes» pasa a aceptar `['club','challenge']`.
-      Ajustar `filterThreads` para admitir valor único o arreglo **sin romper**
-      las pruebas existentes.
-- [ ] `canUseMentionAll`: aceptar `'challenge'` (es un grupo).
-- [ ] `threadKindLabel`: etiqueta «Desafío».
-- [ ] `npm test`, incluida la suite de 859 líneas.
-- [ ] Commit.
+- [x] `TYPE_BY_FILTER`: el filtro «Clubes» pasa a aceptar `['club','challenge']`.
+      `filterThreads` admite valor único o arreglo; `filterCounts` cuenta lo
+      mismo que muestra el filtro. Ninguna prueba existente se editó.
+- [x] `canUseMentionAll`: aceptar `'challenge'` (es un grupo). Se extrajo
+      `isGroupType()` como definición única de «grupo», que antes estaba escrita
+      a mano en cuatro lugares.
+- [x] `threadKindLabel`: etiqueta «DESAFÍO».
+- [x] `npm test`, incluida la suite de 859 líneas: 270 pruebas, 0 fallos.
+- [x] Commit.
 
 ### Tarea 2.3 — Tarjeta de chat con acento rojo neón
 
@@ -475,15 +515,16 @@ modificar `src/components/chat/ConversationCard.js` y `ThreadAvatar.js`.
 (L46-53) y el `LinearGradient` condicional (L54-66), hoy gobernados por
 `isClub`.
 
-- [ ] Añadir `isChallenge` y `styles.cardChallenge` con borde rojo neón. Sin
+- [x] Añadir `isChallenge` y `styles.cardChallenge` con borde rojo neón. Sin
       animación ni parpadeo, tal como pide el enunciado.
-- [ ] Texto «Nuevo desafío aceptado» mientras no se haya abierto; después,
+- [x] Texto «Nuevo desafío aceptado» mientras no se haya abierto; después,
       etiqueta discreta «Negociación activa».
-- [ ] El acento se resuelve con `resolveThreadAccent(thread)` — una función, no
+- [x] El acento se resuelve con `resolveThreadAccent(thread)` — una función, no
       un color literal en el componente. Ese es el punto donde más adelante
       entrará el color temático del club, sin implementarlo ahora.
-- [ ] Rama `challenge` en `ThreadAvatar` (escudos cruzados, no la inicial de DM).
-- [ ] Commit.
+- [x] Rama `challenge` en `ThreadAvatar` (escudos cruzados sobre degradado
+      neón, no la inicial de DM).
+- [x] Commit.
 
 ### Tarea 2.4 — CTA «IR AHORA» de extremo a extremo
 
@@ -493,20 +534,20 @@ modificar `src/utils/notificationPreferences.js` y el espejo Deno
 `supabase/functions/send-push/pushLogic.ts`; modificar `AppNavigator.js`
 (`linking`).
 
-- [ ] `club_challenge_accepted` con `data.threadKey` presente pasa a resolver
+- [x] `club_challenge_accepted` con `data.threadKey` presente pasa a resolver
       `{ screen: 'ChatThread', params: { threadKey } }`. Si falta `threadKey`
       (avisos antiguos), conserva el destino actual `ClubChallenges`. Prueba
       unitaria para ambas ramas.
-- [ ] Botón verde «IR AHORA» en `NotificationCard` para los tipos de desafío que
-      traigan `threadKey`.
-- [ ] Mapear los tipos nuevos a `notif_clubs` en las **dos** copias del mapa
-      (JS y Deno) — están duplicadas a propósito y desincronizarlas es un fallo
-      silencioso.
-- [ ] Añadir `ChatThread: 'chat/:threadKey'` a `linking.config.screens` para que
-      el destino funcione con la app cerrada. `App.js` ya espera a que pase el
-      Splash y deduplica el arranque en frío: no hay que tocarlo.
-- [ ] `npm test`, `deno test supabase/functions/send-push/pushLogic.test.ts`.
-- [ ] Commit.
+- [x] Botón verde «IR AHORA» en `NotificationCard` para los tipos de desafío que
+      traigan `threadKey`. Dispara el mismo `onPress` de la tarjeta, así que no
+      hay dos caminos de navegación que mantener.
+- [x] Mapear los tipos nuevos a `notif_clubs` en las dos copias del mapa: **no
+      hizo falta**, porque no se agregó ningún tipo de notificación nuevo. Los
+      dos mapas siguen sincronizados y la prueba que los compara pasa.
+- [x] Añadir `ChatThread: 'chat/:threadKey'` a `linking.config.screens` para que
+      el destino funcione con la app cerrada.
+- [x] `npm test` (270 pruebas) y `deno test … pushLogic.test.ts` (13 pruebas).
+- [x] Commit.
 
 ### Tarea 2.5 — Cabecera de negociación dentro del hilo
 
@@ -514,16 +555,27 @@ modificar `src/utils/notificationPreferences.js` y el espejo Deno
 compositor, L774-840, ya existe para desafíos); crear
 `src/components/clubes/ChallengeHeader.js` y `ChallengeEventBubble.js`.
 
-- [ ] Cabecera con los dos clubes, estado actual, contador de negociación
+- [x] Cabecera con los dos clubes, estado actual, contador de negociación
       (calculado desde `vence_at` del servidor, nunca desde la hora del
       dispositivo) y acciones contextuales según `getChallengeCta`.
-- [ ] Los `club_challenge_events` se intercalan como burbujas de sistema en el
-      historial, sin desplazar los mensajes normales entre administradores.
-- [ ] Commit.
+- [x] Los `club_challenge_events` se intercalan como burbujas de sistema en el
+      historial, sin desplazar los mensajes normales entre administradores: se
+      mezclan por hora **después** de `decorateMessages`, así que no parten la
+      tanda de burbujas de ningún administrador.
+- [x] Commit.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 41
-completa, y comprobación manual de que los chats de partido, de club y los DM
-siguen funcionando igual.
+> **Acciones que todavía no existen.** `getChallengeCta` ya devuelve
+> `crear_propuesta`, `responder_prorroga`, `aprobar_propuesta` y las de
+> resultado, pero esas transiciones llegan con las migraciones 43 en adelante.
+> `ChallengeHeader` solo dibuja un botón cuando la app sabe ejecutar la acción
+> —hoy, únicamente «Ver el partido»—; el resto se muestra como información. Un
+> botón que no hace nada es peor que no tener botón.
+
+**Verificación de fase:** `npm test` (270 ✓), `npm run build:web` (✓),
+`deno test … pushLogic.test.ts` (13 ✓) y la prueba SQL 42 completa corrida
+contra el esquema desplegado en una transacción con `rollback` (12 casos ✓).
+Falta la comprobación manual en la app —requiere aplicar la migración 42— y
+aplicar la propia migración.
 
 ---
 
@@ -539,8 +591,8 @@ cubierta por el trigger de la Tarea 1.2, pero la RPC debe volver a comprobarlo.
 
 ### Tarea 3.1 — Vencimientos en servidor
 
-**Archivos:** crear `supabase/migrations/42_desafios_plazos_y_propuesta.sql`
-(secciones 1–2); crear `supabase/tests/42_desafio_plazos_test.sql`.
+**Archivos:** crear `supabase/migrations/43_desafios_plazos_y_propuesta.sql`
+(secciones 1–2); crear `supabase/tests/43_desafio_plazos_test.sql`.
 
 - [ ] `club_challenge_extension_replies` con `unique (challenge_id, club_id)` —
       la unicidad es lo que hace idempotente «basta un administrador por club».
@@ -577,7 +629,7 @@ cubierta por el trigger de la Tarea 1.2, pero la RPC debe volver a comprobarlo.
 
 ### Tarea 3.3 — Propuesta oficial
 
-**Archivos:** migración 42 (sección 3); crear `src/screens/ClubProposalScreen.js`.
+**Archivos:** migración 43 (sección 3); crear `src/screens/ClubProposalScreen.js`.
 
 - [ ] Tabla `club_challenge_proposals` con todos los campos del enunciado:
       `fecha`, `duracion_min`, `direccion`, `cancha_nombre`, `comuna`, `region`,
@@ -602,7 +654,7 @@ cubierta por el trigger de la Tarea 1.2, pero la RPC debe volver a comprobarlo.
       no admin no puede crear ni aprobar; un miembro sin rol **sí** puede leer.
 - [ ] Commit.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 41 y 42.
+**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 42 y 43.
 
 ---
 
@@ -617,7 +669,7 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 
 ### Tarea 4.1 — Aprobación atómica que publica el partido
 
-**Archivos:** crear `supabase/migrations/43_partido_de_clubes.sql`.
+**Archivos:** crear `supabase/migrations/44_partido_de_clubes.sql`.
 
 - [ ] Columnas en `matches`: `cupos_por_club integer`, `metodo_inscripcion text`,
       `challenge_proposal_id uuid unique references club_challenge_proposals(id)`.
@@ -636,7 +688,7 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
       `club_esta_sancionado` llega en la Fase 5; aquí se declara como *stub* que
       devuelve `false` y se completa entonces — se deja explícito en el comentario
       de la migración).
-- [ ] Prueba SQL 43: aprobar dos veces deja un solo partido; el proponente no
+- [ ] Prueba SQL 44: aprobar dos veces deja un solo partido; el proponente no
       puede aprobar; la unicidad de `challenge_proposal_id` rechaza el duplicado.
 - [ ] Commit.
 
@@ -672,7 +724,7 @@ píldora «CLUBES» en L63-68, sin escudos), `src/components/home/MatchCard.js`
 
 ### Tarea 4.4 — Cambios negociados
 
-**Archivos:** crear `supabase/migrations/44_cambios_de_partido.sql`.
+**Archivos:** crear `supabase/migrations/45_cambios_de_partido.sql`.
 
 - [ ] `club_match_changes` con `campos jsonb` y estado.
 - [ ] `proponer_cambio_partido`: rechaza si faltan menos de 2 h para el inicio
@@ -683,11 +735,11 @@ píldora «CLUBES» en L63-68, sin escudos), `src/components/home/MatchCard.js`
       inscritos; al rechazar, no cambia nada.
 - [ ] Evento en el chat con el texto exacto del enunciado: «Club A propone
       cambiar la hora de 17:00 a 18:00».
-- [ ] Prueba SQL 44: fuera de plazo rechazado; el proponente no puede aceptar su
+- [ ] Prueba SQL 45: fuera de plazo rechazado; el proponente no puede aceptar su
       propio cambio; rechazar conserva los valores anteriores.
 - [ ] Commit.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 43 y 44, y
+**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 44 y 45, y
 comprobación de que publicar/unirse a un partido normal sigue igual.
 
 ---
@@ -702,7 +754,7 @@ la trazabilidad correctos **sin** inventar un permiso inseguro.
 
 ### Tarea 5.1 — Cancelación y sanción
 
-**Archivos:** crear `supabase/migrations/45_sanciones_y_revisiones.sql`.
+**Archivos:** crear `supabase/migrations/46_sanciones_y_revisiones.sql`.
 
 - [ ] `club_sanctions` (motivo `not null` con `check (length(trim(motivo)) > 0)`,
       `inicio_at`, `fin_at = inicio_at + 14 días`, `estado`).
@@ -717,7 +769,7 @@ la trazabilidad correctos **sin** inventar un permiso inseguro.
       llama desde `createChallenge`, `aceptar_desafio`,
       `crear_propuesta_oficial` y `aprobar_propuesta`.
 - [ ] Acción «Cancelar encuentro» siempre visible en la parte superior del hilo.
-- [ ] Prueba SQL 45: motivo vacío rechazado; cancelar a 1 h sanciona y a 3 h no;
+- [ ] Prueba SQL 46: motivo vacío rechazado; cancelar a 1 h sanciona y a 3 h no;
       el `trust_score` de los jugadores no cambia; el club sancionado no puede
       crear ni aceptar desafíos; **sí** puede seguir en los partidos ya
       publicados (decisión C3).
@@ -739,7 +791,7 @@ la trazabilidad correctos **sin** inventar un permiso inseguro.
 - [ ] Prueba SQL: un `authenticated` no puede ejecutar la resolución.
 - [ ] Commit.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 45.
+**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 46.
 
 ---
 
@@ -750,7 +802,7 @@ perfiles de club, y fixtures de demostración apagados.
 
 ### Tarea 6.1 — Resultado
 
-**Archivos:** crear `supabase/migrations/46_resultado_y_historial.sql`; crear
+**Archivos:** crear `supabase/migrations/47_resultado_y_historial.sql`; crear
 `src/screens/ClubResultScreen.js`, `src/services/clubResults.js`.
 
 - [ ] `club_match_results` con `goles_local`, `goles_visitante`,
@@ -764,7 +816,7 @@ perfiles de club, y fixtures de demostración apagados.
       rechazo.
 - [ ] `club_record(p_club_id)` devuelve V/E/D contando sólo resultados
       confirmados.
-- [ ] Prueba SQL 46: el proponente no confirma su propio resultado; en disputa el
+- [ ] Prueba SQL 47: el proponente no confirma su propio resultado; en disputa el
       récord no cambia.
 - [ ] Commit.
 
@@ -791,7 +843,7 @@ perfiles de club, y fixtures de demostración apagados.
 `docs/memoria/decisiones/2026-08-10-ciclo-desafios-clubes.md`.
 
 - [ ] Registrar la máquina de estados, el tipo de hilo nuevo, las reglas de cupos
-      y sanciones, las migraciones 41–46 y sus pruebas, y la decisión C1–C7.
+      y sanciones, las migraciones 41–47 y sus pruebas, y la decisión C1–C7.
 - [ ] Commit.
 
 **Verificación final:** `npm test`, `npm run build:web`,
@@ -804,7 +856,7 @@ en un Supabase de desarrollo.
 
 | Riesgo | Mitigación |
 |---|---|
-| Reescribir `get_my_threads()` rompe la bandeja | Prueba SQL 41 reutiliza los casos de `40_bandeja_chat_rpc_test.sql` antes de añadir la cuarta rama |
+| Reescribir `get_my_threads()` rompe la bandeja | Prueba SQL 42 reutiliza los casos de `40_bandeja_chat_rpc_test.sql` antes de añadir la cuarta rama |
 | `chatMeta.test.js` (859 líneas) falla al tocar `TYPE_BY_FILTER` | `filterThreads` acepta valor único **y** arreglo; las pruebas viejas no se editan |
 | Doble pulsación crea propuestas o partidos duplicados | `client_token` + índice único parcial + `update … where estado = <esperado>` |
 | Sobrecupo en inscripción concurrente | `select … for update` sobre `matches` y conteo por club dentro de la transacción |

@@ -298,3 +298,59 @@ test('navigateToNotification: destino sin `resource` navega directo, sin necesit
   assert.equal(ok, true);
   assert.deepEqual(navigatedTo, { screen: 'Main', params: { screen: 'SearchTab' } });
 });
+
+// ════════════════════════════════════════════════════════════════
+// CTA «IR AHORA»: el aviso de desafío aceptado abre el hilo grupal
+// ════════════════════════════════════════════════════════════════
+// Desde la migración 42, `aceptar_desafio()` mete `threadKey` en el
+// `data` del aviso. Las dos ramas importan: los avisos viejos (los que
+// escribió el trigger anterior) no lo traen y tienen que seguir yendo
+// a donde iban, o un usuario con la bandeja llena se queda sin destino.
+
+test('resolveNotificationTarget: con threadKey, el desafío aceptado abre la conversación', () => {
+  assert.deepEqual(
+    resolveNotificationTarget({
+      type: 'club_challenge_accepted',
+      data: {
+        challengeId: 'ch-1',
+        clubRetadorId: 'c1',
+        clubRetadoId: 'c2',
+        threadKey: 'challenge:ch-1',
+      },
+    }),
+    { screen: 'ChatThread', params: { threadKey: 'challenge:ch-1' } }
+  );
+});
+
+test('resolveNotificationTarget: sin threadKey (aviso anterior a la migración 42) conserva el destino de siempre', () => {
+  assert.deepEqual(
+    resolveNotificationTarget({
+      type: 'club_challenge_accepted',
+      data: { challengeId: 'ch-1', clubRetadorId: 'c1', clubRetadoId: 'c2' },
+    }),
+    {
+      screen: 'ClubChallenges',
+      params: { clubId: 'c1' },
+      resource: { kind: 'club', id: 'c1' },
+    }
+  );
+});
+
+test('resolveNotificationTarget: el desafío rechazado no tiene hilo y sigue yendo a la bandeja', () => {
+  const target = resolveNotificationTarget({
+    type: 'club_challenge_rejected',
+    data: { clubRetadorId: 'c1', clubRetadoId: 'c2' },
+  });
+  assert.equal(target.screen, 'ClubChallenges');
+});
+
+test('resolveNotificationTarget: el destino del hilo no necesita verificar el club', () => {
+  // Va a una conversación, y ChatThreadScreen ya sabe decir «este desafío
+  // ya no existe» por su cuenta (getThreadAccess). Pedir además el club
+  // sería una consulta de más antes de navegar.
+  const target = resolveNotificationTarget({
+    type: 'club_challenge_accepted',
+    data: { threadKey: 'challenge:ch-1', clubRetadorId: 'c1' },
+  });
+  assert.equal(target.resource, undefined);
+});

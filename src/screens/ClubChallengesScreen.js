@@ -16,20 +16,36 @@ import { ArrowLeft, Shield, Swords, Check, X, Clock, MessageCircle } from 'lucid
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import { getCurrentUser } from '../services/auth';
-import { listMembers } from '../services/clubs';
-import { sendMessage } from '../services/messages';
+import { listMembers, getClubById } from '../services/clubs';
 import {
   listChallengesForClub,
   respondChallenge,
   cancelChallenge,
 } from '../services/clubChallenges';
+import { esEstadoActivo, estadoLabel } from '../services/clubChallengeRules';
+import { challengeThreadKey, challengeThreadTitle } from '../utils/challengeThread';
 
-const ESTADO_LABEL = {
-  pendiente: { text: 'Pendiente', color: colors.textSecondary },
-  aceptado: { text: 'Aceptado', color: colors.primary },
-  rechazado: { text: 'Rechazado', color: colors.error },
-  cancelado: { text: 'Cancelado', color: colors.textMuted },
-  expirado: { text: 'Expirado', color: colors.textMuted },
+/**
+ * El texto de cada estado sale de `clubChallengeRules`, que es el espejo de
+ * `desafio_reglas()`: acá solo se decide el color. Antes esta tabla tenía
+ * los cinco estados antiguos escritos a mano y, al aceptar, el desafío
+ * pasaba a 'negociacion' y la píldora se quedaba sin etiqueta.
+ */
+const ESTADO_COLOR = {
+  pendiente: colors.textSecondary,
+  negociacion: colors.primary,
+  esperando_aprobacion: colors.primary,
+  publicado: colors.primary,
+  en_juego: colors.primary,
+  esperando_resultado: colors.primary,
+  finalizado: colors.textSecondary,
+  resultado_en_disputa: colors.error,
+  bloqueado_sancion: colors.error,
+  rechazado: colors.error,
+  sin_acuerdo: colors.textMuted,
+  cancelado: colors.textMuted,
+  expirado: colors.textMuted,
+  aceptado: colors.primary,
 };
 
 function fmtFecha(iso) {
@@ -58,18 +74,23 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [soyAdmin, setSoyAdmin] = useState(false);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
+  // Hace falta para armar el título «Retador vs Retado» del hilo grupal:
+  // las filas de desafío solo traen el club RIVAL, no el propio.
+  const [nombreDeMiClub, setNombreDeMiClub] = useState('Mi club');
 
   const load = useCallback(async () => {
     const user = await getCurrentUser();
     const myId = user?.id || null;
 
-    const [{ data }, { data: ms }] = await Promise.all([
+    const [{ data }, { data: ms }, { data: miClub }] = await Promise.all([
       listChallengesForClub(clubId),
       listMembers(clubId),
+      getClubById(clubId),
     ]);
     setRecibidos(data.recibidos || []);
     setEnviados(data.enviados || []);
     setSoyAdmin((ms || []).some((m) => m.user_id === myId && m.rol === 'admin'));
+    if (miClub?.nombre) setNombreDeMiClub(miClub.nombre);
     setLoading(false);
   }, [clubId]);
 
@@ -85,7 +106,12 @@ export default function ClubChallengesScreen({ navigation, route }) {
     setRefreshing(false);
   };
 
-  const abrirChatCon = (userId, titulo, challengeId) => {
+  /**
+   * Conversación LEGADA de un desafío anterior a la migración 42: un DM
+   * entre dos administradores. No se migra ninguna fila, así que estos
+   * desafíos conservan su chat tal como estaba.
+   */
+  const abrirChatLegado = (userId, titulo, challengeId) => {
     if (!userId) return;
     navigation.navigate('ChatThread', {
       threadKey: `dm:${userId}`,
@@ -95,29 +121,43 @@ export default function ClubChallengesScreen({ navigation, route }) {
     });
   };
 
+  /** Hilo grupal de negociación: todos los administradores de ambos clubes. */
+  const abrirNegociacion = (challenge) => {
+    const threadKey = challengeThreadKey(challenge?.id);
+    if (!threadKey) return;
+    const esRecibido = challenge.club_retado_id === clubId;
+    // El título es siempre «Retador vs Retado», mire quien mire.
+    const titulo = challengeThreadTitle({
+      club_retador: esRecibido ? challenge.otroClub : { nombre: nombreDeMiClub },
+      club_retado: esRecibido ? { nombre: nombreDeMiClub } : challenge.otroClub,
+    });
+    navigation.navigate('ChatThread', {
+      threadKey,
+      title: titulo,
+      subtitle: estadoLabel(challenge.estado),
+      challengeId: challenge.id,
+    });
+  };
+
   const handleRespond = async (challenge, accept) => {
     setWorking(true);
-    const { error } = await respondChallenge(challenge.id, accept);
+    const { error, threadKey } = await respondChallenge(challenge.id, accept);
     setWorking(false);
     if (error) {
       setBanner({ type: 'error', title: 'No se pudo responder', message: error.message });
       return;
     }
     await load();
-    if (accept && challenge.creado_por) {
-      // Mensaje inicial automático: deja el DM creado y visible en la lista de
-      // chats (un DM vacío no aparece) y le da contexto al otro admin.
-      await sendMessage(
-        `dm:${challenge.creado_por}`,
-        '⚔️ ¡Desafío aceptado! Coordinemos aquí la cancha, la hora y los detalles del partido.'
-      );
+    if (accept && threadKey) {
+      // El mensaje de sistema, el evento y los avisos ya los dejó la RPC
+      // dentro de la misma transacción: acá solo hay que llevar al usuario
+      // a la conversación.
       setBanner({
         type: 'success',
         title: 'Desafío aceptado',
-        message: 'Se abrió el chat con el otro admin para coordinar los detalles.',
+        message: 'Se abrió el chat de negociación con los administradores de ambos clubes.',
       });
-      // Abrir DM con el admin que creó el desafío (creado_por ya viene en la fila)
-      abrirChatCon(challenge.creado_por, challenge.otroClub?.nombre, challenge.id);
+      abrirNegociacion({ ...challenge, estado: 'negociacion' });
     }
   };
 
@@ -194,9 +234,19 @@ export default function ClubChallengesScreen({ navigation, route }) {
                       <X color={colors.error} size={16} strokeWidth={2.6} />
                     </Pressable>
                   </View>
+                ) : esEstadoActivo(c.estado) ? (
+                  <Pressable
+                    onPress={() => abrirNegociacion(c)}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Abrir el chat de negociación del desafío"
+                    style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Swords color={colors.primary} size={16} />
+                  </Pressable>
                 ) : c.estado === 'aceptado' ? (
                   <Pressable
-                    onPress={() => abrirChatCon(c.creado_por, c.otroClub?.nombre, c.id)}
+                    onPress={() => abrirChatLegado(c.creado_por, c.otroClub?.nombre, c.id)}
                     hitSlop={6}
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
@@ -224,9 +274,19 @@ export default function ClubChallengesScreen({ navigation, route }) {
                   >
                     <Text style={styles.cancelText}>Cancelar</Text>
                   </Pressable>
+                ) : esEstadoActivo(c.estado) ? (
+                  <Pressable
+                    onPress={() => abrirNegociacion(c)}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Abrir el chat de negociación del desafío"
+                    style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Swords color={colors.primary} size={16} />
+                  </Pressable>
                 ) : c.estado === 'aceptado' ? (
                   <Pressable
-                    onPress={() => abrirChatCon(c.respondido_por, c.otroClub?.nombre, c.id)}
+                    onPress={() => abrirChatLegado(c.respondido_por, c.otroClub?.nombre, c.id)}
                     hitSlop={6}
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
@@ -288,10 +348,10 @@ function ChallengeRow({ challenge, children }) {
 }
 
 function EstadoPill({ estado }) {
-  const cfg = ESTADO_LABEL[estado] || ESTADO_LABEL.pendiente;
+  const color = ESTADO_COLOR[estado] || colors.textSecondary;
   return (
-    <View style={[styles.estadoPill, { borderColor: cfg.color }]}>
-      <Text style={[styles.estadoPillText, { color: cfg.color }]}>{cfg.text}</Text>
+    <View style={[styles.estadoPill, { borderColor: color }]}>
+      <Text style={[styles.estadoPillText, { color }]}>{estadoLabel(estado)}</Text>
     </View>
   );
 }

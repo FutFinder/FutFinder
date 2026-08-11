@@ -14,13 +14,18 @@
  *   - Sin dato real se escribe `N.A.`, nunca un valor inventado.
  */
 
+// El hilo de desafío tiene su propio módulo puro (título, acento, cuenta
+// atrás) para no engordar éste con reglas del ciclo de clubes. Extensión
+// explícita: `node --test` resuelve ESM sin las implícitas de Metro.
+import { challengeThreadTitle, challengeThreadSubtitle } from './challengeThread.js';
+
 // ============================================================
 // COMANDOS DEL COMPOSITOR (chats grupales)
 // ============================================================
 
 /**
- * Comandos disponibles en chats grupales (club y partido; no existen en DM,
- * donde no hay a quién más avisar o mencionar).
+ * Comandos disponibles en chats grupales (club, partido y desafío; no
+ * existen en DM, donde no hay a quién más avisar o mencionar).
  *
  * `/importante` rompe el silencio: el aviso llega igual a quien tenga el chat
  * silenciado. Solo lo pueden usar los administradores del club — lo valida un
@@ -46,10 +51,14 @@ export const CHAT_COMMANDS = [
     scopes: ['club'],
   },
   {
+    // En un desafío «todos» son los administradores vigentes de ambos
+    // clubes. El fan-out real lo hace `chat_notify_mention_all()`, al que
+    // la migración 42 le agregó esa rama: sin ella el mensaje quedaría
+    // marcado como mención sin mencionar a nadie.
     command: '/todos',
     hint: 'Menciona a todos los participantes del chat',
     adminOnly: false,
-    scopes: ['club', 'match'],
+    scopes: ['club', 'match', 'challenge'],
   },
 ];
 
@@ -159,6 +168,31 @@ export function mapThreadRow(row, myId) {
     };
   }
 
+  if (row.thread_type === 'challenge') {
+    // El título y el subtítulo se arman con el módulo del hilo de desafío
+    // para que la bandeja y la cabecera del chat digan exactamente lo
+    // mismo. `foto_url` queda nulo a propósito: la tarjeta dibuja los dos
+    // escudos cruzados, no la foto de un solo club.
+    const thread = {
+      ...base,
+      challenge_id: p.challenge_id,
+      estado: p.estado || null,
+      mi_club_id: p.mi_club_id || null,
+      club_retador: p.club_retador || null,
+      club_retado: p.club_retado || null,
+      vence_at: p.vence_at || null,
+      prorroga_abierta: !!p.prorroga_abierta,
+      abierto_alguna_vez: !!p.abierto_alguna_vez,
+      foto_url: null,
+      ...senderExtras,
+    };
+    return {
+      ...thread,
+      title: challengeThreadTitle(thread),
+      subtitle: challengeThreadSubtitle(thread),
+    };
+  }
+
   // dm
   return {
     ...base,
@@ -179,19 +213,33 @@ export const CHAT_FILTERS = [
   { id: 'amigos', label: 'Amigos' },
 ];
 
-/** Tipo de hilo que corresponde a cada filtro (null = todos). */
+/**
+ * Tipo de hilo que corresponde a cada filtro (null = todos).
+ *
+ * «Clubes» acepta DOS tipos: el chat permanente del club y el hilo de
+ * negociación de un desafío. Son cosas distintas, pero para quien busca en
+ * la bandeja las dos son "lo de mi club", y separarlas en un quinto filtro
+ * obligaría a rediseñar la fila de píldoras por una conversación que la
+ * mayoría de los jugadores nunca verá (solo la ven los administradores).
+ */
 const TYPE_BY_FILTER = {
   todos: null,
   partidos: 'match',
-  clubes: 'club',
+  clubes: ['club', 'challenge'],
   amigos: 'dm',
 };
 
-/** Conversaciones que entran en un filtro. */
+/**
+ * Conversaciones que entran en un filtro.
+ *
+ * Acepta que un filtro mapee a un tipo o a varios; los filtros de un solo
+ * tipo siguen comportándose exactamente igual que antes.
+ */
 export function filterThreads(threads, filter) {
   const type = TYPE_BY_FILTER[filter];
   if (!type) return threads || [];
-  return (threads || []).filter((t) => t.type === type);
+  const tipos = Array.isArray(type) ? type : [type];
+  return (threads || []).filter((t) => tipos.includes(t.type));
 }
 
 /**
@@ -216,7 +264,9 @@ export function filterCounts(threads) {
   return {
     todos: list.length,
     partidos: list.filter((t) => t.type === 'match').length,
-    clubes: list.filter((t) => t.type === 'club').length,
+    // Mismo criterio que TYPE_BY_FILTER: el contador de la píldora tiene
+    // que coincidir con lo que se ve al tocarla.
+    clubes: list.filter((t) => t.type === 'club' || t.type === 'challenge').length,
     amigos: list.filter((t) => t.type === 'dm').length,
   };
 }
@@ -320,13 +370,26 @@ export function dayLabel(iso, now = new Date()) {
  *   `prefix` es el remitente en los grupos ('Camilo:' / 'Tú:'); en los DMs es
  *   null porque solo hay dos personas. `tone` marca los avisos /importante.
  */
+/**
+ * ¿Este tipo de hilo es un grupo?
+ *
+ * Una sola definición para toda la app: de esto dependen el nombre del
+ * remitente en la vista previa, el avatar y el nombre sobre cada burbuja,
+ * y qué comandos ofrece el compositor. Tenerlo escrito en cuatro lugares
+ * distintos es exactamente cómo se agrega un tipo de hilo nuevo y se
+ * olvida uno.
+ */
+export function isGroupType(threadType) {
+  return threadType === 'match' || threadType === 'club' || threadType === 'challenge';
+}
+
 export function threadPreview(thread) {
   const last = thread?.last_message;
   if (!last) {
     // Sin mensajes NO se repite el subtítulo: la fila de abajo ya dice de qué
     // conversación se trata, y verlo dos veces se lee como si fuera el último
     // mensaje.
-    const isGroupThread = thread?.type === 'match' || thread?.type === 'club';
+    const isGroupThread = isGroupType(thread?.type);
     return {
       prefix: null,
       text: isGroupThread ? 'Sé el primero en saludar' : 'Sin mensajes todavía',
@@ -334,7 +397,7 @@ export function threadPreview(thread) {
     };
   }
 
-  const isGroup = thread.type === 'match' || thread.type === 'club';
+  const isGroup = isGroupType(thread.type);
   const prefix = isGroup && thread.last_sender_name ? `${thread.last_sender_name}:` : null;
 
   return {
@@ -347,6 +410,7 @@ export function threadPreview(thread) {
 /** Etiqueta del tipo de conversación bajo el título. */
 export function threadKindLabel(thread) {
   if (thread?.type === 'club') return 'CHAT DEL CLUB';
+  if (thread?.type === 'challenge') return 'DESAFÍO';
   if (thread?.type === 'match') {
     return thread.subtitle ? `Chat del partido · ${thread.subtitle}` : 'Chat del partido';
   }
@@ -431,13 +495,18 @@ export function canSendDraft(
 
 /**
  * /todos («mencionar a todos») solo tiene sentido en un chat grupal — en un
- * DM ya está la otra persona, no hay a quién más mencionar. Esta es la
- * validación del lado del cliente para dar feedback inmediato; la
- * autorización real (quién es de verdad participante del grupo) la impone
- * el backend — ver la migración 39 y `supabase/tests/39_chat_mention_all_test.sql`.
+ * DM ya está la otra persona, no hay a quién más mencionar. El hilo de
+ * negociación de un desafío SÍ es un grupo: son los administradores de los
+ * dos clubes.
+ *
+ * Esta es la validación del lado del cliente para dar feedback inmediato;
+ * la autorización real (quién es de verdad participante del grupo) la
+ * impone el backend — ver la migración 39, la rama de desafío que agrega
+ * la 42 a `chat_notify_mention_all()`, y
+ * `supabase/tests/39_chat_mention_all_test.sql`.
  */
 export function canUseMentionAll(threadType) {
-  return threadType === 'match' || threadType === 'club';
+  return isGroupType(threadType);
 }
 
 // ============================================================

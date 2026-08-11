@@ -299,8 +299,9 @@ export default function NotificationsScreen({ navigation }) {
 
     const data = n.data || {};
     let error = null;
+    let threadKey = null;
     if (n.type === 'club_challenge') {
-      ({ error } = await respondChallenge(data.challengeId, accept));
+      ({ error, threadKey } = await respondChallenge(data.challengeId, accept));
     } else if (n.type === 'club_request') {
       ({ error } = await respondToRequest(data.requestId, accept));
     } else if (n.type === 'friend_request') {
@@ -318,6 +319,13 @@ export default function NotificationsScreen({ navigation }) {
     }
     setItems((prev) => withActionsResolved(prev, id));
     markAsRead(id);
+
+    // Aceptar un desafío desde el aviso abre el chat de negociación: es
+    // donde hay que actuar a continuación, y dejar al usuario mirando la
+    // bandeja de avisos lo obligaría a buscarlo por su cuenta.
+    if (threadKey) {
+      navigation.navigate('ChatThread', { threadKey, challengeId: data.challengeId });
+    }
   };
 
   const chips = useMemo(

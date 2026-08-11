@@ -125,6 +125,10 @@ const linking = {
           ProfileTab: 'perfil',
         },
       },
+      // Destino del CTA «IR AHORA» de los avisos de desafío. Sin esta
+      // entrada, tocar el push con la app cerrada dejaba al usuario en la
+      // raíz en vez de en la conversación.
+      ChatThread: 'chat/:threadKey',
       // `p/<id>` es el formato del enlace público que compartimos.
       MatchDetail: 'p/:matchId',
       ManageMatch: 'p/:matchId/gestionar',

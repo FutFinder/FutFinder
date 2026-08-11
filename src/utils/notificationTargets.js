@@ -79,6 +79,16 @@ export function resolveNotificationTarget(n) {
 
     case 'club_challenge_accepted':
     case 'club_challenge_rejected':
+      // Aceptado (migración 42): el aviso trae el hilo grupal de
+      // negociación y se abre ahí directamente — es donde hay que
+      // coordinar, y llevar a la bandeja de desafíos sería un paso de más.
+      //
+      // Los avisos ANTERIORES a esa migración no traen `threadKey`, y los
+      // de rechazo no tienen hilo que abrir: los dos conservan el destino
+      // de siempre. Por eso se comprueba el dato y no el tipo.
+      if (data.threadKey) {
+        return { screen: 'ChatThread', params: { threadKey: data.threadKey } };
+      }
       // Respondido: abre la bandeja de desafíos de mi club (el retador).
       return data.clubRetadorId
         ? {

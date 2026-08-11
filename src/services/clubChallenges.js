@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { challengeThreadKey } from '../utils/challengeThread';
 
 /**
  * Desafíos entre clubes (tabla club_challenges).
@@ -6,12 +7,24 @@ import { supabase, isSupabaseConfigured } from './supabase';
  * Flujo:
  *   1. Un admin del club retador crea el desafío (fecha propuesta, zona, mensaje).
  *      Un trigger notifica a todos los miembros del club retado.
- *   2. Un admin del club retado lo acepta o rechaza. Otro trigger notifica a los
- *      admins del retador. Al aceptar, el cliente abre un DM entre ambos admins.
- *   3. (Parte 2) Con el desafío aceptado se crea el partido de club.
+ *   2. Un admin del club retado lo acepta o rechaza.
+ *      - ACEPTAR pasa por la RPC `aceptar_desafio()` (migración 42): mueve el
+ *        desafío a 'negociacion', abre el plazo con la hora del servidor y
+ *        crea el hilo grupal `challenge:<id>` con todos los administradores
+ *        de ambos clubes. El cliente ya no escribe el estado a mano.
+ *      - RECHAZAR sigue siendo un update directo, y lo avisa el trigger
+ *        `notify_club_challenge_responded` de siempre.
+ *   3. Con el desafío en negociación se acuerda la propuesta oficial.
  *
  * Patrón { data, error } en todo.
  */
+
+/** `true` si el error significa "esa función/columna todavía no existe". */
+function esFaltaDeEsquema(error) {
+  if (!error) return false;
+  if (['42P01', '42883', 'PGRST202', 'PGRST205', '42703'].includes(error.code)) return true;
+  return /does not exist|could not find/i.test(error.message || '');
+}
 
 async function getMe() {
   const { data: { user } } = await supabase.auth.getUser();
@@ -149,16 +162,69 @@ export async function countPendingForClub(clubId) {
 }
 
 /**
+ * Acepta un desafío. Lo hace un admin del club retado.
+ *
+ * Toda la transición vive en la RPC: estado, plazo de negociación, evento,
+ * mensaje de sistema y avisos a los administradores de ambos clubes ocurren
+ * en una sola transacción con la hora del servidor. Volver a llamarla con el
+ * desafío ya aceptado devuelve la misma fila sin repetir nada, así que la
+ * doble pulsación es inofensiva.
+ *
+ * Devuelve `{ data, threadKey, error }`: `threadKey` es el hilo grupal al
+ * que hay que llevar al usuario.
+ */
+export async function acceptChallenge(challengeId) {
+  if (!isSupabaseConfigured) return { data: null, threadKey: null, error: { message: 'Demo' } };
+  if (!challengeId) {
+    return { data: null, threadKey: null, error: { message: 'Falta el desafío' } };
+  }
+
+  const { data, error } = await supabase.rpc('aceptar_desafio', {
+    p_challenge_id: challengeId,
+  });
+
+  if (error) {
+    console.error('[FutFinder] acceptChallenge:', error);
+    if (esFaltaDeEsquema(error)) {
+      return {
+        data: null,
+        threadKey: null,
+        error: {
+          message:
+            'Aceptar desafíos necesita la migración 42 en Supabase. Avisa al equipo antes de volver a intentarlo.',
+        },
+      };
+    }
+    return { data: null, threadKey: null, error };
+  }
+
+  // La RPC devuelve la fila de `club_challenges`; PostgREST la entrega como
+  // objeto, pero un `returns setof`-like podría llegar como arreglo.
+  const row = Array.isArray(data) ? data[0] : data;
+  return { data: row || null, threadKey: challengeThreadKey(row?.id || challengeId), error: null };
+}
+
+/**
  * Acepta o rechaza un desafío (lo hace un admin del club retado).
- * El trigger notifica al retador. Devuelve la fila para poder abrir el DM.
+ *
+ * Se conserva la firma de siempre para no tocar a los dos llamadores
+ * (`ClubChallengesScreen` y `NotificationsScreen`), pero por dentro los dos
+ * caminos ya no son simétricos: aceptar pasa por la RPC y rechazar sigue
+ * siendo el update directo que avisa por trigger.
  */
 export async function respondChallenge(challengeId, accept) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+
+  if (accept) {
+    const { data, threadKey, error } = await acceptChallenge(challengeId);
+    return { data, threadKey, error };
+  }
+
   const me = await getMe();
   const { data, error } = await supabase
     .from('club_challenges')
     .update({
-      estado: accept ? 'aceptado' : 'rechazado',
+      estado: 'rechazado',
       responded_at: new Date().toISOString(),
       respondido_por: me,
     })
@@ -168,6 +234,29 @@ export async function respondChallenge(challengeId, accept) {
     .single();
   if (error) console.error('[FutFinder] respondChallenge:', error);
   return { data, error };
+}
+
+/**
+ * Bitácora del desafío (`club_challenge_events`), antiguo → nuevo.
+ *
+ * Se intercala como burbujas de sistema en el hilo. La RLS solo la muestra
+ * a los administradores de los dos clubes, igual que el chat.
+ */
+export async function listChallengeEvents(challengeId) {
+  if (!isSupabaseConfigured || !challengeId) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('club_challenge_events')
+    .select('id, challenge_id, tipo, actor_id, club_id, payload, created_at')
+    .eq('challenge_id', challengeId)
+    .order('created_at', { ascending: true });
+  if (error) {
+    // Sin la migración 42 la tabla no existe: la conversación se muestra
+    // igual, solo que sin las burbujas de sistema.
+    if (esFaltaDeEsquema(error)) return { data: [], error: null };
+    console.error('[FutFinder] listChallengeEvents:', error);
+    return { data: [], error };
+  }
+  return { data: data || [], error: null };
 }
 
 /** Cancela un desafío enviado (admin del retador). */

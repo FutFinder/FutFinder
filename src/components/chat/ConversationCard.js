@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BellOff, Shield, Video, TriangleAlert } from 'lucide-react-native';
+import { BellOff, Shield, Video, TriangleAlert, Swords } from 'lucide-react-native';
 
 import ThreadAvatar from './ThreadAvatar';
 import { chatColors, dsRadius } from '../../theme/colors';
 import { threadTimeLabel, threadPreview } from '../../utils/chatMeta';
+import { resolveThreadAccent, challengeCardLabel } from '../../utils/challengeThread';
 
 /**
  * Fila de la bandeja «Chats y amigos».
@@ -18,12 +19,20 @@ import { threadTimeLabel, threadPreview } from '../../utils/chatMeta';
  * Cuando la última novedad es un aviso `/importante` la tarjeta se pinta en
  * ámbar: es el único mensaje que atraviesa el silencio, así que tiene que
  * distinguirse de un no leído normal.
+ *
+ * El hilo de negociación de un desafío lleva borde rojo neón mientras ese
+ * administrador no lo haya abierto — sin animación ni parpadeo. Qué acento
+ * corresponde lo decide `resolveThreadAccent(thread)`, no un color escrito
+ * acá: ese es el punto por donde más adelante entrará el color temático de
+ * cada club.
  */
 export default function ConversationCard({ thread, now, onPress }) {
   const unread = thread.unread || 0;
   const hasUnread = unread > 0;
   const important = !!thread.has_important;
   const isClub = thread.type === 'club';
+  const isChallenge = thread.type === 'challenge';
+  const accent = resolveThreadAccent(thread);
 
   const preview = threadPreview(thread);
   const time = threadTimeLabel(thread.last_at, now);
@@ -46,16 +55,20 @@ export default function ConversationCard({ thread, now, onPress }) {
       style={({ pressed }) => [
         styles.card,
         isClub && styles.cardClub,
-        hasUnread && !isClub && styles.cardUnread,
+        isChallenge && styles.cardChallenge,
+        accent === 'neon' && styles.cardChallengeNeon,
+        hasUnread && !isClub && !isChallenge && styles.cardUnread,
         important && styles.cardImportant,
         pressed && { opacity: 0.85 },
       ]}
     >
-      {(isClub || important) && (
+      {(isClub || important || accent === 'neon') && (
         <LinearGradient
           colors={
             important
               ? ['rgba(255,190,90,0.12)', 'rgba(255,190,90,0)']
+              : accent === 'neon'
+              ? ['rgba(255,45,85,0.14)', 'rgba(255,45,85,0)']
               : ['rgba(90,224,106,0.13)', 'rgba(90,224,106,0)']
           }
           start={{ x: 0, y: 0 }}
@@ -99,7 +112,14 @@ export default function ConversationCard({ thread, now, onPress }) {
         </Text>
 
         <View style={styles.bottomRow}>
-          {isClub ? (
+          {isChallenge ? (
+            <View style={[styles.kindPill, styles.kindPillChallenge]}>
+              <Swords color={chatColors.neon} size={11} strokeWidth={2.3} />
+              <Text style={[styles.kindPillText, styles.kindPillTextChallenge]}>
+                {challengeCardLabel(thread).toUpperCase()}
+              </Text>
+            </View>
+          ) : isClub ? (
             <View style={[styles.kindPill, important && styles.kindPillImportant]}>
               {important ? (
                 <TriangleAlert color={chatColors.warn} size={11} strokeWidth={2.4} />
@@ -148,6 +168,7 @@ export default function ConversationCard({ thread, now, onPress }) {
 
 function kindText(thread) {
   if (thread.type === 'club') return 'Chat del club';
+  if (thread.type === 'challenge') return challengeCardLabel(thread);
   if (thread.type === 'match') {
     return thread.subtitle ? `Chat del partido · ${thread.subtitle}` : 'Chat del partido';
   }
@@ -175,6 +196,14 @@ const styles = StyleSheet.create({
     borderColor: chatColors.cardBorderClub,
   },
   cardImportant: { borderColor: chatColors.warnBorder },
+  // Ya visto: el hilo sigue siendo reconocible, sin gritar.
+  cardChallenge: {
+    backgroundColor: chatColors.cardChallenge,
+    borderColor: chatColors.challengeBorder,
+  },
+  // Recién aceptado y sin abrir. Borde, no animación: el enunciado pide
+  // que se note, no que parpadee.
+  cardChallengeNeon: { borderColor: chatColors.neonBorder },
 
   body: { flex: 1, minWidth: 0 },
 
@@ -240,6 +269,10 @@ const styles = StyleSheet.create({
     backgroundColor: chatColors.warnSoft,
     borderColor: 'rgba(255,190,90,0.35)',
   },
+  kindPillChallenge: {
+    backgroundColor: chatColors.neonSoft,
+    borderColor: 'rgba(255,45,85,0.35)',
+  },
   kindPillText: {
     color: chatColors.green,
     fontSize: 9.5,
@@ -247,6 +280,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   kindPillTextImportant: { color: chatColors.warn },
+  kindPillTextChallenge: { color: chatColors.neon },
 
   badges: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   unread: {

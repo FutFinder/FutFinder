@@ -120,6 +120,20 @@ export const chatColors = {
   dangerSoft: 'rgba(255,122,107,0.09)',
   dangerBorder: 'rgba(255,122,107,0.35)',
 
+  // Desafío entre clubes (migración 42).
+  // El rojo neón marca el hilo de negociación recién aceptado y se apaga
+  // por administrador en cuanto lo abre. No es el mismo rojo que
+  // `danger`: eso es "algo salió mal", y esto es "hay un partido nuevo
+  // que coordinar".
+  neon: '#FF2D55',
+  neonSoft: 'rgba(255,45,85,0.12)',
+  neonBorder: 'rgba(255,45,85,0.55)',
+  cardChallenge: '#141013',
+  // Ya visto: el acento baja de intensidad pero el hilo sigue siendo
+  // reconocible de un vistazo.
+  challengeBorder: 'rgba(255,45,85,0.22)',
+  challengeShield: ['#FF2D55', '#7A1028'],
+
   // Escudo de club (degradado del avatar)
   clubShield: ['#5AE06A', '#2C9C3B'],
   avatarGreenBg: '#1B2A1D',

@@ -92,10 +92,25 @@ const TAG = {
 
 const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
 
+/**
+ * Avisos del ciclo de desafíos que llevan directo a una conversación.
+ * El atajo se ofrece solo si el aviso trae `threadKey`: los avisos
+ * anteriores a la migración 42 no lo tienen y siguen abriendo la bandeja
+ * de desafíos al tocar la tarjeta.
+ */
+const TIPOS_CON_HILO = new Set(['club_challenge_accepted']);
+
+function tieneHiloDeNegociacion(n) {
+  return TIPOS_CON_HILO.has(n?.type) && !!n?.data?.threadKey;
+}
+
 export default function NotificationCard({ notification: n, onPress, onDelete, onPrimary, onSecondary, busy }) {
   const Icon = ICON[n.type] || Bell;
   const tag = TAG[n.type] || FALLBACK_TAG;
   const unread = !n.read;
+  // «IR AHORA» no es una acción distinta de tocar la tarjeta: es la misma
+  // navegación, hecha evidente. Así no hay dos caminos que mantener.
+  const irAhora = tieneHiloDeNegociacion(n) && !n.actions;
 
   return (
     <Pressable
@@ -137,6 +152,21 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
           </View>
           <Text className="text-[11.5px] font-semibold text-white/35">{n.timeLabel}</Text>
         </View>
+
+        {irAhora ? (
+          <View className="mt-2.5 flex-row">
+            <Pressable
+              onPress={() => !busy && onPress(n)}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="Ir ahora al chat de negociación del desafío"
+              className="h-[38px] flex-1 items-center justify-center rounded-xl bg-[#00FF66] active:opacity-80"
+              style={busy ? { opacity: 0.6 } : null}
+            >
+              <Text className="text-[13px] font-bold text-[#04120A]">IR AHORA</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {n.actions ? (
           <View className="mt-2.5 flex-row gap-2">

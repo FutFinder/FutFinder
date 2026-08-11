@@ -857,3 +857,123 @@ test('la inicial del avatar ignora la arroba', () => {
   assert.equal(initialOf({ username: 'camilo_9' }), 'C');
   assert.equal(initialOf(''), '?');
 });
+
+// ════════════════════════════════════════════════════════════════
+// HILO DE NEGOCIACIÓN DE UN DESAFÍO (migración 42)
+// ════════════════════════════════════════════════════════════════
+// El cuarto tipo de hilo. Lo que se protege acá es que agregarlo no le
+// haya cambiado el comportamiento a los tres que ya existían.
+
+const { threadKindLabel, isGroupType } = require('../chatMeta.js');
+
+const filaDesafio = (payloadExtra = {}) => ({
+  thread_key: 'challenge:ch-1',
+  thread_type: 'challenge',
+  last_at: '2026-08-05T14:00:00',
+  payload: {
+    challenge_id: 'ch-1',
+    estado: 'negociacion',
+    mi_club_id: 'club-a',
+    club_retador: { id: 'club-a', nombre: 'Los Tigres' },
+    club_retado: { id: 'club-b', nombre: 'Deportivo Sur' },
+    vence_at: '2026-08-08T14:00:00',
+    prorroga_abierta: false,
+    abierto_alguna_vez: false,
+    unread: 2,
+    last_message: {
+      id: 'm1',
+      content: 'Coordinemos la cancha',
+      created_at: '2026-08-05T14:00:00',
+      sender_id: 'otro-admin',
+      sender_username: 'camilo',
+    },
+    ...payloadExtra,
+  },
+});
+
+test('mapThreadRow arma el hilo de desafío con los dos clubes y el título «A vs B»', () => {
+  const t = mapThreadRow(filaDesafio(), 'yo');
+  assert.equal(t.type, 'challenge');
+  assert.equal(t.challenge_id, 'ch-1');
+  assert.equal(t.title, 'Los Tigres vs Deportivo Sur');
+  assert.equal(t.subtitle, 'Negociación');
+  assert.equal(t.estado, 'negociacion');
+  assert.equal(t.mi_club_id, 'club-a');
+  assert.equal(t.vence_at, '2026-08-08T14:00:00');
+  assert.equal(t.abierto_alguna_vez, false);
+  assert.equal(t.unread, 2);
+});
+
+test('el hilo de desafío no trae foto: la tarjeta pinta los dos escudos', () => {
+  assert.equal(mapThreadRow(filaDesafio(), 'yo').foto_url, null);
+});
+
+test('el desafío es un grupo: la vista previa lleva el nombre de quién habló', () => {
+  const t = mapThreadRow(filaDesafio(), 'yo');
+  assert.equal(t.last_sender_name, 'camilo');
+  assert.equal(threadPreview(t).prefix, 'camilo:');
+});
+
+test('el título del desafío es el mismo para los dos clubes', () => {
+  const desdeRetador = mapThreadRow(filaDesafio({ mi_club_id: 'club-a' }), 'yo');
+  const desdeRetado = mapThreadRow(filaDesafio({ mi_club_id: 'club-b' }), 'otro');
+  assert.equal(desdeRetador.title, desdeRetado.title);
+});
+
+test('el filtro «Clubes» muestra el chat del club Y el hilo de desafío', () => {
+  const lista = [
+    { key: 'club:1', type: 'club' },
+    { key: 'challenge:ch-1', type: 'challenge' },
+    { key: 'match:1', type: 'match' },
+    { key: 'dm:1', type: 'dm' },
+  ];
+  const visibles = filterThreads(lista, 'clubes');
+  assert.deepEqual(visibles.map((t) => t.type), ['club', 'challenge']);
+});
+
+test('los otros filtros no se contaminan con el tipo nuevo', () => {
+  const lista = [
+    { key: 'challenge:ch-1', type: 'challenge' },
+    { key: 'match:1', type: 'match' },
+    { key: 'dm:1', type: 'dm' },
+  ];
+  assert.deepEqual(filterThreads(lista, 'partidos').map((t) => t.type), ['match']);
+  assert.deepEqual(filterThreads(lista, 'amigos').map((t) => t.type), ['dm']);
+  assert.equal(filterThreads(lista, 'todos').length, 3);
+});
+
+test('el contador de la píldora «Clubes» coincide con lo que muestra al tocarla', () => {
+  const lista = [
+    { key: 'club:1', type: 'club' },
+    { key: 'challenge:ch-1', type: 'challenge' },
+    { key: 'dm:1', type: 'dm' },
+  ];
+  assert.equal(filterCounts(lista).clubes, filterThreads(lista, 'clubes').length);
+  assert.equal(filterCounts(lista).clubes, 2);
+});
+
+test('/todos existe en el hilo de desafío y sigue sin existir en un DM', () => {
+  assert.equal(canUseMentionAll('challenge'), true);
+  assert.equal(canUseMentionAll('club'), true);
+  assert.equal(canUseMentionAll('match'), true);
+  assert.equal(canUseMentionAll('dm'), false);
+});
+
+test('el compositor del desafío ofrece /todos pero no /importante', () => {
+  const sugeridos = suggestCommands('/', { isClubAdmin: true, threadType: 'challenge' });
+  assert.deepEqual(sugeridos.map((c) => c.command), ['/todos']);
+});
+
+test('threadKindLabel etiqueta el hilo nuevo sin tocar los anteriores', () => {
+  assert.equal(threadKindLabel({ type: 'challenge' }), 'DESAFÍO');
+  assert.equal(threadKindLabel({ type: 'club' }), 'CHAT DEL CLUB');
+  assert.equal(threadKindLabel({ type: 'dm' }), 'Amigos');
+});
+
+test('isGroupType reconoce los tres grupos y deja fuera el DM', () => {
+  assert.equal(isGroupType('challenge'), true);
+  assert.equal(isGroupType('club'), true);
+  assert.equal(isGroupType('match'), true);
+  assert.equal(isGroupType('dm'), false);
+  assert.equal(isGroupType(undefined), false);
+});

@@ -36,6 +36,8 @@ import {
   ThreadDenied,
 } from '../components/chat/ThreadDecorations';
 import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
+import ChallengeHeader from '../components/clubes/ChallengeHeader';
+import ChallengeEventBubble from '../components/clubes/ChallengeEventBubble';
 import Banner from '../components/Banner';
 
 import { chatColors } from '../theme/colors';
@@ -57,7 +59,9 @@ import {
 import { getMatchById, getMatchAttendees } from '../services/matches';
 import { getClubById, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
-import { getChallenge } from '../services/clubChallenges';
+import { getChallenge, listChallengeEvents } from '../services/clubChallenges';
+import { getChallengeCta, estadoLabel } from '../services/clubChallengeRules';
+import { parseChallengeThread } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
@@ -68,6 +72,7 @@ import {
   decideAutoScroll,
   attachCachedSender,
   needsSenderFetch,
+  isGroupType,
 } from '../utils/chatMeta';
 import useConnection from '../utils/useConnection';
 
@@ -95,12 +100,20 @@ export default function ChatThreadScreen({ route, navigation }) {
   const paramTitle = route?.params?.title || 'Chat';
   const paramSubtitle = route?.params?.subtitle || '';
   const fotoUrl = route?.params?.fotoUrl || null;
-  // Un DM abierto desde un desafío de club aceptado se permite aunque los
-  // administradores no sean amigos.
-  const challengeId = route?.params?.challengeId || null;
-
   const t = useMemo(() => parseThreadKey(threadKey), [threadKey]);
-  const isGroup = t?.type === 'match' || t?.type === 'club';
+  const isGroup = isGroupType(t?.type);
+
+  // El desafío al que pertenece esta conversación. Puede llegar por dos
+  // caminos distintos, y los dos siguen vivos:
+  //   - `challenge:<id>`: el hilo GRUPAL de negociación (migración 42).
+  //   - `dm:<userId>` + params.challengeId: el DM LEGADO entre dos
+  //     administradores de un desafío anterior, que habilita el chat
+  //     aunque no sean amigos.
+  const challengeId = useMemo(
+    () => parseChallengeThread(threadKey)?.challengeId || route?.params?.challengeId || null,
+    [threadKey, route?.params?.challengeId]
+  );
+  const isChallengeThread = t?.type === 'challenge';
 
   const [myId, setMyId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -117,6 +130,8 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [context, setContext] = useState(null); // info del club / partido
   const [clubChallenge, setClubChallenge] = useState(null);
+  const [challengeEvents, setChallengeEvents] = useState([]);
+  const [myClubIds, setMyClubIds] = useState([]);
   const [busyAction, setBusyAction] = useState(false);
 
   const listRef = useRef(null);
@@ -249,17 +264,42 @@ export default function ChatThreadScreen({ route, navigation }) {
   }, [t?.id, t?.type]);
 
   // ── Chat de desafío de club ──────────────────────────────────
+  // En el hilo grupal se cargan además la bitácora (que se intercala como
+  // burbujas de sistema) y de qué club soy administrador, que es lo que
+  // decide qué acción corresponde ofrecer.
   useEffect(() => {
     if (!challengeId) return undefined;
     let alive = true;
     (async () => {
       const { data } = await getChallenge(challengeId);
-      if (alive) setClubChallenge(data || null);
+      if (!alive) return;
+      setClubChallenge(data || null);
+
+      if (!isChallengeThread || !data) return;
+
+      const [{ data: eventos }, { data: { user } = {} }] = await Promise.all([
+        listChallengeEvents(challengeId),
+        supabase.auth.getUser(),
+      ]);
+      if (!alive) return;
+      setChallengeEvents(eventos || []);
+
+      if (!user?.id) return;
+      const { data: membresias } = await supabase
+        .from('club_members')
+        .select('club_id, rol')
+        .eq('user_id', user.id)
+        .in('club_id', [data.club_retador_id, data.club_retado_id]);
+      if (alive) {
+        setMyClubIds(
+          (membresias || []).filter((m) => m.rol === 'admin').map((m) => m.club_id)
+        );
+      }
     })();
     return () => {
       alive = false;
     };
-  }, [challengeId]);
+  }, [challengeId, isChallengeThread]);
 
   // Trae el perfil (username/foto_url) de un remitente que todavía no
   // habíamos visto hablar en este hilo, y parcha con él cualquier mensaje
@@ -433,6 +473,8 @@ export default function ChatThreadScreen({ route, navigation }) {
         ? { match_id: t.id }
         : t?.type === 'club'
         ? { club_id: t.id }
+        : t?.type === 'challenge'
+        ? { challenge_id: t.id }
         : { receiver_id: t.id }),
     };
     // Enviar siempre lleva al final, aunque el usuario estuviera leyendo
@@ -555,7 +597,74 @@ export default function ChatThreadScreen({ route, navigation }) {
     [messages, myId, isGroup]
   );
 
+  /**
+   * Lo que se pinta en la lista: los mensajes decorados y, en un hilo de
+   * desafío, los eventos del ciclo intercalados por hora.
+   *
+   * Los eventos NO pasan por `decorateMessages`: no tienen autor, así que
+   * no agrupan burbujas, no muestran avatar y no pueden partir la tanda de
+   * mensajes de un administrador. Por eso se mezclan acá, después de
+   * decorar, y no antes.
+   */
+  const timeline = useMemo(() => {
+    const mensajes = decorated.map((d) => ({
+      kind: 'message',
+      key: String(d.message.id),
+      at: d.message.created_at,
+      decorated: d,
+    }));
+
+    if (!isChallengeThread || challengeEvents.length === 0) return mensajes;
+
+    const eventos = challengeEvents.map((e) => ({
+      kind: 'event',
+      key: `event:${e.id}`,
+      at: e.created_at,
+      event: e,
+    }));
+
+    return [...mensajes, ...eventos].sort(
+      (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime()
+    );
+  }, [decorated, challengeEvents, isChallengeThread]);
+
+  /**
+   * Acción contextual de la cabecera. Se calcula con las mismas reglas que
+   * usa el resto del módulo (`getChallengeCta`), pero en esta fase solo hay
+   * una transición que la app sepa ejecutar desde acá: abrir el partido
+   * cuando ya existe. Las demás se muestran como información — ver el
+   * comentario de `ChallengeHeader`.
+   */
+  const challengeCta = useMemo(() => {
+    if (!isChallengeThread || !clubChallenge) return null;
+    const miClubId =
+      myClubIds.find((id) =>
+        [clubChallenge.club_retador_id, clubChallenge.club_retado_id].includes(id)
+      ) || null;
+    return getChallengeCta({
+      challenge: clubChallenge,
+      myClubId,
+      soyAdmin: myClubIds.length > 0,
+      online: connection !== 'offline',
+    });
+  }, [isChallengeThread, clubChallenge, myClubIds, connection]);
+
+  const puedeAbrirPartido =
+    challengeCta?.kind === 'ver_partido' && !!clubChallenge?.match_id;
+
+  const handleChallengeCta = useCallback(() => {
+    if (!puedeAbrirPartido) return;
+    navigation.navigate('MatchDetail', { matchId: clubChallenge.match_id });
+  }, [puedeAbrirPartido, navigation, clubChallenge?.match_id]);
+
   const headerSubtitle = useMemo(() => {
+    if (t?.type === 'challenge') {
+      // El estado del ciclo es lo que de verdad orienta acá: el título ya
+      // dice qué dos clubes se enfrentan.
+      if (!clubChallenge) return paramSubtitle || 'Negociación del desafío';
+      const admins = myClubIds.length > 0 ? 'Administradores de ambos clubes' : 'Solo lectura';
+      return `${estadoLabel(clubChallenge.estado)} · ${admins}`;
+    }
     if (t?.type === 'club') {
       const n = context?.memberCount;
       return n ? `Chat del club · ${n} ${n === 1 ? 'jugador' : 'jugadores'}` : 'Chat del club';
@@ -571,7 +680,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       return [fecha, m.comuna].filter(Boolean).join(' · ') || 'Chat del partido';
     }
     return canWrite ? 'Amigos · Ver perfil' : 'Ver perfil';
-  }, [t?.type, context, paramSubtitle, canWrite]);
+  }, [t?.type, context, paramSubtitle, canWrite, clubChallenge, myClubIds]);
 
   const commandSuggestions = useMemo(
     () => (isGroup ? suggestCommands(draft, { isClubAdmin, threadType: t?.type }) : []),
@@ -614,8 +723,11 @@ export default function ChatThreadScreen({ route, navigation }) {
     });
 
     // Del chat del club no se puede salir sin abandonar el club: solo se
-    // silencia. Por eso «Eliminar conversación» no aparece ahí.
-    if (t?.type !== 'club') {
+    // silencia. Por eso «Eliminar conversación» no aparece ahí. Lo mismo
+    // vale para la negociación de un desafío: tiene un plazo corriendo, y
+    // sacarla de la bandeja es la mejor forma de que se venza sin que
+    // nadie se entere.
+    if (t?.type !== 'club' && t?.type !== 'challenge') {
       items.push({
         key: 'delete',
         label: 'Eliminar conversación',
@@ -696,7 +808,7 @@ export default function ChatThreadScreen({ route, navigation }) {
             <ActivityIndicator color={chatColors.green} />
             <Text style={styles.loadingText}>Cargando mensajes…</Text>
           </View>
-        ) : decorated.length === 0 ? (
+        ) : timeline.length === 0 ? (
           <ThreadEmpty
             title={isGroup ? 'Sé el primero en saludar' : 'Empieza la conversación'}
             message={
@@ -704,26 +816,32 @@ export default function ChatThreadScreen({ route, navigation }) {
                 ? 'Coordina con los jugadores del club sin compartir números.'
                 : t?.type === 'match'
                 ? 'Coordina con los jugadores del partido sin compartir números.'
+                : t?.type === 'challenge'
+                ? 'Acuerden acá la cancha, la fecha y la hora del partido.'
                 : 'Escríbele para coordinar el próximo partido.'
             }
           />
         ) : (
           <FlatList
             ref={listRef}
-            data={decorated}
-            keyExtractor={(item) => String(item.message.id)}
-            renderItem={({ item }) => (
-              <View>
-                {item.startsDay && <DayDivider label={item.dayLabel} />}
-                <MessageBubble
-                  item={item}
-                  isGroup={isGroup}
-                  onPressSender={handlePressSender}
-                  onRetry={handleRetry}
-                  onDiscard={handleDiscard}
-                />
-              </View>
-            )}
+            data={timeline}
+            keyExtractor={(item) => item.key}
+            renderItem={({ item }) =>
+              item.kind === 'event' ? (
+                <ChallengeEventBubble event={item.event} />
+              ) : (
+                <View>
+                  {item.decorated.startsDay && <DayDivider label={item.decorated.dayLabel} />}
+                  <MessageBubble
+                    item={item.decorated}
+                    isGroup={isGroup}
+                    onPressSender={handlePressSender}
+                    onRetry={handleRetry}
+                    onDiscard={handleDiscard}
+                  />
+                </View>
+              )
+            }
             contentContainerStyle={styles.list}
             ListHeaderComponent={
               <>
@@ -807,7 +925,15 @@ export default function ChatThreadScreen({ route, navigation }) {
           </View>
         ) : (
           <>
-            {challengeId && clubChallenge?.estado === 'aceptado' && (
+            {isChallengeThread && (
+              <ChallengeHeader
+                challenge={clubChallenge}
+                cta={challengeCta}
+                onPressCta={puedeAbrirPartido ? handleChallengeCta : null}
+              />
+            )}
+
+            {challengeId && !isChallengeThread && clubChallenge?.estado === 'aceptado' && (
               clubChallenge.match_id ? (
                 <Pressable
                   onPress={() =>

@@ -8,6 +8,15 @@ import { supabase, isSupabaseConfigured } from './supabase';
  *  - DM (1-a-1):    threadKey = 'dm:<userId>'   target = { receiver_id }
  *  - Match grupal:  threadKey = 'match:<matchId>' target = { match_id }
  *  - Club:          threadKey = 'club:<clubId>'  target = { club_id }
+ *  - Desafío:       threadKey = 'challenge:<challengeId>' target = { challenge_id }
+ *
+ * EL HILO DE DESAFÍO (migración 42)
+ * ---------------------------------
+ * Es un grupo con TODOS los administradores de ambos clubes, no un DM
+ * ampliado: convive con el mensaje privado que dos de esos administradores
+ * puedan tener entre ellos sin mezclarse con él. Se lee mientras se sea
+ * administrador vigente (aunque el desafío ya esté cerrado, para no perder
+ * el historial) y solo se escribe mientras el desafío siga activo.
  *
  * ESTADO DE LECTURA Y SILENCIO (migración 32)
  * -------------------------------------------
@@ -46,7 +55,8 @@ export {
   suggestCommands,
   canUseMentionAll,
 } from '../utils/chatMeta';
-import { canUseMentionAll, mapThreadRow, createSharedChannel } from '../utils/chatMeta';
+import { canUseMentionAll, mapThreadRow, createSharedChannel, isGroupType } from '../utils/chatMeta';
+import { esEstadoActivo, estadoLabel } from './clubChallengeRules';
 
 // ============================================================
 // TOLERANCIA A MIGRACIONES SIN APLICAR
@@ -97,6 +107,26 @@ async function tieneEsquemaV39() {
     );
   }
   return _v39;
+}
+
+let _v42 = null; // null = sin comprobar | true | false
+
+/** ¿Está aplicada la migración 42 (messages.challenge_id / hilo de desafío)? */
+async function tieneEsquemaV42() {
+  if (_v42 !== null) return _v42;
+  if (!isSupabaseConfigured) {
+    _v42 = false;
+    return _v42;
+  }
+  const { error } = await supabase.from('messages').select('challenge_id').limit(1);
+  _v42 = !esFaltaDeEsquema(error);
+  if (!_v42) {
+    console.warn(
+      '[FutFinder] Chat: falta la migración 42 (messages.challenge_id). ' +
+        'El chat de negociación de los desafíos no está disponible.'
+    );
+  }
+  return _v42;
 }
 
 async function getMe() {
@@ -434,6 +464,74 @@ export async function getThreadAccess(threadKeyStr, { challengeId = null } = {})
     return ok;
   }
 
+  if (t.type === 'challenge') {
+    // Sin la migración 42 el hilo no existe: mejor decirlo que mostrar un
+    // chat vacío que además rechazaría cada envío.
+    if (!(await tieneEsquemaV42())) {
+      return {
+        ...ok,
+        canRead: false,
+        canWrite: false,
+        reason: 'schema_pending',
+        title: 'El chat del desafío todavía no está disponible',
+        message: 'Falta aplicar la migración 42 en Supabase.',
+      };
+    }
+
+    const { data: challenge, error } = await supabase
+      .from('club_challenges')
+      .select('id, estado, club_retador_id, club_retado_id')
+      .eq('id', t.id)
+      .maybeSingle();
+    if (error) console.error('[FutFinder] getThreadAccess(challenge):', error);
+
+    if (!challenge) {
+      return {
+        ...ok,
+        canRead: false,
+        canWrite: false,
+        reason: 'challenge_missing',
+        title: 'Este desafío ya no existe',
+        message: null,
+      };
+    }
+
+    // Administrador VIGENTE de cualquiera de los dos clubes. Es la misma
+    // definición que aplica la RLS (`chat_puede_ver_desafio`), derivada de
+    // `club_members` en vivo: si te degradan, dejas de tener acceso.
+    const { data: membresias } = await supabase
+      .from('club_members')
+      .select('club_id, rol')
+      .eq('user_id', me)
+      .in('club_id', [challenge.club_retador_id, challenge.club_retado_id]);
+
+    const miAdmin = (membresias || []).find((m) => m.rol === 'admin');
+    if (!miAdmin) {
+      return {
+        ...ok,
+        canRead: false,
+        canWrite: false,
+        reason: 'not_challenge_admin',
+        title: 'Este chat es solo para los administradores',
+        message: 'La negociación del desafío la llevan los administradores de ambos clubes.',
+      };
+    }
+
+    // Desafío cerrado: el historial se conserva legible, pero nadie escribe.
+    if (!esEstadoActivo(challenge.estado)) {
+      return {
+        ...ok,
+        canWrite: false,
+        reason: 'challenge_closed',
+        title: 'Desafío cerrado',
+        message: `Este desafío está en «${estadoLabel(challenge.estado)}». Puedes leer la conversación, pero ya no admite mensajes.`,
+        isClubAdmin: true,
+      };
+    }
+
+    return { ...ok, isClubAdmin: true };
+  }
+
   if (t.type === 'dm') {
     if (t.id === me) {
       return {
@@ -564,16 +662,33 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
     const me = await getMe();
     if (!me) return { data: [], hasMore: false, error: { message: 'No autenticado' } };
 
-    const [v32, v39] = await Promise.all([tieneEsquemaV32(), tieneEsquemaV39()]);
+    const [v32, v39, v42] = await Promise.all([
+      tieneEsquemaV32(),
+      tieneEsquemaV39(),
+      tieneEsquemaV42(),
+    ]);
+    if (t.type === 'challenge' && !v42) {
+      return {
+        data: [],
+        hasMore: false,
+        error: { message: 'El chat del desafío necesita la migración 42 en Supabase.' },
+      };
+    }
     const baseCols =
       'id, created_at, sender_id, receiver_id, match_id, content, read_at' +
       (v32 ? ', is_important' : '') +
       (v39 ? ', mention_all' : '');
+    const cols =
+      t.type === 'club'
+        ? `${baseCols}, club_id`
+        : t.type === 'challenge'
+        ? `${baseCols}, challenge_id`
+        : baseCols;
 
     // Pedimos uno de más para saber si quedan mensajes anteriores.
     let q = supabase
       .from('messages')
-      .select(t.type === 'club' ? `${baseCols}, club_id` : baseCols)
+      .select(cols)
       .order('created_at', { ascending: false })
       .limit(limit + 1);
 
@@ -586,10 +701,15 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
           `and(sender_id.eq.${me},receiver_id.eq.${t.id}),` +
           `and(sender_id.eq.${t.id},receiver_id.eq.${me})`
         );
+      // Un mensaje de desafío también tiene match_id y club_id nulos: sin
+      // esto se colaría en el DM de quien lo escribió.
+      if (v42) q = q.is('challenge_id', null);
     } else if (t.type === 'match') {
       q = q.eq('match_id', t.id);
     } else if (t.type === 'club') {
       q = q.eq('club_id', t.id);
+    } else if (t.type === 'challenge') {
+      q = q.eq('challenge_id', t.id);
     } else {
       return { data: [], hasMore: false, error: { message: 'Tipo de hilo desconocido' } };
     }
@@ -605,7 +725,7 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
     const page = (hasMore ? rows.slice(0, limit) : rows).reverse(); // antiguo → nuevo
 
     // Resolver remitentes en una sola query (para el nombre en los grupos)
-    if ((t.type === 'match' || t.type === 'club') && page.length > 0) {
+    if (isGroupType(t.type) && page.length > 0) {
       const senderIds = Array.from(new Set(page.map((m) => m.sender_id).filter(Boolean)));
       if (senderIds.length > 0) {
         const { data: profs } = await supabase
@@ -653,7 +773,21 @@ export async function sendMessage(threadKeyStr, content, { important = false, me
   const me = await getMe();
   if (!me) return { data: null, error: { message: 'No autenticado' } };
 
-  const [v32, v39] = await Promise.all([tieneEsquemaV32(), tieneEsquemaV39()]);
+  const [v32, v39, v42] = await Promise.all([
+    tieneEsquemaV32(),
+    tieneEsquemaV39(),
+    tieneEsquemaV42(),
+  ]);
+
+  if (t.type === 'challenge' && !v42) {
+    return {
+      data: null,
+      error: {
+        message:
+          'El chat del desafío no está disponible todavía: aplica la migración 42 en Supabase.',
+      },
+    };
+  }
 
   // Sin la columna `is_important` el aviso se enviaría como un mensaje normal
   // y nadie sabría que no rompió el silencio. Mejor decirlo que fingirlo.
@@ -697,6 +831,7 @@ export async function sendMessage(threadKeyStr, content, { important = false, me
   if (t.type === 'dm') payload.receiver_id = t.id;
   else if (t.type === 'match') payload.match_id = t.id;
   else if (t.type === 'club') payload.club_id = t.id;
+  else if (t.type === 'challenge') payload.challenge_id = t.id;
   if (important) payload.is_important = true;
   if (mentionAll) payload.mention_all = true;
 
@@ -704,11 +839,17 @@ export async function sendMessage(threadKeyStr, content, { important = false, me
     'id, created_at, sender_id, receiver_id, match_id, content, read_at' +
     (v32 ? ', is_important' : '') +
     (v39 ? ', mention_all' : '');
+  const cols =
+    t.type === 'club'
+      ? `${baseCols}, club_id`
+      : t.type === 'challenge'
+      ? `${baseCols}, challenge_id`
+      : baseCols;
 
   const { data, error } = await supabase
     .from('messages')
     .insert(payload)
-    .select(t.type === 'club' ? `${baseCols}, club_id` : baseCols)
+    .select(cols)
     .single();
 
   if (error) console.error('[FutFinder] sendMessage:', error);
@@ -777,6 +918,41 @@ export async function getThreadParticipants(threadKeyStr) {
     const organizerId = match?.id_organizador || null;
     return {
       data: decorate(rows, (r) => (r.user_id === organizerId ? 'organizador' : 'jugador')),
+      error: null,
+    };
+  }
+
+  if (t.type === 'challenge') {
+    // Los participantes son los administradores VIGENTES de los dos
+    // clubes: la misma lista que autoriza la RLS, no una copia guardada
+    // que habría que mantener cuando cambia un administrador.
+    const { data: challenge, error: chErr } = await supabase
+      .from('club_challenges')
+      .select('club_retador_id, club_retado_id')
+      .eq('id', t.id)
+      .maybeSingle();
+    if (chErr || !challenge) {
+      if (chErr) console.error('[FutFinder] getThreadParticipants(challenge):', chErr);
+      return { data: [], error: chErr || null };
+    }
+
+    const { data: members, error } = await supabase
+      .from('club_members')
+      .select('user_id, club_id, rol')
+      .in('club_id', [challenge.club_retador_id, challenge.club_retado_id])
+      .eq('rol', 'admin');
+    if (error) {
+      console.error('[FutFinder] getThreadParticipants(challenge):', error);
+      return { data: [], error };
+    }
+
+    const rows = await hydrateProfiles((members || []).map((m) => m.user_id));
+    const clubById = new Map((members || []).map((m) => [m.user_id, m.club_id]));
+    return {
+      data: decorate(rows, () => 'admin').map((r) => ({
+        ...r,
+        club_id: clubById.get(r.user_id) || null,
+      })),
       error: null,
     };
   }
@@ -881,8 +1057,12 @@ export function messageBelongsToThread(message, threadKeyStr, myUserId) {
   if (!t || !message) return false;
   if (t.type === 'match') return message.match_id === t.id;
   if (t.type === 'club') return message.club_id === t.id;
+  if (t.type === 'challenge') return message.challenge_id === t.id;
   if (t.type === 'dm') {
-    if (message.match_id || message.club_id) return false;
+    // `challenge_id` importa acá: un mensaje de desafío también viaja con
+    // match_id y club_id nulos, así que sin descartarlo aparecería dentro
+    // del DM de quien lo escribió.
+    if (message.match_id || message.club_id || message.challenge_id) return false;
     const pair = [message.sender_id, message.receiver_id].filter(Boolean);
     return pair.includes(myUserId) && pair.includes(t.id);
   }
