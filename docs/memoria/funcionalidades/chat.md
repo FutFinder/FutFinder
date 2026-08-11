@@ -20,7 +20,7 @@ RLS decide acceso: DM sólo con amistad aceptada, excepto administradores de dos
 
 - Pantallas: `ChatScreen`, `ChatThreadScreen`, `ChatDetailsScreen` y `src/components/chat/`.
 - Código: `src/services/messages.js`, `src/utils/chatMeta.js`, `src/utils/challengeThread.js`, `src/utils/notificationTargets.js` y `src/components/clubes/ChallengeHeader.js` / `ChallengeEventBubble.js`.
-- Backend: `messages`, `club_challenge_events`, lectura, silencio, ocultamiento, amistades, asistentes, miembros y migraciones 32, 36, 37, 39, 40 y 42.
+- Backend: `messages`, `club_challenge_events`, lectura, silencio, ocultamiento, amistades, asistentes, miembros y migraciones 32, 36, 37, 39, 40, 42 y 42b (todas aplicadas al 2026-08-10).
 
 ## Estados, errores y problemas conocidos
 

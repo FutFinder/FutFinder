@@ -235,7 +235,8 @@ Transiciones autorizadas, con quién puede dispararlas:
 | Archivo | Contenido | Estado |
 |---|---|---|
 | `supabase/migrations/41_desafios_estados_y_chat.sql` | Estados nuevos, columnas de plazos, `desafio_reglas()`, trigger anti-autodesafío | Aplicada |
-| `supabase/migrations/42_desafios_chat_negociacion.sql` | Tipo de hilo `challenge:` (columna `messages.challenge_id`, CHECK de destino a cuatro ramas, helpers `chat_puede_ver_desafio`/`chat_puede_escribir_desafio`, RLS, `get_my_threads`, `get_chat_unread_counts`, `chat_notify_mention_all`, `messages_block_content_edits`), `club_challenge_events`, RPC `aceptar_desafio` | Escrita y verificada; **sin aplicar** |
+| `supabase/migrations/42_desafios_chat_negociacion.sql` | Tipo de hilo `challenge:` (columna `messages.challenge_id`, CHECK de destino a cuatro ramas, helpers `chat_puede_ver_desafio`/`chat_puede_escribir_desafio`, RLS, `get_my_threads`, `get_chat_unread_counts`, `chat_notify_mention_all`, `messages_block_content_edits`), `club_challenge_events`, RPC `aceptar_desafio` | Aplicada |
+| `supabase/migrations/42b_desafio_rpc_revoke_public.sql` | Quita el `EXECUTE` de `PUBLIC` sobre `aceptar_desafio()`. Va aparte porque la 42 ya estaba aplicada | Aplicada |
 | `supabase/migrations/43_desafios_plazos_y_propuesta.sql` | `club_challenge_extension_replies`, `club_challenge_proposals`, RPC `procesar_vencimientos_desafios` (+ `cron.schedule`), `responder_prorroga`, `crear_propuesta_oficial`, `rechazar_propuesta` | Pendiente |
 | `supabase/migrations/44_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda en `join_match` | Pendiente |
 | `supabase/migrations/45_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` | Pendiente |
@@ -573,9 +574,19 @@ compositor, L774-840, ya existe para desafíos); crear
 
 **Verificación de fase:** `npm test` (270 ✓), `npm run build:web` (✓),
 `deno test … pushLogic.test.ts` (13 ✓) y la prueba SQL 42 completa corrida
-contra el esquema desplegado en una transacción con `rollback` (12 casos ✓).
-Falta la comprobación manual en la app —requiere aplicar la migración 42— y
-aplicar la propia migración.
+**contra el esquema ya aplicado** en una transacción con `rollback` (12 casos ✓,
+sin dejar filas). Migraciones 42 y 42b aplicadas y verificadas contra el
+catálogo el 2026-08-10.
+
+> **Advisor de seguridad.** Tras aplicar la 42, el advisor de Supabase marcó
+> «Public Can Execute SECURITY DEFINER Function» sobre `aceptar_desafio()`:
+> `revoke ... from anon` no quita el `EXECUTE` que PostgreSQL concede a
+> `PUBLIC` por defecto. Cerrado en la 42b y comprobado que `authenticated`
+> sigue pudiendo ejecutarla y `anon` no. **Para las RPC de las fases
+> siguientes: revocar de `public`, no de `anon`.**
+
+Queda pendiente sólo la comprobación manual en la app (aceptar un desafío real
+y ver el hilo, la tarjeta neón y el CTA en un dispositivo).
 
 ---
 

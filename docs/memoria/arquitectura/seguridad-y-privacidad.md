@@ -31,6 +31,10 @@ Las políticas y pruebas versionadas no prueban que el proyecto Supabase despleg
 - `supabase/migrations/35_privacy_friend_requests_rls.sql`, `36_chat_seguridad_rls.sql`, `37_chat_helpers_security_invoker.sql` y `39_chat_mencion_todos.sql`
 - `supabase/functions/send-push/` y `supabase/tests/35_privacy_test.sql`
 
+## Revocar EXECUTE en una RPC: `public`, no `anon`
+
+PostgreSQL concede `EXECUTE` a `PUBLIC` en toda función nueva, y `anon` lo hereda por ahí. `revoke execute ... from anon` no quita nada: hay que revocar de `public` y volver a conceder a `authenticated`. Se detectó con el advisor de Supabase («Public Can Execute SECURITY DEFINER Function») sobre `aceptar_desafio()` y se corrigió en la migración 42b. Aplica a toda RPC `security definer` nueva.
+
 ## Notas relacionadas
 
 - [Autenticación](../funcionalidades/autenticacion.md)
