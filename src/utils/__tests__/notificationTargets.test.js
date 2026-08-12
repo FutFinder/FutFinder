@@ -49,6 +49,14 @@ const SAMPLE_DATA_BY_TYPE = {
   club_challenge: { clubRetadoId: 'c1', clubRetadorId: 'c2' },
   club_challenge_accepted: { clubRetadorId: 'c1', clubRetadoId: 'c2' },
   club_challenge_rejected: { clubRetadorId: 'c1', clubRetadoId: 'c2' },
+  // Ciclo formal (migración 43): los tres primeros ocurren dentro de la
+  // negociación y siempre traen el hilo. El cierre es el único que puede
+  // llegar sin él (un desafío que expiró sin que nadie lo aceptara), y esa
+  // rama tiene su propia prueba más abajo.
+  club_challenge_extension: { challengeId: 'ch1', threadKey: 'challenge:ch1' },
+  club_challenge_closed: { challengeId: 'ch1', threadKey: 'challenge:ch1' },
+  club_challenge_proposal: { challengeId: 'ch1', threadKey: 'challenge:ch1' },
+  club_challenge_proposal_rejected: { challengeId: 'ch1', threadKey: 'challenge:ch1' },
   message_new: { threadKey: 'dm:u1' },
   chat_mention_all: { threadKey: 'club:c1' },
   friend_request: { fromUserId: 'u1' },
@@ -77,6 +85,10 @@ const EXPECTED_SCREEN_BY_TYPE = {
   club_challenge: 'ClubChallenges',
   club_challenge_accepted: 'ClubChallenges',
   club_challenge_rejected: 'ClubChallenges',
+  club_challenge_extension: 'ChatThread',
+  club_challenge_closed: 'ChatThread',
+  club_challenge_proposal: 'ChatThread',
+  club_challenge_proposal_rejected: 'ChatThread',
   message_new: 'ChatThread',
   chat_mention_all: 'ChatThread',
   friend_request: 'UserProfile',
@@ -327,6 +339,45 @@ test('resolveNotificationTarget: sin threadKey (aviso anterior a la migración 4
     resolveNotificationTarget({
       type: 'club_challenge_accepted',
       data: { challengeId: 'ch-1', clubRetadorId: 'c1', clubRetadoId: 'c2' },
+    }),
+    {
+      screen: 'ClubChallenges',
+      params: { clubId: 'c1' },
+      resource: { kind: 'club', id: 'c1' },
+    }
+  );
+});
+
+// Migración 43: los cuatro avisos del ciclo formal. Los tres que nacen
+// dentro de la negociación siempre traen `threadKey`; el de expiración
+// no, porque un desafío que nadie aceptó nunca llegó a tener hilo.
+for (const type of [
+  'club_challenge_extension',
+  'club_challenge_proposal',
+  'club_challenge_proposal_rejected',
+  'club_challenge_closed',
+]) {
+  test(`resolveNotificationTarget: ${type} con threadKey abre el hilo de negociación`, () => {
+    assert.deepEqual(
+      resolveNotificationTarget({
+        type,
+        data: {
+          challengeId: 'ch-9',
+          clubRetadorId: 'c1',
+          clubRetadoId: 'c2',
+          threadKey: 'challenge:ch-9',
+        },
+      }),
+      { screen: 'ChatThread', params: { threadKey: 'challenge:ch-9' } }
+    );
+  });
+}
+
+test('resolveNotificationTarget: el desafío que expiró sin hilo lleva a la bandeja del retador', () => {
+  assert.deepEqual(
+    resolveNotificationTarget({
+      type: 'club_challenge_closed',
+      data: { challengeId: 'ch-9', clubRetadorId: 'c1', clubRetadoId: 'c2' },
     }),
     {
       screen: 'ClubChallenges',

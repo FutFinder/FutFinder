@@ -79,13 +79,21 @@ export function resolveNotificationTarget(n) {
 
     case 'club_challenge_accepted':
     case 'club_challenge_rejected':
+    // Ciclo formal (migración 43): prórroga, cierre sin acuerdo,
+    // propuesta oficial y rechazo de propuesta. Todos ocurren dentro de
+    // la negociación, así que su destino natural es el mismo hilo.
+    case 'club_challenge_extension':
+    case 'club_challenge_closed':
+    case 'club_challenge_proposal':
+    case 'club_challenge_proposal_rejected':
       // Aceptado (migración 42): el aviso trae el hilo grupal de
       // negociación y se abre ahí directamente — es donde hay que
       // coordinar, y llevar a la bandeja de desafíos sería un paso de más.
       //
-      // Los avisos ANTERIORES a esa migración no traen `threadKey`, y los
-      // de rechazo no tienen hilo que abrir: los dos conservan el destino
-      // de siempre. Por eso se comprueba el dato y no el tipo.
+      // Los avisos ANTERIORES a esa migración no traen `threadKey`, los
+      // de rechazo no tienen hilo que abrir, y un desafío que expiró sin
+      // que nadie lo aceptara nunca llegó a tener uno: los tres conservan
+      // el destino de siempre. Por eso se comprueba el dato y no el tipo.
       if (data.threadKey) {
         return { screen: 'ChatThread', params: { threadKey: data.threadKey } };
       }

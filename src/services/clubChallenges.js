@@ -286,6 +286,34 @@ export async function linkChallengeMatch(challengeId, matchId) {
   return { error };
 }
 
+/**
+ * Aplica los vencimientos pendientes de UN desafío y devuelve la fila al día.
+ *
+ * El cron de la migración 43 corre cada 5 minutos y es la fuente fiable; esto
+ * solo evita que una pantalla abierta muestre un plazo vencido mientras espera
+ * al siguiente pase. No concede nada ni adelanta nada: aplica exactamente las
+ * mismas transiciones que se habrían aplicado solas, con la hora del servidor.
+ *
+ * Best-effort a propósito: si la RPC todavía no existe se devuelve `null` sin
+ * error y la pantalla sigue dibujando con lo que ya tenía.
+ */
+export async function refreshChallenge(challengeId) {
+  if (!isSupabaseConfigured || !challengeId) return { data: null, error: null };
+
+  const { data, error } = await supabase.rpc('refrescar_desafio', {
+    p_challenge_id: challengeId,
+  });
+
+  if (error) {
+    if (esFaltaDeEsquema(error)) return { data: null, error: null };
+    console.error('[FutFinder] refreshChallenge:', error);
+    return { data: null, error };
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return { data: row || null, error: null };
+}
+
 /** Un desafío por id, enriquecido (para abrir desde una notificación). */
 export async function getChallenge(challengeId) {
   if (!isSupabaseConfigured || !challengeId) return { data: null, error: null };
