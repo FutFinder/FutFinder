@@ -721,6 +721,18 @@ está activo cada 5 minutos.
 > 44, porque publica el partido). `ClubProposalScreen` deja leer la propuesta
 > entera y pedir cambios, y dice explícitamente que aprobar llega después.
 
+**Comprobación manual hecha el 2026-08-11:** el chat de negociación carga, se
+abre «Crear propuesta oficial», la propuesta se guarda y vuelve a mostrarse
+con sus datos. Sin pantalla blanca ni error visible. **Fase 3 cerrada.**
+
+> **Lo que esa comprobación NO cubrió**, porque depende del paso del tiempo o
+> de un segundo club administrado, y queda para cuando ocurra solo:
+> la apertura de la prórroga a las 72 h y su cierre a las 24 h (los ejercita
+> el cron; en la prueba SQL se fuerzan moviendo las fechas hacia atrás, no el
+> reloj), el «No» que cierra el desafío sin acuerdo, y el rechazo de la
+> propuesta desde el club contrario. Los tres están cubiertos por los 15
+> casos SQL contra el esquema aplicado.
+
 ---
 
 ## FASE 4 — Publicación, convocatoria y cambios
