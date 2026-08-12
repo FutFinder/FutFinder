@@ -845,22 +845,62 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
       un jugador del club A no puede ocupar cupo del club B; un ajeno no entra.
 - [ ] Commit.
 
-### Tarea 4.3 — Partido de clubes visualmente distinto
+### Tarea 4.3 — Avisos, tarjeta destacada y presencia en Inicio ✅
 
-**Archivos:** modificar `src/components/partidos/PartidoCard.js` (ya tiene la
-píldora «CLUBES» en L63-68, sin escudos), `src/components/home/MatchCard.js`
-(L74), `src/screens/MatchDetailScreen.js` (héroe, L529-584).
+**Archivos:** crear `src/services/clubMatchRules.js` + su prueba,
+`src/components/partidos/ClubMatchCard.js`; modificar
+`src/utils/notificationTargets.js` y su prueba, `notificationPreferences.js`,
+`supabase/functions/send-push/pushLogic.ts`,
+`src/components/notifications/NotificationCard.js`,
+`src/screens/PartidosScreen.js`, `HomeScreen.js`, `MatchDetailScreen.js`,
+`src/services/matches.js`, `src/services/clubs.js`.
 
-- [ ] Sustituir la píldora de texto por escudos + nombres de ambos clubes,
-      manteniendo los tokens `partidos` del módulo.
-- [ ] Sección «Partido de clubes» en el detalle: estado del desafío, cupos por
-      club, fecha, hora y lugar, con enlace al hilo de negociación para quien sea
-      administrador.
-- [ ] Commit.
+- [x] `ClubMatchCard`: borde verde marcado, halo contenido, franja superior con
+      degradado, escudos + nombres + VS, etiqueta «PARTIDO DE CLUBES», la fecha
+      con más peso y CTA «Ver partido». Sin rojo — ese color queda para lo que
+      necesita atención. Variante `compacta` para Inicio.
+- [x] **Los cupos dejan de mostrarse como compartidos.** Un partido de 9 por
+      club tiene `cupos_totales = 18`, y «18 de 18 cupos» hacía creer que
+      cualquiera podía quedarse con los 18. Ahora: «9 cupos para tu club» a los
+      integrantes y «9 cupos por club» al resto, siempre desde
+      `cupos_por_club`, nunca dividiendo el total.
+- [x] Sección «Próximo partido de tu club» en Inicio, la primera de la
+      pantalla, sólo para integrantes de alguno de los dos clubes y sin
+      duplicar: `seleccionInicio()` decide destacado y resto a la vez, porque
+      el partido que sube es exactamente el que hay que quitar de «Partidos
+      cerca de ti».
+- [x] Aviso `club_match_published` a todos los integrantes de los dos clubes,
+      con destino al PARTIDO y no al hilo, bajo `notif_clubs` en los dos mapas
+      espejo, y con atajo «VER PARTIDO» en la tarjeta del aviso.
+- [x] Sección «Partido de clubes» en el detalle, con los dos escudos, los cupos
+      por club y el método de inscripción.
+- [x] Commit.
+
+> **La dirección exacta también se reserva al pintar.** La RLS de
+> `club_challenge_proposals` la protege, pero el partido publicado vive en
+> `matches`, que es de **lectura pública**: la reserva no sobrevive sola a la
+> publicación. `lugarLabel()` entrega cancha y comuna a cualquiera —hacen falta
+> para saber si el partido queda cerca— y la calle sólo a los dos clubes, y el
+> botón «Cómo llegar» del detalle se apaga para el resto, porque abrir el mapa
+> en el punto exacto es enseñar la dirección por otra puerta. Es una defensa de
+> interfaz: cerrar la columna de verdad es trabajo de servidor y queda anotado
+> en pendientes.
+
+> **El conteo real de inscritos por club no existe todavía y no se simula.**
+> En U3, con `attendees.club_id` poblado, la etiqueta pasa a «3 de 9 inscritos
+> de tu club». Hasta entonces no se muestra numerador: un «0 de 9» sería falso
+> en cuanto alguien se inscriba. Hay una prueba que lo fija.
+
+> **Revisión visual hecha el 2026-08-12** a 320, 390 y 1280 px, renderizando el
+> componente real en el navegador. Salieron dos ajustes: sin tope de ancho los
+> escudos se iban a los extremos en web y dejaban un vacío enorme (`maxWidth`
+> + centrado), y al envolverse el CTA quedaba pegado a la izquierda
+> (`marginLeft: 'auto'` en vez de un separador flexible). Comprobados nombres
+> largos, clubes sin escudo y estado cancelado.
 
 ### Tarea 4.4 — Cambios negociados
 
-**Archivos:** crear `supabase/migrations/45_cambios_de_partido.sql`.
+**Archivos:** crear `supabase/migrations/46_cambios_de_partido.sql`.
 
 - [ ] `club_match_changes` con `campos jsonb` y estado.
 - [ ] `proponer_cambio_partido`: rechaza si faltan menos de 2 h para el inicio

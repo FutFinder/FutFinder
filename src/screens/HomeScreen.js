@@ -24,7 +24,9 @@ import {
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { getMyClub } from '../services/clubs';
+import { getMyClub, getMyClubIds } from '../services/clubs';
+import ClubMatchCard from '../components/partidos/ClubMatchCard';
+import { seleccionInicio } from '../services/clubMatchRules';
 
 function greetingFor(d = new Date()) {
   const h = d.getHours();
@@ -44,6 +46,10 @@ export default function HomeScreen({ navigation }) {
   const [previewMatchId, setPreviewMatchId] = useState(null);
   const [myClubData, setMyClubData] = useState(undefined);
   const [nextMatch, setNextMatch] = useState(null);
+  // Los partidos SIN filtrar por distancia, y mis clubes. El partido de mi
+  // club puede jugarse lejos y aun así tengo que verlo: es de mi club.
+  const [allMatches, setAllMatches] = useState([]);
+  const [misClubIds, setMisClubIds] = useState([]);
   const [banner, setBanner] = useState(null);
 
   const showBanner = useCallback((type, title, message = '') => {
@@ -53,11 +59,12 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [{ data: list }, prof, user, clubResult] = await Promise.all([
+    const [{ data: list }, prof, user, clubResult, misClubes] = await Promise.all([
       listOpenMatches({ limit: 20 }),
       getCurrentProfile(),
       getCurrentUser(),
       getMyClub(),
+      getMyClubIds().catch(() => ({ data: [] })),
     ]);
     const userId = user?.id || null;
     const userCoords = prof?.latitud ? { lat: prof.latitud, lng: prof.longitud } : null;
@@ -96,6 +103,8 @@ export default function HomeScreen({ navigation }) {
       }
     }
 
+    setAllMatches(list || []);
+    setMisClubIds(misClubes?.data || []);
     setMatches(filtered.map((m) => ({ ...m, _joined: joinedIds.has(m.id) })));
     setProfile(prof);
     setMyUserId(userId);
@@ -202,6 +211,15 @@ export default function HomeScreen({ navigation }) {
     { label: 'Explorar clubes', hint: 'Únete a un equipo', onPress: () => navigation.navigate('Main', { screen: 'ClubsTab' }) },
   ];
 
+  // El destacado y la lista se deciden a la vez: el partido que sube a
+  // «Próximo partido de tu club» es el que hay que quitar de «Partidos cerca
+  // de ti», o saldría dos veces en la misma pantalla.
+  const { destacado: partidoDeClub, resto: partidosCerca } = seleccionInicio(
+    allMatches,
+    matches,
+    misClubIds
+  );
+
   const renderMatch = useCallback(
     (m) => (
       <MatchCard
@@ -254,6 +272,23 @@ export default function HomeScreen({ navigation }) {
           )}
 
           <View className="gap-5 px-[18px] pt-[18px]">
+            {/* Va primero a propósito: si mi club juega, es lo más importante
+                que tengo en pantalla. Sin partido de club, la sección no se
+                dibuja — no hay estado vacío que ocupe sitio por nada. */}
+            {partidoDeClub ? (
+              <View>
+                <SectionHeader title="Próximo partido de tu club" />
+                <ClubMatchCard
+                  match={partidoDeClub}
+                  misClubIds={misClubIds}
+                  variant="compacta"
+                  onPress={() =>
+                    navigation.navigate('MatchDetail', { matchId: partidoDeClub.id })
+                  }
+                />
+              </View>
+            ) : null}
+
             {club ? (
               <View>
                 <SectionHeader
@@ -287,14 +322,14 @@ export default function HomeScreen({ navigation }) {
                 actionLabel="Ver todos"
                 onAction={() => navigation.navigate('Main', { screen: 'SearchTab' })}
               />
-              {matches.length ? (
+              {partidosCerca.length ? (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   style={{ marginHorizontal: -18 }}
                   contentContainerStyle={{ paddingHorizontal: 18, gap: 12, paddingBottom: 6 }}
                 >
-                  {matches.map(renderMatch)}
+                  {partidosCerca.map(renderMatch)}
                 </ScrollView>
               ) : (
                 <EmptyMatchesCard

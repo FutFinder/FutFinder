@@ -45,7 +45,7 @@ export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
     console.error('[FutFinder] listOpenMatches error:', error);
     return { data: [], error };
   }
-  return { data: await withOrganizers(data), error: null };
+  return { data: await withClubs(await withOrganizers(data)), error: null };
 }
 
 /**
@@ -64,6 +64,42 @@ export async function withOrganizers(matches) {
     .in('id', ids);
   const byId = new Map((profs || []).map((p) => [p.id, p]));
   return list.map((m) => ({ ...m, organizador: byId.get(m.id_organizador) || null }));
+}
+
+/**
+ * Adjunta los dos clubes a los partidos que enfrentan clubes.
+ *
+ * Una sola consulta para toda la lista, no una por partido. Los partidos
+ * normales pasan intactos y sin coste: si en la tanda no hay ninguno de
+ * clubes, no se consulta nada.
+ *
+ * Si el club fue borrado, la fila llega sin él y `clubesDelPartido()` pone un
+ * nombre genérico: media tarjeta vacía se ve rota.
+ */
+export async function withClubs(matches) {
+  const list = matches || [];
+  if (!isSupabaseConfigured || list.length === 0) return list;
+
+  const ids = [
+    ...new Set(list.flatMap((m) => [m.club_local_id, m.club_visitante_id]).filter(Boolean)),
+  ];
+  if (!ids.length) return list;
+
+  const { data: clubs } = await supabase
+    .from('clubs')
+    .select('id, nombre, foto_url')
+    .in('id', ids);
+
+  const byId = new Map((clubs || []).map((c) => [c.id, c]));
+  return list.map((m) =>
+    m.club_local_id || m.club_visitante_id
+      ? {
+          ...m,
+          club_local: byId.get(m.club_local_id) || null,
+          club_visitante: byId.get(m.club_visitante_id) || null,
+        }
+      : m
+  );
 }
 
 /**
@@ -101,7 +137,7 @@ export async function listMatchesInBounds({
     console.error('[FutFinder] listMatchesInBounds:', error);
     return { data: [], error };
   }
-  return { data: await withOrganizers(data), error: null };
+  return { data: await withClubs(await withOrganizers(data)), error: null };
 }
 
 /**
@@ -652,9 +688,14 @@ export async function getMatchAttendees(matchId) {
       .eq('id', matchId)
       .single();
 
+    // Los dos clubes, si el partido enfrenta clubes: el detalle los necesita
+    // para el encabezado con escudos y nombres.
+    const [conClubes] = await withClubs(match ? [match] : []);
+    const matchConClubes = conClubes || match;
+
     const playerIds = (atts || []).map((a) => a.id_jugador);
     if (playerIds.length === 0) {
-      return { data: [], match, error: null };
+      return { data: [], match: matchConClubes, error: null };
     }
 
     // 3) Trae perfiles en una sola query
@@ -681,7 +722,7 @@ export async function getMatchAttendees(matchId) {
       };
     });
 
-    return { data: list, match, error: null };
+    return { data: list, match: matchConClubes, error: null };
   } catch (e) {
     console.error('[FutFinder] getMatchAttendees exception:', e);
     return { data: [], error: e };

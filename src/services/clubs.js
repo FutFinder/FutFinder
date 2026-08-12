@@ -174,6 +174,35 @@ export async function getMyClubs() {
 }
 
 /**
+ * Sólo los ids de los clubes a los que pertenezco, con cualquier rol.
+ *
+ * `getMyClubs()` trae además el club entero y el recuento de integrantes de
+ * cada uno: dos consultas más que no hacen falta cuando lo único que se
+ * necesita es decidir si un partido de clubes es «de los míos» —qué cupos
+ * mostrar y si se ve la dirección exacta—. Eso se pregunta en cada carga de
+ * Inicio y de Partidos, así que conviene que sea barato.
+ *
+ * Devuelve `[]` sin sesión, que es lo correcto: quien no ha entrado no
+ * pertenece a ningún club.
+ */
+export async function getMyClubIds() {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  const me = await getMe();
+  if (!me) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('club_members')
+    .select('club_id')
+    .eq('user_id', me);
+
+  if (error) {
+    console.error('[FutFinder] getMyClubIds:', error);
+    return { data: [], error };
+  }
+  return { data: (data || []).map((r) => r.club_id).filter(Boolean), error: null };
+}
+
+/**
  * Compat: primer club del usuario o null.
  * Usar getMyClubs() cuando se necesiten todos.
  */

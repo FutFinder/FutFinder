@@ -57,6 +57,10 @@ const SAMPLE_DATA_BY_TYPE = {
   club_challenge_closed: { challengeId: 'ch1', threadKey: 'challenge:ch1' },
   club_challenge_proposal: { challengeId: 'ch1', threadKey: 'challenge:ch1' },
   club_challenge_proposal_rejected: { challengeId: 'ch1', threadKey: 'challenge:ch1' },
+  // Publicado (migración 44): el destino NO es el hilo sino el partido. Es lo
+  // que el aviso anuncia, y lo reciben también los jugadores sin rol, que no
+  // tienen nada que hacer en la negociación entre administradores.
+  club_match_published: { challengeId: 'ch1', matchId: 'm1', threadKey: 'challenge:ch1' },
   message_new: { threadKey: 'dm:u1' },
   chat_mention_all: { threadKey: 'club:c1' },
   friend_request: { fromUserId: 'u1' },
@@ -89,6 +93,7 @@ const EXPECTED_SCREEN_BY_TYPE = {
   club_challenge_closed: 'ChatThread',
   club_challenge_proposal: 'ChatThread',
   club_challenge_proposal_rejected: 'ChatThread',
+  club_match_published: 'MatchDetail',
   message_new: 'ChatThread',
   chat_mention_all: 'ChatThread',
   friend_request: 'UserProfile',

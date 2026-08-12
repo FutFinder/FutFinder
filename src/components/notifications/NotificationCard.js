@@ -32,6 +32,7 @@ export const CATEGORY = {
   club_challenge: 'clubes',
   club_challenge_accepted: 'clubes',
   club_challenge_rejected: 'clubes',
+  club_match_published: 'clubes',
 };
 
 const ICON = {
@@ -60,6 +61,7 @@ const ICON = {
   club_challenge: Swords,
   club_challenge_accepted: CheckCheck,
   club_challenge_rejected: Swords,
+  club_match_published: Swords,
 };
 
 const TAG = {
@@ -88,20 +90,38 @@ const TAG = {
   club_challenge: { label: 'DESAFÍO', color: '#FFB347', bg: 'rgba(255,179,71,0.10)', border: 'rgba(255,179,71,0.28)' },
   club_challenge_accepted: { label: 'DESAFÍO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
   club_challenge_rejected: { label: 'DESAFÍO', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },
+  // Verde, no rojo: el rojo está reservado a lo que necesita atención
+  // (una negociación trabada), y un partido publicado es una buena noticia.
+  club_match_published: { label: 'PARTIDO DE CLUBES', color: '#5AE06A', bg: 'rgba(90,224,106,0.10)', border: 'rgba(90,224,106,0.30)' },
 };
 
 const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
 
 /**
- * Avisos del ciclo de desafíos que llevan directo a una conversación.
- * El atajo se ofrece solo si el aviso trae `threadKey`: los avisos
- * anteriores a la migración 42 no lo tienen y siguen abriendo la bandeja
- * de desafíos al tocar la tarjeta.
+ * Avisos que ofrecen un atajo visible además de la tarjeta entera.
+ *
+ * El atajo se ofrece SOLO si el aviso trae el dato al que lleva: los avisos
+ * anteriores a la migración 42 no traen `threadKey` y siguen abriendo la
+ * bandeja de desafíos al tocar la tarjeta. Cada entrada declara qué dato
+ * necesita y qué dice el botón; el `onPress` es el mismo de la tarjeta, así
+ * que no hay dos caminos de navegación que mantener.
  */
-const TIPOS_CON_HILO = new Set(['club_challenge_accepted']);
+const ATAJOS = {
+  club_challenge_accepted: {
+    dato: 'threadKey',
+    label: 'IR AHORA',
+    accesible: 'Ir ahora al chat de negociación del desafío',
+  },
+  club_match_published: {
+    dato: 'matchId',
+    label: 'VER PARTIDO',
+    accesible: 'Ver el partido de clubes recién publicado',
+  },
+};
 
-function tieneHiloDeNegociacion(n) {
-  return TIPOS_CON_HILO.has(n?.type) && !!n?.data?.threadKey;
+function atajoDe(n) {
+  const atajo = ATAJOS[n?.type];
+  return atajo && n?.data?.[atajo.dato] ? atajo : null;
 }
 
 export default function NotificationCard({ notification: n, onPress, onDelete, onPrimary, onSecondary, busy }) {
@@ -110,7 +130,7 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
   const unread = !n.read;
   // «IR AHORA» no es una acción distinta de tocar la tarjeta: es la misma
   // navegación, hecha evidente. Así no hay dos caminos que mantener.
-  const irAhora = tieneHiloDeNegociacion(n) && !n.actions;
+  const atajo = !n.actions ? atajoDe(n) : null;
 
   return (
     <Pressable
@@ -153,17 +173,17 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
           <Text className="text-[11.5px] font-semibold text-white/35">{n.timeLabel}</Text>
         </View>
 
-        {irAhora ? (
+        {atajo ? (
           <View className="mt-2.5 flex-row">
             <Pressable
               onPress={() => !busy && onPress(n)}
               disabled={busy}
               accessibilityRole="button"
-              accessibilityLabel="Ir ahora al chat de negociación del desafío"
+              accessibilityLabel={atajo.accesible}
               className="h-[38px] flex-1 items-center justify-center rounded-xl bg-[#00FF66] active:opacity-80"
               style={busy ? { opacity: 0.6 } : null}
             >
-              <Text className="text-[13px] font-bold text-[#04120A]">IR AHORA</Text>
+              <Text className="text-[13px] font-bold text-[#04120A]">{atajo.label}</Text>
             </Pressable>
           </View>
         ) : null}

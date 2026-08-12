@@ -40,6 +40,7 @@ export const NOTIF_TYPE_TO_PREFERENCE: Record<string, string> = {
   club_challenge_closed: "notif_clubs",
   club_challenge_proposal: "notif_clubs",
   club_challenge_proposal_rejected: "notif_clubs",
+  club_match_published: "notif_clubs",
 
   // Mensajes y menciones
   message_new: "notif_chat",

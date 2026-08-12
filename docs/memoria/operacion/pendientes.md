@@ -24,6 +24,14 @@ Las migraciones 39 (`/todos`) y 40 (bandeja por RPC) estaban versionadas pero **
 - **Acción:** en la migración 45, acotar las tres políticas con `challenge_proposal_id is null` para que no alcancen a los partidos de clubes. Los partidos normales no cambian de comportamiento. Cerrarlas del todo es un cambio mayor y va aparte.
 - **Verificación necesaria:** la prueba SQL 45 comprueba que un `insert` directo sobre un partido de clubes lo rechaza la RLS, y que en un partido normal todo sigue igual.
 
+## P2 — La dirección exacta del partido de clubes sólo está protegida en la interfaz
+
+- **Dominio afectado:** privacidad y partidos de clubes.
+- **Evidencia (2026-08-12):** mientras es propuesta, la dirección la protege la RLS de `club_challenge_proposals`. Al aprobarse, el partido pasa a `matches`, cuya política de lectura es `using (true)`: `direccion`, `latitud` y `longitud` quedan legibles por cualquiera vía PostgREST. La app no las muestra a quien no pertenece a alguno de los dos clubes —`lugarLabel()` y el botón «Cómo llegar»—, pero eso es una decisión de pintado, no una regla del servidor.
+- **Por qué importa:** la promesa al usuario es que la dirección exacta es de los dos clubes. Hoy se cumple en la app y no en la API.
+- **Acción:** decidir el mecanismo. Una vista con las columnas públicas, o separar la ubicación exacta a una tabla con su propia RLS. Cambiar `matches_read_all` sin más rompería el resto de la app, que lee partidos públicos.
+- **Verificación necesaria:** una prueba SQL en la que un `authenticated` ajeno a los dos clubes no obtiene `direccion` de un partido de clubes, y sí la obtiene de un partido normal.
+
 ## P2 — Funciones de trigger ejecutables como RPC por `anon`
 
 - **Dominio afectado:** superficie de la API.

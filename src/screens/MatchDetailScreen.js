@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   Pressable,
@@ -103,6 +104,13 @@ import {
   timeUntilLabel,
   trustLabel,
 } from '../services/matchRules';
+import { getMyClubIds } from '../services/clubs';
+import {
+  esPartidoDeClubes,
+  cuposLabel as cuposLabelClubes,
+  puedeVerDireccion,
+  clubesDelPartido,
+} from '../services/clubMatchRules';
 import { haversineKm } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
 import { goBackOrPartidos } from '../utils/navigation';
@@ -136,11 +144,14 @@ export default function MatchDetailScreen({ route, navigation }) {
   const [sheet, setSheet] = useState(null); // 'join' | 'leave' | 'share' | 'waitlist'
   const [checks, setChecks] = useState({ llegar: false, cuota: false, aviso: false });
   const [userCoords, setUserCoords] = useState(null);
+  // Mis clubes: deciden si este partido es «de los míos» —qué cupos se
+  // muestran— y si se puede ver la dirección exacta.
+  const [misClubIds, setMisClubIds] = useState([]);
 
   const cacheKey = `partidos/detail/${matchId}`;
 
   const load = useCallback(async () => {
-    const [attRes, user, profile, status, conf, wl, loc] = await Promise.all([
+    const [attRes, user, profile, status, conf, wl, loc, misClubes] = await Promise.all([
       getMatchAttendees(matchId).catch((e) => ({ data: [], match: null, error: e })),
       getCurrentUser(),
       getMyProfile().catch(() => null),
@@ -148,6 +159,7 @@ export default function MatchDetailScreen({ route, navigation }) {
       getScheduleConflict(matchId).catch(() => ({ conflict: false })),
       getWaitlist(matchId).catch(() => ({ data: [] })),
       getCurrentLocation(),
+      getMyClubIds().catch(() => ({ data: [] })),
     ]);
 
     setMyId(user?.id || null);
@@ -161,6 +173,7 @@ export default function MatchDetailScreen({ route, navigation }) {
     setConflict(conf?.conflict ? conf : null);
     setWaitlist(wl?.data || []);
     if (loc?.ok) setUserCoords({ lat: loc.latitude, lng: loc.longitude });
+    setMisClubIds(misClubes?.data || []);
 
     if (attRes.error || !attRes.match) {
       const net = isNetworkError(attRes.error);
@@ -249,6 +262,10 @@ export default function MatchDetailScreen({ route, navigation }) {
     (`confirmed`, que incluye al organizador) y la aritmética de cupos son dos
     cuentas distintas y no se pueden mezclar.
   */
+  const esDeClubes = esPartidoDeClubes(match);
+  const veDireccion = puedeVerDireccion(match, misClubIds);
+  const clubes = esDeClubes ? clubesDelPartido(match) : null;
+
   const total = match?.cupos_totales ?? 0;
   const libres = match?.cupos_disponibles ?? 0;
   const tomados = Math.max(0, total - libres);
@@ -656,8 +673,14 @@ export default function MatchDetailScreen({ route, navigation }) {
           {/* Celdas de resumen */}
           <View style={styles.stats}>
             <StatCell
-              value={libres <= 0 ? '0' : String(libres)}
-              label="CUPOS"
+              value={
+                esDeClubes && match.cupos_por_club != null
+                  ? String(match.cupos_por_club)
+                  : libres <= 0
+                  ? '0'
+                  : String(libres)
+              }
+              label={esDeClubes && match.cupos_por_club != null ? 'POR CLUB' : 'CUPOS'}
               highlight={libres > 0 && !closed}
             />
             <StatCell value={cuotaLabel(match.precio_cuota)} label="CUOTA" />
@@ -670,19 +693,57 @@ export default function MatchDetailScreen({ route, navigation }) {
             />
           </View>
 
+          {/* Partido de clubes: quiénes se enfrentan y cómo se reparten los
+              cupos. Va antes de «Ubicación» porque en este partido lo primero
+              que se quiere saber es contra quién se juega. */}
+          {esDeClubes ? (
+            <Section label="Partido de clubes">
+              <Card>
+                <View style={styles.clubesRow}>
+                  <ClubLado club={clubes.local} etiqueta="LOCAL" />
+                  <Text style={styles.clubesVs}>VS</Text>
+                  <ClubLado club={clubes.visitante} etiqueta="VISITANTE" />
+                </View>
+                <View style={{ height: 10 }} />
+                <DetailRow label="Cupos" value={cuposLabelClubes(match, misClubIds)} />
+                <DetailRow
+                  label="Inscripción"
+                  value={
+                    match.metodo_inscripcion === 'seleccion_admin'
+                      ? 'La elige el administrador de cada club'
+                      : 'Por orden de llegada'
+                  }
+                  last
+                />
+                {/* La inscripción y la nómina por club llegan en U3: hasta
+                    entonces esta sección informa, no opera. */}
+              </Card>
+            </Section>
+          ) : null}
+
           {/* Ubicación */}
           <Section label="Ubicación">
             <Card padded={false} style={{ overflow: 'hidden' }}>
               <View style={{ padding: 13, gap: 8 }}>
                 <View>
                   <Text style={styles.cardTitle}>{match.cancha_nombre}</Text>
-                  {match.direccion ? (
+                  {/* En un partido de clubes la dirección exacta es de los
+                      integrantes de los dos clubes. `matches` es de lectura
+                      pública, así que la reserva hay que sostenerla al pintar:
+                      un tercero ve comuna y región, que es lo que necesita
+                      para saber si le queda cerca, pero no la calle. */}
+                  {match.direccion && veDireccion ? (
                     <Text style={styles.cardSub}>{match.direccion}</Text>
                   ) : (
                     <Text style={styles.cardSub}>
                       {[match.comuna, match.region].filter(Boolean).join(' · ')}
                     </Text>
                   )}
+                  {esDeClubes && !veDireccion ? (
+                    <Text style={styles.cardSub}>
+                      La dirección exacta la ven los integrantes de los dos clubes.
+                    </Text>
+                  ) : null}
                 </View>
                 {distanceKm != null ? (
                   <View style={styles.metaRow}>
@@ -696,10 +757,15 @@ export default function MatchDetailScreen({ route, navigation }) {
                   icon={Navigation}
                   onPress={openDirections}
                   height={44}
-                  disabled={match.latitud == null}
+                  disabled={match.latitud == null || !veDireccion}
                 />
                 {match.latitud == null ? (
                   <Note>Este partido no tiene coordenadas guardadas, así que no podemos abrir el mapa.</Note>
+                ) : null}
+                {/* Abrir el mapa en el punto exacto es enseñar la dirección por
+                    otra puerta. Si no se puede ver escrita, tampoco así. */}
+                {match.latitud != null && !veDireccion ? (
+                  <Note>Únete a alguno de los dos clubes para ver dónde se juega exactamente.</Note>
                 ) : null}
               </View>
             </Card>
@@ -1312,6 +1378,30 @@ function Section({ label, right, children }) {
   );
 }
 
+/**
+ * Un club del enfrentamiento: escudo (o iniciales si no tiene) y nombre.
+ *
+ * El nombre va a dos líneas y la columna es flexible, así que un club con
+ * nombre largo se recorta en vez de empujar al VS fuera de la tarjeta.
+ */
+function ClubLado({ club, etiqueta }) {
+  return (
+    <View style={styles.clubLado}>
+      <View style={styles.clubEscudo}>
+        {club.fotoUrl ? (
+          <Image source={{ uri: club.fotoUrl }} style={styles.clubEscudoImg} accessibilityIgnoresInvertColors />
+        ) : (
+          <Text style={styles.clubIniciales}>{club.iniciales}</Text>
+        )}
+      </View>
+      <Text style={styles.clubEtiqueta}>{etiqueta}</Text>
+      <Text style={styles.clubNombre} numberOfLines={2}>
+        {club.nombre}
+      </Text>
+    </View>
+  );
+}
+
 function Requisito({ text, ok, tone }) {
   const color = tone === 'danger' ? P.coral : tone === 'gold' ? P.gold : ok ? P.green : P.textMuted;
   return (
@@ -1358,6 +1448,39 @@ function capitalize(s) {
 }
 
 const styles = StyleSheet.create({
+  clubesRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  clubesVs: {
+    color: P.green,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1,
+    paddingTop: 20,
+    width: 30,
+    textAlign: 'center',
+  },
+  clubLado: { flex: 1, minWidth: 0, alignItems: 'center', gap: 6 },
+  clubEscudo: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: P.chip,
+    borderWidth: 1,
+    borderColor: P.greenBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  clubEscudoImg: { width: 46, height: 46, borderRadius: 23 },
+  clubIniciales: { color: P.green, fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
+  clubEtiqueta: { color: P.textFaint, fontSize: 9.5, fontWeight: '800', letterSpacing: 1 },
+  clubNombre: {
+    color: P.textStrong,
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+
   root: { flex: 1, backgroundColor: P.bg },
   topBar: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 },
 

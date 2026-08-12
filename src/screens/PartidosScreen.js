@@ -27,6 +27,8 @@ import {
 import { partidos as P, partidosRadius as R } from '../theme/colors';
 import { Pill, Tag, Avatar, PrimaryButton } from '../components/partidos/ui';
 import PartidoCard from '../components/partidos/PartidoCard';
+import ClubMatchCard from '../components/partidos/ClubMatchCard';
+import { esPartidoDeClubes } from '../services/clubMatchRules';
 import FiltersSheet, {
   EMPTY_FILTERS,
   countActiveFilters,
@@ -49,6 +51,7 @@ import {
 } from '../services/matches';
 import { getCurrentLocation, requestLocationPermission } from '../services/location';
 import { getCurrentUser } from '../services/auth';
+import { getMyClubIds } from '../services/clubs';
 import { getMyAccountStatus, searchPlayers } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 import {
@@ -106,6 +109,9 @@ export default function PartidosScreen({ navigation, route }) {
   const [loadError, setLoadError] = useState(null);
   const [fromCache, setFromCache] = useState(null); // timestamp del caché
   const [myUserId, setMyUserId] = useState(null);
+  // Los clubes a los que pertenezco, con cualquier rol: deciden si un partido
+  // de clubes me muestra «cupos para tu club» y la dirección exacta.
+  const [misClubIds, setMisClubIds] = useState([]);
   const [suspended, setSuspended] = useState(null);
 
   const [text, setText] = useState('');
@@ -140,14 +146,16 @@ export default function PartidosScreen({ navigation, route }) {
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoadError(null);
-    const [res, loc, user, status] = await Promise.all([
+    const [res, loc, user, status, misClubes] = await Promise.all([
       listOpenMatches({ limit: 100 }).catch((e) => ({ data: [], error: e })),
       getCurrentLocation(),
       getCurrentUser(),
       getMyAccountStatus().catch(() => null),
+      getMyClubIds().catch(() => ({ data: [] })),
     ]);
 
     setMyUserId(user?.id || null);
+    setMisClubIds(misClubes?.data || []);
     setSuspended(status?.suspended ? status : null);
 
     if (loc?.ok) {
@@ -555,12 +563,20 @@ export default function PartidosScreen({ navigation, route }) {
                         if (!sel) return null;
                         return (
                           <View style={{ marginTop: 10 }}>
-                            <PartidoCard
-                              match={sel}
-                              distanceKm={sel._distanciaKm}
-                              isMine={sel.id_organizador === myUserId}
-                              onPress={() => openMatch(sel.id)}
-                            />
+                            {esPartidoDeClubes(sel) ? (
+                              <ClubMatchCard
+                                match={sel}
+                                misClubIds={misClubIds}
+                                onPress={() => openMatch(sel.id)}
+                              />
+                            ) : (
+                              <PartidoCard
+                                match={sel}
+                                distanceKm={sel._distanciaKm}
+                                isMine={sel.id_organizador === myUserId}
+                                onPress={() => openMatch(sel.id)}
+                              />
+                            )}
                           </View>
                         );
                       })()
@@ -617,15 +633,24 @@ export default function PartidosScreen({ navigation, route }) {
                     </Pressable>
                   ) : null}
                   <View style={{ gap: 9 }}>
-                    {filtered.map((m) => (
-                      <PartidoCard
-                        key={m.id}
-                        match={m}
-                        distanceKm={m._distanciaKm}
-                        isMine={m.id_organizador === myUserId}
-                        onPress={() => openMatch(m.id)}
-                      />
-                    ))}
+                    {filtered.map((m) =>
+                      esPartidoDeClubes(m) ? (
+                        <ClubMatchCard
+                          key={m.id}
+                          match={m}
+                          misClubIds={misClubIds}
+                          onPress={() => openMatch(m.id)}
+                        />
+                      ) : (
+                        <PartidoCard
+                          key={m.id}
+                          match={m}
+                          distanceKm={m._distanciaKm}
+                          isMine={m.id_organizador === myUserId}
+                          onPress={() => openMatch(m.id)}
+                        />
+                      )
+                    )}
                   </View>
                   <PrimaryButton
                     label="Publicar un partido"

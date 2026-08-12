@@ -67,6 +67,21 @@ export function resolveNotificationTarget(n) {
     case 'club_request_rejected':
       return { screen: 'Main', params: { screen: 'ClubsTab' } };
 
+    // El partido de clubes quedó publicado (migración 44). El destino es el
+    // PARTIDO, no el hilo de negociación: es lo que el aviso anuncia, y lo
+    // reciben todos los integrantes de los dos clubes, incluidos los jugadores
+    // sin rol, que no tienen nada que hacer en una conversación entre
+    // administradores. Se verifica el recurso porque el partido puede haberse
+    // cancelado entre el aviso y el toque.
+    case 'club_match_published':
+      return data.matchId
+        ? {
+            screen: 'MatchDetail',
+            params: { matchId: data.matchId },
+            resource: { kind: 'match', id: data.matchId },
+          }
+        : null;
+
     case 'club_challenge':
       // Recibido: abre la bandeja de desafíos de mi club (el retado).
       return data.clubRetadoId
