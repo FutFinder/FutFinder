@@ -17,7 +17,13 @@ import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import Button from '../components/Button';
 import LocationAutocomplete from '../components/LocationAutocomplete';
-import { matchComuna } from '../data/regiones-chile';
+import {
+  UBICACION_VACIA,
+  seleccionarLugar,
+  escribirDireccion,
+  ubicacionFijada,
+  ubicacionDraft,
+} from '../utils/ubicacionPropuesta';
 import { supabase } from '../services/supabase';
 import { getChallenge } from '../services/clubChallenges';
 import {
@@ -34,7 +40,6 @@ import {
   CUPOS_POR_CLUB,
   INSTRUCCIONES_MAX,
   validarPropuestaOficial,
-  coordenadasValidas,
   metodoLabel,
   cuposLabel,
 } from '../services/clubChallengeRules';
@@ -120,14 +125,16 @@ export default function ClubProposalScreen({ navigation, route }) {
   const [fechaStr, setFechaStr] = useState(formatDate(manana));
   const [horaStr, setHoraStr] = useState(formatTime(manana));
   const [duracionMin, setDuracionMin] = useState(90);
-  const [direccion, setDireccion] = useState('');
-  const [canchaNombre, setCanchaNombre] = useState('');
-  const [comuna, setComuna] = useState('');
-  const [region, setRegion] = useState('');
-  // Las coordenadas SÓLO las pone el buscador de lugares: no hay campo donde
-  // escribirlas a mano. `matches.latitud`/`longitud` son NOT NULL, así que una
-  // propuesta sin ellas sería imposible de aprobar más adelante.
-  const [coords, setCoords] = useState(null);
+  // Dirección, cancha, comuna, región y el punto en el mapa van juntos en un
+  // solo estado, y las dos transiciones viven en `utils/ubicacionPropuesta`.
+  // No es preferencia de estilo: `LocationAutocomplete` dispara `onSelect` y
+  // acto seguido `onChangeText` con la dirección elegida, así que con estados
+  // sueltos y manejadores en línea el segundo callback borraba las
+  // coordenadas que acababa de poner el primero. Con la forma funcional de
+  // `setUbicacion` el resultado ya no depende del orden.
+  const [ubicacion, setUbicacion] = useState(UBICACION_VACIA);
+  const { direccion, canchaNombre, comuna, region } = ubicacion;
+  const hayUbicacion = ubicacionFijada(ubicacion);
   const [modalidad, setModalidad] = useState('futbol7');
   const [cuposPorClub, setCuposPorClub] = useState(String(CUPOS_POR_CLUB.min + 3));
   const [metodoInscripcion, setMetodoInscripcion] = useState('orden_llegada');
@@ -200,12 +207,7 @@ export default function ClubProposalScreen({ navigation, route }) {
     const draft = {
       fecha,
       duracionMin,
-      direccion,
-      canchaNombre,
-      comuna,
-      region,
-      latitud: coords?.lat ?? null,
-      longitud: coords?.lng ?? null,
+      ...ubicacionDraft(ubicacion),
       modalidad,
       cuposPorClub: parseInt(cuposPorClub, 10),
       metodoInscripcion,
@@ -245,11 +247,7 @@ export default function ClubProposalScreen({ navigation, route }) {
     fechaStr,
     horaStr,
     duracionMin,
-    direccion,
-    canchaNombre,
-    comuna,
-    region,
-    coords,
+    ubicacion,
     modalidad,
     cuposPorClub,
     metodoInscripcion,
@@ -497,7 +495,7 @@ export default function ClubProposalScreen({ navigation, route }) {
                   placeholder="Ej: Complejo Municipal"
                   placeholderTextColor={colors.textMuted}
                   value={canchaNombre}
-                  onChangeText={setCanchaNombre}
+                  onChangeText={(v) => setUbicacion((prev) => ({ ...prev, canchaNombre: v }))}
                   maxLength={120}
                 />
                 {!!errores.canchaNombre && <Text style={styles.error}>{errores.canchaNombre}</Text>}
@@ -506,25 +504,16 @@ export default function ClubProposalScreen({ navigation, route }) {
                 <LocationAutocomplete
                   value={direccion}
                   placeholder="Busca la cancha por nombre o dirección"
-                  proximity={coords ? { lat: coords.lat, lng: coords.lng } : null}
-                  onChangeText={(v) => {
-                    setDireccion(v);
-                    // Escribir a mano invalida el punto elegido antes: la
-                    // dirección y las coordenadas tienen que describir el
-                    // mismo lugar, y si no vuelve a elegir del buscador la
-                    // validación lo detiene.
-                    setCoords(null);
-                  }}
-                  onSelect={({ lat, lng, address, comunaRaw, regionRaw, canchaName }) => {
-                    if (address) setDireccion(address);
-                    if (coordenadasValidas(lat, lng)) setCoords({ lat, lng });
-                    const m = matchComuna(comunaRaw) || matchComuna(regionRaw);
-                    if (m) {
-                      setRegion(m.region);
-                      setComuna(m.comuna);
-                    }
-                    if (canchaName && !canchaNombre.trim()) setCanchaNombre(canchaName);
-                  }}
+                  proximity={
+                    hayUbicacion ? { lat: ubicacion.coords.lat, lng: ubicacion.coords.lng } : null
+                  }
+                  // Los dos van con la forma funcional a propósito.
+                  // `LocationAutocomplete` llama `onSelect` y a continuación
+                  // `onChangeText` con la dirección elegida: leyendo el estado
+                  // por closure, el segundo vería el valor de antes de la
+                  // selección y borraría las coordenadas recién puestas.
+                  onChangeText={(v) => setUbicacion((prev) => escribirDireccion(prev, v))}
+                  onSelect={(lugar) => setUbicacion((prev) => seleccionarLugar(prev, lugar))}
                   inputRowStyle={[styles.autoRow, errores.ubicacion && styles.inputError]}
                   inputStyle={styles.autoInput}
                   placeholderColor={colors.textMuted}
@@ -534,7 +523,7 @@ export default function ClubProposalScreen({ navigation, route }) {
                 {!!errores.direccion && <Text style={styles.error}>{errores.direccion}</Text>}
                 {errores.ubicacion ? (
                   <Text style={styles.error}>{errores.ubicacion}</Text>
-                ) : coords ? (
+                ) : hayUbicacion ? (
                   <Text style={styles.hint}>
                     Ubicación fijada en el mapa. Todos los integrantes de los dos clubes verán esta
                     dirección.
@@ -553,7 +542,7 @@ export default function ClubProposalScreen({ navigation, route }) {
                       placeholder="Ej: Ñuñoa"
                       placeholderTextColor={colors.textMuted}
                       value={comuna}
-                      onChangeText={setComuna}
+                      onChangeText={(v) => setUbicacion((prev) => ({ ...prev, comuna: v }))}
                       maxLength={80}
                     />
                   </View>
@@ -564,7 +553,7 @@ export default function ClubProposalScreen({ navigation, route }) {
                       placeholder="Ej: Metropolitana"
                       placeholderTextColor={colors.textMuted}
                       value={region}
-                      onChangeText={setRegion}
+                      onChangeText={(v) => setUbicacion((prev) => ({ ...prev, region: v }))}
                       maxLength={80}
                     />
                   </View>
