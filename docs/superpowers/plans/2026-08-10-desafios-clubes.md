@@ -585,8 +585,28 @@ catálogo el 2026-08-10.
 > sigue pudiendo ejecutarla y `anon` no. **Para las RPC de las fases
 > siguientes: revocar de `public`, no de `anon`.**
 
-Queda pendiente sólo la comprobación manual en la app (aceptar un desafío real
-y ver el hilo, la tarjeta neón y el CTA en un dispositivo).
+**Comprobación manual hecha el 2026-08-11:** aceptar un desafío real abre el
+hilo grupal, se ve la conversación y se pueden enviar mensajes. Fase 2
+cerrada.
+
+> **Dos fallos que salieron en esa comprobación**, los dos ya corregidos:
+>
+> 1. El hilo quedaba **en blanco** por un `ReferenceError: myClubId is not
+>    defined`: variable local en español (`miClubId`) contra la clave en
+>    inglés del contrato de `getChallengeCta`, unidas por la forma abreviada
+>    de objeto. Ahora el contexto lo arma `challengeCtaContext()`, función
+>    pura con pruebas que fijan el nombre de la clave. Ver
+>    `docs/memoria/decisiones/2026-08-11-contexto-cta-desafio.md`.
+> 2. `supabase.channel(topic)` **reutiliza** el canal existente, así que un
+>    segundo suscriptor al mismo topic reventaba con «cannot add
+>    postgres_changes callbacks … after subscribe()». Preexistente, en los
+>    avisos; resuelto con `createSharedChannel`.
+>
+> **Dos carencias que dejó al descubierto, y que siguen abiertas:** el
+> proyecto no tiene **ESLint** (`no-undef` habría atrapado el primero en un
+> segundo) ni ningún **error boundary** (sin él, cualquier excepción de
+> render deja la app en blanco y sin mensaje, que es lo que hizo caro el
+> diagnóstico). Las dos son trabajo aparte de este plan.
 
 ---
 
