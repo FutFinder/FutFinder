@@ -4,6 +4,9 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 
 import { supabase, isSupabaseConfigured } from './supabase';
+// El multiplexado de un canal Realtime es lógica pura y ya estaba resuelta
+// para el chat: se reutiliza en vez de escribir una segunda versión.
+import { createSharedChannel } from '../utils/chatMeta';
 
 /**
  * Servicio de notificaciones push de FutFinder.
@@ -260,32 +263,57 @@ export async function deleteAllNotifications() {
  * onEvent(notif) recibe la row actualizada en ambos casos.
  * Devuelve función para unsubscribe.
  */
+/**
+ * Un canal compartido POR USUARIO, no uno por llamador.
+ *
+ * `supabase.channel(topic)` NO crea un canal nuevo si ya existe uno con
+ * ese topic: devuelve el que hay (ver `RealtimeClient.channel`). Como el
+ * topic acá es determinista (`notif-<userId>`), el segundo llamador
+ * recibía un canal YA SUSCRITO y el `.on('postgres_changes', …)`
+ * encadenado reventaba con «cannot add postgres_changes callbacks for
+ * realtime channel after subscribe()».
+ *
+ * Pasaba de verdad: el badge de `MainTabs` está suscrito siempre, así que
+ * abrir la pantalla de Avisos disparaba el error.
+ *
+ * Se resuelve igual que en el chat (`createSharedChannel`): un solo canal
+ * real por usuario, abierto con el primer suscriptor y cerrado con el
+ * último, y cada llamador recibe los mismos eventos.
+ */
+const canalesPorUsuario = new Map();
+
+function canalDeNotificaciones(userId) {
+  let compartido = canalesPorUsuario.get(userId);
+  if (compartido) return compartido;
+
+  compartido = createSharedChannel({
+    open: ({ emit }) => {
+      const filtro = {
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      };
+      return supabase
+        .channel(`notif-${userId}`)
+        .on('postgres_changes', { ...filtro, event: 'INSERT' }, (p) => emit(p.new))
+        .on('postgres_changes', { ...filtro, event: 'UPDATE' }, (p) => emit(p.new))
+        .subscribe();
+    },
+    close: (channel) => {
+      canalesPorUsuario.delete(userId);
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        // noop
+      }
+    },
+  });
+
+  canalesPorUsuario.set(userId, compartido);
+  return compartido;
+}
+
 export function subscribeToNotifications(userId, onEvent) {
   if (!isSupabaseConfigured || !userId) return () => {};
-  const channel = supabase
-    .channel(`notif-${userId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${userId}`,
-      },
-      (payload) => onEvent?.(payload.new)
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${userId}`,
-      },
-      (payload) => onEvent?.(payload.new)
-    )
-    .subscribe();
-  return () => {
-    supabase.removeChannel(channel);
-  };
+  return canalDeNotificaciones(userId).subscribe((notif) => onEvent?.(notif));
 }

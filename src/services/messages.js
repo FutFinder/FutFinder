@@ -1021,32 +1021,10 @@ export function subscribeToMessages(onChange, { onStatus } = {}) {
   return messagesSharedChannel.subscribe(onChange, { onStatus });
 }
 
-/**
- * Suscribe SOLO a inserts de mensajes de club (para badges de no leídos).
- * Canal con nombre propio para no colisionar con 'public:messages'.
- */
-export function subscribeToClubMessages(onInsert) {
-  if (!isSupabaseConfigured) return () => {};
-  const channel = supabase
-    .channel(`club-badges:${(messagesChannelSeq += 1)}`)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'messages' },
-      (payload) => {
-        try {
-          if (payload?.new?.club_id) onInsert(payload.new);
-        } catch (e) {
-          console.error('[FutFinder] club badge handler error:', e);
-        }
-      }
-    )
-    .subscribe();
-  return () => {
-    try {
-      supabase.removeChannel(channel);
-    } catch {}
-  };
-}
+// `subscribeToClubMessages()` vivía acá y se borró: no la llamaba nadie y
+// además referenciaba una variable inexistente (`messagesChannelSeq`), así
+// que la primera llamada habría lanzado un ReferenceError. Los badges de no
+// leídos del club se resuelven con `subscribeToMessages()` + `getUnreadByThread()`.
 
 /**
  * Helper: determina si un mensaje pertenece al hilo dado.
