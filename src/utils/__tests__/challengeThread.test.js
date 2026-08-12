@@ -256,3 +256,75 @@ test('sin conexión la acción lo dice antes que cualquier otra cosa', () => {
   );
   assert.equal(cta.kind, 'sin_conexion');
 });
+
+// ════════════════════════════════════════════════════════════════
+// Prórroga y propuesta dentro del contexto (migración 43)
+// ════════════════════════════════════════════════════════════════
+// Mismo motivo que arriba: `getChallengeCta` lee `miRespuestaProrroga` y
+// `propuesta`, y esos nombres se fijan acá y no en la pantalla.
+
+const enProrroga = {
+  estado: 'negociacion',
+  club_retador_id: 'club-a',
+  club_retado_id: 'club-b',
+  prorroga_abierta_at: '2026-08-11T10:00:00.000Z',
+  prorroga_vence_at: '2026-08-12T10:00:00.000Z',
+};
+
+test('sin respuesta de mi club, la prórroga sigue esperándome', () => {
+  const ctx = T.challengeCtaContext({ challenge: enProrroga, misClubIds: ['club-b'] });
+  assert.equal(ctx.miRespuestaProrroga, null);
+  assert.equal(getChallengeCta(ctx).kind, 'responder_prorroga');
+});
+
+test('la respuesta de OTRO club no cuenta como la mía', () => {
+  const ctx = T.challengeCtaContext({
+    challenge: enProrroga,
+    misClubIds: ['club-b'],
+    respuestasProrroga: [{ club_id: 'club-a', respuesta: true }],
+  });
+  assert.equal(ctx.miRespuestaProrroga, null);
+  assert.equal(getChallengeCta(ctx).kind, 'responder_prorroga');
+});
+
+test('con mi club ya respondido, la acción pasa a esperar al rival', () => {
+  const ctx = T.challengeCtaContext({
+    challenge: enProrroga,
+    misClubIds: ['club-b'],
+    respuestasProrroga: [{ club_id: 'club-b', respuesta: true }],
+  });
+  assert.equal(ctx.miRespuestaProrroga, true);
+  assert.equal(getChallengeCta(ctx).kind, 'esperar_prorroga');
+});
+
+test('un «No» de mi club es false, no null: la interfaz no vuelve a preguntar', () => {
+  const ctx = T.challengeCtaContext({
+    challenge: enProrroga,
+    misClubIds: ['club-b'],
+    respuestasProrroga: [{ club_id: 'club-b', respuesta: false }],
+  });
+  assert.equal(ctx.miRespuestaProrroga, false);
+  assert.equal(getChallengeCta(ctx).kind, 'esperar_prorroga');
+});
+
+test('la propuesta del rival me deja revisarla; la mía, esperando', () => {
+  const esperando = {
+    estado: 'esperando_aprobacion',
+    club_retador_id: 'club-a',
+    club_retado_id: 'club-b',
+  };
+
+  const ajena = T.challengeCtaContext({
+    challenge: esperando,
+    misClubIds: ['club-b'],
+    propuesta: { club_proponente_id: 'club-a' },
+  });
+  assert.equal(getChallengeCta(ajena).kind, 'aprobar_propuesta');
+
+  const propia = T.challengeCtaContext({
+    challenge: esperando,
+    misClubIds: ['club-a'],
+    propuesta: { club_proponente_id: 'club-a' },
+  });
+  assert.equal(getChallengeCta(propia).kind, 'esperar_aprobacion');
+});

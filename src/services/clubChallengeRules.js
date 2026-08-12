@@ -390,6 +390,42 @@ export function validarPropuestaOficial(draft = {}, ahora = new Date()) {
   return { ok: Object.keys(errors).length === 0, errors };
 }
 
+/**
+ * Traduce el borrador de la pantalla al payload que espera
+ * `crear_propuesta_oficial(p_payload jsonb)`.
+ *
+ * Existe por la misma razón que `challengeCtaContext`: el borrador está en
+ * camelCase y las columnas de `club_challenge_proposals` en snake_case, y esa
+ * traducción escrita a mano dentro de la pantalla es exactamente donde un
+ * nombre mal puesto se convierte en un campo que llega vacío al servidor sin
+ * que nadie se entere. Acá ocurre en un solo lugar, con pruebas que fijan los
+ * nombres.
+ *
+ * La fecha viaja en ISO: PostgreSQL la interpreta con zona horaria explícita
+ * y no depende de cómo tenga configurado el teléfono quien propone.
+ */
+export function propuestaOficialPayload(draft = {}) {
+  const fecha = aFecha(draft.fecha);
+  const texto = (v) => (v == null ? null : String(v).trim() || null);
+  const numero = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+
+  return {
+    fecha: fecha ? fecha.toISOString() : null,
+    duracion_min: draft.duracionMin ?? null,
+    direccion: texto(draft.direccion),
+    cancha_nombre: texto(draft.canchaNombre),
+    comuna: texto(draft.comuna),
+    region: texto(draft.region),
+    latitud: numero(draft.latitud),
+    longitud: numero(draft.longitud),
+    modalidad: draft.modalidad ?? null,
+    cupos_por_club: draft.cuposPorClub ?? null,
+    metodo_inscripcion: draft.metodoInscripcion ?? null,
+    cuota_por_persona: draft.cuotaPorPersona ?? 0,
+    instrucciones: texto(draft.instrucciones),
+  };
+}
+
 // ─────────────────────────────────────────────── CTA y bloqueos
 
 /**

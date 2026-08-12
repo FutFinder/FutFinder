@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -59,7 +60,12 @@ import {
 import { getMatchById, getMatchAttendees } from '../services/matches';
 import { getClubById, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
-import { getChallenge, listChallengeEvents } from '../services/clubChallenges';
+import { getChallenge, listChallengeEvents, refreshChallenge } from '../services/clubChallenges';
+import {
+  responderProrroga,
+  listRespuestasProrroga,
+  getPropuestaVigente,
+} from '../services/clubProposals';
 import { getChallengeCta, estadoLabel } from '../services/clubChallengeRules';
 import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
@@ -131,6 +137,9 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [context, setContext] = useState(null); // info del club / partido
   const [clubChallenge, setClubChallenge] = useState(null);
   const [challengeEvents, setChallengeEvents] = useState([]);
+  const [challengeProposal, setChallengeProposal] = useState(null);
+  const [prorrogaReplies, setProrrogaReplies] = useState([]);
+  const [challengeBusy, setChallengeBusy] = useState(false);
   const [myClubIds, setMyClubIds] = useState([]);
   const [busyAction, setBusyAction] = useState(false);
 
@@ -271,18 +280,28 @@ export default function ChatThreadScreen({ route, navigation }) {
     if (!challengeId) return undefined;
     let alive = true;
     (async () => {
-      const { data } = await getChallenge(challengeId);
+      // Primero se aplican los vencimientos de ESTA fila: el cron corre cada
+      // 5 minutos y sin esto la cabecera podría mostrar «quedan 0 min» en vez
+      // de la prórroga que ya correspondía. Si la RPC no existe todavía,
+      // devuelve null sin error y se sigue con la lectura de siempre.
+      const { data: alDia } = await refreshChallenge(challengeId);
+      const { data } = alDia ? { data: alDia } : await getChallenge(challengeId);
       if (!alive) return;
       setClubChallenge(data || null);
 
       if (!isChallengeThread || !data) return;
 
-      const [{ data: eventos }, { data: { user } = {} }] = await Promise.all([
-        listChallengeEvents(challengeId),
-        supabase.auth.getUser(),
-      ]);
+      const [{ data: eventos }, { data: { user } = {} }, { data: respuestas }, { data: prop }] =
+        await Promise.all([
+          listChallengeEvents(challengeId),
+          supabase.auth.getUser(),
+          listRespuestasProrroga(challengeId),
+          getPropuestaVigente(challengeId),
+        ]);
       if (!alive) return;
       setChallengeEvents(eventos || []);
+      setProrrogaReplies(respuestas || []);
+      setChallengeProposal(prop || null);
 
       if (!user?.id) return;
       const { data: membresias } = await supabase
@@ -629,11 +648,10 @@ export default function ChatThreadScreen({ route, navigation }) {
   }, [decorated, challengeEvents, isChallengeThread]);
 
   /**
-   * Acción contextual de la cabecera. Se calcula con las mismas reglas que
-   * usa el resto del módulo (`getChallengeCta`), pero en esta fase solo hay
-   * una transición que la app sepa ejecutar desde acá: abrir el partido
-   * cuando ya existe. Las demás se muestran como información — ver el
-   * comentario de `ChallengeHeader`.
+   * Acción contextual de la cabecera, con las mismas reglas que usa el resto
+   * del módulo (`getChallengeCta`). El contexto se arma con la función pura
+   * `challengeCtaContext` — ver el comentario de ese archivo: armarlo a mano
+   * acá es lo que una vez dejó el hilo en blanco.
    */
   const challengeCta = useMemo(() => {
     if (!isChallengeThread || !clubChallenge) return null;
@@ -642,17 +660,103 @@ export default function ChatThreadScreen({ route, navigation }) {
         challenge: clubChallenge,
         misClubIds: myClubIds,
         online: connection !== 'offline',
+        propuesta: challengeProposal,
+        respuestasProrroga: prorrogaReplies,
       })
     );
-  }, [isChallengeThread, clubChallenge, myClubIds, connection]);
+  }, [
+    isChallengeThread,
+    clubChallenge,
+    myClubIds,
+    connection,
+    challengeProposal,
+    prorrogaReplies,
+  ]);
 
   const puedeAbrirPartido =
     challengeCta?.kind === 'ver_partido' && !!clubChallenge?.match_id;
 
+  // Qué acciones sabe ejecutar esta pantalla hoy. `aprobar_propuesta` publica
+  // el partido y llega con la migración 44: hasta entonces se puede revisar
+  // la propuesta y rechazarla, que sí existe.
+  const ctaAccionable =
+    puedeAbrirPartido ||
+    challengeCta?.kind === 'crear_propuesta' ||
+    challengeCta?.kind === 'aprobar_propuesta';
+
   const handleChallengeCta = useCallback(() => {
-    if (!puedeAbrirPartido) return;
-    navigation.navigate('MatchDetail', { matchId: clubChallenge.match_id });
-  }, [puedeAbrirPartido, navigation, clubChallenge?.match_id]);
+    if (puedeAbrirPartido) {
+      navigation.navigate('MatchDetail', { matchId: clubChallenge.match_id });
+      return;
+    }
+    if (challengeCta?.kind === 'crear_propuesta') {
+      navigation.navigate('ClubProposal', { challengeId, modo: 'crear' });
+      return;
+    }
+    if (challengeCta?.kind === 'aprobar_propuesta') {
+      navigation.navigate('ClubProposal', {
+        challengeId,
+        modo: 'revisar',
+        proposalId: challengeProposal?.id,
+      });
+    }
+  }, [
+    puedeAbrirPartido,
+    navigation,
+    clubChallenge?.match_id,
+    challengeCta?.kind,
+    challengeId,
+    challengeProposal?.id,
+  ]);
+
+  /**
+   * Responder la prórroga. El «No» cierra el desafío en el acto, así que se
+   * confirma antes: es la única acción de esta pantalla que no tiene vuelta
+   * atrás. El «Sí» no la necesita — como mucho reabre la negociación.
+   */
+  const enviarRespuestaProrroga = useCallback(
+    async (respuesta) => {
+      if (challengeBusy || !challengeId) return;
+      setChallengeBusy(true);
+      const { data, error } = await responderProrroga(challengeId, respuesta);
+      if (error) {
+        setChallengeBusy(false);
+        Alert.alert('No se pudo responder', error.message);
+        return;
+      }
+      if (data) setClubChallenge(data);
+      const [{ data: respuestas }, { data: eventos }] = await Promise.all([
+        listRespuestasProrroga(challengeId),
+        listChallengeEvents(challengeId),
+      ]);
+      setProrrogaReplies(respuestas || []);
+      setChallengeEvents(eventos || []);
+      setChallengeBusy(false);
+    },
+    [challengeBusy, challengeId]
+  );
+
+  const handleResponderProrroga = useCallback(
+    (respuesta) => {
+      if (respuesta) {
+        enviarRespuestaProrroga(true);
+        return;
+      }
+      Alert.alert(
+        '¿El partido no se disputará?',
+        'El desafío se cierra sin acuerdo para los dos clubes y la conversación queda solo como historial.',
+        [
+          { text: 'Volver', style: 'cancel' },
+          {
+            text: 'Sí, cerrar el desafío',
+            style: 'destructive',
+            onPress: () => enviarRespuestaProrroga(false),
+          },
+        ]
+      );
+    },
+    [enviarRespuestaProrroga]
+  );
 
   const headerSubtitle = useMemo(() => {
     if (t?.type === 'challenge') {
@@ -926,7 +1030,9 @@ export default function ChatThreadScreen({ route, navigation }) {
               <ChallengeHeader
                 challenge={clubChallenge}
                 cta={challengeCta}
-                onPressCta={puedeAbrirPartido ? handleChallengeCta : null}
+                onPressCta={ctaAccionable ? handleChallengeCta : null}
+                onResponderProrroga={handleResponderProrroga}
+                ocupado={challengeBusy}
               />
             )}
 

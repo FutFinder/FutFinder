@@ -19,14 +19,25 @@ import { challengeCountdown } from '../../utils/challengeThread';
  * módulo de chat, no en una pantalla de Clubes: mezclar las dos familias en
  * la misma vista se vería como dos verdes distintos.
  *
- * SOBRE LAS ACCIONES: en esta fase las únicas transiciones implementadas son
- * aceptar (que es lo que crea este hilo) y ver el partido cuando ya existe.
- * Las demás — crear propuesta, responder la prórroga, aprobar, registrar
- * resultado — llegan con las migraciones siguientes. Hasta entonces el
- * estado se muestra como información y NO como un botón: un botón que no
- * hace nada es peor que no tener botón.
+ * SOBRE LAS ACCIONES: se dibuja botón únicamente cuando la app sabe ejecutar
+ * la acción. Con la migración 43 ya son reales responder la prórroga, crear
+ * la propuesta oficial, revisarla y ver el partido. Aprobar la propuesta
+ * —que es lo que publica el partido— llega con la 44, así que hasta
+ * entonces se muestra como información. Un botón que no hace nada es peor
+ * que no tener botón.
+ *
+ * La prórroga es la única acción con DOS salidas, y por eso no cabe en el
+ * botón único: se responde «Sí» o «No», y el «No» cierra el desafío en el
+ * acto. Por lo mismo lleva confirmación aparte en la pantalla.
  */
-export default function ChallengeHeader({ challenge, cta, ahora = new Date(), onPressCta }) {
+export default function ChallengeHeader({
+  challenge,
+  cta,
+  ahora = new Date(),
+  onPressCta,
+  onResponderProrroga,
+  ocupado = false,
+}) {
   if (!challenge) return null;
 
   const cuenta = challengeCountdown(
@@ -39,7 +50,8 @@ export default function ChallengeHeader({ challenge, cta, ahora = new Date(), on
   );
 
   const cerrado = esEstadoCerrado(challenge.estado);
-  const accionable = !!onPressCta && !!cta && !cta.disabled;
+  const esProrroga = cta?.kind === 'responder_prorroga' && !!onResponderProrroga;
+  const accionable = !esProrroga && !!onPressCta && !!cta && !cta.disabled;
 
   return (
     <View style={[styles.bar, cerrado && styles.barCerrado]}>
@@ -67,12 +79,57 @@ export default function ChallengeHeader({ challenge, cta, ahora = new Date(), on
         )}
       </View>
 
-      {accionable ? (
+      {esProrroga ? (
+        <>
+          <Text style={styles.pregunta}>{cta.label}</Text>
+          <View style={styles.dosBotones}>
+            <Pressable
+              onPress={() => onResponderProrroga(true)}
+              disabled={ocupado}
+              accessibilityRole="button"
+              accessibilityLabel="Sí, el partido se disputará"
+              style={({ pressed }) => [
+                styles.cta,
+                styles.ctaMitad,
+                pressed && { opacity: 0.85 },
+                ocupado && styles.ctaOcupado,
+              ]}
+            >
+              <Text style={styles.ctaText}>Sí, se juega</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onResponderProrroga(false)}
+              disabled={ocupado}
+              accessibilityRole="button"
+              accessibilityLabel="No, el partido no se disputará"
+              style={({ pressed }) => [
+                styles.cta,
+                styles.ctaMitad,
+                styles.ctaNo,
+                pressed && { opacity: 0.85 },
+                ocupado && styles.ctaOcupado,
+              ]}
+            >
+              <Text style={[styles.ctaText, styles.ctaTextNo]}>No se juega</Text>
+            </Pressable>
+          </View>
+          {!!cta.hint && (
+            <Text style={styles.hint} numberOfLines={2}>
+              {cta.hint}
+            </Text>
+          )}
+        </>
+      ) : accionable ? (
         <Pressable
           onPress={onPressCta}
+          disabled={ocupado}
           accessibilityRole="button"
           accessibilityLabel={cta.label}
-          style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [
+            styles.cta,
+            pressed && { opacity: 0.85 },
+            ocupado && styles.ctaOcupado,
+          ]}
         >
           <Text style={styles.ctaText}>{cta.label}</Text>
         </Pressable>
@@ -140,6 +197,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     includeFontPadding: false,
   },
+  ctaOcupado: { opacity: 0.6 },
+
+  pregunta: {
+    color: chatColors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+    includeFontPadding: false,
+  },
+  dosBotones: { flexDirection: 'row', gap: 8 },
+  ctaMitad: { flex: 1 },
+  // El «No» cierra el desafío: se ve como lo que es, no como la otra
+  // mitad de un par de botones equivalentes.
+  ctaNo: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: chatColors.challengeBorder,
+  },
+  ctaTextNo: { color: chatColors.textPrimary },
 
   hint: {
     color: 'rgba(255,255,255,0.5)',

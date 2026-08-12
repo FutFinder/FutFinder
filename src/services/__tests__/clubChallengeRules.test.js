@@ -445,3 +445,61 @@ test('toda etiqueta de CTA está en español y no queda vacía', () => {
     }
   }
 });
+
+// ─────────────────────────────────────────────── payload de la propuesta
+
+// `crear_propuesta_oficial()` lee el jsonb por nombre de columna. Un campo
+// mal nombrado no da error: llega nulo y la RPC lo rechaza con un mensaje
+// que no dice cuál era. Estas pruebas fijan los nombres.
+
+const borrador = {
+  fecha: '2026-09-01T21:30:00.000Z',
+  duracionMin: 90,
+  direccion: '  Av. Siempre Viva 742  ',
+  canchaNombre: 'Complejo Municipal',
+  comuna: 'Ñuñoa',
+  region: 'Metropolitana',
+  latitud: -33.45,
+  longitud: -70.62,
+  modalidad: 'futbol7',
+  cuposPorClub: 7,
+  metodoInscripcion: 'orden_llegada',
+  cuotaPorPersona: 4000,
+  instrucciones: 'Llegar 20 minutos antes.',
+};
+
+test('el payload usa los nombres de columna que espera la RPC', () => {
+  const p = R.propuestaOficialPayload(borrador);
+  assert.deepEqual(Object.keys(p).sort(), [
+    'cancha_nombre', 'comuna', 'cuota_por_persona', 'cupos_por_club',
+    'direccion', 'duracion_min', 'fecha', 'instrucciones', 'latitud',
+    'longitud', 'metodo_inscripcion', 'modalidad', 'region',
+  ]);
+  assert.equal(p.duracion_min, 90);
+  assert.equal(p.cupos_por_club, 7);
+  assert.equal(p.metodo_inscripcion, 'orden_llegada');
+  assert.equal(p.cuota_por_persona, 4000);
+});
+
+test('la fecha viaja en ISO, no como la escribió el teléfono', () => {
+  const p = R.propuestaOficialPayload({ ...borrador, fecha: new Date('2026-09-01T21:30:00Z') });
+  assert.equal(p.fecha, '2026-09-01T21:30:00.000Z');
+});
+
+test('los textos van recortados y lo vacío viaja como null', () => {
+  const p = R.propuestaOficialPayload({ ...borrador, instrucciones: '   ' });
+  assert.equal(p.direccion, 'Av. Siempre Viva 742');
+  assert.equal(p.instrucciones, null);
+});
+
+test('sin cuota, se propone gratis y no null: la columna es NOT NULL', () => {
+  const { cuotaPorPersona, ...sinCuota } = borrador;
+  assert.equal(R.propuestaOficialPayload(sinCuota).cuota_por_persona, 0);
+});
+
+test('un borrador vacío no revienta ni inventa valores', () => {
+  const p = R.propuestaOficialPayload({});
+  assert.equal(p.fecha, null);
+  assert.equal(p.direccion, null);
+  assert.equal(p.cupos_por_club, null);
+});

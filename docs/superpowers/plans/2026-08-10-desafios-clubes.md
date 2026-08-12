@@ -237,7 +237,8 @@ Transiciones autorizadas, con quién puede dispararlas:
 | `supabase/migrations/41_desafios_estados_y_chat.sql` | Estados nuevos, columnas de plazos, `desafio_reglas()`, trigger anti-autodesafío | Aplicada |
 | `supabase/migrations/42_desafios_chat_negociacion.sql` | Tipo de hilo `challenge:` (columna `messages.challenge_id`, CHECK de destino a cuatro ramas, helpers `chat_puede_ver_desafio`/`chat_puede_escribir_desafio`, RLS, `get_my_threads`, `get_chat_unread_counts`, `chat_notify_mention_all`, `messages_block_content_edits`), `club_challenge_events`, RPC `aceptar_desafio` | Aplicada |
 | `supabase/migrations/42b_desafio_rpc_revoke_public.sql` | Quita el `EXECUTE` de `PUBLIC` sobre `aceptar_desafio()`. Va aparte porque la 42 ya estaba aplicada | Aplicada |
-| `supabase/migrations/43_desafios_plazos_y_propuesta.sql` | `club_challenge_extension_replies`, `club_challenge_proposals`, RPC `procesar_vencimientos_desafios` (+ `cron.schedule`), `responder_prorroga`, `crear_propuesta_oficial`, `rechazar_propuesta` | Pendiente |
+| `supabase/migrations/43_desafios_plazos_y_propuesta.sql` | `club_challenge_extension_replies`, `club_challenge_proposals`, RPC `procesar_vencimientos_desafios` (+ `cron.schedule`), `procesar_vencimiento_desafio`, `refrescar_desafio`, `responder_prorroga`, `crear_propuesta_oficial`, `rechazar_propuesta`, helper `desafio_avisar` | Aplicada |
+| `supabase/migrations/43b_propuesta_autoriza_antes_del_token.sql` | `crear_propuesta_oficial()` resuelve el `client_token` DESPUÉS de autorizar y atado al desafío. Va aparte porque la 43 ya estaba aplicada | Aplicada |
 | `supabase/migrations/44_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda en `join_match` | Pendiente |
 | `supabase/migrations/45_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` | Pendiente |
 | `supabase/migrations/46_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), helper `club_esta_sancionado` | Pendiente |
@@ -625,67 +626,100 @@ cubierta por el trigger de la Tarea 1.2, pero la RPC debe volver a comprobarlo.
 **Archivos:** crear `supabase/migrations/43_desafios_plazos_y_propuesta.sql`
 (secciones 1–2); crear `supabase/tests/43_desafio_plazos_test.sql`.
 
-- [ ] `club_challenge_extension_replies` con `unique (challenge_id, club_id)` —
+- [x] `club_challenge_extension_replies` con `unique (challenge_id, club_id)` —
       la unicidad es lo que hace idempotente «basta un administrador por club».
-- [ ] `procesar_vencimientos_desafios()`: en una sola pasada, `pendiente`
+- [x] `procesar_vencimientos_desafios()`: en una sola pasada, `pendiente`
       vencido → `expirado`; `negociacion` vencida sin prórroga → abre prórroga de
       24 h + evento + aviso «¿Este partido se disputará?»; prórroga vencida sin
       dos «Sí» → `sin_acuerdo` + archivar el hilo como sólo lectura + avisar;
       `publicado` con hora pasada → `en_juego`; `en_juego` pasado fin+duración →
       `esperando_resultado`. Todo con `where` sobre el estado esperado, de modo
       que ejecutarla dos veces seguidas no cambia nada.
-- [ ] `revoke execute … from anon, authenticated` y `cron.schedule('futfinder-desafios','*/5 * * * *', …)`,
+- [x] `revoke execute … from anon, authenticated` y `cron.schedule('futfinder-desafios','*/5 * * * *', …)`,
       siguiendo el patrón de `38_push_reliability.sql:174`.
-- [ ] Además, una RPC pública y delgada `refrescar_desafio(p_challenge_id uuid)`
+- [x] Además, una RPC pública y delgada `refrescar_desafio(p_challenge_id uuid)`
       que aplique los mismos vencimientos **sólo a esa fila**, para que la
       pantalla no dependa de esperar al cron. El cron es la fuente fiable; esto
       es sólo latencia.
-- [ ] Sólo lectura del hilo cuando el desafío está cerrado: la política
+- [x] Sólo lectura del hilo cuando el desafío está cerrado: la política
       `messages_insert` consulta el estado vía `chat_puede_ver_desafio`, que ya
       exige estado activo. Comprobarlo en la prueba SQL.
-- [ ] Prueba SQL: correr `procesar_vencimientos_desafios()` dos veces seguidas y
+- [x] Prueba SQL: correr `procesar_vencimientos_desafios()` dos veces seguidas y
       verificar que el segundo pase no produce eventos ni avisos nuevos.
-- [ ] Commit.
+- [x] Commit.
 
 ### Tarea 3.2 — Respuesta de prórroga
 
-- [ ] RPC `responder_prorroga(p_challenge_id uuid, p_respuesta boolean)`: exige
+- [x] RPC `responder_prorroga(p_challenge_id uuid, p_respuesta boolean)`: exige
       prórroga abierta y no vencida, deriva el club del `auth.uid()`, inserta con
       `on conflict do nothing` (idempotente). Un «No» cierra el desafío en
       `sin_acuerdo` de inmediato.
-- [ ] Servicio `src/services/clubProposals.js` + interfaz en `ChallengeHeader`.
-- [ ] Prueba SQL: dos administradores del mismo club responden, queda una fila;
+- [x] Servicio `src/services/clubProposals.js` + interfaz en `ChallengeHeader`.
+- [x] Prueba SQL: dos administradores del mismo club responden, queda una fila;
       un «No» cierra; falta de respuesta al vencer cierra.
-- [ ] Commit.
+- [x] Commit.
 
 ### Tarea 3.3 — Propuesta oficial
 
 **Archivos:** migración 43 (sección 3); crear `src/screens/ClubProposalScreen.js`.
 
-- [ ] Tabla `club_challenge_proposals` con todos los campos del enunciado:
+- [x] Tabla `club_challenge_proposals` con todos los campos del enunciado:
       `fecha`, `duracion_min`, `direccion`, `cancha_nombre`, `comuna`, `region`,
       `latitud`, `longitud`, `modalidad`, `cupos_por_club` (check 4–15),
       `metodo_inscripcion`, `cuota_por_persona`, `instrucciones`, `estado`,
       `client_token` con índice único parcial.
-- [ ] Índice único parcial `where estado = 'pendiente'`: **una sola propuesta
+- [x] Índice único parcial `where estado = 'pendiente'`: **una sola propuesta
       abierta por desafío**.
-- [ ] `crear_propuesta_oficial(p_challenge_id, p_payload jsonb, p_client_token uuid)`:
+- [x] `crear_propuesta_oficial(p_challenge_id, p_payload jsonb, p_client_token uuid)`:
       admin de cualquiera de los dos clubes, desafío en `negociacion`, pasa a
       `esperando_aprobacion`. Reintento con el mismo `client_token` devuelve la
       propuesta existente sin crear otra.
-- [ ] `rechazar_propuesta(p_proposal_id, p_motivo)`: sólo admin del club
+- [x] `rechazar_propuesta(p_proposal_id, p_motivo)`: sólo admin del club
       contrario; vuelve a `negociacion` conservando el registro.
-- [ ] Pantalla de creación y de revisión con todos los campos, validados por
+- [x] Pantalla de creación y de revisión con todos los campos, validados por
       `validarPropuestaOficial` antes de llamar.
-- [ ] Dirección exacta, cuota e información oficial visibles para **todos** los
+- [x] Dirección exacta, cuota e información oficial visibles para **todos** los
       integrantes de ambos clubes: política de `select` sobre
       `club_challenge_proposals` para `club_members` de cualquiera de los dos
       clubes (no sólo administradores).
-- [ ] Prueba SQL: el proponente no puede aprobar su propia propuesta; un miembro
+- [x] Prueba SQL: el proponente no puede aprobar su propia propuesta; un miembro
       no admin no puede crear ni aprobar; un miembro sin rol **sí** puede leer.
-- [ ] Commit.
+- [x] Commit.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 42 y 43.
+**Verificación de fase:** `npm run lint` (0 errores), `npm test` (293 ✓),
+`npm run build:web` (✓), `deno test … pushLogic.test.ts` (13 ✓) y la prueba
+SQL 43 corrida **contra el esquema ya aplicado** en una transacción con
+`rollback` (15 casos ✓, sin dejar filas). Migraciones 43 y 43b aplicadas y
+verificadas contra el catálogo el 2026-08-11: las siete funciones nuevas dan
+`has_function_privilege('public', …) = false` y el job `futfinder-desafios`
+está activo cada 5 minutos.
+
+> **Tres cosas que salieron al implementar y no estaban en el plan.**
+>
+> 1. **Las respuestas de prórroga se borran al reabrir la negociación.** El
+>    plan pedía `unique (challenge_id, club_id)` sin más, pero esas filas
+>    sobrevivían a la reapertura: una segunda prórroga nacía con dos «Sí»
+>    viejos, el desafío se reabría solo indefinidamente y nadie podía volver
+>    a responder por el conflicto de unicidad. El historial queda en
+>    `club_challenge_events`.
+> 2. **Proponer durante la prórroga la cierra.** Si no, un rechazo devolvía
+>    el desafío a un plazo ya vencido y el barrido lo cerraba sin acuerdo
+>    justo cuando los dos clubes estaban negociando.
+> 3. **El `client_token` no puede resolverse antes de autorizar.** La 43
+>    devolvía la propuesta a cualquiera que acertara un token, porque el
+>    `return` temprano de la idempotencia estaba antes de consultar
+>    `club_members`, y la función es `security definer`. Cerrado en la
+>    **43b**, que además ata el token al desafío pedido. Adivinar un uuid no
+>    es realista, pero el token lo genera el cliente y no hay ninguna
+>    garantía sobre su entropía.
+>
+> **Los vencimientos automáticos no escriben mensajes:** `messages.sender_id`
+> es NOT NULL y el sistema no es un usuario, así que dejan sólo un evento de
+> bitácora, que el hilo ya intercala como burbuja.
+>
+> **Aprobar la propuesta no está en esta fase** (es la tarea 4.1, migración
+> 44, porque publica el partido). `ClubProposalScreen` deja leer la propuesta
+> entera y pedir cambios, y dice explícitamente que aprobar llega después.
 
 ---
 

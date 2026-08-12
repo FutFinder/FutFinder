@@ -594,6 +594,27 @@ begin
   end if;
   raise notice 'OK (caso 14): rechazar dos veces devuelve lo mismo sin repetir efectos';
 
+  -- ══ CASO 15: el token no es una llave (migración 43b) ════════
+  -- La versión original resolvía el reintento idempotente ANTES de
+  -- autorizar, así que quien acertara un token recibía la propuesta
+  -- —dirección exacta y cuota incluidas— sin ser de ninguno de los dos
+  -- clubes. La autorización no puede depender de que un dato que genera
+  -- el cliente sea difícil de adivinar.
+  execute 'set local role authenticated';
+  execute format('set local request.jwt.claims to %L',
+    json_build_object('sub', v_x, 'role', 'authenticated')::text);
+  begin
+    perform public.crear_propuesta_oficial(v_ch3, '{}'::jsonb, v_token);
+    v_ok := true;
+  exception when insufficient_privilege then
+    v_ok := false;
+  end;
+  execute 'reset role';
+  if v_ok then
+    raise exception 'FALLÓ (caso 15): un ajeno con el token no debería recibir la propuesta';
+  end if;
+  raise notice 'OK (caso 15): el client_token no sustituye a la autorización';
+
   raise notice '════════ TODAS LAS PRUEBAS DE LA MIGRACIÓN 43 PASARON ════════';
 end;
 $$;

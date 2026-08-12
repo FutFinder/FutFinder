@@ -1,6 +1,6 @@
 # Seguridad y privacidad
 
-Última revisión: 2026-08-08
+Última revisión: 2026-08-11
 
 ## Propósito
 
@@ -16,6 +16,8 @@ Auth de Supabase define la identidad; `AuthProvider` y `withAuthGuard` evitan mo
 - Las solicitudes de amistad se rechazan en RLS si el destinatario eligió no recibirlas; la visibilidad en búsqueda se filtra desde la consulta de perfiles.
 - Chat: los DM requieren amistad aceptada o la excepción de administradores de clubes con desafío aceptado; grupos de partido requieren asistencia inscrita o GPS confirmada y chats de club requieren membresía. Las funciones auxiliares son `SECURITY INVOKER`, con lo que no revelan relaciones a terceros.
 - Los triggers de mensajes asignan hora/autores del servidor, bloquean editar contenido y limitan avisos importantes a administradores de club. `/todos` sólo se acepta en grupos y el servidor deriva a sus destinatarios.
+- Desafíos entre clubes: la bitácora y las respuestas de prórroga las leen los administradores de los dos clubes; la propuesta oficial la lee cualquier integrante, porque dirección, cuota e instrucciones son lo que un jugador necesita para decidir si va. Ninguna de las tres tiene política de escritura: sólo escriben las RPC. Las de vencimientos están revocadas de todos los roles y corren por `cron`.
+- Un token de idempotencia que genera el cliente no es una credencial. La primera versión de `crear_propuesta_oficial()` resolvía el reintento por `client_token` antes de autorizar, así que acertar un token entregaba la propuesta a cualquiera; la 43b mueve esa resolución después de derivar el club desde `club_members` y la ata al desafío pedido. En una función `security definer`, todo `return` temprano tiene que estar después de la autorización.
 
 ## Privacidad y avisos
 

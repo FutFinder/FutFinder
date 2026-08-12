@@ -106,22 +106,40 @@ export function challengeCountdown(thread, ahora = new Date()) {
  * en un solo lugar, cubierto por pruebas que fijan el nombre de la clave.
  *
  * `misClubIds` son los clubes donde el usuario es administrador vigente.
+ *
+ * `propuesta` y `respuestasProrroga` llegan desde el servidor: la primera
+ * decide si el usuario revisa la propuesta o espera al rival, y de la segunda
+ * sale `miRespuestaProrroga`, que es lo que distingue «responde tu club» de
+ * «ya respondiste, falta el otro». Se resuelve acá y no en la pantalla por lo
+ * mismo de siempre: es una traducción de nombres, y esas se hacen en un solo
+ * lugar con pruebas encima.
  */
 export function challengeCtaContext({
   challenge = null,
   misClubIds = [],
   online = true,
   sancion = null,
+  propuesta = null,
+  respuestasProrroga = [],
 } = {}) {
   const clubes = Array.isArray(misClubIds) ? misClubIds.filter(Boolean) : [];
   const delDesafio = [challenge?.club_retador_id, challenge?.club_retado_id].filter(Boolean);
+  const myClubId = clubes.find((id) => delDesafio.includes(id)) || null;
+
+  const respuestas = Array.isArray(respuestasProrroga) ? respuestasProrroga : [];
+  const mia = myClubId ? respuestas.find((r) => r?.club_id === myClubId) : null;
 
   return {
     challenge: challenge || {},
-    myClubId: clubes.find((id) => delDesafio.includes(id)) || null,
+    myClubId,
     soyAdmin: clubes.length > 0,
     online,
     sancion,
+    propuesta,
+    // `null` significa «mi club todavía no responde»; el booleano, lo que
+    // respondió. Un `undefined` acá haría que la interfaz volviera a pedir
+    // una respuesta que el club ya dio.
+    miRespuestaProrroga: mia ? !!mia.respuesta : null,
   };
 }
 
