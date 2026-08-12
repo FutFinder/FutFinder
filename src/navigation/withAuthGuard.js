@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { colors } from '../theme/colors';
 import { useAuth } from '../contexts/AuthContext';
+import withErrorBoundary from './withErrorBoundary';
 
 /**
  * Envuelve una pantalla privada: si no hay sesión, nunca llega a montarse el
@@ -16,6 +17,12 @@ import { useAuth } from '../contexts/AuthContext';
  * renderizar, deja de mostrar la pantalla y dispara la redirección.
  */
 export default function withAuthGuard(ScreenComponent, routeName) {
+  // Toda ruta privada lleva además su propio boundary: se envuelve acá una
+  // sola vez en vez de repetirlo en las ~25 pantallas del stack. Va por
+  // DENTRO del guard, así una pantalla que revienta no arrastra consigo la
+  // redirección a Login ni el resto de la navegación.
+  const PantallaProtegida = withErrorBoundary(ScreenComponent, routeName);
+
   function GuardedScreen(props) {
     const { isAuthenticated, setPendingDestination } = useAuth();
     const { navigation, route } = props;
@@ -32,7 +39,7 @@ export default function withAuthGuard(ScreenComponent, routeName) {
       return <View style={styles.fallback} />;
     }
 
-    return <ScreenComponent {...props} />;
+    return <PantallaProtegida {...props} />;
   }
 
   GuardedScreen.displayName = `withAuthGuard(${routeName})`;

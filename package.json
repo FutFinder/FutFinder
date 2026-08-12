@@ -8,7 +8,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
-    "test": "node --test 'src/**/__tests__/*.test.js'"
+    "test": "node --test 'src/**/__tests__/*.test.js'",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "verify": "npm run lint && npm test"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -48,6 +51,10 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.1.10",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.10.0",
     "typescript": "~5.9.2"
   },
   "private": true

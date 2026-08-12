@@ -8,6 +8,7 @@ import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 
 import AppNavigator, { navigationRef, navigationReadyPromise } from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import { supabase, isSupabaseConfigured } from './src/services/supabase';
 import {
   registerForPushNotifications,
@@ -151,14 +152,20 @@ export default function App() {
     };
   }, []);
 
+  // Cada pantalla ya trae su propio boundary (ver `withErrorBoundary`), que
+  // es el que mantiene la app usable. Éste es la última red: cubre lo que
+  // vive FUERA de las pantallas —los proveedores, el navegador mismo— y es
+  // lo único que separa un fallo ahí de una pantalla en blanco sin texto.
   return (
-    <ActionSheetProvider>
-      <SafeAreaProvider>
-        <StatusBar style="light" />
-        <AuthProvider>
-          <AppNavigator />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </ActionSheetProvider>
+    <ErrorBoundary nombre="la aplicación">
+      <ActionSheetProvider>
+        <SafeAreaProvider>
+          <StatusBar style="light" />
+          <AuthProvider>
+            <AppNavigator />
+          </AuthProvider>
+        </SafeAreaProvider>
+      </ActionSheetProvider>
+    </ErrorBoundary>
   );
 }

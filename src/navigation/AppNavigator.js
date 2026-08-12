@@ -53,6 +53,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
+import withErrorBoundary from './withErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 
 import { colors } from '../theme/colors';
@@ -60,7 +61,18 @@ import { colors } from '../theme/colors';
 const Stack = createNativeStackNavigator();
 
 // Rutas de onboarding: son las únicas que se pueden ver sin sesión. Todo lo
-// demás en este stack pasa por `withAuthGuard`.
+// demás en este stack pasa por `withAuthGuard`, que ya les pone su propio
+// error boundary. Éstas no pasan por el guard, así que se les envuelve a
+// mano: un fallo en Login o en Splash dejaría la app en blanco antes
+// siquiera de poder iniciar sesión.
+const SafeSplashScreen = withErrorBoundary(SplashScreen, 'Splash');
+const SafeWelcomeScreen = withErrorBoundary(WelcomeScreen, 'Welcome');
+const SafeLoginScreen = withErrorBoundary(LoginScreen, 'Login');
+const SafeVerificationScreen = withErrorBoundary(VerificationScreen, 'Verification');
+const SafeLocationPermissionScreen = withErrorBoundary(LocationPermissionScreen, 'LocationPermission');
+const SafeTermsScreen = withErrorBoundary(TermsScreen, 'Terms');
+const SafeSuccessScreen = withErrorBoundary(SuccessScreen, 'Success');
+
 const GuardedMainTabs = withAuthGuard(MainTabs, 'Main');
 const GuardedPublishMatchScreen = withAuthGuard(PublishMatchScreen, 'CreateMatch');
 const GuardedEditMatchScreen = withAuthGuard(EditMatchScreen, 'EditMatch');
@@ -177,13 +189,13 @@ export default function AppNavigator() {
           animation: 'slide_from_right',
         }}
       >
-        <Stack.Screen name="Splash" component={SplashScreen} options={{ animation: 'none' }} />
-        <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ animation: 'fade' }} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Verification" component={VerificationScreen} />
-        <Stack.Screen name="LocationPermission" component={LocationPermissionScreen} />
-        <Stack.Screen name="Terms" component={TermsScreen} />
-        <Stack.Screen name="Success" component={SuccessScreen} options={{ animation: 'fade' }} />
+        <Stack.Screen name="Splash" component={SafeSplashScreen} options={{ animation: 'none' }} />
+        <Stack.Screen name="Welcome" component={SafeWelcomeScreen} options={{ animation: 'fade' }} />
+        <Stack.Screen name="Login" component={SafeLoginScreen} />
+        <Stack.Screen name="Verification" component={SafeVerificationScreen} />
+        <Stack.Screen name="LocationPermission" component={SafeLocationPermissionScreen} />
+        <Stack.Screen name="Terms" component={SafeTermsScreen} />
+        <Stack.Screen name="Success" component={SafeSuccessScreen} options={{ animation: 'fade' }} />
 
         {/* Una vez logueado, el usuario vive dentro de Main (tabs) */}
         <Stack.Screen name="Main" component={GuardedMainTabs} options={{ animation: 'fade' }} />

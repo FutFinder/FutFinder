@@ -37,6 +37,7 @@ Esta bóveda documenta la configuración, el código y las migraciones versionad
 | Sistema visual o componentes compartidos | [Sistema visual](diseno/sistema-visual.md) | Ninguna |
 | Arquitectura general | [Stack y estructura](arquitectura/stack-y-estructura.md) | [Navegación](arquitectura/navegacion.md), [Base de datos](arquitectura/base-de-datos.md), [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) |
 | Estado, pendientes o pruebas | [Estado actual](operacion/estado-actual.md) | [Pendientes](operacion/pendientes.md), [Pruebas](operacion/pruebas.md) |
+| Lint, calidad o errores de render | [Calidad y lint](operacion/calidad-y-lint.md) | [Pruebas](operacion/pruebas.md) |
 
 ## Política de actualización
 

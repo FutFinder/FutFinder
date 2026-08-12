@@ -10,7 +10,11 @@ Este repositorio se trabaja desde dos Macs. Ejecuta `git pull` antes de tocar ar
 Consulta `docs/memoria/00-inicio.md`, clasifica la tarea y lee únicamente la nota principal del dominio y las dependencias directas indicadas. No leas toda la bóveda por defecto. Verifica contra el código y las migraciones cualquier dato sensible al tiempo.
 
 ## Al terminar
-Ejecuta las comprobaciones pertinentes y revisa `git status`. Conserva cambios ajenos. Añade solo los archivos de la tarea, crea un commit descriptivo y ejecuta `git push` de inmediato. Si el cambio fue material, actualiza en el mismo commit únicamente las notas de memoria afectadas.
+Ejecuta `npm run verify` (lint + pruebas) y revisa `git status`.
+`npm run lint` tiene que salir con **cero errores**: la configuración es corta
+a propósito y solo marca fallos reales, así que un error es un fallo de verdad.
+Los avisos son deuda conocida y no bloquean. Si tocaste la interfaz, `no-undef`
+es la regla que atrapa el typo que Babel no ve y que deja la pantalla en blanco. Conserva cambios ajenos. Añade solo los archivos de la tarea, crea un commit descriptivo y ejecuta `git push` de inmediato. Si el cambio fue material, actualiza en el mismo commit únicamente las notas de memoria afectadas.
 
 ## Comandos esenciales
 ```bash
@@ -19,6 +23,8 @@ npm run web
 npm run ios
 npm run android
 npm test
+npm run lint
+npm run verify      # lint + pruebas: lo mínimo antes de dar algo por terminado
 npm run build:web
 ```
 
