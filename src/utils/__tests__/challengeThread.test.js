@@ -185,3 +185,74 @@ test('ya abierta, la tarjeta baja el tono al estado real', () => {
     'Sin acuerdo'
   );
 });
+
+// ════════════════════════════════════════════════════════════════
+// CONTEXTO DE LA ACCIÓN DEL DESAFÍO
+// ════════════════════════════════════════════════════════════════
+// Regresión: la pantalla armaba este objeto a mano y nombraba la
+// variable local en español (`miClubId`) mientras que `getChallengeCta`
+// lee la clave en inglés (`myClubId`). Con la forma abreviada de objeto,
+// ese desajuste no era una clave mal puesta sino una referencia a un
+// identificador inexistente: `ReferenceError: myClubId is not defined`
+// en cada render, que dejaba el chat del desafío en blanco.
+//
+// Por eso el contexto se arma en una función pura y estas pruebas fijan
+// el NOMBRE de la clave, no solo su valor.
+
+const { getChallengeCta } = require('../../services/clubChallengeRules.js');
+
+const desafio = {
+  estado: 'negociacion',
+  club_retador_id: 'club-a',
+  club_retado_id: 'club-b',
+};
+
+test('challengeCtaContext usa exactamente la clave myClubId que lee getChallengeCta', () => {
+  const ctx = T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-b'] });
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(ctx, 'myClubId'),
+    'el contexto tiene que traer la clave myClubId'
+  );
+  assert.equal(ctx.myClubId, 'club-b');
+});
+
+test('reconoce mi club sea el retador o el retado', () => {
+  assert.equal(T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-a'] }).myClubId, 'club-a');
+  assert.equal(T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-b'] }).myClubId, 'club-b');
+});
+
+test('un club ajeno al desafío no me convierte en parte de él', () => {
+  const ctx = T.challengeCtaContext({ challenge: desafio, misClubIds: ['otro-club'] });
+  assert.equal(ctx.myClubId, null);
+});
+
+test('sin clubes administrados no soy admin y no hay club propio', () => {
+  const ctx = T.challengeCtaContext({ challenge: desafio, misClubIds: [] });
+  assert.equal(ctx.myClubId, null);
+  assert.equal(ctx.soyAdmin, false);
+});
+
+test('no revienta con entradas ausentes', () => {
+  const ctx = T.challengeCtaContext({});
+  assert.equal(ctx.myClubId, null);
+  assert.equal(ctx.soyAdmin, false);
+});
+
+test('el contexto encaja con getChallengeCta: un admin en negociación puede crear la propuesta', () => {
+  // Ésta es la prueba que habría atrapado el fallo: con el contexto mal
+  // armado, `myClubId` llegaba indefinido y la acción caía a otra rama.
+  const cta = getChallengeCta(T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-b'] }));
+  assert.equal(cta.kind, 'crear_propuesta');
+});
+
+test('quien no administra ninguno de los dos clubes solo lee', () => {
+  const cta = getChallengeCta(T.challengeCtaContext({ challenge: desafio, misClubIds: [] }));
+  assert.equal(cta.kind, 'solo_lectura');
+});
+
+test('sin conexión la acción lo dice antes que cualquier otra cosa', () => {
+  const cta = getChallengeCta(
+    T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-b'], online: false })
+  );
+  assert.equal(cta.kind, 'sin_conexion');
+});

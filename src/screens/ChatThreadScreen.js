@@ -61,7 +61,7 @@ import { getClubById, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getChallenge, listChallengeEvents } from '../services/clubChallenges';
 import { getChallengeCta, estadoLabel } from '../services/clubChallengeRules';
-import { parseChallengeThread } from '../utils/challengeThread';
+import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
@@ -637,16 +637,13 @@ export default function ChatThreadScreen({ route, navigation }) {
    */
   const challengeCta = useMemo(() => {
     if (!isChallengeThread || !clubChallenge) return null;
-    const miClubId =
-      myClubIds.find((id) =>
-        [clubChallenge.club_retador_id, clubChallenge.club_retado_id].includes(id)
-      ) || null;
-    return getChallengeCta({
-      challenge: clubChallenge,
-      myClubId,
-      soyAdmin: myClubIds.length > 0,
-      online: connection !== 'offline',
-    });
+    return getChallengeCta(
+      challengeCtaContext({
+        challenge: clubChallenge,
+        misClubIds: myClubIds,
+        online: connection !== 'offline',
+      })
+    );
   }, [isChallengeThread, clubChallenge, myClubIds, connection]);
 
   const puedeAbrirPartido =

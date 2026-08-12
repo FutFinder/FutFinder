@@ -93,6 +93,39 @@ export function challengeCountdown(thread, ahora = new Date()) {
 }
 
 /**
+ * Arma el contexto que espera `getChallengeCta`.
+ *
+ * Existe como función pura por una razón concreta: la pantalla lo armaba
+ * a mano y nombraba la variable local en español (`miClubId`) mientras que
+ * el contrato de `getChallengeCta` usa la clave en inglés (`myClubId`).
+ * Con la forma abreviada de objeto, ese desajuste no producía una clave
+ * mal puesta —que sería un fallo silencioso— sino una referencia a un
+ * identificador inexistente, y el hilo reventaba en cada render.
+ *
+ * Acá la traducción entre el nombre local y la clave del contrato ocurre
+ * en un solo lugar, cubierto por pruebas que fijan el nombre de la clave.
+ *
+ * `misClubIds` son los clubes donde el usuario es administrador vigente.
+ */
+export function challengeCtaContext({
+  challenge = null,
+  misClubIds = [],
+  online = true,
+  sancion = null,
+} = {}) {
+  const clubes = Array.isArray(misClubIds) ? misClubIds.filter(Boolean) : [];
+  const delDesafio = [challenge?.club_retador_id, challenge?.club_retado_id].filter(Boolean);
+
+  return {
+    challenge: challenge || {},
+    myClubId: clubes.find((id) => delDesafio.includes(id)) || null,
+    soyAdmin: clubes.length > 0,
+    online,
+    sancion,
+  };
+}
+
+/**
  * Qué acento lleva la tarjeta de la bandeja.
  *
  * Devuelve el NOMBRE del acento, no un color: el componente lo traduce a

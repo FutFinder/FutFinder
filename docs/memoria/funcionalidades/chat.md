@@ -26,7 +26,11 @@ RLS decide acceso: DM sólo con amistad aceptada, excepto administradores de dos
 
 El servicio distingue falta de sesión de inbox vacío. Si falta la migración 32, degrada lectura de club a marcador local y deshabilita silencio; si faltan 39, 40 o 42, `/todos`, la bandeja o el hilo de desafío quedan indisponibles de forma explícita. Las pruebas SQL verifican RLS, mención, bandeja y el hilo de desafío, pero deben ejecutarse pegándolas en el editor de Supabase: no las corre ningún script.
 
-`subscribeToClubMessages()` (`src/services/messages.js`) referencia una variable inexistente (`messagesChannelSeq`) y lanzaría `ReferenceError`. Hoy no la llama nadie, así que es código muerto, no un fallo activo.
+## Canales Realtime: un topic, un solo suscriptor
+
+`supabase.channel(topic)` **no crea un canal nuevo si ya existe uno con ese topic**: devuelve el existente. Si ese canal ya llamó a `subscribe()`, encadenarle `.on('postgres_changes', …)` lanza «cannot add postgres_changes callbacks for realtime channel after subscribe()». Con topics deterministas (`notif-<userId>`) basta un segundo suscriptor para reventar: el badge de `MainTabs` está suscrito siempre, así que abrir Avisos lo disparaba. La solución en este repositorio es `createSharedChannel` (`utils/chatMeta`): un canal real por topic, abierto con el primer suscriptor y cerrado con el último. Lo usan el chat (`subscribeToMessages`) y los avisos (`subscribeToNotifications`). Cualquier suscripción nueva a un topic fijo debe pasar por ahí.
+
+No hay ESLint en el proyecto, así que `no-undef` no cubre nada: un identificador mal escrito solo se descubre cuando esa rama se ejecuta. Ya costó una pantalla en blanco (ver decisiones). Al tocar componentes conviene pasar un `npx eslint --no-config-lookup` con `no-undef` sobre lo modificado.
 
 ## Notas relacionadas
 
