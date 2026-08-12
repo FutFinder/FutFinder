@@ -227,6 +227,11 @@ function oficialValida(extra = {}) {
     canchaNombre: 'Complejo Deportivo Ñuñoa',
     comuna: 'Ñuñoa',
     region: 'Región Metropolitana de Santiago',
+    // Las coordenadas son parte de lo que hace válida a una propuesta: sin
+    // ellas el partido no se puede crear (`matches.latitud`/`longitud` son
+    // NOT NULL), así que la propuesta nacería imposible de aprobar.
+    latitud: -33.4569,
+    longitud: -70.6019,
     modalidad: 'futbol7',
     cuposPorClub: 7,
     metodoInscripcion: 'seleccion_admin',
@@ -249,6 +254,90 @@ test('la propuesta oficial exige dirección exacta, cancha, comuna y región', (
     const r = R.validarPropuestaOficial(oficialValida({ [campo]: '   ' }), AHORA);
     assert.equal(r.ok, false, `${campo} vacío debería invalidar`);
     assert.ok(r.errors[campo], `falta el error de ${campo}`);
+  }
+});
+
+// ── ubicación en el mapa ──────────────────────────────────────
+// El partido no se puede crear sin coordenadas, así que una propuesta sin
+// ellas nace imposible de aprobar. La dirección escrita a mano no basta.
+
+test('sin ubicación, la propuesta oficial no es válida aunque la dirección esté escrita', () => {
+  const r = R.validarPropuestaOficial(
+    oficialValida({ latitud: null, longitud: null }),
+    AHORA
+  );
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.ubicacion, 'falta el error de ubicación');
+  // La dirección sí está escrita: el problema es el punto en el mapa, y el
+  // mensaje tiene que decir eso y no «indica la dirección».
+  assert.equal(r.errors.direccion, undefined);
+  assert.match(r.errors.ubicacion, /buscador/i);
+});
+
+test('falta una sola de las dos coordenadas y tampoco vale', () => {
+  assert.ok(R.validarPropuestaOficial(oficialValida({ latitud: null }), AHORA).errors.ubicacion);
+  assert.ok(R.validarPropuestaOficial(oficialValida({ longitud: null }), AHORA).errors.ubicacion);
+});
+
+test('coordenadas fuera del rango de la Tierra se rechazan', () => {
+  const fuera = [
+    { latitud: 91, longitud: -70.6 },
+    { latitud: -91, longitud: -70.6 },
+    { latitud: -33.4, longitud: 181 },
+    { latitud: -33.4, longitud: -181 },
+  ];
+  for (const coords of fuera) {
+    const r = R.validarPropuestaOficial(oficialValida(coords), AHORA);
+    assert.equal(r.ok, false, `${JSON.stringify(coords)} debería invalidar`);
+    assert.ok(r.errors.ubicacion);
+  }
+});
+
+test('coordenadas que no son números se rechazan, incluidas las cadenas y NaN', () => {
+  const malas = [
+    { latitud: '-33.4569', longitud: '-70.6019' },
+    { latitud: NaN, longitud: -70.6 },
+    { latitud: -33.4, longitud: Infinity },
+    { latitud: undefined, longitud: undefined },
+  ];
+  for (const coords of malas) {
+    const r = R.validarPropuestaOficial(oficialValida(coords), AHORA);
+    assert.equal(r.ok, false, `${JSON.stringify(coords)} debería invalidar`);
+    assert.ok(r.errors.ubicacion);
+  }
+});
+
+test('coordenadasValidas acepta los bordes exactos del rango y el (0, 0)', () => {
+  assert.equal(R.coordenadasValidas(90, 180), true);
+  assert.equal(R.coordenadasValidas(-90, -180), true);
+  // (0, 0) es un punto real del Atlántico. No se rechaza por su valor: lo que
+  // impide que llegue por accidente es que el cliente ya no convierte una
+  // coordenada ausente en cero.
+  assert.equal(R.coordenadasValidas(0, 0), true);
+  assert.equal(R.coordenadasValidas(null, null), false);
+});
+
+test('una propuesta con ubicación válida pasa entera', () => {
+  const r = R.validarPropuestaOficial(
+    oficialValida({ latitud: -33.4569, longitud: -70.6019 }),
+    AHORA
+  );
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.errors, {});
+});
+
+test('el payload manda las coordenadas como números y las ausentes como null, nunca como 0', () => {
+  const conCoords = R.propuestaOficialPayload(oficialValida());
+  assert.equal(conCoords.latitud, -33.4569);
+  assert.equal(conCoords.longitud, -70.6019);
+
+  // `Number(null)` es 0 en JavaScript. Si el payload lo dejara pasar, el
+  // servidor no vería la ausencia y el partido se publicaría en medio del
+  // Atlántico en vez de rechazarse.
+  for (const vacio of [null, undefined, '']) {
+    const p = R.propuestaOficialPayload(oficialValida({ latitud: vacio, longitud: vacio }));
+    assert.equal(p.latitud, null, `latitud con ${JSON.stringify(vacio)} debería ser null`);
+    assert.equal(p.longitud, null, `longitud con ${JSON.stringify(vacio)} debería ser null`);
   }
 });
 

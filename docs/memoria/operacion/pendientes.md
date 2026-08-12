@@ -16,6 +16,22 @@ Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios
 
 Las migraciones 39 (`/todos`) y 40 (bandeja por RPC) estaban versionadas pero **no** aplicadas: `get_my_threads()` no existía, así que `listMyThreads()` no tenía contra qué correr. Se aplicaron junto con la 41 y se verificaron: `get_my_threads()` ejecuta, `messages.mention_all` y los dos triggers de la 39 existen, y la prueba SQL del ciclo de desafíos pasa sin dejar residuos. No existe un proyecto Supabase de desarrollo separado: hay uno solo y es el que usa `.env`.
 
+## P1 — `attendees` se puede escribir sin pasar por ninguna RPC
+
+- **Dominio afectado:** partidos y, sobre todo, los cupos por club del ciclo de desafíos.
+- **Evidencia (comprobada el 2026-08-12 contra `jvfoendzblkoxvwvommz`):** las políticas `attendees_insert_self`, `attendees_update_self` y `attendees_delete_self` permiten a cualquier `authenticated` insertar, modificar o borrar su propia fila de `attendees` directo por PostgREST, sin pasar por `join_match` ni por sus comprobaciones de cupo. `attendees_update_self` incluso deja pasar de `pendiente` a `inscrito`, que es la aprobación manual.
+- **Por qué importa:** el reparto de cupos por club de la migración 45 cuenta filas de `attendees` dentro de una transacción; si un jugador puede insertarlas por su cuenta, el conteo no protege nada. Hoy no se explota porque el cliente sólo usa RPC, pero eso es una convención del cliente, no una regla del servidor.
+- **Acción:** en la migración 45, acotar las tres políticas con `challenge_proposal_id is null` para que no alcancen a los partidos de clubes. Los partidos normales no cambian de comportamiento. Cerrarlas del todo es un cambio mayor y va aparte.
+- **Verificación necesaria:** la prueba SQL 45 comprueba que un `insert` directo sobre un partido de clubes lo rechaza la RLS, y que en un partido normal todo sigue igual.
+
+## P2 — Funciones de trigger ejecutables como RPC por `anon`
+
+- **Dominio afectado:** superficie de la API.
+- **Evidencia (comprobada el 2026-08-12):** el advisor de seguridad marca 54 funciones `SECURITY DEFINER` ejecutables por `anon`, entre ellas funciones de trigger que nunca deberían ser un endpoint: `add_organizer_as_attendee`, `matches_guard_cupos`, `tg_notify_match_join`, `tg_register_cancha`, `check_club_limits` y `handle_new_user`. Todas tienen `=X/postgres` en su ACL, es decir el `EXECUTE` que PostgreSQL concede a `PUBLIC` por defecto y que nunca se revocó.
+- **Por qué importa:** PostgreSQL **no** comprueba `EXECUTE` cuando un trigger dispara su función, así que revocarlas de `public`, `anon` y `authenticated` no rompe ningún trigger y quita esos endpoints de PostgREST.
+- **Acción:** una migración de limpieza que revoque `EXECUTE` de `public` en todas las funciones de trigger. No se hizo dentro de la 44 para no mezclar una limpieza transversal con la publicación de partidos.
+- **Verificación necesaria:** el advisor deja de marcarlas y las pruebas SQL existentes siguen pasando.
+
 ## P1 — Validar el envío push de extremo a extremo en dispositivo físico
 
 - **Dominio afectado:** avisos y push.

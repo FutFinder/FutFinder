@@ -250,6 +250,84 @@ test('quien no administra ninguno de los dos clubes solo lee', () => {
   assert.equal(cta.kind, 'solo_lectura');
 });
 
+// ── doble pertenencia: espejo de la regla del servidor ────────────
+// `aprobar_propuesta` (migración 44) y `rechazar_propuesta` (43d) exigen no
+// pertenecer al club proponente en NINGÚN rol. La interfaz tiene que decir lo
+// mismo, o estaría ofreciendo un botón que el servidor va a rechazar.
+
+const esperandoAprobacion = {
+  estado: 'esperando_aprobacion',
+  club_retador_id: 'club-a',
+  club_retado_id: 'club-b',
+};
+const propuestaDeA = { id: 'prop-1', club_proponente_id: 'club-a', estado: 'pendiente' };
+
+test('el admin del club rival, sin vínculo con el proponente, puede revisar la propuesta', () => {
+  const cta = getChallengeCta(
+    T.challengeCtaContext({
+      challenge: esperandoAprobacion,
+      misClubIds: ['club-b'],
+      misClubIdsTodos: ['club-b'],
+      propuesta: propuestaDeA,
+    })
+  );
+  assert.equal(cta.kind, 'aprobar_propuesta');
+});
+
+test('quien administra el rival pero además pertenece al proponente no puede responder', () => {
+  const ctx = T.challengeCtaContext({
+    challenge: esperandoAprobacion,
+    misClubIds: ['club-b'],
+    // Juega en el club A, el que propuso. No lo administra, pero es su club.
+    misClubIdsTodos: ['club-b', 'club-a'],
+    propuesta: propuestaDeA,
+  });
+  assert.equal(ctx.pertenezcoAlProponente, true);
+
+  const cta = getChallengeCta(ctx);
+  assert.equal(cta.kind, 'conflicto_pertenencia');
+  assert.equal(cta.disabled, true);
+  assert.match(cta.hint, /dos clubes/i);
+});
+
+test('el club proponente sigue viendo que espera al rival, no un conflicto', () => {
+  const cta = getChallengeCta(
+    T.challengeCtaContext({
+      challenge: esperandoAprobacion,
+      misClubIds: ['club-a'],
+      misClubIdsTodos: ['club-a'],
+      propuesta: propuestaDeA,
+    })
+  );
+  assert.equal(cta.kind, 'esperar_aprobacion');
+});
+
+test('omitir misClubIdsTodos no inventa pertenencias, y ser admin ya cuenta como pertenecer', () => {
+  // Sin el dato, el contexto se apoya solo en los clubes administrados: no
+  // puede saber de una membresía de jugador, pero tampoco se la inventa.
+  const sinDato = T.challengeCtaContext({
+    challenge: esperandoAprobacion,
+    misClubIds: ['club-b'],
+    propuesta: propuestaDeA,
+  });
+  assert.equal(sinDato.pertenezcoAlProponente, false);
+
+  // Y administrar el club proponente cuenta como pertenecer aunque
+  // `misClubIdsTodos` no lo repita: se unen las dos listas, no se sustituyen.
+  const soloAdmin = T.challengeCtaContext({
+    challenge: esperandoAprobacion,
+    misClubIds: ['club-a', 'club-b'],
+    misClubIdsTodos: [],
+    propuesta: propuestaDeA,
+  });
+  assert.equal(soloAdmin.pertenezcoAlProponente, true);
+});
+
+test('sin propuesta todavía no hay conflicto de pertenencia posible', () => {
+  const ctx = T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-b'] });
+  assert.equal(ctx.pertenezcoAlProponente, false);
+});
+
 test('sin conexión la acción lo dice antes que cualquier otra cosa', () => {
   const cta = getChallengeCta(
     T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-b'], online: false })

@@ -20,11 +20,16 @@ import { challengeCountdown } from '../../utils/challengeThread';
  * la misma vista se vería como dos verdes distintos.
  *
  * SOBRE LAS ACCIONES: se dibuja botón únicamente cuando la app sabe ejecutar
- * la acción. Con la migración 43 ya son reales responder la prórroga, crear
- * la propuesta oficial, revisarla y ver el partido. Aprobar la propuesta
- * —que es lo que publica el partido— llega con la 44, así que hasta
- * entonces se muestra como información. Un botón que no hace nada es peor
- * que no tener botón.
+ * la acción. Con las migraciones 43 y 44 ya son reales responder la prórroga,
+ * crear la propuesta oficial, revisarla —que es la puerta a aprobarla y
+ * publicar el partido— y ver el partido publicado. Las de resultado llegan
+ * con la 48 y hasta entonces se muestran como información. Un botón que no
+ * hace nada es peor que no tener botón.
+ *
+ * Aprobar NO se hace desde esta barra: «Revisar propuesta» lleva a
+ * `ClubProposalScreen`, donde están la cancha, la hora, los cupos y la cuota.
+ * Publicar un partido de un toque, sin haber leído lo que se publica, sería
+ * un botón demasiado fácil de pulsar por accidente.
  *
  * La prórroga es la única acción con DOS salidas, y por eso no cabe en el
  * botón único: se responde «Sí» o «No», y el «No» cierra el desafío en el

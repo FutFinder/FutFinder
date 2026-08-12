@@ -117,6 +117,12 @@ export function challengeCountdown(thread, ahora = new Date()) {
 export function challengeCtaContext({
   challenge = null,
   misClubIds = [],
+  // TODAS mis membresías en los clubes del desafío, con cualquier rol. Es
+  // distinto de `misClubIds`, que son solo aquellas donde soy administrador.
+  // La diferencia importa: `aprobar_propuesta` y `rechazar_propuesta` exigen
+  // NO pertenecer al club proponente ni siquiera como jugador, así que sin
+  // este dato la interfaz ofrecería un botón que el servidor va a rechazar.
+  misClubIdsTodos = null,
   online = true,
   sancion = null,
   propuesta = null,
@@ -126,6 +132,14 @@ export function challengeCtaContext({
   const delDesafio = [challenge?.club_retador_id, challenge?.club_retado_id].filter(Boolean);
   const myClubId = clubes.find((id) => delDesafio.includes(id)) || null;
 
+  // Unión y no reemplazo: ser administrador implica ser integrante, así que
+  // omitir `misClubIdsTodos` nunca puede dar menos pertenencias de las que ya
+  // se conocían.
+  const todos = [
+    ...new Set([...clubes, ...(Array.isArray(misClubIdsTodos) ? misClubIdsTodos.filter(Boolean) : [])]),
+  ];
+  const proponente = propuesta?.club_proponente_id || null;
+
   const respuestas = Array.isArray(respuestasProrroga) ? respuestasProrroga : [];
   const mia = myClubId ? respuestas.find((r) => r?.club_id === myClubId) : null;
 
@@ -133,6 +147,7 @@ export function challengeCtaContext({
     challenge: challenge || {},
     myClubId,
     soyAdmin: clubes.length > 0,
+    pertenezcoAlProponente: !!proponente && todos.includes(proponente),
     online,
     sancion,
     propuesta,

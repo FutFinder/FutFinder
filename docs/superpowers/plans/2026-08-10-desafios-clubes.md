@@ -239,10 +239,19 @@ Transiciones autorizadas, con quién puede dispararlas:
 | `supabase/migrations/42b_desafio_rpc_revoke_public.sql` | Quita el `EXECUTE` de `PUBLIC` sobre `aceptar_desafio()`. Va aparte porque la 42 ya estaba aplicada | Aplicada |
 | `supabase/migrations/43_desafios_plazos_y_propuesta.sql` | `club_challenge_extension_replies`, `club_challenge_proposals`, RPC `procesar_vencimientos_desafios` (+ `cron.schedule`), `procesar_vencimiento_desafio`, `refrescar_desafio`, `responder_prorroga`, `crear_propuesta_oficial`, `rechazar_propuesta`, helper `desafio_avisar` | Aplicada |
 | `supabase/migrations/43b_propuesta_autoriza_antes_del_token.sql` | `crear_propuesta_oficial()` resuelve el `client_token` DESPUÉS de autorizar y atado al desafío. Va aparte porque la 43 ya estaba aplicada | Aplicada |
-| `supabase/migrations/44_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda en `join_match` | Pendiente |
-| `supabase/migrations/45_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` | Pendiente |
-| `supabase/migrations/46_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), helper `club_esta_sancionado` | Pendiente |
-| `supabase/migrations/47_resultado_y_historial.sql` | `club_match_results`, RPC `proponer_resultado`, `confirmar_resultado`, `club_record()` | Pendiente |
+| `supabase/migrations/43c_propuesta_ubicacion_obligatoria.sql` | `crear_propuesta_oficial()` exige latitud y longitud válidas. Sin ellas la propuesta nacía imposible de aprobar, porque `matches.latitud`/`longitud` son NOT NULL | Aplicada |
+| `supabase/migrations/43d_rechazo_doble_pertenencia.sql` | `rechazar_propuesta()` con la regla estricta: no responde quien pertenece al club proponente, ni siquiera como jugador | Aplicada |
+| `supabase/migrations/44_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), marcador `club_esta_sancionado`, guarda en `add_organizer_as_attendee` | Aplicada |
+| `supabase/migrations/45_inscripcion_por_club.sql` | `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda C7 en `join_match`/`request_join`/`approve_join`, cierre de las políticas de `attendees` | Pendiente |
+| `supabase/migrations/46_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` | Pendiente |
+| `supabase/migrations/47_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), y el cuerpo real de `club_esta_sancionado` | Pendiente |
+| `supabase/migrations/48_resultado_y_historial.sql` | `club_match_results`, RPC `proponer_resultado`, `confirmar_resultado`, `club_record()` | Pendiente |
+
+> **Renumeración (2026-08-12).** La Fase 4 se partió en cuatro unidades y cada
+> una lleva su propia migración aplicable sola, en vez de meter aprobación e
+> inscripción en la 44. Por eso inscripción pasó a la 45, cambios a la 46,
+> sanciones a la 47 y resultado a la 48. La tabla ya refleja la numeración
+> nueva.
 
 ### Pruebas SQL nuevas
 
@@ -744,32 +753,82 @@ club contrario.
 **Riesgo principal:** partidos duplicados si la aprobación se pulsa dos veces, y
 sobrecupo si dos jugadores del mismo club entran a la vez.
 
-### Tarea 4.1 — Aprobación atómica que publica el partido
+### Tarea 4.1 — Aprobación atómica que publica el partido ✅
 
-**Archivos:** crear `supabase/migrations/44_partido_de_clubes.sql`.
+**Archivos:** `supabase/migrations/43c_propuesta_ubicacion_obligatoria.sql`,
+`43d_rechazo_doble_pertenencia.sql`, `44_partido_de_clubes.sql`; pruebas
+`supabase/tests/43c_propuesta_ubicacion_test.sql`,
+`43d_rechazo_doble_pertenencia_test.sql`, `44_partido_clubes_test.sql`;
+`src/services/clubProposals.js`, `clubChallengeRules.js`,
+`src/utils/challengeThread.js`, `src/screens/ClubProposalScreen.js`,
+`ChatThreadScreen.js`, `src/components/clubes/ChallengeHeader.js`.
 
-- [ ] Columnas en `matches`: `cupos_por_club integer`, `metodo_inscripcion text`,
-      `challenge_proposal_id uuid unique references club_challenge_proposals(id)`.
-      La unicidad es la garantía **estructural** de que no hay partido duplicado,
-      no una comprobación en código.
-- [ ] Columna `attendees.club_id uuid references clubs(id)`, índice
-      `(id_partido, club_id, estado)`.
-- [ ] `aprobar_propuesta(p_proposal_id uuid)`: una sola transacción que verifica
-      admin del club contrario, `update … where estado='pendiente'` (0 filas →
-      salir sin efecto), inserta el `matches` con `cupos_totales = 2 × cupos_por_club`,
-      `aprobacion = case metodo when 'seleccion_admin' then 'manual' else 'inmediata' end`,
-      `club_local_id`/`club_visitante_id`/`challenge_id`, pasa el desafío a
-      `publicado`, registra el evento y notifica a **todos** los integrantes de
-      ambos clubes.
-- [ ] Verificar que ningún club esté sancionado antes de publicar (la función
-      `club_esta_sancionado` llega en la Fase 5; aquí se declara como *stub* que
-      devuelve `false` y se completa entonces — se deja explícito en el comentario
-      de la migración).
-- [ ] Prueba SQL 44: aprobar dos veces deja un solo partido; el proponente no
-      puede aprobar; la unicidad de `challenge_proposal_id` rechaza el duplicado.
-- [ ] Commit.
+- [x] Columnas en `matches`: `cupos_por_club`, `metodo_inscripcion`,
+      `challenge_proposal_id` con índice único parcial. La unicidad es la
+      garantía **estructural** de que no hay partido duplicado.
+- [x] Columna `attendees.club_id`, índice `(id_partido, club_id, estado)`.
+- [x] `aprobar_propuesta(p_proposal_id uuid)` en una sola transacción, con
+      `cupos_totales = 2 × cupos_por_club`, el desafío a `publicado`, el evento
+      y el aviso `club_match_published` a **todos** los integrantes.
+- [x] `club_esta_sancionado` como marcador documentado que devuelve `false`
+      siempre, revocado de los tres roles del cliente para que ninguna pantalla
+      se apoye en él. El cuerpo real llega en la 47.
+- [x] Prueba SQL 44, 13 casos.
+- [x] Commit.
+
+> **Cuatro cosas que salieron al implementar y no estaban en el plan.**
+>
+> 1. **La propuesta oficial no capturaba coordenadas.** `matches.latitud` y
+>    `longitud` son NOT NULL, pero `ClubProposalScreen` pedía la dirección
+>    como texto libre y la 43 no exigía el punto en el mapa: **toda propuesta
+>    creada hasta entonces era imposible de aprobar**. Se integró
+>    `LocationAutocomplete` (el mismo componente de `PublishMatchScreen`) y se
+>    exigen coordenadas en `validarPropuestaOficial`, en
+>    `crear_propuesta_oficial` (43c) y otra vez en `aprobar_propuesta`, que no
+>    confía en que otra función validara antes.
+> 2. **`propuestaOficialPayload` convertía una coordenada ausente en 0.**
+>    `Number(null)` es 0 en JavaScript, así que el guardia
+>    `Number.isFinite(Number(v))` la dejaba pasar. Una propuesta sin ubicación
+>    habría publicado el partido en medio del Atlántico. Por eso el servidor
+>    valida el RANGO y no sólo la nulidad.
+> 3. **`rechazar_propuesta` tenía el mismo hueco de doble pertenencia** que
+>    cierra `aprobar_propuesta`: quien administra el club rival y además
+>    pertenece al proponente podía responderse a sí mismo. Cerrado en la 43d
+>    con la regla estricta, y espejado en `getChallengeCta`
+>    (`conflicto_pertenencia`) para no ofrecer un botón que el servidor
+>    rechaza.
+> 4. **El organizador se autoinscribía.** `add_organizer_as_attendee` metía al
+>    administrador que aprueba como 'inscrito': le gastaba un cupo a su club
+>    sin pedirlo y dejaba una fila con `club_id` NULL, que es justo lo que el
+>    conteo por club no sabe contar. Ahora el trigger salta en los partidos de
+>    clubes; en los normales no cambia nada.
+>
+> **Dos fallos que las pruebas encontraron antes de aplicar nada:**
+> `jsonb_typeof(x) <> 'number'` vale NULL cuando la clave no existe, así que
+> el `if` no disparaba y dejaba pasar justamente el caso de la clave ausente
+> (hay que usar `is distinct from`); y `set local role anon` **no borra**
+> `request.jwt.claims`, de modo que una prueba de acceso anónimo seguía
+> autenticada como el usuario anterior y pasaba midiendo otra cosa.
+
+> **`add_organizer_as_attendee` es ejecutable por `anon` vía RPC.** Es estado
+> heredado —lo comparten `matches_guard_cupos`, `tg_notify_match_join`,
+> `tg_register_cancha` y otras 50 funciones—, no algo que introdujera la 44:
+> `create or replace` conserva la ACL. Los triggers no comprueban EXECUTE, así
+> que revocarlo es seguro; queda anotado en pendientes como limpieza aparte.
 
 ### Tarea 4.2 — Inscripción con cupos por club
+
+> **Antes de empezar, un agujero que hay que cerrar acá.** Las políticas
+> `attendees_insert_self`, `attendees_update_self` y `attendees_delete_self`
+> dejan a cualquier `authenticated` escribir en `attendees` directo por
+> PostgREST, saltándose `join_match`. Sin cerrarlo, el reparto por club no
+> sirve de nada: un jugador se mete al partido con un `insert`. El cliente ya
+> usa sólo RPC, así que acotar esas tres políticas con
+> `challenge_proposal_id is null` no cambia el comportamiento de los partidos
+> normales. Además, `join_match` **no está versionada** (es de las aplicadas
+> por consola, como `request_join`, `approve_join` y `cancel_match`): para
+> ponerle la guarda C7 hay que versionar su definición actual con la guarda
+> añadida, y aprovechar de revocarle el `EXECUTE` de `public`.
 
 - [ ] `join_club_match(p_match_id)`: deriva el club del jugador de `club_members`
       ∩ {local, visitante}; si no pertenece a ninguno, rechaza. Bloquea la fila
@@ -816,8 +875,27 @@ píldora «CLUBES» en L63-68, sin escudos), `src/components/home/MatchCard.js`
       propio cambio; rechazar conserva los valores anteriores.
 - [ ] Commit.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 44 y 45, y
+**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 44 a 46, y
 comprobación de que publicar/unirse a un partido normal sigue igual.
+
+**Verificación de la Tarea 4.1 (2026-08-12):** `npm run lint` (0 errores),
+`npm test` (305 ✓), `npm run build:web` (✓) y las tres pruebas SQL en
+transacción con `rollback` contra el esquema desplegado: 43c (8 casos ✓),
+43d (8 ✓) y 44 (13 ✓), sin dejar filas. Migraciones 43c, 43d y 44 aplicadas
+en ese orden y verificadas contra el catálogo: `aprobar_propuesta` y
+`crear_propuesta_oficial` dan `public`/`anon` en falso y `authenticated` en
+verdadero, y `club_esta_sancionado` en falso para los tres.
+
+**Recorrido completo del flujo (2026-08-12), contra las funciones ya
+aplicadas y dentro de una transacción con `rollback`:** el club retado acepta
+el desafío → el retador crea la propuesta oficial con la cancha ubicada en el
+mapa → el club rival la lee entera, y también la lee un jugador sin rol
+mientras que un anónimo no ve nada → el proponente intenta aprobarla y se le
+rechaza → el administrador rival aprueba y se publica «Deportivo vs Atlético»
+con 16 cupos, 8 por club → vuelve a pulsar aprobar y recibe el mismo partido,
+con un total de 1 → 3 avisos `club_match_published`, 0 inscritos y 1 evento
+`partido_publicado`. **Falta la comprobación en la app**, que necesita dos
+cuentas administrando clubes distintos, igual que en las fases 2 y 3.
 
 ---
 

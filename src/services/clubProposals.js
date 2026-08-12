@@ -23,7 +23,7 @@ function esFaltaDeEsquema(error) {
 
 const FALTA_MIGRACION = {
   message:
-    'Esta parte del desafío necesita la migración 43 en Supabase. Avisa al equipo antes de volver a intentarlo.',
+    'Esta parte del desafío necesita una migración que todavía no está en Supabase. Avisa al equipo antes de volver a intentarlo.',
 };
 
 /**
@@ -123,6 +123,32 @@ export async function crearPropuestaOficial(challengeId, draft, clientToken = nu
   });
 
   if (error) return { data: null, error: traducirError(error, 'crearPropuestaOficial') };
+  return { data: unaFila(data), error: null };
+}
+
+/**
+ * Aprueba la propuesta y publica el partido, todo en la misma transacción.
+ *
+ * NO LLEVA `clientToken`, y no es un olvido: la idempotencia la da la base.
+ * `matches.challenge_proposal_id` es único y la RPC cierra la propuesta con
+ * `update … where estado = 'pendiente'`, así que volver a llamarla devuelve
+ * EL MISMO partido en vez de crear otro. Un token acá sería una segunda
+ * defensa peor que la que ya hay.
+ *
+ * Quién puede: solo un administrador del club contrario al proponente que
+ * además no pertenezca al club proponente. Eso lo decide el servidor con
+ * `auth.uid()` y `club_members` en vivo; la interfaz esconde el botón cuando
+ * no corresponde, pero esconderlo no es la protección.
+ */
+export async function aprobarPropuesta(proposalId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
+  if (!proposalId) return { data: null, error: { message: 'Falta la propuesta' } };
+
+  const { data, error } = await supabase.rpc('aprobar_propuesta', {
+    p_proposal_id: proposalId,
+  });
+
+  if (error) return { data: null, error: traducirError(error, 'aprobarPropuesta') };
   return { data: unaFila(data), error: null };
 }
 

@@ -306,6 +306,23 @@ function validarModalidad(errors, modalidad) {
 }
 
 /**
+ * `true` si el par de coordenadas es un punto real del planeta.
+ *
+ * Los rangos son los mismos que el CHECK de `matches.latitud`/`longitud`, que
+ * además son NOT NULL: una propuesta sin coordenadas no se puede convertir en
+ * partido, así que exigirlas acá es lo que evita una propuesta que nace
+ * imposible de aprobar. Se rechaza `null`, `undefined`, `NaN`, infinitos y
+ * cualquier cosa que no sea número — un `''` de un campo de texto vacío se
+ * convertiría en 0 con `Number()`, y (0, 0) es una coordenada válida en medio
+ * del Atlántico.
+ */
+export function coordenadasValidas(lat, lng) {
+  if (typeof lat !== 'number' || typeof lng !== 'number') return false;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+/**
  * Propuesta preliminar: lo que viaja al crear el desafío, antes de que exista
  * ninguna negociación. La fecha es tentativa y la zona aproximada a propósito.
  */
@@ -375,6 +392,12 @@ export function validarPropuestaOficial(draft = {}, ahora = new Date()) {
   if (textoVacio(draft.comuna)) errors.comuna = 'Indica la comuna';
   if (textoVacio(draft.region)) errors.region = 'Indica la región';
 
+  // La dirección escrita a mano no basta: el partido necesita coordenadas
+  // para nacer, y sólo las trae el buscador de lugares.
+  if (!coordenadasValidas(draft.latitud, draft.longitud)) {
+    errors.ubicacion = 'Elige la cancha en el buscador para fijar su ubicación en el mapa';
+  }
+
   validarModalidad(errors, draft.modalidad);
   validarCupos(errors, draft.cuposPorClub);
   validarMetodo(errors, draft.metodoInscripcion);
@@ -407,7 +430,15 @@ export function validarPropuestaOficial(draft = {}, ahora = new Date()) {
 export function propuestaOficialPayload(draft = {}) {
   const fecha = aFecha(draft.fecha);
   const texto = (v) => (v == null ? null : String(v).trim() || null);
-  const numero = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  // `Number(null)` y `Number('')` son 0, no NaN. Con la versión ingenua
+  // —`Number.isFinite(Number(v)) ? Number(v) : null`— una propuesta sin
+  // ubicación viajaba con latitud 0 y longitud 0 en vez de nulas, el servidor
+  // no la veía como ausente y el partido nacía en medio del Atlántico.
+  const numero = (v) => {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
 
   return {
     fecha: fecha ? fecha.toISOString() : null,
@@ -499,6 +530,7 @@ export function getChallengeCta(ctx = {}) {
     miRespuestaProrroga = null,
     online = true,
     sancion = null,
+    pertenezcoAlProponente = false,
   } = ctx;
 
   const estado = challenge.estado;
@@ -572,6 +604,20 @@ export function getChallengeCta(ctx = {}) {
     case 'esperando_aprobacion': {
       const proponente = propuesta?.club_proponente_id;
       if (proponente && myClubId && proponente !== myClubId) {
+        // Espejo exacto de la condición B de `aprobar_propuesta` y
+        // `rechazar_propuesta`: quien pertenece también al club proponente no
+        // responde por el rival, ni siquiera si administra el otro club.
+        // Ofrecer el botón aquí sería mandar al usuario contra un error del
+        // servidor.
+        if (pertenezcoAlProponente) {
+          return {
+            kind: 'conflicto_pertenencia',
+            label: 'No puedes responder por el rival',
+            tone: 'muted',
+            disabled: true,
+            hint: 'Perteneces a los dos clubes. Responde otro administrador de tu club.',
+          };
+        }
         return { kind: 'aprobar_propuesta', label: 'Revisar propuesta', tone: 'primary' };
       }
       return {

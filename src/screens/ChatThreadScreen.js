@@ -141,6 +141,7 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [prorrogaReplies, setProrrogaReplies] = useState([]);
   const [challengeBusy, setChallengeBusy] = useState(false);
   const [myClubIds, setMyClubIds] = useState([]);
+  const [myClubIdsTodos, setMyClubIdsTodos] = useState([]);
   const [busyAction, setBusyAction] = useState(false);
 
   const listRef = useRef(null);
@@ -310,9 +311,11 @@ export default function ChatThreadScreen({ route, navigation }) {
         .eq('user_id', user.id)
         .in('club_id', [data.club_retador_id, data.club_retado_id]);
       if (alive) {
-        setMyClubIds(
-          (membresias || []).filter((m) => m.rol === 'admin').map((m) => m.club_id)
-        );
+        const filas = membresias || [];
+        setMyClubIds(filas.filter((m) => m.rol === 'admin').map((m) => m.club_id));
+        // Todas las membresías, con cualquier rol: responder una propuesta
+        // exige NO pertenecer al club proponente ni siquiera como jugador.
+        setMyClubIdsTodos(filas.map((m) => m.club_id));
       }
     })();
     return () => {
@@ -659,6 +662,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       challengeCtaContext({
         challenge: clubChallenge,
         misClubIds: myClubIds,
+        misClubIdsTodos: myClubIdsTodos,
         online: connection !== 'offline',
         propuesta: challengeProposal,
         respuestasProrroga: prorrogaReplies,
@@ -668,6 +672,7 @@ export default function ChatThreadScreen({ route, navigation }) {
     isChallengeThread,
     clubChallenge,
     myClubIds,
+    myClubIdsTodos,
     connection,
     challengeProposal,
     prorrogaReplies,
@@ -676,9 +681,10 @@ export default function ChatThreadScreen({ route, navigation }) {
   const puedeAbrirPartido =
     challengeCta?.kind === 'ver_partido' && !!clubChallenge?.match_id;
 
-  // Qué acciones sabe ejecutar esta pantalla hoy. `aprobar_propuesta` publica
-  // el partido y llega con la migración 44: hasta entonces se puede revisar
-  // la propuesta y rechazarla, que sí existe.
+  // Qué acciones sabe ejecutar esta pantalla hoy. `aprobar_propuesta` no
+  // aprueba desde acá: lleva a `ClubProposal` en modo revisión, porque
+  // publicar el partido no se hace de un toque sin haber leído cancha, hora,
+  // cupos y cuota. El botón de aprobar de verdad vive en esa pantalla.
   const ctaAccionable =
     puedeAbrirPartido ||
     challengeCta?.kind === 'crear_propuesta' ||

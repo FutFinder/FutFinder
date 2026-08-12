@@ -16,10 +16,13 @@ import { X, Check, FileText, MapPin, Users, Wallet, Clock } from 'lucide-react-n
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import Button from '../components/Button';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import { matchComuna } from '../data/regiones-chile';
 import { supabase } from '../services/supabase';
 import { getChallenge } from '../services/clubChallenges';
 import {
   crearPropuestaOficial,
+  aprobarPropuesta,
   rechazarPropuesta,
   getPropuestaVigente,
   nuevoClientToken,
@@ -31,6 +34,7 @@ import {
   CUPOS_POR_CLUB,
   INSTRUCCIONES_MAX,
   validarPropuestaOficial,
+  coordenadasValidas,
   metodoLabel,
   cuposLabel,
 } from '../services/clubChallengeRules';
@@ -97,6 +101,7 @@ export default function ClubProposalScreen({ navigation, route }) {
   const [challenge, setChallenge] = useState(null);
   const [propuesta, setPropuesta] = useState(null);
   const [misClubIds, setMisClubIds] = useState([]);
+  const [misClubIdsTodos, setMisClubIdsTodos] = useState([]);
   const [banner, setBanner] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState({});
@@ -119,6 +124,10 @@ export default function ClubProposalScreen({ navigation, route }) {
   const [canchaNombre, setCanchaNombre] = useState('');
   const [comuna, setComuna] = useState('');
   const [region, setRegion] = useState('');
+  // Las coordenadas SÓLO las pone el buscador de lugares: no hay campo donde
+  // escribirlas a mano. `matches.latitud`/`longitud` son NOT NULL, así que una
+  // propuesta sin ellas sería imposible de aprobar más adelante.
+  const [coords, setCoords] = useState(null);
   const [modalidad, setModalidad] = useState('futbol7');
   const [cuposPorClub, setCuposPorClub] = useState(String(CUPOS_POR_CLUB.min + 3));
   const [metodoInscripcion, setMetodoInscripcion] = useState('orden_llegada');
@@ -145,7 +154,14 @@ export default function ClubProposalScreen({ navigation, route }) {
           .eq('user_id', user.id)
           .in('club_id', [ch.club_retador_id, ch.club_retado_id]);
         if (alive) {
-          setMisClubIds((membresias || []).filter((m) => m.rol === 'admin').map((m) => m.club_id));
+          const filas = membresias || [];
+          setMisClubIds(filas.filter((m) => m.rol === 'admin').map((m) => m.club_id));
+          // Se guardan TODAS las membresías, no solo las de administrador:
+          // aprobar y rechazar exigen no pertenecer al club proponente ni
+          // siquiera como jugador. Con la lista filtrada por rol, quien
+          // administra el club rival y juega en el proponente vería el botón
+          // y se estrellaría contra el error del servidor.
+          setMisClubIdsTodos(filas.map((m) => m.club_id));
         }
       }
       if (alive) setLoading(false);
@@ -155,12 +171,27 @@ export default function ClubProposalScreen({ navigation, route }) {
     };
   }, [challengeId, proposalId]);
 
-  // Si la propuesta la hizo mi club, esta pantalla solo informa: quien
-  // responde es el otro.
+  // Espejo exacto de la autorización de `aprobar_propuesta` y
+  // `rechazar_propuesta`. La protección real es la del servidor; esto solo
+  // evita ofrecer un botón que va a fallar.
+  //
+  //   A) soy administrador de un club del desafío distinto al proponente, y
+  //   B) NO pertenezco al club proponente en ningún rol.
+  //
+  // `soyProponente` mira TODAS mis membresías, no solo las de administrador:
+  // si juego en el club que propuso, ese club es mío aunque no lo administre.
   const soyProponente =
-    !!propuesta && misClubIds.includes(propuesta.club_proponente_id);
+    !!propuesta && misClubIdsTodos.includes(propuesta.club_proponente_id);
+  const soyAdminDelRival =
+    !!propuesta && misClubIds.some((id) => id !== propuesta.club_proponente_id);
   const puedoResponder =
-    !!propuesta && propuesta.estado === 'pendiente' && misClubIds.length > 0 && !soyProponente;
+    !!propuesta && propuesta.estado === 'pendiente' && soyAdminDelRival && !soyProponente;
+
+  // Caso raro pero real: administro el club rival y además pertenezco al que
+  // propuso. No puedo responder, y hay que decir por qué en vez de dejar la
+  // pantalla muda.
+  const conflictoDePertenencia =
+    !!propuesta && propuesta.estado === 'pendiente' && soyAdminDelRival && soyProponente;
 
   const revisando = modo === 'revisar' || (!!propuesta && propuesta.estado === 'pendiente');
 
@@ -173,6 +204,8 @@ export default function ClubProposalScreen({ navigation, route }) {
       canchaNombre,
       comuna,
       region,
+      latitud: coords?.lat ?? null,
+      longitud: coords?.lng ?? null,
       modalidad,
       cuposPorClub: parseInt(cuposPorClub, 10),
       metodoInscripcion,
@@ -216,6 +249,7 @@ export default function ClubProposalScreen({ navigation, route }) {
     canchaNombre,
     comuna,
     region,
+    coords,
     modalidad,
     cuposPorClub,
     metodoInscripcion,
@@ -224,6 +258,37 @@ export default function ClubProposalScreen({ navigation, route }) {
     challengeId,
     navigation,
   ]);
+
+  /**
+   * Aprobar publica el partido. Una sola llamada, y la base garantiza que no
+   * haya dos partidos aunque se pulse dos veces: `challenge_proposal_id` es
+   * único y la RPC devuelve el partido que ya existe. Por eso el botón se
+   * bloquea con `enviando` por comodidad, no por seguridad.
+   */
+  const handleAprobar = useCallback(async () => {
+    if (!propuesta?.id) return;
+    setEnviando(true);
+    const { data, error } = await aprobarPropuesta(propuesta.id);
+    setEnviando(false);
+
+    if (error) {
+      setBanner({ type: 'error', title: 'No se pudo aprobar', message: error.message });
+      return;
+    }
+
+    setPropuesta((p) => (p ? { ...p, estado: 'aprobada' } : p));
+    setBanner({
+      type: 'success',
+      title: '¡Partido publicado!',
+      message: `Ya pueden inscribirse: ${cuposLabel(propuesta.cupos_por_club)}.`,
+    });
+
+    // Al partido recién creado, no de vuelta al formulario.
+    setTimeout(() => {
+      if (data?.id) navigation.replace('MatchDetail', { matchId: data.id });
+      else if (navigation.canGoBack()) navigation.goBack();
+    }, 1200);
+  }, [propuesta?.id, propuesta?.cupos_por_club, navigation]);
 
   const handleRechazar = useCallback(async () => {
     if (!propuesta?.id) return;
@@ -331,15 +396,41 @@ export default function ClubProposalScreen({ navigation, route }) {
                   />
                 )}
 
+                {propuesta.estado === 'aprobada' && (
+                  <Banner
+                    type="success"
+                    title="El partido ya está publicado"
+                    message={`Los dos clubes pueden inscribirse: ${cuposLabel(
+                      propuesta.cupos_por_club
+                    )}.`}
+                  />
+                )}
+
+                {conflictoDePertenencia && (
+                  <Banner
+                    type="info"
+                    title="No puedes responder por el club rival"
+                    message="Perteneces a los dos clubes, así que la respuesta la tiene que dar otro administrador. Puedes seguir la negociación en el chat."
+                  />
+                )}
+
                 {puedoResponder && (
                   <>
-                    <Banner
-                      type="info"
-                      title="Aprobar llega en la próxima entrega"
-                      message="Aprobar publica el partido con los cupos por club, y eso todavía no está disponible. Mientras tanto puedes pedir cambios y seguir en el chat."
+                    <Button
+                      label="Aprobar y publicar el partido"
+                      onPress={handleAprobar}
+                      loading={enviando}
+                      style={styles.submitBtn}
                     />
+                    <Text style={styles.hint}>
+                      Al aprobar se crea el partido con {cuposLabel(propuesta.cupos_por_club)} y se
+                      avisa a los integrantes de los dos clubes. Esto no se puede deshacer: para
+                      cambiar algo después hace falta el visto bueno del club rival.
+                    </Text>
 
-                    <Text style={styles.label}>Motivo (opcional)</Text>
+                    <View style={styles.separador} />
+
+                    <Text style={styles.label}>¿Prefieres pedir cambios? Motivo (opcional)</Text>
                     <TextInput
                       style={[styles.input, styles.inputMultiline]}
                       placeholder="Ej: la cancha nos queda muy lejos, ¿probamos otra?"
@@ -412,15 +503,47 @@ export default function ClubProposalScreen({ navigation, route }) {
                 {!!errores.canchaNombre && <Text style={styles.error}>{errores.canchaNombre}</Text>}
 
                 <Text style={styles.label}>Dirección exacta</Text>
-                <TextInput
-                  style={[styles.input, errores.direccion && styles.inputError]}
-                  placeholder="Calle y número"
-                  placeholderTextColor={colors.textMuted}
+                <LocationAutocomplete
                   value={direccion}
-                  onChangeText={setDireccion}
-                  maxLength={160}
+                  placeholder="Busca la cancha por nombre o dirección"
+                  proximity={coords ? { lat: coords.lat, lng: coords.lng } : null}
+                  onChangeText={(v) => {
+                    setDireccion(v);
+                    // Escribir a mano invalida el punto elegido antes: la
+                    // dirección y las coordenadas tienen que describir el
+                    // mismo lugar, y si no vuelve a elegir del buscador la
+                    // validación lo detiene.
+                    setCoords(null);
+                  }}
+                  onSelect={({ lat, lng, address, comunaRaw, regionRaw, canchaName }) => {
+                    if (address) setDireccion(address);
+                    if (coordenadasValidas(lat, lng)) setCoords({ lat, lng });
+                    const m = matchComuna(comunaRaw) || matchComuna(regionRaw);
+                    if (m) {
+                      setRegion(m.region);
+                      setComuna(m.comuna);
+                    }
+                    if (canchaName && !canchaNombre.trim()) setCanchaNombre(canchaName);
+                  }}
+                  inputRowStyle={[styles.autoRow, errores.ubicacion && styles.inputError]}
+                  inputStyle={styles.autoInput}
+                  placeholderColor={colors.textMuted}
+                  accentColor={colors.primary}
+                  spinnerColor={colors.primary}
                 />
                 {!!errores.direccion && <Text style={styles.error}>{errores.direccion}</Text>}
+                {errores.ubicacion ? (
+                  <Text style={styles.error}>{errores.ubicacion}</Text>
+                ) : coords ? (
+                  <Text style={styles.hint}>
+                    Ubicación fijada en el mapa. Todos los integrantes de los dos clubes verán esta
+                    dirección.
+                  </Text>
+                ) : (
+                  <Text style={styles.hint}>
+                    Elige un resultado del buscador: el partido necesita la ubicación en el mapa.
+                  </Text>
+                )}
 
                 <View style={styles.row2}>
                   <View style={{ flex: 1 }}>
@@ -616,6 +739,25 @@ const styles = StyleSheet.create({
   },
   inputError: { borderColor: colors.error },
   inputMultiline: { minHeight: 88, textAlignVertical: 'top' },
+
+  hint: { color: colors.textMuted, fontSize: 12, marginTop: 4, lineHeight: 16 },
+  separador: {
+    height: 1,
+    backgroundColor: colors.surface,
+    marginTop: 20,
+    marginBottom: 4,
+  },
+
+  // `LocationAutocomplete` trae su propia estructura; acá sólo se le pasa la
+  // paleta de esta pantalla para que no se vea como un campo de otro módulo.
+  autoRow: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  autoInput: { color: colors.textPrimary, fontSize: 15, paddingVertical: 12 },
 
   row2: { flexDirection: 'row', gap: 10 },
 
