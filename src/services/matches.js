@@ -103,6 +103,43 @@ export async function withClubs(matches) {
 }
 
 /**
+ * La ubicación exacta de un partido nacido de un desafío entre clubes.
+ *
+ * Vive en `club_match_locations` (migración 44b), fuera de `matches`, porque
+ * `matches` es de lectura pública y la dirección de estos partidos es de los
+ * integrantes de los dos clubes.
+ *
+ * LO QUE PROTEGE NO ES ESTA FUNCIÓN, ES LA RLS. A quien no le corresponde, la
+ * consulta le devuelve cero filas: no hay nada que esconder después. Por eso
+ * «no soy del club» y «este partido no tiene ubicación guardada» llegan aquí
+ * de la misma forma —`{ data: null }`— y la pantalla no necesita distinguirlos
+ * para decidir qué dibujar.
+ *
+ * Sólo se pregunta por los partidos protegidos: para un partido normal la
+ * dirección viene en la propia fila y esta consulta sería un viaje perdido.
+ */
+export async function getClubMatchLocation(matchId) {
+  if (!isSupabaseConfigured || !matchId) return { data: null, error: null };
+
+  const { data, error } = await supabase
+    .from('club_match_locations')
+    .select('match_id, direccion, latitud, longitud')
+    .eq('match_id', matchId)
+    .maybeSingle();
+
+  if (error) {
+    // Sin la migración 44b la tabla no existe: la pantalla se dibuja igual,
+    // sólo que sin dirección exacta. No es motivo para dejarla en blanco.
+    if (['42P01', 'PGRST205'].includes(error.code) || /does not exist/i.test(error.message || '')) {
+      return { data: null, error: null };
+    }
+    console.error('[FutFinder] getClubMatchLocation:', error);
+    return { data: null, error };
+  }
+  return { data: data || null, error: null };
+}
+
+/**
  * Trae los partidos abiertos cuyas coordenadas están dentro de un cuadrante
  * (bounding box) — usado por el mapa de la pestaña Buscar al moverlo.
  */

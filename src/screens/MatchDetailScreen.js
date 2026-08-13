@@ -107,11 +107,13 @@ import {
 import { getMyClubIds } from '../services/clubs';
 import {
   esPartidoDeClubes,
+  esUbicacionProtegida,
+  esUbicacionAproximada,
   cuposLabel as cuposLabelClubes,
   puedeVerDireccion,
   clubesDelPartido,
 } from '../services/clubMatchRules';
-import { haversineKm } from '../services/matches';
+import { haversineKm, getClubMatchLocation } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
 import { goBackOrPartidos } from '../utils/navigation';
 
@@ -147,6 +149,10 @@ export default function MatchDetailScreen({ route, navigation }) {
   // Mis clubes: deciden si este partido es «de los míos» —qué cupos se
   // muestran— y si se puede ver la dirección exacta.
   const [misClubIds, setMisClubIds] = useState([]);
+  // La ubicación exacta de un partido de clubes no viene en `matches`: vive en
+  // `club_match_locations`, protegida por RLS. `'cargando'` mientras se pide,
+  // `null` cuando no corresponde o no hay, y el objeto cuando sí.
+  const [ubicacionProtegida, setUbicacionProtegida] = useState('cargando');
 
   const cacheKey = `partidos/detail/${matchId}`;
 
@@ -215,6 +221,44 @@ export default function MatchDetailScreen({ route, navigation }) {
     return navigation.addListener('focus', load);
   }, [load, navigation]);
 
+  /**
+   * La ubicación exacta de un partido de clubes, si me corresponde verla.
+   *
+   * Se pide APARTE del partido y sólo cuando `challenge_proposal_id` está
+   * puesto: para un partido normal la dirección viene en la propia fila y esta
+   * consulta sería un viaje perdido.
+   *
+   * No distingue «no soy del club» de «no hay ubicación guardada», y no le
+   * hace falta: la RLS devuelve cero filas en los dos casos y la pantalla
+   * dibuja lo mismo. Un error tampoco deja la pantalla en blanco — se queda
+   * sin dirección exacta y el resto del partido se ve igual.
+   */
+  // Se leen los dos valores primitivos y no el objeto entero: así el efecto
+  // se repite cuando cambia el partido, y no cada vez que se recarga la lista
+  // de inscritos.
+  const idDelPartido = match?.id ?? null;
+  const propuestaDelPartido = match?.challenge_proposal_id ?? null;
+
+  useEffect(() => {
+    let alive = true;
+    if (!idDelPartido) return undefined;
+    if (!propuestaDelPartido) {
+      setUbicacionProtegida(null);
+      return undefined;
+    }
+    setUbicacionProtegida('cargando');
+    getClubMatchLocation(idDelPartido)
+      .then(({ data }) => {
+        if (alive) setUbicacionProtegida(data || null);
+      })
+      .catch(() => {
+        if (alive) setUbicacionProtegida(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [idDelPartido, propuestaDelPartido]);
+
   // Alternativa honesta para el bloqueo por Trust Score.
   useEffect(() => {
     if (!match) return;
@@ -250,9 +294,41 @@ export default function MatchDetailScreen({ route, navigation }) {
   const cta = match ? getCtaState(ctx) : null;
   const block = match ? getBlockReason(ctx) : null;
 
+  const esDeClubes = esPartidoDeClubes(match);
+  const protegida = esUbicacionProtegida(match);
+  const veDireccion = puedeVerDireccion(match, misClubIds);
+  const clubes = esDeClubes ? clubesDelPartido(match) : null;
+
+  // DOS ubicaciones, y no se pueden confundir:
+  //
+  //   · la EXACTA sale de `club_match_locations` y sólo llega si la RLS la
+  //     entrega, es decir si pertenezco a alguno de los dos clubes;
+  //   · la APROXIMADA viene en el propio partido (rejilla de ~1 km) y la ve
+  //     cualquiera: es la que permite descubrirlo en listas, mapa y filtros.
+  //
+  // Un partido normal no tiene esta división: su ubicación es exacta y
+  // pública, y por eso entra por la misma puerta que la exacta.
+  const cargandoUbicacion = protegida && ubicacionProtegida === 'cargando';
+  const ubicacionExacta = protegida
+    ? (cargandoUbicacion ? null : ubicacionProtegida)
+    : { direccion: match?.direccion, latitud: match?.latitud, longitud: match?.longitud };
+  const hayExacta = ubicacionExacta?.latitud != null && ubicacionExacta?.longitud != null;
+
+  // Para pintar y medir se usa la exacta si la hay, y si no la aproximada. La
+  // distancia se calcula igual —conviene saber si el partido queda lejos—,
+  // pero cuando sale de la aproximada hay que decir que lo es.
+  const ubicacion = hayExacta
+    ? ubicacionExacta
+    : { direccion: null, latitud: match?.latitud, longitud: match?.longitud };
+  const hayCoordenadas = ubicacion?.latitud != null && ubicacion?.longitud != null;
+  const distanciaAproximada = !hayExacta && esUbicacionAproximada(match);
+
   const distanceKm =
-    userCoords && match?.latitud != null
-      ? haversineKm(userCoords, { lat: Number(match.latitud), lng: Number(match.longitud) })
+    userCoords && hayCoordenadas
+      ? haversineKm(userCoords, {
+          lat: Number(ubicacion.latitud),
+          lng: Number(ubicacion.longitud),
+        })
       : null;
 
   /*
@@ -262,9 +338,6 @@ export default function MatchDetailScreen({ route, navigation }) {
     (`confirmed`, que incluye al organizador) y la aritmética de cupos son dos
     cuentas distintas y no se pueden mezclar.
   */
-  const esDeClubes = esPartidoDeClubes(match);
-  const veDireccion = puedeVerDireccion(match, misClubIds);
-  const clubes = esDeClubes ? clubesDelPartido(match) : null;
 
   const total = match?.cupos_totales ?? 0;
   const libres = match?.cupos_disponibles ?? 0;
@@ -418,8 +491,11 @@ export default function MatchDetailScreen({ route, navigation }) {
     });
 
   const openDirections = () => {
-    const lat = match?.latitud;
-    const lng = match?.longitud;
+    // Sólo con la EXACTA: llevar a alguien al centro de una celda de un
+    // kilómetro no es «cómo llegar», y además sería enseñar por el mapa lo
+    // que no se enseña escrito.
+    const lat = ubicacionExacta?.latitud;
+    const lng = ubicacionExacta?.longitud;
     if (lat == null || lng == null) return;
     const label = encodeURIComponent(match.cancha_nombre || 'Cancha');
     const url =
@@ -727,45 +803,60 @@ export default function MatchDetailScreen({ route, navigation }) {
               <View style={{ padding: 13, gap: 8 }}>
                 <View>
                   <Text style={styles.cardTitle}>{match.cancha_nombre}</Text>
-                  {/* En un partido de clubes la dirección exacta es de los
-                      integrantes de los dos clubes. `matches` es de lectura
-                      pública, así que la reserva hay que sostenerla al pintar:
-                      un tercero ve comuna y región, que es lo que necesita
-                      para saber si le queda cerca, pero no la calle. */}
-                  {match.direccion && veDireccion ? (
-                    <Text style={styles.cardSub}>{match.direccion}</Text>
+                  {/* La calle y el número de un partido de clubes NO están en
+                      `matches`: viven en `club_match_locations`, y la RLS sólo
+                      los entrega a los integrantes de los dos clubes. Si aquí
+                      no hay dirección es porque el servidor no la dio. La
+                      comuna y la región sí son públicas: hacen falta para
+                      saber si el partido queda cerca. */}
+                  {ubicacion?.direccion ? (
+                    <Text style={styles.cardSub}>{ubicacion.direccion}</Text>
                   ) : (
                     <Text style={styles.cardSub}>
                       {[match.comuna, match.region].filter(Boolean).join(' · ')}
                     </Text>
                   )}
-                  {esDeClubes && !veDireccion ? (
+                  {cargandoUbicacion ? (
+                    <Text style={styles.cardSub}>Buscando la dirección exacta…</Text>
+                  ) : protegida && !veDireccion ? (
                     <Text style={styles.cardSub}>
-                      La dirección exacta la ven los integrantes de los dos clubes.
+                      Ubicación aproximada. La dirección exacta la ven los integrantes de los dos
+                      clubes.
+                    </Text>
+                  ) : protegida && !hayExacta ? (
+                    <Text style={styles.cardSub}>
+                      Ubicación aproximada: no pudimos cargar la dirección exacta. Desliza para
+                      reintentar.
                     </Text>
                   ) : null}
                 </View>
                 {distanceKm != null ? (
                   <View style={styles.metaRow}>
-                    <Text style={styles.metaText}>A {fmtKm(distanceKm)} de ti</Text>
+                    <Text style={styles.metaText}>
+                      {distanciaAproximada ? 'A unos ' : 'A '}
+                      {fmtKm(distanceKm)} de ti
+                    </Text>
                     <View style={styles.metaDot} />
                     <Text style={styles.metaText}>{match.comuna}</Text>
                   </View>
                 ) : null}
                 <SurfaceButton
-                  label="Cómo llegar"
+                  label={cargandoUbicacion ? 'Cargando ubicación…' : 'Cómo llegar'}
                   icon={Navigation}
                   onPress={openDirections}
                   height={44}
-                  disabled={match.latitud == null || !veDireccion}
+                  disabled={!hayExacta}
                 />
-                {match.latitud == null ? (
+                {/* «Cómo llegar» necesita la EXACTA. Sin ella hay dos motivos
+                    posibles y conviene no confundirlos: que no me corresponda
+                    verla, o que el partido no tenga ninguna guardada. */}
+                {!hayExacta && !cargandoUbicacion && protegida && !veDireccion ? (
+                  <Note>
+                    Te mostramos la zona aproximada. Únete a alguno de los dos clubes para ver la
+                    dirección exacta y cómo llegar.
+                  </Note>
+                ) : !hayExacta && !cargandoUbicacion ? (
                   <Note>Este partido no tiene coordenadas guardadas, así que no podemos abrir el mapa.</Note>
-                ) : null}
-                {/* Abrir el mapa en el punto exacto es enseñar la dirección por
-                    otra puerta. Si no se puede ver escrita, tampoco así. */}
-                {match.latitud != null && !veDireccion ? (
-                  <Note>Únete a alguno de los dos clubes para ver dónde se juega exactamente.</Note>
                 ) : null}
               </View>
             </Card>

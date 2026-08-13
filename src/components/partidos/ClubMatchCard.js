@@ -5,7 +5,12 @@ import { MapPin, Users, Swords, Wallet } from 'lucide-react-native';
 
 import { partidos as P, partidosRadius as R } from '../../theme/colors';
 import { cuotaLabel } from '../../services/matchRules';
-import { cuposLabel, clubesDelPartido, lugarLabel } from '../../services/clubMatchRules';
+import {
+  cuposLabel,
+  clubesDelPartido,
+  lugarLabel,
+  esUbicacionAproximada,
+} from '../../services/clubMatchRules';
 import { whenLabel } from './PartidoCard';
 
 /**
@@ -23,9 +28,11 @@ import { whenLabel } from './PartidoCard';
  * quedarse con los 18. La etiqueta la decide `cuposLabel`, que sabe si quien
  * mira pertenece a alguno de los dos clubes.
  *
- * LA DIRECCIÓN EXACTA es de los integrantes de los dos clubes. `matches` es de
- * lectura pública, así que esa reserva hay que sostenerla al pintar:
- * `lugarLabel` da cancha y comuna a cualquiera, y la calle sólo a los clubes.
+ * LA UBICACIÓN DE ESTA TARJETA ES APROXIMADA, siempre. La exacta vive en
+ * `club_match_locations` y pedirla aquí sería una consulta por tarjeta; en la
+ * lista, entonces, ni los integrantes la tienen. Por eso el aviso no depende
+ * de quién mire: describe el dato que hay, y el dato es una celda de ~1 km.
+ * La dirección exacta y el «Cómo llegar» están en el detalle.
  *
  * `variant="compacta"` es la de Inicio: mismo lenguaje visual, menos alto.
  */
@@ -89,6 +96,9 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
             {lugarLabel(match, misClubIds)}
           </Text>
         </View>
+        {esUbicacionAproximada(match) ? (
+          <Text style={styles.aproximada}>Ubicación aproximada</Text>
+        ) : null}
 
         <View style={styles.divider} />
 
@@ -263,6 +273,13 @@ const styles = StyleSheet.create({
     paddingTop: 5,
   },
   lugarText: { color: P.textDim, fontSize: 12.5, flex: 1, minWidth: 0 },
+  aproximada: {
+    color: P.textFaint,
+    fontSize: 11,
+    fontStyle: 'italic',
+    paddingHorizontal: 13,
+    paddingTop: 3,
+  },
 
   divider: {
     height: 1,

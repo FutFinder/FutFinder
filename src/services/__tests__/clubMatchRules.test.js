@@ -24,7 +24,12 @@ function partidoDeClubes(extra = {}) {
     titulo: 'Deportivo Ñuñoa vs Atlético Macul',
     hora: '2026-09-05T23:00:00.000Z',
     cancha_nombre: 'Complejo Ñuñoa',
-    direccion: 'Av. Grecia 3401',
+    // Tras la migración 44b, en `matches` no hay calle y las coordenadas son
+    // la aproximación pública. La exacta vive en `club_match_locations`.
+    direccion: null,
+    latitud: -33.46,
+    longitud: -70.6,
+    ubicacion_aproximada: true,
     comuna: 'Ñuñoa',
     region: 'Metropolitana',
     cupos_totales: 18,
@@ -120,7 +125,12 @@ test('un partido normal conserva su etiqueta de siempre', () => {
 test('un partido de clubes del flujo antiguo, sin cupos_por_club, cae en la etiqueta normal', () => {
   // Los partidos creados antes de la migración 44 tienen los dos clubes pero
   // no reparto por club. Inventarles un número sería mentir.
-  const viejo = partidoDeClubes({ cupos_por_club: null, cupos_disponibles: 6, cupos_totales: 14 });
+  const viejo = partidoDeClubes({
+    challenge_proposal_id: null,
+    cupos_por_club: null,
+    cupos_disponibles: 6,
+    cupos_totales: 14,
+  });
   assert.equal(R.cuposLabel(viejo, ['club-a']), '6 de 14 cupos');
 });
 
@@ -151,12 +161,53 @@ test('en un partido normal la dirección se ve como siempre', () => {
   assert.equal(R.puedeVerDireccion(partidoNormal(), []), true);
 });
 
-test('lugarPublico entrega cancha y comuna a cualquiera, y la calle sólo a los clubes', () => {
+test('la ubicación protegida se reconoce por challenge_proposal_id, no por tener dos clubes', () => {
+  // Es el MISMO predicado que usa la migración 44b para decidir qué partidos
+  // guardan su ubicación en `club_match_locations`. Si la interfaz usara otro,
+  // diría una cosa y la base otra.
+  assert.equal(R.esUbicacionProtegida(partidoDeClubes()), true);
+  assert.equal(R.esUbicacionProtegida(partidoNormal()), false);
+  assert.equal(R.esUbicacionProtegida(null), false);
+});
+
+test('el partido de clubes del flujo antiguo NO tiene ubicación protegida', () => {
+  // Nunca pasó por una propuesta protegida: su dirección siempre fue pública,
+  // también en la base. Esconderla sólo en pantalla sería la incoherencia que
+  // esto viene a cerrar.
+  const viejo = partidoDeClubes({ challenge_proposal_id: null });
+  assert.equal(R.esUbicacionProtegida(viejo), false);
+  assert.equal(R.puedeVerDireccion(viejo, []), true, 'un ajeno la sigue viendo, como siempre');
+  assert.equal(R.esPartidoDeClubes(viejo), true, 'pero sigue mereciendo la tarjeta de clubes');
+});
+
+test('en la lista, el partido de clubes no muestra calle a nadie: no la tiene', () => {
+  // La calle no viaja en `matches`. En una lista tampoco se pide la protegida
+  // —sería una consulta por tarjeta—, así que el texto es el mismo para todos.
   const m = partidoDeClubes();
-  assert.equal(R.lugarLabel(m, ['club-a']), 'Complejo Ñuñoa · Av. Grecia 3401 · Ñuñoa');
+  assert.equal(R.lugarLabel(m, ['club-a']), 'Complejo Ñuñoa · Ñuñoa');
   assert.equal(R.lugarLabel(m, []), 'Complejo Ñuñoa · Ñuñoa');
-  // Y nunca se filtra la calle por otra vía.
-  assert.doesNotMatch(R.lugarLabel(m, []), /Grecia/);
+});
+
+test('si la calle llega por la ubicación protegida, se muestra a quien corresponde', () => {
+  // Es lo que hace el detalle: fusiona la protegida y vuelve a preguntar.
+  const conCalle = { ...partidoDeClubes(), direccion: 'Av. Grecia 3401' };
+  assert.equal(R.lugarLabel(conCalle, ['club-a']), 'Complejo Ñuñoa · Av. Grecia 3401 · Ñuñoa');
+  assert.equal(R.lugarLabel(conCalle, []), 'Complejo Ñuñoa · Ñuñoa');
+  assert.doesNotMatch(R.lugarLabel(conCalle, []), /Grecia/);
+});
+
+test('la aproximación se reconoce por la marca de la base, no por adivinarla', () => {
+  assert.equal(R.esUbicacionAproximada(partidoDeClubes()), true);
+  assert.equal(R.esUbicacionAproximada(partidoNormal()), false);
+  assert.equal(R.esUbicacionAproximada(null), false);
+});
+
+test('el partido de clubes CONSERVA coordenadas públicas: por eso se puede descubrir', () => {
+  // Si fueran nulas, desaparecería del mapa, del cuadrante y del filtro por
+  // distancia, que es justo lo que no se quiere.
+  const m = partidoDeClubes();
+  assert.equal(typeof m.latitud, 'number');
+  assert.equal(typeof m.longitud, 'number');
 });
 
 // ── los dos clubes, para pintarlos ────────────────────────────

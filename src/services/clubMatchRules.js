@@ -11,10 +11,12 @@
  *    son 9 y 9. Mostrar «18 de 18 cupos» —lo que hace la tarjeta de un partido
  *    normal— hace creer que el club rival puede quedarse con todos.
  *
- * 2. LA DIRECCIÓN EXACTA ES DE LOS DOS CLUBES. La RLS de
- *    `club_challenge_proposals` ya la reserva a sus integrantes; el partido
- *    publicado, en cambio, vive en `matches`, que es de lectura pública. Así
- *    que la reserva hay que sostenerla también acá, al pintar.
+ * 2. HAY DOS UBICACIONES, Y NO SE PUEDEN CONFUNDIR. Desde la migración 44b,
+ *    `matches` guarda una ubicación APROXIMADA y pública —rejilla de 0,01°,
+ *    ~1 km— para que cualquiera pueda descubrir el partido en las listas, el
+ *    mapa y los filtros por zona. La EXACTA vive en `club_match_locations`,
+ *    con su RLS, y sólo la leen los integrantes de los dos clubes. Quien
+ *    pinta tiene que saber cuál de las dos tiene en la mano y decirlo.
  *
  * Los partidos normales no pasan por ninguna de estas dos reglas y no cambian
  * en nada.
@@ -73,13 +75,47 @@ export function cuposLabel(match, misClubIds) {
 }
 
 /**
+ * `true` si la ubicación de este partido está protegida en la base.
+ *
+ * El criterio es `challenge_proposal_id`, y es EXACTAMENTE el mismo que usa
+ * la migración 44b: la ubicación de estos partidos no está en `matches` sino
+ * en `club_match_locations`, con su propia RLS. Que la interfaz y la base
+ * usen el mismo predicado es lo que evita que una diga una cosa y la otra
+ * otra.
+ *
+ * No se usa `esPartidoDeClubes()` a propósito: los partidos de clubes del
+ * flujo antiguo (migración 27) nunca pasaron por una propuesta protegida y su
+ * dirección siempre fue pública, también en la base. Tratarlos aquí como
+ * protegidos escondería en pantalla algo que la API entrega igual, que es
+ * justo la incoherencia que esto viene a cerrar.
+ */
+export function esUbicacionProtegida(match) {
+  return !!match?.challenge_proposal_id;
+}
+
+/**
+ * `true` si las coordenadas que trae el partido son una aproximación.
+ *
+ * La marca la pone la base (`matches.ubicacion_aproximada`, migración 44b).
+ * Describe EL DATO, no a quien mira: en una lista nadie tiene el punto exacto
+ * —pedirlo sería una consulta por tarjeta—, así que ahí la distancia es
+ * aproximada también para los integrantes, y la tarjeta tiene que decirlo. En
+ * el detalle, en cambio, a un integrante sí se le entrega el punto exacto.
+ */
+export function esUbicacionAproximada(match) {
+  return !!match?.ubicacion_aproximada;
+}
+
+/**
  * `true` si a esta persona se le puede mostrar la dirección de la calle.
  *
- * En un partido de clubes, sólo a los integrantes de los dos clubes. En
- * cualquier otro partido, a todo el mundo, como siempre.
+ * ESTO NO ES LA PROTECCIÓN. La protección es la RLS de
+ * `club_match_locations`: a quien no le corresponde, la consulta le devuelve
+ * cero filas y no hay nada que ocultar. Esta función decide si tiene sentido
+ * pedirla y si se dibuja el botón de «Cómo llegar»; nada más.
  */
 export function puedeVerDireccion(match, misClubIds) {
-  if (!esPartidoDeClubes(match)) return true;
+  if (!esUbicacionProtegida(match)) return true;
   return soyDeAlgunClub(match, misClubIds);
 }
 
