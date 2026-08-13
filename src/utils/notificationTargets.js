@@ -73,6 +73,20 @@ export function resolveNotificationTarget(n) {
     // sin rol, que no tienen nada que hacer en una conversación entre
     // administradores. Se verifica el recurso porque el partido puede haberse
     // cancelado entre el aviso y el toque.
+    // La reserva de cupo que un administrador se autorizó al proponer o al
+    // aprobar no se pudo aplicar (migración 45): choque de horario,
+    // suspensión o Trust Score. Va a la NÓMINA y no al detalle, porque lo
+    // único que se puede hacer al respecto es intentar inscribirse cuando el
+    // impedimento se resuelva, y eso se hace ahí.
+    case 'club_match_reserva_omitida':
+      return data.matchId
+        ? {
+            screen: 'ClubMatchRoster',
+            params: { matchId: data.matchId },
+            resource: { kind: 'match', id: data.matchId },
+          }
+        : null;
+
     case 'club_match_published':
       return data.matchId
         ? {

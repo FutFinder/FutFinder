@@ -1,6 +1,6 @@
 # Navegación
 
-Última revisión: 2026-08-08
+Última revisión: 2026-08-13
 
 ## Propósito
 
@@ -18,6 +18,7 @@ Las rutas operativas del stack (partidos, chat, perfil, clubes, ajustes, avisos 
 - `navigationRef` y la promesa de disponibilidad permiten que `App.js` espere el fin de Splash antes de abrir el destino de un push. Los destinos se resuelven una sola vez por identificador de aviso para evitar dobles navegaciones en arranque frío.
 - `NotifTab` y `ChatTab` renderizan respectivamente la bandeja de avisos y la bandeja de chat dentro de `Main`. El stack añade la ruta `Notifications` y los detalles `ChatThread` y `ChatDetails`; los badges se actualizan desde las suscripciones de sus dominios.
 - `ClubProposal` es la propuesta oficial de un desafío y se abre desde la cabecera del hilo `challenge:<id>` con `{ challengeId, modo: 'crear' | 'revisar', proposalId? }`. La cabecera sólo dibuja botón para las acciones que la app sabe ejecutar; el resto del estado se muestra como información.
+- `ClubMatchRoster` recibe `{ matchId }` y es la superficie operativa de U3: inscripción/postulación, confirmación/rechazo y salida por club. `MatchDetail` deriva allí sólo los partidos formales con propuesta y reparto por club; los partidos de clubes antiguos conservan el flujo normal. `club_match_reserva_omitida` también apunta a esta ruta.
 
 ## Fuentes principales
 

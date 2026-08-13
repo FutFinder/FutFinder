@@ -1,6 +1,6 @@
 # Pendientes
 
-Última revisión: 2026-08-08
+Última revisión: 2026-08-13
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
@@ -16,15 +16,13 @@ Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios
 
 Las migraciones 39 (`/todos`) y 40 (bandeja por RPC) estaban versionadas pero **no** aplicadas: `get_my_threads()` no existía, así que `listMyThreads()` no tenía contra qué correr. Se aplicaron junto con la 41 y se verificaron: `get_my_threads()` ejecuta, `messages.mention_all` y los dos triggers de la 39 existen, y la prueba SQL del ciclo de desafíos pasa sin dejar residuos. No existe un proyecto Supabase de desarrollo separado: hay uno solo y es el que usa `.env`.
 
-## P1 — `attendees` se puede escribir sin pasar por ninguna RPC · BLOQUEO OBLIGATORIO DE U3
+## Resuelto el 2026-08-13 — `attendees` y `match_waitlist` sólo se escriben por RPC
 
 - **Dominio afectado:** partidos y, sobre todo, los cupos por club del ciclo de desafíos.
 - **Evidencia (comprobada el 2026-08-12 contra `jvfoendzblkoxvwvommz`):** las políticas `attendees_insert_self`, `attendees_update_self` y `attendees_delete_self` permiten a cualquier `authenticated` insertar, modificar o borrar su propia fila de `attendees` directo por PostgREST, sin pasar por `join_match` ni por sus comprobaciones de cupo. `attendees_update_self` incluso deja pasar de `pendiente` a `inscrito`, que es la aprobación manual.
 - **Por qué importa:** el reparto de cupos por club de la migración 45 cuenta filas de `attendees` dentro de una transacción; si un jugador puede insertarlas por su cuenta, el conteo no protege nada. Hoy no se explota porque el cliente sólo usa RPC, pero eso es una convención del cliente, no una regla del servidor.
-- **Al día (2026-08-13):** la migración 44d ya acotó las políticas de `attendees` y `match_waitlist` a `challenge_proposal_id is null` y añadió triggers que atrapan a las RPC `security definer`. **La mitad de los partidos de clubes queda cerrada.** Lo que sigue abierto es la otra mitad: en un partido NORMAL, cualquier `authenticated` puede insertarse en `attendees` directo por PostgREST y saltarse `join_match` y sus comprobaciones de cupo.
-- **Bloqueo:** U3 (inscripción y cupos por club) NO puede darse por terminada sin resolver esto. Su conteo por club se apoya en filas de `attendees`, y mientras la puerta siga abierta para los partidos normales el patrón sigue siendo frágil.
-- **Acción:** decidir si `join_match` pasa a ser la única vía también en los partidos normales, cerrando las tres políticas del todo para que no alcancen a los partidos de clubes. Los partidos normales no cambian de comportamiento. Cerrarlas del todo es un cambio mayor y va aparte.
-- **Verificación necesaria:** la prueba SQL 45 comprueba que un `insert` directo sobre un partido de clubes lo rechaza la RLS, y que en un partido normal todo sigue igual.
+- **Resolución:** se aplicó `44e_attendees_solo_por_rpc.sql` antes de la 45. `join_match` y las demás RPC son las únicas vías también para partidos normales, `cancel_join_request()` sustituye el delete directo del cliente y `approve_join` serializa el último cupo.
+- **Verificación de cierre:** el catálogo remoto devolvió cero políticas y cero privilegios de escritura directa; INSERT/UPDATE/DELETE fueron rechazados; 44e pasó 8/8 y todos los escritores reales conservaron su flujo. No quedaron fixtures, objetos temporales ni sesiones `idle in transaction`.
 
 ## Resuelto el 2026-08-13 — la ubicación exacta del partido de clubes ya no es pública
 

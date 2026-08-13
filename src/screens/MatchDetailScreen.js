@@ -112,7 +112,11 @@ import {
   cuposLabel as cuposLabelClubes,
   puedeVerDireccion,
   clubesDelPartido,
+  soyDeAlgunClub,
+  resumenNomina,
+  usaNominaPorClub,
 } from '../services/clubMatchRules';
+import { getNominaPartido, suscribirseANomina } from '../services/clubRoster';
 import { haversineKm, getClubMatchLocation } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
 import { goBackOrPartidos } from '../utils/navigation';
@@ -153,6 +157,8 @@ export default function MatchDetailScreen({ route, navigation }) {
   // `club_match_locations`, protegida por RLS. `'cargando'` mientras se pide,
   // `null` cuando no corresponde o no hay, y el objeto cuando sí.
   const [ubicacionProtegida, setUbicacionProtegida] = useState('cargando');
+  // `null` mientras no se sepa: la etiqueta se queda entonces sin numerador.
+  const [inscritosDeMiClub, setInscritosDeMiClub] = useState(null);
 
   const cacheKey = `partidos/detail/${matchId}`;
 
@@ -259,6 +265,60 @@ export default function MatchDetailScreen({ route, navigation }) {
     };
   }, [idDelPartido, propuestaDelPartido]);
 
+  /**
+   * Cuántos de MI club van a este partido.
+   *
+   * Es lo único que convierte «9 cupos para tu club» en «3 de 9 inscritos de
+   * tu club». Se pide sólo en los partidos con reparto por club: en un partido
+   * normal el numerador ya sale de `cupos_disponibles` y esta consulta sería
+   * un viaje perdido.
+   *
+   * Se resuscribe a los cambios de la nómina para que el número no se quede
+   * viejo mientras la pantalla está abierta. Si la consulta falla se deja en
+   * `null`, que es lo que hace volver a la etiqueta sin numerador: mejor no
+   * decir el número que decir uno equivocado.
+   */
+  useEffect(() => {
+    if (!idDelPartido || !propuestaDelPartido) {
+      setInscritosDeMiClub(null);
+      return undefined;
+    }
+    // Mi club sale del PARTIDO, no de la nómina: si todavía no hay nadie
+    // inscrito, lo correcto es «0 de 9», no quedarse sin numerador.
+    const miClubId = [match?.club_local_id, match?.club_visitante_id].find(
+      (id) => id && misClubIds.includes(id)
+    );
+    if (!miClubId) {
+      setInscritosDeMiClub(null);
+      return undefined;
+    }
+
+    let alive = true;
+    const recargar = () => {
+      getNominaPartido(idDelPartido)
+        .then(({ data }) => {
+          if (!alive) return;
+          setInscritosDeMiClub(resumenNomina(data, miClubId, match?.cupos_por_club).inscritos);
+        })
+        .catch(() => {
+          if (alive) setInscritosDeMiClub(null);
+        });
+    };
+    recargar();
+    const baja = suscribirseANomina(idDelPartido, recargar);
+    return () => {
+      alive = false;
+      baja();
+    };
+  }, [
+    idDelPartido,
+    propuestaDelPartido,
+    misClubIds,
+    match?.club_local_id,
+    match?.club_visitante_id,
+    match?.cupos_por_club,
+  ]);
+
   // Alternativa honesta para el bloqueo por Trust Score.
   useEffect(() => {
     if (!match) return;
@@ -289,12 +349,22 @@ export default function MatchDetailScreen({ route, navigation }) {
     [attendees]
   );
 
-  const isOrganizer = !!(match && myId && match.id_organizador === myId);
+  const esDeClubes = esPartidoDeClubes(match);
+  const usaNominaClub = usaNominaPorClub(match);
+  // En el flujo formal `id_organizador` es quien aprobó porque la columna es
+  // NOT NULL; no lo convierte en organizador ni le abre la gestión normal.
+  const isOrganizer = !!(match && myId && match.id_organizador === myId && !usaNominaClub);
   const ctx = { match, myId, myProfile, myAttendee, myWaitlist, conflict, online };
-  const cta = match ? getCtaState(ctx) : null;
+  const ctaNormal = match ? getCtaState(ctx) : null;
+  const cta = usaNominaClub
+    ? {
+        kind: 'nomina_club',
+        label: 'Ver nómina del partido',
+        hint: 'La inscripción, las postulaciones y las bajas se gestionan por club.',
+      }
+    : ctaNormal;
   const block = match ? getBlockReason(ctx) : null;
 
-  const esDeClubes = esPartidoDeClubes(match);
   const protegida = esUbicacionProtegida(match);
   const veDireccion = puedeVerDireccion(match, misClubIds);
   const clubes = esDeClubes ? clubesDelPartido(match) : null;
@@ -520,6 +590,9 @@ export default function MatchDetailScreen({ route, navigation }) {
     switch (cta?.kind) {
       case 'gestionar':
         navigation.navigate('ManageMatch', { matchId });
+        break;
+      case 'nomina_club':
+        navigation.navigate('ClubMatchRoster', { matchId });
         break;
       case 'unirme':
         if (conflict) {
@@ -781,7 +854,10 @@ export default function MatchDetailScreen({ route, navigation }) {
                   <ClubLado club={clubes.visitante} etiqueta="VISITANTE" />
                 </View>
                 <View style={{ height: 10 }} />
-                <DetailRow label="Cupos" value={cuposLabelClubes(match, misClubIds)} />
+                <DetailRow
+                  label="Cupos"
+                  value={cuposLabelClubes(match, misClubIds, { inscritosDeMiClub })}
+                />
                 <DetailRow
                   label="Inscripción"
                   value={
@@ -791,8 +867,21 @@ export default function MatchDetailScreen({ route, navigation }) {
                   }
                   last
                 />
-                {/* La inscripción y la nómina por club llegan en U3: hasta
-                    entonces esta sección informa, no opera. */}
+                {/* La nómina vive en su propia pantalla: son dos listas con
+                    dos conteos, y meterlas acá dentro obligaría a elegir cuál
+                    se ve entera. Sólo se ofrece a quien es de alguno de los
+                    dos clubes — al resto, la RLS le devolvería cero filas. */}
+                {match.cupos_por_club != null && soyDeAlgunClub(match, misClubIds) && (
+                  <>
+                    <View style={{ height: 12 }} />
+                    <SurfaceButton
+                      label="Ver nómina del partido"
+                      icon={Users}
+                      height={44}
+                      onPress={() => navigation.navigate('ClubMatchRoster', { matchId: match.id })}
+                    />
+                  </>
+                )}
               </Card>
             </Section>
           ) : null}
@@ -897,7 +986,7 @@ export default function MatchDetailScreen({ route, navigation }) {
           </Section>
 
           {/* Organizador */}
-          {organizer ? (
+          {organizer && !usaNominaClub ? (
             <Section label="Organizador">
               <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
                 <Avatar url={organizer.foto_url} name={organizer.username} size={44} />
@@ -946,7 +1035,7 @@ export default function MatchDetailScreen({ route, navigation }) {
           ) : null}
 
           {/* Jugadores */}
-          <Section
+          {!usaNominaClub ? <Section
             label="Jugadores"
             right={`${confirmed.length} en el plantel`}
           >
@@ -984,10 +1073,10 @@ export default function MatchDetailScreen({ route, navigation }) {
                   : ''}
               </Text>
             </Card>
-          </Section>
+          </Section> : null}
 
           {/* Lista de espera */}
-          {waitlist.length > 0 ? (
+          {!usaNominaClub && waitlist.length > 0 ? (
             <Section label="Lista de espera" right={`${waitlist.length} en espera`}>
               <Card style={{ paddingVertical: 4, paddingHorizontal: 13 }}>
                 {waitlist.map((w, i) => (
@@ -1164,7 +1253,22 @@ export default function MatchDetailScreen({ route, navigation }) {
 
       {/* ---------------- CTA sticky ---------------- */}
       <View style={[styles.footer, { paddingBottom: 14 + Math.max(insets.bottom, 8) }]}>
-        {cta?.kind === 'confirmado' ? (
+        {cta?.kind === 'nomina_club' ? (
+          <View style={{ gap: 9 }}>
+            <PrimaryButton
+              label={cta.label}
+              icon={Users}
+              onPress={onCta}
+              height={52}
+              disabled={!online}
+            />
+            <Note>
+              {inscritosDeMiClub == null
+                ? cta.hint
+                : `${inscritosDeMiClub} de ${match.cupos_por_club} inscritos de tu club. ${cta.hint}`}
+            </Note>
+          </View>
+        ) : cta?.kind === 'confirmado' ? (
           <View style={{ gap: 9 }}>
             <View style={styles.confirmedBox}>
               <View style={styles.confirmedIcon}>

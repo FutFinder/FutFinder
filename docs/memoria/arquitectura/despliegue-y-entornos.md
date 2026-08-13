@@ -1,6 +1,6 @@
 # Despliegue y entornos
 
-Última revisión: 2026-08-08
+Última revisión: 2026-08-13
 
 ## Propósito
 
@@ -39,6 +39,8 @@ Flujo requerido para builds:
 3. Para EAS Build, carga el archivo como secreto de tipo archivo del proyecto EAS con el nombre `GOOGLE_SERVICES_JSON`. EAS entrega al worker una ruta al archivo descifrado; por eso la variable contiene una ruta, no el contenido del archivo.
 
 No incorpores una copia ficticia, el contenido del archivo ni credenciales en esta memoria. El repositorio no permite confirmar si el secreto ya existe en EAS.
+
+El cierre de U3 del 2026-08-13 no ejecutó ningún build nativo. La exportación web pasa, pero sigue avisando que no puede resolver `./google-services.json`; antes de un futuro build Android hay que confirmar que EAS tenga configurado el secreto de archivo `GOOGLE_SERVICES_JSON`.
 
 ## Rutas de código relacionadas
 

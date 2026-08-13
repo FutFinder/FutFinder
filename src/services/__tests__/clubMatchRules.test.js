@@ -134,9 +134,24 @@ test('un partido de clubes del flujo antiguo, sin cupos_por_club, cae en la etiq
   assert.equal(R.cuposLabel(viejo, ['club-a']), '6 de 14 cupos');
 });
 
-test('el conteo real de inscritos por club todavía NO existe y no se simula', () => {
-  // En U3, con `attendees.club_id` poblado, esto pasará a «3 de 9 inscritos de
-  // tu club». Hasta entonces la etiqueta no promete un dato que nadie tiene.
+test('usaNominaPorClub sólo activa la ruta U3 en partidos nacidos de una propuesta con cupos por club', () => {
+  assert.equal(R.usaNominaPorClub(partidoDeClubes()), true);
+  assert.equal(
+    R.usaNominaPorClub(partidoDeClubes({ challenge_proposal_id: null })),
+    false,
+    'el flujo antiguo de clubes conserva su CTA anterior'
+  );
+  assert.equal(
+    R.usaNominaPorClub(partidoDeClubes({ cupos_por_club: null })),
+    false,
+    'sin reparto por club no se promete una nómina U3'
+  );
+  assert.equal(R.usaNominaPorClub({ id: 'normal', cupos_por_club: 9 }), false);
+});
+
+test('sin cargar el conteo real de inscritos por club no se simula un numerador', () => {
+  // U3 puede entregar «3 de 9» cuando la nómina está cargada. Sin ese dato,
+  // esta etiqueta no inventa un cero ni un conteo a partir del total global.
   const label = R.cuposLabel(partidoDeClubes(), ['club-a']);
   assert.equal(label, '9 cupos para tu club');
   assert.doesNotMatch(label, /inscrit/i);
@@ -347,4 +362,145 @@ test('sin partidos, sin lista o con entradas basura devuelve null, no revienta',
 test('sirve para los dos clubes: el rival ve el mismo partido en su Inicio', () => {
   const lista = [conHora('m1', '2026-09-03T20:00:00.000Z')];
   assert.equal(R.proximoPartidoDeClub(lista, ['club-b'], { ahora: AHORA }).id, 'm1');
+});
+
+// ─────────────────────────────────────────────────────── Nómina por club
+//
+// El conteo por club es la regla entera de U3. Lo que se fija acá:
+//   - `pendiente` NO ocupa cupo, ni en la base ni en pantalla.
+//   - lo del club A no le quita nada al club B.
+//   - la interfaz no ofrece un botón que la RPC vaya a rechazar.
+
+function nomina() {
+  return [
+    { id: '1', id_jugador: 'u1', club_id: 'club-a', estado: 'inscrito', origen: 'orden_llegada' },
+    { id: '2', id_jugador: 'u2', club_id: 'club-a', estado: 'confirmado_gps', origen: 'orden_llegada' },
+    { id: '3', id_jugador: 'u3', club_id: 'club-a', estado: 'pendiente', origen: 'postulacion' },
+    { id: '4', id_jugador: 'u4', club_id: 'club-b', estado: 'inscrito', origen: 'reserva_aprobador' },
+  ];
+}
+
+test('resumenNomina: `pendiente` no ocupa cupo', () => {
+  const r = R.resumenNomina(nomina(), 'club-a', 9);
+  assert.equal(r.inscritos, 2, 'inscrito + confirmado_gps');
+  assert.equal(r.pendientes, 1);
+  assert.equal(r.disponibles, 7, 'la postulación no reserva');
+});
+
+test('resumenNomina: cada club cuenta lo suyo', () => {
+  assert.equal(R.resumenNomina(nomina(), 'club-b', 9).inscritos, 1);
+  assert.equal(R.resumenNomina(nomina(), 'club-b', 9).disponibles, 8);
+  // Que el club A tenga gente no le quita cupos al club B, ni al revés.
+  assert.equal(R.resumenNomina(nomina(), 'club-a', 9).disponibles, 7);
+});
+
+test('resumenNomina: nunca devuelve cupos negativos', () => {
+  const llena = Array.from({ length: 12 }, (_, i) => ({
+    id: String(i), id_jugador: `x${i}`, club_id: 'club-a', estado: 'inscrito',
+  }));
+  assert.equal(R.resumenNomina(llena, 'club-a', 9).disponibles, 0);
+});
+
+test('cuposLabel: con el conteo real dice el numerador; sin él, no lo inventa', () => {
+  const m = partidoDeClubes();
+  assert.equal(
+    R.cuposLabel(m, ['club-a'], { inscritosDeMiClub: 3 }),
+    '3 de 9 inscritos de tu club'
+  );
+  // Cero es un número que se sabe: es distinto de no saberlo.
+  assert.equal(
+    R.cuposLabel(m, ['club-a'], { inscritosDeMiClub: 0 }),
+    '0 de 9 inscritos de tu club'
+  );
+  assert.equal(R.cuposLabel(m, ['club-a']), '9 cupos para tu club');
+  assert.equal(R.cuposLabel(m, ['club-a'], { inscritosDeMiClub: null }), '9 cupos para tu club');
+});
+
+test('cuposLabel: a un ajeno no se le dice cómo va la nómina', () => {
+  assert.equal(R.cuposLabel(partidoDeClubes(), ['club-z'], { inscritosDeMiClub: 3 }), '9 cupos por club');
+});
+
+test('accionNomina: orden de llegada ofrece inscribirse; selección administrativa, postular', () => {
+  const base = { match: partidoDeClubes(), misClubIds: ['club-a'], miFila: null,
+    resumen: R.resumenNomina(nomina(), 'club-a', 9), ahora: new Date('2026-09-01T00:00:00Z') };
+  assert.equal(R.accionNomina(base).accion, 'inscribirse');
+  assert.equal(
+    R.accionNomina({ ...base, match: partidoDeClubes({ metodo_inscripcion: 'seleccion_admin' }) }).accion,
+    'postular'
+  );
+});
+
+test('accionNomina: quien ya está sale; quien postuló retira', () => {
+  const base = { match: partidoDeClubes(), misClubIds: ['club-a'],
+    resumen: R.resumenNomina(nomina(), 'club-a', 9), ahora: new Date('2026-09-01T00:00:00Z') };
+  assert.equal(R.accionNomina({ ...base, miFila: { estado: 'inscrito' } }).accion, 'salir');
+  assert.equal(R.accionNomina({ ...base, miFila: { estado: 'confirmado_gps' } }).accion, 'salir');
+  assert.equal(
+    R.accionNomina({ ...base, miFila: { estado: 'pendiente' } }).accion,
+    'cancelar_postulacion'
+  );
+});
+
+test('accionNomina: sin cupo no se ofrece inscribirse, pero sí postular', () => {
+  const lleno = { inscritos: 9, pendientes: 0, disponibles: 0, cupos: 9 };
+  const base = { misClubIds: ['club-a'], miFila: null, resumen: lleno,
+    ahora: new Date('2026-09-01T00:00:00Z') };
+  assert.equal(R.accionNomina({ ...base, match: partidoDeClubes() }).accion, 'ninguna');
+  // En selección administrativa postular NO reserva, así que el club lleno no
+  // impide postular: el límite lo aplica el administrador al confirmar.
+  assert.equal(
+    R.accionNomina({ ...base, match: partidoDeClubes({ metodo_inscripcion: 'seleccion_admin' }) }).accion,
+    'postular'
+  );
+});
+
+test('accionNomina: un ajeno, un partido empezado y uno cancelado no ofrecen nada', () => {
+  const resumen = R.resumenNomina(nomina(), 'club-a', 9);
+  const ahora = new Date('2026-09-01T00:00:00Z');
+  assert.equal(
+    R.accionNomina({ match: partidoDeClubes(), misClubIds: ['club-z'], miFila: null, resumen, ahora }).accion,
+    'ninguna'
+  );
+  assert.equal(
+    R.accionNomina({ match: partidoDeClubes(), misClubIds: ['club-a'], miFila: null, resumen,
+      ahora: new Date('2026-09-06T00:00:00Z') }).accion,
+    'ninguna'
+  );
+  assert.equal(
+    R.accionNomina({ match: partidoDeClubes({ estado: 'cancelado' }), misClubIds: ['club-a'],
+      miFila: null, resumen, ahora }).accion,
+    'ninguna'
+  );
+});
+
+test('accionNomina: cuando no hay acción, siempre explica por qué', () => {
+  const casos = [
+    { match: null },
+    { match: partidoDeClubes({ estado: 'cancelado' }), misClubIds: ['club-a'] },
+    { match: partidoDeClubes(), misClubIds: ['club-z'] },
+  ];
+  for (const c of casos) {
+    const r = R.accionNomina({ ahora: new Date('2026-09-01T00:00:00Z'), ...c });
+    assert.equal(r.accion, 'ninguna');
+    assert.ok(r.motivo && r.motivo.length > 0, 'un botón que no está tiene que decir por qué');
+  }
+});
+
+test('miFilaEnNomina: encuentra la mía y sólo la mía', () => {
+  assert.equal(R.miFilaEnNomina(nomina(), 'u3').estado, 'pendiente');
+  assert.equal(R.miFilaEnNomina(nomina(), 'nadie'), null);
+  assert.equal(R.miFilaEnNomina(nomina(), null), null);
+});
+
+test('puedoConfirmarNomina: administrar el club RIVAL no da ningún derecho', () => {
+  assert.equal(R.puedoConfirmarNomina('club-a', ['club-a']), true);
+  assert.equal(R.puedoConfirmarNomina('club-a', ['club-b']), false);
+  assert.equal(R.puedoConfirmarNomina('club-a', []), false);
+  assert.equal(R.puedoConfirmarNomina(null, ['club-a']), false);
+});
+
+test('ACCION_LABEL: toda acción posible tiene texto', () => {
+  for (const a of ['inscribirse', 'postular', 'salir', 'cancelar_postulacion']) {
+    assert.ok(R.ACCION_LABEL[a], `falta la etiqueta de ${a}`);
+  }
 });

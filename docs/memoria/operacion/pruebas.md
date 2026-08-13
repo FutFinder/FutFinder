@@ -1,6 +1,6 @@
 # Pruebas
 
-Última revisión: 2026-08-08
+Última revisión: 2026-08-13
 
 ## Comprobaciones locales del proyecto
 
@@ -18,11 +18,15 @@ Genera la exportación web de Expo y detecta fallos de empaquetado o compatibili
 
 ## Pruebas SQL de RLS y contratos de base de datos
 
-Los archivos `supabase/tests/35_privacy_test.sql`, `36_chat_security_test.sql`, `38_push_reliability_test.sql`, `39_chat_mention_all_test.sql`, `40_bandeja_chat_rpc_test.sql`, `41_desafio_ciclo_test.sql`, `42_desafio_chat_rls_test.sql`, `43_desafio_plazos_test.sql`, `43c_propuesta_ubicacion_test.sql`, `43d_rechazo_doble_pertenencia_test.sql`, `44_partido_clubes_test.sql`, `44b_ubicacion_protegida_test.sql`, `44c_notify_match_updated_test.sql` y `44d_partido_privado_test.sql` verifican privacidad, RLS de chat, fiabilidad de push, `/todos`, la RPC de bandeja y el ciclo de desafíos entre clubes hasta la publicación del partido.
+Los archivos `supabase/tests/35_privacy_test.sql`, `36_chat_security_test.sql`, `38_push_reliability_test.sql`, `39_chat_mention_all_test.sql`, `40_bandeja_chat_rpc_test.sql`, `41_desafio_ciclo_test.sql`, `42_desafio_chat_rls_test.sql`, `43_desafio_plazos_test.sql`, `43c_propuesta_ubicacion_test.sql`, `43d_rechazo_doble_pertenencia_test.sql`, `44_partido_clubes_test.sql`, `44b_ubicacion_protegida_test.sql`, `44c_notify_match_updated_test.sql`, `44d_partido_privado_test.sql`, `44e_attendees_solo_por_rpc_test.sql`, `45_inscripcion_por_club_test.sql`, `45b_origen_compatibilidad_test.sql`, `45c_reserva_voluntaria_test.sql` y `45d_escritores_attendees_test.sql` verifican privacidad, RLS de chat, fiabilidad de push, `/todos`, la RPC de bandeja y el ciclo de desafíos entre clubes hasta inscripción, reservas y nómina por club.
 
 Dos trampas al escribir estas pruebas. `set local role anon` **no borra** `request.jwt.claims`: sin poner unas claims sin `sub`, `auth.uid()` sigue devolviendo el usuario del bloque anterior y la comprobación de acceso anónimo pasa midiendo otra cosa. Y para provocar un vencimiento se envejece la fila, nunca el reloj, de modo que lo que se prueba es la comparación contra `now()` que hace el servidor.
 
 Cada archivo se abre con `begin;` y termina en `rollback;`, así que ejecutarlo no deja filas guardadas ni siquiera si se corre contra el proyecto real — que hoy es el único que existe, porque no hay un Supabase de desarrollo separado. Lo que sí exige autorización explícita es **aplicar** una migración, no correr una prueba.
+
+La verificación U3 del 2026-08-13 compuso también cada migración con su arnés dentro de una transacción exterior: 44e sola 8/8, 45 sola 14/14, ambas juntas 45b 13/13, 45c 18/18 y 45d 5/5. Se probó una carrera real con dos sesiones: la segunda recibió `lock_not_available` mientras la primera retenía la fila de `matches`, y ambas hicieron rollback. Tras aplicar 44e y 45 en producción se repitieron los arneses seguros —todos con su propio `BEGIN/ROLLBACK`— con los mismos resultados, más 44d 16/16. El catálogo confirmó 25 asistentes `legado`, cero NULL, ACL, Realtime y orden de triggers; la consulta final confirmó cero fixtures, objetos temporales, avisos duplicados y sesiones `idle in transaction`.
+
+La comprobación local posterior al despliegue pasó `npm run lint` con 0 errores y 25 advertencias conocidas, `npm test` 376/376, Deno 13/13 y `npm run build:web`. U3 queda pendiente únicamente de una prueba manual autenticada con cuentas de ambos clubes.
 
 ## Pruebas de Edge Function
 
@@ -43,6 +47,7 @@ Con una instancia de desarrollo configurada y cuentas de prueba, comprobar al me
 - permisos de chat directo, de partido y de club, lectura, silencio y `/todos` grupal;
 - publicación/solicitud/gestión de partido, asistencia y estados de error;
 - membresía, administración y desafío de club;
+- U3 con ambos clubes: reservar o no al proponer/aprobar, publicar, inscribirse/postular, confirmar o rechazar desde el club propio, salir/retirar y observar los cambios en la otra sesión sin recargar;
 - edición de perfil con una imagen válida y una operación que falle para observar la reversión;
 - bandeja de avisos: lectura, borrado, reintento y navegación al destino.
 

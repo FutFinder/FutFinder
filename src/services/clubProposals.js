@@ -139,13 +139,20 @@ export async function crearPropuestaOficial(challengeId, draft, clientToken = nu
  * además no pertenezca al club proponente. Eso lo decide el servidor con
  * `auth.uid()` y `club_members` en vivo; la interfaz esconde el botón cuando
  * no corresponde, pero esconderlo no es la protección.
+ *
+ * `meInscribo` es la reserva voluntaria de quien aprueba: gasta un cupo de SU
+ * club, en la misma transacción que publica el partido. Por defecto es `false`
+ * —«No» es lo que pasa si nadie dice nada— y se manda explícito para que la
+ * llamada diga lo que quiere en vez de apoyarse en el valor por defecto de la
+ * RPC.
  */
-export async function aprobarPropuesta(proposalId) {
+export async function aprobarPropuesta(proposalId, meInscribo = false) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
   if (!proposalId) return { data: null, error: { message: 'Falta la propuesta' } };
 
   const { data, error } = await supabase.rpc('aprobar_propuesta', {
     p_proposal_id: proposalId,
+    p_me_inscribo: meInscribo === true,
   });
 
   if (error) return { data: null, error: traducirError(error, 'aprobarPropuesta') };

@@ -454,6 +454,11 @@ export function propuestaOficialPayload(draft = {}) {
     metodo_inscripcion: draft.metodoInscripcion ?? null,
     cuota_por_persona: draft.cuotaPorPersona ?? 0,
     instrucciones: texto(draft.instrucciones),
+    // «No» es lo que pasa si nadie dice nada, acá y en el servidor. No se
+    // manda `undefined`: `coalesce((payload->>'proponente_juega')::boolean,
+    // false)` ya resuelve la ausencia, pero mandar el valor explícito deja el
+    // registro de que la pregunta se hizo y la respuesta fue no.
+    proponente_juega: draft.proponenteJuega === true,
   };
 }
 

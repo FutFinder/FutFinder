@@ -245,7 +245,8 @@ Transiciones autorizadas, con quién puede dispararlas:
 | `supabase/migrations/44b_ubicacion_protegida_clubes.sql` | `club_match_locations` (ubicación exacta con RLS), `matches.ubicacion_aproximada`, `aproximar_grado()`, guarda en `tg_register_cancha`, GPS sólo con la exacta, `aprobar_propuesta` publica la aproximada | Aplicada |
 | `supabase/migrations/44c_notify_match_updated_texto.sql` | `notify_match_updated()` con `array_append`. **Independiente de la 44b**: corrige un fallo preexistente que impedía editar cualquier partido | Aplicada |
 | `supabase/migrations/44d_partido_de_clubes_privado.sql` | El partido de clubes es privado hasta que termina: RLS de `matches`, `attendees` y `match_waitlist`, triggers que atrapan a las RPC de inscripción, y `historial_publico_club()` como única salida pública | Aplicada |
-| `supabase/migrations/45_inscripcion_por_club.sql` | `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda C7 en `join_match`/`request_join`/`approve_join`, cierre de las políticas de `attendees` | Pendiente |
+| `supabase/migrations/44e_attendees_solo_por_rpc.sql` | Cierra toda escritura directa de `attendees`/`match_waitlist`, agrega `cancel_join_request` y serializa `approve_join` | Aplicada el 2026-08-13 |
+| `supabase/migrations/45_inscripcion_por_club.sql` | RPC de nómina por club, `attendees.origen`, reserva voluntaria al proponer/aprobar, Realtime y aviso de reserva omitida | Aplicada el 2026-08-13 |
 | `supabase/migrations/46_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` | Pendiente |
 | `supabase/migrations/47_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), y el cuerpo real de `club_esta_sancionado` | Pendiente |
 | `supabase/migrations/48_resultado_y_historial.sql` | `club_match_results`, RPC `proponer_resultado`, `confirmar_resultado`, `club_record()` | Pendiente |
@@ -259,7 +260,9 @@ Transiciones autorizadas, con quién puede dispararlas:
 ### Pruebas SQL nuevas
 
 `supabase/tests/42_desafio_chat_rls_test.sql`, `43_desafio_plazos_test.sql`,
-`44_partido_clubes_cupos_test.sql`, `45_cambios_partido_test.sql`,
+`44_partido_clubes_cupos_test.sql`, `44e_attendees_solo_por_rpc_test.sql`,
+`45_inscripcion_por_club_test.sql`, `45b_origen_compatibilidad_test.sql`,
+`45c_reserva_voluntaria_test.sql`, `45d_escritores_attendees_test.sql`, `45_cambios_partido_test.sql`,
 `46_sanciones_test.sql`, `47_resultado_test.sql`. Mismo estilo que
 `36_chat_security_test.sql`: `begin; do $$ … raise exception 'FALLÓ (caso N): …' … $$; rollback;`,
 usuarios de prueba insertados en `auth.users`, identidad simulada con
@@ -819,7 +822,7 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > `create or replace` conserva la ACL. Los triggers no comprueban EXECUTE, así
 > que revocarlo es seguro; queda anotado en pendientes como limpieza aparte.
 
-### Tarea 4.2 — Inscripción con cupos por club
+### Tarea 4.2 — Inscripción con cupos por club ✅ (U3 APLICADA)
 
 > **Antes de empezar, un agujero que hay que cerrar acá.** Las políticas
 > `attendees_insert_self`, `attendees_update_self` y `attendees_delete_self`
@@ -833,20 +836,35 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > ponerle la guarda C7 hay que versionar su definición actual con la guarda
 > añadida, y aprovechar de revocarle el `EXECUTE` de `public`.
 
-- [ ] `join_club_match(p_match_id)`: deriva el club del jugador de `club_members`
+- [x] `join_club_match(p_match_id)`: deriva el club del jugador de `club_members`
       ∩ {local, visitante}; si no pertenece a ninguno, rechaza. Bloquea la fila
       del partido (`select … for update`) y cuenta los inscritos de ese club
       antes de insertar: eso es lo que impide el sobrecupo, no un contador
       global. `orden_llegada` → `inscrito`; `seleccion_admin` → `pendiente`.
-- [ ] `leave_club_match(p_match_id)` y `confirmar_nomina_club(p_match_id, p_player_id, p_aprobar)`
+- [x] `leave_club_match(p_match_id)` y `confirmar_nomina_club(p_match_id, p_player_id, p_aprobar)`
       (admin del club **del jugador**, no del otro).
-- [ ] Guarda en `join_match`: rechazar si `challenge_proposal_id is not null`
+- [x] Guarda en `join_match`: rechazar si `challenge_proposal_id is not null`
       (decisión C7).
-- [ ] `src/screens/ClubMatchRosterScreen.js`: cupos disponibles, confirmados y
+- [x] `src/screens/ClubMatchRosterScreen.js`: cupos disponibles, confirmados y
       pendientes **por equipo**.
-- [ ] Prueba SQL: dos inscripciones concurrentes al último cupo dejan una sola;
+- [x] Prueba SQL: el intento N+1 no supera el límite; una prueba real de dos
+      sesiones confirma que el bloqueo de la fila serializa a la segunda;
       un jugador del club A no puede ocupar cupo del club B; un ajeno no entra.
-- [ ] Commit.
+- [x] Despliegue coordinado en producción: 44e, comprobación inmediata y luego 45.
+- [x] Cliente U3 integrado y verificado para móvil y web.
+- [ ] Comprobación manual autenticada con cuentas de ambos clubes.
+- [x] Commit y push autorizados para el cierre de U3.
+
+> **Verificación U3 del 2026-08-13.** Antes de desplegar, cada arnés se
+> ejecutó dentro de `BEGIN/ROLLBACK`: 44e sola 8/8; 45 sola 14/14; ambas juntas
+> 45b 13/13, reserva voluntaria 18/18 y escritores residuales 5/5. El catálogo
+> encontró 12 funciones que escriben `attendees`; todas quedaron ejercitadas.
+> `aa_attendees_completa_origen` dispara primero, sólo completa NULL y conserva
+> orígenes explícitos. La concurrencia se comprobó además con dos sesiones y
+> `FOR UPDATE NOWAIT`. Después se aplicaron 44e y 45 en ese orden y se repitieron
+> los arneses seguros contra el esquema final: mismos resultados, 44d 16/16,
+> 25 asistentes `legado`, cero NULL, cero residuos y ningún 5xx nuevo. Falta
+> únicamente la comprobación manual autenticada con cuentas de ambos clubes.
 
 ### Tarea 4.3 — Avisos, tarjeta destacada y presencia en Inicio ✅ (U2 COMPLETADA)
 

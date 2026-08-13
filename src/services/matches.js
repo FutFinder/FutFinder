@@ -802,21 +802,31 @@ export async function cancelMatchWithReason(matchId, motivo = null) {
 }
 
 /**
- * El jugador retira su propia solicitud pendiente (aprobación manual).
- * No toca cupos porque una solicitud pendiente nunca reservó uno.
+ * Retira mi propia solicitud pendiente.
+ *
+ * ANTES ERA UN `delete` DIRECTO sobre `attendees`, y era el único sitio del
+ * cliente que escribía en esa tabla sin pasar por una RPC. Eso obligaba a
+ * mantener abiertas las políticas `attendees_*_self`, que dejaban a cualquier
+ * `authenticated` inscribirse por PostgREST saltándose `join_match` y sus
+ * comprobaciones de cupo. La migración 44e cierra esas políticas y trae
+ * `cancel_join_request()` justamente para sustituir esta llamada: sin el
+ * cambio, retirar una solicitud dejaría de funcionar.
+ *
+ * Volver a pulsar no es un error: la RPC devuelve `sinSolicitud: true` y no
+ * toca cupos, porque una solicitud pendiente nunca reservó ninguno.
  */
 export async function cancelMyJoinRequest(matchId) {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, reason: 'No autenticado' };
-  const { error } = await supabase
-    .from('attendees')
-    .delete()
-    .eq('id_partido', matchId)
-    .eq('id_jugador', user.id)
-    .eq('estado', 'pendiente');
-  if (error) return { ok: false, error };
-  return { ok: true };
+  if (!matchId) return { ok: false, reason: 'Falta el partido' };
+
+  const { data, error } = await supabase.rpc('cancel_join_request', { p_match_id: matchId });
+  if (error) {
+    console.error('[FutFinder] cancelMyJoinRequest:', error);
+    return { ok: false, error };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (row && row.ok === false) return { ok: false, reason: row.reason };
+  return { ok: true, sinSolicitud: !!row?.sinSolicitud };
 }
 
 /**

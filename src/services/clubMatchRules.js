@@ -35,6 +35,21 @@ export function esPartidoDeClubes(match) {
   return !!(match && match.club_local_id && match.club_visitante_id);
 }
 
+/**
+ * `true` sólo para el flujo formal que usa la nómina y las RPC de U3.
+ *
+ * Los partidos de clubes del flujo antiguo también tienen dos clubes, pero no
+ * nacieron de una propuesta ni tienen reparto por club. Mandarlos a esta
+ * nómina ofrecería RPC que el servidor rechaza y les quitaría su CTA anterior.
+ */
+export function usaNominaPorClub(match) {
+  return !!(
+    esPartidoDeClubes(match) &&
+    match.challenge_proposal_id &&
+    match.cupos_por_club != null
+  );
+}
+
 /** `'local'`, `'visitante'` o `null` si no soy de ninguno de los dos. */
 export function miLadoEnPartido(match, misClubIds) {
   if (!esPartidoDeClubes(match)) return null;
@@ -55,18 +70,24 @@ export function soyDeAlgunClub(match, misClubIds) {
  * En un partido de clubes con reparto, el número que importa es el del club:
  * los otros nueve no son tuyos.
  *
- * TODO(U3): cuando `attendees.club_id` esté poblado y exista el conteo real
- * por club, esto pasa a «3 de 9 inscritos de tu club». Hasta entonces NO se
- * muestra un numerador: no hay dato que ponerle y un «0 de 9» sería falso en
- * cuanto alguien se inscriba.
+ * EL NUMERADOR SOLO SE DIBUJA CUANDO SE SABE. `inscritosDeMiClub` llega desde
+ * la nómina (U3, `cupos_ocupados_club()`); en las listas no se pide, porque
+ * sería una consulta por tarjeta. Cuando falta, la etiqueta se queda en «9
+ * cupos para tu club»: un «0 de 9» inventado sería falso en cuanto alguien se
+ * inscriba, y esa mentira es peor que no decir el número.
+ *
+ * Cuando sí se sabe, el numerador es de MI club y no del partido: contar los
+ * dieciocho juntos es exactamente el error que esta función existe para
+ * evitar.
  */
-export function cuposLabel(match, misClubIds) {
+export function cuposLabel(match, misClubIds, { inscritosDeMiClub = null } = {}) {
   const porClub = match?.cupos_por_club;
 
   if (esPartidoDeClubes(match) && porClub != null) {
-    return soyDeAlgunClub(match, misClubIds)
-      ? `${porClub} cupos para tu club`
-      : `${porClub} cupos por club`;
+    if (!soyDeAlgunClub(match, misClubIds)) return `${porClub} cupos por club`;
+    return Number.isFinite(inscritosDeMiClub)
+      ? `${inscritosDeMiClub} de ${porClub} inscritos de tu club`
+      : `${porClub} cupos para tu club`;
   }
 
   // Partido normal, o partido de clubes anterior a la migración 44: la
@@ -74,6 +95,87 @@ export function cuposLabel(match, misClubIds) {
   const libres = match?.cupos_disponibles ?? 0;
   const totales = match?.cupos_totales ?? 0;
   return libres <= 0 ? 'Sin cupos' : `${libres} de ${totales} cupos`;
+}
+
+// ─────────────────────────────────────────────────────── Nómina por club
+
+/** Los dos estados que ocupan cupo. Mismo criterio que `cupos_ocupados_club()`. */
+const OCUPAN_CUPO = new Set(['inscrito', 'confirmado_gps']);
+
+/**
+ * Cómo va la nómina de un club: inscritos, postulaciones y cupos libres.
+ *
+ * `pendiente` NO cuenta como ocupado, igual que en la base: en selección por
+ * administrador se postulan muchos y el administrador elige. Si postular
+ * reservara, tres postulaciones llenarían un club de tres.
+ */
+export function resumenNomina(attendees, clubId, cuposPorClub) {
+  const filas = (Array.isArray(attendees) ? attendees : []).filter(
+    (a) => a && a.club_id === clubId
+  );
+  const inscritos = filas.filter((a) => OCUPAN_CUPO.has(a.estado)).length;
+  const pendientes = filas.filter((a) => a.estado === 'pendiente').length;
+  const cupos = Number.isFinite(cuposPorClub) ? cuposPorClub : 0;
+  return { inscritos, pendientes, disponibles: Math.max(cupos - inscritos, 0), cupos };
+}
+
+/** Mi fila en la nómina, o `null` si no estoy. */
+export function miFilaEnNomina(attendees, userId) {
+  if (!userId) return null;
+  return (Array.isArray(attendees) ? attendees : []).find((a) => a?.id_jugador === userId) || null;
+}
+
+/**
+ * Qué puede hacer esta persona con la nómina, dicho en una sola palabra.
+ *
+ * La interfaz no protege nada —eso es de las RPC— pero ofrecer un botón que el
+ * servidor va a rechazar es peor que no ofrecerlo. El orden de las salidas es
+ * el de la vida real: primero si el partido sigue vivo, después si soy de
+ * alguno de los dos clubes, y sólo al final qué me toca.
+ *
+ * ctx = { match, misClubIds, miFila, resumen, ahora }
+ */
+export function accionNomina({ match, misClubIds, miFila, resumen, ahora = new Date() } = {}) {
+  if (!match) return { accion: 'ninguna', motivo: 'Este partido ya no existe' };
+  if (match.estado === 'cancelado') return { accion: 'ninguna', motivo: 'El partido se canceló' };
+
+  const hora = new Date(match.hora).getTime();
+  if (Number.isFinite(hora) && hora <= (ahora instanceof Date ? ahora : new Date(ahora)).getTime()) {
+    return { accion: 'ninguna', motivo: 'El partido ya comenzó' };
+  }
+  if (!soyDeAlgunClub(match, misClubIds)) {
+    return { accion: 'ninguna', motivo: 'Solo se inscriben los integrantes de los dos clubes' };
+  }
+
+  if (miFila?.estado === 'pendiente') return { accion: 'cancelar_postulacion' };
+  if (miFila && OCUPAN_CUPO.has(miFila.estado)) return { accion: 'salir' };
+
+  if (resumen && resumen.disponibles <= 0 && match.metodo_inscripcion !== 'seleccion_admin') {
+    return { accion: 'ninguna', motivo: 'Tu club ya llenó sus cupos' };
+  }
+  return {
+    accion: match.metodo_inscripcion === 'seleccion_admin' ? 'postular' : 'inscribirse',
+  };
+}
+
+/** El texto del botón para cada acción. Español de Chile, sin adornos. */
+export const ACCION_LABEL = {
+  inscribirse: 'Inscribirme',
+  postular: 'Postular a la nómina',
+  salir: 'Salir del partido',
+  cancelar_postulacion: 'Retirar mi postulación',
+};
+
+/**
+ * `true` si soy administrador de este club dentro de este partido.
+ *
+ * Se pide la lista de clubes donde SÍ administro, no un booleano suelto:
+ * administrar el club rival no da ningún derecho sobre esta nómina, y esa
+ * distinción es justo la que `confirmar_nomina_club()` hace en el servidor.
+ */
+export function puedoConfirmarNomina(clubId, misClubIdsAdmin) {
+  const admin = Array.isArray(misClubIdsAdmin) ? misClubIdsAdmin.filter(Boolean) : [];
+  return !!clubId && admin.includes(clubId);
 }
 
 /**

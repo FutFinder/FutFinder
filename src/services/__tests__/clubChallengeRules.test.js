@@ -562,12 +562,41 @@ test('el payload usa los nombres de columna que espera la RPC', () => {
   assert.deepEqual(Object.keys(p).sort(), [
     'cancha_nombre', 'comuna', 'cuota_por_persona', 'cupos_por_club',
     'direccion', 'duracion_min', 'fecha', 'instrucciones', 'latitud',
-    'longitud', 'metodo_inscripcion', 'modalidad', 'region',
+    'longitud', 'metodo_inscripcion', 'modalidad', 'proponente_juega', 'region',
   ]);
   assert.equal(p.duracion_min, 90);
   assert.equal(p.cupos_por_club, 7);
   assert.equal(p.metodo_inscripcion, 'orden_llegada');
   assert.equal(p.cuota_por_persona, 4000);
+});
+
+// La reserva del proponente se lo quita a un compañero de club, así que «No»
+// tiene que ser lo que pasa cuando nadie dice nada. Un `undefined` que el
+// servidor interpretara como falso serviría igual, pero entonces el valor por
+// defecto viviría en dos sitios y bastaría cambiar uno para que dejaran de
+// coincidir.
+test('proponente_juega es false salvo que se pida explícitamente', () => {
+  assert.equal(R.propuestaOficialPayload(borrador).proponente_juega, false);
+  assert.equal(
+    R.propuestaOficialPayload({ ...borrador, proponenteJuega: false }).proponente_juega,
+    false
+  );
+  assert.equal(
+    R.propuestaOficialPayload({ ...borrador, proponenteJuega: true }).proponente_juega,
+    true
+  );
+});
+
+// `'true'`, `1` o `'on'` son lo que llega de un control mal cableado. Un
+// booleano de verdad o nada: acá no se adivina la intención de nadie.
+test('proponente_juega no acepta valores parecidos a true', () => {
+  for (const v of ['true', 1, 'sí', {}, [], 'on']) {
+    assert.equal(
+      R.propuestaOficialPayload({ ...borrador, proponenteJuega: v }).proponente_juega,
+      false,
+      `${JSON.stringify(v)} no debe contar como sí`
+    );
+  }
 });
 
 test('la fecha viaja en ISO, no como la escribió el teléfono', () => {
@@ -582,7 +611,8 @@ test('los textos van recortados y lo vacío viaja como null', () => {
 });
 
 test('sin cuota, se propone gratis y no null: la columna es NOT NULL', () => {
-  const { cuotaPorPersona, ...sinCuota } = borrador;
+  const sinCuota = { ...borrador };
+  delete sinCuota.cuotaPorPersona;
   assert.equal(R.propuestaOficialPayload(sinCuota).cuota_por_persona, 0);
 });
 

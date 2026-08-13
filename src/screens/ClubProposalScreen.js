@@ -55,10 +55,8 @@ import {
  * para decidir si van, y la RLS de `club_challenge_proposals` se lo permite
  * aunque no sean administradores.
  *
- * APROBAR NO ESTÁ ACÁ TODAVÍA. Aprobar es lo que publica el partido, y eso
- * llega con la migración 44 junto con los cupos por club. Hasta entonces el
- * club que recibe la propuesta puede leerla entera y pedir cambios, que sí
- * existe. Un botón «Aprobar» que no publicara nada sería peor que no tenerlo.
+ * Aprobar publica el partido: antes del RPC hay un resumen final y la pregunta
+ * voluntaria de si quien aprueba quiere reservar un cupo de su propio club.
  *
  * Usa `colors`/`radius` como su pantalla hermana `ClubChallengeScreen`, no
  * `dsColors`: son los dos pasos del mismo flujo y mezclar las dos familias
@@ -142,6 +140,17 @@ export default function ClubProposalScreen({ navigation, route }) {
   const [instrucciones, setInstrucciones] = useState('');
   const [motivo, setMotivo] = useState('');
 
+  // LAS DOS RESERVAS VOLUNTARIAS, con «No» por defecto en las dos.
+  // `proponenteJuega` viaja en la propuesta y NO gasta cupo mientras esté
+  // pendiente: se materializa al publicarse el partido. `meInscribo` es la de
+  // quien aprueba, y se decide en el momento de aprobar. Cada una gasta un
+  // cupo de SU club.
+  const [proponenteJuega, setProponenteJuega] = useState(false);
+  const [meInscribo, setMeInscribo] = useState(false);
+  // El resumen final es un paso a propósito: aprobar publica el partido y no
+  // se puede deshacer.
+  const [confirmando, setConfirmando] = useState(false);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -213,6 +222,7 @@ export default function ClubProposalScreen({ navigation, route }) {
       metodoInscripcion,
       cuotaPorPersona: parseInt(cuotaPorPersona, 10),
       instrucciones,
+      proponenteJuega,
     };
 
     const { ok, errors } = validarPropuestaOficial(draft);
@@ -253,6 +263,7 @@ export default function ClubProposalScreen({ navigation, route }) {
     metodoInscripcion,
     cuotaPorPersona,
     instrucciones,
+    proponenteJuega,
     challengeId,
     navigation,
   ]);
@@ -266,7 +277,7 @@ export default function ClubProposalScreen({ navigation, route }) {
   const handleAprobar = useCallback(async () => {
     if (!propuesta?.id) return;
     setEnviando(true);
-    const { data, error } = await aprobarPropuesta(propuesta.id);
+    const { data, error } = await aprobarPropuesta(propuesta.id, meInscribo);
     setEnviando(false);
 
     if (error) {
@@ -274,6 +285,7 @@ export default function ClubProposalScreen({ navigation, route }) {
       return;
     }
 
+    setConfirmando(false);
     setPropuesta((p) => (p ? { ...p, estado: 'aprobada' } : p));
     setBanner({
       type: 'success',
@@ -286,7 +298,7 @@ export default function ClubProposalScreen({ navigation, route }) {
       if (data?.id) navigation.replace('MatchDetail', { matchId: data.id });
       else if (navigation.canGoBack()) navigation.goBack();
     }, 1200);
-  }, [propuesta?.id, propuesta?.cupos_por_club, navigation]);
+  }, [propuesta?.id, propuesta?.cupos_por_club, meInscribo, navigation]);
 
   const handleRechazar = useCallback(async () => {
     if (!propuesta?.id) return;
@@ -414,17 +426,77 @@ export default function ClubProposalScreen({ navigation, route }) {
 
                 {puedoResponder && (
                   <>
-                    <Button
-                      label="Aprobar y publicar el partido"
-                      onPress={handleAprobar}
-                      loading={enviando}
-                      style={styles.submitBtn}
+                    <Text style={styles.label}>¿Quieres incluirte como jugador?</Text>
+                    <SiNo
+                      valor={meInscribo}
+                      onChange={(v) => {
+                        setMeInscribo(v);
+                        // Cambiar de opinión reabre el resumen: lo que se
+                        // confirmó ya no es lo que se va a hacer.
+                        setConfirmando(false);
+                      }}
+                      siLabel="Sí, resérvame un cupo"
+                      noLabel="No, solo apruebo"
                     />
-                    <Text style={styles.hint}>
-                      Al aprobar se crea el partido con {cuposLabel(propuesta.cupos_por_club)} y se
-                      avisa a los integrantes de los dos clubes. Esto no se puede deshacer: para
-                      cambiar algo después hace falta el visto bueno del club rival.
+                    <Text style={styles.ayuda}>
+                      Ocuparías uno de los {propuesta.cupos_por_club} cupos de TU club. Es la única
+                      vez que puedes incluirte sin que te confirme otro administrador.
                     </Text>
+
+                    {confirmando ? (
+                      <>
+                        <View style={styles.confirmBox}>
+                          <Text style={styles.confirmTitulo}>Antes de publicar, revisa</Text>
+                          <Text style={styles.confirmLinea}>
+                            · {fechaLarga(propuesta.fecha)} · {propuesta.duracion_min} min
+                          </Text>
+                          <Text style={styles.confirmLinea}>
+                            · {propuesta.cancha_nombre}, {propuesta.comuna}
+                          </Text>
+                          <Text style={styles.confirmLinea}>
+                            · {cuposLabel(propuesta.cupos_por_club)} ·{' '}
+                            {metodoLabel(propuesta.metodo_inscripcion)}
+                          </Text>
+                          <Text style={styles.confirmLinea}>
+                            ·{' '}
+                            {propuesta.cuota_por_persona > 0
+                              ? `$${propuesta.cuota_por_persona.toLocaleString('es-CL')} por persona`
+                              : 'Sin cuota'}
+                          </Text>
+                          <Text style={styles.confirmLinea}>
+                            · {meInscribo ? 'Te incluyes como jugador' : 'No te incluyes como jugador'}
+                          </Text>
+                          {propuesta.proponente_juega && (
+                            <Text style={styles.confirmLinea}>
+                              · Quien propuso pidió un cupo de su club
+                            </Text>
+                          )}
+                          <Text style={styles.confirmAviso}>
+                            Al publicar se avisa a los integrantes de los dos clubes. Esto no se
+                            puede deshacer: para cambiar algo después hace falta el visto bueno del
+                            club rival.
+                          </Text>
+                        </View>
+                        <Button
+                          label="Confirmar y publicar el partido"
+                          onPress={handleAprobar}
+                          loading={enviando}
+                          style={styles.submitBtn}
+                        />
+                        <Button
+                          label="Volver a revisar"
+                          variant="secondary"
+                          onPress={() => setConfirmando(false)}
+                          style={styles.submitBtn}
+                        />
+                      </>
+                    ) : (
+                      <Button
+                        label="Aprobar y publicar el partido"
+                        onPress={() => setConfirmando(true)}
+                        style={styles.submitBtn}
+                      />
+                    )}
 
                     <View style={styles.separador} />
 
@@ -641,6 +713,21 @@ export default function ClubProposalScreen({ navigation, route }) {
                   maxLength={INSTRUCCIONES_MAX}
                 />
 
+                <View style={styles.separador} />
+
+                <Text style={styles.label}>¿Quieres incluirte como jugador?</Text>
+                <SiNo
+                  valor={proponenteJuega}
+                  onChange={setProponenteJuega}
+                  siLabel="Sí, resérvame un cupo"
+                  noLabel="No, solo organizo"
+                />
+                <Text style={styles.ayuda}>
+                  Si dices que sí, ocuparás uno de los {cuposPorClub || '—'} cupos de TU club en
+                  cuanto el partido se publique. Mientras la propuesta esté esperando respuesta no
+                  se reserva nada.
+                </Text>
+
                 <Button
                   label="Enviar propuesta oficial"
                   icon={<FileText color="#0E0E0D" size={18} strokeWidth={2.4} />}
@@ -668,6 +755,22 @@ function Opcion({ label, activa, onPress }) {
     >
       <Text style={[styles.chipText, activa && styles.chipTextActive]}>{label}</Text>
     </Pressable>
+  );
+}
+
+/**
+ * Sí / No con el «No» a la izquierda y activo de entrada.
+ *
+ * El orden no es decorativo: reservarse un cupo se lo quita a un compañero,
+ * así que la opción que no cambia nada tiene que ser la que está puesta si
+ * nadie toca nada. Es la misma regla que aplica el servidor por defecto.
+ */
+function SiNo({ valor, onChange, siLabel, noLabel }) {
+  return (
+    <View style={styles.chipsRow}>
+      <Opcion label={noLabel} activa={valor !== true} onPress={() => onChange(false)} />
+      <Opcion label={siLabel} activa={valor === true} onPress={() => onChange(true)} />
+    </View>
   );
 }
 
@@ -704,7 +807,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  content: { paddingHorizontal: 16, paddingBottom: 40, gap: 8 },
+  content: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    gap: 8,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
 
   label: {
     color: colors.textSecondary,
@@ -735,6 +845,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     marginTop: 20,
     marginBottom: 4,
+  },
+
+  // El resumen previo a publicar. Borde marcado porque es el último punto en
+  // que se puede volver atrás.
+  confirmBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    padding: 14,
+    marginTop: 14,
+  },
+  confirmTitulo: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  confirmLinea: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
+  confirmAviso: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 10,
   },
 
   // `LocationAutocomplete` trae su propia estructura; acá sólo se le pasa la

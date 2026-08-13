@@ -61,6 +61,7 @@ const SAMPLE_DATA_BY_TYPE = {
   // que el aviso anuncia, y lo reciben también los jugadores sin rol, que no
   // tienen nada que hacer en la negociación entre administradores.
   club_match_published: { challengeId: 'ch1', matchId: 'm1', threadKey: 'challenge:ch1' },
+  club_match_reserva_omitida: { matchId: 'm1', challengeId: 'ch1', motivo: 'ya tienes otro partido en ese horario' },
   message_new: { threadKey: 'dm:u1' },
   chat_mention_all: { threadKey: 'club:c1' },
   friend_request: { fromUserId: 'u1' },
@@ -94,6 +95,9 @@ const EXPECTED_SCREEN_BY_TYPE = {
   club_challenge_proposal: 'ChatThread',
   club_challenge_proposal_rejected: 'ChatThread',
   club_match_published: 'MatchDetail',
+  // A la NÓMINA, no al detalle: lo único que se puede hacer con este aviso
+  // es inscribirse cuando el impedimento se resuelva, y eso se hace ahí.
+  club_match_reserva_omitida: 'ClubMatchRoster',
   message_new: 'ChatThread',
   chat_mention_all: 'ChatThread',
   friend_request: 'UserProfile',
@@ -409,4 +413,19 @@ test('resolveNotificationTarget: el destino del hilo no necesita verificar el cl
     data: { threadKey: 'challenge:ch-1', clubRetadorId: 'c1' },
   });
   assert.equal(target.resource, undefined);
+});
+
+// La reserva omitida (migración 45) le llega SÓLO a quien pidió el cupo y no
+// lo obtuvo. Sin `matchId` no hay adónde ir, y un destino inventado sería peor
+// que ninguno.
+test('club_match_reserva_omitida sin matchId no resuelve a ninguna pantalla', () => {
+  assert.equal(resolveNotificationTarget({ type: 'club_match_reserva_omitida', data: {} }), null);
+});
+
+test('club_match_reserva_omitida verifica que el partido siga existiendo', () => {
+  const t = resolveNotificationTarget({
+    type: 'club_match_reserva_omitida',
+    data: { matchId: 'm1' },
+  });
+  assert.deepEqual(t.resource, { kind: 'match', id: 'm1' });
 });

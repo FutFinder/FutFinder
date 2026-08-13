@@ -1,6 +1,6 @@
 # Base de datos
 
-Última revisión: 2026-08-11
+Última revisión: 2026-08-13
 
 ## Propósito
 
@@ -18,12 +18,14 @@ La 44b separa la ubicación del partido de clubes en dos: la EXACTA vive en `clu
 
 La migración 44 abre el partido de clubes sobre las tablas que ya existían: `matches` gana `cupos_por_club`, `metodo_inscripcion` y `challenge_proposal_id`, esta última con índice único parcial —es la garantía estructural de que una propuesta aprobada produce un solo partido, no una comprobación en código—, y `attendees` gana `club_id` con índice `(id_partido, club_id, estado)` para contar cupos por club. `club_esta_sancionado()` existe desde la 44 como marcador que devuelve `false` siempre y está revocada de los tres roles del cliente; su cuerpo real llega con las sanciones. El trigger `add_organizer_as_attendee` salta cuando el partido viene de una propuesta: autoinscribir al administrador que aprueba le gastaría un cupo a su club y dejaría una fila con `club_id` nulo.
 
+U3 quedó aplicada en producción el 2026-08-13, en el orden 44e y después 45. La 44e elimina políticas y privilegios de escritura directa en `attendees`/`match_waitlist`, crea `cancel_join_request()` y bloquea la fila del partido al aprobar una solicitud normal. La 45 agrega las RPC de nómina por club, publica `attendees` en Realtime y agrega `attendees.origen` con CHECK/NOT NULL. Al exigir NOT NULL, las 25 filas existentes quedaron marcadas `legado`; el trigger `aa_attendees_completa_origen` corre primero, rellena sólo los INSERT con NULL según estado/organizador y nunca pisa un origen explícito. Las pruebas posteriores confirmaron cero escrituras directas, las ACL, el orden de triggers y ausencia de residuos; queda pendiente únicamente la comprobación manual autenticada con integrantes de ambos clubes.
+
 Dos hábitos que se ganaron a golpes en estas migraciones: `revoke ... from anon` **no** quita el `EXECUTE` que PostgreSQL concede a `PUBLIC` por defecto, así que toda RPC nueva revoca de `public` explícitamente; y un `update ... returning * into fila` que no mueve ninguna fila deja la variable en NULL, de modo que los avisos posteriores se irían al vacío.
 
 ## Integridad y tiempo real
 
 - Triggers crean perfiles y asistentes organizadores, limitan clubes, automatizan cola y avisos, protegen mensajes y generan notificaciones de clubes, partido y chat.
-- `messages` está en la publicación `supabase_realtime`; las pantallas también se suscriben a `notifications` y `friendships` mediante canales de cambios.
+- `messages` y, desde la 45, `attendees` están en la publicación `supabase_realtime`. Las pantallas se suscriben además a `notifications` y `friendships` mediante canales de cambios.
 - RLS está habilitado para las tablas versionadas que contienen datos de usuario. Las políticas y RPC son parte del contrato, no un detalle del cliente.
 
 ## Convención de cambio

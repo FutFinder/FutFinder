@@ -33,6 +33,7 @@ export const CATEGORY = {
   club_challenge_accepted: 'clubes',
   club_challenge_rejected: 'clubes',
   club_match_published: 'clubes',
+  club_match_reserva_omitida: 'clubes',
 };
 
 const ICON = {
@@ -62,6 +63,7 @@ const ICON = {
   club_challenge_accepted: CheckCheck,
   club_challenge_rejected: Swords,
   club_match_published: Swords,
+  club_match_reserva_omitida: UserX,
 };
 
 const TAG = {
@@ -93,6 +95,9 @@ const TAG = {
   // Verde, no rojo: el rojo está reservado a lo que necesita atención
   // (una negociación trabada), y un partido publicado es una buena noticia.
   club_match_published: { label: 'PARTIDO DE CLUBES', color: '#5AE06A', bg: 'rgba(90,224,106,0.10)', border: 'rgba(90,224,106,0.30)' },
+  // Ámbar y no rojo: el partido salió bien, lo que no se pudo aplicar es
+  // sólo el cupo de quien lo pidió. Es un «revisa esto», no una alarma.
+  club_match_reserva_omitida: { label: 'TU CUPO', color: '#F5C451', bg: 'rgba(245,196,81,0.10)', border: 'rgba(245,196,81,0.28)' },
 };
 
 const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
@@ -116,6 +121,11 @@ const ATAJOS = {
     dato: 'matchId',
     label: 'VER PARTIDO',
     accesible: 'Ver el partido de clubes recién publicado',
+  },
+  club_match_reserva_omitida: {
+    dato: 'matchId',
+    label: 'VER NÓMINA',
+    accesible: 'Ver la nómina del partido para inscribirte cuando se resuelva',
   },
 };
 
