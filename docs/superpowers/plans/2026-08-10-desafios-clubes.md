@@ -242,6 +242,8 @@ Transiciones autorizadas, con quién puede dispararlas:
 | `supabase/migrations/43c_propuesta_ubicacion_obligatoria.sql` | `crear_propuesta_oficial()` exige latitud y longitud válidas. Sin ellas la propuesta nacía imposible de aprobar, porque `matches.latitud`/`longitud` son NOT NULL | Aplicada |
 | `supabase/migrations/43d_rechazo_doble_pertenencia.sql` | `rechazar_propuesta()` con la regla estricta: no responde quien pertenece al club proponente, ni siquiera como jugador | Aplicada |
 | `supabase/migrations/44_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), marcador `club_esta_sancionado`, guarda en `add_organizer_as_attendee` | Aplicada |
+| `supabase/migrations/44b_ubicacion_protegida_clubes.sql` | `club_match_locations` (ubicación exacta con RLS), `matches.ubicacion_aproximada`, `aproximar_grado()`, guarda en `tg_register_cancha`, GPS sólo con la exacta, `aprobar_propuesta` publica la aproximada | Aplicada |
+| `supabase/migrations/44c_notify_match_updated_texto.sql` | `notify_match_updated()` con `array_append`. **Independiente de la 44b**: corrige un fallo preexistente que impedía editar cualquier partido | Aplicada |
 | `supabase/migrations/45_inscripcion_por_club.sql` | `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda C7 en `join_match`/`request_join`/`approve_join`, cierre de las políticas de `attendees` | Pendiente |
 | `supabase/migrations/46_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` | Pendiente |
 | `supabase/migrations/47_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), y el cuerpo real de `club_esta_sancionado` | Pendiente |
@@ -917,6 +919,45 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 
 **Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 44 a 46, y
 comprobación de que publicar/unirse a un partido normal sigue igual.
+
+### Corrección de seguridad (2026-08-13) — la ubicación deja de ser pública
+
+La protección de la dirección exacta vivía **sólo en la interfaz**. Al
+publicarse, el partido pasa a `matches`, cuya política de lectura es
+`using (true)`: `direccion`, `latitud` y `longitud` quedaban legibles por
+cualquiera, incluido `anon`. Y había una segunda fuga: `tg_register_cancha`
+copiaba además la dirección a la tabla pública `canchas`, consultable por
+`anon` con `search_canchas()`.
+
+**Separar, no cerrar.** Cerrar la lectura de `matches` habría roto el resto de
+la app, que vive de listar partidos abiertos.
+
+- La exacta pasa a `club_match_locations`, con RLS para los integrantes de los
+  dos clubes y **sin políticas de escritura**: sólo la escriben las RPC
+  `security definer`.
+- `matches` conserva un punto **aproximado** —rejilla de 0,01°, ~1 km— marcado
+  con `ubicacion_aproximada`, para que el partido se siga descubriendo.
+- `matches.direccion` queda en NULL: la calle no se aproxima, se omite.
+
+La aproximación va en las **mismas columnas** porque todo el descubrimiento
+—`listMatchesInBounds`, `applyFilters`, los marcadores del mapa y el radio de
+Inicio— las lee directo. Así esas cuatro rutas siguen funcionando sin tocarlas
+y **sin una consulta por tarjeta**.
+
+**Precisión: la distancia pública puede errar hasta ~0,73 km** (media diagonal
+de la celda). En el partido real, la aproximada quedó a 189 m de la exacta. Se
+guarda el nodo de la rejilla y no un desplazamiento aleatorio: al ser
+determinista no se puede promediar entre lecturas para afinarlo, y no se corre
+el riesgo de caer en otra comuna y romper el filtro por zona.
+
+**El GPS usa exclusivamente la exacta y falla cerrado sin ella.** Confirmar
+contra un punto redondeado a un kilómetro habría dejado marcarse presente desde
+una cuadra de distancia.
+
+**El nombre de la cancha sigue siendo público**, como el resto de la
+información de descubrimiento. Si el recinto es conocido, su nombre identifica
+el lugar mejor que la celda de 1 km: la aproximación protege la coordenada, no
+el nombre.
 
 **Verificación de la Tarea 4.1 (2026-08-12):** `npm run lint` (0 errores),
 `npm test` (305 ✓), `npm run build:web` (✓) y las tres pruebas SQL en
