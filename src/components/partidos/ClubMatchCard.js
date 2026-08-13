@@ -34,6 +34,9 @@ import { whenLabel } from './PartidoCard';
  * de quién mire: describe el dato que hay, y el dato es una celda de ~1 km.
  * La dirección exacta y el «Cómo llegar» están en el detalle.
  *
+ * A esta tarjeta sólo llegan integrantes de los dos clubes: desde la
+ * migración 44d el partido no existe para nadie más hasta que termina.
+ *
  * `variant="compacta"` es la de Inicio: mismo lenguaje visual, menos alto.
  */
 export default function ClubMatchCard({ match, misClubIds = [], onPress, variant = 'completa' }) {

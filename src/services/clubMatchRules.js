@@ -11,12 +11,14 @@
  *    son 9 y 9. Mostrar «18 de 18 cupos» —lo que hace la tarjeta de un partido
  *    normal— hace creer que el club rival puede quedarse con todos.
  *
- * 2. HAY DOS UBICACIONES, Y NO SE PUEDEN CONFUNDIR. Desde la migración 44b,
- *    `matches` guarda una ubicación APROXIMADA y pública —rejilla de 0,01°,
- *    ~1 km— para que cualquiera pueda descubrir el partido en las listas, el
- *    mapa y los filtros por zona. La EXACTA vive en `club_match_locations`,
- *    con su RLS, y sólo la leen los integrantes de los dos clubes. Quien
- *    pinta tiene que saber cuál de las dos tiene en la mano y decirlo.
+ * 2. HAY DOS UBICACIONES, Y NO SE PUEDEN CONFUNDIR. `matches` guarda una
+ *    APROXIMADA —rejilla de 0,01°, ~1 km—; la EXACTA vive en
+ *    `club_match_locations`. Desde la migración 44d **ninguna de las dos es
+ *    pública**: el partido entero sólo lo ven los integrantes de los dos
+ *    clubes hasta que termina. La aproximada es lo que hay en las listas,
+ *    donde pedir la exacta sería una consulta por tarjeta, y por eso la
+ *    tarjeta avisa de que lo es. En el detalle, a un integrante se le entrega
+ *    la exacta.
  *
  * Los partidos normales no pasan por ninguna de estas dos reglas y no cambian
  * en nada.

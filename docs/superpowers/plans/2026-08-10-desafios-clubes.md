@@ -244,6 +244,7 @@ Transiciones autorizadas, con quién puede dispararlas:
 | `supabase/migrations/44_partido_de_clubes.sql` | Columnas de `matches`/`attendees`, RPC `aprobar_propuesta` (crea el partido atómicamente), marcador `club_esta_sancionado`, guarda en `add_organizer_as_attendee` | Aplicada |
 | `supabase/migrations/44b_ubicacion_protegida_clubes.sql` | `club_match_locations` (ubicación exacta con RLS), `matches.ubicacion_aproximada`, `aproximar_grado()`, guarda en `tg_register_cancha`, GPS sólo con la exacta, `aprobar_propuesta` publica la aproximada | Aplicada |
 | `supabase/migrations/44c_notify_match_updated_texto.sql` | `notify_match_updated()` con `array_append`. **Independiente de la 44b**: corrige un fallo preexistente que impedía editar cualquier partido | Aplicada |
+| `supabase/migrations/44d_partido_de_clubes_privado.sql` | El partido de clubes es privado hasta que termina: RLS de `matches`, `attendees` y `match_waitlist`, triggers que atrapan a las RPC de inscripción, y `historial_publico_club()` como única salida pública | Aplicada |
 | `supabase/migrations/45_inscripcion_por_club.sql` | `join_club_match`, `leave_club_match`, `confirmar_nomina_club`, guarda C7 en `join_match`/`request_join`/`approve_join`, cierre de las políticas de `attendees` | Pendiente |
 | `supabase/migrations/46_cambios_de_partido.sql` | `club_match_changes`, RPC `proponer_cambio_partido`, `responder_cambio_partido` | Pendiente |
 | `supabase/migrations/47_sanciones_y_revisiones.sql` | `club_sanctions`, `club_sanction_reviews`, `club_match_noshow_reports`, RPC `cancelar_encuentro_club`, `aplicar_sancion_club`, `reportar_incomparecencia`, `solicitar_revision_sancion`, `resolver_revision_sancion` (sólo service_role), y el cuerpo real de `club_esta_sancionado` | Pendiente |
@@ -847,7 +848,7 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
       un jugador del club A no puede ocupar cupo del club B; un ajeno no entra.
 - [ ] Commit.
 
-### Tarea 4.3 — Avisos, tarjeta destacada y presencia en Inicio ✅
+### Tarea 4.3 — Avisos, tarjeta destacada y presencia en Inicio ✅ (U2 COMPLETADA)
 
 **Archivos:** crear `src/services/clubMatchRules.js` + su prueba,
 `src/components/partidos/ClubMatchCard.js`; modificar
@@ -920,7 +921,40 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 **Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 44 a 46, y
 comprobación de que publicar/unirse a un partido normal sigue igual.
 
-### Corrección de seguridad (2026-08-13) — la ubicación deja de ser pública
+### Regla definitiva de privacidad (2026-08-13) — el partido es privado hasta que termina
+
+**Ésta es la regla que manda.** Lo de más abajo describe un paso intermedio que
+la 44d dejó atrás: durante unas horas el partido fue público con la ubicación
+aproximada, y ya no lo es.
+
+Mientras el partido no esté **finalizado**, sólo existe para los integrantes de
+los dos clubes —integrantes, no sólo administradores—. Un externo o un anónimo
+no obtiene nada: ni por id, ni listando, ni en la nómina, ni en la cola, ni en
+la ubicación, ni en Inicio, Partidos, mapa, filtros o búsquedas. Tampoco puede
+inscribirse: ni con un insert directo, ni por `join_match`, `request_join` o
+`join_waitlist`.
+
+El predicado vive en una sola política, la de `matches`:
+`challenge_proposal_id is null` (partido normal, público) **o** soy integrante
+de alguno de los dos clubes. `attendees` y `match_waitlist` se cuelgan de ella
+con un `exists`, de modo que la regla no está copiada en tres sitios.
+
+Las RPC que inscriben son `security definer` y no pasan por RLS. En vez de
+reescribir cinco funciones largas y no versionadas, hay un **trigger** en
+`attendees` y otro en `match_waitlist`: se disparan venga la fila de donde
+venga, incluida cualquier función futura que nadie recuerde tapar. El trigger
+deja pasar la fila que trae `club_id`, que es por donde entrará
+`join_club_match()` en U3 sin tener que acordarse de tocarlo.
+
+Al finalizar, lo único público es el resultado, por `historial_publico_club()`:
+clubes, **día** (nunca la hora), marcador y V/E/D. Es una proyección, no una
+ventana a la fila, y filtra `estado = 'finalizado'`, así que un partido
+cancelado o no disputado no se publica.
+
+**El chat de negociación sigue siendo exclusivo de administradores**, sin
+cambios.
+
+### Paso intermedio (2026-08-13, superado por la 44d) — la ubicación deja de ser pública
 
 La protección de la dirección exacta vivía **sólo en la interfaz**. Al
 publicarse, el partido pasa a `matches`, cuya política de lectura es

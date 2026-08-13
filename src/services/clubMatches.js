@@ -54,13 +54,19 @@ const ESTADO_LABEL = {
 export async function getClubMatchHistory(clubId, { limit = 20 } = {}) {
   if (!isSupabaseConfigured || !clubId) return { data: [], error: null };
 
-  // `hora` es la fecha-hora del partido (timestamptz), ver supabase/schema.sql.
-  const { data, error } = await supabase
-    .from('matches')
-    .select('id, titulo, hora, estado, club_local_id, club_visitante_id')
-    .or(`club_local_id.eq.${clubId},club_visitante_id.eq.${clubId}`)
-    .order('hora', { ascending: false })
-    .limit(limit);
+  // NO se lee `matches`. Desde la migración 44d los partidos entre clubes son
+  // privados hasta que terminan: sólo los ven los integrantes de los dos
+  // clubes, y consultar la tabla desde el perfil público de un club devolvería
+  // cero filas a cualquiera que no sea de la casa.
+  //
+  // El historial público sale de `historial_publico_club()`, una proyección
+  // que expone SÓLO clubes, día, marcador y resultado — nunca cancha, hora
+  // exacta, cuota, cupos, nómina ni ubicación— y sólo de partidos
+  // `finalizado`: los cancelados y los no disputados no se publican.
+  const { data, error } = await supabase.rpc('historial_publico_club', {
+    p_club_id: clubId,
+    p_limit: limit,
+  });
 
   if (error) {
     // Serializado: los errores de PostgREST se imprimen como [object Object]
@@ -70,38 +76,27 @@ export async function getClubMatchHistory(clubId, { limit = 20 } = {}) {
       error.code || '',
       error.message || JSON.stringify(error)
     );
+    // Sin la migración 44d la función no existe todavía: el perfil del club se
+    // dibuja igual, con el historial vacío, en vez de romperse.
+    if (['42883', 'PGRST202'].includes(error.code)) return { data: [], error: null };
     return { data: [], error };
   }
   if (!data || data.length === 0) return { data: [], error: null };
 
-  // Nombres/logos de los clubes rivales, en una sola query.
-  const rivalIds = data
-    .map((m) => (m.club_local_id === clubId ? m.club_visitante_id : m.club_local_id))
-    .filter(Boolean);
-
-  let rivalById = new Map();
-  if (rivalIds.length > 0) {
-    const { data: clubs } = await supabase
-      .from('clubs')
-      .select('id, nombre, foto_url')
-      .in('id', rivalIds);
-    rivalById = new Map((clubs || []).map((c) => [c.id, c]));
-  }
-
   return {
     data: data.map((m) => {
-      const rivalId = m.club_local_id === clubId ? m.club_visitante_id : m.club_local_id;
-      const rival = rivalById.get(rivalId);
+      const soyLocal = m.club_local_id === clubId;
       return {
-        id: m.id,
-        rivalNombre: rival?.nombre || 'Club rival',
-        rivalLogoUrl: rival?.foto_url || null,
-        // Sin marcador en la BD todavía (ver comentario de cabecera).
-        miMarcador: null,
-        suMarcador: null,
-        fecha: m.hora,
-        estado: ESTADO_LABEL[m.estado] || m.estado,
-        resultado: null,
+        id: m.match_id,
+        rivalNombre: (soyLocal ? m.club_visitante_nombre : m.club_local_nombre) || 'Club rival',
+        // La proyección pública no expone escudos: el perfil del club ya los
+        // tiene cuando hace falta, y pedirlos aquí sería una consulta más.
+        rivalLogoUrl: null,
+        miMarcador: soyLocal ? m.goles_local : m.goles_visitante,
+        suMarcador: soyLocal ? m.goles_visitante : m.goles_local,
+        fecha: m.fecha,
+        estado: ESTADO_LABEL.finalizado,
+        resultado: m.resultado,
         esDemo: false,
       };
     }),
