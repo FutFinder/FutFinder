@@ -975,7 +975,7 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > (`marginLeft: 'auto'` en vez de un separador flexible). Comprobados nombres
 > largos, clubes sin escudo y estado cancelado.
 
-### Tarea 4.4 — Cambios negociados ✅ (desplegada el 2026-08-13, falta la comprobación manual)
+### Tarea 4.4 — Cambios negociados ✅ CERRADA el 2026-08-14
 
 **Archivos:** `supabase/migrations/46_cambios_de_partido.sql`, prueba
 `supabase/tests/46_cambios_de_partido_test.sql`; crear
@@ -999,9 +999,7 @@ prueba), `src/services/clubMatchChanges.js`,
 - [x] Prueba SQL `46_cambios_de_partido_test.sql`: 22 casos.
 - [x] Interfaz completa: pedir, revisar, aceptar y rechazar desde el hilo.
 - [x] Commit.
-- [ ] Comprobación manual con `chatgpt` y `chatgpt2` — primera pasada hecha el
-      2026-08-13: pasó hasta el rechazo con motivo y encontró dos fallos, los
-      dos corregidos. Falta repetirla desde una solicitud nueva.
+- [x] Comprobación manual con `chatgpt` y `chatgpt2`, aprobada el 2026-08-14.
 
 > **La primera pasada manual encontró dos fallos, y ninguno era del servidor.**
 > El rechazo quedó bien persistido y bien notificado; lo que fallaba era la
@@ -1053,8 +1051,51 @@ prueba), `src/services/clubMatchChanges.js`,
 > el caso de la doble pulsación reusaba un token viejo, con lo que medía el
 > reencuentro con una fila anterior en vez de la idempotencia.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 44 a 46, y
-comprobación de que publicar/unirse a un partido normal sigue igual.
+**Verificación de fase (2026-08-14): FASE 4 CERRADA.** `npm run lint` (0
+errores), `npm test` (467 ✓), `deno test … pushLogic.test.ts` (13 ✓) y
+`npm run build:web` (✓). Arnés `46_cambios_de_partido_test.sql` en **22/22**
+antes de aplicar —fallando por función ausente— y **22/22** después, y
+`44c_notify_match_updated_test.sql` en **9/9**, que es la prueba de que
+publicar y editar un partido normal sigue exactamente igual. Migración 46
+aplicada y verificada contra el catálogo: RLS con una sola política de
+lectura, `authenticated` sin escritura, `anon` sin lectura, las dos RPC
+revocadas de `public`/`anon`, la firma vieja de dos argumentos ausente y los
+33 tipos de aviso = 31 previos intactos + 2 nuevos. `send-push` redesplegada
+(v6, `verify_jwt` conservado). Advisors de seguridad: 0 ERROR.
+
+> **La comprobación manual con dos cuentas encontró TRES fallos, y ninguno
+> era del servidor.** El arnés SQL estuvo en 22/22 desde el primer día
+> mientras la pantalla se caía entera. Es la misma lección que dejó U3, ahora
+> con una vuelta de tuerca: no basta con que la prueba exista, tiene que
+> ejercitar el camino que corre de verdad.
+>
+> 1. **El hilo no se enteraba de lo que hacía el otro club.** No había ningún
+>    camino de refresco: la única suscripción escucha `messages`, y ni
+>    `club_challenge_events` ni `club_match_changes` están en la publicación
+>    `supabase_realtime`. La laguna venía de la 42/43 y afectaba igual a
+>    prórroga y propuesta. Arreglado con `utils/sondeo.js` (`cda723c`).
+> 2. **El sondeo reventaba en web.** Guardaba `{ setInterval, clearInterval }`
+>    en un objeto y los llamaba como método de ese objeto: en el navegador el
+>    receptor equivocado da `TypeError: Illegal invocation`, y el Error
+>    Boundary se comía el hilo entero. Las nueve pruebas del sondeo inyectaban
+>    dobles, así que el camino por defecto —el único que corre— era el único
+>    sin cubrir, y Node no comprueba el receptor.
+> 3. **El nombre del club rival salía de una fila que nunca lo trae.** Los
+>    `useMemo` leían `clubChallenge.club_retador?.nombre`, pero ni
+>    `getChallenge` (`select('*')`) ni `refrescar_desafio` (devuelve
+>    `club_challenges` a secas) traen los clubes embebidos: eran código muerto
+>    desde el primer commit. La prueba pura pasaba porque se le daba el nombre
+>    a mano — probaba la función, no la fuente.
+>
+> **Comprobación manual aprobada el 2026-08-14** contra `b3115a6`, en
+> `localhost`, con las dos sesiones abiertas a la vez: solicitud de cuota de
+> gratis a $1.000; el proponente ve «Pediste un cambio» y «Esperando la
+> respuesta de chatgpt2.»; el rival la ve aparecer **sola, sin recargar**,
+> con «chatgpt pide un cambio» y los dos botones; rechaza; y en la sesión del
+> proponente la tarjeta desaparece sola, entra el evento de rechazo y vuelve
+> «Pedir un cambio del partido». Sin Error Boundary, sin solicitudes
+> pendientes y con la cuota oficial intacta en gratis. Falta confirmar el
+> despliegue de Vercel, que no bloquea el cierre.
 
 ### Regla definitiva de privacidad (2026-08-13) — el partido es privado hasta que termina
 
