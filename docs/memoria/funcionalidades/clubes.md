@@ -32,12 +32,14 @@ El partido publicado tiene tarjeta propia (`ClubMatchCard`): borde y halo verdes
 
 U3 está implementada y sus migraciones 44e y 45 quedaron aplicadas en producción el 2026-08-13. `ClubMatchRosterScreen` muestra las dos nóminas, «X de Y inscritos de tu club», inscripción por llegada o postulación, confirmación/rechazo por un administrador del club del jugador, salida y retiro de postulación. Se refresca con Realtime para INSERT/UPDATE y sondeo de respaldo para DELETE/reconexiones. Proponer y aprobar preguntan por una reserva voluntaria con «No» predeterminado; la aprobación presenta un resumen final. Una reserva impedida no aborta la publicación y genera `club_match_reserva_omitida` sólo para la persona afectada. Las pruebas automatizadas y de esquema están completas; queda pendiente la comprobación manual autenticada con cuentas de ambos clubes.
 
+La consulta de la nómina se arma en `src/utils/nominaQuery.js` y sus columnas se contrastan con `supabase/schema.sql` y las migraciones en una prueba. Es la corrección de un fallo real: la nómina pedía `profiles.nombre`, columna que no existe, y PostgREST rechazaba la consulta entera con 400 y `42703`. El nombre visible sale de `username`, que es el único identificador de persona en `profiles`. Además, `getNominaPartido()` ya no traduce un fallo de esquema a lista vacía: devuelve `data: null` con el error, y `ClubMatchRosterScreen` distingue «no hay nadie inscrito» de «no se pudo cargar» —en el segundo caso no dibuja conteos, listas ni botón de acción, sólo el aviso y «Reintentar»—, porque un «0 de 7» con las listas en blanco y «Inscribirme» a quien ya estaba dentro se ve igual que un partido vacío.
+
 Lo que todavía no comenzó es U4: cambios negociados, sanciones y resultado. U3 se desplegó en el orden 44e y después 45. El plan por fases está en `docs/superpowers/plans/2026-08-10-desafios-clubes.md`. El flujo antiguo sigue vivo: los desafíos en estado `aceptado` conservan su conversación directa entre dos administradores, permitida por `chat_valid_club_challenge_dm()`.
 
 ## Pantallas y dependencias
 
 - Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, galería, invitación, planes, desafíos, `ClubProposalScreen` y `ClubMatchRosterScreen`.
-- Código: `src/services/clubs.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/challengeThread.js`, `src/components/club/` y `src/components/clubes/`.
+- Código: `src/services/clubs.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/components/club/` y `src/components/clubes/`.
 - Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 45; 44e/45 están aplicadas.
 
 ## Estados, errores y problemas conocidos

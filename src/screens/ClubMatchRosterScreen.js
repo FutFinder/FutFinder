@@ -64,6 +64,11 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [match, setMatch] = useState(null);
   const [nomina, setNomina] = useState([]);
+  // Una nómina vacía y una nómina que no se pudo cargar NO se dibujan igual.
+  // Pintar «0 de 7» y las listas en blanco cuando la consulta se cayó es
+  // inventar un hecho: se ve idéntico a un partido al que no se ha inscrito
+  // nadie, y encima ofrece «Inscribirme» a quien ya está dentro.
+  const [errorNomina, setErrorNomina] = useState(null);
   const [misClubes, setMisClubes] = useState([]);
   const [me, setMe] = useState(null);
   const [banner, setBanner] = useState(null);
@@ -74,18 +79,21 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
   const vivo = useRef(true);
 
   const cargar = useCallback(async () => {
-    const [{ data: m }, { data: filas }, { data: clubes }, { data: sesion }] = await Promise.all([
-      getMatchById(matchId),
-      getNominaPartido(matchId),
-      getMyClubs(),
-      supabase.auth.getUser(),
-    ]);
+    const [{ data: m }, { data: filas, error: errNomina }, { data: clubes }, { data: sesion }] =
+      await Promise.all([
+        getMatchById(matchId),
+        getNominaPartido(matchId),
+        getMyClubs(),
+        supabase.auth.getUser(),
+      ]);
     // `getMatchById` trae la fila plana. La nómina necesita además nombres y
     // escudos para no pintar «Club local vs Club visitante» cuando sí existen.
     const [mConClubes] = await withClubs(m ? [m] : []);
     if (!vivo.current) return;
     setMatch(mConClubes || m || null);
+    // `filas === null` es «no se pudo cargar»; `[]` es «no hay nadie».
     setNomina(filas || []);
+    setErrorNomina(errNomina || null);
     setMisClubes(clubes || []);
     setMe(sesion?.user?.id || null);
     setLoading(false);
@@ -219,43 +227,66 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
             </Text>
           )}
 
-          <View style={[styles.columnas, dosColumnas && styles.columnasAncho]}>
-            <NominaClub
-              club={clubes.local}
-              clubId={match.club_local_id}
-              nomina={nomina}
-              cuposPorClub={match.cupos_por_club}
-              esMiClub={miClubId === match.club_local_id}
-              puedoConfirmar={puedoConfirmarNomina(match.club_local_id, misClubIdsAdmin)}
-              me={me}
-              enviando={enviando}
-              onConfirmar={handleConfirmar}
-              ancho={dosColumnas}
-            />
-            <NominaClub
-              club={clubes.visitante}
-              clubId={match.club_visitante_id}
-              nomina={nomina}
-              cuposPorClub={match.cupos_por_club}
-              esMiClub={miClubId === match.club_visitante_id}
-              puedoConfirmar={puedoConfirmarNomina(match.club_visitante_id, misClubIdsAdmin)}
-              me={me}
-              enviando={enviando}
-              onConfirmar={handleConfirmar}
-              ancho={dosColumnas}
-            />
-          </View>
-
-          {accion === 'ninguna' ? (
-            <Text style={styles.motivo}>{motivo}</Text>
+          {errorNomina ? (
+            // Ni conteos ni listas ni botón de acción: los tres dirían algo que
+            // no sabemos. Se dice lo único cierto —que no cargó— y se ofrece
+            // volver a intentarlo.
+            <>
+              <Banner
+                type="error"
+                title="No se pudo cargar la nómina"
+                message={`${errorNomina.message} No se muestran los cupos ni las listas para no darte un dato equivocado.`}
+              />
+              <Button
+                label="Reintentar"
+                variant="secondary"
+                onPress={cargar}
+                style={styles.accionBtn}
+              />
+            </>
           ) : (
-            <Button
-              label={ACCION_LABEL[accion]}
-              variant={accion === 'salir' || accion === 'cancelar_postulacion' ? 'secondary' : 'primary'}
-              onPress={handleAccion}
-              loading={enviando}
-              style={styles.accionBtn}
-            />
+            <>
+              <View style={[styles.columnas, dosColumnas && styles.columnasAncho]}>
+                <NominaClub
+                  club={clubes.local}
+                  clubId={match.club_local_id}
+                  nomina={nomina}
+                  cuposPorClub={match.cupos_por_club}
+                  esMiClub={miClubId === match.club_local_id}
+                  puedoConfirmar={puedoConfirmarNomina(match.club_local_id, misClubIdsAdmin)}
+                  me={me}
+                  enviando={enviando}
+                  onConfirmar={handleConfirmar}
+                  ancho={dosColumnas}
+                />
+                <NominaClub
+                  club={clubes.visitante}
+                  clubId={match.club_visitante_id}
+                  nomina={nomina}
+                  cuposPorClub={match.cupos_por_club}
+                  esMiClub={miClubId === match.club_visitante_id}
+                  puedoConfirmar={puedoConfirmarNomina(match.club_visitante_id, misClubIdsAdmin)}
+                  me={me}
+                  enviando={enviando}
+                  onConfirmar={handleConfirmar}
+                  ancho={dosColumnas}
+                />
+              </View>
+
+              {accion === 'ninguna' ? (
+                <Text style={styles.motivo}>{motivo}</Text>
+              ) : (
+                <Button
+                  label={ACCION_LABEL[accion]}
+                  variant={
+                    accion === 'salir' || accion === 'cancelar_postulacion' ? 'secondary' : 'primary'
+                  }
+                  onPress={handleAccion}
+                  loading={enviando}
+                  style={styles.accionBtn}
+                />
+              )}
+            </>
           )}
         </ScrollView>
       )}

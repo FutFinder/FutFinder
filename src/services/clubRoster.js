@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { createSharedChannel } from '../utils/chatMeta';
+import { buildNominaQuery } from '../utils/nominaQuery';
 
 /**
  * Inscripción y nómina de un partido entre clubes (migración 45).
@@ -52,32 +53,24 @@ function comoResultado(data, error, etiqueta) {
 /**
  * La nómina completa del partido, los dos clubes.
  *
- * Se piden LOS DOS a propósito: la gracia de la pantalla es ver cómo va el
- * rival, y la RLS de la 44d ya decide quién puede mirar — a un externo le
- * devuelve cero filas, así que no hay nada que filtrar acá.
+ * Las columnas se arman en `buildNominaQuery` para poder contrastarlas con el
+ * esquema versionado en una prueba. Ahí está el porqué.
  *
- * `origen` viaja porque es lo que distingue una inscripción normal de la
- * reserva que un administrador se autorizó al proponer o al aprobar. Sin eso,
- * la nómina no podría explicar por qué alguien ya estaba dentro.
+ * NO DEVUELVE `[]` CUANDO FALLA, Y ESO ES EL ARREGLO. Antes, cualquier error
+ * que oliera a esquema se traducía a «nómina vacía» y se seguía dibujando: la
+ * consulta se caía con 400 por pedir `profiles.nombre` —una columna que no
+ * existe— y la pantalla mostraba «0 de 7», las dos listas en blanco y el botón
+ * «Inscribirme» a gente que ya estaba inscrita. Todo consistente, todo falso.
+ * Una lista vacía y una lista que no se pudo cargar son cosas distintas y
+ * tienen que llegar distintas a la pantalla: `data: []` es «no hay nadie»,
+ * `data: null` es «no sé quién hay».
  */
 export async function getNominaPartido(matchId) {
   if (!isSupabaseConfigured || !matchId) return { data: [], error: null };
 
-  const { data, error } = await supabase
-    .from('attendees')
-    .select(
-      'id, id_jugador, id_partido, estado, club_id, origen, inscrito_at, ' +
-        'profiles:id_jugador (id, username, nombre, foto_url, trust_score)'
-    )
-    .eq('id_partido', matchId)
-    .order('inscrito_at', { ascending: true });
+  const { data, error } = await buildNominaQuery(supabase, matchId);
 
-  if (error) {
-    // Sin la 45 no existe `origen`: la pantalla se dibuja igual, con lo que hay.
-    if (esFaltaDeEsquema(error)) return { data: [], error: null };
-    console.error('[FutFinder] getNominaPartido:', error);
-    return { data: [], error };
-  }
+  if (error) return { data: null, error: traducirError(error, 'getNominaPartido') };
   return { data: data || [], error: null };
 }
 

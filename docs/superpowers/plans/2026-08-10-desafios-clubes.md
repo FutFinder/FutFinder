@@ -866,6 +866,20 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > 25 asistentes `legado`, cero NULL, cero residuos y ningún 5xx nuevo. Falta
 > únicamente la comprobación manual autenticada con cuentas de ambos clubes.
 
+> **La primera pasada manual encontró un fallo, y era del cliente.** El desafío,
+> la negociación, la propuesta, la publicación con 7 cupos por club, las dos
+> reservas y `join_club_match` funcionaron; pero la nómina mostraba «0 de 7» en
+> los dos clubes, las listas vacías y «Inscribirme» a quien la RPC confirmaba
+> inscrito. La causa no era la nómina sino el `select`: pedía `profiles.nombre`,
+> una columna que no existe en ningún sitio. PostgREST no ignora un embed
+> inventado, rechaza la consulta ENTERA — reproducido contra producción:
+> `400 {"code":"42703","message":"column profiles_1.nombre does not exist"}`.
+> Y el error no se veía porque `getNominaPartido()` traducía `42703` a lista
+> vacía: la pantalla quedaba coherente y equivocada. Se corrigieron las dos
+> cosas —la consulta sale ahora de `src/utils/nominaQuery.js`, con una prueba
+> que contrasta cada columna contra el esquema versionado, y un fallo de carga
+> ya no se disfraza de nómina vacía—. Falta repetir la comprobación manual.
+
 ### Tarea 4.3 — Avisos, tarjeta destacada y presencia en Inicio ✅ (U2 COMPLETADA)
 
 **Archivos:** crear `src/services/clubMatchRules.js` + su prueba,
