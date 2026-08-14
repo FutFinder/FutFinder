@@ -999,7 +999,36 @@ prueba), `src/services/clubMatchChanges.js`,
 - [x] Prueba SQL `46_cambios_de_partido_test.sql`: 22 casos.
 - [x] Interfaz completa: pedir, revisar, aceptar y rechazar desde el hilo.
 - [x] Commit.
-- [ ] Comprobación manual con `chatgpt` y `chatgpt2`.
+- [ ] Comprobación manual con `chatgpt` y `chatgpt2` — primera pasada hecha el
+      2026-08-13: pasó hasta el rechazo con motivo y encontró dos fallos, los
+      dos corregidos. Falta repetirla desde una solicitud nueva.
+
+> **La primera pasada manual encontró dos fallos, y ninguno era del servidor.**
+> El rechazo quedó bien persistido y bien notificado; lo que fallaba era la
+> pantalla.
+>
+> 1. **La otra sesión no se enteraba.** `ChatThreadScreen` sólo se suscribe a
+>    `messages`, y la publicación `supabase_realtime` lleva únicamente
+>    `messages`, `attendees` y `notifications`: `club_challenge_events` y
+>    `club_match_changes` no emiten nada. Los eventos del ciclo tampoco
+>    escriben un mensaje del que colgarse, porque `messages.sender_id` es NOT
+>    NULL. Se cargaban al montar y sólo se recargaban tras una acción PROPIA,
+>    así que quien esperaba respuesta veía «pendiente» indefinidamente. La
+>    laguna venía de la 42/43 y afecta igual a prórroga y propuesta; 4.4 la
+>    hizo visible por ser la primera negociación de dos partes con una tarjeta
+>    de estado. Arreglado con `utils/sondeo.js`, el mismo remedio que la nómina
+>    de U3 —pero acá es la única vía, no la reserva—.
+> 2. **Al proponente se le mostraba una negación.** La tarjeta pintaba
+>    `bloqueoResponder` («No puedes responder tu propia solicitud») en vez de
+>    «Esperando la respuesta de X», y lo hacía aunque el estado estuviera
+>    fresco. Quien pide un cambio no está bloqueado: está esperando. Lo decide
+>    ahora `mensajeDeEspera()`, con prueba.
+>
+> **Dos riesgos que el propio sondeo introducía y se cerraron con él:** un
+> fallo transitorio de red habría pintado un error permanente en la tarjeta
+> (el sondeo de fondo falla en silencio y se queda con lo último bueno), y
+> reemplazar la bitácora cada 15 segundos habría re-montado las burbujas sin
+> novedad (sólo se toca el estado si la firma de eventos cambió).
 
 > **Tres cosas que salieron al implementar y no estaban en el plan.**
 >

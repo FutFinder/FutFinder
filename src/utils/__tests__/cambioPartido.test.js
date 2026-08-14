@@ -28,6 +28,7 @@ const {
   textoCambioRespondido,
   accionesDeCambio,
   filasDeComparacion,
+  mensajeDeEspera,
 } = require('../cambioPartido.js');
 
 const AHORA = new Date(2026, 7, 15, 12, 0); // 15 de agosto de 2026, 12:00 local
@@ -646,4 +647,90 @@ test('un username vacío o en blanco no deja paréntesis huérfanos', () => {
     assert.doesNotMatch(texto, /\(\s*@?\s*\)/);
     assert.doesNotMatch(texto, /undefined|null/);
   }
+});
+
+// ---------------------------------------------------------------------------
+// mensajeDeEspera — qué dice la tarjeta a quien no puede responder
+//
+// REGRESIÓN de la comprobación manual del 2026-08-13: al proponente la
+// tarjeta le mostraba «No puedes responder tu propia solicitud», que es la
+// razón interna por la que no se le dibujan botones, no lo que necesita
+// leer. Quien acaba de pedir el cambio no está bloqueado: está esperando.
+// ---------------------------------------------------------------------------
+
+test('REGRESIÓN: a quien pidió el cambio se le dice que espera, no que no puede', () => {
+  const acciones = accionesDeCambio({
+    partido: partidoDeClubes(),
+    cambio: solicitudPendiente({ club_proponente_id: CLUB_A, propuesto_por: YO }),
+    userId: YO,
+    clubesAdmin: [CLUB_A],
+    clubesTodos: [CLUB_A],
+    ahora: AHORA,
+  });
+
+  const texto = mensajeDeEspera(acciones, 'chatgpt2');
+  assert.equal(texto, 'Esperando la respuesta de chatgpt2.');
+  assert.doesNotMatch(texto, /no puedes/i);
+});
+
+test('sin saber el nombre del club contrario, la espera sigue siendo legible', () => {
+  const acciones = accionesDeCambio({
+    partido: partidoDeClubes(),
+    cambio: solicitudPendiente({ club_proponente_id: CLUB_A, propuesto_por: YO }),
+    userId: YO,
+    clubesAdmin: [CLUB_A],
+    clubesTodos: [CLUB_A],
+    ahora: AHORA,
+  });
+
+  const texto = mensajeDeEspera(acciones, null);
+  assert.match(texto, /Esperando la respuesta/);
+  assert.doesNotMatch(texto, /undefined|null/);
+});
+
+test('a quien sí está bloqueado se le sigue explicando por qué', () => {
+  const jugador = accionesDeCambio({
+    partido: partidoDeClubes(),
+    cambio: solicitudPendiente(),
+    userId: YO,
+    clubesAdmin: [],
+    clubesTodos: [CLUB_B],
+    ahora: AHORA,
+  });
+  assert.match(mensajeDeEspera(jugador, 'chatgpt'), /administrador del club contrario/i);
+
+  const fueraDePlazo = accionesDeCambio({
+    partido: partidoDeClubes({ hora: new Date(2026, 7, 15, 13, 0).toISOString() }),
+    cambio: solicitudPendiente(),
+    userId: YO,
+    clubesAdmin: [CLUB_B],
+    clubesTodos: [CLUB_B],
+    ahora: AHORA,
+  });
+  assert.match(mensajeDeEspera(fueraDePlazo, 'chatgpt'), /2 horas/);
+});
+
+test('quien sí puede responder no necesita ningún mensaje', () => {
+  const acciones = accionesDeCambio({
+    partido: partidoDeClubes(),
+    cambio: solicitudPendiente(),
+    userId: YO,
+    clubesAdmin: [CLUB_B],
+    clubesTodos: [CLUB_B],
+    ahora: AHORA,
+  });
+  assert.equal(mensajeDeEspera(acciones, 'chatgpt'), null);
+});
+
+test('sin solicitud pendiente no hay nada que esperar', () => {
+  const acciones = accionesDeCambio({
+    partido: partidoDeClubes(),
+    cambio: null,
+    userId: YO,
+    clubesAdmin: [CLUB_A],
+    clubesTodos: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(mensajeDeEspera(acciones, 'chatgpt2'), null);
+  assert.equal(mensajeDeEspera(null, 'chatgpt2'), null);
 });

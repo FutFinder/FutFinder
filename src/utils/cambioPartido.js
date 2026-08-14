@@ -366,6 +366,31 @@ export function filasDeComparacion(cambio) {
 }
 
 /**
+ * Qué se le dice a quien NO puede responder la solicitud, o null si puede.
+ *
+ * Existe por un fallo real de la comprobación manual: a quien acababa de
+ * pedir el cambio se le mostraba «No puedes responder tu propia solicitud».
+ * Eso es la razón interna por la que no se le dibujan botones, no lo que la
+ * persona necesita leer — quien pidió el cambio no está bloqueado, está
+ * esperando, y leer una negación donde debería haber una espera hace pensar
+ * que algo falló.
+ *
+ * El resto de los casos sí quiere el motivo: a un jugador sin rol, a un
+ * administrador del club equivocado o a una solicitud fuera de plazo hay que
+ * decirles por qué, o el hueco se lee como una pantalla rota.
+ */
+export function mensajeDeEspera(acciones, clubContrarioNombre) {
+  if (!acciones?.hayPendiente || acciones?.puedeResponder) return null;
+  if (acciones.esMiSolicitud) {
+    const club = esTextoConContenido(clubContrarioNombre)
+      ? clubContrarioNombre
+      : 'el club contrario';
+    return `Esperando la respuesta de ${club}.`;
+  }
+  return acciones.bloqueoResponder || null;
+}
+
+/**
  * Qué acciones corresponde ofrecer, y por qué no las demás.
  *
  * ESPEJO DE LA AUTORIZACIÓN DEL SERVIDOR, no la protección. Esconder un botón

@@ -3,7 +3,7 @@ import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from 
 import { ArrowRight, RefreshCw, TriangleAlert } from 'lucide-react-native';
 
 import { chatColors, dsRadius } from '../../theme/colors';
-import { filasDeComparacion } from '../../utils/cambioPartido';
+import { filasDeComparacion, mensajeDeEspera } from '../../utils/cambioPartido';
 
 /**
  * La solicitud de cambio que está esperando respuesta, dentro del hilo.
@@ -29,6 +29,7 @@ export default function CambioPartidoCard({
   cambio,
   acciones,
   clubProponenteNombre,
+  clubContrarioNombre,
   ocupado = false,
   error = null,
   onAceptar,
@@ -142,8 +143,12 @@ export default function CambioPartidoCard({
           </View>
         )
       ) : (
+        // Quien pidió el cambio no está bloqueado: está esperando. La
+        // distinción la hace `mensajeDeEspera`, que está probada — mostrarle
+        // «No puedes responder tu propia solicitud» hacía pensar que algo
+        // había fallado.
         <Text style={styles.hint} numberOfLines={3}>
-          {acciones?.bloqueoResponder || `Esperando la respuesta de ${club}.`}
+          {mensajeDeEspera(acciones, clubContrarioNombre) || `Esperando la respuesta de ${club}.`}
         </Text>
       )}
     </View>

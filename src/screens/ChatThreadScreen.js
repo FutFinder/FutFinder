@@ -74,6 +74,7 @@ import {
   responderCambioPartido,
 } from '../services/clubMatchChanges';
 import { accionesDeCambio } from '../utils/cambioPartido';
+import { crearSondeo } from '../utils/sondeo';
 import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
 import { supabase } from '../services/supabase';
@@ -159,6 +160,9 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [cambioPendiente, setCambioPendiente] = useState(null);
   const [cambioBusy, setCambioBusy] = useState(false);
   const [cambioError, setCambioError] = useState(null);
+  // Firma de la bitácora ya pintada, para que el sondeo no reemplace el
+  // arreglo —y con él las burbujas— cuando no hay nada nuevo.
+  const firmaEventosRef = useRef('');
 
   const listRef = useRef(null);
   const mountedRef = useRef(true);
@@ -317,6 +321,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         ]);
       if (!alive) return;
       setChallengeEvents(eventos || []);
+      firmaEventosRef.current = (eventos || []).map((e) => e.id).join(',');
       setProrrogaReplies(respuestas || []);
       setChallengeProposal(prop || null);
 
@@ -702,42 +707,97 @@ export default function ChatThreadScreen({ route, navigation }) {
    * una copia vieja diría «de 17:00 a 18:00» cuando el partido ya está a las
    * 18:00.
    */
-  const cargarCambio = useCallback(async () => {
-    const matchId = clubChallenge?.match_id;
-    if (!isChallengeThread || !matchId) {
-      setCambioPartido(null);
-      setCambioPendiente(null);
-      return;
-    }
-    const [{ data: m }, { data: pend, error: ePend }] = await Promise.all([
-      getMatchById(matchId),
-      getCambioPendiente(matchId),
-    ]);
-    if (!mountedRef.current) return;
-    setCambioPartido(m || null);
-    // Un fallo de carga NO se dibuja como «no hay ninguna solicitud»: eso es
-    // exactamente lo que hizo que la nómina de U3 mostrara un partido vacío,
-    // coherente y falso. Se conserva lo que ya había y se dice qué pasó.
-    if (ePend) setCambioError(ePend.message);
-    else setCambioPendiente(pend || null);
-  }, [isChallengeThread, clubChallenge?.match_id]);
+  const cargarCambio = useCallback(
+    async ({ silencioso = false } = {}) => {
+      const matchId = clubChallenge?.match_id;
+      if (!isChallengeThread || !matchId) {
+        setCambioPartido(null);
+        setCambioPendiente(null);
+        return;
+      }
+      const [{ data: m }, { data: pend, error: ePend }] = await Promise.all([
+        getMatchById(matchId),
+        getCambioPendiente(matchId),
+      ]);
+      if (!mountedRef.current) return;
+
+      // Un fallo de carga NO se dibuja como «no hay ninguna solicitud»: eso es
+      // exactamente lo que hizo que la nómina de U3 mostrara un partido vacío,
+      // coherente y falso. Se conserva lo que ya había y se dice qué pasó.
+      //
+      // Pero un sondeo de fondo que falla no grita: se queda con lo último
+      // bueno y espera al siguiente tick. Si cada corte de red pintara un
+      // error permanente en la tarjeta, el remedio del refresco sería peor
+      // que la enfermedad.
+      if (ePend) {
+        if (!silencioso) setCambioError(ePend.message);
+        return;
+      }
+      setCambioPartido(m || null);
+      setCambioPendiente(pend || null);
+    },
+    [isChallengeThread, clubChallenge?.match_id]
+  );
 
   useEffect(() => {
     cargarCambio();
   }, [cargarCambio]);
+
+  /**
+   * Todo lo que puede haber cambiado por acción del OTRO club: los eventos
+   * del hilo y la solicitud de cambio con el partido al que apunta.
+   */
+  const refrescarDesafio = useCallback(
+    async ({ silencioso = false } = {}) => {
+      if (!isChallengeThread || !challengeId) return;
+      const [{ data: eventos }] = await Promise.all([
+        listChallengeEvents(challengeId),
+        cargarCambio({ silencioso }),
+      ]);
+      if (!mountedRef.current) return;
+
+      // Sólo se toca el estado si la bitácora de verdad cambió. Reemplazar el
+      // arreglo cada 15 segundos volvería a montar las burbujas del hilo sin
+      // que haya novedad ninguna, y un chat que parpadea solo es un fallo
+      // nuevo a cambio de nada.
+      const firma = (eventos || []).map((e) => e.id).join(',');
+      if (firma === firmaEventosRef.current) return;
+      firmaEventosRef.current = firma;
+      setChallengeEvents(eventos || []);
+    },
+    [isChallengeThread, challengeId, cargarCambio]
+  );
 
   // Al volver de «Pedir un cambio» la pantalla se refresca sola: sin esto, el
   // administrador que acaba de enviar la solicitud volvería al hilo y no la
   // vería hasta reabrirlo.
   useEffect(() => {
     if (!route?.params?.cambioPedido) return;
-    cargarCambio();
-    if (challengeId) {
-      listChallengeEvents(challengeId).then(({ data }) => {
-        if (mountedRef.current) setChallengeEvents(data || []);
-      });
-    }
-  }, [route?.params?.cambioPedido, cargarCambio, challengeId]);
+    refrescarDesafio();
+  }, [route?.params?.cambioPedido, refrescarDesafio]);
+
+  /**
+   * SONDEO DE RESPALDO, Y ACÁ ES LA ÚNICA VÍA.
+   *
+   * La suscripción de Realtime de esta pantalla escucha `messages`, y la
+   * publicación `supabase_realtime` sólo lleva `messages`, `attendees` y
+   * `notifications`. `club_challenge_events` y `club_match_changes` no
+   * emiten nada, así que no hay ninguna suscripción posible; y los eventos
+   * del ciclo tampoco escriben un mensaje del que colgarse, porque
+   * `messages.sender_id` es NOT NULL y el sistema no es un usuario.
+   *
+   * Sin esto, la sesión de quien pidió un cambio seguía mostrando la
+   * solicitud como pendiente después de que el club contrario la respondiera,
+   * hasta recargar a mano. Comprobado el 2026-08-13.
+   */
+  useEffect(
+    () =>
+      crearSondeo({
+        activo: isChallengeThread && !!challengeId,
+        onTick: () => refrescarDesafio({ silencioso: true }),
+      }),
+    [isChallengeThread, challengeId, refrescarDesafio]
+  );
 
   /**
    * Qué acciones de cambio corresponde ofrecer. Espejo puro y probado de la
@@ -764,6 +824,16 @@ export default function ChatThreadScreen({ route, navigation }) {
     return null;
   }, [cambioPendiente?.club_proponente_id, clubChallenge]);
 
+  // El club que TIENE que responder. Es el que se nombra cuando el que mira
+  // es quien pidió el cambio: «Esperando la respuesta de chatgpt2».
+  const nombreClubContrario = useMemo(() => {
+    const id = cambioPendiente?.club_proponente_id;
+    if (!id) return null;
+    if (id === clubChallenge?.club_retador_id) return clubChallenge?.club_retado?.nombre || null;
+    if (id === clubChallenge?.club_retado_id) return clubChallenge?.club_retador?.nombre || null;
+    return null;
+  }, [cambioPendiente?.club_proponente_id, clubChallenge]);
+
   const responderCambio = useCallback(
     async (aceptar, motivo) => {
       if (cambioBusy || !cambioPendiente?.id) return;
@@ -780,19 +850,17 @@ export default function ChatThreadScreen({ route, navigation }) {
       }
 
       // Se recargan las tres cosas que cambiaron: el partido (si se aceptó),
-      // la solicitud (ya respondida) y los eventos del hilo.
-      await cargarCambio();
-      if (challengeId) {
-        const { data: eventos } = await listChallengeEvents(challengeId);
-        if (mountedRef.current) setChallengeEvents(eventos || []);
-      }
+      // la solicitud (ya respondida) y los eventos del hilo. Va por el mismo
+      // camino que el sondeo para que la firma de la bitácora quede al día y
+      // el siguiente tick no vuelva a repintar por gusto.
+      await refrescarDesafio();
       if (mountedRef.current) {
         setCambioBusy(false);
         setCambioPendiente(null);
         notify(aceptar ? 'Cambio aceptado. El partido quedó actualizado.' : 'Cambio rechazado. El partido sigue igual.');
       }
     },
-    [cambioBusy, cambioPendiente?.id, cargarCambio, challengeId]
+    [cambioBusy, cambioPendiente?.id, refrescarDesafio]
   );
 
   const puedeAbrirPartido =
@@ -854,6 +922,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       ]);
       setProrrogaReplies(respuestas || []);
       setChallengeEvents(eventos || []);
+      firmaEventosRef.current = (eventos || []).map((e) => e.id).join(',');
       setChallengeBusy(false);
     },
     [challengeBusy, challengeId]
@@ -1161,6 +1230,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                 cambio={cambioPendiente}
                 acciones={accionesCambio}
                 clubProponenteNombre={nombreClubProponente}
+                clubContrarioNombre={nombreClubContrario}
                 ocupado={cambioBusy}
                 error={cambioError}
                 onAceptar={() => responderCambio(true)}
