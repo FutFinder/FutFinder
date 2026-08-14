@@ -852,7 +852,9 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
       un jugador del club A no puede ocupar cupo del club B; un ajeno no entra.
 - [x] Despliegue coordinado en producción: 44e, comprobación inmediata y luego 45.
 - [x] Cliente U3 integrado y verificado para móvil y web.
-- [ ] Comprobación manual autenticada con cuentas de ambos clubes.
+- [x] Comprobación manual autenticada con cuentas de ambos clubes (2026-08-13,
+      tras el arreglo de la nómina). **Salvo el ancho menor de 720 px**, que
+      sigue sin evidencia.
 - [x] Commit y push autorizados para el cierre de U3.
 
 > **Verificación U3 del 2026-08-13.** Antes de desplegar, cada arnés se
@@ -878,7 +880,31 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > vacía: la pantalla quedaba coherente y equivocada. Se corrigieron las dos
 > cosas —la consulta sale ahora de `src/utils/nominaQuery.js`, con una prueba
 > que contrasta cada columna contra el esquema versionado, y un fallo de carga
-> ya no se disfraza de nómina vacía—. Falta repetir la comprobación manual.
+> ya no se disfraza de nómina vacía—.
+
+> **La comprobación manual se repitió y pasó (2026-08-13).** Dos sesiones
+> autenticadas a la vez, clubes `chatgpt` y `chatgpt2`, partido de 7 cupos por
+> club. Las dos cuentas abrieron la nómina, vieron **1 de 7** en cada club, las
+> dos listas y los `username` reales. Al salir `chatgpt2` bajó a 0 de 7 y
+> `chatgpt` se quedó en 1 de 7: el cupo liberado es sólo el del club de quien
+> se va. La otra sesión reflejó cada cambio sola, por el sondeo de respaldo y
+> sin recargar, al salir y al volver a inscribirse. Dos inscripciones seguidas
+> dieron «Ya estabas en la nómina», una sola fila y el contador quieto. La web
+> se comprobó a 904 px con las dos columnas.
+>
+> **Lo que NO se comprobó: el ancho menor de 720 px**, donde las dos nóminas
+> pasan a estar apiladas. El navegador integrado no permitió cambiar el
+> viewport. No hay evidencia y no se da por bueno.
+>
+> Los permisos de administración se cubrieron por el servidor, no por la
+> interfaz: este partido es `orden_llegada` y ahí nadie queda `pendiente`, así
+> que los botones de confirmar/rechazar no llegan a dibujarse. El arnés
+> `45_inscripcion_por_club_test.sql` se ejecutó contra producción dentro de su
+> `BEGIN/ROLLBACK` — **14/14 en verde**—, y su caso 9 es exactamente el punto:
+> el administrador del club RIVAL no puede confirmar y el del club propio sí;
+> el caso 11 añade que nadie se confirma a sí mismo. Se comprobó después que el
+> `rollback` no dejó nada: la nómina del partido quedó idéntica fila por fila,
+> cero usuarios de fixture y cero partidos de fixture.
 
 ### Tarea 4.3 — Avisos, tarjeta destacada y presencia en Inicio ✅ (U2 COMPLETADA)
 

@@ -26,7 +26,11 @@ Cada archivo se abre con `begin;` y termina en `rollback;`, así que ejecutarlo 
 
 La verificación U3 del 2026-08-13 compuso también cada migración con su arnés dentro de una transacción exterior: 44e sola 8/8, 45 sola 14/14, ambas juntas 45b 13/13, 45c 18/18 y 45d 5/5. Se probó una carrera real con dos sesiones: la segunda recibió `lock_not_available` mientras la primera retenía la fila de `matches`, y ambas hicieron rollback. Tras aplicar 44e y 45 en producción se repitieron los arneses seguros —todos con su propio `BEGIN/ROLLBACK`— con los mismos resultados, más 44d 16/16. El catálogo confirmó 25 asistentes `legado`, cero NULL, ACL, Realtime y orden de triggers; la consulta final confirmó cero fixtures, objetos temporales, avisos duplicados y sesiones `idle in transaction`.
 
-La comprobación local posterior al despliegue pasó `npm run lint` con 0 errores y 25 advertencias conocidas, `npm test` 376/376, Deno 13/13 y `npm run build:web`. U3 queda pendiente únicamente de una prueba manual autenticada con cuentas de ambos clubes.
+La comprobación local posterior al despliegue pasó `npm run lint` con 0 errores y 25 advertencias conocidas, `npm test` 376/376, Deno 13/13 y `npm run build:web`.
+
+La prueba manual autenticada se hizo el 2026-08-13, con dos sesiones a la vez, y encontró un fallo de cliente que ninguna prueba SQL podía ver: la nómina pedía `profiles.nombre`, columna inexistente, y PostgREST rechazaba la consulta entera con `400 / 42703`. Corregido y cubierto por `src/utils/__tests__/nominaQuery.test.js`, que contrasta cada columna pedida contra `schema.sql` y las migraciones. Repetida la comprobación, pasó entera salvo el ancho menor de 720 px, que sigue sin evidencia. `45_inscripcion_por_club_test.sql` se volvió a ejecutar contra producción, 14/14, y se verificó después que su `ROLLBACK` dejó la nómina idéntica fila por fila, sin usuarios ni partidos de fixture.
+
+Una prueba SQL en verde no dice que la pantalla funcione. El arnés de la 45 llevaba 14/14 desde el despliegue mientras la nómina se veía vacía en las dos cuentas: el servidor estaba bien y quien mentía era el `select` del cliente. Por eso ninguna fase se cierra sólo con SQL.
 
 ## Pruebas de Edge Function
 
