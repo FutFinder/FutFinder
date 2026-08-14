@@ -822,7 +822,7 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > `create or replace` conserva la ACL. Los triggers no comprueban EXECUTE, así
 > que revocarlo es seguro; queda anotado en pendientes como limpieza aparte.
 
-### Tarea 4.2 — Inscripción con cupos por club ✅ (U3 APLICADA)
+### Tarea 4.2 — Inscripción con cupos por club ✅ (U3 CERRADA el 2026-08-13)
 
 > **Antes de empezar, un agujero que hay que cerrar acá.** Las políticas
 > `attendees_insert_self`, `attendees_update_self` y `attendees_delete_self`
@@ -853,8 +853,7 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 - [x] Despliegue coordinado en producción: 44e, comprobación inmediata y luego 45.
 - [x] Cliente U3 integrado y verificado para móvil y web.
 - [x] Comprobación manual autenticada con cuentas de ambos clubes (2026-08-13,
-      tras el arreglo de la nómina). **Salvo el ancho menor de 720 px**, que
-      sigue sin evidencia.
+      tras el arreglo de la nómina), en web a 904 px y a 390 × 845.
 - [x] Commit y push autorizados para el cierre de U3.
 
 > **Verificación U3 del 2026-08-13.** Antes de desplegar, cada arnés se
@@ -892,9 +891,12 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > dieron «Ya estabas en la nómina», una sola fila y el contador quieto. La web
 > se comprobó a 904 px con las dos columnas.
 >
-> **Lo que NO se comprobó: el ancho menor de 720 px**, donde las dos nóminas
-> pasan a estar apiladas. El navegador integrado no permitió cambiar el
-> viewport. No hay evidencia y no se da por bueno.
+> El corte de 720 px se comprobó después en Chrome a 390 × 845: las dos
+> nóminas apiladas, sin cortes ni superposiciones, los nombres de club
+> legibles, los dos contadores en «1 de 7», «de tu club» en el propio, los
+> `username` completos y «Salir del partido» alcanzable bajo las listas. Lo
+> único que sigue sin evidencia es el render NATIVO en un dispositivo físico:
+> todo lo comprobado es web, a 904 px y a 390 px.
 >
 > Los permisos de administración se cubrieron por el servidor, no por la
 > interfaz: este partido es `orden_llegada` y ahí nadie queda `pendiente`, así
@@ -905,6 +907,19 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > el caso 11 añade que nadie se confirma a sí mismo. Se comprobó después que el
 > `rollback` no dejó nada: la nómina del partido quedó idéntica fila por fila,
 > cero usuarios de fixture y cero partidos de fixture.
+>
+> **Con esto U3 queda cerrada.**
+
+> **La interfaz de U3 es funcional, no definitiva.** Se acepta tal cual y no se
+> rediseña ahora: lo que se prioriza de aquí en adelante es que lógica,
+> permisos, estados y flujos queden completos, para que el trabajo visual
+> posterior sea principalmente de interfaz y no obligue a rehacer
+> funcionalidad. Eso obliga a seguir dejando las reglas en el servidor y en
+> módulos puros —`clubMatchRules.js`, `nominaQuery.js`— y no dentro de los
+> componentes. Registrado en
+> [decisiones/2026-08-13-funcionalidad-antes-que-rediseno.md](../../memoria/decisiones/2026-08-13-funcionalidad-antes-que-rediseno.md).
+> Lo que sí se sigue corrigiendo es lo que impide usar una pantalla: texto
+> cortado, algo inalcanzable, un estado indistinguible de otro.
 
 ### Tarea 4.3 — Avisos, tarjeta destacada y presencia en Inicio ✅ (U2 COMPLETADA)
 
