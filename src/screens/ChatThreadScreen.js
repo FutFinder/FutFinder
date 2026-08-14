@@ -59,7 +59,7 @@ import {
   suggestCommands,
   canUseMentionAll,
 } from '../services/messages';
-import { getMatchById, getMatchAttendees } from '../services/matches';
+import { getMatchById, getMatchAttendees, withClubs } from '../services/matches';
 import { getClubById, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getChallenge, listChallengeEvents, refreshChallenge } from '../services/clubChallenges';
@@ -73,7 +73,7 @@ import {
   getCambioPendiente,
   responderCambioPartido,
 } from '../services/clubMatchChanges';
-import { accionesDeCambio } from '../utils/cambioPartido';
+import { accionesDeCambio, nombresDeLosClubes } from '../utils/cambioPartido';
 import { crearSondeo } from '../utils/sondeo';
 import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
@@ -719,6 +719,10 @@ export default function ChatThreadScreen({ route, navigation }) {
         getMatchById(matchId),
         getCambioPendiente(matchId),
       ]);
+      // `getMatchById` devuelve la fila plana. Los NOMBRES de los dos clubes
+      // sólo llegan pasando por `withClubs`, y son los que lee la tarjeta: sin
+      // esto decía «Esperando la respuesta de el club contrario».
+      const [mConClubes] = await withClubs(m ? [m] : []);
       if (!mountedRef.current) return;
 
       // Un fallo de carga NO se dibuja como «no hay ninguna solicitud»: eso es
@@ -733,7 +737,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         if (!silencioso) setCambioError(ePend.message);
         return;
       }
-      setCambioPartido(m || null);
+      setCambioPartido(mConClubes || m || null);
       setCambioPendiente(pend || null);
     },
     [isChallengeThread, clubChallenge?.match_id]
@@ -816,23 +820,18 @@ export default function ChatThreadScreen({ route, navigation }) {
     [cambioPartido, cambioPendiente, myId, myClubIds, myClubIdsTodos]
   );
 
-  const nombreClubProponente = useMemo(() => {
-    const id = cambioPendiente?.club_proponente_id;
-    if (!id) return null;
-    if (id === clubChallenge?.club_retador_id) return clubChallenge?.club_retador?.nombre || null;
-    if (id === clubChallenge?.club_retado_id) return clubChallenge?.club_retado?.nombre || null;
-    return null;
-  }, [cambioPendiente?.club_proponente_id, clubChallenge]);
-
-  // El club que TIENE que responder. Es el que se nombra cuando el que mira
-  // es quien pidió el cambio: «Esperando la respuesta de chatgpt2».
-  const nombreClubContrario = useMemo(() => {
-    const id = cambioPendiente?.club_proponente_id;
-    if (!id) return null;
-    if (id === clubChallenge?.club_retador_id) return clubChallenge?.club_retado?.nombre || null;
-    if (id === clubChallenge?.club_retado_id) return clubChallenge?.club_retador?.nombre || null;
-    return null;
-  }, [cambioPendiente?.club_proponente_id, clubChallenge]);
+  /**
+   * Quién pide el cambio y quién debe responderlo, por nombre.
+   *
+   * Sale del PARTIDO —la misma fila con la que `accionesDeCambio` decide los
+   * botones, así que no pueden discrepar— y no del desafío: esa fila nunca
+   * trae los clubes embebidos, ni por `getChallenge` (`select('*')`) ni por
+   * `refrescar_desafio` (devuelve `club_challenges` a secas).
+   */
+  const nombresClubes = useMemo(
+    () => nombresDeLosClubes({ partido: cambioPartido, cambio: cambioPendiente }),
+    [cambioPartido, cambioPendiente]
+  );
 
   const responderCambio = useCallback(
     async (aceptar, motivo) => {
@@ -1229,8 +1228,8 @@ export default function ChatThreadScreen({ route, navigation }) {
               <CambioPartidoCard
                 cambio={cambioPendiente}
                 acciones={accionesCambio}
-                clubProponenteNombre={nombreClubProponente}
-                clubContrarioNombre={nombreClubContrario}
+                clubProponenteNombre={nombresClubes.proponente}
+                clubContrarioNombre={nombresClubes.contrario}
                 ocupado={cambioBusy}
                 error={cambioError}
                 onAceptar={() => responderCambio(true)}

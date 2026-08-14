@@ -29,6 +29,7 @@ const {
   accionesDeCambio,
   filasDeComparacion,
   mensajeDeEspera,
+  nombresDeLosClubes,
 } = require('../cambioPartido.js');
 
 const AHORA = new Date(2026, 7, 15, 12, 0); // 15 de agosto de 2026, 12:00 local
@@ -733,4 +734,121 @@ test('sin solicitud pendiente no hay nada que esperar', () => {
   });
   assert.equal(mensajeDeEspera(acciones, 'chatgpt2'), null);
   assert.equal(mensajeDeEspera(null, 'chatgpt2'), null);
+});
+
+// ---------------------------------------------------------------------------
+// nombresDeLosClubes — de dónde sale el nombre que se lee en la tarjeta
+//
+// REGRESIÓN del 2026-08-14: la sesión proponente mostraba «Esperando la
+// respuesta de el club contrario». `mensajeDeEspera` estaba bien y su prueba
+// pura pasaba; lo que llegaba vacío era el NOMBRE, porque se derivaba de
+// `clubChallenge.club_retador?.nombre` y esa fila nunca trae los clubes
+// embebidos: `getChallenge` hace `select('*')` y `refrescar_desafio` devuelve
+// `public.club_challenges` a secas. Eran dos `useMemo` muertos desde el
+// primer día, y por lo mismo el encabezado decía «El club rival pide un
+// cambio» en vez del nombre.
+//
+// Por eso estas pruebas usan las formas REALES que devuelven los cargadores,
+// y fijan además el contrato de esas dos fuentes: si mañana alguien vuelve a
+// sacar el nombre del desafío, esto lo dice.
+// ---------------------------------------------------------------------------
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+const RAIZ_APP = path.resolve(__dirname, '..', '..', '..');
+
+/** Un partido tal como lo deja `withClubs()`: `club_local` y `club_visitante`. */
+function partidoConClubes(extra = {}) {
+  return {
+    ...partidoDeClubes(extra),
+    club_local: { id: CLUB_A, nombre: 'chatgpt', foto_url: null },
+    club_visitante: { id: CLUB_B, nombre: 'chatgpt2', foto_url: null },
+  };
+}
+
+test('el nombre sale del partido con clubes adjuntos, en los dos sentidos', () => {
+  const pideLocal = nombresDeLosClubes({
+    partido: partidoConClubes(),
+    cambio: solicitudPendiente({ club_proponente_id: CLUB_A }),
+  });
+  assert.deepEqual(pideLocal, { proponente: 'chatgpt', contrario: 'chatgpt2' });
+
+  const pideVisitante = nombresDeLosClubes({
+    partido: partidoConClubes(),
+    cambio: solicitudPendiente({ club_proponente_id: CLUB_B }),
+  });
+  assert.deepEqual(pideVisitante, { proponente: 'chatgpt2', contrario: 'chatgpt' });
+});
+
+test('REGRESIÓN: con el partido plano de `getMatchById` no se inventa un nombre', () => {
+  // `getMatchById` devuelve la fila tal cual: sin pasar por `withClubs` no hay
+  // nombres, y la tarjeta tiene que caer en su texto genérico en vez de
+  // mostrar un id o un «undefined».
+  const { proponente, contrario } = nombresDeLosClubes({
+    partido: partidoDeClubes(),
+    cambio: solicitudPendiente({ club_proponente_id: CLUB_A }),
+  });
+  assert.equal(proponente, null);
+  assert.equal(contrario, null);
+});
+
+test('un club borrado no deja a medias al otro', () => {
+  const { proponente, contrario } = nombresDeLosClubes({
+    partido: { ...partidoConClubes(), club_visitante: null },
+    cambio: solicitudPendiente({ club_proponente_id: CLUB_A }),
+  });
+  assert.equal(proponente, 'chatgpt');
+  assert.equal(contrario, null);
+});
+
+test('sin solicitud o sin partido no hay nombres que dar', () => {
+  assert.deepEqual(nombresDeLosClubes({ partido: partidoConClubes(), cambio: null }),
+    { proponente: null, contrario: null });
+  assert.deepEqual(nombresDeLosClubes({ partido: null, cambio: solicitudPendiente() }),
+    { proponente: null, contrario: null });
+  assert.deepEqual(nombresDeLosClubes({}), { proponente: null, contrario: null });
+});
+
+test('INTEGRACIÓN: con los datos reales el proponente lee el nombre del rival', () => {
+  // El recorrido completo de la capa pura, con la forma que de verdad llega:
+  // partido de `withClubs`, solicitud de `club_match_changes`.
+  const partido = partidoConClubes();
+  const cambio = solicitudPendiente({ club_proponente_id: CLUB_A, propuesto_por: YO });
+  const { contrario } = nombresDeLosClubes({ partido, cambio });
+
+  const acciones = accionesDeCambio({
+    partido,
+    cambio,
+    userId: YO,
+    clubesAdmin: [CLUB_A],
+    clubesTodos: [CLUB_A],
+    ahora: AHORA,
+  });
+
+  assert.equal(mensajeDeEspera(acciones, contrario), 'Esperando la respuesta de chatgpt2.');
+});
+
+test('el nombre NO puede salir del desafío: esa fila no trae los clubes', () => {
+  // Las dos fuentes de `clubChallenge` en el hilo, fijadas contra el código
+  // real. Si alguna empezara a traer los clubes embebidos, esta prueba avisa
+  // y se puede simplificar; mientras tanto, deriva del partido.
+  const servicio = fs.readFileSync(
+    path.join(RAIZ_APP, 'src', 'services', 'clubChallenges.js'), 'utf8'
+  );
+  const getChallenge = servicio.slice(servicio.indexOf('export async function getChallenge'));
+  assert.match(
+    getChallenge.slice(0, 400),
+    /\.select\('\*'\)/,
+    '`getChallenge` pide `select(*)`: la fila del desafío no trae `club_retador` ni `club_retado`'
+  );
+
+  const migracion = fs.readFileSync(
+    path.join(RAIZ_APP, 'supabase', 'migrations', '43_desafios_plazos_y_propuesta.sql'), 'utf8'
+  );
+  assert.match(
+    migracion,
+    /create or replace function public\.refrescar_desafio\(p_challenge_id uuid\)\s*\nreturns public\.club_challenges/,
+    '`refrescar_desafio` devuelve una fila pelada de `club_challenges`'
+  );
 });

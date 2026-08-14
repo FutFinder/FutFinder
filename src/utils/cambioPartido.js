@@ -366,6 +366,41 @@ export function filasDeComparacion(cambio) {
 }
 
 /**
+ * Quién pide el cambio y quién tiene que responderlo, por nombre.
+ *
+ * SALE DEL PARTIDO, NO DEL DESAFÍO, y eso es el arreglo de un fallo real. La
+ * fila de `club_challenges` que tiene el hilo **nunca** trae los clubes
+ * embebidos: `getChallenge` hace `select('*')` y `refrescar_desafio` devuelve
+ * `public.club_challenges` a secas. Derivar el nombre de ahí daba siempre
+ * vacío, y la sesión proponente leía «Esperando la respuesta de el club
+ * contrario» mientras el encabezado decía «El club rival pide un cambio».
+ *
+ * El partido sí los trae, en cuanto pasa por `withClubs()`, y además es la
+ * MISMA fila con la que `accionesDeCambio()` decide los botones: sacando de
+ * ahí las dos cosas, no pueden discrepar.
+ *
+ * Devuelve `null` en vez de inventar cuando el partido llegó plano o el club
+ * fue borrado: quien pinta ya tiene su texto genérico, y un id crudo o un
+ * «undefined» en la tarjeta es peor que una frase sin nombre.
+ */
+export function nombresDeLosClubes({ partido = null, cambio = null } = {}) {
+  const vacio = { proponente: null, contrario: null };
+  const proponenteId = cambio?.club_proponente_id;
+  if (!partido || !proponenteId) return vacio;
+
+  const nombre = (club) =>
+    esTextoConContenido(club?.nombre) ? club.nombre.trim() : null;
+
+  if (proponenteId === partido.club_local_id) {
+    return { proponente: nombre(partido.club_local), contrario: nombre(partido.club_visitante) };
+  }
+  if (proponenteId === partido.club_visitante_id) {
+    return { proponente: nombre(partido.club_visitante), contrario: nombre(partido.club_local) };
+  }
+  return vacio;
+}
+
+/**
  * Qué se le dice a quien NO puede responder la solicitud, o null si puede.
  *
  * Existe por un fallo real de la comprobación manual: a quien acababa de
