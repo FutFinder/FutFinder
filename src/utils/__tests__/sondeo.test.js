@@ -185,3 +185,108 @@ test('sin `onTick` no se programa nada', () => {
   assert.equal(reloj.vivos(), 0);
   detener();
 });
+
+// ---------------------------------------------------------------------------
+// El camino POR DEFECTO, que es el que corre en la aplicación
+//
+// REGRESIÓN del 2026-08-14: abrir el hilo de negociación en web reventaba con
+// `TypeError: Illegal invocation` y el Error Boundary se comía la pantalla en
+// las dos sesiones. La causa: los temporizadores por defecto se guardaban en
+// un objeto (`{ setInterval, clearInterval }`) y se invocaban como método de
+// ESE objeto, así que en el navegador llegaban con el receptor equivocado.
+//
+// Las pruebas de arriba no podían verlo: todas inyectan dobles, de modo que
+// el camino por defecto —el único que corre de verdad— no se ejecutaba nunca.
+// ---------------------------------------------------------------------------
+
+/**
+ * Modelo de los temporizadores de un navegador.
+ *
+ * WebIDL permite `setInterval(fn, ms)` a secas —cuando el receptor es
+ * undefined se sustituye por el objeto global, que es por lo que la llamada
+ * suelta funciona dentro de un módulo— pero lanza «Illegal invocation» si se
+ * invoca como método de otro objeto. Node no comprueba nada, y ahí estaba el
+ * punto ciego.
+ */
+function conTemporizadoresDeNavegador(fn) {
+  const realSet = globalThis.setInterval;
+  const realClear = globalThis.clearInterval;
+  const cuenta = { programados: 0, cancelados: 0 };
+
+  const brandCheck = (contar) =>
+    function () {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError('Illegal invocation');
+      }
+      contar();
+      return 'id-de-navegador';
+    };
+
+  globalThis.setInterval = brandCheck(() => { cuenta.programados += 1; });
+  globalThis.clearInterval = brandCheck(() => { cuenta.cancelados += 1; });
+  try {
+    return fn(cuenta);
+  } finally {
+    globalThis.setInterval = realSet;
+    globalThis.clearInterval = realClear;
+  }
+}
+
+test('REGRESIÓN: abrir un hilo de desafío en web no lanza «Illegal invocation»', () => {
+  conTemporizadoresDeNavegador((cuenta) => {
+    let detener;
+    assert.doesNotThrow(() => {
+      // Sin `timers`: exactamente como lo llama `ChatThreadScreen`.
+      detener = crearSondeo({ activo: true, onTick: () => {} });
+    }, 'crearSondeo no puede reventar con los temporizadores del navegador');
+
+    assert.equal(cuenta.programados, 1, 'debería haber programado el sondeo');
+
+    assert.doesNotThrow(() => detener(), 'detener tampoco puede reventar');
+    assert.equal(cuenta.cancelados, 1, 'debería haber cancelado el intervalo');
+  });
+});
+
+test('REGRESIÓN: un hilo inactivo en web no toca los temporizadores', () => {
+  conTemporizadoresDeNavegador((cuenta) => {
+    const detener = crearSondeo({ activo: false, onTick: () => {} });
+    assert.doesNotThrow(() => detener());
+    assert.equal(cuenta.programados, 0);
+  });
+});
+
+test('con temporizadores de verdad, el sondeo programa y limpia sin ayuda', async () => {
+  // La última red: sin dobles y sin modelos, contra el `setInterval` real de
+  // este entorno, con un intervalo corto.
+  let llamadas = 0;
+  const detener = crearSondeo({
+    activo: true,
+    intervaloMs: 5,
+    onTick: () => { llamadas += 1; },
+  });
+
+  await new Promise((r) => setTimeout(r, 40));
+  detener();
+  const alDetener = llamadas;
+  assert.ok(alDetener >= 2, `debería haber sondeado varias veces, fueron ${alDetener}`);
+
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(llamadas, alDetener, 'después de detener no debería sondear más');
+});
+
+test('REGRESIÓN: si programar el sondeo falla, el hilo sigue en pie', () => {
+  // La lección del Error Boundary: un refresco de respaldo que revienta se
+  // lleva por delante toda la conversación. Degradar a «sin refresco
+  // automático» es malo; quedarse sin chat es mucho peor.
+  const timers = {
+    setInterval: () => { throw new TypeError('Illegal invocation'); },
+    clearInterval: () => {},
+  };
+
+  let detener;
+  assert.doesNotThrow(() => {
+    detener = crearSondeo({ activo: true, onTick: () => {}, timers });
+  });
+  assert.equal(typeof detener, 'function');
+  assert.doesNotThrow(() => detener());
+});

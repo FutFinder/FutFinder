@@ -55,6 +55,12 @@ y se puede volver atrás.
 No hay pruebas automáticas del boundary: el proyecto no tiene arnés de
 render (decisión C8 del plan de desafíos), así que se comprueba a mano.
 
+## Un doble que no se parece al entorno real no prueba nada
+
+El sondeo del hilo de desafío tenía nueve pruebas en verde y reventaba en el navegador con `TypeError: Illegal invocation` la primera vez que alguien abría la pantalla, con Error Boundary incluido. Todas inyectaban temporizadores falsos, así que **el único camino que corre de verdad —el de por defecto— era el único sin cubrir**. La causa: guardar `{ setInterval, clearInterval }` en un objeto y llamarlos como método de ese objeto le cambia el receptor, y en el navegador esas funciones exigen que sea el global; Node no lo comprueba, y por eso las pruebas pasaban.
+
+Dos reglas que salen de ahí. La primera: cuando algo se puede inyectar, **hay que probar también el valor por defecto**, porque es el que se usa en producción. La segunda: si el entorno real tiene una restricción que el de pruebas no tiene, se modela —acá, un doble de `setInterval` que lanza si el receptor no es el global reproduce el fallo exacto—. `npm test` corre en Node; la aplicación corre en un navegador y en Hermes, y esa diferencia hay que escribirla en la prueba o no existe.
+
 ## Notas relacionadas
 
 - [Pruebas](pruebas.md)

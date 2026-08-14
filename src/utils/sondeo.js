@@ -24,6 +24,28 @@
 export const SONDEO_MS = 15000;
 
 /**
+ * Los temporizadores reales, envueltos.
+ *
+ * NO es una ceremonia. Escribir `{ setInterval, clearInterval }` y llamar
+ * después `timers.setInterval(...)` invoca la función global **como método de
+ * ese objeto**, y en el navegador `setInterval` exige que el receptor sea el
+ * global: llega un `this` ajeno y lanza `TypeError: Illegal invocation`. Eso
+ * reventaba el hilo de negociación entero en web, con Error Boundary incluido,
+ * el 2026-08-14. Node no comprueba el receptor y las pruebas inyectaban dobles,
+ * así que el único camino que corre de verdad era el único sin cubrir.
+ *
+ * Con estas envolturas la llamada al global es SUELTA —`setInterval(fn, ms)`—
+ * y WebIDL sustituye el receptor ausente por el objeto global, que es lo que
+ * hace que funcione igual en el navegador, en Hermes y en Node. Se siguen
+ * pudiendo inyectar temporizadores falsos, y a los falsos se los sigue
+ * llamando como método por si alguno dependiera de su propio `this`.
+ */
+const TEMPORIZADORES_REALES = {
+  setInterval: (fn, ms) => setInterval(fn, ms),
+  clearInterval: (id) => clearInterval(id),
+};
+
+/**
  * Programa `onTick` cada `intervaloMs` mientras `activo` sea cierto.
  *
  * Devuelve SIEMPRE una función de limpieza, aunque no haya programado nada:
@@ -44,34 +66,49 @@ export function crearSondeo({
   activo = true,
   intervaloMs = SONDEO_MS,
   onTick,
-  timers = { setInterval, clearInterval },
+  timers = TEMPORIZADORES_REALES,
 } = {}) {
   if (!activo || typeof onTick !== 'function') return () => {};
 
   let corriendo = false;
 
-  const id = timers.setInterval(() => {
-    if (corriendo) return;
-    corriendo = true;
-    try {
-      const resultado = onTick();
-      if (resultado && typeof resultado.then === 'function') {
-        resultado.then(
-          () => { corriendo = false; },
-          () => { corriendo = false; }
-        );
-      } else {
+  // Programar el sondeo NO puede tumbar la pantalla. Es la lección del
+  // 2026-08-14: un `Illegal invocation` acá se llevó por delante toda la
+  // conversación, con Error Boundary y todo. Si no se puede programar, se
+  // degrada a «sin refresco automático» —que es lo que había antes— y se deja
+  // constancia en la consola, en vez de dejar al usuario sin chat.
+  let id;
+  try {
+    id = timers.setInterval(() => {
+      if (corriendo) return;
+      corriendo = true;
+      try {
+        const resultado = onTick();
+        if (resultado && typeof resultado.then === 'function') {
+          resultado.then(
+            () => { corriendo = false; },
+            () => { corriendo = false; }
+          );
+        } else {
+          corriendo = false;
+        }
+      } catch {
         corriendo = false;
       }
-    } catch {
-      corriendo = false;
-    }
-  }, intervaloMs);
+    }, intervaloMs);
+  } catch (e) {
+    console.warn('[FutFinder] crearSondeo: no se pudo programar el sondeo:', e?.message || e);
+    return () => {};
+  }
 
   let detenido = false;
   return () => {
     if (detenido) return;
     detenido = true;
-    timers.clearInterval(id);
+    try {
+      timers.clearInterval(id);
+    } catch (e) {
+      console.warn('[FutFinder] crearSondeo: no se pudo cancelar el sondeo:', e?.message || e);
+    }
   };
 }
