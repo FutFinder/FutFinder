@@ -78,6 +78,13 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Acción:** repetir el arnés de dos sesiones simultáneas que se usó en U3 (`FOR UPDATE NOWAIT`) para dos aceptaciones a la vez y para dos solicitudes a la vez.
 - **Verificación necesaria:** con dos sesiones, sólo una aceptación aplica el cambio y sólo una solicitud queda pendiente; la otra recibe el rechazo esperado y no deja fila.
 
+## P4 — 17 funciones de trigger heredadas siguen ejecutables por los roles del cliente
+
+- **Dominio afectado:** todo el esquema; son funciones anteriores al ciclo de desafíos.
+- **Evidencia:** el advisor de seguridad de Supabase marca 71 funciones `security definer` alcanzables desde `/rest/v1/rpc/`. La mayoría son RPC del cliente y están así a propósito. Pero 17 son funciones de TRIGGER —`club_challenges_valida_rival`, `notify_*`, `tg_*`, `attendees_solo_rpc_de_clubes`, `matches_guard_cupos`…— que nadie debería poder invocar. Llamarlas directamente falla con `0A000 — trigger functions can only be called as triggers`, así que hoy no se les puede sacar nada; es superficie expuesta, no un agujero.
+- **Acción:** una migración que revoque `execute` de `public, anon, authenticated` sobre esas 17, en un cambio propio y revisado. La 47b ya lo hizo con `club_challenges_valida_sancion()` y sirve de plantilla, incluido su arnés.
+- **Verificación necesaria:** además de comprobar los privilegios, cada trigger tiene que seguir disparando. Revocar el `EXECUTE` no lo desactiva —PostgreSQL comprueba ese privilegio al crear el trigger, no en cada disparo—, pero si alguna vez dejara de aplicarse una regla el fallo sería SILENCIOSO: ninguna pantalla se rompe, sólo se pierde la validación. `47b_valida_sancion_sin_execute_test.sql` muestra la forma de probarlo.
+
 ## Notas relacionadas
 
 - [Estado actual](estado-actual.md)
