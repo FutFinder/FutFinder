@@ -115,6 +115,13 @@ export function resolveNotificationTarget(n) {
     case 'club_challenge_closed':
     case 'club_challenge_proposal':
     case 'club_challenge_proposal_rejected':
+    // Cambios negociados del partido (migración 46). También van al hilo: la
+    // solicitud se responde ahí, y el evento del chat es donde se lee «de
+    // 17:00 a 18:00» con el valor anterior al lado del propuesto. Llevar al
+    // detalle del partido mostraría el valor VIGENTE, que mientras la
+    // solicitud está pendiente es justamente el que no cambió.
+    case 'club_match_change':
+    case 'club_match_change_responded':
       // Aceptado (migración 42): el aviso trae el hilo grupal de
       // negociación y se abre ahí directamente — es donde hay que
       // coordinar, y llevar a la bandeja de desafíos sería un paso de más.

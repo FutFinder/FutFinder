@@ -22,6 +22,7 @@ import {
   MapPin,
   Swords,
   Video,
+  RefreshCw,
 } from 'lucide-react-native';
 import EmojiPicker from 'rn-emoji-keyboard';
 
@@ -39,6 +40,7 @@ import {
 import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
 import ChallengeHeader from '../components/clubes/ChallengeHeader';
 import ChallengeEventBubble from '../components/clubes/ChallengeEventBubble';
+import CambioPartidoCard from '../components/clubes/CambioPartidoCard';
 import Banner from '../components/Banner';
 
 import { chatColors } from '../theme/colors';
@@ -67,6 +69,11 @@ import {
   getPropuestaVigente,
 } from '../services/clubProposals';
 import { getChallengeCta, estadoLabel } from '../services/clubChallengeRules';
+import {
+  getCambioPendiente,
+  responderCambioPartido,
+} from '../services/clubMatchChanges';
+import { accionesDeCambio } from '../utils/cambioPartido';
 import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
 import { supabase } from '../services/supabase';
@@ -143,6 +150,15 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [myClubIds, setMyClubIds] = useState([]);
   const [myClubIdsTodos, setMyClubIdsTodos] = useState([]);
   const [busyAction, setBusyAction] = useState(false);
+
+  // Cambios negociados del partido publicado (migración 46). El partido se
+  // carga acá y no se deduce del desafío porque la solicitud se compara
+  // contra los valores VIGENTES: la hora, la cancha y la cuota que hoy tiene
+  // `matches`, no las que tenía la propuesta que lo publicó.
+  const [cambioPartido, setCambioPartido] = useState(null);
+  const [cambioPendiente, setCambioPendiente] = useState(null);
+  const [cambioBusy, setCambioBusy] = useState(false);
+  const [cambioError, setCambioError] = useState(null);
 
   const listRef = useRef(null);
   const mountedRef = useRef(true);
@@ -678,6 +694,107 @@ export default function ChatThreadScreen({ route, navigation }) {
     prorrogaReplies,
   ]);
 
+  /**
+   * El partido publicado y la solicitud de cambio que esté esperando.
+   *
+   * Se vuelve a pedir después de cada respuesta: aceptar mueve la hora o la
+   * cancha del partido, y la tarjeta compara contra los valores vigentes. Con
+   * una copia vieja diría «de 17:00 a 18:00» cuando el partido ya está a las
+   * 18:00.
+   */
+  const cargarCambio = useCallback(async () => {
+    const matchId = clubChallenge?.match_id;
+    if (!isChallengeThread || !matchId) {
+      setCambioPartido(null);
+      setCambioPendiente(null);
+      return;
+    }
+    const [{ data: m }, { data: pend, error: ePend }] = await Promise.all([
+      getMatchById(matchId),
+      getCambioPendiente(matchId),
+    ]);
+    if (!mountedRef.current) return;
+    setCambioPartido(m || null);
+    // Un fallo de carga NO se dibuja como «no hay ninguna solicitud»: eso es
+    // exactamente lo que hizo que la nómina de U3 mostrara un partido vacío,
+    // coherente y falso. Se conserva lo que ya había y se dice qué pasó.
+    if (ePend) setCambioError(ePend.message);
+    else setCambioPendiente(pend || null);
+  }, [isChallengeThread, clubChallenge?.match_id]);
+
+  useEffect(() => {
+    cargarCambio();
+  }, [cargarCambio]);
+
+  // Al volver de «Pedir un cambio» la pantalla se refresca sola: sin esto, el
+  // administrador que acaba de enviar la solicitud volvería al hilo y no la
+  // vería hasta reabrirlo.
+  useEffect(() => {
+    if (!route?.params?.cambioPedido) return;
+    cargarCambio();
+    if (challengeId) {
+      listChallengeEvents(challengeId).then(({ data }) => {
+        if (mountedRef.current) setChallengeEvents(data || []);
+      });
+    }
+  }, [route?.params?.cambioPedido, cargarCambio, challengeId]);
+
+  /**
+   * Qué acciones de cambio corresponde ofrecer. Espejo puro y probado de la
+   * autorización del servidor: `responder_cambio_partido` vuelve a
+   * comprobarlo todo con las membresías de PostgreSQL.
+   */
+  const accionesCambio = useMemo(
+    () =>
+      accionesDeCambio({
+        partido: cambioPartido,
+        cambio: cambioPendiente,
+        userId: myId,
+        clubesAdmin: myClubIds,
+        clubesTodos: myClubIdsTodos,
+      }),
+    [cambioPartido, cambioPendiente, myId, myClubIds, myClubIdsTodos]
+  );
+
+  const nombreClubProponente = useMemo(() => {
+    const id = cambioPendiente?.club_proponente_id;
+    if (!id) return null;
+    if (id === clubChallenge?.club_retador_id) return clubChallenge?.club_retador?.nombre || null;
+    if (id === clubChallenge?.club_retado_id) return clubChallenge?.club_retado?.nombre || null;
+    return null;
+  }, [cambioPendiente?.club_proponente_id, clubChallenge]);
+
+  const responderCambio = useCallback(
+    async (aceptar, motivo) => {
+      if (cambioBusy || !cambioPendiente?.id) return;
+      setCambioBusy(true);
+      setCambioError(null);
+
+      const { error } = await responderCambioPartido(cambioPendiente.id, aceptar, motivo);
+      if (!mountedRef.current) return;
+
+      if (error) {
+        setCambioBusy(false);
+        setCambioError(error.message);
+        return;
+      }
+
+      // Se recargan las tres cosas que cambiaron: el partido (si se aceptó),
+      // la solicitud (ya respondida) y los eventos del hilo.
+      await cargarCambio();
+      if (challengeId) {
+        const { data: eventos } = await listChallengeEvents(challengeId);
+        if (mountedRef.current) setChallengeEvents(eventos || []);
+      }
+      if (mountedRef.current) {
+        setCambioBusy(false);
+        setCambioPendiente(null);
+        notify(aceptar ? 'Cambio aceptado. El partido quedó actualizado.' : 'Cambio rechazado. El partido sigue igual.');
+      }
+    },
+    [cambioBusy, cambioPendiente?.id, cargarCambio, challengeId]
+  );
+
   const puedeAbrirPartido =
     challengeCta?.kind === 'ver_partido' && !!clubChallenge?.match_id;
 
@@ -1032,6 +1149,49 @@ export default function ChatThreadScreen({ route, navigation }) {
           </View>
         ) : (
           <>
+            {/*
+              Los cambios negociados van SOBRE la cabecera del ciclo y no
+              dentro: la cabecera lleva una sola acción y el estado del
+              desafío, mientras que esto es una negociación aparte que corre
+              con el partido ya publicado. Mezclarlas dejaría dos botones
+              compitiendo por el mismo hueco.
+            */}
+            {isChallengeThread && cambioPendiente && (
+              <CambioPartidoCard
+                cambio={cambioPendiente}
+                acciones={accionesCambio}
+                clubProponenteNombre={nombreClubProponente}
+                ocupado={cambioBusy}
+                error={cambioError}
+                onAceptar={() => responderCambio(true)}
+                onRechazar={(motivo) => responderCambio(false, motivo)}
+              />
+            )}
+
+            {isChallengeThread && !cambioPendiente && accionesCambio.puedePedir && (
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('ClubMatchChange', {
+                    matchId: clubChallenge.match_id,
+                    challengeId,
+                  })
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Pedir un cambio de hora, cancha o cuota del partido"
+                style={({ pressed }) => [styles.cambioBar, pressed && { opacity: 0.85 }]}
+              >
+                <RefreshCw color={chatColors.neon} size={16} strokeWidth={2.2} />
+                <Text style={styles.cambioBarText}>Pedir un cambio del partido</Text>
+              </Pressable>
+            )}
+
+            {isChallengeThread && !cambioPendiente && !accionesCambio.puedePedir
+              && accionesCambio.esDeClubes && accionesCambio.soyAdmin && (
+              <Text style={styles.cambioHint} numberOfLines={2}>
+                {accionesCambio.bloqueoPedir}
+              </Text>
+            )}
+
             {isChallengeThread && (
               <ChallengeHeader
                 challenge={clubChallenge}
@@ -1158,6 +1318,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.45)',
     backgroundColor: 'rgba(90,224,106,0.10)',
+  },
+
+  // Pedir un cambio es una acción secundaria: discreta y sin relleno verde,
+  // para que no compita con el CTA principal de la cabecera del ciclo.
+  cambioBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 14,
+    marginBottom: 8,
+    minHeight: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: chatColors.challengeBorder,
+    backgroundColor: 'transparent',
+    maxWidth: 560,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  cambioBarText: {
+    color: chatColors.textPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+    includeFontPadding: false,
+  },
+  cambioHint: {
+    marginHorizontal: 14,
+    marginBottom: 8,
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   challengeBarText: { color: chatColors.green, fontSize: 14, fontWeight: '800' },
   challengeBarCreate: { backgroundColor: chatColors.green, borderColor: chatColors.green },

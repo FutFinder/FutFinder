@@ -34,6 +34,8 @@ export const CATEGORY = {
   club_challenge_rejected: 'clubes',
   club_match_published: 'clubes',
   club_match_reserva_omitida: 'clubes',
+  club_match_change: 'clubes',
+  club_match_change_responded: 'clubes',
 };
 
 const ICON = {
@@ -64,6 +66,8 @@ const ICON = {
   club_challenge_rejected: Swords,
   club_match_published: Swords,
   club_match_reserva_omitida: UserX,
+  club_match_change: RefreshCw,
+  club_match_change_responded: CheckCheck,
 };
 
 const TAG = {
@@ -98,6 +102,13 @@ const TAG = {
   // Ámbar y no rojo: el partido salió bien, lo que no se pudo aplicar es
   // sólo el cupo de quien lo pidió. Es un «revisa esto», no una alarma.
   club_match_reserva_omitida: { label: 'TU CUPO', color: '#F5C451', bg: 'rgba(245,196,81,0.10)', border: 'rgba(245,196,81,0.28)' },
+  // Ámbar: pedir un cambio no es una alarma, pero SÍ espera algo del club que
+  // lo recibe —mientras nadie responda, el partido sigue como estaba—.
+  club_match_change: { label: 'CAMBIO PEDIDO', color: '#F5C451', bg: 'rgba(245,196,81,0.10)', border: 'rgba(245,196,81,0.28)' },
+  // La respuesta ya no espera nada de nadie, así que vuelve al verde del
+  // partido de clubes. Que fuera un rechazo no lo convierte en un problema:
+  // el partido simplemente se queda como estaba.
+  club_match_change_responded: { label: 'PARTIDO DE CLUBES', color: '#5AE06A', bg: 'rgba(90,224,106,0.10)', border: 'rgba(90,224,106,0.30)' },
 };
 
 const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
@@ -126,6 +137,13 @@ const ATAJOS = {
     dato: 'matchId',
     label: 'VER NÓMINA',
     accesible: 'Ver la nómina del partido para inscribirte cuando se resuelva',
+  },
+  // El único aviso del ciclo que espera una acción concreta del que lo
+  // recibe: mientras no responda, el partido no se mueve.
+  club_match_change: {
+    dato: 'threadKey',
+    label: 'RESPONDER',
+    accesible: 'Ir al chat de negociación para aceptar o rechazar el cambio',
   },
 };
 

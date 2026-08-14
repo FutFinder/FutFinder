@@ -262,8 +262,9 @@ Transiciones autorizadas, con quién puede dispararlas:
 `supabase/tests/42_desafio_chat_rls_test.sql`, `43_desafio_plazos_test.sql`,
 `44_partido_clubes_cupos_test.sql`, `44e_attendees_solo_por_rpc_test.sql`,
 `45_inscripcion_por_club_test.sql`, `45b_origen_compatibilidad_test.sql`,
-`45c_reserva_voluntaria_test.sql`, `45d_escritores_attendees_test.sql`, `45_cambios_partido_test.sql`,
-`46_sanciones_test.sql`, `47_resultado_test.sql`. Mismo estilo que
+`45c_reserva_voluntaria_test.sql`, `45d_escritores_attendees_test.sql`,
+`46_cambios_de_partido_test.sql`,
+`47_sanciones_test.sql`, `48_resultado_test.sql`. Mismo estilo que
 `36_chat_security_test.sql`: `begin; do $$ … raise exception 'FALLÓ (caso N): …' … $$; rollback;`,
 usuarios de prueba insertados en `auth.users`, identidad simulada con
 `set local role authenticated` + `set local request.jwt.claims`.
@@ -974,22 +975,54 @@ sobrecupo si dos jugadores del mismo club entran a la vez.
 > (`marginLeft: 'auto'` en vez de un separador flexible). Comprobados nombres
 > largos, clubes sin escudo y estado cancelado.
 
-### Tarea 4.4 — Cambios negociados
+### Tarea 4.4 — Cambios negociados ✅ (desplegada el 2026-08-13, falta la comprobación manual)
 
-**Archivos:** crear `supabase/migrations/46_cambios_de_partido.sql`.
+**Archivos:** `supabase/migrations/46_cambios_de_partido.sql`, prueba
+`supabase/tests/46_cambios_de_partido_test.sql`; crear
+`src/utils/cambioPartido.js`, `cambioQuery.js`, `cambioRpc.js` (los tres con
+prueba), `src/services/clubMatchChanges.js`,
+`src/components/clubes/CambioPartidoCard.js`,
+`src/screens/ClubMatchChangeScreen.js`; modificar `ChatThreadScreen.js`,
+`AppNavigator.js`, `ChallengeEventBubble.js`, `NotificationCard.js`,
+`notificationTargets.js`, `notificationPreferences.js`, `pushLogic.ts`.
 
-- [ ] `club_match_changes` con `campos jsonb` y estado.
-- [ ] `proponer_cambio_partido`: rechaza si faltan menos de 2 h para el inicio
+- [x] `club_match_changes` con `campos jsonb`, `valores_anteriores`, estado y
+      `motivo` opcional del rechazo.
+- [x] `proponer_cambio_partido`: rechaza si faltan menos de 2 h para el inicio
       (comparando con `now()` de PostgreSQL). El valor vigente **no** se toca
       mientras la solicitud está pendiente.
-- [ ] `responder_cambio_partido(p_change_id, p_aceptar)`: sólo admin del club
-      contrario. Al aceptar, actualiza el partido y notifica a todos los
-      inscritos; al rechazar, no cambia nada.
-- [ ] Evento en el chat con el texto exacto del enunciado: «Club A propone
-      cambiar la hora de 17:00 a 18:00».
-- [ ] Prueba SQL 45: fuera de plazo rechazado; el proponente no puede aceptar su
-      propio cambio; rechazar conserva los valores anteriores.
-- [ ] Commit.
+- [x] `responder_cambio_partido(p_change_id, p_aceptar, p_motivo)`: sólo admin
+      del club contrario. Al aceptar, actualiza el partido y notifica a todos
+      los inscritos; al rechazar, no cambia nada.
+- [x] Evento en el chat con el texto del enunciado, armado en el cliente desde
+      el payload: «Club A (@usuario) propone cambiar la hora de 17:00 a 18:00».
+- [x] Prueba SQL `46_cambios_de_partido_test.sql`: 22 casos.
+- [x] Interfaz completa: pedir, revisar, aceptar y rechazar desde el hilo.
+- [x] Commit.
+- [ ] Comprobación manual con `chatgpt` y `chatgpt2`.
+
+> **Tres cosas que salieron al implementar y no estaban en el plan.**
+>
+> 1. **El aviso a los inscritos ya existía y se reutiliza.**
+>    `tg_notify_match_updated` es AFTER UPDATE sobre `matches`, así que
+>    aceptar un cambio lo dispara solo. No se inventó un aviso nuevo: se le
+>    añadió una rama para los partidos de clubes, porque «El organizador
+>    cambió la hora» es falso cuando el cambio lo acordaron dos clubes, y
+>    porque excluir al organizador —que ahí puede no ser quien cambió nada—
+>    le escondía un cambio que le afecta. En los partidos normales no cambia
+>    nada, y el caso 20 del arnés lo demuestra.
+> 2. **Quien administra los DOS clubes no puede pedir cambios.** No hay forma
+>    de decir en nombre de quién los pide, y quien los respondiera se estaría
+>    respondiendo a sí mismo. Es el conflicto de doble pertenencia de la 43d,
+>    un paso antes.
+> 3. **El plazo se mira DOS veces.** Se pidió con tiempo, pero el partido se
+>    acerca mientras la solicitud está pendiente: al responder dentro de las
+>    2 h la solicitud caduca en vez de quedarse abierta para siempre.
+>
+> **El arnés encontró dos fallos, los dos de la propia prueba:** el `update`
+> de preparación disparaba `notify_match_updated` y contaminaba el conteo, y
+> el caso de la doble pulsación reusaba un token viejo, con lo que medía el
+> reencuentro con una fila anterior en vez de la idempotencia.
 
 **Verificación de fase:** `npm test`, `npm run build:web`, pruebas SQL 44 a 46, y
 comprobación de que publicar/unirse a un partido normal sigue igual.
@@ -1097,7 +1130,7 @@ la trazabilidad correctos **sin** inventar un permiso inseguro.
 
 ### Tarea 5.1 — Cancelación y sanción
 
-**Archivos:** crear `supabase/migrations/46_sanciones_y_revisiones.sql`.
+**Archivos:** crear `supabase/migrations/47_sanciones_y_revisiones.sql`.
 
 - [ ] `club_sanctions` (motivo `not null` con `check (length(trim(motivo)) > 0)`,
       `inicio_at`, `fin_at = inicio_at + 14 días`, `estado`).
@@ -1112,7 +1145,7 @@ la trazabilidad correctos **sin** inventar un permiso inseguro.
       llama desde `createChallenge`, `aceptar_desafio`,
       `crear_propuesta_oficial` y `aprobar_propuesta`.
 - [ ] Acción «Cancelar encuentro» siempre visible en la parte superior del hilo.
-- [ ] Prueba SQL 46: motivo vacío rechazado; cancelar a 1 h sanciona y a 3 h no;
+- [ ] Prueba SQL 47: motivo vacío rechazado; cancelar a 1 h sanciona y a 3 h no;
       el `trust_score` de los jugadores no cambia; el club sancionado no puede
       crear ni aceptar desafíos; **sí** puede seguir en los partidos ya
       publicados (decisión C3).
@@ -1134,7 +1167,7 @@ la trazabilidad correctos **sin** inventar un permiso inseguro.
 - [ ] Prueba SQL: un `authenticated` no puede ejecutar la resolución.
 - [ ] Commit.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 46.
+**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 47.
 
 ---
 
@@ -1145,7 +1178,7 @@ perfiles de club, y fixtures de demostración apagados.
 
 ### Tarea 6.1 — Resultado
 
-**Archivos:** crear `supabase/migrations/47_resultado_y_historial.sql`; crear
+**Archivos:** crear `supabase/migrations/48_resultado_y_historial.sql`; crear
 `src/screens/ClubResultScreen.js`, `src/services/clubResults.js`.
 
 - [ ] `club_match_results` con `goles_local`, `goles_visitante`,
@@ -1159,7 +1192,7 @@ perfiles de club, y fixtures de demostración apagados.
       rechazo.
 - [ ] `club_record(p_club_id)` devuelve V/E/D contando sólo resultados
       confirmados.
-- [ ] Prueba SQL 47: el proponente no confirma su propio resultado; en disputa el
+- [ ] Prueba SQL 48: el proponente no confirma su propio resultado; en disputa el
       récord no cambia.
 - [ ] Commit.
 
@@ -1186,7 +1219,7 @@ perfiles de club, y fixtures de demostración apagados.
 `docs/memoria/decisiones/2026-08-10-ciclo-desafios-clubes.md`.
 
 - [ ] Registrar la máquina de estados, el tipo de hilo nuevo, las reglas de cupos
-      y sanciones, las migraciones 41–47 y sus pruebas, y la decisión C1–C7.
+      y sanciones, las migraciones 41–48 y sus pruebas, y la decisión C1–C7.
 - [ ] Commit.
 
 **Verificación final:** `npm test`, `npm run build:web`,

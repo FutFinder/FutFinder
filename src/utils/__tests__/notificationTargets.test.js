@@ -62,6 +62,11 @@ const SAMPLE_DATA_BY_TYPE = {
   // tienen nada que hacer en la negociación entre administradores.
   club_match_published: { challengeId: 'ch1', matchId: 'm1', threadKey: 'challenge:ch1' },
   club_match_reserva_omitida: { matchId: 'm1', challengeId: 'ch1', motivo: 'ya tienes otro partido en ese horario' },
+  // Cambios negociados (migración 46): al HILO, porque ahí se responde y ahí
+  // está el evento con el valor anterior al lado del propuesto. El detalle del
+  // partido mostraría el valor vigente, que es el que todavía no cambió.
+  club_match_change: { challengeId: 'ch1', matchId: 'm1', changeId: 'cb1', threadKey: 'challenge:ch1' },
+  club_match_change_responded: { challengeId: 'ch1', matchId: 'm1', changeId: 'cb1', aceptado: true, threadKey: 'challenge:ch1' },
   message_new: { threadKey: 'dm:u1' },
   chat_mention_all: { threadKey: 'club:c1' },
   friend_request: { fromUserId: 'u1' },
@@ -98,6 +103,8 @@ const EXPECTED_SCREEN_BY_TYPE = {
   // A la NÓMINA, no al detalle: lo único que se puede hacer con este aviso
   // es inscribirse cuando el impedimento se resuelva, y eso se hace ahí.
   club_match_reserva_omitida: 'ClubMatchRoster',
+  club_match_change: 'ChatThread',
+  club_match_change_responded: 'ChatThread',
   message_new: 'ChatThread',
   chat_mention_all: 'ChatThread',
   friend_request: 'UserProfile',

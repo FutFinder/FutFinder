@@ -47,6 +47,7 @@ import ClubChallengeScreen from '../screens/ClubChallengeScreen';
 import ClubChallengesScreen from '../screens/ClubChallengesScreen';
 import ClubProposalScreen from '../screens/ClubProposalScreen';
 import ClubMatchRosterScreen from '../screens/ClubMatchRosterScreen';
+import ClubMatchChangeScreen from '../screens/ClubMatchChangeScreen';
 import ExploreClubsScreen from '../screens/ExploreClubsScreen';
 import ClubPlansScreen from '../screens/ClubPlansScreen';
 import EditClubScreen from '../screens/EditClubScreen';
@@ -97,6 +98,7 @@ const GuardedClubChallengeScreen = withAuthGuard(ClubChallengeScreen, 'ClubChall
 const GuardedClubChallengesScreen = withAuthGuard(ClubChallengesScreen, 'ClubChallenges');
 const GuardedClubProposalScreen = withAuthGuard(ClubProposalScreen, 'ClubProposal');
 const GuardedClubMatchRosterScreen = withAuthGuard(ClubMatchRosterScreen, 'ClubMatchRoster');
+const GuardedClubMatchChangeScreen = withAuthGuard(ClubMatchChangeScreen, 'ClubMatchChange');
 const GuardedExploreClubsScreen = withAuthGuard(ExploreClubsScreen, 'ExploreClubs');
 const GuardedClubPlansScreen = withAuthGuard(ClubPlansScreen, 'ClubPlans');
 const GuardedEditClubScreen = withAuthGuard(EditClubScreen, 'EditClub');
@@ -313,6 +315,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ClubMatchRoster"
           component={GuardedClubMatchRosterScreen}
+          options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="ClubMatchChange"
+          component={GuardedClubMatchChangeScreen}
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen

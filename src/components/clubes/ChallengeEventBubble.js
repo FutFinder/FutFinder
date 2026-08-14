@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import { chatColors, dsRadius } from '../../theme/colors';
 import { hourLabel } from '../../utils/chatMeta';
+import { textoCambioPropuesto, textoCambioRespondido } from '../../utils/cambioPartido';
 
 /**
  * Burbuja de sistema dentro del hilo de negociación.
@@ -64,10 +65,15 @@ export function textoDelEvento(event) {
         : 'La propuesta oficial fue rechazada.';
     case 'partido_publicado':
       return 'El partido quedó publicado.';
+    // Migración 46. El texto sale de `cambios` —campo, valor anterior y valor
+    // propuesto— y se arma en `utils/cambioPartido.js`, que es puro y está
+    // probado: «Deportivo propone cambiar la hora de 17:00 a 18:00». El
+    // servidor guarda datos, no frases, así que la redacción se corrige acá
+    // sin migrar ninguna fila.
     case 'cambio_propuesto':
-      return p.texto || 'Se propuso un cambio en el partido.';
+      return textoCambioPropuesto(p);
     case 'cambio_respondido':
-      return p.aceptado ? 'El cambio fue aceptado.' : 'El cambio fue rechazado.';
+      return textoCambioRespondido(p);
     case 'encuentro_cancelado':
       return p.motivo ? `Encuentro cancelado: ${p.motivo}` : 'El encuentro fue cancelado.';
     case 'sancion_aplicada':

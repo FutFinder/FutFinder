@@ -64,6 +64,20 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Acción:** decidir si la lista/filtros es el alcance web definitivo o implementar una alternativa de mapa compatible.
 - **Verificación necesaria:** prueba manual de búsqueda de partidos en navegador documenta la experiencia acordada y, si se implementa un mapa, cubre selección y cambio de región.
 
+## P2 — El servidor acepta (0, 0) como coordenada de una cancha
+
+- **Dominio afectado:** propuestas y cambios del partido entre clubes.
+- **Evidencia:** `crear_propuesta_oficial` (43c), `aprobar_propuesta` (44) y `cambio_partido_revisa_campos` (46) validan la latitud y la longitud por RANGO, y (0, 0) está dentro del rango. En esta app ese par nunca es una cancha: es la marca de que no se eligió ninguna, porque `Number(null)` es 0 en JavaScript. El cliente sí lo rechaza —`construirCampos` en `src/utils/cambioPartido.js`, con prueba—, así que hoy la única vía sería una llamada directa a la RPC.
+- **Acción:** decidir el guardia (rechazar el par exacto (0, 0), o exigir un punto dentro de Chile) y aplicarlo a las tres funciones en una sola migración, para que no queden dos reglas distintas según por dónde entre la cancha.
+- **Verificación necesaria:** una prueba SQL confirma que las tres funciones rechazan (0, 0) y que siguen aceptando una cancha real de Santiago.
+
+## P3 — La concurrencia de los cambios negociados no tiene prueba de dos sesiones
+
+- **Dominio afectado:** cambios negociados del partido entre clubes (migración 46).
+- **Evidencia:** el invariante lo sostienen tres piezas de la base —`select … for update` sobre el partido, el índice único parcial `club_match_changes_pendiente_uidx` y el `update … where estado = 'pendiente'`—, pero `46_cambios_de_partido_test.sql` corre en UNA sola sesión: prueba que el invariante se cumple, no la carrera real.
+- **Acción:** repetir el arnés de dos sesiones simultáneas que se usó en U3 (`FOR UPDATE NOWAIT`) para dos aceptaciones a la vez y para dos solicitudes a la vez.
+- **Verificación necesaria:** con dos sesiones, sólo una aceptación aplica el cambio y sólo una solicitud queda pendiente; la otra recibe el rechazo esperado y no deja fila.
+
 ## Notas relacionadas
 
 - [Estado actual](estado-actual.md)
