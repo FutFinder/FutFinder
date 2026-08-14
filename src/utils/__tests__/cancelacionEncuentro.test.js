@@ -1,0 +1,476 @@
+/**
+ * Pruebas de la cancelación del encuentro y de la sanción del club
+ * (migración 47).
+ *
+ * QUÉ SE FIJA ACÁ. Lo que se puede probar sin abrir Supabase y que, cuando se
+ * rompe, se rompe en silencio:
+ *
+ *   · El motivo es OBLIGATORIO. Tres espacios no son un motivo.
+ *   · El corte de las 2 horas lo mira el servidor, pero la advertencia que se
+ *     lee ANTES de pulsar sale de acá: cancelar a 1 h del encuentro tiene que
+ *     avisar que sanciona, y a 3 h tiene que decir que no.
+ *   · Los NOMBRES de los argumentos de la RPC, contrastados contra la firma
+ *     real de la migración. PostgREST no contesta «te faltó `p_motivo`»:
+ *     contesta 404 «function not found».
+ *   · La sanción es DEL CLUB: se lee de `club_sanctions`, y ninguna de estas
+ *     funciones toca ni menciona el Trust Score de nadie.
+ *
+ * Se ejecutan con: npm test
+ */
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const {
+  MOTIVO_MAX,
+  COLUMNAS_SANCION,
+  validarMotivoCancelacion,
+  accionesDeCancelacion,
+  avisoDeCancelacion,
+  argumentosCancelarEncuentro,
+  comoResultadoCancelacion,
+  textoEncuentroCancelado,
+  textoSancionAplicada,
+  sancionVigente,
+  textoDeSancion,
+} = require('../cancelacionEncuentro.js');
+
+const {
+  CANCELACION_SANCION_HORAS,
+  SANCION_DIAS,
+} = require('../../services/clubChallengeRules.js');
+
+const RAIZ = path.resolve(__dirname, '..', '..', '..');
+const MIGRACION = fs.readFileSync(
+  path.join(RAIZ, 'supabase', 'migrations', '47_sanciones_y_revisiones.sql'),
+  'utf8'
+);
+
+/** Los nombres de argumento que declara una función en la migración. */
+function argumentosDe(nombre) {
+  const inicio = MIGRACION.search(
+    new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${nombre}\\s*\\(`, 'i')
+  );
+  assert.notEqual(inicio, -1, `la migración 47 debería declarar ${nombre}`);
+  const desde = MIGRACION.indexOf('(', inicio);
+  const hasta = MIGRACION.indexOf(')', desde);
+  return MIGRACION.slice(desde + 1, hasta)
+    .split(',')
+    .map((s) => s.trim().split(/\s+/)[0])
+    .filter(Boolean);
+}
+
+/** El bloque `create table public.club_sanctions (...)` de la migración. */
+function columnasDeLaTabla() {
+  const inicio = MIGRACION.indexOf('create table if not exists public.club_sanctions');
+  assert.notEqual(inicio, -1, 'la migración 47 debería crear public.club_sanctions');
+  const desde = MIGRACION.indexOf('(', inicio);
+  const hasta = MIGRACION.indexOf('\n);', desde);
+  return MIGRACION.slice(desde + 1, hasta)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('--'))
+    .map((l) => l.split(/\s+/)[0]);
+}
+
+test('la consulta de sanciones pide columnas que existen en la migración', () => {
+  // Mismo guardián que `nominaQuery.test.js`: PostgREST rechaza la consulta
+  // ENTERA con 400 y 42703 si una sola columna no existe, y la pantalla se
+  // queda sin saber si su club está sancionado.
+  const declaradas = columnasDeLaTabla();
+  for (const col of COLUMNAS_SANCION.split(',').map((c) => c.trim())) {
+    assert.ok(
+      declaradas.includes(col),
+      `club_sanctions no declara «${col}» — declaradas: ${declaradas.join(', ')}`
+    );
+  }
+});
+
+const AHORA = new Date('2026-08-14T12:00:00.000Z');
+const CLUB_A = 'club-a';
+const CLUB_B = 'club-b';
+
+function partidoDeClubes(extra = {}) {
+  return {
+    id: 'match-1',
+    estado: 'abierto',
+    hora: new Date('2026-08-16T22:00:00.000Z').toISOString(),
+    club_local_id: CLUB_A,
+    club_visitante_id: CLUB_B,
+    challenge_proposal_id: 'prop-1',
+    ...extra,
+  };
+}
+
+function desafioPublicado(extra = {}) {
+  return {
+    id: 'ch-1',
+    estado: 'publicado',
+    club_retador_id: CLUB_A,
+    club_retado_id: CLUB_B,
+    match_id: 'match-1',
+    ...extra,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// El motivo es obligatorio
+// ---------------------------------------------------------------------------
+
+test('sin motivo no se cancela', () => {
+  for (const vacio of [null, undefined, '', '   ', '\n\t ']) {
+    const r = validarMotivoCancelacion(vacio);
+    assert.equal(r.ok, false, `«${String(vacio)}» no debería pasar como motivo`);
+    assert.equal(r.motivo, null);
+    assert.match(r.error, /motivo/i);
+  }
+});
+
+test('el motivo viaja recortado, no con los espacios que se escribieron', () => {
+  const r = validarMotivoCancelacion('  se nos inundó la cancha  ');
+  assert.equal(r.ok, true);
+  assert.equal(r.motivo, 'se nos inundó la cancha');
+  assert.equal(r.error, null);
+});
+
+test('un motivo más largo que el máximo se rechaza en vez de recortarse', () => {
+  // Recortarlo dejaría en el historial una explicación cortada a la mitad, y
+  // ese texto es justamente el que se conserva para siempre.
+  const r = validarMotivoCancelacion('x'.repeat(MOTIVO_MAX + 1));
+  assert.equal(r.ok, false);
+  assert.match(r.error, new RegExp(String(MOTIVO_MAX)));
+});
+
+test('un motivo justo en el máximo sí pasa', () => {
+  const r = validarMotivoCancelacion('x'.repeat(MOTIVO_MAX));
+  assert.equal(r.ok, true);
+  assert.equal(r.motivo.length, MOTIVO_MAX);
+});
+
+// ---------------------------------------------------------------------------
+// Quién puede cancelar
+// ---------------------------------------------------------------------------
+
+test('un administrador de uno de los dos clubes puede cancelar', () => {
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado(),
+    partido: partidoDeClubes(),
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.esDeClubes, true);
+  assert.equal(a.soyAdmin, true);
+  assert.equal(a.miClubId, CLUB_A);
+  assert.equal(a.puedeCancelar, true);
+  assert.equal(a.bloqueo, null);
+});
+
+test('quien no es administrador no cancela, y se le dice por qué', () => {
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado(),
+    partido: partidoDeClubes(),
+    clubesAdmin: [],
+    ahora: AHORA,
+  });
+  assert.equal(a.puedeCancelar, false);
+  assert.match(a.bloqueo, /administrador/i);
+});
+
+test('quien administra los dos clubes no cancela en nombre de uno solo', () => {
+  // Mismo conflicto de doble pertenencia que cierra `proponer_cambio_partido`:
+  // la sanción es de UN club, y no hay forma de decidir de cuál.
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado(),
+    partido: partidoDeClubes(),
+    clubesAdmin: [CLUB_A, CLUB_B],
+    ahora: AHORA,
+  });
+  assert.equal(a.administroLosDos, true);
+  assert.equal(a.puedeCancelar, false);
+  assert.match(a.bloqueo, /los dos clubes/i);
+});
+
+test('un encuentro ya cancelado no se vuelve a cancelar', () => {
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado({ estado: 'cancelado' }),
+    partido: partidoDeClubes({ estado: 'cancelado' }),
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.puedeCancelar, false);
+  assert.match(a.bloqueo, /ya está cancelado/i);
+});
+
+test('un encuentro en juego todavía se puede cancelar', () => {
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado({ estado: 'en_juego' }),
+    partido: partidoDeClubes({ estado: 'lleno' }),
+    clubesAdmin: [CLUB_B],
+    ahora: AHORA,
+  });
+  assert.equal(a.puedeCancelar, true);
+  assert.equal(a.miClubId, CLUB_B);
+});
+
+test('con el resultado ya en juego de espera, cancelar deja de tener sentido', () => {
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado({ estado: 'esperando_resultado' }),
+    partido: partidoDeClubes(),
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.puedeCancelar, false);
+  assert.match(a.bloqueo, /ya no se puede cancelar/i);
+});
+
+test('un partido que no es de clubes no entra por acá', () => {
+  const a = accionesDeCancelacion({
+    challenge: null,
+    partido: partidoDeClubes({ challenge_proposal_id: null }),
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.esDeClubes, false);
+  assert.equal(a.puedeCancelar, false);
+  assert.equal(a.bloqueo, null);
+});
+
+test('sin partido publicado no hay encuentro que cancelar', () => {
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado({ estado: 'negociacion', match_id: null }),
+    partido: null,
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.esDeClubes, false);
+  assert.equal(a.puedeCancelar, false);
+});
+
+test('no revienta con entradas ausentes', () => {
+  const a = accionesDeCancelacion();
+  assert.equal(a.esDeClubes, false);
+  assert.equal(a.puedeCancelar, false);
+  assert.equal(a.miClubId, null);
+});
+
+// ---------------------------------------------------------------------------
+// El corte de las 2 horas
+// ---------------------------------------------------------------------------
+
+test('a más de 2 horas del encuentro, cancelar no sanciona', () => {
+  const partido = partidoDeClubes({
+    hora: new Date(AHORA.getTime() + 3 * 3600 * 1000).toISOString(),
+  });
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado(),
+    partido,
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.puedeCancelar, true);
+  assert.equal(a.sanciona, false);
+  assert.equal(a.finDeSancion, null);
+
+  const aviso = avisoDeCancelacion({ partido, ahora: AHORA });
+  assert.equal(aviso.sanciona, false);
+  assert.match(aviso.detalle, /sin sanción|no hay sanción/i);
+});
+
+test('dentro de las 2 horas previas, cancelar sanciona 14 días', () => {
+  const partido = partidoDeClubes({
+    hora: new Date(AHORA.getTime() + 1 * 3600 * 1000).toISOString(),
+  });
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado(),
+    partido,
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.puedeCancelar, true, 'sancionar no es lo mismo que impedir');
+  assert.equal(a.sanciona, true);
+  assert.equal(
+    a.finDeSancion.getTime(),
+    AHORA.getTime() + SANCION_DIAS * 24 * 3600 * 1000
+  );
+
+  const aviso = avisoDeCancelacion({ partido, ahora: AHORA });
+  assert.equal(aviso.sanciona, true);
+  assert.match(aviso.detalle, new RegExp(String(SANCION_DIAS)));
+});
+
+test('el borde exacto de las 2 horas sanciona, igual que en el servidor', () => {
+  // El servidor compara con `<=`: a exactamente 2 horas ya se sanciona. Si el
+  // cliente usara `<`, prometería «sin sanción» justo donde sí la hay.
+  const partido = partidoDeClubes({
+    hora: new Date(AHORA.getTime() + CANCELACION_SANCION_HORAS * 3600 * 1000).toISOString(),
+  });
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado(),
+    partido,
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.sanciona, true);
+});
+
+test('un encuentro que ya empezó también sanciona al cancelarlo', () => {
+  const partido = partidoDeClubes({
+    hora: new Date(AHORA.getTime() - 30 * 60 * 1000).toISOString(),
+  });
+  const a = accionesDeCancelacion({
+    challenge: desafioPublicado({ estado: 'en_juego' }),
+    partido,
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA,
+  });
+  assert.equal(a.sanciona, true);
+});
+
+test('sin hora legible se avisa de la sanción: la duda no se resuelve a favor', () => {
+  const partido = partidoDeClubes({ hora: 'no es una fecha' });
+  const aviso = avisoDeCancelacion({ partido, ahora: AHORA });
+  assert.equal(aviso.sanciona, true);
+});
+
+// ---------------------------------------------------------------------------
+// Los argumentos de la RPC
+// ---------------------------------------------------------------------------
+
+test('cancelar manda exactamente los argumentos que declara la migración', () => {
+  const args = argumentosCancelarEncuentro('ch-1', '  se nos cayó la cancha ');
+  assert.deepEqual(Object.keys(args).sort(), ['p_challenge_id', 'p_motivo']);
+  assert.equal(args.p_challenge_id, 'ch-1');
+  assert.equal(args.p_motivo, 'se nos cayó la cancha');
+
+  const declarados = argumentosDe('cancelar_encuentro_club');
+  assert.deepEqual(declarados.sort(), Object.keys(args).sort());
+});
+
+test('un motivo vacío viaja como cadena vacía, no como null', () => {
+  // El servidor tiene que poder rechazarlo con su propio mensaje. Mandar
+  // `null` haría que la RPC lo leyera como «no vino el argumento».
+  const args = argumentosCancelarEncuentro('ch-1', '   ');
+  assert.equal(args.p_motivo, '');
+});
+
+test('la respuesta {ok:false} se lee como error de negocio, no como caída', () => {
+  const r = comoResultadoCancelacion(
+    { ok: false, reason: 'Solo un administrador puede cancelar' },
+    null
+  );
+  assert.equal(r.data, null);
+  assert.equal(r.error.message, 'Solo un administrador puede cancelar');
+});
+
+test('la respuesta {ok:true} llega tal cual, con la sanción incluida', () => {
+  const r = comoResultadoCancelacion({ ok: true, sanciona: true, sancionId: 's1' }, null);
+  assert.equal(r.error, null);
+  assert.equal(r.data.sanciona, true);
+  assert.equal(r.data.sancionId, 's1');
+});
+
+test('una migración ausente se traduce en vez de mostrar «function does not exist»', () => {
+  const r = comoResultadoCancelacion(null, { code: 'PGRST202', message: 'function does not exist' });
+  assert.equal(r.data, null);
+  assert.match(r.error.message, /migración/i);
+});
+
+// ---------------------------------------------------------------------------
+// El texto del hilo
+// ---------------------------------------------------------------------------
+
+test('el evento de cancelación dice qué club canceló y por qué', () => {
+  const texto = textoEncuentroCancelado({
+    club_cancela_nombre: 'Deportivo',
+    actor_username: 'vicente',
+    motivo: 'se nos inundó la cancha',
+  });
+  assert.match(texto, /Deportivo/);
+  assert.match(texto, /@vicente/);
+  assert.match(texto, /se nos inundó la cancha/);
+});
+
+test('sin nombre de club el evento sigue siendo legible', () => {
+  const texto = textoEncuentroCancelado({ motivo: 'lluvia' });
+  assert.match(texto, /Un club/);
+  assert.match(texto, /lluvia/);
+});
+
+test('el evento de sanción dice el club, los días y hasta cuándo', () => {
+  const texto = textoSancionAplicada({
+    club_nombre: 'Deportivo',
+    dias: SANCION_DIAS,
+    fin_at: '2026-08-28T12:00:00.000Z',
+  });
+  assert.match(texto, /Deportivo/);
+  assert.match(texto, new RegExp(String(SANCION_DIAS)));
+  assert.match(texto, /28 de agosto/);
+});
+
+test('ningún texto del hilo menciona el Trust Score: la sanción es del club', () => {
+  const textos = [
+    textoEncuentroCancelado({ club_cancela_nombre: 'Deportivo', motivo: 'lluvia' }),
+    textoSancionAplicada({ club_nombre: 'Deportivo', dias: SANCION_DIAS, fin_at: '2026-08-28T12:00:00.000Z' }),
+    avisoDeCancelacion({ partido: partidoDeClubes({ hora: AHORA.toISOString() }), ahora: AHORA }).detalle,
+  ];
+  for (const texto of textos) {
+    assert.doesNotMatch(texto, /trust/i, `«${texto}» no debería hablar del Trust Score`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// La sanción vigente
+// ---------------------------------------------------------------------------
+
+const SANCION = {
+  id: 's1',
+  club_id: CLUB_A,
+  estado: 'vigente',
+  motivo: 'Canceló el encuentro con menos de 2 horas de aviso',
+  inicio_at: '2026-08-14T00:00:00.000Z',
+  // Mediodía UTC y no medianoche: `fechaLarga` formatea en hora LOCAL, y una
+  // medianoche UTC se lee como el día anterior en Chile. La prueba mediría el
+  // huso horario de quien la corre en vez del texto.
+  fin_at: '2026-08-28T12:00:00.000Z',
+};
+
+test('una sanción en curso es la vigente', () => {
+  assert.equal(sancionVigente([SANCION], AHORA)?.id, 's1');
+});
+
+test('una sanción ya cumplida no bloquea nada', () => {
+  const vieja = { ...SANCION, fin_at: '2026-08-01T00:00:00.000Z' };
+  assert.equal(sancionVigente([vieja], AHORA), null);
+});
+
+test('una sanción retirada por la revisión deja de contar', () => {
+  const retirada = { ...SANCION, estado: 'retirada' };
+  assert.equal(sancionVigente([retirada], AHORA), null);
+});
+
+test('con dos sanciones encima manda la que termina más tarde', () => {
+  const larga = { ...SANCION, id: 's2', fin_at: '2026-09-10T00:00:00.000Z' };
+  assert.equal(sancionVigente([SANCION, larga], AHORA)?.id, 's2');
+});
+
+test('sin sanciones, o con basura, no hay sanción vigente', () => {
+  assert.equal(sancionVigente([], AHORA), null);
+  assert.equal(sancionVigente(null, AHORA), null);
+  assert.equal(sancionVigente([null, {}], AHORA), null);
+});
+
+test('la sanción se explica con el motivo y la fecha de término', () => {
+  const texto = textoDeSancion(SANCION);
+  assert.match(texto, /28 de agosto/);
+  assert.match(texto, /menos de 2 horas/);
+});
+
+test('el club sancionado conserva sus partidos ya publicados, y se dice', () => {
+  const aviso = avisoDeCancelacion({
+    partido: partidoDeClubes({ hora: AHORA.toISOString() }),
+    ahora: AHORA,
+  });
+  assert.match(aviso.detalle, /ya publicó/i);
+});

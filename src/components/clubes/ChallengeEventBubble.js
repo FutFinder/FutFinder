@@ -4,6 +4,10 @@ import { View, Text, StyleSheet } from 'react-native';
 import { chatColors, dsRadius } from '../../theme/colors';
 import { hourLabel } from '../../utils/chatMeta';
 import { textoCambioPropuesto, textoCambioRespondido } from '../../utils/cambioPartido';
+import {
+  textoEncuentroCancelado,
+  textoSancionAplicada,
+} from '../../utils/cancelacionEncuentro';
 
 /**
  * Burbuja de sistema dentro del hilo de negociación.
@@ -74,10 +78,13 @@ export function textoDelEvento(event) {
       return textoCambioPropuesto(p);
     case 'cambio_respondido':
       return textoCambioRespondido(p);
+    // Migración 47. Igual que los cambios: el servidor guarda quién canceló,
+    // con qué motivo y si hubo sanción, y la frase se arma en
+    // `utils/cancelacionEncuentro.js`, que es puro y está probado.
     case 'encuentro_cancelado':
-      return p.motivo ? `Encuentro cancelado: ${p.motivo}` : 'El encuentro fue cancelado.';
+      return textoEncuentroCancelado(p);
     case 'sancion_aplicada':
-      return 'Se aplicó una sanción a un club.';
+      return textoSancionAplicada(p);
     case 'sancion_retirada':
       return 'Se retiró la sanción.';
     case 'resultado_propuesto':

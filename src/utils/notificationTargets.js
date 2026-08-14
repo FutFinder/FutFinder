@@ -67,6 +67,19 @@ export function resolveNotificationTarget(n) {
     case 'club_request_rejected':
       return { screen: 'Main', params: { screen: 'ClubsTab' } };
 
+    // Tu club quedó sancionado (migración 47). Va al CLUB y no al hilo del
+    // desafío que la originó: la sanción es del club, dura 14 días y alcanza a
+    // todo lo que intente hacer, no sólo a ese encuentro. El aviso ya trae el
+    // motivo y la fecha de término en su cuerpo.
+    case 'club_sancionado':
+      return data.clubId
+        ? {
+            screen: 'ClubDetail',
+            params: { clubId: data.clubId },
+            resource: { kind: 'club', id: data.clubId },
+          }
+        : null;
+
     // El partido de clubes quedó publicado (migración 44). El destino es el
     // PARTIDO, no el hilo de negociación: es lo que el aviso anuncia, y lo
     // reciben todos los integrantes de los dos clubes, incluidos los jugadores
@@ -122,6 +135,10 @@ export function resolveNotificationTarget(n) {
     // solicitud está pendiente es justamente el que no cambió.
     case 'club_match_change':
     case 'club_match_change_responded':
+    // Se canceló el encuentro (migración 47). También al hilo: ahí está el
+    // evento con el club que canceló y el motivo. Al detalle del partido no,
+    // porque un partido cancelado no explica quién lo canceló ni por qué.
+    case 'club_match_cancelled':
       // Aceptado (migración 42): el aviso trae el hilo grupal de
       // negociación y se abre ahí directamente — es donde hay que
       // coordinar, y llevar a la bandeja de desafíos sería un paso de más.

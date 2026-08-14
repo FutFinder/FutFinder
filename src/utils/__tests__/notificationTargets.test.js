@@ -67,6 +67,12 @@ const SAMPLE_DATA_BY_TYPE = {
   // partido mostraría el valor vigente, que es el que todavía no cambió.
   club_match_change: { challengeId: 'ch1', matchId: 'm1', changeId: 'cb1', threadKey: 'challenge:ch1' },
   club_match_change_responded: { challengeId: 'ch1', matchId: 'm1', changeId: 'cb1', aceptado: true, threadKey: 'challenge:ch1' },
+  // Cancelación y sanción (migración 47). La cancelación va al HILO, donde
+  // está el evento con el club que canceló y el motivo. La sanción va al
+  // CLUB: dura 14 días y alcanza a todo, no sólo a ese encuentro, así que
+  // llevar al hilo de un desafío ya cerrado sería llevar al lugar equivocado.
+  club_match_cancelled: { challengeId: 'ch1', matchId: 'm1', clubCancelaId: 'c1', motivo: 'lluvia', sanciona: true, threadKey: 'challenge:ch1' },
+  club_sancionado: { sancionId: 's1', clubId: 'c1', challengeId: 'ch1', matchId: 'm1', dias: 14, finAt: '2026-08-28T12:00:00.000Z' },
   message_new: { threadKey: 'dm:u1' },
   chat_mention_all: { threadKey: 'club:c1' },
   friend_request: { fromUserId: 'u1' },
@@ -105,6 +111,8 @@ const EXPECTED_SCREEN_BY_TYPE = {
   club_match_reserva_omitida: 'ClubMatchRoster',
   club_match_change: 'ChatThread',
   club_match_change_responded: 'ChatThread',
+  club_match_cancelled: 'ChatThread',
+  club_sancionado: 'ClubDetail',
   message_new: 'ChatThread',
   chat_mention_all: 'ChatThread',
   friend_request: 'UserProfile',

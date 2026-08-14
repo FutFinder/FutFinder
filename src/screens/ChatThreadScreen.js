@@ -41,6 +41,7 @@ import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
 import ChallengeHeader from '../components/clubes/ChallengeHeader';
 import ChallengeEventBubble from '../components/clubes/ChallengeEventBubble';
 import CambioPartidoCard from '../components/clubes/CambioPartidoCard';
+import CancelarEncuentroBar from '../components/clubes/CancelarEncuentroBar';
 import Banner from '../components/Banner';
 
 import { chatColors } from '../theme/colors';
@@ -74,6 +75,8 @@ import {
   responderCambioPartido,
 } from '../services/clubMatchChanges';
 import { accionesDeCambio, nombresDeLosClubes } from '../utils/cambioPartido';
+import { cancelarEncuentroClub, getSancionVigente } from '../services/clubSanctions';
+import { accionesDeCancelacion } from '../utils/cancelacionEncuentro';
 import { crearSondeo } from '../utils/sondeo';
 import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
@@ -160,6 +163,14 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [cambioPendiente, setCambioPendiente] = useState(null);
   const [cambioBusy, setCambioBusy] = useState(false);
   const [cambioError, setCambioError] = useState(null);
+
+  // Cancelación del encuentro y sanción del club (migración 47). La sanción se
+  // lee de `club_sanctions` y no se pregunta por `club_esta_sancionado()`: esa
+  // función está revocada de `authenticated` a propósito, y la RLS de la tabla
+  // ya muestra sólo las sanciones de los clubes propios.
+  const [sancion, setSancion] = useState(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState(null);
   // Firma de la bitácora ya pintada, para que el sondeo no reemplace el
   // arreglo —y con él las burbujas— cuando no hay nada nuevo.
   const firmaEventosRef = useRef('');
@@ -687,6 +698,9 @@ export default function ChatThreadScreen({ route, navigation }) {
         online: connection !== 'offline',
         propuesta: challengeProposal,
         respuestasProrroga: prorrogaReplies,
+        // Con el club sancionado, `getChallengeCta` devuelve «Club sancionado»
+        // en vez de ofrecer una acción que el servidor va a rechazar.
+        sancion,
       })
     );
   }, [
@@ -697,6 +711,7 @@ export default function ChatThreadScreen({ route, navigation }) {
     connection,
     challengeProposal,
     prorrogaReplies,
+    sancion,
   ]);
 
   /**
@@ -746,6 +761,30 @@ export default function ChatThreadScreen({ route, navigation }) {
   useEffect(() => {
     cargarCambio();
   }, [cargarCambio]);
+
+  /**
+   * ¿Alguno de mis clubes está sancionado ahora mismo?
+   *
+   * NO ENTRA EN EL SONDEO DE 15 SEGUNDOS, a propósito. Una sanción sólo puede
+   * aparecer mientras el hilo está abierto si otro administrador de mi propio
+   * club cancela otro encuentro en ese preciso rato, y pagar una consulta cada
+   * quince segundos en todas las sesiones por ese caso no se justifica. Se
+   * recarga al abrir el hilo y después de cancelar, que son los dos momentos
+   * en que de verdad cambia. Y aunque quedara vieja, la autoridad sigue siendo
+   * el servidor: quien intente operar recibirá su negativa igual.
+   */
+  const cargarSancion = useCallback(async () => {
+    if (!isChallengeThread || myClubIds.length === 0) {
+      setSancion(null);
+      return;
+    }
+    const { data } = await getSancionVigente(myClubIds);
+    if (mountedRef.current) setSancion(data || null);
+  }, [isChallengeThread, myClubIds]);
+
+  useEffect(() => {
+    cargarSancion();
+  }, [cargarSancion]);
 
   /**
    * Todo lo que puede haber cambiado por acción del OTRO club: los eventos
@@ -860,6 +899,61 @@ export default function ChatThreadScreen({ route, navigation }) {
       }
     },
     [cambioBusy, cambioPendiente?.id, refrescarDesafio]
+  );
+
+  /**
+   * Qué corresponde ofrecer en la barra de cancelación de arriba. Espejo puro
+   * y probado de la autorización del servidor: `cancelar_encuentro_club`
+   * vuelve a comprobar membresía, estado y plazo con los datos de PostgreSQL.
+   *
+   * El partido sale de `cambioPartido` —la fila vigente de `matches`— y no de
+   * la propuesta que lo publicó: el corte de las 2 horas se mide contra la
+   * hora que el partido tiene HOY, que pudo moverse con un cambio negociado.
+   */
+  const accionesCancelar = useMemo(
+    () =>
+      accionesDeCancelacion({
+        challenge: clubChallenge,
+        partido: cambioPartido,
+        clubesAdmin: myClubIds,
+      }),
+    [clubChallenge, cambioPartido, myClubIds]
+  );
+
+  const cancelarEncuentro = useCallback(
+    async (motivo) => {
+      if (cancelBusy || !challengeId) return;
+      setCancelBusy(true);
+      setCancelError(null);
+
+      const { data, error } = await cancelarEncuentroClub(challengeId, motivo);
+      if (!mountedRef.current) return;
+
+      if (error) {
+        setCancelBusy(false);
+        setCancelError(error.message);
+        return;
+      }
+
+      // Se recarga TODO lo que la cancelación movió: el desafío (que pasó a
+      // cancelado), el partido y la bitácora, y además la sanción, que es la
+      // que a partir de ahora bloquea los desafíos nuevos de este club.
+      const { data: alDia } = await refreshChallenge(challengeId);
+      const { data: fila } = alDia ? { data: alDia } : await getChallenge(challengeId);
+      if (mountedRef.current) setClubChallenge(fila || null);
+      await refrescarDesafio();
+      await cargarSancion();
+
+      if (mountedRef.current) {
+        setCancelBusy(false);
+        notify(
+          data?.sanciona
+            ? 'Encuentro cancelado. Tu club queda sancionado 14 días.'
+            : 'Encuentro cancelado. Se avisó a los dos clubes y a los inscritos.'
+        );
+      }
+    },
+    [cancelBusy, challengeId, refrescarDesafio, cargarSancion]
   );
 
   const puedeAbrirPartido =
@@ -1093,6 +1187,25 @@ export default function ChatThreadScreen({ route, navigation }) {
               onClose={() => setBanner(null)}
             />
           </View>
+        )}
+
+        {/*
+          «Cancelar encuentro» va ARRIBA y no en el menú de tres puntos: se
+          busca con urgencia y casi siempre con el partido cerca. Enterrarla
+          hace que la cancelación se resuelva por WhatsApp y que el club rival
+          siga organizando gente para un partido que ya no existe. Separada de
+          la barra del ciclo, que vive abajo: aquella lleva la acción que toca
+          ahora, ésta es la salida de emergencia.
+        */}
+        {isChallengeThread && (
+          <CancelarEncuentroBar
+            acciones={accionesCancelar}
+            partido={cambioPartido}
+            sancion={sancion}
+            ocupado={cancelBusy}
+            error={cancelError}
+            onCancelar={cancelarEncuentro}
+          />
         )}
 
         {loading ? (

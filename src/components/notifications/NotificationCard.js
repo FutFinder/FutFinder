@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import {
   UserPlus, CheckCheck, Swords, Shield, CalendarDays, MessageCircle, Star, Bell, Users, Trash2,
-  RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone,
+  RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone, CalendarX, ShieldAlert,
 } from 'lucide-react-native';
 
 /** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
@@ -36,6 +36,8 @@ export const CATEGORY = {
   club_match_reserva_omitida: 'clubes',
   club_match_change: 'clubes',
   club_match_change_responded: 'clubes',
+  club_match_cancelled: 'clubes',
+  club_sancionado: 'clubes',
 };
 
 const ICON = {
@@ -68,6 +70,8 @@ const ICON = {
   club_match_reserva_omitida: UserX,
   club_match_change: RefreshCw,
   club_match_change_responded: CheckCheck,
+  club_match_cancelled: CalendarX,
+  club_sancionado: ShieldAlert,
 };
 
 const TAG = {
@@ -109,6 +113,10 @@ const TAG = {
   // partido de clubes. Que fuera un rechazo no lo convierte en un problema:
   // el partido simplemente se queda como estaba.
   club_match_change_responded: { label: 'PARTIDO DE CLUBES', color: '#5AE06A', bg: 'rgba(90,224,106,0.10)', border: 'rgba(90,224,106,0.30)' },
+  // Rojo, y es de las pocas veces que corresponde: el encuentro se terminó y
+  // quien lee esto tiene que reorganizar a su gente.
+  club_match_cancelled: { label: 'ENCUENTRO CANCELADO', color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)' },
+  club_sancionado: { label: 'CLUB SANCIONADO', color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)' },
 };
 
 const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
@@ -144,6 +152,13 @@ const ATAJOS = {
     dato: 'threadKey',
     label: 'RESPONDER',
     accesible: 'Ir al chat de negociación para aceptar o rechazar el cambio',
+  },
+  // No hay nada que responder, pero sí que leer: el motivo entero y quién
+  // canceló están en el evento del hilo.
+  club_match_cancelled: {
+    dato: 'threadKey',
+    label: 'VER MOTIVO',
+    accesible: 'Ir al chat de negociación para leer por qué se canceló el encuentro',
   },
 };
 
