@@ -298,3 +298,38 @@ la única sesión donde el fallo se veía—, abre el hilo de `P51-A vs P51-B`
 
 Si los tres puntos pasan, **la Tarea 5.1 queda cerrada** y se anota la fecha en
 `docs/memoria/funcionalidades/clubes.md`.
+
+---
+
+# Resultado de la segunda pasada (2026-08-14) — APROBADA
+
+Los tres puntos pasaron:
+
+1. En el hilo `P51-A vs P51-B`, la zona inferior dice **«Cancelado»** y ya no
+   «Club sancionado». El evento conserva «Prueba manual P51: cancelación con
+   anticipación» y «cancha no disponible» ya no aparece como motivo de este
+   encuentro. La advertencia superior sobre la sanción viva de `P51-A` sigue
+   visible y correctamente separada — que es justo como debe quedar: son dos
+   cosas distintas y ahora se leen como dos cosas distintas.
+2. La sanción sigue operando donde corresponde: enviar un desafío nuevo con
+   `P51-A` se rechaza con **«Tu club está sancionado hasta el 28/08/2026 y no
+   puede enviar desafíos»**.
+3. El hilo de control `P51-A vs P51-C` conserva su motivo propio, «Prueba
+   manual P51: cancha no disponible», y su evento de sanción de 14 días.
+
+**La Tarea 5.1 queda cerrada el 2026-08-14.**
+
+Ni los clubes protegidos ni el partido protegido se modificaron. Sobre
+`c0e0b5fd`: su huella de fila cambió durante la sesión, pero no lo tocó nadie —
+su hora (`2026-08-15T00:00:00Z`) se cumplió y el cron de la migración 43 movió
+el DESAFÍO de `publicado` a `en_juego` y después a `esperando_resultado`. El
+partido sigue `abierto`, con `motivo_cancelacion` en NULL y sus dos inscritos.
+
+## Qué queda vivo para las unidades siguientes
+
+- `P51-A` sancionado hasta el **2026-08-28**, con sus dos encuentros cancelados
+  (uno con anticipación, otro tarde). Es un banco de pruebas ya montado para la
+  Tarea 5.2: la revisión de sanciones tiene ahí una sanción real que retirar.
+- `P51-B` y `P51-C` sin sanciones.
+- Si hiciera falta desbloquear `P51-A` antes de tiempo, se marca su sanción
+  como `retirada` con el SQL de más arriba.

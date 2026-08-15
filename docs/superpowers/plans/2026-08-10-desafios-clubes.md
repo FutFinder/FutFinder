@@ -1202,24 +1202,40 @@ la trazabilidad correctos **sin** inventar un permiso inseguro.
 
 **Archivos:** crear `supabase/migrations/47_sanciones_y_revisiones.sql`.
 
-- [ ] `club_sanctions` (motivo `not null` con `check (length(trim(motivo)) > 0)`,
+- [x] `club_sanctions` (motivo `not null` con `check (length(trim(motivo)) > 0)`,
       `inicio_at`, `fin_at = inicio_at + 14 días`, `estado`).
-- [ ] `cancelar_encuentro_club(p_challenge_id, p_motivo)`: motivo no vacío,
+- [x] `cancelar_encuentro_club(p_challenge_id, p_motivo)`: motivo no vacío,
       unilateral, sin aprobación del rival; registra club, administrador, motivo
       y hora de servidor; cancela el partido reutilizando la lógica de
       `cancel_match` (migración 34, que ya conserva el historial); notifica a
       administradores y a los inscritos.
-- [ ] `aplicar_sancion_club`: si faltan menos de 2 h, sanción de 14 días.
+      **Desviación:** se reutiliza su LÓGICA, no la función. `cancel_match()`
+      descuenta Trust Score al organizador, y en un partido de clubes el
+      organizador es sólo el administrador que un día aprobó la propuesta:
+      llamarla habría contradicho la regla de que la sanción es del club.
+- [x] `aplicar_sancion_club`: si faltan menos de 2 h, sanción de 14 días.
       **No toca `profiles.trust_score`** — comprobado en la prueba SQL.
-- [ ] `club_esta_sancionado(p_club_id)` completa el *stub* de la Tarea 4.1 y se
+- [x] `club_esta_sancionado(p_club_id)` completa el *stub* de la Tarea 4.1 y se
       llama desde `createChallenge`, `aceptar_desafio`,
       `crear_propuesta_oficial` y `aprobar_propuesta`.
-- [ ] Acción «Cancelar encuentro» siempre visible en la parte superior del hilo.
-- [ ] Prueba SQL 47: motivo vacío rechazado; cancelar a 1 h sanciona y a 3 h no;
+      `createChallenge` es un `insert` directo del cliente y no pasa por
+      ninguna RPC, así que esa puerta la cierra el trigger
+      `trg_club_challenges_valida_sancion`, `security definer` porque
+      `club_esta_sancionado` está revocada de `authenticated`. La 47b le quitó
+      después el `EXECUTE` a los tres roles del cliente.
+- [x] Acción «Cancelar encuentro» siempre visible en la parte superior del hilo.
+- [x] Prueba SQL 47: motivo vacío rechazado; cancelar a 1 h sanciona y a 3 h no;
       el `trust_score` de los jugadores no cambia; el club sancionado no puede
       crear ni aceptar desafíos; **sí** puede seguir en los partidos ya
-      publicados (decisión C3).
-- [ ] Commit.
+      publicados (decisión C3). 25/25.
+- [x] Commit.
+
+**Cerrada el 2026-08-14.** Migraciones 47 y 47b aplicadas; arneses 25/25 y 5/5
+contra el esquema desplegado; comprobación manual con dos cuentas aprobada.
+Encontró un fallo de interfaz que las pruebas SQL no podían ver —el hilo de un
+encuentro cancelado mostraba el motivo de otra sanción del club— corregido en
+`d3206e4` con su regresión. Ver
+[la comprobación manual](2026-08-14-comprobacion-manual-5.1.md).
 
 ### Tarea 5.2 — Incomparecencia y revisión
 
