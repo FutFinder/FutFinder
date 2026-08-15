@@ -73,6 +73,10 @@ const SAMPLE_DATA_BY_TYPE = {
   // llevar al hilo de un desafío ya cerrado sería llevar al lugar equivocado.
   club_match_cancelled: { challengeId: 'ch1', matchId: 'm1', clubCancelaId: 'c1', motivo: 'lluvia', sanciona: true, threadKey: 'challenge:ch1' },
   club_sancionado: { sancionId: 's1', clubId: 'c1', challengeId: 'ch1', matchId: 'm1', dias: 14, finAt: '2026-08-28T12:00:00.000Z' },
+  // Revisión resuelta (migración 47c): al HILO, y no al club como la sanción.
+  // Lo que hay que leer es la decisión y la nota de quien revisó, y eso está
+  // en el evento del encuentro que se reclamó.
+  club_revision_resuelta: { reviewId: 'rev1', sancionId: 's1', clubId: 'c1', challengeId: 'ch1', decision: 'retirada', threadKey: 'challenge:ch1' },
   message_new: { threadKey: 'dm:u1' },
   chat_mention_all: { threadKey: 'club:c1' },
   friend_request: { fromUserId: 'u1' },
@@ -113,6 +117,7 @@ const EXPECTED_SCREEN_BY_TYPE = {
   club_match_change_responded: 'ChatThread',
   club_match_cancelled: 'ChatThread',
   club_sancionado: 'ClubDetail',
+  club_revision_resuelta: 'ChatThread',
   message_new: 'ChatThread',
   chat_mention_all: 'ChatThread',
   friend_request: 'UserProfile',

@@ -139,6 +139,11 @@ export function resolveNotificationTarget(n) {
     // evento con el club que canceló y el motivo. Al detalle del partido no,
     // porque un partido cancelado no explica quién lo canceló ni por qué.
     case 'club_match_cancelled':
+    // La revisión resuelta (migración 47c) también al hilo, y no al club como
+    // la sanción: lo que hay que leer es la decisión y la nota de quien la
+    // revisó, y eso está en el evento del encuentro que se reclamó. El club
+    // llevaría a una pantalla que no menciona la revisión por ninguna parte.
+    case 'club_revision_resuelta':
       // Aceptado (migración 42): el aviso trae el hilo grupal de
       // negociación y se abre ahí directamente — es donde hay que
       // coordinar, y llevar a la bandeja de desafíos sería un paso de más.

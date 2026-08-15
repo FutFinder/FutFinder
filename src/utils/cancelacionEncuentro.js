@@ -316,14 +316,24 @@ export function textoEncuentroCancelado(payload) {
  *
  * La sanción es DEL CLUB: la frase nombra al club y nunca a una persona,
  * aunque el `payload` traiga quién la disparó.
+ *
+ * UNA PROVISIONAL SE DICE PROVISIONAL (migración 47c). Bloquea exactamente
+ * igual que una vigente —si esperara a la revisión no serviría de nada—, pero
+ * todavía no la miró nadie, y ésa es justo la diferencia que decide si el club
+ * pide la revisión o se queda mirando una pantalla que parece definitiva.
  */
 export function textoSancionAplicada(payload) {
   const club = esTextoConContenido(payload?.club_nombre) ? payload.club_nombre.trim() : 'Un club';
   const dias = Number.isFinite(Number(payload?.dias)) ? Number(payload.dias) : SANCION_DIAS;
   const hasta = fechaLarga(payload?.fin_at);
+  const provisional = payload?.estado === 'provisional';
 
-  const base = `${club} quedó sancionado ${dias} días y no podrá crear ni aceptar desafíos nuevos`;
-  return hasta ? `${base}. Hasta el ${hasta}.` : `${base}.`;
+  const base = provisional
+    ? `${club} quedó sancionado ${dias} días de forma provisional y no podrá crear ni aceptar desafíos nuevos`
+    : `${club} quedó sancionado ${dias} días y no podrá crear ni aceptar desafíos nuevos`;
+
+  const conFecha = hasta ? `${base}. Hasta el ${hasta}.` : `${base}.`;
+  return provisional ? `${conFecha} Puede pedir que se revise.` : conFecha;
 }
 
 // ---------------------------------------------------------------------------

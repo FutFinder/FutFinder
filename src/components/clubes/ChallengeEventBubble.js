@@ -8,6 +8,11 @@ import {
   textoEncuentroCancelado,
   textoSancionAplicada,
 } from '../../utils/cancelacionEncuentro';
+import {
+  textoIncomparecenciaReportada,
+  textoRevisionSolicitada,
+  textoRevisionResuelta,
+} from '../../utils/revisionSancion';
 
 /**
  * Burbuja de sistema dentro del hilo de negociación.
@@ -87,6 +92,15 @@ export function textoDelEvento(event) {
       return textoSancionAplicada(p);
     case 'sancion_retirada':
       return 'Se retiró la sanción.';
+    // Migración 47c. El informe nombra a los dos clubes y el motivo; la
+    // solicitud, sólo quién la pidió —lo que se le dijo a quien modera no es
+    // del hilo—; y la resolución, en qué terminó.
+    case 'incomparecencia_reportada':
+      return textoIncomparecenciaReportada(p);
+    case 'revision_solicitada':
+      return textoRevisionSolicitada(p);
+    case 'revision_resuelta':
+      return textoRevisionResuelta(p);
     case 'resultado_propuesto':
       return 'Se registró un resultado, a la espera de confirmación.';
     case 'resultado_confirmado':

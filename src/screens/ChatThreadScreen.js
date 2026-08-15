@@ -42,6 +42,7 @@ import ChallengeHeader from '../components/clubes/ChallengeHeader';
 import ChallengeEventBubble from '../components/clubes/ChallengeEventBubble';
 import CambioPartidoCard from '../components/clubes/CambioPartidoCard';
 import CancelarEncuentroBar from '../components/clubes/CancelarEncuentroBar';
+import IncomparecenciaYRevisionBar from '../components/clubes/IncomparecenciaYRevisionBar';
 import Banner from '../components/Banner';
 
 import { chatColors } from '../theme/colors';
@@ -75,8 +76,16 @@ import {
   responderCambioPartido,
 } from '../services/clubMatchChanges';
 import { accionesDeCambio, nombresDeLosClubes } from '../utils/cambioPartido';
-import { cancelarEncuentroClub, getSancionVigente } from '../services/clubSanctions';
-import { accionesDeCancelacion } from '../utils/cancelacionEncuentro';
+import {
+  cancelarEncuentroClub,
+  listSancionesDeClubes,
+  reportarIncomparecencia,
+  solicitarRevisionSancion,
+  getIncomparecenciaDeDesafio,
+  listRevisionesDeDesafio,
+} from '../services/clubSanctions';
+import { accionesDeCancelacion, sancionVigente } from '../utils/cancelacionEncuentro';
+import { accionesDeIncomparecencia, accionesDeRevision } from '../utils/revisionSancion';
 import { crearSondeo } from '../utils/sondeo';
 import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
@@ -171,6 +180,16 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [sancion, setSancion] = useState(null);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState(null);
+
+  // Incomparecencia y revisión (migración 47c). `sanciones` es la lista
+  // completa de mis clubes y no sólo la vigente: para saber si esta medida se
+  // puede revisar hace falta la sanción ATADA A ESTE DESAFÍO, que puede no ser
+  // la que hoy bloquea al club.
+  const [sanciones, setSanciones] = useState([]);
+  const [reporteNoShow, setReporteNoShow] = useState(null);
+  const [revisiones, setRevisiones] = useState([]);
+  const [revisionBusy, setRevisionBusy] = useState(false);
+  const [revisionError, setRevisionError] = useState(null);
   // Firma de la bitácora ya pintada, para que el sondeo no reemplace el
   // arreglo —y con él las burbujas— cuando no hay nada nuevo.
   const firmaEventosRef = useRef('');
@@ -776,15 +795,49 @@ export default function ChatThreadScreen({ route, navigation }) {
   const cargarSancion = useCallback(async () => {
     if (!isChallengeThread || myClubIds.length === 0) {
       setSancion(null);
+      setSanciones([]);
       return;
     }
-    const { data } = await getSancionVigente(myClubIds);
-    if (mountedRef.current) setSancion(data || null);
+    // Una sola consulta para las dos cosas: la que hoy bloquea al club (la
+    // cabecera del hilo) y la lista entera (la revisión, que necesita la
+    // sanción de ESTE encuentro aunque ya no sea la que bloquea).
+    const { data } = await listSancionesDeClubes(myClubIds);
+    if (!mountedRef.current) return;
+    setSanciones(data || []);
+    setSancion(sancionVigente(data || [], new Date()));
   }, [isChallengeThread, myClubIds]);
 
   useEffect(() => {
     cargarSancion();
   }, [cargarSancion]);
+
+  /**
+   * El informe de incomparecencia de este encuentro y las revisiones que pidió
+   * mi club (migración 47c).
+   *
+   * Tampoco entra en el sondeo de 15 segundos, por lo mismo que la sanción: son
+   * dos consultas que sólo cambian cuando alguien actúa, y quien actúa las
+   * recarga al terminar. Sin la migración aplicada las dos devuelven vacío sin
+   * ruido, así que el hilo se dibuja igual.
+   */
+  const cargarRevisiones = useCallback(async () => {
+    if (!isChallengeThread || !challengeId || myClubIds.length === 0) {
+      setReporteNoShow(null);
+      setRevisiones([]);
+      return;
+    }
+    const [{ data: reporte }, { data: lista }] = await Promise.all([
+      getIncomparecenciaDeDesafio(challengeId),
+      listRevisionesDeDesafio(challengeId),
+    ]);
+    if (!mountedRef.current) return;
+    setReporteNoShow(reporte || null);
+    setRevisiones(lista || []);
+  }, [isChallengeThread, challengeId, myClubIds]);
+
+  useEffect(() => {
+    cargarRevisiones();
+  }, [cargarRevisiones]);
 
   /**
    * Todo lo que puede haber cambiado por acción del OTRO club: los eventos
@@ -954,6 +1007,93 @@ export default function ChatThreadScreen({ route, navigation }) {
       }
     },
     [cancelBusy, challengeId, refrescarDesafio, cargarSancion]
+  );
+
+  // ── Incomparecencia y revisión (migración 47c) ──────────────────
+  // Las dos mitades miran los mismos datos que la barra de cancelación —el
+  // desafío, el partido vigente y mis clubes— más lo que sólo existe acá: el
+  // informe ya presentado y las revisiones que pedí.
+  const accionesIncomparecencia = useMemo(
+    () =>
+      accionesDeIncomparecencia({
+        challenge: clubChallenge,
+        partido: cambioPartido,
+        clubesAdmin: myClubIds,
+        reporte: reporteNoShow,
+      }),
+    [clubChallenge, cambioPartido, myClubIds, reporteNoShow]
+  );
+
+  const accionesRevision = useMemo(
+    () =>
+      accionesDeRevision({
+        challenge: clubChallenge,
+        partido: cambioPartido,
+        clubesAdmin: myClubIds,
+        sanciones,
+        revisiones,
+      }),
+    [clubChallenge, cambioPartido, myClubIds, sanciones, revisiones]
+  );
+
+  const informarIncomparecencia = useCallback(
+    async (motivo) => {
+      if (revisionBusy || !challengeId) return;
+      setRevisionBusy(true);
+      setRevisionError(null);
+
+      const { error } = await reportarIncomparecencia(challengeId, motivo);
+      if (!mountedRef.current) return;
+
+      if (error) {
+        setRevisionBusy(false);
+        setRevisionError(error.message);
+        return;
+      }
+
+      // Se recarga todo lo que el informe movió: el desafío (que pasó a
+      // `bloqueado_sancion`), la bitácora, la sanción provisional del club
+      // rival y el informe mismo.
+      const { data: fila } = await getChallenge(challengeId);
+      if (mountedRef.current) setClubChallenge(fila || null);
+      await refrescarDesafio();
+      await cargarSancion();
+      await cargarRevisiones();
+
+      if (mountedRef.current) {
+        setRevisionBusy(false);
+        notify('Incomparecencia informada. El club rival queda sancionado mientras se revisa.');
+      }
+    },
+    [revisionBusy, challengeId, refrescarDesafio, cargarSancion, cargarRevisiones]
+  );
+
+  const pedirRevision = useCallback(
+    async (motivo, sancionId) => {
+      if (revisionBusy || !challengeId) return;
+      setRevisionBusy(true);
+      setRevisionError(null);
+
+      const { error } = await solicitarRevisionSancion(challengeId, motivo, sancionId);
+      if (!mountedRef.current) return;
+
+      if (error) {
+        setRevisionBusy(false);
+        setRevisionError(error.message);
+        return;
+      }
+
+      await refrescarDesafio();
+      await cargarRevisiones();
+
+      if (mountedRef.current) {
+        setRevisionBusy(false);
+        // No se promete plazo: la resolución la hace una persona y todavía no
+        // hay una pieza de moderación que pueda comprometer uno.
+        notify('Revisión enviada. Te avisaremos acá cuando esté resuelta.');
+      }
+    },
+    [revisionBusy, challengeId, refrescarDesafio, cargarRevisiones]
   );
 
   const puedeAbrirPartido =
@@ -1205,6 +1345,22 @@ export default function ChatThreadScreen({ route, navigation }) {
             ocupado={cancelBusy}
             error={cancelError}
             onCancelar={cancelarEncuentro}
+          />
+        )}
+
+        {/* Debajo de la cancelación, y no arriba: informar una incomparecencia
+          o pedir una revisión son cosas que se hacen DESPUÉS de que el
+          encuentro salió mal, no en vez de cancelarlo. Cada mitad se dibuja
+          sólo cuando se puede usar o cuando hay algo que contar. */}
+        {isChallengeThread && (
+          <IncomparecenciaYRevisionBar
+            incomparecencia={accionesIncomparecencia}
+            revision={accionesRevision}
+            reporte={reporteNoShow}
+            ocupado={revisionBusy}
+            error={revisionError}
+            onInformar={informarIncomparecencia}
+            onSolicitar={pedirRevision}
           />
         )}
 

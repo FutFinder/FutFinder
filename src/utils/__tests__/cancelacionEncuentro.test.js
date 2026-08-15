@@ -412,6 +412,29 @@ test('el evento de sanción dice el club, los días y hasta cuándo', () => {
   assert.match(texto, /28 de agosto/);
 });
 
+test('una sanción provisional se lee como provisional, no como definitiva (47c)', () => {
+  // Es la diferencia que decide si el club entiende que puede pedir una
+  // revisión. Leer «quedó sancionado 14 días» a secas, cuando la sanción
+  // todavía no la miró nadie, es lo que hace que nadie la pida.
+  const texto = textoSancionAplicada({
+    club_nombre: 'Deportivo',
+    tipo: 'incomparecencia',
+    estado: 'provisional',
+    dias: SANCION_DIAS,
+    fin_at: '2026-08-28T12:00:00.000Z',
+  });
+  assert.match(texto, /provisional/i);
+  assert.match(texto, /revis/i);
+
+  const definitiva = textoSancionAplicada({
+    club_nombre: 'Deportivo',
+    estado: 'vigente',
+    dias: SANCION_DIAS,
+    fin_at: '2026-08-28T12:00:00.000Z',
+  });
+  assert.doesNotMatch(definitiva, /provisional/i);
+});
+
 test('ningún texto del hilo menciona el Trust Score: la sanción es del club', () => {
   const textos = [
     textoEncuentroCancelado({ club_cancela_nombre: 'Deportivo', motivo: 'lluvia' }),

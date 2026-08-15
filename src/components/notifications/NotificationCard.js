@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import {
   UserPlus, CheckCheck, Swords, Shield, CalendarDays, MessageCircle, Star, Bell, Users, Trash2,
-  RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone, CalendarX, ShieldAlert,
+  RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone, CalendarX, ShieldAlert, Scale,
 } from 'lucide-react-native';
 
 /** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
@@ -38,6 +38,7 @@ export const CATEGORY = {
   club_match_change_responded: 'clubes',
   club_match_cancelled: 'clubes',
   club_sancionado: 'clubes',
+  club_revision_resuelta: 'clubes',
 };
 
 const ICON = {
@@ -72,6 +73,7 @@ const ICON = {
   club_match_change_responded: CheckCheck,
   club_match_cancelled: CalendarX,
   club_sancionado: ShieldAlert,
+  club_revision_resuelta: Scale,
 };
 
 const TAG = {
@@ -117,6 +119,9 @@ const TAG = {
   // quien lee esto tiene que reorganizar a su gente.
   club_match_cancelled: { label: 'ENCUENTRO CANCELADO', color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)' },
   club_sancionado: { label: 'CLUB SANCIONADO', color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)' },
+  // Ni rojo ni verde: la revisión puede terminar de las dos formas y el color
+  // no puede adelantar cuál, porque la misma etiqueta sirve para las dos.
+  club_revision_resuelta: { label: 'REVISIÓN RESUELTA', color: '#F5C451', bg: 'rgba(245,196,81,0.10)', border: 'rgba(245,196,81,0.28)' },
 };
 
 const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
@@ -159,6 +164,13 @@ const ATAJOS = {
     dato: 'threadKey',
     label: 'VER MOTIVO',
     accesible: 'Ir al chat de negociación para leer por qué se canceló el encuentro',
+  },
+  // La decisión y la nota de quien revisó están en el evento del hilo, que es
+  // lo único que hay que leer acá.
+  club_revision_resuelta: {
+    dato: 'threadKey',
+    label: 'VER DECISIÓN',
+    accesible: 'Ir al chat del encuentro para leer cómo terminó la revisión',
   },
 };
 

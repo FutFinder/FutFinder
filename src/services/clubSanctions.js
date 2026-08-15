@@ -6,6 +6,13 @@ import {
   esFaltaDeEsquemaSanciones,
   sancionVigente,
 } from '../utils/cancelacionEncuentro';
+import {
+  COLUMNAS_INCOMPARECENCIA,
+  COLUMNAS_REVISION,
+  argumentosReportarIncomparecencia,
+  argumentosSolicitarRevision,
+  comoResultadoRevision,
+} from '../utils/revisionSancion';
 
 /**
  * Cancelación del encuentro y sanciones de club (migración 47).
@@ -89,4 +96,103 @@ export async function getSancionVigente(clubIds = [], ahora = new Date()) {
   const { data, error } = await listSancionesDeClubes(clubIds);
   if (error) return { data: null, error };
   return { data: sancionVigente(data, ahora), error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Incomparecencia y revisión (migración 47c)
+// ---------------------------------------------------------------------------
+
+/**
+ * Informa que el club rival no se presentó al encuentro.
+ *
+ * Sólo se puede DESPUÉS de la hora del partido, y eso lo decide el `now()` de
+ * PostgreSQL: `accionesDeIncomparecencia()` esconde el botón antes de la hora,
+ * pero quien manda es la RPC.
+ *
+ * Devuelve `{ data, error }`. En `data` viajan `sancionId` y `finAt`: informar
+ * deja una sanción PROVISIONAL de 14 días sobre el club informado.
+ */
+export async function reportarIncomparecencia(challengeId, motivo) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
+  if (!challengeId) return { data: null, error: { message: 'Falta el desafío' } };
+
+  const { data, error } = await supabase.rpc(
+    'reportar_incomparecencia',
+    argumentosReportarIncomparecencia(challengeId, motivo)
+  );
+  return comoResultadoRevision(data, error, 'reportarIncomparecencia');
+}
+
+/**
+ * Pide que se revise una sanción o una cancelación del encuentro.
+ *
+ * `sancionId` es opcional: sin él, el servidor busca la sanción vigente o
+ * provisional del club en este desafío, y si no hay ninguna entiende que lo que
+ * se revisa es la cancelación.
+ *
+ * NO EXISTE LA OTRA MITAD. Resolver la revisión es `resolver_revision_sancion`,
+ * revocada de `authenticated`: hoy la ejecuta una persona con `service_role`
+ * desde el panel de Supabase. Por eso acá no hay ninguna función que la llame
+ * — no es un olvido, está documentado en `docs/memoria/operacion/pendientes.md`.
+ */
+export async function solicitarRevisionSancion(challengeId, motivo, sancionId = null) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
+  if (!challengeId) return { data: null, error: { message: 'Falta el desafío' } };
+
+  const { data, error } = await supabase.rpc(
+    'solicitar_revision_sancion',
+    argumentosSolicitarRevision(challengeId, motivo, sancionId)
+  );
+  return comoResultadoRevision(data, error, 'solicitarRevisionSancion');
+}
+
+/**
+ * El informe de incomparecencia de un encuentro, o `null` si no hay ninguno.
+ *
+ * Lo leen los DOS clubes: al acusado hay que decirle de qué se le acusa y con
+ * qué palabras. Sin la migración 47c la tabla no existe, y eso no es un error
+ * de la pantalla —el hilo se dibuja igual, sólo que sin la barra—, así que se
+ * devuelve `null` sin ruido.
+ */
+export async function getIncomparecenciaDeDesafio(challengeId) {
+  if (!isSupabaseConfigured || !challengeId) return { data: null, error: null };
+
+  const { data, error } = await supabase
+    .from('club_match_noshow_reports')
+    .select(COLUMNAS_INCOMPARECENCIA)
+    .eq('challenge_id', challengeId)
+    .maybeSingle();
+
+  if (error) {
+    if (esFaltaDeEsquemaSanciones(error)) return { data: null, error: null };
+    console.error('[FutFinder] getIncomparecenciaDeDesafio:', error);
+    return { data: null, error: { message: error.message || 'No se pudo leer el informe.' } };
+  }
+  return { data: data || null, error: null };
+}
+
+/**
+ * Las revisiones que pidió MI club en un encuentro.
+ *
+ * La RLS sólo muestra las del club de quien consulta: una revisión es un
+ * reclamo dirigido a quien modera, no un mensaje al rival.
+ *
+ * `data: []` es «no pedí ninguna» y no se confunde con un fallo de carga, por
+ * lo mismo que en `listSancionesDeClubes`.
+ */
+export async function listRevisionesDeDesafio(challengeId) {
+  if (!isSupabaseConfigured || !challengeId) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('club_sanction_reviews')
+    .select(COLUMNAS_REVISION)
+    .eq('challenge_id', challengeId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    if (esFaltaDeEsquemaSanciones(error)) return { data: [], error: null };
+    console.error('[FutFinder] listRevisionesDeDesafio:', error);
+    return { data: null, error: { message: error.message || 'No se pudieron leer las revisiones.' } };
+  }
+  return { data: data || [], error: null };
 }
