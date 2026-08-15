@@ -42,6 +42,8 @@ const {
   textoRevisionResuelta,
 } = require('../revisionSancion.js');
 
+const { INCOMPARECENCIA_HORAS } = require('../../services/clubChallengeRules.js');
+
 const RAIZ = path.resolve(__dirname, '..', '..', '..');
 const MIGRACION = fs.readFileSync(
   path.join(RAIZ, 'supabase', 'migrations', '47c_incomparecencia_y_revisiones.sql'),
@@ -89,7 +91,7 @@ const DESAFIO = {
   estado: 'publicado',
 };
 
-/** El partido ya empezó hace dos horas: la incomparecencia es informable. */
+/** El partido empezó hace dos horas: dentro de la ventana de 24 h. */
 const PARTIDO_PASADO = {
   id: 'm-1',
   challenge_proposal_id: 'prop-1',
@@ -152,18 +154,67 @@ test('pasada la hora, el administrador informa contra el club rival', () => {
   assert.equal(a.clubReportadoId, RIVAL);
 });
 
-test('un informe ya presentado cierra la puerta y lo dice', () => {
+test('pasadas las 24 horas ya no se puede informar', () => {
+  // El borde que cierra la denuncia tardía. El servidor lo vuelve a
+  // comprobar con su propio reloj: acá sólo se deja de ofrecer el botón.
+  const a = accionesDeIncomparecencia({
+    challenge: DESAFIO,
+    partido: { ...PARTIDO_PASADO, hora: '2026-08-13T19:00:00.000Z' }, // 25 h antes
+    clubesAdmin: [MI_CLUB],
+    ahora: AHORA,
+  });
+
+  assert.equal(a.puedeInformar, false);
+  assert.match(a.bloqueo, /plazo|24/i);
+});
+
+test('justo dentro de las 24 horas todavía se puede', () => {
+  const a = accionesDeIncomparecencia({
+    challenge: DESAFIO,
+    partido: { ...PARTIDO_PASADO, hora: '2026-08-13T20:30:00.000Z' }, // 23,5 h antes
+    clubesAdmin: [MI_CLUB],
+    ahora: AHORA,
+  });
+
+  assert.equal(a.puedeInformar, true);
+});
+
+test('el plazo del cliente es el mismo que el del servidor', () => {
+  // Espejo de `desafio_reglas() ->> 'incomparecencia_horas'`. Si algún día
+  // cambian por separado, el botón se ofrece cuando el servidor ya no acepta.
+  assert.equal(INCOMPARECENCIA_HORAS, 24);
+  assert.match(MIGRACION, /'incomparecencia_horas',\s*24/);
+});
+
+test('un informe mío ya presentado cierra la puerta y lo dice', () => {
   const a = accionesDeIncomparecencia({
     challenge: DESAFIO,
     partido: PARTIDO_PASADO,
     clubesAdmin: [MI_CLUB],
-    reporte: { id: 'rep-1', club_reportado_id: RIVAL },
+    reportes: [{ id: 'rep-1', club_reportante_id: MI_CLUB, club_reportado_id: RIVAL }],
     ahora: AHORA,
   });
 
   assert.equal(a.puedeInformar, false);
   assert.equal(a.yaInformada, true);
-  assert.match(a.bloqueo, /ya se informó/i);
+  assert.match(a.bloqueo, /ya (se )?informas?te|ya se informó/i);
+});
+
+test('que me hayan acusado a mí no me impide informar al rival', () => {
+  // Un informe por partido y por club acusado: el informe del rival contra
+  // mi club no es el mío, y esconder el botón por eso dejaría al acusado sin
+  // poder contar su versión por la misma vía.
+  const a = accionesDeIncomparecencia({
+    challenge: DESAFIO,
+    partido: PARTIDO_PASADO,
+    clubesAdmin: [MI_CLUB],
+    reportes: [{ id: 'rep-1', club_reportante_id: RIVAL, club_reportado_id: MI_CLUB }],
+    ahora: AHORA,
+  });
+
+  assert.equal(a.puedeInformar, true);
+  assert.equal(a.yaInformada, false);
+  assert.equal(a.reporteContraMiClub.id, 'rep-1');
 });
 
 test('quien administra los dos clubes no informa contra ninguno', () => {

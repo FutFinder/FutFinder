@@ -32,6 +32,17 @@ export const CAMBIO_LIMITE_HORAS = 2;
 /** Por debajo de estas horas, cancelar sanciona al club que cancela. */
 export const CANCELACION_SANCION_HORAS = 2;
 
+/**
+ * Horas que hay para informar una incomparecencia, contadas desde la hora del
+ * partido.
+ *
+ * El borde de arriba de la ventana: pasado ese día ya no queda quién se acuerde
+ * de si el rival llegó a la cancha, y quien revise la sanción tampoco tendría
+ * con qué. Sin él, un club puede bloquear a otro dos semanas por un partido de
+ * hace un mes. Espejo de `desafio_reglas() ->> 'incomparecencia_horas'`.
+ */
+export const INCOMPARECENCIA_HORAS = 24;
+
 /** Días que dura una sanción de club. */
 export const SANCION_DIAS = 14;
 

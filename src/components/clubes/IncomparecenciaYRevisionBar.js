@@ -36,7 +36,6 @@ import {
 export default function IncomparecenciaYRevisionBar({
   incomparecencia,
   revision,
-  reporte = null,
   ocupado = false,
   error = null,
   onInformar,
@@ -47,13 +46,15 @@ export default function IncomparecenciaYRevisionBar({
 
   const puedeInformar = !!incomparecencia?.puedeInformar;
   const yaInformada = !!incomparecencia?.yaInformada;
+  const miReporte = incomparecencia?.miReporte || null;
+  const acusacion = incomparecencia?.reporteContraMiClub || null;
   const puedeSolicitar = !!revision?.puedeSolicitar;
   const revisionEnCurso = revision?.revision || null;
 
   const muestraIncomparecencia = puedeInformar || yaInformada;
   const muestraRevision = puedeSolicitar || !!revisionEnCurso;
 
-  if (!muestraIncomparecencia && !muestraRevision) return null;
+  if (!muestraIncomparecencia && !muestraRevision && !acusacion) return null;
 
   const esRevision = abierto === 'revision';
   const revisado = esRevision ? validarMotivoRevision(texto) : validarMotivoIncomparecencia(texto);
@@ -74,6 +75,18 @@ export default function IncomparecenciaYRevisionBar({
     <View style={styles.bar}>
       {abierto === null ? (
         <>
+          {/* De qué se acusa a MI club, con las palabras del rival. Sin esto,
+            el club sancionado ve «tu club está sancionado» sin saber quién lo
+            dijo ni por qué, y no tiene con qué pedir la revisión. */}
+          {!!acusacion && (
+            <View style={styles.row}>
+              <TriangleAlert color={chatColors.warn} size={15} strokeWidth={2.2} />
+              <Text style={styles.hint} numberOfLines={4}>
+                {`El club rival informó que tu club no se presentó: «${acusacion.motivo}».`}
+              </Text>
+            </View>
+          )}
+
           {muestraIncomparecencia && (
             puedeInformar ? (
               <Pressable
@@ -90,8 +103,8 @@ export default function IncomparecenciaYRevisionBar({
               <View style={styles.row}>
                 <UserX color="rgba(255,255,255,0.4)" size={15} strokeWidth={2.2} />
                 <Text style={styles.hint} numberOfLines={3}>
-                  {reporte?.motivo
-                    ? `Ya se informó una incomparecencia: «${reporte.motivo}».`
+                  {miReporte?.motivo
+                    ? `Informaste una incomparecencia: «${miReporte.motivo}».`
                     : incomparecencia?.bloqueo}
                 </Text>
               </View>

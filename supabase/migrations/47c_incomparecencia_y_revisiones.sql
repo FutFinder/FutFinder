@@ -8,42 +8,59 @@
 -- revise, y quien resuelve —una persona con `service_role`, porque no
 -- existe interfaz de moderación— la retira o la mantiene.
 --
--- LAS SEIS GARANTÍAS, Y DÓNDE VIVEN:
+-- LAS SIETE GARANTÍAS, Y DÓNDE VIVEN:
 --
---   1. NADIE «FALTA» A UN PARTIDO QUE NO HA EMPEZADO. `reportar_
---      incomparecencia` compara `matches.hora` con el `now()` de
---      PostgreSQL. Antes de esa hora no hay nada que informar, y el
---      teléfono no puede adelantar el reloj.
---   2. LA SANCIÓN NACE PROVISIONAL. `estado = 'provisional'`, que la 47
+--   1. LA VENTANA ES DE 24 HORAS, Y LA MIDE POSTGRESQL. Se puede
+--      informar desde `matches.hora` y hasta 24 horas después, con el
+--      `now()` del servidor. El borde de abajo impide «informar» que
+--      alguien faltó a un partido que no ha empezado; el de arriba
+--      impide la denuncia tardía, que es la que no se puede comprobar:
+--      a los tres días nadie se acuerda de quién llegó a la cancha, y
+--      quien revisa la sanción tampoco tiene con qué. Las horas salen
+--      de `desafio_reglas()`, que es el espejo de
+--      `clubChallengeRules.js`; escribir «24» acá sería la forma más
+--      rápida de que un día el cliente y el servidor contaran distinto.
+--   2. UN INFORME POR PARTIDO Y POR CLUB ACUSADO. El índice único es
+--      `(match_id, club_reportado_id)`. Cada club puede informar una
+--      vez, contra el otro: si los dos se acusan quedan dos informes y
+--      dos sanciones provisionales, y las dos se revisan por separado.
+--      El segundo informe del MISMO club contra el MISMO rival no abre
+--      nada: devuelve «ya estaba».
+--   3. QUIEN INFORMA ES EL CLUB RIVAL, siempre. El informe se levanta
+--      contra el OTRO club del encuentro, nunca contra el propio: el
+--      acusado sale de la fila del desafío, no de un argumento que
+--      mande quien llama. Quien administra los dos clubes no puede
+--      informar — mismo conflicto de doble pertenencia que ya cierran
+--      la 43d, la 46 y la 47.
+--   4. LA SANCIÓN NACE PROVISIONAL. `estado = 'provisional'`, que la 47
 --      ya admitía en el CHECK y que `club_esta_sancionado()` ya cuenta
 --      como bloqueante. Bloquea desde el primer momento —si esperara a
 --      la revisión no serviría de nada— pero se llama provisional
 --      porque todavía no la miró nadie.
---   3. EL DESAFÍO SE CONGELA Y RECUERDA DE DÓNDE VINO.
---      `aplicar_sancion_club()` guarda el estado anterior en
---      `club_challenges.estado_previo_sancion` (columna que la 41 dejó
---      creada y vacía) y pasa el desafío a `bloqueado_sancion`. Retirar
---      la sanción lo devuelve exactamente a ese estado. Es la transición
---      transversal de la máquina de estados del plan.
---   4. RETIRAR NO BORRA. La fila de `club_sanctions` queda con
+--   5. EL DESAFÍO SE CONGELA MIENTRAS HAY UNA REVISIÓN PENDIENTE, y no
+--      un minuto más. `solicitar_revision_sancion()` guarda el estado
+--      anterior en `club_challenges.estado_previo_sancion` (columna que
+--      la 41 dejó creada y vacía) y pasa el desafío a
+--      `bloqueado_sancion`; `resolver_revision_sancion()` lo devuelve a
+--      ese estado exacto en cuanto no queda ninguna revisión pendiente,
+--      se haya retirado la sanción o no. Congelar al informar habría
+--      dejado el encuentro atrapado para siempre cuando nadie pide la
+--      revisión, que es el caso más frecuente.
+--   6. RETIRAR NO BORRA. La fila de `club_sanctions` queda con
 --      `estado = 'retirada'` y su motivo intacto. El historial de un
 --      club no se reescribe: se anota.
---   5. LA RESOLUCIÓN NO ES DEL CLIENTE. `resolver_revision_sancion` se
+--   7. LA RESOLUCIÓN NO ES DEL CLIENTE. `resolver_revision_sancion` se
 --      revoca de `public`, `anon` y `authenticated`, y sólo la conserva
 --      `service_role`. No hay comprobación de rol dentro del cuerpo: la
 --      única puerta es el privilegio `EXECUTE`, que es el que prueba el
---      caso 13 del arnés. Un guardia interno que leyera el JWT daría
---      una sensación de seguridad que el privilegio ya da de verdad.
---   6. EL EXPEDIENTE SE COPIA AL PEDIR LA REVISIÓN, no al resolverla.
---      `club_sanction_reviews.contexto` guarda el partido, la sanción,
---      el informe, los tiempos y los eventos del hilo tal como estaban
---      en ese instante. Si después alguien cancela, cambia o reabre
---      algo, quien revise sigue viendo lo que se le reclamó.
+--      arnés. Un guardia interno que leyera el JWT daría una sensación
+--      de seguridad que el privilegio ya da de verdad.
 --
--- QUIÉN INFORMA. Un administrador de uno de los dos clubes, contra el
--- OTRO. Quien administra los dos no puede: la sanción recae sobre un
--- club concreto. Es el mismo conflicto de doble pertenencia que ya
--- cierran la 43d, la 46 y la 47.
+-- Y el expediente se copia AL PEDIR la revisión, no al resolverla:
+-- `club_sanction_reviews.contexto` guarda el partido, la sanción, el
+-- informe, los tiempos y los eventos del hilo tal como estaban en ese
+-- instante. Si después alguien cancela, cambia o reabre algo, quien
+-- revise sigue viendo lo que se le reclamó.
 --
 -- POR QUÉ UN ARCHIVO 47c Y NO UNA EDICIÓN DE LA 47. La 47 y la 47b están
 -- aplicadas en producción desde el 2026-08-14. Editar una migración
@@ -62,11 +79,50 @@
 -- Es idempotente: se puede volver a correr sin efectos secundarios.
 -- =============================================================
 
+-- ── 0. EL PLAZO PARA INFORMAR, EN LAS REGLAS ────────────────────
+-- Copia literal de `desafio_reglas()` de la migración 41 con UNA sola
+-- adición: `incomparecencia_horas`. Se versiona entera porque
+-- `create or replace` reemplaza el cuerpo completo; lo demás no cambia
+-- ni una línea.
+--
+-- Acá y no dentro de la RPC por lo mismo que `sancion_dias`: esta
+-- función es el espejo de `src/services/clubChallengeRules.js`, y un
+-- número escrito dos veces es un número que algún día va a estar mal en
+-- una de las dos.
+create or replace function public.desafio_reglas()
+returns jsonb
+language sql
+immutable
+as $$
+    select jsonb_build_object(
+        'negociacion_horas', 72,
+        'prorroga_horas', 24,
+        'cambio_limite_horas', 2,
+        'cancelacion_sancion_horas', 2,
+        'incomparecencia_horas', 24,
+        'sancion_dias', 14,
+        'expiracion_pendiente_dias', 7,
+        'cupos_por_club_min', 4,
+        'cupos_por_club_max', 15,
+        'mensaje_max', 300,
+        'instrucciones_max', 500,
+        'metodos_inscripcion', jsonb_build_array('orden_llegada', 'seleccion_admin'),
+        'estados_activos', jsonb_build_array(
+            'negociacion', 'esperando_aprobacion', 'publicado',
+            'en_juego', 'esperando_resultado', 'resultado_en_disputa'
+        ),
+        'estados_cerrados', jsonb_build_array(
+            'finalizado', 'rechazado', 'sin_acuerdo', 'cancelado', 'expirado'
+        )
+    );
+$$;
+
 -- ── 1. EL INFORME DE INCOMPARECENCIA ────────────────────────────
--- Una fila por encuentro, no por club: si los dos clubes se acusan de no
--- haber llegado, eso no es una incomparecencia, es una discusión, y la
--- resuelve una persona mirando el expediente. El único índice de esta
--- tabla dice exactamente eso.
+-- Una fila por partido Y POR CLUB ACUSADO. Si los dos clubes dicen que
+-- el otro no llegó, quedan los dos informes y las dos sanciones
+-- provisionales: no se elige al que informó primero. Que se contradigan
+-- es información —y va entera al expediente— pero no es la aplicación la
+-- que decide cuál de los dos miente.
 create table if not exists public.club_match_noshow_reports (
     id                  uuid primary key default gen_random_uuid(),
     challenge_id        uuid not null references public.club_challenges(id) on delete cascade,
@@ -89,11 +145,16 @@ alter table public.club_match_noshow_reports
     add constraint club_match_noshow_reports_motivo_check
     check (length(trim(motivo)) > 0 and length(motivo) <= 300);
 
-create unique index if not exists club_match_noshow_reports_encuentro_uidx
-    on public.club_match_noshow_reports (challenge_id);
+-- `(match_id, club_reportado_id)`, que es literalmente «uno por partido y
+-- por club acusado». Parcial porque `match_id` es `on delete set null`:
+-- borrado el partido no hay nada que restringir, y un índice que tratara
+-- todos esos nulos como iguales impediría archivar dos informes viejos.
+create unique index if not exists club_match_noshow_reports_partido_club_uidx
+    on public.club_match_noshow_reports (match_id, club_reportado_id)
+    where match_id is not null;
 
 comment on table public.club_match_noshow_reports is
-    'Informes de incomparecencia (migración 47c). Uno por encuentro, sólo después de la hora del partido, y cada uno deja una sanción provisional de 14 días sobre el club que no se presentó.';
+    'Informes de incomparecencia (migración 47c). Uno por partido y por club acusado, sólo dentro de las 24 horas siguientes a la hora del partido, y cada uno deja una sanción provisional de 14 días sobre el club que no se presentó.';
 
 -- ── 2. LA REVISIÓN ──────────────────────────────────────────────
 -- «Solicitar revisión» tiene que estar disponible ante CUALQUIER
@@ -101,7 +162,7 @@ comment on table public.club_match_noshow_reports is
 -- cancelación con aviso suficiente no deja sanción, pero deja a un club
 -- sin partido, y ése también tiene derecho a que alguien lo mire.
 --
--- `contexto` es el expediente, y se copia al pedirla (garantía 6).
+-- `contexto` es el expediente, y se copia al pedirla, no al resolverla.
 create table if not exists public.club_sanction_reviews (
     id             uuid primary key default gen_random_uuid(),
     -- El club que PIDE la revisión: el afectado.
@@ -268,23 +329,21 @@ alter table public.notifications add constraint notifications_type_check
         'club_match_cancelled', 'club_sancionado', 'club_revision_resuelta'
     ));
 
--- ── 5. LA SANCIÓN CONGELA EL DESAFÍO ────────────────────────────
--- Copia literal de `aplicar_sancion_club` de la migración 47 con DOS
--- adiciones: el congelado del desafío y el texto del aviso cuando la
--- sanción es provisional. Se versiona entera porque `create or replace`
--- reemplaza el cuerpo completo; lo demás no cambia ni una línea.
+-- ── 5. EL AVISO DICE QUE LA SANCIÓN ES PROVISIONAL ──────────────
+-- Copia literal de `aplicar_sancion_club` de la migración 47 con UNA
+-- sola adición: el texto del aviso cuando la sanción nace provisional.
+-- Se versiona entera porque `create or replace` reemplaza el cuerpo
+-- completo; lo demás no cambia ni una línea, y la prueba 47 lo comprueba.
 --
--- POR QUÉ CONGELAR. Un encuentro cuyo club quedó sancionado no puede
--- seguir avanzando como si nada mientras se revisa: `bloqueado_sancion`
--- es un estado real y reversible (decisión C2 del plan), y
--- `estado_previo_sancion` es lo que permite deshacerlo sin adivinar.
+-- «Tu club quedó sancionado» a secas, para una sanción que todavía no
+-- miró nadie, es lo que hace que nadie pida la revisión. Ésta es la
+-- única puerta por la que el club se entera de que puede pedirla.
 --
--- POR QUÉ SÓLO EL DESAFÍO DE LA SANCIÓN, Y SÓLO SI ESTÁ ACTIVO. Los
--- demás partidos que el club ya tenía publicados NO se tocan: es la
--- decisión C3 y sigue en pie. Y un desafío ya cerrado —`cancelado`,
--- `finalizado`, `expirado`— no se congela: la cancelación tardía de la
--- 47 llega acá con el desafío ya en `cancelado`, así que ese camino
--- no cambia en nada.
+-- ACÁ NO SE CONGELA NADA. El congelado del desafío vive en
+-- `solicitar_revision_sancion()` y dura lo que dura la revisión: si se
+-- hiciera al aplicar la sanción, un encuentro cuyo club nunca pide
+-- revisión —el caso más frecuente— se quedaría en `bloqueado_sancion`
+-- para siempre, sin nada ni nadie que pudiera sacarlo de ahí.
 create or replace function public.aplicar_sancion_club(
     p_club_id      uuid,
     p_motivo       text,
@@ -306,7 +365,6 @@ declare
     v_ch     public.club_challenges;
     v_nombre text;
     v_admin  record;
-    v_previo text;
 begin
     v_motivo := nullif(btrim(coalesce(p_motivo, '')), '');
     if v_motivo is null then
@@ -350,21 +408,6 @@ begin
                     'inicio_at',   v_row.inicio_at,
                     'fin_at',      v_row.fin_at,
                     'estado',      v_row.estado));
-
-            -- ── LO NUEVO DE LA 47c: el desafío se congela ───────
-            -- `coalesce` sobre `estado_previo_sancion`: si ya venía
-            -- congelado por otra sanción, el estado bueno es el PRIMERO
-            -- que se guardó, no `bloqueado_sancion`.
-            if v_ch.estado in (
-                select jsonb_array_elements_text(public.desafio_reglas() -> 'estados_activos')
-            ) then
-                update public.club_challenges
-                   set estado_previo_sancion = coalesce(estado_previo_sancion, estado),
-                       estado                = 'bloqueado_sancion'
-                 where id = v_ch.id
-                   and estado <> 'bloqueado_sancion'
-                returning estado_previo_sancion into v_previo;
-            end if;
         end if;
     end if;
 
@@ -407,7 +450,7 @@ revoke execute on function public.aplicar_sancion_club(uuid, text, text, uuid, u
     from public, anon, authenticated;
 
 comment on function public.aplicar_sancion_club(uuid, text, text, uuid, uuid, uuid, text) is
-    'Ayudante interno: crea la sanción del club, su evento en el hilo, el congelado del desafío en bloqueado_sancion (47c) y el aviso a los administradores. No es una RPC del cliente y no toca el Trust Score de nadie.';
+    'Ayudante interno: crea la sanción del club, su evento en el hilo y el aviso a los administradores, que dice que la sanción es provisional cuando lo es (47c). No es una RPC del cliente, no congela ningún desafío y no toca el Trust Score de nadie.';
 
 -- ── 6. INFORMAR LA INCOMPARECENCIA ──────────────────────────────
 -- ORDEN DE BLOQUEO: primero la fila grande (el partido) y después la
@@ -441,7 +484,7 @@ declare
     v_nombre    text;
     v_rival_nom text;
     v_user      text;
-    v_previo    text;
+    v_horas     integer := (public.desafio_reglas() ->> 'incomparecencia_horas')::int;
 begin
     if v_me is null then
         return json_build_object('ok', false, 'reason', 'No autenticado');
@@ -497,12 +540,17 @@ begin
                     else v_row.club_retador_id end;
 
     -- ── reintento ───────────────────────────────────────────────
-    -- Antes que los estados: informar dos veces tiene que devolver «ya
-    -- estaba» aunque entretanto el desafío se haya congelado por la
-    -- sanción que dejó el PRIMER informe. Si no, el segundo toque leería
-    -- «este encuentro ya no admite un informe» y parecería un error.
+    -- Antes que los estados y que el plazo: el segundo toque del MISMO
+    -- club contra el MISMO rival tiene que devolver «ya estaba» aunque
+    -- entretanto se hayan pasado las 24 horas o el desafío se haya
+    -- congelado. Si no, un reintento leería «el plazo venció» sobre un
+    -- informe que sí se presentó a tiempo, y parecería que se perdió.
+    --
+    -- Por `club_reportado_id` y no sólo por el encuentro: el otro club
+    -- puede tener su propio informe, y ése no es el reintento de éste.
     select * into v_rep from public.club_match_noshow_reports
-     where challenge_id = v_row.id;
+     where challenge_id = v_row.id
+       and club_reportado_id = v_rival;
     if found then
         return json_build_object('ok', true, 'already', true,
             'reportId', v_rep.id, 'sancionId', v_rep.sancion_id,
@@ -519,12 +567,22 @@ begin
             'reason', 'Este encuentro ya no admite un informe de incomparecencia');
     end if;
 
-    -- ── la hora, con el reloj del servidor ──────────────────────
-    -- Estrictamente la hora de inicio y no un margen de cortesía: quien
-    -- llega tarde llega, y eso se discute en la revisión, no acá.
+    -- ── la ventana de 24 horas, con el reloj del servidor ───────
+    -- Abajo, estrictamente la hora de inicio y no un margen de cortesía:
+    -- quien llega tarde llega, y eso se discute en la revisión, no acá.
     if now() < v_match.hora then
         return json_build_object('ok', false,
             'reason', 'Podrás informar la incomparecencia después de la hora del partido');
+    end if;
+    -- Arriba, 24 horas. Es el límite que hace comprobable la acusación:
+    -- pasado ese día ya no queda quién se acuerde de si el rival llegó a
+    -- la cancha, y quien revise la sanción tampoco tendría con qué. Sin
+    -- este borde, un club puede bloquear a otro dos semanas por un
+    -- partido de hace un mes.
+    if now() > v_match.hora + make_interval(hours => v_horas) then
+        return json_build_object('ok', false,
+            'reason', 'El plazo para informar una incomparecencia venció: eran ' || v_horas
+                      || ' horas desde la hora del partido');
     end if;
 
     select nombre into v_nombre     from public.clubs where id = v_club;
@@ -542,8 +600,11 @@ begin
         returning * into v_rep;
     exception when unique_violation then
         -- Dos administradores del mismo club informando a la vez: el
-        -- índice único es el que serializa de verdad.
-        select * into v_rep from public.club_match_noshow_reports where challenge_id = v_row.id;
+        -- índice único `(match_id, club_reportado_id)` es el que
+        -- serializa de verdad, y el que impide que la carrera deje dos
+        -- sanciones sobre el mismo club por el mismo partido.
+        select * into v_rep from public.club_match_noshow_reports
+         where match_id = v_match.id and club_reportado_id = v_rival;
         return json_build_object('ok', true, 'already', true,
             'reportId', v_rep.id, 'sancionId', v_rep.sancion_id,
             'clubReportadoId', v_rep.club_reportado_id);
@@ -580,16 +641,12 @@ begin
        set sancion_id = v_san.id
      where id = v_rep.id;
 
-    select estado_previo_sancion into v_previo
-      from public.club_challenges where id = v_row.id;
-
     return json_build_object(
         'ok',              true,
         'reportId',        v_rep.id,
         'sancionId',       v_san.id,
         'clubReportadoId', v_rival,
-        'finAt',           v_san.fin_at,
-        'estadoPrevio',    v_previo);
+        'finAt',           v_san.fin_at);
 end;
 $$;
 
@@ -597,7 +654,7 @@ revoke execute on function public.reportar_incomparecencia(uuid, text) from publ
 grant execute on function public.reportar_incomparecencia(uuid, text) to authenticated;
 
 comment on function public.reportar_incomparecencia(uuid, text) is
-    'Informa que el club rival no se presentó al encuentro (migración 47c). Sólo después de la hora del partido, sólo un administrador de uno de los dos clubes, y deja una sanción provisional de 14 días sobre el club informado.';
+    'Informa que el club rival no se presentó al encuentro (migración 47c). Sólo dentro de las 24 horas siguientes a la hora del partido, sólo un administrador de uno de los dos clubes y siempre contra el OTRO, uno por partido y por club acusado, y deja una sanción provisional de 14 días sobre el club informado.';
 
 -- ── 7. PEDIR LA REVISIÓN ────────────────────────────────────────
 -- Disponible ante cualquier cancelación o sanción del encuentro. El
@@ -805,6 +862,33 @@ begin
             'reviewId', v_rev.id, 'tipo', v_rev.tipo, 'sancionId', v_rev.sancion_id);
     end;
 
+    -- ── el desafío se congela mientras dure la revisión ─────────
+    -- `bloqueado_sancion` es un estado real y reversible (decisión C2
+    -- del plan) y `estado_previo_sancion` es lo que permite deshacerlo
+    -- sin adivinar. Se congela ACÁ, y no al aplicar la sanción, para que
+    -- el congelado dure exactamente lo que dura la revisión: un
+    -- encuentro cuyo club nunca la pide no tiene por qué quedar
+    -- atrapado.
+    --
+    -- SÓLO SI EL DESAFÍO SIGUE ACTIVO. Uno ya cerrado —`cancelado`,
+    -- `finalizado`, `expirado`— no se congela: la revisión de una
+    -- cancelación entra por acá con el desafío en `cancelado` y lo deja
+    -- como está. Y los OTROS encuentros del club no se tocan nunca:
+    -- ésa es la decisión C3.
+    --
+    -- `coalesce` sobre `estado_previo_sancion`: si el otro club ya pidió
+    -- su revisión y lo congeló, el estado bueno es el PRIMERO que se
+    -- guardó, no `bloqueado_sancion`.
+    if v_row.estado in (
+        select jsonb_array_elements_text(public.desafio_reglas() -> 'estados_activos')
+    ) then
+        update public.club_challenges
+           set estado_previo_sancion = coalesce(estado_previo_sancion, estado),
+               estado                = 'bloqueado_sancion'
+         where id = v_row.id
+           and estado <> 'bloqueado_sancion';
+    end if;
+
     -- El evento NO lleva el motivo. Que se pidió una revisión es público
     -- para los dos clubes; lo que se le dice a quien modera, no.
     insert into public.club_challenge_events (challenge_id, tipo, actor_id, club_id, payload)
@@ -841,8 +925,11 @@ comment on function public.solicitar_revision_sancion(uuid, text, uuid) is
 --
 -- `retirar` no borra la sanción: la marca 'retirada' —estado que
 -- `club_esta_sancionado()` ya no cuenta, comprobado en el caso 25 de la
--- prueba 47— y devuelve el desafío a `estado_previo_sancion`.
--- `mantener` confirma la provisional y la deja 'vigente'.
+-- prueba 47—. `mantener` confirma la provisional y la deja 'vigente'.
+--
+-- LAS DOS descongelan el desafío, en cuanto no quede ninguna revisión
+-- pendiente sobre ese encuentro: lo que lo congela es la revisión en
+-- curso, no la sanción.
 create or replace function public.resolver_revision_sancion(
     p_review_id uuid,
     p_decision  text,
@@ -896,18 +983,42 @@ begin
          where id = v_rev.sancion_id
            and estado in ('vigente', 'provisional');
         v_retirada := true;
+    else
+        -- Mantener confirma la provisional. Una que ya era 'vigente' o
+        -- que se cumplió no se toca.
+        update public.club_sanctions
+           set estado = 'vigente'
+         where id = v_rev.sancion_id
+           and estado = 'provisional';
+    end if;
 
-        -- El desafío vuelve EXACTAMENTE a donde estaba. Si no hay estado
-        -- guardado no se inventa ninguno: se deja como está y la
-        -- respuesta lo dice con `estadoRestaurado` en null.
+    -- ── el desafío se descongela ────────────────────────────────
+    -- En las DOS decisiones, porque lo que congela es la revisión en
+    -- curso y no la sanción: mantenerla deja al club sin poder abrir
+    -- desafíos NUEVOS durante 14 días, que es el castigo, pero no tiene
+    -- por qué dejar este encuentro atrapado para siempre.
+    --
+    -- Y sólo cuando no queda ninguna otra pendiente: si los dos clubes
+    -- se acusaron y pidieron revisión, el encuentro sigue congelado
+    -- hasta que se resuelvan las dos. `v_rev` ya está marcada como
+    -- resuelta más abajo, así que acá se excluye a mano.
+    if not exists (
+        select 1 from public.club_sanction_reviews r
+         where r.challenge_id = v_rev.challenge_id
+           and r.estado = 'pendiente'
+           and r.id <> v_rev.id
+    ) then
+        -- Vuelve EXACTAMENTE a donde estaba. Si no hay estado guardado no
+        -- se inventa ninguno: se deja como está y la respuesta lo dice
+        -- con `estadoRestaurado` en null.
         --
         -- El `exception` no es decorativo: `club_challenges_unique_activo`
         -- es único sobre el par de clubes para los estados activos, así
         -- que devolver este desafío a `publicado` chocaría si esos dos
         -- clubes hubieran abierto otro encuentro entretanto. Hoy no puede
         -- pasar —un club sancionado no crea ni acepta desafíos—, pero si
-        -- pasara, lo que NO puede es tumbar la retirada de la sanción,
-        -- que es lo que de verdad pidió la revisión.
+        -- pasara, lo que NO puede es tumbar la resolución de la revisión,
+        -- que es lo que de verdad se pidió.
         begin
             update public.club_challenges
                set estado                = estado_previo_sancion,
@@ -919,13 +1030,6 @@ begin
         exception when unique_violation then
             v_estado := null;
         end;
-    else
-        -- Mantener confirma la provisional. Una que ya era 'vigente' o
-        -- que se cumplió no se toca.
-        update public.club_sanctions
-           set estado = 'vigente'
-         where id = v_rev.sancion_id
-           and estado = 'provisional';
     end if;
 
     update public.club_sanction_reviews
@@ -999,4 +1103,4 @@ revoke execute on function public.resolver_revision_sancion(uuid, text, text)
 grant execute on function public.resolver_revision_sancion(uuid, text, text) to service_role;
 
 comment on function public.resolver_revision_sancion(uuid, text, text) is
-    'Resuelve una revisión: retira la sanción (y devuelve el desafío a su estado previo) o la mantiene (migración 47c). SÓLO service_role: no existe interfaz de moderación y hoy se ejecuta desde el panel de Supabase.';
+    'Resuelve una revisión: retira la sanción o la mantiene, y en los dos casos devuelve el desafío a su estado previo cuando no queda ninguna revisión pendiente sobre ese encuentro (migración 47c). SÓLO service_role: no existe interfaz de moderación y hoy se ejecuta desde el panel de Supabase.';

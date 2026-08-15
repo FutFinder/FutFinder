@@ -21,6 +21,7 @@
  */
 
 import { esFaltaDeEsquema } from './cambioRpc.js';
+import { INCOMPARECENCIA_HORAS } from '../services/clubChallengeRules.js';
 import { ESTADOS_SANCION_ACTIVOS, fechaLarga } from './cancelacionEncuentro.js';
 
 /** Espejo del CHECK de `club_match_noshow_reports.motivo`. */
@@ -119,19 +120,26 @@ function misClubesDelDesafio(challenge, clubesAdmin) {
  * Quién puede informar una incomparecencia, contra quién, y por qué no los
  * demás.
  *
- * LA HORA ES LA REGLA. Antes del inicio del partido no hay incomparecencia que
- * informar: nadie ha faltado todavía. El servidor lo vuelve a comprobar con su
- * propio reloj, así que ofrecer el botón antes sólo conseguiría un rechazo.
+ * LA VENTANA ES DE 24 HORAS. Antes del inicio del partido no hay
+ * incomparecencia que informar —nadie ha faltado todavía— y pasado un día ya no
+ * se puede comprobar: nadie se acuerda de quién llegó a la cancha, y quien
+ * revise la sanción tampoco tendría con qué. El servidor lo vuelve a comprobar
+ * con su propio reloj, así que ofrecer el botón fuera de la ventana sólo
+ * conseguiría un rechazo.
  *
- * SIN MARGEN DE CORTESÍA. Se compara con la hora de inicio y no con «la hora
- * más quince minutos»: quien llegó tarde, llegó, y eso se discute en la
+ * SIN MARGEN DE CORTESÍA ABAJO. Se compara con la hora de inicio y no con «la
+ * hora más quince minutos»: quien llegó tarde, llegó, y eso se discute en la
  * revisión, que es donde hay una persona leyendo.
+ *
+ * UN INFORME POR CLUB ACUSADO. `reportes` son los del encuentro, que pueden ser
+ * dos: el mío contra el rival y el del rival contra el mío. Sólo el PRIMERO
+ * cierra esta puerta; que me hayan acusado no me quita el derecho a informar.
  */
 export function accionesDeIncomparecencia({
   challenge = null,
   partido = null,
   clubesAdmin = [],
-  reporte = null,
+  reportes = [],
   ahora = new Date(),
 } = {}) {
   const c = challenge || {};
@@ -141,6 +149,7 @@ export function accionesDeIncomparecencia({
   const esDeClubes = !!p.id && !!p.challenge_proposal_id && delDesafio.length === 2;
   const administroLosDos = admin.length > 1;
   const miClubId = admin.length === 1 ? admin[0] : null;
+  const lista = Array.isArray(reportes) ? reportes.filter(Boolean) : [];
 
   const salida = {
     esDeClubes,
@@ -148,7 +157,9 @@ export function accionesDeIncomparecencia({
     administroLosDos,
     miClubId,
     clubReportadoId: null,
-    yaInformada: !!reporte?.id,
+    yaInformada: false,
+    miReporte: null,
+    reporteContraMiClub: null,
     puedeInformar: false,
     bloqueo: null,
   };
@@ -161,13 +172,17 @@ export function accionesDeIncomparecencia({
   if (miClubId) {
     salida.clubReportadoId =
       miClubId === c.club_retador_id ? c.club_retado_id : c.club_retador_id;
+    salida.miReporte = lista.find((r) => r.club_reportante_id === miClubId) || null;
+    salida.reporteContraMiClub = lista.find((r) => r.club_reportado_id === miClubId) || null;
   }
+  salida.yaInformada = !!salida.miReporte;
 
   const referencia = aFecha(ahora) || new Date();
   const hora = aFecha(p.hora);
+  const limite = hora ? hora.getTime() + INCOMPARECENCIA_HORAS * 3600 * 1000 : null;
 
   if (salida.yaInformada) {
-    salida.bloqueo = 'Ya se informó una incomparecencia en este encuentro.';
+    salida.bloqueo = 'Ya informaste una incomparecencia en este encuentro.';
   } else if (c.estado === 'cancelado' || p.estado === 'cancelado') {
     salida.bloqueo = 'Este encuentro se canceló: nadie faltó a un partido que no se jugó.';
   } else if (!salida.soyAdmin) {
@@ -182,6 +197,10 @@ export function accionesDeIncomparecencia({
     // Sin hora legible se bloquea: ofrecer el botón «por si acaso» termina en
     // un rechazo del servidor que nadie sabe explicar.
     salida.bloqueo = 'Podrás informar la incomparecencia después de la hora del partido.';
+  } else if (referencia.getTime() > limite) {
+    salida.bloqueo =
+      `El plazo para informar una incomparecencia venció: eran ${INCOMPARECENCIA_HORAS} horas `
+      + 'desde la hora del partido.';
   }
 
   salida.puedeInformar = !salida.bloqueo;

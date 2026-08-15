@@ -81,7 +81,7 @@ import {
   listSancionesDeClubes,
   reportarIncomparecencia,
   solicitarRevisionSancion,
-  getIncomparecenciaDeDesafio,
+  listIncomparecenciasDeDesafio,
   listRevisionesDeDesafio,
 } from '../services/clubSanctions';
 import { accionesDeCancelacion, sancionVigente } from '../utils/cancelacionEncuentro';
@@ -186,7 +186,10 @@ export default function ChatThreadScreen({ route, navigation }) {
   // puede revisar hace falta la sanción ATADA A ESTE DESAFÍO, que puede no ser
   // la que hoy bloquea al club.
   const [sanciones, setSanciones] = useState([]);
-  const [reporteNoShow, setReporteNoShow] = useState(null);
+  // Dos informes como máximo, uno por club acusado: cada club puede decir que
+  // el otro no llegó, y las dos acusaciones conviven hasta que alguien las
+  // revise.
+  const [reportesNoShow, setReportesNoShow] = useState([]);
   const [revisiones, setRevisiones] = useState([]);
   const [revisionBusy, setRevisionBusy] = useState(false);
   const [revisionError, setRevisionError] = useState(null);
@@ -812,8 +815,8 @@ export default function ChatThreadScreen({ route, navigation }) {
   }, [cargarSancion]);
 
   /**
-   * El informe de incomparecencia de este encuentro y las revisiones que pidió
-   * mi club (migración 47c).
+   * Los informes de incomparecencia de este encuentro y las revisiones que
+   * pidió mi club (migración 47c).
    *
    * Tampoco entra en el sondeo de 15 segundos, por lo mismo que la sanción: son
    * dos consultas que sólo cambian cuando alguien actúa, y quien actúa las
@@ -822,16 +825,16 @@ export default function ChatThreadScreen({ route, navigation }) {
    */
   const cargarRevisiones = useCallback(async () => {
     if (!isChallengeThread || !challengeId || myClubIds.length === 0) {
-      setReporteNoShow(null);
+      setReportesNoShow([]);
       setRevisiones([]);
       return;
     }
-    const [{ data: reporte }, { data: lista }] = await Promise.all([
-      getIncomparecenciaDeDesafio(challengeId),
+    const [{ data: informes }, { data: lista }] = await Promise.all([
+      listIncomparecenciasDeDesafio(challengeId),
       listRevisionesDeDesafio(challengeId),
     ]);
     if (!mountedRef.current) return;
-    setReporteNoShow(reporte || null);
+    setReportesNoShow(informes || []);
     setRevisiones(lista || []);
   }, [isChallengeThread, challengeId, myClubIds]);
 
@@ -1019,9 +1022,9 @@ export default function ChatThreadScreen({ route, navigation }) {
         challenge: clubChallenge,
         partido: cambioPartido,
         clubesAdmin: myClubIds,
-        reporte: reporteNoShow,
+        reportes: reportesNoShow,
       }),
-    [clubChallenge, cambioPartido, myClubIds, reporteNoShow]
+    [clubChallenge, cambioPartido, myClubIds, reportesNoShow]
   );
 
   const accionesRevision = useMemo(
@@ -1051,9 +1054,11 @@ export default function ChatThreadScreen({ route, navigation }) {
         return;
       }
 
-      // Se recarga todo lo que el informe movió: el desafío (que pasó a
-      // `bloqueado_sancion`), la bitácora, la sanción provisional del club
-      // rival y el informe mismo.
+      // Se recarga todo lo que el informe movió: la bitácora del hilo, la
+      // sanción provisional del club rival y el informe mismo. El desafío NO
+      // cambia de estado al informar —eso pasa recién si alguien pide la
+      // revisión— pero se relee igual, que es barato y evita razonar sobre
+      // qué quedó viejo.
       const { data: fila } = await getChallenge(challengeId);
       if (mountedRef.current) setClubChallenge(fila || null);
       await refrescarDesafio();
@@ -1083,6 +1088,10 @@ export default function ChatThreadScreen({ route, navigation }) {
         return;
       }
 
+      // Pedir la revisión SÍ congela el desafío: hay que releer la fila o la
+      // pantalla seguiría ofreciendo acciones sobre un encuentro bloqueado.
+      const { data: fila } = await getChallenge(challengeId);
+      if (mountedRef.current) setClubChallenge(fila || null);
       await refrescarDesafio();
       await cargarRevisiones();
 
@@ -1356,7 +1365,6 @@ export default function ChatThreadScreen({ route, navigation }) {
           <IncomparecenciaYRevisionBar
             incomparecencia={accionesIncomparecencia}
             revision={accionesRevision}
-            reporte={reporteNoShow}
             ocupado={revisionBusy}
             error={revisionError}
             onInformar={informarIncomparecencia}

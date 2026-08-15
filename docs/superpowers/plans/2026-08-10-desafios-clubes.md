@@ -1257,26 +1257,39 @@ encuentro cancelado mostraba el motivo de otra sanción del club— corregido en
 escrito en `supabase/migrations/47c_incomparecencia_y_revisiones.sql` (archivo
 sufijado, porque la 47 y la 47b ya están aplicadas y editarlas dejaría el
 repositorio diciendo una cosa y la base otra). El arnés
-`47c_incomparecencia_y_revisiones_test.sql` corrió 22/22 contra el esquema
+`47c_incomparecencia_y_revisiones_test.sql` corrió 26/26 contra el esquema
 desplegado con la 47c dentro de la misma transacción, que terminó en `rollback`:
 en la base no quedó ninguna de las dos tablas nuevas. Las casillas siguen sin
 marcar porque la migración **no está aplicada** y la comprobación manual con dos
 cuentas está pendiente.
 
-Dos decisiones que este plan no fijaba y que quedaron tomadas acá:
+La denuncia tardía se cerró antes de desplegar: informar una incomparecencia
+tiene una ventana de **24 horas** desde la hora del partido
+(`desafio_reglas() ->> 'incomparecencia_horas'`, con su espejo en
+`clubChallengeRules.js`), y el índice único es `(match_id, club_reportado_id)`
+—uno por partido y por club acusado—, así que los dos clubes pueden acusarse y
+cada acusación se revisa por separado.
+
+Tres decisiones que este plan no fijaba y que quedaron tomadas acá:
 
 1. **Quién escribe `estado_previo_sancion`.** La transición transversal
    «cualquier estado activo → `bloqueado_sancion`» que la máquina de estados
    atribuye a `aplicar_sancion_club()` no existía: la 47 sólo creaba la fila de
-   la sanción. La 47c re-versiona esa función para que congele **el desafío de
-   la sanción** —no los demás, que siguen protegidos por la decisión C3— cuando
-   está en un estado activo. Sin eso, `estado_previo_sancion` no la escribe
-   nadie y «devolver el desafío a su estado previo» no tiene a qué volver.
-2. **El hilo queda de solo lectura mientras dura.** Es consecuencia de lo
-   anterior: `bloqueado_sancion` no está en los `estados_activos` de
-   `desafio_reglas()`, que es lo que mira `chat_puede_escribir_desafio()`. La
-   conversación se conserva y se sigue leyendo, y retirar la sanción la reabre.
-   Está probado (casos 11 y 16) en vez de descubierto en producción.
+   la sanción. La escribe `solicitar_revision_sancion()`, no la sanción, y sólo
+   sobre **el desafío de esa revisión** —los demás siguen protegidos por la
+   decisión C3—.
+2. **El congelado dura lo que dura la revisión, no lo que dura la sanción.**
+   Congelar al aplicar la sanción dejaba atrapado para siempre el encuentro
+   cuyo club nunca pide revisión, que es el caso más frecuente. Ahora se congela
+   al pedirla y se descongela al resolverla, con cualquiera de las dos
+   decisiones y en cuanto no queda ninguna pendiente sobre ese encuentro. Es
+   una desviación de la flecha del diagrama, que sólo contemplaba el regreso al
+   retirar la sanción.
+3. **El hilo queda de solo lectura mientras hay una revisión pendiente.** Es
+   consecuencia de lo anterior: `bloqueado_sancion` no está en los
+   `estados_activos` de `desafio_reglas()`, que es lo que mira
+   `chat_puede_escribir_desafio()`. La conversación se conserva y se sigue
+   leyendo. Está probado (casos 8, 16 y 21) en vez de descubierto en producción.
 
 **Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 47.
 

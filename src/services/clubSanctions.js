@@ -147,28 +147,29 @@ export async function solicitarRevisionSancion(challengeId, motivo, sancionId = 
 }
 
 /**
- * El informe de incomparecencia de un encuentro, o `null` si no hay ninguno.
+ * Los informes de incomparecencia de un encuentro. Pueden ser DOS: uno por
+ * club acusado, si cada club dice que el otro no llegó.
  *
- * Lo leen los DOS clubes: al acusado hay que decirle de qué se le acusa y con
- * qué palabras. Sin la migración 47c la tabla no existe, y eso no es un error
- * de la pantalla —el hilo se dibuja igual, sólo que sin la barra—, así que se
- * devuelve `null` sin ruido.
+ * Los leen los dos clubes: al acusado hay que decirle de qué se le acusa y con
+ * qué palabras, o no puede defenderse. Sin la migración 47c la tabla no existe,
+ * y eso no es un error de la pantalla —el hilo se dibuja igual, sólo que sin la
+ * barra—, así que se devuelve la lista vacía sin ruido.
  */
-export async function getIncomparecenciaDeDesafio(challengeId) {
-  if (!isSupabaseConfigured || !challengeId) return { data: null, error: null };
+export async function listIncomparecenciasDeDesafio(challengeId) {
+  if (!isSupabaseConfigured || !challengeId) return { data: [], error: null };
 
   const { data, error } = await supabase
     .from('club_match_noshow_reports')
     .select(COLUMNAS_INCOMPARECENCIA)
     .eq('challenge_id', challengeId)
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
   if (error) {
-    if (esFaltaDeEsquemaSanciones(error)) return { data: null, error: null };
-    console.error('[FutFinder] getIncomparecenciaDeDesafio:', error);
-    return { data: null, error: { message: error.message || 'No se pudo leer el informe.' } };
+    if (esFaltaDeEsquemaSanciones(error)) return { data: [], error: null };
+    console.error('[FutFinder] listIncomparecenciasDeDesafio:', error);
+    return { data: null, error: { message: error.message || 'No se pudieron leer los informes.' } };
   }
-  return { data: data || null, error: null };
+  return { data: data || [], error: null };
 }
 
 /**

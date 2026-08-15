@@ -111,6 +111,16 @@ begin
    where id = v_m;
   update public.club_challenges set estado = 'publicado', motivo_cierre = null where id = v_ch;
   delete from public.club_sanctions where club_id in (v_cA, v_cB);
+  -- La bitácora del encuentro también entra al estado de partida. El arnés
+  -- toma un partido REAL —el último de clubes que exista— y cuenta cuántas
+  -- cancelaciones deja (caso 15): si ese encuentro ya se canceló alguna vez
+  -- de verdad, la cuenta arranca en uno y el caso falla sin que nada del
+  -- código haya cambiado. Pasó con el partido que dejó la comprobación
+  -- manual de la U5.1. Se borra dentro de la transacción, que termina en
+  -- ROLLBACK: la bitácora real queda intacta.
+  delete from public.club_challenge_events
+   where challenge_id = v_ch
+     and tipo in ('encuentro_cancelado', 'sancion_aplicada');
 
   -- ── gente de prueba ───────────────────────────────────────────
   insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,
@@ -308,18 +318,27 @@ begin
   if v_count <> 1 then
     raise exception 'FALLÓ (caso 9): el jugador inscrito recibió % avisos de cancelación', v_count;
   end if;
+  -- Los tres conteos van ACOTADOS AL PARTIDO DE ESTA PRUEBA. Contar por
+  -- tipo a secas parecía más estricto y era justo lo contrario: `v_adminA`
+  -- y `v_adminB` son personas REALES de la base —el arnés toma el último
+  -- partido de clubes que exista— y cualquier `club_match_cancelled` que
+  -- ya tuvieran de OTRO encuentro entraba en la cuenta. Pasó de verdad: la
+  -- comprobación manual de la U5.1 dejó uno, y el caso 9 empezó a fallar
+  -- sin que nada del código hubiera cambiado.
   select count(*) into v_count from public.notifications
-   where type = 'club_match_cancelled' and user_id = v_adminB;
+   where type = 'club_match_cancelled' and user_id = v_adminB
+     and data ->> 'matchId' = v_m::text;
   if v_count <> 1 then
     raise exception 'FALLÓ (caso 9): el administrador del club rival recibió % avisos', v_count;
   end if;
   select count(*) into v_count from public.notifications
-   where type = 'club_match_cancelled' and user_id = v_adminA2;
+   where type = 'club_match_cancelled' and user_id = v_adminA2
+     and data ->> 'matchId' = v_m::text;
   if v_count <> 1 then
     raise exception 'FALLÓ (caso 9): el otro administrador del club que canceló recibió % avisos', v_count;
   end if;
   select count(*) into v_count from public.notifications
-   where user_id = v_adminA and (type = 'club_match_cancelled' or data ->> 'matchId' = v_m::text);
+   where user_id = v_adminA and data ->> 'matchId' = v_m::text;
   if v_count <> 0 then
     raise exception 'FALLÓ (caso 9): se le avisó a quien canceló, que ya sabe lo que hizo';
   end if;
