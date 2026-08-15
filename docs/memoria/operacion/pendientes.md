@@ -45,6 +45,8 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 
 ## P1 — No existe interfaz de moderación: las revisiones de sanción se resuelven a mano
 
+> **En producción desde el 2026-08-15.** La 47c está aplicada, así que esto dejó de ser un riesgo previsto y pasó a ser una obligación operativa: desde hoy un club puede pedir una revisión y **nadie recibe un aviso cuando llega**. Mientras no exista la pieza de moderación, alguien tiene que mirar la cola a mano.
+
 - **Dominio afectado:** sanciones de club del ciclo de desafíos (migraciones 47, 47b y 47c).
 - **Evidencia:** `solicitar_revision_sancion()` está concedida a `authenticated` y la pantalla del hilo ofrece «Solicitar revisión», pero `resolver_revision_sancion(p_review_id, p_decision, p_nota)` está **revocada de `public`, `anon` y `authenticated`** y sólo la conserva `service_role`. No hay ninguna pantalla, rol ni bandeja que la llame, y `src/services/clubSanctions.js` no tiene —a propósito— ninguna función que la invoque.
 - **Cómo se resuelve HOY:** desde el panel de Supabase, con `service_role`, en dos pasos.

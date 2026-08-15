@@ -1253,15 +1253,18 @@ encuentro cancelado mostraba el motivo de otra sanción del club— corregido en
 - [ ] Prueba SQL: un `authenticated` no puede ejecutar la resolución.
 - [ ] Commit.
 
-**Estado al 2026-08-14: preparada y probada, SIN aplicar.** Todo lo anterior está
-escrito en `supabase/migrations/47c_incomparecencia_y_revisiones.sql` (archivo
-sufijado, porque la 47 y la 47b ya están aplicadas y editarlas dejaría el
-repositorio diciendo una cosa y la base otra). El arnés
-`47c_incomparecencia_y_revisiones_test.sql` corrió 26/26 contra el esquema
-desplegado con la 47c dentro de la misma transacción, que terminó en `rollback`:
-en la base no quedó ninguna de las dos tablas nuevas. Las casillas siguen sin
-marcar porque la migración **no está aplicada** y la comprobación manual con dos
-cuentas está pendiente.
+**Estado al 2026-08-15: APLICADA en producción, sin cerrar.** Todo lo anterior
+está en `supabase/migrations/47c_incomparecencia_y_revisiones.sql` (archivo
+sufijado, porque la 47 y la 47b ya estaban aplicadas y editarlas dejaría el
+repositorio diciendo una cosa y la base otra). Aplicada el 2026-08-15 y
+registrada como `20260815232714 / 47c_incomparecencia_y_revisiones`. Contra el
+esquema ya aplicado: arnés 47c **26/26**, arnés 47 **25/25** y arnés 47b
+**5/5**, cada uno en su transacción y todos terminados en `rollback`, sin
+residuos. `send-push` redesplegada en su **versión 8** (ACTIVE, `verify_jwt` y
+configuración sin cambios) porque `pushLogic.ts` viaja dentro de la función y
+sin eso `club_revision_resuelta` no llegaría a ningún teléfono. Las casillas
+siguen sin marcar: **la comprobación manual con las dos cuentas está pendiente**
+y la tarea no se cierra hasta tenerla.
 
 La denuncia tardía se cerró antes de desplegar: informar una incomparecencia
 tiene una ventana de **24 horas** desde la hora del partido
