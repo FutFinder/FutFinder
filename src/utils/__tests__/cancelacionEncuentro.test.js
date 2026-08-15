@@ -40,7 +40,10 @@ const {
 const {
   CANCELACION_SANCION_HORAS,
   SANCION_DIAS,
+  getChallengeCta,
 } = require('../../services/clubChallengeRules.js');
+
+const { challengeCtaContext } = require('../challengeThread.js');
 
 const RAIZ = path.resolve(__dirname, '..', '..', '..');
 const MIGRACION = fs.readFileSync(
@@ -465,6 +468,170 @@ test('la sanción se explica con el motivo y la fecha de término', () => {
   const texto = textoDeSancion(SANCION);
   assert.match(texto, /28 de agosto/);
   assert.match(texto, /menos de 2 horas/);
+});
+
+// ---------------------------------------------------------------------------
+// Regresión: el motivo del encuentro no se mezcla con el de la sanción
+//
+// Fallo real encontrado en la comprobación manual del 2026-08-14 (P51-A vs
+// P51-B, partido e50c7303, desafío 4affb4d3). El encuentro se canceló CON
+// anticipación y su motivo era «cancelación con anticipación», pero la barra
+// de abajo del hilo mostraba «Canceló el encuentro con menos de 2 horas de
+// aviso: … cancha no disponible», que es el motivo de una sanción ANTERIOR del
+// mismo club, por otro encuentro.
+//
+// El servidor tenía el dato bien —el detalle del partido lo mostraba
+// correcto—: lo que fallaba era el orden de `getChallengeCta`, que miraba la
+// sanción del club ANTES que el estado del desafío. En un desafío ya cerrado
+// no hay ninguna acción que bloquear, así que la sanción no pinta nada ahí.
+//
+// LAS PRUEBAS USAN LAS FUENTES REALES DEL CARGADOR, y ésa es la lección de
+// U4.4: una prueba que fabrica su propia entrada no dice nada sobre de dónde
+// sale esa entrada en la aplicación. Acá la sanción se obtiene con
+// `sancionVigente()` sobre filas con la forma de `club_sanctions`, y el
+// contexto con `challengeCtaContext()`, que es exactamente lo que arma
+// `ChatThreadScreen`.
+// ---------------------------------------------------------------------------
+
+// Las marcas de tiempo son las REALES de la sanción de P51-A, así que el
+// «ahora» de este bloque tiene que caer dentro de su ventana. Con el `AHORA`
+// general —anterior al `inicio_at`— `sancionVigente()` devolvía null y estas
+// pruebas pasaban sin que hubiera ninguna sanción que mezclar: verde por la
+// razón equivocada, que es peor que rojo.
+const AHORA_P51 = new Date('2026-08-15T12:00:00.000Z');
+
+const MOTIVO_DEL_ENCUENTRO = 'Prueba manual P51: cancelación con anticipación';
+const MOTIVO_DE_LA_SANCION =
+  'Canceló el encuentro con menos de 2 horas de aviso: Prueba manual P51: cancha no disponible';
+
+/** Fila de `club_sanctions` tal como la devuelve `listSancionesDeClubes`. */
+const SANCION_DE_OTRO_ENCUENTRO = {
+  id: 's-p51',
+  club_id: CLUB_A,
+  challenge_id: 'otro-desafio',
+  match_id: 'otro-partido',
+  tipo: 'cancelacion_tardia',
+  motivo: MOTIVO_DE_LA_SANCION,
+  inicio_at: '2026-08-14T22:29:59.184Z',
+  fin_at: '2026-08-28T22:29:59.184Z',
+  estado: 'vigente',
+  created_at: '2026-08-14T22:29:59.184Z',
+};
+
+/** Fila de `club_challenges` del encuentro ya cancelado. */
+const DESAFIO_CANCELADO = {
+  id: '4affb4d3-b988-4570-9a06-9158f18d4753',
+  estado: 'cancelado',
+  motivo_cierre: MOTIVO_DEL_ENCUENTRO,
+  club_retador_id: CLUB_A,
+  club_retado_id: CLUB_B,
+  match_id: 'e50c7303-82fe-41b5-aa3a-88cd94e2a76d',
+};
+
+/** Fila de `matches` del encuentro ya cancelado. */
+const PARTIDO_CANCELADO = partidoDeClubes({
+  id: 'e50c7303-82fe-41b5-aa3a-88cd94e2a76d',
+  estado: 'cancelado',
+  motivo_cancelacion: MOTIVO_DEL_ENCUENTRO,
+});
+
+/** El contexto tal como lo arma `ChatThreadScreen`, con el cargador real. */
+function ctaDelHiloCancelado() {
+  return getChallengeCta(
+    challengeCtaContext({
+      challenge: DESAFIO_CANCELADO,
+      misClubIds: [CLUB_A],
+      misClubIdsTodos: [CLUB_A],
+      online: true,
+      sancion: sancionVigente([SANCION_DE_OTRO_ENCUENTRO], AHORA_P51),
+      propuesta: null,
+      respuestasProrroga: [],
+    })
+  );
+}
+
+test('el hilo de un encuentro cancelado no muestra el motivo de otra sanción', () => {
+  const cta = ctaDelHiloCancelado();
+  const textos = [cta.label, cta.hint].filter(Boolean).join(' | ');
+
+  assert.ok(
+    !textos.includes(MOTIVO_DE_LA_SANCION),
+    `la barra del hilo repite el motivo de la sanción: «${textos}»`
+  );
+  assert.ok(
+    !textos.includes('menos de 2 horas'),
+    `la barra dice «menos de 2 horas» en un encuentro cancelado CON anticipación: «${textos}»`
+  );
+});
+
+test('el hilo de un encuentro cancelado muestra su propio estado', () => {
+  const cta = ctaDelHiloCancelado();
+  assert.equal(cta.kind, 'cerrado');
+  assert.match(`${cta.label} ${cta.hint}`, /cancelad/i);
+});
+
+test('el motivo del encuentro sale del partido, no de la sanción del club', () => {
+  // La sanción viva del club dice otra cosa; el motivo que se presenta tiene
+  // que venir de la fila del PARTIDO que se está mirando.
+  assert.equal(PARTIDO_CANCELADO.motivo_cancelacion, MOTIVO_DEL_ENCUENTRO);
+  assert.notEqual(
+    PARTIDO_CANCELADO.motivo_cancelacion,
+    sancionVigente([SANCION_DE_OTRO_ENCUENTRO], AHORA_P51).motivo
+  );
+
+  const acciones = accionesDeCancelacion({
+    challenge: DESAFIO_CANCELADO,
+    partido: PARTIDO_CANCELADO,
+    clubesAdmin: [CLUB_A],
+    ahora: AHORA_P51,
+  });
+  assert.equal(acciones.puedeCancelar, false);
+  assert.match(acciones.bloqueo, /ya está cancelado/i);
+  assert.ok(!acciones.bloqueo.includes(MOTIVO_DE_LA_SANCION));
+});
+
+test('el evento del hilo sigue contando el motivo de ESTE encuentro', () => {
+  // El payload es el que escribe `cancelar_encuentro_club`.
+  const texto = textoEncuentroCancelado({
+    club_cancela_nombre: 'P51-B',
+    actor_username: 'chatgptpruebas54152',
+    motivo: MOTIVO_DEL_ENCUENTRO,
+    sanciona: false,
+  });
+  assert.match(texto, /cancelación con anticipación/);
+  assert.ok(!texto.includes(MOTIVO_DE_LA_SANCION));
+});
+
+test('con el desafío todavía vivo, la sanción sí se anuncia y dice de quién es', () => {
+  // La corrección no puede apagar la sanción donde SÍ bloquea algo: con el
+  // desafío en negociación no hay estado cerrado que mostrar y el club tiene
+  // que enterarse de que no puede operar.
+  const cta = getChallengeCta(
+    challengeCtaContext({
+      challenge: { ...DESAFIO_CANCELADO, estado: 'negociacion', motivo_cierre: null },
+      misClubIds: [CLUB_A],
+      misClubIdsTodos: [CLUB_A],
+      online: true,
+      sancion: sancionVigente([SANCION_DE_OTRO_ENCUENTRO], AHORA_P51),
+    })
+  );
+  assert.equal(cta.kind, 'sancionado');
+  assert.match(cta.hint, /tu club/i, 'el aviso tiene que decir que la restricción es del club');
+});
+
+test('sin sanción, un encuentro cancelado se comporta igual', () => {
+  // Fija que lo que arregla el orden es la sanción, no otra cosa: el hilo
+  // cerrado ya se veía bien cuando el club no estaba sancionado.
+  const cta = getChallengeCta(
+    challengeCtaContext({
+      challenge: DESAFIO_CANCELADO,
+      misClubIds: [CLUB_A],
+      misClubIdsTodos: [CLUB_A],
+      online: true,
+      sancion: sancionVigente([], AHORA_P51),
+    })
+  );
+  assert.equal(cta.kind, 'cerrado');
 });
 
 test('el club sancionado conserva sus partidos ya publicados, y se dice', () => {

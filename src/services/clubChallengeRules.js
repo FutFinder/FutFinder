@@ -560,18 +560,36 @@ export function getChallengeCta(ctx = {}) {
     };
   }
 
+  // EL ESTADO CERRADO MANDA SOBRE LA SANCIÓN, y ese orden es el arreglo de un
+  // fallo real de la comprobación manual del 2026-08-14. Con la sanción
+  // primero, el hilo de un encuentro YA CANCELADO mostraba «Club sancionado»
+  // con el motivo de una sanción anterior del club —por otro encuentro— justo
+  // donde se lee el motivo de esta cancelación. El servidor tenía el dato
+  // bien; lo que estaba mal era preguntar por la sanción antes de mirar si
+  // quedaba algo que bloquear.
+  //
+  // En un desafío cerrado no hay ninguna acción que la sanción pueda impedir:
+  // lo que corresponde mostrar es su propio estado. La restricción del club
+  // sigue anunciándose en los desafíos vivos, que es donde significa algo, y
+  // en la barra de cancelación de arriba, que la redacta como lo que es.
+  if (esEstadoCerrado(estado)) {
+    return { ...CERRADO, hint: estadoLabel(estado) };
+  }
+
   if (sancion) {
     return {
       kind: 'sancionado',
       label: 'Club sancionado',
       tone: 'danger',
       disabled: true,
-      hint: sancion.motivo || 'Tu club no puede operar desafíos por ahora.',
+      // El motivo NUNCA va solo. Suelto empieza por «Canceló el encuentro
+      // con menos de 2 horas de aviso: …» y se lee como el motivo del hilo en
+      // el que está pintado; con el sujeto delante queda claro que es una
+      // restricción del club y no algo que le pasó a este desafío.
+      hint: sancion.motivo
+        ? `Tu club está sancionado: ${sancion.motivo}`
+        : 'Tu club no puede operar desafíos por ahora.',
     };
-  }
-
-  if (esEstadoCerrado(estado)) {
-    return { ...CERRADO, hint: estadoLabel(estado) };
   }
 
   const soyRetador = myClubId && myClubId === challenge.club_retador_id;

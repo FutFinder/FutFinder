@@ -223,3 +223,78 @@ físico sigue sin evidencia, igual que en U3 y U4.4.
 Si pasa entera, se actualiza `docs/memoria/funcionalidades/clubes.md` para
 cerrar la Tarea 5.1 con la fecha y lo verificado, y recién ahí se pasa a la
 Tarea 5.2 (incomparecencia y revisión de sanciones).
+
+---
+
+# Resultado de la primera pasada (2026-08-14)
+
+**Pasó todo lo de fondo.** La cancelación dentro de 2 horas sancionó a `P51-A`
+14 días; `P51-A` no puede enviar ni recibir desafíos; su partido publicado
+anterior siguió activo (decisión C3); los avisos llegaron a las cuentas
+correctas; el Trust Score de las dos cuentas quedó en 100. La cancelación con
+anticipación desde `P51-B` avisó de que no habría sanción, no dejó sanción ni
+evento, y conservó el motivo correcto en el evento del chat y en el detalle del
+partido, con la nómina disponible.
+
+**Y encontró un fallo de interfaz**, ya corregido. En el hilo de
+`P51-A vs P51-B` —cancelado CON anticipación— la barra sobre el compositor
+mostraba:
+
+> Club sancionado — «Canceló el encuentro con menos de 2 horas de aviso:
+> Prueba manual P51: cancha no disponible»
+
+Ese texto es el motivo de la sanción que `P51-A` se llevó por el OTRO encuentro
+(`P51-A vs P51-C`). El motivo real de éste era «Prueba manual P51: cancelación
+con anticipación», y el servidor lo tenía bien: el detalle del partido lo
+mostraba correcto.
+
+La causa era el orden en `getChallengeCta`, que preguntaba por la sanción del
+club antes de mirar si el desafío ya estaba cerrado. Ahora **el estado cerrado
+manda**: en un desafío cerrado no hay ninguna acción que la sanción pueda
+impedir, así que se muestra su propio estado. Y donde la sanción sí bloquea
+algo, su motivo ya no va suelto: lleva delante «Tu club está sancionado:».
+
+---
+
+# Comprobación corta para cerrar 5.1
+
+Sólo esto. **No hace falta volver a cancelar nada ni crear clubes nuevos**: se
+usan los mismos `P51-*` y sus datos, que se conservaron a propósito.
+
+Antes de empezar, recarga la web para tomar el cliente nuevo (Cmd+Shift+R).
+
+### 1. El hilo del encuentro cancelado con anticipación
+
+Con la **cuenta A** (`chatgptpruebas5415`), que es la del club sancionado —es
+la única sesión donde el fallo se veía—, abre el hilo de `P51-A vs P51-B`
+(partido `e50c7303-82fe-41b5-aa3a-88cd94e2a76d`).
+
+- [ ] La barra **sobre el compositor** ya **no** dice «Club sancionado» ni
+      repite «Canceló el encuentro con menos de 2 horas de aviso…». Ahora debe
+      mostrar el estado del desafío: **«Cancelado»**.
+- [ ] En el chat, el evento sigue diciendo el motivo correcto de ESTE
+      encuentro: **«…canceló el encuentro: «Prueba manual P51: cancelación con
+      anticipación».»**
+- [ ] En ningún punto de ese hilo aparece la frase «cancha no disponible», que
+      es de la sanción del otro encuentro.
+- [ ] La barra de **arriba** puede seguir informando que el club está
+      sancionado y hasta cuándo. Eso es correcto y no es lo que se arregló: va
+      redactado como restricción del club («Tu club no puede crear ni aceptar
+      desafíos hasta el…»), no como el motivo del encuentro.
+
+### 2. Que la sanción siga anunciándose donde sí importa
+
+- [ ] Con la cuenta A, abre un hilo de un desafío de `P51-A` que **no** esté
+      cerrado, o intenta enviar un desafío nuevo con `P51-A`. Tiene que seguir
+      diciendo que el club está sancionado — el arreglo no apagó el aviso, sólo
+      lo sacó de donde no correspondía.
+
+### 3. El otro hilo, de control
+
+- [ ] Abre el hilo de `P51-A vs P51-C` (el que sí se canceló dentro de las 2
+      horas). Su evento de cancelación debe seguir diciendo «cancha no
+      disponible», que ahí sí es el motivo correcto, y su evento de sanción
+      debe seguir estando.
+
+Si los tres puntos pasan, **la Tarea 5.1 queda cerrada** y se anota la fecha en
+`docs/memoria/funcionalidades/clubes.md`.
