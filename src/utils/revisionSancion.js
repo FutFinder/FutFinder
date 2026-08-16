@@ -230,15 +230,35 @@ function sancionDeEsteEncuentro(sanciones, clubId, challengeId) {
   });
 }
 
-/** La revisión que ya existe sobre esta misma medida, o `null`. */
-function revisionDeLaMedida(revisiones, { clubId, challengeId, sancionId }) {
-  if (!Array.isArray(revisiones)) return null;
-  return revisiones.find(
-    (r) => r
-      && r.club_id === clubId
-      && r.challenge_id === challengeId
-      && (sancionId ? r.sancion_id === sancionId : !r.sancion_id)
-  ) || null;
+/**
+ * La revisión que ya existe sobre esta misma medida, o `null`.
+ *
+ * SE BUSCA POR ENCUENTRO Y CLUB, no por sanción. Atarla a `sancion_id` tenía
+ * un agujero: al RETIRAR la sanción, ésta deja de estar activa, la medida
+ * pasa a leerse como «la cancelación» y la revisión anterior —que sí lleva
+ * `sancion_id`— dejaba de encontrarse. El botón «Solicitar revisión»
+ * reaparecía sobre un encuentro que ya se había revisado y resuelto.
+ *
+ * Con la búsqueda por encuentro, la que se muestra es la más reciente: es la
+ * que cuenta lo último que pasó.
+ */
+function revisionDeLaMedida(revisiones, { clubId, challengeId }) {
+  if (!Array.isArray(revisiones) || !clubId) return null;
+
+  const mias = revisiones.filter(
+    (r) => r && r.club_id === clubId && r.challenge_id === challengeId
+  );
+  if (mias.length === 0) return null;
+
+  // Una pendiente manda sobre una ya resuelta: es la que sigue esperando.
+  const pendiente = mias.find((r) => r.estado === 'pendiente');
+  if (pendiente) return pendiente;
+
+  return mias.reduce((mejor, r) => {
+    const a = aFecha(r.created_at)?.getTime() ?? 0;
+    const b = aFecha(mejor.created_at)?.getTime() ?? 0;
+    return a > b ? r : mejor;
+  });
 }
 
 /**
@@ -296,7 +316,6 @@ export function accionesDeRevision({
   salida.revision = revisionDeLaMedida(revisiones, {
     clubId: miClubId,
     challengeId: c.id,
-    sancionId: salida.sancionId,
   });
 
   if (!salida.soyAdmin) {

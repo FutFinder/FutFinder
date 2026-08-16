@@ -16,7 +16,7 @@ import Banner from '../components/Banner';
 import NotificationCard, { CATEGORY } from '../components/notifications/NotificationCard';
 import FilterChips from '../components/notifications/FilterChips';
 import { getCurrentUser } from '../services/auth';
-import { getMyClub, respondToRequest, getClubById } from '../services/clubs';
+import { getMisClubesAdmin, respondToRequest, getClubById } from '../services/clubs';
 import { getMatchById } from '../services/matches';
 import { respondChallenge } from '../services/clubChallenges';
 import { acceptFriendRequest, rejectFriendRequest } from '../services/friends';
@@ -29,6 +29,7 @@ import {
   subscribeToNotifications,
 } from '../services/notifications';
 import { navigateToNotification } from '../utils/notificationTargets';
+import { puedeResponderDesafio } from '../utils/permisosDesafio';
 import {
   getInboxStatus,
   createRequestGuard,
@@ -113,12 +114,22 @@ const GROUP_ORDER = ['Hoy', 'Esta semana', 'Anteriores'];
 const MARK_ALL_ID = '__markAll__';
 const CLEAR_ALL_ID = '__clearAll__';
 
-/** Acciones inline disponibles para este aviso, o null si solo navega al tocar. */
-function actionsFor(n, myClub) {
+/**
+ * Acciones inline disponibles para este aviso, o null si solo navega al tocar.
+ *
+ * `clubesAdmin` son TODOS los clubes que administra el usuario. Antes se
+ * comparaba contra `getMyClub()`, que devuelve el PRIMERO por `joined_at`:
+ * quien administra varios sólo veía botones en los retos dirigidos al club
+ * más antiguo, y los demás llegaban sin acciones y sin explicación.
+ */
+function actionsFor(n, clubesAdmin) {
   const data = n?.data || {};
   if (n.type === 'club_challenge' && data.challengeId) {
-    const isAdminOfRetado = myClub?.role === 'admin' && myClub?.id === data.clubRetadoId;
-    return isAdminOfRetado ? ['Aceptar reto', 'Rechazar'] : null;
+    // Sin `estado` en el payload: se ofrece y responde el servidor si el
+    // desafío ya dejó de estar pendiente.
+    return puedeResponderDesafio({ clubesAdmin, clubRetadoId: data.clubRetadoId })
+      ? ['Aceptar reto', 'Rechazar']
+      : null;
   }
   if (n.type === 'club_request' && data.requestId) {
     return ['Aceptar', 'Rechazar'];
@@ -131,7 +142,9 @@ function actionsFor(n, myClub) {
 
 export default function NotificationsScreen({ navigation }) {
   const [items, setItems] = useState([]);
-  const [myClub, setMyClub] = useState(null);
+  // TODOS los clubes que administro. `null` es «no se pudo averiguar» y no
+  // se confunde con «no administro ninguno» ([]).
+  const [clubesAdmin, setClubesAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -153,7 +166,7 @@ export default function NotificationsScreen({ navigation }) {
   const load = useCallback(async () => {
     const [{ data, error }, clubResult] = await Promise.all([
       listNotifications({ limit: 50 }),
-      getMyClub(),
+      getMisClubesAdmin(),
     ]);
     if (error) {
       // No pisamos `items`: si ya había una lista cargada, se queda ahí
@@ -163,8 +176,7 @@ export default function NotificationsScreen({ navigation }) {
     }
     setLoadError(null);
     setItems(data || []);
-    const mc = clubResult?.data;
-    setMyClub(mc ? { id: mc.club.id, role: mc.miRol } : null);
+    setClubesAdmin(clubResult?.data ?? null);
   }, []);
 
   useEffect(() => {
@@ -352,10 +364,10 @@ export default function NotificationsScreen({ navigation }) {
       data: buckets.get(title).map((n) => ({
         ...n,
         timeLabel: formatNotifTime(n.created_at),
-        actions: n._actionsResolved ? null : actionsFor(n, myClub),
+        actions: n._actionsResolved ? null : actionsFor(n, clubesAdmin),
       })),
     }));
-  }, [items, filter, myClub]);
+  }, [items, filter, clubesAdmin]);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>

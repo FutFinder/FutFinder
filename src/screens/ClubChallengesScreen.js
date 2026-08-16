@@ -15,8 +15,8 @@ import { ArrowLeft, Shield, Swords, Check, X, Clock, MessageCircle } from 'lucid
 
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
-import { getCurrentUser } from '../services/auth';
-import { listMembers, getClubById } from '../services/clubs';
+import { getMisClubesAdmin, getClubById } from '../services/clubs';
+import { puedeResponderDesafio, puedeCancelarDesafio } from '../utils/permisosDesafio';
 import {
   listChallengesForClub,
   respondChallenge,
@@ -71,7 +71,10 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [recibidos, setRecibidos] = useState([]);
   const [enviados, setEnviados] = useState([]);
-  const [soyAdmin, setSoyAdmin] = useState(false);
+  // TODOS los clubes que administro, no sólo éste: la pregunta «¿puedo
+  // responder este reto?» la contesta la misma regla que usa «Avisos».
+  const [clubesAdmin, setClubesAdmin] = useState(null);
+  const [errorRol, setErrorRol] = useState(null);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
   // Hace falta para armar el título «Retador vs Retado» del hilo grupal:
@@ -79,17 +82,21 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [nombreDeMiClub, setNombreDeMiClub] = useState('Mi club');
 
   const load = useCallback(async () => {
-    const user = await getCurrentUser();
-    const myId = user?.id || null;
-
-    const [{ data }, { data: ms }, { data: miClub }] = await Promise.all([
+    const [{ data }, { data: clubesAdmin, error: eRol }, { data: miClub }] = await Promise.all([
       listChallengesForClub(clubId),
-      listMembers(clubId),
+      getMisClubesAdmin(),
       getClubById(clubId),
     ]);
     setRecibidos(data.recibidos || []);
     setEnviados(data.enviados || []);
-    setSoyAdmin((ms || []).some((m) => m.user_id === myId && m.rol === 'admin'));
+
+    // `clubesAdmin` en null es «no se pudo averiguar», no «no eres admin».
+    // Antes las dos cosas se coercían al mismo `false` y la pantalla escondía
+    // aceptar y rechazar sin decir nada: una comprobación manual entera se
+    // quedó sin saber si le faltaba permiso o si algo había fallado.
+    setClubesAdmin(clubesAdmin ?? null);
+    setErrorRol(clubesAdmin ? null : eRol?.message || 'No se pudo comprobar tu rol en el club.');
+
     if (miClub?.nombre) setNombreDeMiClub(miClub.nombre);
     setLoading(false);
   }, [clubId]);
@@ -201,6 +208,18 @@ export default function ClubChallengesScreen({ navigation, route }) {
       >
         {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
+        {/* Que no se pueda comprobar el rol NO se dibuja como «no eres
+          admin»: sin esto, aceptar y rechazar desaparecían en silencio y
+          desde la pantalla era imposible distinguir un fallo de carga de una
+          falta de permisos. */}
+        {!!errorRol && (
+          <Banner
+            type="error"
+            title="No pudimos comprobar tu rol"
+            message={`${errorRol} Desliza para reintentar: mientras tanto no se muestran aceptar ni rechazar.`}
+          />
+        )}
+
         {sinNada && (
           <View style={styles.emptyBox}>
             <Swords color={colors.textMuted} size={36} />
@@ -215,7 +234,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
             <Text style={styles.sectionTitle}>Recibidos</Text>
             {recibidos.map((c) => (
               <ChallengeRow key={c.id} challenge={c}>
-                {soyAdmin && c.estado === 'pendiente' ? (
+                {puedeResponderDesafio({ clubesAdmin, clubRetadoId: c.club_retado_id, estado: c.estado }) ? (
                   <View style={styles.actionsRow}>
                     <Pressable
                       disabled={working}
@@ -265,7 +284,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
             <Text style={styles.sectionTitle}>Enviados</Text>
             {enviados.map((c) => (
               <ChallengeRow key={c.id} challenge={c}>
-                {soyAdmin && c.estado === 'pendiente' ? (
+                {puedeCancelarDesafio({ clubesAdmin, clubRetadorId: c.club_retador_id, estado: c.estado }) ? (
                   <Pressable
                     disabled={working}
                     onPress={() => handleCancel(c)}

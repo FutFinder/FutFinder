@@ -380,6 +380,56 @@ test('una medida ya revisada no se vuelve a revisar', () => {
   assert.match(a.bloqueo, /ya se revisó|ya fue revisada/i);
 });
 
+test('una medida ya revisada no se vuelve a ofrecer aunque la sanción quedara retirada', () => {
+  // El fallo real de la Fase 2: al retirar la sanción, deja de estar activa;
+  // la regla caía entonces a «revisión de la cancelación» y no reconocía la
+  // revisión anterior, que va atada a `sancion_id`. El botón reaparecía.
+  //
+  // No es que el servidor lo fuera a rechazar —crearía una segunda revisión,
+  // esta vez de la cancelación—: es que ofrecer «Solicitar revisión» sobre un
+  // encuentro que YA se revisó y se resolvió no es una acción, es ruido.
+  const a = accionesDeRevision({
+    challenge: { ...DESAFIO, estado: 'cancelado' },
+    partido: { ...PARTIDO_PASADO, estado: 'cancelado' },
+    clubesAdmin: [MI_CLUB],
+    sanciones: [{ ...SANCION_PROVISIONAL, estado: 'retirada' }],
+    revisiones: [{
+      id: 'rev-1',
+      club_id: MI_CLUB,
+      challenge_id: 'ch-1',
+      sancion_id: 'san-1',
+      estado: 'resuelta',
+      decision: 'retirada',
+      nota: 'Se confirmó que la cancha estaba cambiada',
+    }],
+    ahora: AHORA,
+  });
+
+  assert.equal(a.puedeSolicitar, false);
+  assert.equal(a.revision.id, 'rev-1');
+  assert.match(a.bloqueo, /ya se revisó|ya fue revisada/i);
+});
+
+test('la revisión pendiente de una medida ya retirada tampoco reabre el botón', () => {
+  const a = accionesDeRevision({
+    challenge: { ...DESAFIO, estado: 'cancelado' },
+    partido: { ...PARTIDO_PASADO, estado: 'cancelado' },
+    clubesAdmin: [MI_CLUB],
+    sanciones: [{ ...SANCION_PROVISIONAL, estado: 'retirada' }],
+    revisiones: [{
+      id: 'rev-1',
+      club_id: MI_CLUB,
+      challenge_id: 'ch-1',
+      sancion_id: 'san-1',
+      estado: 'pendiente',
+    }],
+    ahora: AHORA,
+  });
+
+  assert.equal(a.puedeSolicitar, false);
+  assert.match(a.bloqueo, /en cola|pendiente|revisando/i);
+});
+
 test('quien administra los dos clubes no pide la revisión de ninguno', () => {
   const a = accionesDeRevision({
     challenge: { ...DESAFIO, estado: 'cancelado' },

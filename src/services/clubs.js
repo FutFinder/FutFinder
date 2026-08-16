@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { esModalidadValida } from '../utils/clubMeta';
 import { buildRivalClubsQuery } from '../utils/rivalClubsQuery';
+import { buildMisClubesAdminQuery } from '../utils/permisosDesafio';
 
 /**
  * Servicio de clubes.
@@ -203,8 +204,38 @@ export async function getMyClubIds() {
 }
 
 /**
+ * Los clubes que ADMINISTRO, en una sola consulta.
+ *
+ * `data: []` es «no administro ninguno» y `data: null` es «no se pudo
+ * averiguar»: son cosas distintas y tienen que llegar distintas a la
+ * pantalla, igual que en `listSancionesDeClubes`. Confundirlas es lo que
+ * hizo que «Desafíos» escondiera los botones de aceptar y rechazar sin que
+ * nadie pudiera saber por qué —un fallo de carga y una falta de permisos se
+ * veían exactamente igual—.
+ *
+ * Sin sesión también devuelve `null`: quien no ha entrado no es que no
+ * administre clubes, es que todavía no sabemos quién es.
+ */
+export async function getMisClubesAdmin() {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  const me = await getMe();
+  if (!me) {
+    return { data: null, error: { message: 'No se pudo comprobar tu sesión.' } };
+  }
+
+  const { data, error } = await buildMisClubesAdminQuery(supabase, me);
+  if (error) {
+    console.error('[FutFinder] getMisClubesAdmin:', error);
+    return { data: null, error: { message: error.message || 'No se pudo comprobar tu rol.' } };
+  }
+  return { data: (data || []).map((r) => r.club_id).filter(Boolean), error: null };
+}
+
+/**
  * Compat: primer club del usuario o null.
- * Usar getMyClubs() cuando se necesiten todos.
+ * Usar getMyClubs() cuando se necesiten todos, y `getMisClubesAdmin()`
+ * cuando lo que se decide es un permiso: comparar contra el PRIMER club
+ * deja fuera a quien administra varios.
  */
 export async function getMyClub() {
   const { data, error } = await getMyClubs();
