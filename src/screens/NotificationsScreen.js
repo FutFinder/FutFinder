@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Check, Trash2, BellOff, ServerCrash } from 'lucide-react-native';
+import { ArrowLeft, Check, Trash2, BellOff, ServerCrash } from 'lucide-react-native';
 
 import { tactical as t } from '../theme/colors';
 import Banner from '../components/Banner';
@@ -379,9 +379,20 @@ export default function NotificationsScreen({ navigation }) {
           className="px-5 pb-4 pt-3"
         >
           <View className="mt-2 flex-row items-end justify-between">
-            <View>
-              <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00FF66]/75">Centro de actividad</Text>
-              <Text className="mt-1 text-[30px] font-extrabold tracking-tight text-white">Avisos</Text>
+            <View className="flex-row items-center gap-3">
+              <Pressable
+                onPress={() => navigation.goBack()}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Salir de Avisos"
+                className="h-[34px] w-[34px] items-center justify-center rounded-xl border border-white/12 bg-black/45 active:opacity-70"
+              >
+                <ArrowLeft size={16} color={t.text} strokeWidth={2.2} />
+              </Pressable>
+              <View>
+                <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00FF66]/75">Centro de actividad</Text>
+                <Text className="mt-1 text-[30px] font-extrabold tracking-tight text-white">Avisos</Text>
+              </View>
             </View>
             <View className="flex-row gap-2">
               <Pressable
