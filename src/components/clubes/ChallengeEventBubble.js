@@ -13,6 +13,11 @@ import {
   textoRevisionSolicitada,
   textoRevisionResuelta,
 } from '../../utils/revisionSancion';
+import {
+  textoResultadoPropuesto,
+  textoResultadoConfirmado,
+  textoResultadoDisputado,
+} from '../../utils/resultadoRpc';
 
 /**
  * Burbuja de sistema dentro del hilo de negociación.
@@ -101,12 +106,16 @@ export function textoDelEvento(event) {
       return textoRevisionSolicitada(p);
     case 'revision_resuelta':
       return textoRevisionResuelta(p);
+    // Migraciones 48 y 48b. Como los cambios y las sanciones: el club, el
+    // `username` y el MARCADOR salen del payload y la frase se arma en
+    // `utils/resultadoRpc.js`. Antes las tres decían sólo que «hubo un
+    // resultado», mientras el push del mismo evento sí traía el 3-1.
     case 'resultado_propuesto':
-      return 'Se registró un resultado, a la espera de confirmación.';
+      return textoResultadoPropuesto(p);
     case 'resultado_confirmado':
-      return 'El resultado quedó confirmado.';
+      return textoResultadoConfirmado(p);
     case 'resultado_disputado':
-      return 'El resultado quedó en disputa.';
+      return textoResultadoDisputado(p);
     default:
       // Un tipo que este cliente todavía no conoce (una migración más nueva
       // en el servidor) no debe romper la conversación ni mostrar el valor

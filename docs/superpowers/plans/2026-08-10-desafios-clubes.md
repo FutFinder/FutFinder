@@ -1397,21 +1397,61 @@ pendiente. Y «Ver todo» del historial sigue llevando a la bandeja de desafíos
 no hay pantalla de historial completo, así que el perfil muestra los tres
 últimos encuentros.
 
-### Tarea 6.3 — Memoria
+### Tarea 6.3 — Cierre técnico y memoria ✅ CERRADA el 2026-08-17
 
-**Archivos:** modificar `docs/memoria/funcionalidades/clubes.md`,
-`chat.md`, `avisos-y-push.md`, `producto/reglas-de-negocio.md`,
-`arquitectura/base-de-datos.md`, `arquitectura/seguridad-y-privacidad.md`,
-`operacion/pendientes.md`, `operacion/pruebas.md`; crear
-`docs/memoria/decisiones/2026-08-10-ciclo-desafios-clubes.md`.
+**Archivos:** crear `supabase/migrations/50_partido_de_clubes_una_sola_puerta.sql`,
+`50b_frase_del_rechazo.sql`, `supabase/tests/50_una_sola_puerta_test.sql`,
+`src/screens/ClubHistoryScreen.js` y
+`docs/memoria/decisiones/2026-08-17-ciclo-desafios-clubes.md`; modificar
+`src/utils/historialClub.js`, `resultadoRpc.js`, `cambioPartido.js`,
+`src/components/club/MatchHistoryCard.js`,
+`src/components/clubes/ChallengeEventBubble.js`,
+`src/screens/ClubDetailScreen.js`, `src/services/clubResults.js`,
+`src/navigation/AppNavigator.js`, las dos pruebas afectadas y las notas de
+memoria.
 
-- [ ] Registrar la máquina de estados, el tipo de hilo nuevo, las reglas de cupos
-      y sanciones, las migraciones 41–48 y sus pruebas, y la decisión C1–C7.
-- [ ] Commit.
+No fue sólo memoria: la auditoría del ciclo encontró cuatro incoherencias.
 
-**Verificación final:** `npm test`, `npm run build:web`,
-`deno test supabase/functions/send-push/pushLogic.test.ts`, y las seis pruebas SQL
-en un Supabase de desarrollo.
+- [x] **Dos textos contradecían la 48b.** El aviso del rechazo terminaba en
+      «Propongan uno nuevo.» y el motivo de error decía «pide que propongan uno
+      nuevo»: instrucciones que el servidor rechaza acto seguido. Corregidas en
+      la 50 (y la 50b, porque la 50 rompía el arranque «ya fue rechazado» que
+      comprueba el caso 10 del arnés de la 48).
+- [x] **Dos puertas traseras del partido de clubes.**
+      `save_match_attendance()` finalizaba el encuentro y castigaba a los
+      jugadores del rival con −15 de Trust Score sin marcador ni confirmación
+      del otro club; `cancel_match()` lo cancelaba sin sanción de club. Las dos
+      rechazan ahora `challenge_proposal_id`. Era además la CAUSA del
+      «finalizado sin resultado» que la 49 había tapado en la lectura.
+- [x] **Las tres burbujas del resultado ignoraban su payload:** decían «El
+      resultado quedó confirmado» mientras el push del mismo evento decía
+      «confirmó 3-1». Ahora salen de `resultadoRpc.js` con el club, el
+      `username` y el marcador anclado a «(local-visitante)».
+- [x] **El «tipo de partido» del historial era un `default`:** nadie acuerda el
+      nivel en el ciclo, así que los 7 partidos de clubes están todos en
+      `recreativo`. Se dejó de mostrar y quedó registrado como P3.
+- [x] **«Ver todo» lleva al historial** y no a la bandeja de desafíos:
+      `ClubHistoryScreen`, con el tope real de 50 y reutilizando servicio,
+      tarjeta y resumen.
+- [x] Las dos pantallas distinguen «no se pudo cargar» de «no hay partidos», y
+      la tarjeta no ofrece destino a quien no es del club.
+- [x] Registrada la máquina de estados, las reglas, las migraciones 41–50b y
+      sus pruebas en [la decisión del 2026-08-17](../../memoria/decisiones/2026-08-17-ciclo-desafios-clubes.md).
+- [x] Commit.
+
+**Verificación final del 2026-08-17:** `npm run verify` con lint en 0 errores y
+644/644 pruebas, `npm run build:web` sin fallos,
+`deno test supabase/functions/send-push/pushLogic.test.ts`, y los tres arneses
+del resultado contra el esquema aplicado después de la 50 y la 50b —48 19/19,
+49 13/13 y 50 8/8—, cada uno en su transacción y todos con `rollback`.
+
+**Lo único pendiente de la fase es la aceptación visual del historial con dos
+cuentas**, con sus pasos exactos en
+[Pendientes](../../memoria/operacion/pendientes.md), clasificada como NO
+bloqueante porque el recorrido del servidor está demostrado por los tres
+arneses.
+
+**FASE 6 CERRADA el 2026-08-17.**
 
 ---
 

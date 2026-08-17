@@ -36,6 +36,11 @@ function estiloResultado(resultado) {
  *
  * La hora y la cancha sólo llegan a los integrantes de los dos clubes: para
  * cualquier otro viajan en `null` y esa parte de la línea no se dibuja.
+ *
+ * SIN `onPress` NO HAY CHEVRON. Al partido de un encuentro entre clubes sólo
+ * entran sus integrantes (RLS de la 44d): a quien mira el historial desde
+ * fuera, el chevron le prometía una pantalla que le iba a contestar «este
+ * partido ya no está disponible». La tarjeta se queda quieta y sin flecha.
  */
 export default function MatchHistoryCard({
   miNombre,
@@ -50,7 +55,6 @@ export default function MatchHistoryCard({
   horaLabel,
   localLabel,
   canchaNombre,
-  tipoLabel,
   onPress,
 }) {
   const r = estiloResultado(resultado);
@@ -60,18 +64,18 @@ export default function MatchHistoryCard({
   // El resultado se pinta con su color y el resto en gris, así que la primera
   // línea se arma en dos trozos en vez de uno.
   const contexto = [fechaLabel, horaLabel, localLabel].filter(Boolean).join(' · ');
-  const linea2 = [canchaNombre, tipoLabel].filter(Boolean).join(' · ');
 
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="button"
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityLabel={[
         `${resultadoNombre || 'Partido'}.`,
         `${miNombre} ${marcador} ${rivalNombre}.`,
-        [fechaLabel, horaLabel, localLabel, canchaNombre, tipoLabel].filter(Boolean).join(', '),
+        [fechaLabel, horaLabel, localLabel, canchaNombre].filter(Boolean).join(', '),
       ].join(' ')}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.card, onPress && pressed && styles.pressed]}
     >
       <View style={[styles.bar, { backgroundColor: r.color }]} />
 
@@ -98,9 +102,9 @@ export default function MatchHistoryCard({
             {contexto ? `${resultadoNombre ? ' · ' : ''}${contexto}` : ''}
           </Text>
         ) : null}
-        {linea2 ? (
+        {canchaNombre ? (
           <Text style={styles.sub} numberOfLines={1}>
-            {linea2}
+            {canchaNombre}
           </Text>
         ) : null}
       </View>
@@ -111,7 +115,7 @@ export default function MatchHistoryCard({
         </View>
       ) : null}
 
-      <ChevronRight color={clubColors.textFaint} size={16} strokeWidth={2.2} />
+      {onPress ? <ChevronRight color={clubColors.textFaint} size={16} strokeWidth={2.2} /> : null}
     </Pressable>
   );
 }

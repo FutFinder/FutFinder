@@ -15,6 +15,7 @@
  */
 
 import { esFaltaDeEsquema } from './cambioRpc.js';
+import { sujetoDelEvento } from './cambioPartido.js';
 
 export { esFaltaDeEsquema };
 
@@ -83,6 +84,73 @@ export function comoResultadoResultado(data, error, etiqueta = 'resultado') {
     return { data: null, error: { message: row.reason || 'No se pudo completar la acción.' } };
   }
   return { data: row || null, error: null };
+}
+
+/**
+ * LAS TRES FRASES DE LOS EVENTOS DEL RESULTADO.
+ *
+ * Se arman acá y no en la base, igual que las de los cambios (46), la
+ * cancelación (47) y las revisiones (47c): la fila de
+ * `club_challenge_events` guarda `tipo` y `payload` —datos—, nunca una frase,
+ * así que la redacción se corrige sin migrar nada.
+ *
+ * POR QUÉ EXISTEN. Hasta la Tarea 6.3 las tres burbujas del resultado eran las
+ * únicas del hilo que TIRABAN SU PAYLOAD A LA BASURA: decían «Se registró un
+ * resultado, a la espera de confirmación» sin el marcador ni el club, mientras
+ * el aviso push del MISMO evento sí decía «chatgpt2 propuso 3-1». El hilo al
+ * que ese push manda contaba menos que el push.
+ *
+ * EL MARCADOR VA SIEMPRE ANCLADO: «3-1 (local-visitante)». El payload trae
+ * `goles_local` y `goles_visitante` pero no dice qué club fue local, y en un
+ * hilo donde están los dos clubes un «3-1» suelto se lee al revés la mitad de
+ * las veces. La perspectiva de cada club es cosa del historial
+ * (`utils/historialClub.js`), no del hilo del encuentro.
+ */
+
+/** '3-1 (local-visitante)', o `null` si el evento no trae marcador. */
+function marcadorDelEvento(payload) {
+  const gl = Number(payload?.goles_local);
+  const gv = Number(payload?.goles_visitante);
+  if (payload?.goles_local === null || payload?.goles_local === undefined) return null;
+  if (payload?.goles_visitante === null || payload?.goles_visitante === undefined) return null;
+  if (!Number.isFinite(gl) || !Number.isFinite(gv)) return null;
+  return `${gl}-${gv} (local-visitante)`;
+}
+
+/** «Club A (@vicente) registró el resultado: 3-1 (local-visitante).» */
+export function textoResultadoPropuesto(payload) {
+  const sujeto = sujetoDelEvento(payload?.club_proponente_nombre, payload?.actor_username);
+  const marcador = marcadorDelEvento(payload);
+  const base = marcador
+    ? `${sujeto} registró el resultado: ${marcador}.`
+    : `${sujeto} registró el resultado del partido.`;
+  return `${base} Falta que lo confirme el club contrario.`;
+}
+
+/** «Club B (@juan) confirmó el resultado: 3-1 (local-visitante).» */
+export function textoResultadoConfirmado(payload) {
+  const sujeto = sujetoDelEvento(payload?.club_confirma_nombre, payload?.actor_username);
+  const marcador = marcadorDelEvento(payload);
+  const base = marcador
+    ? `${sujeto} confirmó el resultado: ${marcador}.`
+    : `${sujeto} confirmó el resultado.`;
+  return `${base} Quedó en el historial de los dos clubes.`;
+}
+
+/**
+ * «Club B (@juan) rechazó el marcador 3-1 (local-visitante).»
+ *
+ * Y dice lo que pasa después, que desde la 48b NO es «propongan otro»: el
+ * encuentro se queda en disputa hasta que la moderación lo revise. El servidor
+ * dice lo mismo desde la migración 50, en el aviso y en el motivo de error.
+ */
+export function textoResultadoDisputado(payload) {
+  const sujeto = sujetoDelEvento(payload?.club_responde_nombre, payload?.actor_username);
+  const marcador = marcadorDelEvento(payload);
+  const base = marcador
+    ? `${sujeto} rechazó el marcador ${marcador}.`
+    : `${sujeto} rechazó el resultado propuesto.`;
+  return `${base} El encuentro queda en disputa: sólo la moderación puede reabrirlo.`;
 }
 
 /** Los clubes del desafío donde soy administrador. */

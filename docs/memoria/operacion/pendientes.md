@@ -59,28 +59,55 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 
 ## P2 — Un resultado en disputa no tiene forma de reabrirse
 
-- **Dominio afectado:** resultado del encuentro entre clubes (migraciones 48 y 48b).
+> **Sigue abierto, pero desde la Tarea 6.3 ya nadie lo niega en pantalla.** La 48b arregló la GUARDA y dejó dos frases diciendo lo contrario: el aviso del rechazo terminaba en «Propongan uno nuevo.» y el motivo de error al confirmar un rechazado decía «pide que propongan uno nuevo». Las corrigieron las migraciones **50 y 50b**, y la burbuja del hilo dice lo mismo desde `textoResultadoDisputado()`. La deuda es la pieza de moderación, no el texto.
+
+- **Dominio afectado:** resultado del encuentro entre clubes (migraciones 48, 48b, 50 y 50b).
 - **Evidencia:** `confirmar_resultado(id, false)` deja `club_challenges.estado = 'resultado_en_disputa'`, y desde la 48b `proponer_resultado()` exige `estado = 'esperando_resultado'` a secas — ni el club proponente ni el contrario pueden proponer un resultado nuevo por su cuenta. `src/services/clubChallengeRules.js` ya declaraba esto («Sólo la moderación puede reabrir una disputa; nunca se cierra sola») y `getChallengeCta()` siempre devuelve ese estado deshabilitado, sin ninguna acción que ofrecer.
 - **Por qué importa:** hoy, un resultado disputado se queda ahí para siempre. No hay una función que lo resuelva ni una persona con el rol para hacerlo — es el mismo hueco que el P1 de abajo sobre las revisiones de sanción, y conviene resolverlos con el mismo modelo de roles y no con dos.
 - **Decisión consciente:** no se inventó una forma de que el club se autorresuelva la disputa (dejaría a cualquiera de los dos deshacer un rechazo por su cuenta) ni se dejó `proponer_resultado()` aceptando `resultado_en_disputa`, que fue exactamente el error que corrigió la 48b.
 - **Acción:** decidir quién modera (mismo rol que resuelva las revisiones de sanción) y construir la función que reabre el desafío a `esperando_resultado` — el índice único parcial de `club_match_results` ya está preparado para admitir una propuesta nueva sin chocar con la rechazada.
 - **Verificación necesaria:** una prueba de autorización que demuestre que sólo el rol de moderación reabre, y que `club_record()`/`historial_publico_club()` siguen sin contar nada hasta que el resultado nuevo se confirme.
 
-## P3 — El historial real todavía no se ha visto con datos reales
+## P3 — Falta la comprobación manual del historial en pantalla (NO bloqueante)
 
-- **Dominio afectado:** historial y estadísticas del club (migración 49, Tarea 6.2).
-- **Evidencia (comprobada el 2026-08-17 contra `jvfoendzblkoxvwvommz`):** `club_match_results` tiene **cero filas**, así que `historial_club()` y `club_estadisticas()` devuelven vacío y ceros para todos los clubes, y cada perfil muestra el estado vacío. El caso poblado —marcador, escudos, hora, cancha, tipo y V/E/D desde los dos lados— sólo está demostrado por `49_historial_test.sql` (13/13) y por `historialClub.test.js` (28/28), no por una pantalla.
-- **Por qué importa:** es el mismo hueco que encontraron las comprobaciones manuales de U5.1 y U5.2 — una prueba SQL en verde no dice que la pantalla funcione. Lo que ninguna de las dos puede ver es la tarjeta con datos de verdad: el corte de los nombres largos junto al marcador, la línea de contexto en 390 px y la fecha con la hora del dispositivo.
-- **Acción:** con dos cuentas, llevar un encuentro hasta `confirmar_resultado(id, true)` y revisar el perfil de los DOS clubes: el que ganó y el que perdió, uno como local y otro como visitante. Después abrirlo con una cuenta que no pertenezca a ninguno de los dos, para ver que no llegan ni la hora ni la cancha.
-- **Verificación necesaria:** las dos lecturas del mismo partido coinciden e invierten el marcador, el resumen PJ · GF · GC cuadra con los partidos mostrados, y el externo ve el marcador sin la hora ni la cancha.
+> **El servidor está demostrado de punta a punta; lo que falta es la aceptación visual.** El recorrido completo —propuesta, confirmación por el club contrario, `matches` y `club_challenges` en `finalizado`, `club_record()`, `club_estadisticas()` e `historial_club()`— lo recorren tres arneses contra el esquema aplicado: `48_resultado_test.sql` 19/19, `49_historial_test.sql` 13/13 y `50_una_sola_puerta_test.sql` 8/8, todos con `rollback`. Lo que ninguno puede ver es la pantalla.
 
-## P3 — «Ver todo» del historial lleva a la bandeja de desafíos
+- **Dominio afectado:** historial y estadísticas del club (migraciones 48 a 50b, Tareas 6.1 a 6.3).
+- **Evidencia (comprobada el 2026-08-17 contra `jvfoendzblkoxvwvommz`):** `club_match_results` tiene **cero filas**, así que hoy todos los perfiles muestran el estado vacío —«Aún no hay partidos en el historial»—, que es el comportamiento correcto y no un fallo.
+- **Por qué importa:** es el mismo hueco que encontraron las comprobaciones manuales de U5.1 y U5.2, y las dos veces apareció un fallo real de interfaz que ninguna prueba SQL podía ver. Acá lo que falta por mirar es el corte de los nombres largos junto al marcador, las dos líneas de contexto en 390 px, y la fecha y la hora con el reloj del dispositivo.
+- **Pasos exactos, con dos cuentas (A y B, cada una administradora de un club):**
+  1. Con A, desafiar al club de B; con B, aceptar. Acordar y aprobar la propuesta hasta que el partido quede publicado.
+  2. Esperar a que el desafío pase a `esperando_resultado` (el cron corre cada cinco minutos; el hilo también lo empuja al abrirlo). Si no se quiere esperar el partido, mover la hora del partido al pasado desde el panel de Supabase.
+  3. Con A: «Registrar resultado» en el hilo, poner un marcador **distinto de un empate** y destildar a alguien de la nómina.
+  4. En el hilo de B tiene que aparecer la burbuja con el club, el `username` y el marcador anclado —«Club A (@a) registró el resultado: 3-1 (local-visitante)»— y el CTA «Confirmar resultado».
+  5. Con B: confirmar. Revisar entonces **los dos perfiles de club**: el ganador debe leer «Victoria 3-1» y el perdedor «Derrota 1-3» del MISMO partido, con «Local» o «Visita» según corresponda, y el resumen «1 partido jugado · 3 goles a favor · 1 en contra» cuadrando con la tarjeta.
+  6. Con una tercera cuenta que no pertenezca a ninguno de los dos clubes, abrir el perfil de cualquiera de ellos: tiene que verse el marcador y los escudos, y **no** la hora ni la cancha, y la tarjeta no debe llevar a ninguna parte (sin chevron).
+  7. Repetir el paso 3 en otro encuentro y, con B, **rechazar**: el hilo debe decir que queda en disputa y que sólo la moderación puede reabrirlo, el aviso también, y el historial y las estadísticas de los dos clubes no deben moverse.
+- **Verificación necesaria:** los seis puntos de arriba. Es aceptación visual, no funcionalidad pendiente: por eso no bloquea el cierre de la Fase 6.
+
+## Resuelto el 2026-08-17 — «Ver todo» del historial ya lleva al historial
 
 - **Dominio afectado:** perfil del club.
-- **Evidencia:** `ClubDetailScreen` muestra los tres últimos encuentros (`MAX_HISTORIAL = 3`) y su «Ver todo» navega a `ClubChallenges`, que es la bandeja de desafíos y no un historial. `historial_club()` ya acepta hasta 50 partidos: falta la pantalla, no el dato.
-- **Por qué importa:** en cuanto un club pase de tres encuentros confirmados, no habrá forma de ver los anteriores desde la aplicación.
-- **Acción:** decidir si el historial completo es una pantalla propia o una sección de la bandeja, y construirla reutilizando `MatchHistoryCard` y `getClubMatchHistory` tal como están.
-- **Verificación necesaria:** un club con más de tres encuentros confirmados puede llegar a todos, y la pantalla nueva respeta el mismo corte de privacidad (hora y cancha sólo para los integrantes).
+- **Evidencia:** `ClubDetailScreen` mostraba los tres últimos encuentros y su «Ver todo» navegaba a `ClubChallenges`, la bandeja de retos pendientes: en cuanto un club pasara de tres encuentros confirmados, los anteriores no se podían ver desde la aplicación.
+- **Resolución (Tarea 6.3):** se creó `ClubHistoryScreen` —registrada como `ClubHistory` en `AppNavigator`— que pide `historial_club()` con su tope real de 50 y reutiliza `getClubMatchHistory`, `MatchHistoryCard` y `resumenEstadisticas`, sin duplicar ninguna regla. «Ver todo» sólo aparece cuando hay más de tres encuentros.
+- **Verificación de cierre:** `historialClub.test.js` comprueba que la sección del historial ya no navega a `ClubChallenges`, que la ruta existe en el navegador, que la pantalla pide `HISTORIAL_LIMITE_MAX` y que las dos pantallas usan el mismo servicio, la misma tarjeta y el mismo resumen.
+
+## P3 — El nivel de un encuentro entre clubes no se acuerda en ninguna parte
+
+- **Dominio afectado:** desafíos entre clubes y el historial del club.
+- **Evidencia (comprobada el 2026-08-17 contra `jvfoendzblkoxvwvommz`):** `club_challenges` no tiene columna de nivel, `club_challenge_proposals` tampoco —se acuerdan fecha, cancha, modalidad, cupos, método de inscripción y cuota— y `aprobar_propuesta()` (migración 44) crea el `matches` sin `nivel`, así que queda el `default 'recreativo'` de la tabla. Los **7** partidos de clubes que existen están todos en `recreativo`, ninguno por elección.
+- **Por qué importa:** la Tarea 6.2 mostraba ese campo en la tarjeta del historial como «tipo de partido», así que un encuentro competitivo se leía «Recreativo». Es un valor por defecto disfrazado de dato, exactamente lo que la 6.2 vino a quitar del historial. En la 6.3 se dejó de mostrar: `historial_club()` sigue devolviendo la columna, pero el cliente no la pinta (ver `NIVEL_POR_OMISION` en `src/utils/historialClub.js`).
+- **Acción:** decidir si el nivel se acuerda en la propuesta —quién lo elige, si se negocia como la hora y la cuota, y si condiciona algo— y sólo entonces agregarlo. Volver a mostrarlo son dos líneas: `tipoLabel` en `normalizarPartido()` y la prop en `MatchHistoryCard`.
+- **Verificación necesaria:** un encuentro creado con nivel competitivo se lee «Competitivo» en el historial de los dos clubes, y uno anterior a ese cambio no miente.
+
+## P4 — `historial_publico_club()` quedó sin consumidor
+
+- **Dominio afectado:** base de datos y la futura página pública de un club.
+- **Evidencia:** la creó la migración 44d como la proyección estrictamente pública de un partido de clubes terminado (clubes, día, marcador y V/E/D) y la 48 le rellenó el marcador. Desde la 49, la aplicación lee el historial con `historial_club()`, que devuelve más —escudos y nivel— y reserva la hora exacta y la cancha para los integrantes de los dos clubes. Ninguna pantalla, servicio ni Edge Function llama ya a `historial_publico_club()`; sólo la usan `44d_partido_privado_test.sql` (caso 15) y `49_historial_test.sql` (caso 5), que la comparan a propósito.
+- **Por qué NO se elimina:** sigue siendo el contrato que fija qué es público de un encuentro terminado, y `clubs.slug` existe desde la migración 11 «para la futura página pública `futfinder.com/club/<slug>`», donde el visitante es `anon` — el caso exacto que esta función atiende. Retirar una función aplicada porque hoy no tiene quien la llame es perder la referencia sin ganar nada; su coste es una función `stable security definer` de sólo lectura.
+- **El detalle que hay que recordar si se usa:** su `join` contra `club_match_results` es `left`, así que publica cualquier partido `finalizado` **aunque nadie haya confirmado el marcador**, con los goles en `null`. `historial_club()` hace ese join interno justamente para no publicar un partido como jugado sin resultado. Quien construya la página pública tiene que elegir una de las dos a conciencia.
+- **Acción:** al construir la página pública del club, decidir si se usa `historial_club()` para todo —recomendado, ya funciona para `anon`— y, si es así, retirar `historial_publico_club()` con una migración nueva que también actualice el caso 15 de la prueba de la 44d. Nunca editando la 44d.
+- **Verificación necesaria:** la página pública no muestra ningún partido sin marcador confirmado, y ninguna prueba versionada queda apuntando a una función que ya no existe.
 
 ## P2 — Definir y construir la moderación posterior a un reporte
 

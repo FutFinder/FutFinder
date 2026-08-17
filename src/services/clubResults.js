@@ -30,8 +30,8 @@ const COLUMNAS_RESULTADO =
  *
  * `asistencia` es la lista de ids de jugadores que SÍ llegaron; el resto de
  * los inscritos queda `no_asistio`. Pasar `undefined`/`null` no toca la
- * asistencia — útil al reproponer un resultado tras un rechazo, cuando ya
- * quedó marcada la primera vez.
+ * asistencia, que es lo que corresponde cuando ya quedó marcada: la RPC sólo
+ * mueve a quien sigue `inscrito`.
  *
  * Devuelve `{ data, error }`. En `data` viajan `resultId` y `estado`
  * (`'propuesto'`, o `'confirmado'` con `already: true` si el desafío ya
@@ -54,7 +54,9 @@ export async function proponerResultado(challengeId, golesLocal, golesVisitante,
  *
  * Aceptar cierra el desafío (`finalizado`) y publica el partido con el
  * marcador; rechazar lo deja en `resultado_en_disputa` sin tocar ningún
- * récord, y el proponente puede volver a proponer.
+ * récord, y ahí se queda: desde la migración 48b **ningún club puede proponer
+ * un resultado nuevo**, sólo la moderación reabre una disputa. El aviso y el
+ * motivo de error del servidor lo dicen así desde la 50.
  *
  * La pantalla esconde el botón cuando no corresponde, pero esconderlo no es
  * la protección: el servidor comprueba las tres condiciones (no ser quien

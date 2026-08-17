@@ -254,13 +254,17 @@ function enumerar(frases) {
  * El sujeto de la frase: el CLUB primero y, si el servidor lo entregó, el
  * administrador.
  *
+ * Se exporta porque los eventos del resultado (migración 48) arman su frase
+ * igual, en `resultadoRpc.js`: es la misma convención del mismo hilo, y dos
+ * copias terminarían escribiendo el sujeto de dos formas distintas.
+ *
  * El club es lo que no puede faltar —un cambio lo pide un club, no una
  * persona— y el `username` es trazabilidad para los otros administradores del
  * hilo. Sale de `profiles` dentro de la RPC, nunca de lo que mande el cliente:
  * un nombre de actor enviado por quien actúa se puede escribir solo. En la
  * fila queda además `actor_id`, que es la auditoría de verdad.
  */
-function sujetoDelEvento(club, username) {
+export function sujetoDelEvento(club, username) {
   const nombre = esTextoConContenido(club) ? club : 'Un club';
   if (!esTextoConContenido(username)) return nombre;
   return `${nombre} (@${username.trim()})`;

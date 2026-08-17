@@ -23,6 +23,9 @@ const {
   argumentosConfirmarResultado,
   comoResultadoResultado,
   accionesDeResultado,
+  textoResultadoPropuesto,
+  textoResultadoConfirmado,
+  textoResultadoDisputado,
   FALTA_MIGRACION_RESULTADO,
 } = require('../resultadoRpc.js');
 
@@ -228,4 +231,166 @@ test('sin ningún resultado propuesto no hay nada que confirmar', () => {
     resultadoActivo: { estado: 'confirmado', club_proponente_id: 'A' },
   });
   assert.equal(confirmado.puedeConfirmar, false);
+});
+
+// ---------------------------------------------------------------------------
+// Las tres frases del hilo (Tarea 6.3)
+// ---------------------------------------------------------------------------
+//
+// EL FALLO QUE CIERRAN. Las tres burbujas del resultado eran las únicas del
+// hilo que tiraban su `payload` a la basura: decían «Se registró un resultado,
+// a la espera de confirmación» sin el marcador ni el club, mientras el aviso
+// push del MISMO evento —armado en la migración 48— sí decía «chatgpt2 propuso
+// 3-1 en «…»». El hilo al que ese push manda contaba menos que el push.
+
+/** El payload tal como lo escribe `proponer_resultado()` (migración 48). */
+const PAYLOAD_PROPUESTO = {
+  result_id: 'r1',
+  match_id: 'm1',
+  club_proponente_id: 'A',
+  club_proponente_nombre: 'Club A',
+  actor_id: 'u-a',
+  actor_username: 'vicente',
+  goles_local: 3,
+  goles_visitante: 1,
+};
+
+/** El de `confirmar_resultado()` al aceptar. */
+const PAYLOAD_CONFIRMADO = {
+  result_id: 'r1',
+  match_id: 'm1',
+  club_confirma_id: 'B',
+  club_confirma_nombre: 'Club B',
+  actor_id: 'u-b',
+  actor_username: 'juan',
+  goles_local: 3,
+  goles_visitante: 1,
+};
+
+/** Y el de rechazar. */
+const PAYLOAD_DISPUTADO = {
+  result_id: 'r1',
+  match_id: 'm1',
+  club_responde_id: 'B',
+  club_responde_nombre: 'Club B',
+  actor_id: 'u-b',
+  actor_username: 'juan',
+  goles_local: 3,
+  goles_visitante: 1,
+};
+
+test('la frase del resultado propuesto nombra al club, al administrador y el marcador', () => {
+  const t = textoResultadoPropuesto(PAYLOAD_PROPUESTO);
+  assert.match(t, /Club A \(@vicente\)/);
+  assert.match(t, /3-1 \(local-visitante\)/);
+  assert.match(t, /confirme el club contrario/);
+});
+
+test('la frase del confirmado dice que quedó en el historial de los dos clubes', () => {
+  const t = textoResultadoConfirmado(PAYLOAD_CONFIRMADO);
+  assert.match(t, /Club B \(@juan\)/);
+  assert.match(t, /3-1 \(local-visitante\)/);
+  assert.match(t, /historial de los dos clubes/);
+});
+
+test('la frase del rechazo NO invita a proponer otro: es la regla de la 48b', () => {
+  const t = textoResultadoDisputado(PAYLOAD_DISPUTADO);
+  assert.match(t, /Club B \(@juan\)/);
+  assert.match(t, /rechazó el marcador 3-1 \(local-visitante\)/);
+  assert.match(t, /sólo la moderación puede reabrirlo/);
+  assert.equal(/propon/i.test(t.replace('propuesto', '')), false, `la frase invita a proponer: ${t}`);
+});
+
+test('el marcador va siempre anclado a local-visitante', () => {
+  // El payload trae `goles_local` y `goles_visitante` pero no dice qué club fue
+  // local, y en un hilo donde están los dos clubes un «3-1» suelto se lee al
+  // revés la mitad de las veces. La perspectiva de cada club es cosa del
+  // historial, no del hilo.
+  for (const texto of [
+    textoResultadoPropuesto(PAYLOAD_PROPUESTO),
+    textoResultadoConfirmado(PAYLOAD_CONFIRMADO),
+    textoResultadoDisputado(PAYLOAD_DISPUTADO),
+  ]) {
+    assert.match(texto, /\(local-visitante\)/);
+  }
+});
+
+test('sin marcador en el payload la frase sigue siendo legible, sin «undefined»', () => {
+  const sinGoles = { club_proponente_nombre: 'Club A', actor_username: 'vicente' };
+  for (const texto of [
+    textoResultadoPropuesto(sinGoles),
+    textoResultadoConfirmado(sinGoles),
+    textoResultadoDisputado(sinGoles),
+  ]) {
+    assert.equal(texto.includes('undefined'), false, texto);
+    assert.equal(texto.includes('NaN'), false, texto);
+    assert.equal(texto.includes('null'), false, texto);
+  }
+  // Un 0-0 sí es un marcador y tiene que salir.
+  assert.match(
+    textoResultadoConfirmado({ ...PAYLOAD_CONFIRMADO, goles_local: 0, goles_visitante: 0 }),
+    /0-0 \(local-visitante\)/
+  );
+});
+
+test('sin club ni username la frase no queda coja', () => {
+  const t = textoResultadoPropuesto({ goles_local: 2, goles_visitante: 0 });
+  assert.match(t, /^Un club registró el resultado: 2-0/);
+  assert.equal(t.includes('(@'), false);
+});
+
+test('la burbuja del hilo usa estas tres funciones y no un texto fijo', () => {
+  // Se lee el componente como fuente porque no se puede cargar en node (importa
+  // react-native), igual que `expedienteSancion.test.js` lee ChatThreadScreen.
+  const burbuja = fs.readFileSync(
+    path.join(RAIZ, 'src', 'components', 'clubes', 'ChallengeEventBubble.js'),
+    'utf8'
+  );
+  for (const fn of [
+    'textoResultadoPropuesto',
+    'textoResultadoConfirmado',
+    'textoResultadoDisputado',
+  ]) {
+    assert.match(burbuja, new RegExp(fn), `la burbuja no usa ${fn}`);
+  }
+  // Y ya no quedan las frases mudas que ignoraban el payload.
+  for (const viejo of [
+    'Se registró un resultado, a la espera de confirmación',
+    'El resultado quedó confirmado.',
+    'El resultado quedó en disputa.',
+  ]) {
+    assert.equal(burbuja.includes(viejo), false, `sigue el texto fijo: ${viejo}`);
+  }
+});
+
+test('el servidor tampoco invita ya a proponer otro resultado (migraciones 50 y 50b)', () => {
+  // La 48b corrigió la GUARDA de `proponer_resultado()` pero dejó dos frases
+  // diciendo lo contrario en `confirmar_resultado()`: el aviso del rechazo
+  // («Propongan uno nuevo.») y el motivo de error al confirmar un rechazado
+  // («pide que propongan uno nuevo»). Un aviso que pide una acción que el
+  // servidor rechaza acto seguido es peor que no avisar.
+  const m50 = fs.readFileSync(
+    path.join(RAIZ, 'supabase', 'migrations', '50_partido_de_clubes_una_sola_puerta.sql'),
+    'utf8'
+  );
+  const m50b = fs.readFileSync(
+    path.join(RAIZ, 'supabase', 'migrations', '50b_frase_del_rechazo.sql'),
+    'utf8'
+  );
+
+  // El cuerpo de la función que quedó aplicada es el de la 50b.
+  const cuerpo = m50b.slice(m50b.indexOf('create or replace function public.confirmar_resultado'));
+  assert.equal(cuerpo.includes('Propongan uno nuevo'), false);
+  assert.equal(cuerpo.includes('pide que propongan uno nuevo'), false);
+  assert.match(cuerpo, /sólo la moderación puede reabrirlo/);
+  assert.match(cuerpo, /hasta que la moderación lo revise/);
+  // La 48 exige «ya fue rechazado» en su caso 10: la frase lo conserva.
+  assert.match(cuerpo, /Este resultado ya fue rechazado/);
+
+  // Y las dos guardas de la 50 siguen en el archivo: son las que impiden
+  // finalizar o cancelar un encuentro entre clubes por la puerta genérica.
+  assert.match(m50, /save_match_attendance/);
+  assert.match(m50, /cancel_match/);
+  const guardas = m50.match(/if v_match\.challenge_proposal_id is not null then/g) || [];
+  assert.equal(guardas.length, 2, 'la 50 debería tener las dos guardas');
 });

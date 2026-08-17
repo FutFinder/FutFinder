@@ -77,15 +77,27 @@ export const ESTADISTICAS_COLUMNAS = ['pj', 'v', 'e', 'd', 'gf', 'gc'];
  */
 export const ESTADISTICAS_VACIAS = Object.freeze({ pj: 0, v: 0, e: 0, d: 0, gf: 0, gc: 0 });
 
-/** Partidos que se piden por defecto. El servidor topa en 50. */
+/** Partidos que se piden por defecto. */
 export const HISTORIAL_LIMITE = 20;
+
+/**
+ * El tope real de `historial_club()`: su `least(coalesce(p_limit, 20), 50)`.
+ *
+ * Lo pide la pantalla del historial completo. Está acá y no escrito a mano en
+ * la pantalla para que el día que la RPC cambie su tope haya un solo número que
+ * mover.
+ */
+export const HISTORIAL_LIMITE_MAX = 50;
 
 /** Argumentos de `historial_club(p_club_id, p_limit)`. */
 export function argumentosHistorial(clubId, limit = HISTORIAL_LIMITE) {
   const n = Number(limit);
   return {
     p_club_id: clubId,
-    p_limit: Number.isFinite(n) && n > 0 ? Math.min(Math.trunc(n), 50) : HISTORIAL_LIMITE,
+    p_limit:
+      Number.isFinite(n) && n > 0
+        ? Math.min(Math.trunc(n), HISTORIAL_LIMITE_MAX)
+        : HISTORIAL_LIMITE,
   };
 }
 
@@ -116,11 +128,36 @@ export function resultadoNombre(resultado) {
   return 'Sin resultado';
 }
 
-/** `matches.nivel` → tipo de partido visible. Mismo vocabulario que `matchRules`. */
-export function tipoPartidoLabel(nivel) {
-  const mapa = { recreativo: 'Recreativo', intermedio: 'Intermedio', competitivo: 'Competitivo' };
-  return mapa[nivel] || null;
-}
+/**
+ * EL TIPO DE PARTIDO NO SE MUESTRA EN EL HISTORIAL DE UN CLUB, Y NO ES UN
+ * OLVIDO.
+ *
+ * `historial_club()` devuelve `matches.nivel` y la Tarea 6.2 lo pintaba como
+ * «Recreativo / Intermedio / Competitivo». La auditoría de la 6.3 encontró que
+ * en un encuentro entre clubes ese campo NO ES UNA DECISIÓN DE NADIE:
+ *
+ *   · `club_challenges` no tiene columna de nivel;
+ *   · `club_challenge_proposals` tampoco —se acuerdan fecha, cancha,
+ *     modalidad, cupos, método de inscripción y cuota, nunca el nivel—;
+ *   · `aprobar_propuesta()` (migración 44) crea el `matches` sin `nivel`, así
+ *     que queda el `default 'recreativo'` de la tabla.
+ *
+ * Comprobado contra el proyecto el 2026-08-17: los 7 partidos de clubes que
+ * existen tienen `nivel = 'recreativo'`, todos por omisión. Mostrarlo era
+ * enseñar un valor por defecto como si fuera un dato —exactamente lo que la
+ * 6.2 vino a quitar del historial— y un encuentro competitivo se habría leído
+ * igual «Recreativo».
+ *
+ * VOLVER A MOSTRARLO ES UNA LÍNEA, el día que el nivel se acuerde de verdad en
+ * la propuesta: `tipoLabel` en `normalizarPartido()` y la prop en
+ * `MatchHistoryCard`. Está registrado en `docs/memoria/operacion/pendientes.md`.
+ *
+ * El vocabulario existe y es correcto en `services/matchRules.js`, donde SÍ lo
+ * elige una persona: el organizador de un partido normal.
+ */
+
+/** El nivel que la tabla pone cuando nadie lo eligió. */
+export const NIVEL_POR_OMISION = 'recreativo';
 
 /**
  * '2026-07-28' → '28 jul'.
@@ -218,7 +255,8 @@ export function normalizarPartido(row, clubId) {
     horaLabel: formatHora(row.hora),
     localLabel: esLocal ? 'Local' : 'Visita',
     canchaNombre: row.cancha_nombre || null,
-    tipoLabel: tipoPartidoLabel(row.nivel),
+    // `nivel` viaja en la fila pero no se muestra: en un encuentro entre
+    // clubes nadie lo elige. Ver `NIVEL_POR_OMISION` arriba.
     soyIntegrante: row.soy_integrante === true,
   };
 }
@@ -243,6 +281,29 @@ export function normalizarEstadisticas(data) {
     gf: n(row.gf),
     gc: n(row.gc),
   };
+}
+
+/**
+ * «8 partidos jugados · 21 goles a favor · 12 en contra», o `null` si el club
+ * todavía no jugó.
+ *
+ * Vive acá y no en la pantalla porque lo muestran DOS: el perfil del club bajo
+ * los últimos encuentros y la pantalla del historial completo. Escrito dos
+ * veces terminaría diciendo dos cosas distintas del mismo dato, que es el
+ * mismo error que se corrigió al dejar V/E/D en una sola función.
+ *
+ * NO SE DERIVA DE LOS PARTIDOS CARGADOS: el historial viaja paginado y sumar
+ * los goles de las filas visibles daría un total falso en cuanto el club pase
+ * del límite. Estos números salen de `club_estadisticas()`.
+ */
+export function resumenEstadisticas(estadisticas) {
+  const s = estadisticas || ESTADISTICAS_VACIAS;
+  if (!s.pj) return null;
+  return (
+    `${s.pj} ${s.pj === 1 ? 'partido jugado' : 'partidos jugados'} · ` +
+    `${s.gf} ${s.gf === 1 ? 'gol' : 'goles'} a favor · ` +
+    `${s.gc} en contra`
+  );
 }
 
 /** `true` si el error es «la migración 49 no está aplicada todavía». */

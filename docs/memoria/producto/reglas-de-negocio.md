@@ -1,6 +1,6 @@
 # Reglas de negocio
 
-Última revisión: 2026-08-08
+Última revisión: 2026-08-17
 
 ## Propósito
 
@@ -25,6 +25,13 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 - Estados: `pendiente`, `negociacion`, `esperando_aprobacion`, `publicado`, `en_juego`, `esperando_resultado`, `finalizado`, `rechazado`, `sin_acuerdo`, `cancelado`, `resultado_en_disputa`, `bloqueado_sancion` y `expirado`. `aceptado` es legado: no lo produce el código nuevo, pero las filas anteriores a la migración 41 lo conservan junto con su conversación directa.
 - Un club no puede desafiar a otro del que quien crea el desafío es miembro. Se aplica en la interfaz, en `listRivalCandidates()` y —única capa que un cliente modificado no puede saltarse— en el trigger `club_challenges_valida_rival()`.
 - Sólo puede existir un desafío activo por par de clubes, sin importar quién retó a quién.
+- **El resultado lo firman los dos clubes.** Propone el marcador un administrador de uno de los dos; lo confirma o lo rechaza un administrador del **otro**, que además no puede pertenecer al club proponente en ningún rol. Quien administra los dos clubes no participa en ninguna de las dos puntas.
+- **Una disputa no la reabre ningún club.** Rechazar deja el desafío en `resultado_en_disputa`, y de ahí sólo lo saca la moderación: ni el proponente ni el contrario pueden proponer un resultado nuevo. Nada de lo que se lee en la aplicación —el aviso, el motivo de error, la burbuja del hilo o el CTA— ofrece esa acción.
+- **Un resultado que no está confirmado no mueve nada:** ni el récord, ni las estadísticas, ni el historial. Un partido que se cerró sin que el club contrario confirmara el marcador **no es un partido jugado**.
+- **El marcador se lee desde el club que se mira.** «Club A 3-1 Club B» es «Victoria 3-1» en el perfil de A y «Derrota 1-3» en el de B; quién fue local se dice aparte. En el hilo del encuentro, donde están los dos clubes, el marcador va anclado como «3-1 (local-visitante)».
+- **De un encuentro terminado es público** el nombre y el escudo de los dos clubes, el día, el marcador y el V/E/D. La hora exacta y la cancha sólo las ven los integrantes de los dos clubes. Antes de terminar, el partido no existe para nadie más.
+- **El nivel de un encuentro entre clubes no se acuerda todavía** en ninguna parte del ciclo, así que no se muestra en el historial: el `nivel` del partido queda en el valor por defecto de la tabla y no representa ninguna decisión.
+- **La asistencia y el cierre de un encuentro entre clubes viajan con el resultado**, no por la vía del partido normal: nadie pierde Trust Score por un encuentro entre clubes, y un solo club no puede darlo por jugado.
 
 ## Trust Score
 
@@ -37,7 +44,7 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 
 - Los estados de partido son `abierto`, `lleno`, `en_curso`, `finalizado` y `cancelado`.
 - Los estados de asistencia son `pendiente` (solicitud con aprobación manual, sin reservar cupo), `inscrito`, `confirmado_gps`, `no_asistio` y `cancelado`.
-- El organizador solo puede guardar asistencia después de que termine el partido y hasta 72 horas después de su hora de término; al guardarla, el partido queda `finalizado`, salvo si ya estaba cancelado o finalizado.
+- El organizador solo puede guardar asistencia después de que termine el partido y hasta 72 horas después de su hora de término; al guardarla, el partido queda `finalizado`, salvo si ya estaba cancelado o finalizado. **Esto vale sólo para los partidos normales:** desde la migración 50, un partido nacido de una propuesta entre clubes rechaza `save_match_attendance()` y `cancel_match()`, porque su asistencia viaja con el resultado y su cierre lo firma el club contrario.
 
 ## Confirmación GPS
 

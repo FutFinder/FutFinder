@@ -39,7 +39,8 @@ const {
   argumentosHistorial,
   argumentosEstadisticas,
   resultadoDesdeMarcador,
-  tipoPartidoLabel,
+  resumenEstadisticas,
+  HISTORIAL_LIMITE_MAX,
   formatFechaCorta,
   formatHora,
   normalizarPartido,
@@ -324,7 +325,7 @@ test('varios partidos: se normalizan todos y en el orden en que llegan', async (
   assert.deepEqual(cliente.llamadas[0].args, { p_club_id: CLUB_A, p_limit: 5 });
 });
 
-test('cada partido trae escudos, fecha, hora, cancha y tipo de partido', () => {
+test('cada partido trae escudos, fecha, hora y cancha', () => {
   const p = normalizarPartido(
     fila({ id: 'm9', golesLocal: 1, golesVisitante: 0, nivel: 'intermedio' }),
     CLUB_A
@@ -334,9 +335,27 @@ test('cada partido trae escudos, fecha, hora, cancha y tipo de partido', () => {
   assert.equal(p.rivalLogoUrl, 'https://cdn/b.png');
   assert.equal(p.horaLabel, '21:00');
   assert.equal(p.canchaNombre, 'Cancha El Roble');
-  assert.equal(p.tipoLabel, 'Intermedio');
   assert.equal(p.soyIntegrante, true);
   assert.match(p.fechaLabel, /^28/);
+});
+
+test('el tipo de partido NO viaja al historial: en un encuentro entre clubes nadie lo elige', () => {
+  // Hallazgo de la auditoría de la 6.3: ni `club_challenges` ni
+  // `club_challenge_proposals` tienen nivel, y `aprobar_propuesta()` crea el
+  // partido sin ponerlo, así que queda el `default 'recreativo'` de la tabla.
+  // Los 7 partidos de clubes de producción están todos en 'recreativo' por
+  // omisión. Mostrarlo era enseñar un valor por defecto como si fuera un dato.
+  for (const nivel of ['recreativo', 'intermedio', 'competitivo', null]) {
+    const p = normalizarPartido(fila({ id: 'm-nivel', golesLocal: 1, golesVisitante: 0, nivel }), CLUB_A);
+    assert.equal(p.tipoLabel, undefined, `el nivel «${nivel}» volvió a la tarjeta`);
+  }
+
+  // Y la tarjeta tampoco lo espera ya.
+  const tarjeta = fs.readFileSync(
+    path.join(RAIZ, 'src', 'components', 'club', 'MatchHistoryCard.js'),
+    'utf8'
+  );
+  assert.equal(tarjeta.includes('tipoLabel'), false, 'MatchHistoryCard sigue recibiendo tipoLabel');
 });
 
 test('la fecha no se corre un día: 2026-07-28 se lee 28, no 27', () => {
@@ -357,20 +376,13 @@ test('a quien no es del club no le llegan hora ni cancha, pero sí el marcador',
   assert.equal(p.horaLabel, null);
   assert.equal(p.canchaNombre, null);
   assert.equal(p.soyIntegrante, false);
-  // Lo público sigue estando: clubes, escudos, marcador, resultado y tipo.
+  // Lo público sigue estando: clubes, escudos, marcador y resultado.
   assert.equal(p.miMarcador, 3);
   assert.equal(p.resultado, RESULTADO.VICTORIA);
-  assert.equal(p.tipoLabel, 'Competitivo');
   assert.equal(p.rivalLogoUrl, 'https://cdn/b.png');
 });
 
-test('las etiquetas sueltas: tipo de partido, hora y resultado sin datos', () => {
-  assert.equal(tipoPartidoLabel('recreativo'), 'Recreativo');
-  assert.equal(tipoPartidoLabel('intermedio'), 'Intermedio');
-  assert.equal(tipoPartidoLabel('competitivo'), 'Competitivo');
-  assert.equal(tipoPartidoLabel('inventado'), null);
-  assert.equal(tipoPartidoLabel(null), null);
-
+test('las etiquetas sueltas: hora y resultado sin datos', () => {
   assert.equal(formatHora(null), null);
   assert.equal(formatHora('esto no es una hora'), null);
 
@@ -425,6 +437,104 @@ test('estadísticas de un club que no jugó: ceros, nunca nulos', async () => {
   const cliente = clienteFalso({ [ESTADISTICAS_RPC]: [] });
   const { data } = await cargarEstadisticas(cliente, CLUB_A);
   assert.deepEqual(data, { ...ESTADISTICAS_VACIAS });
+});
+
+test('el resumen de estadísticas se escribe en un solo lugar y lo usan las dos pantallas', () => {
+  assert.equal(
+    resumenEstadisticas({ pj: 8, v: 5, e: 1, d: 2, gf: 21, gc: 12 }),
+    '8 partidos jugados · 21 goles a favor · 12 en contra'
+  );
+  // Singulares: «1 partido jugado» y «1 gol a favor», no «1 partidos».
+  assert.equal(
+    resumenEstadisticas({ pj: 1, v: 1, e: 0, d: 0, gf: 1, gc: 0 }),
+    '1 partido jugado · 1 gol a favor · 0 en contra'
+  );
+  // Sin partidos no hay frase que mostrar.
+  assert.equal(resumenEstadisticas(ESTADISTICAS_VACIAS), null);
+  assert.equal(resumenEstadisticas(null), null);
+
+  // Y ninguna de las dos pantallas se lo escribe por su cuenta: si una lo
+  // hiciera, el mismo dato acabaría redactado de dos formas.
+  for (const pantalla of ['ClubDetailScreen.js', 'ClubHistoryScreen.js']) {
+    const texto = fs.readFileSync(path.join(RAIZ, 'src', 'screens', pantalla), 'utf8');
+    assert.match(texto, /resumenEstadisticas/, `${pantalla} no usa el resumen compartido`);
+    assert.equal(
+      texto.includes('partidos jugados'),
+      false,
+      `${pantalla} volvió a armar la frase del resumen a mano`
+    );
+  }
+});
+
+test('el historial completo pide el tope real de la RPC, no los tres del perfil', () => {
+  assert.equal(HISTORIAL_LIMITE_MAX, 50);
+  assert.deepEqual(argumentosHistorial(CLUB_A, HISTORIAL_LIMITE_MAX), {
+    p_club_id: CLUB_A,
+    p_limit: 50,
+  });
+
+  const pantalla = fs.readFileSync(
+    path.join(RAIZ, 'src', 'screens', 'ClubHistoryScreen.js'),
+    'utf8'
+  );
+  assert.match(pantalla, /HISTORIAL_LIMITE_MAX/);
+  // Reutiliza el servicio y la tarjeta del perfil: nada de una segunda
+  // normalización que algún día muestre otra cosa del mismo partido.
+  assert.match(pantalla, /getClubMatchHistory/);
+  assert.match(pantalla, /MatchHistoryCard/);
+});
+
+test('«Ver todo» del historial ya no lleva a la bandeja de desafíos', () => {
+  const perfil = fs.readFileSync(path.join(RAIZ, 'src', 'screens', 'ClubDetailScreen.js'), 'utf8');
+  const seccion = perfil.slice(
+    perfil.indexOf('Historial de partidos'),
+    perfil.indexOf('Fotos del club')
+  );
+  assert.match(seccion, /navigate\('ClubHistory'/);
+  assert.equal(
+    seccion.includes("navigate('ClubChallenges'"),
+    false,
+    'el historial sigue mandando a la bandeja de desafíos'
+  );
+
+  // Y la ruta existe de verdad en el navegador: un `navigate` a una pantalla
+  // no registrada no falla al compilar, falla al tocarlo.
+  const nav = fs.readFileSync(path.join(RAIZ, 'src', 'navigation', 'AppNavigator.js'), 'utf8');
+  assert.match(nav, /name="ClubHistory"/);
+  assert.match(nav, /GuardedClubHistoryScreen/);
+});
+
+test('la tarjeta no ofrece destino a quien no es del club', () => {
+  // Al partido de un encuentro entre clubes sólo entran sus integrantes (RLS
+  // de la 44d): para el resto, el chevron prometía «este partido ya no está
+  // disponible».
+  const tarjeta = fs.readFileSync(
+    path.join(RAIZ, 'src', 'components', 'club', 'MatchHistoryCard.js'),
+    'utf8'
+  );
+  assert.match(tarjeta, /disabled=\{!onPress\}/);
+  assert.match(tarjeta, /onPress \? <ChevronRight/);
+
+  for (const pantalla of ['ClubDetailScreen.js', 'ClubHistoryScreen.js']) {
+    const texto = fs.readFileSync(path.join(RAIZ, 'src', 'screens', pantalla), 'utf8');
+    assert.match(
+      texto,
+      /soyIntegrante\s*\n?\s*\?\s*\(?\)?\s*=>?/,
+      `${pantalla} navega al partido sin mirar si soy integrante`
+    );
+  }
+});
+
+test('un fallo de lectura no se disfraza de historial vacío', () => {
+  for (const pantalla of ['ClubDetailScreen.js', 'ClubHistoryScreen.js']) {
+    const texto = fs.readFileSync(path.join(RAIZ, 'src', 'screens', pantalla), 'utf8');
+    assert.match(
+      texto,
+      /No se pudo cargar el historial/,
+      `${pantalla} no distingue «no se pudo leer» de «no hay partidos»`
+    );
+    assert.match(texto, /Aún no hay partidos en el historial/);
+  }
 });
 
 test('las estadísticas NO se derivan del historial cargado', () => {

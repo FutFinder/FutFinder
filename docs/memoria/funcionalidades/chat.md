@@ -1,6 +1,6 @@
 # Chat
 
-Última revisión: 2026-08-10
+Última revisión: 2026-08-17
 
 ## Propósito
 
@@ -10,7 +10,7 @@ Ofrecer conversaciones directas, de partido, de club y de negociación de desaf�
 
 Los hilos usan `dm:<usuario>`, `match:<partido>`, `club:<club>` o `challenge:<desafío>`. Inbox usa `get_my_threads()` en una RPC, una fila por conversación, último mensaje real, no leídos, silencio y ocultamiento ya aplicados en servidor. El historial pagina de 40 en 40; abrirlo marca lectura. Un hilo oculto reaparece ante actividad posterior. El compositor permite `/importante` y `/todos` cuando corresponda.
 
-El hilo de desafío (`messages.challenge_id`, migración 42) es un grupo con todos los administradores vigentes de ambos clubes y convive con el DM que dos de ellos puedan tener: son conversaciones distintas. Lo crea la RPC `aceptar_desafio()`, que en la misma transacción pasa el desafío a `negociacion`, fija el plazo con hora de servidor, escribe el evento, deja el mensaje de sistema y avisa con `threadKey`. El filtro «Clubes» de la bandeja muestra los dos tipos. La tarjeta lleva acento rojo neón hasta que ese administrador la abre (`abierto_alguna_vez` sale de `chat_reads`, que es por usuario). Los `club_challenge_events` se intercalan como burbujas de sistema. Del hilo no se puede eliminar la conversación: tiene un plazo corriendo.
+El hilo de desafío (`messages.challenge_id`, migración 42) es un grupo con todos los administradores vigentes de ambos clubes y convive con el DM que dos de ellos puedan tener: son conversaciones distintas. Lo crea la RPC `aceptar_desafio()`, que en la misma transacción pasa el desafío a `negociacion`, fija el plazo con hora de servidor, escribe el evento, deja el mensaje de sistema y avisa con `threadKey`. El filtro «Clubes» de la bandeja muestra los dos tipos. La tarjeta lleva acento rojo neón hasta que ese administrador la abre (`abierto_alguna_vez` sale de `chat_reads`, que es por usuario). Los `club_challenge_events` se intercalan como burbujas de sistema. **Su texto se arma en el cliente, no en la base:** la fila guarda `tipo` y `payload` —datos— y la frase sale de una utilidad pura y probada por dominio (`cambioPartido.js`, `cancelacionEncuentro.js`, `revisionSancion.js`, `resultadoRpc.js`), así que la redacción se corrige sin migrar filas. Las tres burbujas del resultado eran las únicas que ignoraban su payload: decían «El resultado quedó confirmado» mientras el aviso push del mismo evento decía «confirmó 3-1». Desde la Tarea 6.3 nombran al club, al administrador y el marcador **anclado** —«Club B (@juan) confirmó el resultado: 3-1 (local-visitante)»—, porque el payload no dice qué club fue local y en un hilo donde están los dos un «3-1» suelto se lee al revés la mitad de las veces; la perspectiva de cada club es cosa del historial, no del hilo. La del rechazo dice además que el encuentro queda en disputa y que sólo la moderación puede reabrirlo, igual que el servidor desde la migración 50. Del hilo no se puede eliminar la conversación: tiene un plazo corriendo.
 
 ## Reglas y permisos
 

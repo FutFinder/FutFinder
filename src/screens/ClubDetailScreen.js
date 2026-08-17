@@ -49,6 +49,7 @@ import {
   getClubEstadisticas,
   ESTADISTICAS_VACIAS,
 } from '../services/clubMatches';
+import { resumenEstadisticas } from '../utils/historialClub';
 import {
   modalidadBadges,
   nivelBadge,
@@ -101,6 +102,7 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [photos, setPhotos] = useState([]);
   const [rivals, setRivals] = useState([]);
   const [historial, setHistorial] = useState([]);
+  const [historialError, setHistorialError] = useState(null);
   const [estadisticas, setEstadisticas] = useState(ESTADISTICAS_VACIAS);
   const [pendingChallenges, setPendingChallenges] = useState(0);
   const [banner, setBanner] = useState(initialBanner || null);
@@ -127,7 +129,7 @@ export default function ClubDetailScreen({ navigation, route }) {
       { data: mine },
       { data: ph },
       { data: candidatos },
-      { data: partidos },
+      { data: partidos, error: errHistorial },
       { data: stats },
       pending,
     ] = await Promise.all([
@@ -149,7 +151,13 @@ export default function ClubDetailScreen({ navigation, route }) {
 
     // Historial y estadísticas: lo que hay en la base de datos y nada más. Un
     // club sin encuentros confirmados muestra el estado vacío, no un ejemplo.
+    //
+    // «NO SE PUDO LEER» NO ES «NO HAY PARTIDOS». Sin esto, un corte de red o un
+    // permiso mal puesto se leían como «Aún no hay partidos en el historial»:
+    // el mismo fallo que la nómina tuvo en la 45 y que dibujaba un «0 de 7»
+    // falso. `cargarHistorial` distingue las dos cosas; la pantalla también.
     setHistorial(partidos || []);
+    setHistorialError(errHistorial || null);
     setEstadisticas(stats || ESTADISTICAS_VACIAS);
 
     // Rivales sugeridos: los candidatos ya vienen sin este club ni ninguno
@@ -279,13 +287,10 @@ export default function ClubDetailScreen({ navigation, route }) {
   const esPremium = club.plan === 'premium';
   const historialVisible = historial.slice(0, MAX_HISTORIAL);
   // Las estadísticas NO se derivan de `historial`: ese viaja paginado y las
-  // suma el servidor sobre todos los resultados confirmados del club.
-  const resumenHistorial =
-    estadisticas.pj > 0
-      ? `${estadisticas.pj} ${estadisticas.pj === 1 ? 'partido jugado' : 'partidos jugados'} · ` +
-        `${estadisticas.gf} ${estadisticas.gf === 1 ? 'gol' : 'goles'} a favor · ` +
-        `${estadisticas.gc} en contra`
-      : null;
+  // suma el servidor sobre todos los resultados confirmados del club. La frase
+  // se arma en `utils/historialClub.js`, que es de donde también la toma la
+  // pantalla del historial completo.
+  const resumenHistorial = resumenEstadisticas(estadisticas);
 
   const miembrosLabel = [
     club.comuna || null,
@@ -440,16 +445,30 @@ export default function ClubDetailScreen({ navigation, route }) {
         )}
 
         {/* ── Historial de partidos ── */}
+        {/* «Ver todo» lleva al HISTORIAL completo, no a la bandeja de desafíos:
+            hasta la 6.3 apuntaba ahí, que es la lista de retos pendientes y no
+            los encuentros jugados. */}
         <SectionHeader
           title="Historial de partidos"
-          actionLabel={historialVisible.length > 0 ? 'Ver todo' : null}
+          actionLabel={historial.length > MAX_HISTORIAL ? 'Ver todo' : null}
           onAction={
-            historialVisible.length > 0
-              ? () => navigation.navigate('ClubChallenges', { clubId: club.id })
+            historial.length > MAX_HISTORIAL
+              ? () => navigation.navigate('ClubHistory', { clubId: club.id, clubNombre: club.nombre })
               : null
           }
         />
-        {historialVisible.length === 0 ? (
+        {historialError ? (
+          // Un fallo de lectura NO se disfraza de historial vacío: decir «aún
+          // no hay partidos» cuando el club sí los tiene es peor que decir que
+          // no se pudo cargar.
+          <EmptyStateCard
+            icon={<Trophy color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+            title="No se pudo cargar el historial"
+            subtitle="Revisa tu conexión y vuelve a intentarlo"
+            actionLabel="Reintentar"
+            onAction={load}
+          />
+        ) : historialVisible.length === 0 ? (
           <EmptyStateCard
             icon={<Trophy color={clubColors.textSecondary} size={18} strokeWidth={2} />}
             title="Aún no hay partidos en el historial"
@@ -475,8 +494,14 @@ export default function ClubDetailScreen({ navigation, route }) {
                 horaLabel={p.horaLabel}
                 localLabel={p.localLabel}
                 canchaNombre={p.canchaNombre}
-                tipoLabel={p.tipoLabel}
-                onPress={() => navigation.navigate('MatchDetail', { matchId: p.id })}
+                // Al partido sólo entran los integrantes de los dos clubes: a
+                // quien mira desde fuera, la tarjeta no le ofrece un destino
+                // que le va a contestar «este partido ya no está disponible».
+                onPress={
+                  p.soyIntegrante
+                    ? () => navigation.navigate('MatchDetail', { matchId: p.id })
+                    : null
+                }
               />
             ))}
             {resumenHistorial && <Text style={styles.historyResumen}>{resumenHistorial}</Text>}
