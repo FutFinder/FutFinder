@@ -1322,25 +1322,42 @@ existe interfaz de moderación y la resolución se ejecuta desde el panel con
 **Entregable:** resultado propuesto y confirmado, récord V/E/D real en ambos
 perfiles de club, y fixtures de demostración apagados.
 
-### Tarea 6.1 — Resultado
+### Tarea 6.1 — Resultado ✅ CERRADA el 2026-08-17
 
 **Archivos:** crear `supabase/migrations/48_resultado_y_historial.sql`; crear
 `src/screens/ClubResultScreen.js`, `src/services/clubResults.js`.
 
-- [ ] `club_match_results` con `goles_local`, `goles_visitante`,
+- [x] `club_match_results` con `goles_local`, `goles_visitante`,
       `estado ('propuesto','confirmado','rechazado')`, único parcial `where estado <> 'rechazado'`.
-- [ ] `proponer_resultado(p_challenge_id, p_goles_local, p_goles_visitante, p_asistencia jsonb)`:
+- [x] `proponer_resultado(p_challenge_id, p_goles_local, p_goles_visitante, p_asistencia jsonb)`:
       admin de cualquiera de los dos; marca la asistencia real sobre `attendees`
       (`confirmado_gps` / `no_asistio`) reutilizando la semántica existente.
-- [ ] `confirmar_resultado(p_result_id, p_aceptar)`: admin del club contrario.
+- [x] `confirmar_resultado(p_result_id, p_aceptar)`: admin del club contrario.
       Aceptar → `finalizado` y `matches.estado='finalizado'`. Rechazar →
       `resultado_en_disputa`, **sin** tocar estadísticas, conservando propuesta y
       rechazo.
-- [ ] `club_record(p_club_id)` devuelve V/E/D contando sólo resultados
+- [x] `club_record(p_club_id)` devuelve V/E/D contando sólo resultados
       confirmados.
-- [ ] Prueba SQL 48: el proponente no confirma su propio resultado; en disputa el
+- [x] Prueba SQL 48: el proponente no confirma su propio resultado; en disputa el
       récord no cambia.
-- [ ] Commit.
+- [x] Commit.
+
+**Corrección 48b, el mismo día.** La 48 dejaba `proponer_resultado()` aceptar
+también `estado = 'resultado_en_disputa'`, para permitir reproponer tras un
+rechazo. Pero `src/services/clubChallengeRules.js` —ya escrito antes que esta
+migración— dice lo contrario en `TRANSICIONES.resultado_en_disputa`: «Sólo la
+moderación puede reabrir una disputa; nunca se cierra sola», y
+`getChallengeCta()` siempre devolvió ese estado deshabilitado, sin ninguna
+acción que ofrecer. Se corrigió en `48b_resultado_disputa_solo_moderacion.sql`
+—va aparte porque la 48 ya estaba aplicada— exigiendo `estado = 'esperando_resultado'`
+a secas. El arnés `48_resultado_test.sql` quedó con dos encuentros: el primero
+termina en disputa y prueba que ni el proponente ni el contrario pueden
+reabrirlo (caso 11), y el segundo, sin disputa, es el único camino para llegar
+a `confirmado` y probar `club_record()` e `historial_publico_club()`. 19/19
+contra el esquema real, dos veces (antes y después de la 48b). `resultado_en_disputa`
+queda como un callejón sin salida para el club, del mismo tipo que
+`bloqueado_sancion`: no hay todavía una pieza de moderación que lo reabra — ver
+[Pendientes](../../memoria/operacion/pendientes.md).
 
 ### Tarea 6.2 — Historial real
 

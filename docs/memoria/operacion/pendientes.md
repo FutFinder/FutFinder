@@ -1,6 +1,6 @@
 # Pendientes
 
-Última revisión: 2026-08-14
+Última revisión: 2026-08-17
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
@@ -56,6 +56,15 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Decisión consciente:** no se inventó un permiso para fabricar la pieza que falta. Conceder la resolución a `authenticated` habría dejado a cualquier administrador retirándose sus propias sanciones, que es exactamente lo que la revisión existe para impedir. La prueba SQL 47c (caso 13) comprueba que un `authenticated` recibe `permission denied`.
 - **Acción:** decidir quién modera (rol propio, no `admin` de club), y después construir la bandeja, la pantalla y la auditoría. Está emparentado con el pendiente de moderación de reportes de más abajo: conviene resolverlos con el mismo modelo de roles y no con dos.
 - **Verificación necesaria:** una prueba de autorización que demuestre que sólo el rol de moderación resuelve, más una medida operativa mientras tanto —un aviso o una revisión periódica de la cola— para que ninguna revisión quede sin respuesta.
+
+## P2 — Un resultado en disputa no tiene forma de reabrirse
+
+- **Dominio afectado:** resultado del encuentro entre clubes (migraciones 48 y 48b).
+- **Evidencia:** `confirmar_resultado(id, false)` deja `club_challenges.estado = 'resultado_en_disputa'`, y desde la 48b `proponer_resultado()` exige `estado = 'esperando_resultado'` a secas — ni el club proponente ni el contrario pueden proponer un resultado nuevo por su cuenta. `src/services/clubChallengeRules.js` ya declaraba esto («Sólo la moderación puede reabrir una disputa; nunca se cierra sola») y `getChallengeCta()` siempre devuelve ese estado deshabilitado, sin ninguna acción que ofrecer.
+- **Por qué importa:** hoy, un resultado disputado se queda ahí para siempre. No hay una función que lo resuelva ni una persona con el rol para hacerlo — es el mismo hueco que el P1 de abajo sobre las revisiones de sanción, y conviene resolverlos con el mismo modelo de roles y no con dos.
+- **Decisión consciente:** no se inventó una forma de que el club se autorresuelva la disputa (dejaría a cualquiera de los dos deshacer un rechazo por su cuenta) ni se dejó `proponer_resultado()` aceptando `resultado_en_disputa`, que fue exactamente el error que corrigió la 48b.
+- **Acción:** decidir quién modera (mismo rol que resuelva las revisiones de sanción) y construir la función que reabre el desafío a `esperando_resultado` — el índice único parcial de `club_match_results` ya está preparado para admitir una propuesta nueva sin chocar con la rechazada.
+- **Verificación necesaria:** una prueba de autorización que demuestre que sólo el rol de moderación reabre, y que `club_record()`/`historial_publico_club()` siguen sin contar nada hasta que el resultado nuevo se confirme.
 
 ## P2 — Definir y construir la moderación posterior a un reporte
 
