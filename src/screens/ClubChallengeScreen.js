@@ -14,9 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Shield, Swords, Check } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
+import { Button, IconButton, Chip } from '../components/reservas/ui';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { getMyClubs } from '../services/clubs';
 import { createChallenge } from '../services/clubChallenges';
 
@@ -49,6 +49,10 @@ function parseDateTime(dateStr, timeStr) {
  * params: { rivalClubId, rivalNombre, rivalFotoUrl }
  *
  * Desafío AS uno de mis clubes donde soy admin (si tengo varios, elijo).
+ *
+ * Rediseño visual (handoff «Desafío entre clubes», comparte tokens con
+ * Reservas) — `createChallenge`/`getMyClubs` y toda su validación quedan
+ * exactamente como estaban.
  */
 export default function ClubChallengeScreen({ navigation, route }) {
   const { rivalClubId, rivalNombre, rivalFotoUrl } = route.params || {};
@@ -126,18 +130,12 @@ export default function ClubChallengeScreen({ navigation, route }) {
           <Text style={styles.headerTitle}>Desafiar club</Text>
           <Text style={styles.headerSubtitle}>Reta a otro equipo a un partido</Text>
         </View>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
-        >
-          <X color={colors.textPrimary} size={20} />
-        </Pressable>
+        <IconButton icon={X} onPress={() => navigation.goBack()} accessibilityLabel="Cerrar" />
       </View>
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       ) : misClubs.length === 0 ? (
         <View style={styles.content}>
@@ -157,14 +155,14 @@ export default function ClubChallengeScreen({ navigation, route }) {
 
             {/* Rival */}
             <View style={styles.rivalCard}>
-              <Swords color={colors.primary} size={18} />
+              <Swords color={C.green} size={18} strokeWidth={2} />
               <Text style={styles.rivalLabel}>Desafías a</Text>
               <View style={styles.rivalChip}>
                 {rivalFotoUrl ? (
                   <Image source={{ uri: rivalFotoUrl }} style={styles.rivalLogo} />
                 ) : (
                   <View style={[styles.rivalLogo, styles.rivalLogoFallback]}>
-                    <Shield color={colors.textMuted} size={14} />
+                    <Shield color={C.textMuted} size={14} strokeWidth={1.7} />
                   </View>
                 )}
                 <Text style={styles.rivalName} numberOfLines={1}>
@@ -191,7 +189,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
                       <Text style={[styles.optionText, c.id === retadorId && styles.optionTextActive]}>
                         {c.nombre}
                       </Text>
-                      {c.id === retadorId && <Check color={colors.primary} size={16} />}
+                      {c.id === retadorId && <Check color={C.green} size={16} strokeWidth={2.4} />}
                     </Pressable>
                   ))}
                 </View>
@@ -205,7 +203,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
                 <TextInput
                   style={styles.input}
                   placeholder="DD/MM/AAAA"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={C.textMuted}
                   value={fechaStr}
                   onChangeText={setFechaStr}
                   keyboardType="numbers-and-punctuation"
@@ -216,7 +214,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
                 <TextInput
                   style={styles.input}
                   placeholder="HH:MM"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={C.textMuted}
                   value={horaStr}
                   onChangeText={setHoraStr}
                   keyboardType="numbers-and-punctuation"
@@ -224,9 +222,9 @@ export default function ClubChallengeScreen({ navigation, route }) {
               </View>
             </View>
             <View style={styles.chipsRow}>
-              <QuickChip label="20:00" onPress={() => setHoraStr('20:00')} />
-              <QuickChip label="21:00" onPress={() => setHoraStr('21:00')} />
-              <QuickChip label="22:00" onPress={() => setHoraStr('22:00')} />
+              <Chip label="20:00" onPress={() => setHoraStr('20:00')} />
+              <Chip label="21:00" onPress={() => setHoraStr('21:00')} />
+              <Chip label="22:00" onPress={() => setHoraStr('22:00')} />
             </View>
 
             {/* Zona (opcional) */}
@@ -234,7 +232,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="Ej: Cancha La Reina — o déjalo para acordar por chat"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={C.textMuted}
               value={zona}
               onChangeText={setZona}
               maxLength={120}
@@ -245,7 +243,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
             <TextInput
               style={[styles.input, styles.inputMultiline]}
               placeholder="Un saludo o detalles del reto..."
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={C.textMuted}
               value={mensaje}
               onChangeText={setMensaje}
               multiline
@@ -254,7 +252,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
 
             <Button
               label={sent ? 'Desafío enviado' : 'Enviar desafío'}
-              icon={<Swords color="#0E0E0D" size={18} strokeWidth={2.4} />}
+              icon={Swords}
               onPress={handleSend}
               loading={sending}
               disabled={sent}
@@ -267,49 +265,33 @@ export default function ClubChallengeScreen({ navigation, route }) {
   );
 }
 
-function QuickChip({ label, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.quickChip, pressed && { opacity: 0.7 }]}
-    >
-      <Text style={styles.quickChipText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
+    gap: 12,
   },
   headerCenter: { flex: 1 },
-  headerTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  headerSubtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: { padding: 16, paddingBottom: 40 },
+  headerTitle: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 19, letterSpacing: -0.3 },
+  headerSubtitle: { fontFamily: F.medium, color: C.textSecondary, fontSize: 12, marginTop: 2 },
+  content: { padding: 20, paddingBottom: 40 },
 
   rivalCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.lg,
-    padding: 12,
-    marginBottom: 18,
+    backgroundColor: C.shieldBg,
+    borderWidth: 1,
+    borderColor: C.greenDeepBorder,
+    borderRadius: R.row,
+    padding: 14,
+    marginBottom: 20,
   },
-  rivalLabel: { color: colors.textSecondary, fontSize: 13 },
+  rivalLabel: { fontFamily: F.medium, color: C.textSecondary, fontSize: 13 },
   rivalChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -319,48 +301,40 @@ const styles = StyleSheet.create({
   },
   rivalLogo: { width: 28, height: 28, borderRadius: 14 },
   rivalLogoFallback: {
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rivalName: { color: colors.textPrimary, fontSize: 15, fontWeight: '700', flexShrink: 1 },
+  rivalName: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 15, flexShrink: 1 },
 
   label: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
+    color: C.textSecondary,
+    fontSize: 12,
     marginBottom: 8,
     marginTop: 4,
   },
   input: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    color: colors.textPrimary,
+    borderColor: C.border,
+    color: C.textPrimary,
+    fontFamily: F.semiBold,
     fontSize: 15,
     paddingHorizontal: 14,
-    height: 52,
+    height: 50,
     marginBottom: 16,
   },
   inputMultiline: { height: 90, paddingTop: 14, textAlignVertical: 'top' },
   row2: { flexDirection: 'row', gap: 12 },
   chipsRow: { flexDirection: 'row', gap: 8, marginTop: -8, marginBottom: 16 },
-  quickChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-  },
-  quickChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
 
   optionsBox: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.border,
     marginBottom: 16,
     overflow: 'hidden',
   },
@@ -371,11 +345,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 13,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
+    borderBottomColor: C.dividerInner,
   },
-  optionActive: { backgroundColor: colors.primarySoft },
-  optionText: { color: colors.textPrimary, fontSize: 14 },
-  optionTextActive: { color: colors.primary, fontWeight: '700' },
+  optionActive: { backgroundColor: C.shieldBg },
+  optionText: { fontFamily: F.medium, color: C.textPrimary, fontSize: 14 },
+  optionTextActive: { fontFamily: F.extraBold, color: C.green },
 
   submitBtn: { marginTop: 8 },
 });

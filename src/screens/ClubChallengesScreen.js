@@ -1,20 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Image,
-  RefreshControl,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Shield, Swords, Check, X, Clock, MessageCircle } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
+import { IconButton, Badge } from '../components/reservas/ui';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { getMisClubesAdmin, getClubById } from '../services/clubs';
 import { puedeResponderDesafio, puedeCancelarDesafio } from '../utils/permisosDesafio';
 import {
@@ -26,26 +18,24 @@ import { esEstadoActivo, estadoLabel } from '../services/clubChallengeRules';
 import { challengeThreadKey, challengeThreadTitle } from '../utils/challengeThread';
 
 /**
- * El texto de cada estado sale de `clubChallengeRules`, que es el espejo de
- * `desafio_reglas()`: acá solo se decide el color. Antes esta tabla tenía
- * los cinco estados antiguos escritos a mano y, al aceptar, el desafío
- * pasaba a 'negociacion' y la píldora se quedaba sin etiqueta.
+ * El texto de cada estado sale de `clubChallengeRules` (espejo de
+ * `desafio_reglas()`): acá solo se decide el tono del badge.
  */
-const ESTADO_COLOR = {
-  pendiente: colors.textSecondary,
-  negociacion: colors.primary,
-  esperando_aprobacion: colors.primary,
-  publicado: colors.primary,
-  en_juego: colors.primary,
-  esperando_resultado: colors.primary,
-  finalizado: colors.textSecondary,
-  resultado_en_disputa: colors.error,
-  bloqueado_sancion: colors.error,
-  rechazado: colors.error,
-  sin_acuerdo: colors.textMuted,
-  cancelado: colors.textMuted,
-  expirado: colors.textMuted,
-  aceptado: colors.primary,
+const ESTADO_TONE = {
+  pendiente: 'neutral',
+  negociacion: 'green',
+  esperando_aprobacion: 'green',
+  publicado: 'green',
+  en_juego: 'green',
+  esperando_resultado: 'green',
+  finalizado: 'neutral',
+  resultado_en_disputa: 'red',
+  bloqueado_sancion: 'red',
+  rechazado: 'red',
+  sin_acuerdo: 'neutral',
+  cancelado: 'neutral',
+  expirado: 'neutral',
+  aceptado: 'green',
 };
 
 function fmtFecha(iso) {
@@ -63,6 +53,10 @@ function fmtFecha(iso) {
  * Bandeja de desafíos de un club: recibidos (aceptar/rechazar) y enviados
  * (cancelar). Responder es solo para admins; ver es para cualquier miembro.
  * params: { clubId }
+ *
+ * Rediseño visual (handoff «Desafío entre clubes», comparte tokens con
+ * Reservas) — toda la lógica de carga, permisos y acciones es la misma que
+ * ya estaba: no se tocó ningún servicio ni regla.
  */
 export default function ClubChallengesScreen({ navigation, route }) {
   const { clubId } = route.params || {};
@@ -184,7 +178,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <Header navigation={navigation} />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       </SafeAreaView>
     );
@@ -198,12 +192,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.green} colors={[C.green]} />
         }
       >
         {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
@@ -222,7 +211,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
 
         {sinNada && (
           <View style={styles.emptyBox}>
-            <Swords color={colors.textMuted} size={36} />
+            <Swords color={C.textMuted} size={36} strokeWidth={1.6} />
             <Text style={styles.emptyText}>
               Aún no hay desafíos. Reta a un club desde su perfil para empezar.
             </Text>
@@ -242,7 +231,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                       hitSlop={6}
                       style={({ pressed }) => [styles.actBtn, styles.actAccept, pressed && { opacity: 0.7 }]}
                     >
-                      <Check color="#0E0E0D" size={16} strokeWidth={2.6} />
+                      <Check color={C.textOnGreen} size={16} strokeWidth={2.6} />
                     </Pressable>
                     <Pressable
                       disabled={working}
@@ -250,7 +239,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                       hitSlop={6}
                       style={({ pressed }) => [styles.actBtn, styles.actReject, pressed && { opacity: 0.7 }]}
                     >
-                      <X color={colors.error} size={16} strokeWidth={2.6} />
+                      <X color={C.red} size={16} strokeWidth={2.6} />
                     </Pressable>
                   </View>
                 ) : esEstadoActivo(c.estado) ? (
@@ -261,7 +250,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     accessibilityLabel="Abrir el chat de negociación del desafío"
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <Swords color={colors.primary} size={16} />
+                    <Swords color={C.green} size={16} />
                   </Pressable>
                 ) : c.estado === 'aceptado' ? (
                   <Pressable
@@ -269,10 +258,10 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     hitSlop={6}
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <MessageCircle color={colors.primary} size={16} />
+                    <MessageCircle color={C.green} size={16} />
                   </Pressable>
                 ) : (
-                  <EstadoPill estado={c.estado} />
+                  <Badge label={estadoLabel(c.estado)} tone={ESTADO_TONE[c.estado] || 'neutral'} />
                 )}
               </ChallengeRow>
             ))}
@@ -301,7 +290,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     accessibilityLabel="Abrir el chat de negociación del desafío"
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <Swords color={colors.primary} size={16} />
+                    <Swords color={C.green} size={16} />
                   </Pressable>
                 ) : c.estado === 'aceptado' ? (
                   <Pressable
@@ -309,10 +298,10 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     hitSlop={6}
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <MessageCircle color={colors.primary} size={16} />
+                    <MessageCircle color={C.green} size={16} />
                   </Pressable>
                 ) : (
-                  <EstadoPill estado={c.estado} />
+                  <Badge label={estadoLabel(c.estado)} tone={ESTADO_TONE[c.estado] || 'neutral'} />
                 )}
               </ChallengeRow>
             ))}
@@ -326,15 +315,9 @@ export default function ClubChallengesScreen({ navigation, route }) {
 function Header({ navigation }) {
   return (
     <View style={styles.header}>
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={12}
-        style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
-      >
-        <ArrowLeft color={colors.textPrimary} size={22} />
-      </Pressable>
+      <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
       <Text style={styles.headerTitle}>Desafíos</Text>
-      <View style={styles.iconBtn} />
+      <View style={{ width: 40 }} />
     </View>
   );
 }
@@ -347,13 +330,13 @@ function ChallengeRow({ challenge, children }) {
         <Image source={{ uri: club.foto_url }} style={styles.logo} />
       ) : (
         <View style={[styles.logo, styles.logoFallback]}>
-          <Shield color={colors.textMuted} size={18} />
+          <Shield color={C.textMuted} size={18} strokeWidth={1.7} />
         </View>
       )}
       <View style={{ flex: 1 }}>
         <Text style={styles.clubName} numberOfLines={1}>{club?.nombre || 'Club'}</Text>
         <View style={styles.metaRow}>
-          <Clock color={colors.textMuted} size={12} />
+          <Clock color={C.textMuted} size={12} strokeWidth={2} />
           <Text style={styles.metaText}>{fmtFecha(challenge.fecha_propuesta)}</Text>
           {challenge.zona ? <Text style={styles.metaText} numberOfLines={1}> · {challenge.zona}</Text> : null}
         </View>
@@ -366,51 +349,27 @@ function ChallengeRow({ challenge, children }) {
   );
 }
 
-function EstadoPill({ estado }) {
-  const color = ESTADO_COLOR[estado] || colors.textSecondary;
-  return (
-    <View style={[styles.estadoPill, { borderColor: color }]}>
-      <Text style={[styles.estadoPillText, { color }]}>{estadoLabel(estado)}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    gap: 12,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  content: { padding: 16, paddingBottom: 40 },
+  headerTitle: { fontFamily: F.extraBold, fontSize: 18, color: C.textPrimary, letterSpacing: -0.3 },
+  content: { padding: 20, paddingBottom: 40 },
 
   emptyBox: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 60, paddingHorizontal: 30 },
-  emptyText: { color: colors.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyText: { fontFamily: F.medium, color: C.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
 
   sectionTitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontFamily: F.bold,
+    color: C.textSecondary,
+    fontSize: 10.5,
+    letterSpacing: 1.5,
     marginBottom: 10,
     marginTop: 8,
   },
@@ -418,51 +377,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    padding: 12,
-    marginBottom: 8,
+    borderColor: C.border,
+    padding: 14,
+    marginBottom: 9,
   },
   logo: { width: 44, height: 44, borderRadius: 22 },
   logoFallback: {
-    backgroundColor: colors.surface,
+    backgroundColor: C.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.border,
   },
-  clubName: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  clubName: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 15 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  metaText: { color: colors.textMuted, fontSize: 12 },
-  mensaje: { color: colors.textSecondary, fontSize: 12, fontStyle: 'italic', marginTop: 4 },
+  metaText: { fontFamily: F.medium, color: C.textMuted, fontSize: 12 },
+  mensaje: { fontFamily: F.medium, color: C.textSecondary, fontSize: 12, fontStyle: 'italic', marginTop: 4 },
 
   actionsRow: { flexDirection: 'row', gap: 8 },
   actBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  actAccept: { backgroundColor: colors.primary },
-  actReject: { backgroundColor: colors.errorSoft, borderWidth: 1, borderColor: colors.error },
+  actAccept: { backgroundColor: C.green },
+  actReject: { backgroundColor: 'rgba(237,107,118,0.14)', borderWidth: 1, borderColor: 'rgba(237,107,118,0.4)' },
   chatBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.shieldBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: radius.pill,
+    borderRadius: R.pill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: C.border,
   },
-  cancelText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
-  estadoPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  estadoPillText: { fontSize: 11, fontWeight: '800' },
+  cancelText: { fontFamily: F.bold, color: C.textSecondary, fontSize: 12 },
 });
