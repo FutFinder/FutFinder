@@ -102,22 +102,12 @@ export async function getResultadoActivo(challengeId) {
 }
 
 /**
- * V/E/D de un club contando sólo resultados confirmados.
+ * EL RÉCORD DEL CLUB NO SE PIDE ACÁ.
  *
- * Sin la migración 48 la función no existe todavía: se devuelve el récord en
- * cero en vez de romper el perfil del club.
+ * `club_record()` sigue siendo la fuente de V/E/D, pero la migración 49 la
+ * envolvió en `club_estadisticas()`, que agrega PJ, GF y GC sin repetir su
+ * `case`. Quien lo necesita llama a `getClubEstadisticas()` en
+ * `services/clubMatches.js`, junto al historial que muestra esos mismos
+ * partidos: dos funciones de cliente para el mismo dato terminan
+ * discrepando.
  */
-export async function getClubRecord(clubId) {
-  const vacio = { v: 0, e: 0, d: 0 };
-  if (!isSupabaseConfigured || !clubId) return { data: vacio, error: null };
-
-  const { data, error } = await supabase.rpc('club_record', { p_club_id: clubId });
-  if (error) {
-    console.error('[FutFinder] getClubRecord:', error.code || '', error.message || error);
-    if (esFaltaDeEsquema(error)) return { data: vacio, error: null };
-    return { data: vacio, error };
-  }
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return { data: vacio, error: null };
-  return { data: { v: row.v || 0, e: row.e || 0, d: row.d || 0 }, error: null };
-}

@@ -66,6 +66,22 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Acción:** decidir quién modera (mismo rol que resuelva las revisiones de sanción) y construir la función que reabre el desafío a `esperando_resultado` — el índice único parcial de `club_match_results` ya está preparado para admitir una propuesta nueva sin chocar con la rechazada.
 - **Verificación necesaria:** una prueba de autorización que demuestre que sólo el rol de moderación reabre, y que `club_record()`/`historial_publico_club()` siguen sin contar nada hasta que el resultado nuevo se confirme.
 
+## P3 — El historial real todavía no se ha visto con datos reales
+
+- **Dominio afectado:** historial y estadísticas del club (migración 49, Tarea 6.2).
+- **Evidencia (comprobada el 2026-08-17 contra `jvfoendzblkoxvwvommz`):** `club_match_results` tiene **cero filas**, así que `historial_club()` y `club_estadisticas()` devuelven vacío y ceros para todos los clubes, y cada perfil muestra el estado vacío. El caso poblado —marcador, escudos, hora, cancha, tipo y V/E/D desde los dos lados— sólo está demostrado por `49_historial_test.sql` (13/13) y por `historialClub.test.js` (28/28), no por una pantalla.
+- **Por qué importa:** es el mismo hueco que encontraron las comprobaciones manuales de U5.1 y U5.2 — una prueba SQL en verde no dice que la pantalla funcione. Lo que ninguna de las dos puede ver es la tarjeta con datos de verdad: el corte de los nombres largos junto al marcador, la línea de contexto en 390 px y la fecha con la hora del dispositivo.
+- **Acción:** con dos cuentas, llevar un encuentro hasta `confirmar_resultado(id, true)` y revisar el perfil de los DOS clubes: el que ganó y el que perdió, uno como local y otro como visitante. Después abrirlo con una cuenta que no pertenezca a ninguno de los dos, para ver que no llegan ni la hora ni la cancha.
+- **Verificación necesaria:** las dos lecturas del mismo partido coinciden e invierten el marcador, el resumen PJ · GF · GC cuadra con los partidos mostrados, y el externo ve el marcador sin la hora ni la cancha.
+
+## P3 — «Ver todo» del historial lleva a la bandeja de desafíos
+
+- **Dominio afectado:** perfil del club.
+- **Evidencia:** `ClubDetailScreen` muestra los tres últimos encuentros (`MAX_HISTORIAL = 3`) y su «Ver todo» navega a `ClubChallenges`, que es la bandeja de desafíos y no un historial. `historial_club()` ya acepta hasta 50 partidos: falta la pantalla, no el dato.
+- **Por qué importa:** en cuanto un club pase de tres encuentros confirmados, no habrá forma de ver los anteriores desde la aplicación.
+- **Acción:** decidir si el historial completo es una pantalla propia o una sección de la bandeja, y construirla reutilizando `MatchHistoryCard` y `getClubMatchHistory` tal como están.
+- **Verificación necesaria:** un club con más de tres encuentros confirmados puede llegar a todos, y la pantalla nueva respeta el mismo corte de privacidad (hora y cancha sólo para los integrantes).
+
 ## P2 — Definir y construir la moderación posterior a un reporte
 
 - **Dominio afectado:** perfil y seguridad de la comunidad.

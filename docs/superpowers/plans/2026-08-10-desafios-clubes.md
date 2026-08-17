@@ -1359,19 +1359,43 @@ queda como un callejón sin salida para el club, del mismo tipo que
 `bloqueado_sancion`: no hay todavía una pieza de moderación que lo reabra — ver
 [Pendientes](../../memoria/operacion/pendientes.md).
 
-### Tarea 6.2 — Historial real
+### Tarea 6.2 — Historial real ✅ CERRADA el 2026-08-17
 
-**Archivos:** modificar `src/services/clubMatches.js`,
-`src/components/club/MatchHistoryCard.js`, `ClubStatsRow.js`,
-`src/screens/ClubDetailScreen.js`.
+**Archivos:** crear `supabase/migrations/49_historial_real_club.sql`,
+`supabase/tests/49_historial_test.sql`, `src/utils/historialClub.js` y su
+prueba; modificar `src/services/clubMatches.js`, `clubResults.js`,
+`src/components/club/MatchHistoryCard.js`, `src/screens/ClubDetailScreen.js`.
 
-- [ ] `getClubMatchHistory` lee `club_match_results` y devuelve marcador y
-      resultado reales en lugar de `null`.
-- [ ] `DEMO_HISTORIAL = false` y borrar `getDemoMatchHistory()`/`usarHistorialDemo()`
-      con sus llamadas. Éste es el punto —y no antes— en que se retiran los
-      fixtures, porque hasta aquí no había datos reales que mostrar.
-- [ ] `calcularRecord` pasa a apoyarse en `club_record()` cuando hay sesión.
-- [ ] Commit.
+- [x] `getClubMatchHistory` devuelve marcador y resultado reales. Pasa por
+      `historial_club()` (migración 49) y no por `club_match_results` directo:
+      desde la 44d esa tabla no se lee desde el perfil público de un club.
+- [x] El `join` contra los resultados confirmados es INTERNO. Fue el hallazgo
+      de la auditoría: `historial_publico_club()` publica cualquier partido
+      `finalizado` aunque nadie confirmara el marcador —`save_match_attendance()`
+      de la 33 lo pone `finalizado` sin mirar el resultado— y la tarjeta lo
+      pintaba como jugado con un «vs». La proyección de la 44d NO se cambió,
+      porque su forma es el contrato que comprueba su propia prueba.
+- [x] Marcador y V/E/D desde la perspectiva del club, sea local o visitante,
+      con la letra derivada de los dos números que se pintan.
+- [x] Escudos, hora, cancha y tipo de partido en la tarjeta. La hora exacta y
+      la cancha sólo para los integrantes de los dos clubes; el resto es
+      público.
+- [x] `DEMO_HISTORIAL`, `getDemoMatchHistory()` y `usarHistorialDemo()`
+      borrados con todas sus llamadas, incluido el placeholder de la galería
+      que colgaba del mismo interruptor. Una prueba recorre `src/` para que no
+      vuelvan.
+- [x] El récord se apoya en `club_record()`: `club_estadisticas()` lo envuelve
+      y agrega PJ, GF y GC sin repetir su cálculo. `getClubRecord()` se retiró
+      de `clubResults.js` para no dejar dos caminos al mismo dato.
+- [x] `49_historial_test.sql` 13/13 y `historialClub.test.js` 28/28.
+- [x] Commit.
+
+**Lo que queda para la 6.3, además de la memoria:** con `club_match_results`
+vacía en producción, el caso poblado sólo está demostrado por el arnés SQL; la
+comprobación manual con dos cuentas y un resultado confirmado de verdad está
+pendiente. Y «Ver todo» del historial sigue llevando a la bandeja de desafíos:
+no hay pantalla de historial completo, así que el perfil muestra los tres
+últimos encuentros.
 
 ### Tarea 6.3 — Memoria
 

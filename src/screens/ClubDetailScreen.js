@@ -46,10 +46,8 @@ import { getClubPhotos } from '../services/clubGallery';
 import { countPendingForClub } from '../services/clubChallenges';
 import {
   getClubMatchHistory,
-  getDemoMatchHistory,
-  calcularRecord,
-  formatFechaCorta,
-  usarHistorialDemo,
+  getClubEstadisticas,
+  ESTADISTICAS_VACIAS,
 } from '../services/clubMatches';
 import {
   modalidadBadges,
@@ -75,17 +73,19 @@ const TAB_BAR_HEIGHT = 88;
 /**
  * Detalle del club ("Mi club").
  *
- * DATOS REALES: club, miembros, fotos, desafíos pendientes, rivales sugeridos
- * (con distancia calculada desde la comuna) y partidos de club de la BD.
+ * TODO LO QUE MUESTRA ES REAL: club, miembros, fotos, desafíos pendientes,
+ * rivales sugeridos (con distancia calculada desde la comuna), el historial de
+ * encuentros disputados y las estadísticas del club.
+ *
+ * SIN FIXTURES. Hasta la Tarea 6.1 no había marcadores en la base de datos, y
+ * esta pantalla dibujaba tres partidos de ejemplo con su récord 1-1-1 cuando
+ * `__DEV__` estaba activo, más placeholders de galería. La 48 trajo el
+ * resultado confirmado y la 49 el historial completo; en la Tarea 6.2 se
+ * retiraron los tres fixtures y el interruptor que los encendía.
  *
  * DATOS AÚN NO EXISTENTES EN EL BACKEND, mostrados como N.A. sin inventarse:
  *  - nivel del club        → "NIVEL N.A."
  *  - valoración del club   → "N.A." con estrella
- *  - marcador de partidos  → "vs" en lugar de un score
- *
- * FIXTURES DE DESARROLLO (solo con __DEV__, ver services/clubMatches.js):
- *  - 3 partidos de ejemplo (V/D/E) y su récord 1-1-1 coherente
- *  - placeholders de la galería cuando no hay fotos reales
  */
 export default function ClubDetailScreen({ navigation, route }) {
   const { clubId, viaClubesTab, initialBanner } = route.params || {};
@@ -101,6 +101,7 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [photos, setPhotos] = useState([]);
   const [rivals, setRivals] = useState([]);
   const [historial, setHistorial] = useState([]);
+  const [estadisticas, setEstadisticas] = useState(ESTADISTICAS_VACIAS);
   const [pendingChallenges, setPendingChallenges] = useState(0);
   const [banner, setBanner] = useState(initialBanner || null);
   const [working, setWorking] = useState(false);
@@ -127,6 +128,7 @@ export default function ClubDetailScreen({ navigation, route }) {
       { data: ph },
       { data: candidatos },
       { data: partidos },
+      { data: stats },
       pending,
     ] = await Promise.all([
       getClubById(clubId),
@@ -135,6 +137,7 @@ export default function ClubDetailScreen({ navigation, route }) {
       getClubPhotos(clubId),
       listRivalCandidates({ retadorClubId: clubId }),
       getClubMatchHistory(clubId),
+      getClubEstadisticas(clubId),
       countPendingForClub(clubId),
     ]);
 
@@ -144,9 +147,10 @@ export default function ClubDetailScreen({ navigation, route }) {
     setPhotos(ph || []);
     setPendingChallenges(pending || 0);
 
-    // Historial: real si existe; si no y estamos en desarrollo, fixtures.
-    const reales = partidos || [];
-    setHistorial(reales.length > 0 ? reales : usarHistorialDemo() ? getDemoMatchHistory() : []);
+    // Historial y estadísticas: lo que hay en la base de datos y nada más. Un
+    // club sin encuentros confirmados muestra el estado vacío, no un ejemplo.
+    setHistorial(partidos || []);
+    setEstadisticas(stats || ESTADISTICAS_VACIAS);
 
     // Rivales sugeridos: los candidatos ya vienen sin este club ni ninguno
     // de los míos —la exclusión la hace la consulta, no un filtro de acá—,
@@ -274,9 +278,14 @@ export default function ClubDetailScreen({ navigation, route }) {
 
   const esPremium = club.plan === 'premium';
   const historialVisible = historial.slice(0, MAX_HISTORIAL);
-  const esHistorialDemo = historialVisible.some((p) => p.esDemo);
-  // El récord se deriva del historial: real con datos reales, 1-1-1 con fixtures.
-  const record = calcularRecord(historial);
+  // Las estadísticas NO se derivan de `historial`: ese viaja paginado y las
+  // suma el servidor sobre todos los resultados confirmados del club.
+  const resumenHistorial =
+    estadisticas.pj > 0
+      ? `${estadisticas.pj} ${estadisticas.pj === 1 ? 'partido jugado' : 'partidos jugados'} · ` +
+        `${estadisticas.gf} ${estadisticas.gf === 1 ? 'gol' : 'goles'} a favor · ` +
+        `${estadisticas.gc} en contra`
+      : null;
 
   const miembrosLabel = [
     club.comuna || null,
@@ -323,7 +332,7 @@ export default function ClubDetailScreen({ navigation, route }) {
           badges={modalidadBadges(club.modalidad)}
           nivelLabel={nivelBadge(club.nivel)}
           miembrosLabel={miembrosLabel}
-          record={record}
+          record={estadisticas}
           ratingLabel={fmtRating(club.rating)}
           onPressMiembros={() => navigation.navigate('ClubMembers', { clubId: club.id })}
         />
@@ -443,8 +452,8 @@ export default function ClubDetailScreen({ navigation, route }) {
         {historialVisible.length === 0 ? (
           <EmptyStateCard
             icon={<Trophy color={clubColors.textSecondary} size={18} strokeWidth={2} />}
-            title="Sin partidos"
-            subtitle="Tu club todavía no ha disputado partidos contra otros clubes"
+            title="Aún no hay partidos en el historial"
+            subtitle="Los partidos aparecerán acá cuando tengan un resultado confirmado"
             actionLabel={soyAdmin ? 'Buscar un rival' : null}
             onAction={soyAdmin ? goToExplore : null}
             variant="solid"
@@ -454,42 +463,34 @@ export default function ClubDetailScreen({ navigation, route }) {
             {historialVisible.map((p) => (
               <MatchHistoryCard
                 key={p.id}
-                miNombre={club.nombre}
+                miNombre={p.miNombre}
+                miLogoUrl={p.miLogoUrl}
                 rivalNombre={p.rivalNombre}
+                rivalLogoUrl={p.rivalLogoUrl}
                 miMarcador={p.miMarcador}
                 suMarcador={p.suMarcador}
-                fechaLabel={formatFechaCorta(p)}
-                estado={p.estado}
                 resultado={p.resultado}
-                onPress={() =>
-                  p.esDemo
-                    ? setBanner({
-                        type: 'info',
-                        title: 'Partido de ejemplo',
-                        message:
-                          'Este partido es una maqueta de desarrollo, todavía no existe en la base de datos.',
-                      })
-                    : navigation.navigate('MatchDetail', { matchId: p.id })
-                }
+                resultadoNombre={p.resultadoNombre}
+                fechaLabel={p.fechaLabel}
+                horaLabel={p.horaLabel}
+                localLabel={p.localLabel}
+                canchaNombre={p.canchaNombre}
+                tipoLabel={p.tipoLabel}
+                onPress={() => navigation.navigate('MatchDetail', { matchId: p.id })}
               />
             ))}
-            {esHistorialDemo && (
-              <Text style={styles.demoNote}>
-                Partidos de ejemplo · solo visibles en desarrollo
-              </Text>
-            )}
+            {resumenHistorial && <Text style={styles.historyResumen}>{resumenHistorial}</Text>}
           </View>
         )}
 
         {/* ── Fotos del club ── */}
         <SectionHeader
           title="Fotos del club"
-          actionLabel={photos.length > 0 || usarHistorialDemo() ? 'Ver todas' : null}
-          onAction={photos.length > 0 || usarHistorialDemo() ? goToGallery : null}
+          actionLabel={photos.length > 0 ? 'Ver todas' : null}
+          onAction={photos.length > 0 ? goToGallery : null}
         />
         <ClubPhotoGallery
           photos={photos}
-          showDemo={usarHistorialDemo()}
           puedeAñadir={soyAdmin}
           onAdd={goToGallery}
           onOpenPhoto={goToGallery}
@@ -646,7 +647,9 @@ const styles = StyleSheet.create({
 
   // Historial
   historyList: { paddingHorizontal: clubSizes.gutter, gap: 8 },
-  demoNote: {
+  // PJ · goles a favor · goles en contra, bajo las tarjetas: son del club
+  // completo, no de los tres partidos que se muestran.
+  historyResumen: {
     color: clubColors.textFaint,
     fontSize: 11,
     textAlign: 'center',
