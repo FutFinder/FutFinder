@@ -144,6 +144,12 @@ export function resolveNotificationTarget(n) {
     // revisó, y eso está en el evento del encuentro que se reclamó. El club
     // llevaría a una pantalla que no menciona la revisión por ninguna parte.
     case 'club_revision_resuelta':
+    // El resultado del encuentro (migración 48), también al hilo: ahí está
+    // el evento con el marcador propuesto, confirmado o disputado, y es
+    // donde se responde mientras está esperando confirmación.
+    case 'club_resultado_propuesto':
+    case 'club_resultado_confirmado':
+    case 'club_resultado_disputado':
       // Aceptado (migración 42): el aviso trae el hilo grupal de
       // negociación y se abre ahí directamente — es donde hay que
       // coordinar, y llevar a la bandeja de desafíos sería un paso de más.

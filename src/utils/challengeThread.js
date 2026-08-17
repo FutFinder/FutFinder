@@ -127,6 +127,7 @@ export function challengeCtaContext({
   sancion = null,
   propuesta = null,
   respuestasProrroga = [],
+  resultado = null,
 } = {}) {
   const clubes = Array.isArray(misClubIds) ? misClubIds.filter(Boolean) : [];
   const delDesafio = [challenge?.club_retador_id, challenge?.club_retado_id].filter(Boolean);
@@ -155,6 +156,7 @@ export function challengeCtaContext({
     // respondió. Un `undefined` acá haría que la interfaz volviera a pedir
     // una respuesta que el club ya dio.
     miRespuestaProrroga: mia ? !!mia.respuesta : null,
+    resultado,
   };
 }
 

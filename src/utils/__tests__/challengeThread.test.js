@@ -328,6 +328,35 @@ test('sin propuesta todavía no hay conflicto de pertenencia posible', () => {
   assert.equal(ctx.pertenezcoAlProponente, false);
 });
 
+// ---------------------------------------------------------------------------
+// El resultado (migración 48) pasa intacto: `getChallengeCta` es quien decide
+// «Registrar resultado» vs. «Confirmar resultado» vs. «Esperando
+// confirmación del rival», y necesita el dato tal cual, no traducido acá.
+// ---------------------------------------------------------------------------
+
+const esperandoResultado = {
+  estado: 'esperando_resultado',
+  club_retador_id: 'club-a',
+  club_retado_id: 'club-b',
+};
+
+test('sin resultado activo, el contexto lo deja en null y el CTA ofrece registrarlo', () => {
+  const ctx = T.challengeCtaContext({ challenge: esperandoResultado, misClubIds: ['club-a'] });
+  assert.equal(ctx.resultado, null);
+  assert.equal(getChallengeCta(ctx).kind, 'proponer_resultado');
+});
+
+test('con un resultado propuesto por el rival, el contexto lo expone y el CTA ofrece confirmarlo', () => {
+  const propuestoPorA = { estado: 'propuesto', club_proponente_id: 'club-a' };
+  const ctx = T.challengeCtaContext({
+    challenge: esperandoResultado,
+    misClubIds: ['club-b'],
+    resultado: propuestoPorA,
+  });
+  assert.deepEqual(ctx.resultado, propuestoPorA);
+  assert.equal(getChallengeCta(ctx).kind, 'confirmar_resultado');
+});
+
 test('sin conexión la acción lo dice antes que cualquier otra cosa', () => {
   const cta = getChallengeCta(
     T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-b'], online: false })

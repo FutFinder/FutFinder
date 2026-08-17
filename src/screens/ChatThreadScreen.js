@@ -75,6 +75,7 @@ import {
   getCambioPendiente,
   responderCambioPartido,
 } from '../services/clubMatchChanges';
+import { getResultadoActivo } from '../services/clubResults';
 import { accionesDeCambio, nombresDeLosClubes } from '../utils/cambioPartido';
 import {
   cancelarEncuentroClub,
@@ -171,6 +172,11 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [cambioPendiente, setCambioPendiente] = useState(null);
   const [cambioBusy, setCambioBusy] = useState(false);
   const [cambioError, setCambioError] = useState(null);
+
+  // El resultado activo del desafío (migración 48): `propuesto` o
+  // `confirmado`, nunca `rechazado`. Es lo que decide si `getChallengeCta`
+  // ofrece «Registrar resultado» o «Confirmar resultado».
+  const [resultadoActivo, setResultadoActivo] = useState(null);
 
   // Cancelación del encuentro (migración 47).
   const [cancelBusy, setCancelBusy] = useState(false);
@@ -737,6 +743,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         // Con el club sancionado, `getChallengeCta` devuelve «Club sancionado»
         // en vez de ofrecer una acción que el servidor va a rechazar.
         sancion,
+        resultado: resultadoActivo,
       })
     );
   }, [
@@ -748,6 +755,7 @@ export default function ChatThreadScreen({ route, navigation }) {
     challengeProposal,
     prorrogaReplies,
     sancion,
+    resultadoActivo,
   ]);
 
   /**
@@ -797,6 +805,26 @@ export default function ChatThreadScreen({ route, navigation }) {
   useEffect(() => {
     cargarCambio();
   }, [cargarCambio]);
+
+  /**
+   * El resultado activo del encuentro (migración 48): `propuesto` o
+   * `confirmado`, nunca `rechazado` — ver `getResultadoActivo`. Sin él,
+   * `getChallengeCta` no puede distinguir «Registrar resultado» de
+   * «Confirmar resultado» ni de «Esperando confirmación del rival».
+   */
+  const cargarResultado = useCallback(async () => {
+    if (!isChallengeThread || !challengeId) {
+      setResultadoActivo(null);
+      return;
+    }
+    const { data } = await getResultadoActivo(challengeId);
+    if (!mountedRef.current) return;
+    setResultadoActivo(data || null);
+  }, [isChallengeThread, challengeId]);
+
+  useEffect(() => {
+    cargarResultado();
+  }, [cargarResultado]);
 
   /**
    * El expediente de sanciones: las de mis clubes, los informes de
@@ -863,6 +891,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         getChallenge(challengeId),
         cargarCambio({ silencioso }),
         cargarExpediente(),
+        cargarResultado(),
       ]);
       if (!mountedRef.current) return;
 
@@ -893,7 +922,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       firmaEventosRef.current = firma;
       setChallengeEvents(eventos || []);
     },
-    [isChallengeThread, challengeId, threadKey, cargarCambio, cargarExpediente]
+    [isChallengeThread, challengeId, threadKey, cargarCambio, cargarExpediente, cargarResultado]
   );
 
   // Al volver de «Pedir un cambio» la pantalla se refresca sola: sin esto, el
@@ -903,6 +932,14 @@ export default function ChatThreadScreen({ route, navigation }) {
     if (!route?.params?.cambioPedido) return;
     refrescarDesafio();
   }, [route?.params?.cambioPedido, refrescarDesafio]);
+
+  // Mismo motivo, al volver de proponer o confirmar un resultado (migración
+  // 48): sin esto, la cabecera seguiría ofreciendo «Registrar resultado»
+  // sobre un resultado que ya se propuso o ya se confirmó.
+  useEffect(() => {
+    if (!route?.params?.resultadoRegistrado) return;
+    refrescarDesafio();
+  }, [route?.params?.resultadoRegistrado, refrescarDesafio]);
 
   /**
    * SONDEO DE RESPALDO, Y ACÁ ES LA ÚNICA VÍA.
@@ -1145,7 +1182,9 @@ export default function ChatThreadScreen({ route, navigation }) {
   const ctaAccionable =
     puedeAbrirPartido ||
     challengeCta?.kind === 'crear_propuesta' ||
-    challengeCta?.kind === 'aprobar_propuesta';
+    challengeCta?.kind === 'aprobar_propuesta' ||
+    challengeCta?.kind === 'proponer_resultado' ||
+    challengeCta?.kind === 'confirmar_resultado';
 
   const handleChallengeCta = useCallback(() => {
     if (puedeAbrirPartido) {
@@ -1162,6 +1201,10 @@ export default function ChatThreadScreen({ route, navigation }) {
         modo: 'revisar',
         proposalId: challengeProposal?.id,
       });
+      return;
+    }
+    if (challengeCta?.kind === 'proponer_resultado' || challengeCta?.kind === 'confirmar_resultado') {
+      navigation.navigate('ClubResult', { challengeId, matchId: clubChallenge?.match_id });
     }
   }, [
     puedeAbrirPartido,

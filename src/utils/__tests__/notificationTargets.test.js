@@ -77,6 +77,12 @@ const SAMPLE_DATA_BY_TYPE = {
   // Lo que hay que leer es la decisión y la nota de quien revisó, y eso está
   // en el evento del encuentro que se reclamó.
   club_revision_resuelta: { reviewId: 'rev1', sancionId: 's1', clubId: 'c1', challengeId: 'ch1', decision: 'retirada', threadKey: 'challenge:ch1' },
+  // Resultado del encuentro (migración 48): al HILO, igual que los cambios
+  // negociados — ahí está el evento con el marcador y ahí se confirma o se
+  // rechaza mientras está pendiente.
+  club_resultado_propuesto: { matchId: 'm1', resultId: 'r1', golesLocal: 3, golesVisitante: 1, threadKey: 'challenge:ch1' },
+  club_resultado_confirmado: { matchId: 'm1', resultId: 'r1', threadKey: 'challenge:ch1' },
+  club_resultado_disputado: { matchId: 'm1', resultId: 'r1', threadKey: 'challenge:ch1' },
   message_new: { threadKey: 'dm:u1' },
   chat_mention_all: { threadKey: 'club:c1' },
   friend_request: { fromUserId: 'u1' },
@@ -118,6 +124,9 @@ const EXPECTED_SCREEN_BY_TYPE = {
   club_match_cancelled: 'ChatThread',
   club_sancionado: 'ClubDetail',
   club_revision_resuelta: 'ChatThread',
+  club_resultado_propuesto: 'ChatThread',
+  club_resultado_confirmado: 'ChatThread',
+  club_resultado_disputado: 'ChatThread',
   message_new: 'ChatThread',
   chat_mention_all: 'ChatThread',
   friend_request: 'UserProfile',
