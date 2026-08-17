@@ -311,10 +311,103 @@ export const clubsExplorerRadius = {
   fab: 18,
 };
 
+/**
+ * Tokens del handoff «Reservas» (`Reservas.dc.html`, 33 pantallas).
+ *
+ * Extiende `clubsExplorer` en vez de duplicarlo: fondo, superficies, borde,
+ * verde de acción y los tres pasos de texto son EXACTAMENTE los mismos
+ * valores hex que el handoff de «Explorar clubes» — comparten diseñador y
+ * paleta base. Lo que agrega son los tonos que ese handoff no necesitaba:
+ * rojo de error/destructivo, ámbar de advertencia, el texto sobre verde
+ * (más oscuro que `greenInk` de clubsExplorer: este handoff lo pide así) y
+ * las superficies de tarjeta seleccionada / nota punteada / cita.
+ *
+ * `Desafio entre clubes.dc.html` es el flujo hermano y comparte esta misma
+ * familia de tokens.
+ */
+export const reservas = {
+  ...clubsExplorer,
+
+  // Texto sobre fondo verde: este handoff lo pide más oscuro que
+  // clubsExplorer.greenInk (#0A0C0A) — no se toca el original, se agrega
+  // un tono propio para no correr el riesgo de re-pintar Explorar Clubes.
+  textOnGreen: '#06130A',
+
+  // Rojo — errores, destructivo, badge de notificaciones
+  red: '#ED6B76',
+  textOnRed: '#150607',
+
+  // Ámbar — advertencias
+  amber: '#E8B34B',
+  amberBorder: '#4A3A14',
+  amberSoft: 'rgba(232, 179, 75, 0.14)',
+  textAmber: '#F0DBA8',
+
+  // Verde profundo de insignias: mismo valor que clubsExplorer.shieldBg
+  // (#17351E), con su borde propio que clubsExplorer no definía.
+  greenDeepBorder: '#2C5C39',
+
+  // Divisores y bordes especiales
+  dividerInner: '#1E221F',
+  dashedBorder: '#2E3430',
+  dashedBorderStrong: '#3A4139',
+
+  // Tarjeta seleccionada (fondo verdoso oscuro + borde verde)
+  selectedBg: '#111A13',
+
+  // Párrafos con barra verde a la izquierda (citas / avisos obligatorios)
+  textQuote: '#B4BAB5',
+};
+
+/**
+ * Radios propios del handoff de Reservas — nombrados según el uso que les
+ * da el propio diseño (hero/card grande, card, card chica, fila, CTA
+ * primario/secundario, icon button, chip, pill), no reutiliza
+ * `clubsExplorerRadius` porque sus nombres no significan lo mismo: por
+ * ejemplo `clubsExplorerRadius.pill` vale 14 (una esquina redondeada, no
+ * una cápsula), mientras que este handoff sí usa 999 para sus pills.
+ */
+export const reservasRadius = {
+  hero: 24,
+  card: 22,
+  cardSm: 20,
+  row: 18,
+  ctaPrimary: 17,
+  ctaSecondary: 16,
+  iconBtn: 14,
+  chip: 13,
+  pill: 999,
+};
+
+export const reservasSizes = {
+  screenPadding: 20,
+  cardGap: 11,
+  rowGap: 9,
+  ctaPrimary: 54, // 52–56
+  ctaSecondary: 49, // 48–50
+  iconBtn: 40,
+  chip: 33, // 32–34
+  badge: 22, // 20–24
+};
+
 export const fonts = {
   regular: 'System',
   medium: 'System',
   bold: 'System',
+};
+
+/**
+ * Familia tipográfica del handoff de Reservas: Manrope (Google Fonts),
+ * cargada en App.js con `expo-font` bajo estos mismos nombres. Es la única
+ * familia distinta de `fonts.*` (System) en toda la app a propósito — el
+ * handoff la pide como parte de la fidelidad pixel-perfect exigida — y solo
+ * la usan los componentes de `src/components/reservas/`.
+ */
+export const reservasFonts = {
+  medium: 'Manrope_500Medium',
+  semiBold: 'Manrope_600SemiBold',
+  bold: 'Manrope_700Bold',
+  extraBold: 'Manrope_800ExtraBold',
 };
 
 export const radius = {

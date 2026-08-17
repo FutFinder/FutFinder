@@ -54,6 +54,7 @@ import EditClubScreen from '../screens/EditClubScreen';
 import ClubInviteScreen from '../screens/ClubInviteScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
+import ReservasUiGalleryScreen from '../screens/ReservasUiGalleryScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
 import withErrorBoundary from './withErrorBoundary';
@@ -75,6 +76,10 @@ const SafeVerificationScreen = withErrorBoundary(VerificationScreen, 'Verificati
 const SafeLocationPermissionScreen = withErrorBoundary(LocationPermissionScreen, 'LocationPermission');
 const SafeTermsScreen = withErrorBoundary(TermsScreen, 'Terms');
 const SafeSuccessScreen = withErrorBoundary(SuccessScreen, 'Success');
+// Galería interna de QA (Fase 1 del handoff de Reservas): no muestra datos
+// de usuario, así que no pasa por withAuthGuard — es la misma razón por la
+// que Welcome/Login tampoco lo hacen.
+const SafeReservasUiGalleryScreen = withErrorBoundary(ReservasUiGalleryScreen, 'ReservasUiGallery');
 
 const GuardedMainTabs = withAuthGuard(MainTabs, 'Main');
 const GuardedPublishMatchScreen = withAuthGuard(PublishMatchScreen, 'CreateMatch');
@@ -350,6 +355,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="TrustScoreHistory"
           component={GuardedTrustScoreHistoryScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ReservasUiGallery"
+          component={SafeReservasUiGalleryScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

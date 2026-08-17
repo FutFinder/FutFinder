@@ -5,6 +5,13 @@ import { Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
+import { useFonts } from 'expo-font';
+import {
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from '@expo-google-fonts/manrope';
 
 import AppNavigator, { navigationRef, navigationReadyPromise } from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
@@ -91,6 +98,16 @@ export default function App() {
   // Guardamos el último userId para poder borrar su token al hacer logout
   const lastUserIdRef = useRef(null);
 
+  // Manrope es la única fuente que no es `System` en toda la app — la pide
+  // el handoff de Reservas (theme/colors.js: reservasFonts). El resto de la
+  // app no depende de esto y sigue rindiendo con `System` mientras carga.
+  const [fontsLoaded] = useFonts({
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+  });
+
   useEffect(() => {
     // 1) Listeners globales de notifs (received + tapped)
     const cleanupListeners = addNotificationListeners({
@@ -151,6 +168,13 @@ export default function App() {
       sub?.subscription?.unsubscribe?.();
     };
   }, []);
+
+  // Sin esto, un componente de Reservas podría montarse un instante antes de
+  // que Manrope esté lista y quedar con la fuente por defecto hasta el
+  // siguiente re-render. La espera es breve (son 4 pesos, ya cacheados tras
+  // la primera carga) y el splash animado de la app cubre visualmente esta
+  // ventana igual.
+  if (!fontsLoaded) return null;
 
   // Cada pantalla ya trae su propio boundary (ver `withErrorBoundary`), que
   // es el que mantiene la app usable. Éste es la última red: cubre lo que

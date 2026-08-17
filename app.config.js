@@ -87,6 +87,11 @@ module.exports = {
           sounds: [],
         },
       ],
+      // Manrope (Google Fonts) — tipografía del handoff de Reservas. Se
+      // carga bajo su propio nombre de familia; el resto de la app sigue
+      // usando `System` (theme/colors.js: fonts.*), no se toca nada fuera
+      // de los componentes de `src/components/reservas/`.
+      'expo-font',
     ],
     scheme: 'futfinder',
     extra: {
