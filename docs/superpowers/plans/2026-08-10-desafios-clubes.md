@@ -1237,23 +1237,23 @@ encuentro cancelado mostraba el motivo de otra sanción del club— corregido en
 `d3206e4` con su regresión. Ver
 [la comprobación manual](2026-08-14-comprobacion-manual-5.1.md).
 
-### Tarea 5.2 — Incomparecencia y revisión
+### Tarea 5.2 — Incomparecencia y revisión ✅ CERRADA el 2026-08-17
 
-- [ ] `club_match_noshow_reports`: sólo después de la hora del partido; sanción
+- [x] `club_match_noshow_reports`: sólo después de la hora del partido; sanción
       provisional de 14 días con `estado='provisional'`.
-- [ ] `club_sanction_reviews`: «Solicitar revisión» visible para el club
+- [x] `club_sanction_reviews`: «Solicitar revisión» visible para el club
       afectado ante cualquier cancelación o sanción; guarda motivo, historial del
       partido, tiempos y eventos relevantes.
-- [ ] `resolver_revision_sancion(p_review_id, p_decision, p_nota)` con
+- [x] `resolver_revision_sancion(p_review_id, p_decision, p_nota)` con
       `revoke execute … from anon, authenticated` — **sólo `service_role`**.
       Retirar la sanción devuelve el desafío a `estado_previo_sancion`.
-- [ ] Documentar la pieza pendiente en
+- [x] Documentar la pieza pendiente en
       `docs/memoria/operacion/pendientes.md`: no existe interfaz de moderación;
       hoy la resolución se ejecuta desde el panel de Supabase con `service_role`.
-- [ ] Prueba SQL: un `authenticated` no puede ejecutar la resolución.
-- [ ] Commit.
+- [x] Prueba SQL: un `authenticated` no puede ejecutar la resolución.
+- [x] Commit.
 
-**Estado al 2026-08-15: APLICADA en producción, sin cerrar.** Todo lo anterior
+**Estado al 2026-08-15: APLICADA en producción.** Todo lo anterior
 está en `supabase/migrations/47c_incomparecencia_y_revisiones.sql` (archivo
 sufijado, porque la 47 y la 47b ya estaban aplicadas y editarlas dejaría el
 repositorio diciendo una cosa y la base otra). Aplicada el 2026-08-15 y
@@ -1262,9 +1262,22 @@ esquema ya aplicado: arnés 47c **26/26**, arnés 47 **25/25** y arnés 47b
 **5/5**, cada uno en su transacción y todos terminados en `rollback`, sin
 residuos. `send-push` redesplegada en su **versión 8** (ACTIVE, `verify_jwt` y
 configuración sin cambios) porque `pushLogic.ts` viaja dentro de la función y
-sin eso `club_revision_resuelta` no llegaría a ningún teléfono. Las casillas
-siguen sin marcar: **la comprobación manual con las dos cuentas está pendiente**
-y la tarea no se cierra hasta tenerla.
+sin eso `club_revision_resuelta` no llegaría a ningún teléfono.
+
+**Cerrada el 2026-08-17**, con la comprobación manual de dos cuentas aprobada
+sobre `90e8f92`. Encontró un fallo que ninguna prueba SQL podía ver —el mismo
+tipo que cerró la 5.1— y que además invalidaba una premisa de la 47: el hilo
+leía sanciones, informes y revisiones sólo al montar y tras una acción PROPIA,
+así que tras la acusación cruzada el club acusado no veía «Solicitar revisión»
+hasta recargar. Corregido en `90e8f92` con su regresión de dos sesiones
+(`src/utils/__tests__/expedienteSancion.test.js`). Repetida entera, pasó:
+solicitudes, congelamiento, resolución intermedia y restauración final se
+propagaron solas dentro del sondeo de 15 segundos, sin recargar. El desafío
+`c44df2d8-49b7-4298-b357-69aa91b1ba96` volvió a `en_juego`, las dos sanciones
+quedaron `retirada` sin borrarse, no quedan sanciones activas ni revisiones
+pendientes, y hay dos eventos y dos avisos de resolución sin duplicados. Lo
+único sin evidencia sigue siendo el render nativo en un dispositivo físico:
+todo lo comprobado es web.
 
 La denuncia tardía se cerró antes de desplegar: informar una incomparecencia
 tiene una ventana de **24 horas** desde la hora del partido
@@ -1294,7 +1307,13 @@ Tres decisiones que este plan no fijaba y que quedaron tomadas acá:
    `chat_puede_escribir_desafio()`. La conversación se conserva y se sigue
    leyendo. Está probado (casos 8, 16 y 21) en vez de descubierto en producción.
 
-**Verificación de fase:** `npm test`, `npm run build:web`, prueba SQL 47.
+**Verificación de fase (2026-08-17): FASE 5 CERRADA.** Sus dos tareas están
+cerradas con comprobación manual aprobada —la 5.1 el 2026-08-14 y la 5.2 el
+2026-08-17—. Contra el esquema desplegado: arnés 47 **25/25**, 47b **5/5** y
+47c **26/26**. Sobre `90e8f92`: `npm run lint` sin errores, `npm test`
+**566/566** y `npm run build:web` exportado. Queda abierto el pendiente P1 —no
+existe interfaz de moderación y la resolución se ejecuta desde el panel con
+`service_role`—, que es una decisión consciente y no un cabo suelto de la fase.
 
 ---
 
