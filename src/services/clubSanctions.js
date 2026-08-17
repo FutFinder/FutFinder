@@ -1,18 +1,21 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import {
-  COLUMNAS_SANCION,
   argumentosCancelarEncuentro,
   comoResultadoCancelacion,
-  esFaltaDeEsquemaSanciones,
   sancionVigente,
 } from '../utils/cancelacionEncuentro';
 import {
-  COLUMNAS_INCOMPARECENCIA,
-  COLUMNAS_REVISION,
   argumentosReportarIncomparecencia,
   argumentosSolicitarRevision,
   comoResultadoRevision,
 } from '../utils/revisionSancion';
+import {
+  EXPEDIENTE_VACIO,
+  leerIncomparecencias,
+  leerRevisiones,
+  leerSanciones,
+  refrescarExpediente,
+} from '../utils/expedienteSancion';
 
 /**
  * Cancelación del encuentro y sanciones de club (migración 47).
@@ -66,23 +69,14 @@ export async function cancelarEncuentroClub(challengeId, motivo) {
  * Sin la migración 47 la tabla no existe: eso NO es un error de la pantalla
  * —el hilo se dibuja igual, sólo que sin la advertencia—, así que se devuelve
  * la lista vacía.
+ *
+ * La consulta vive en `utils/expedienteSancion.js`, que recibe el cliente por
+ * parámetro; acá sólo se le ata el cliente único. Así la prueba de las dos
+ * sesiones recorre esta misma lectura sin abrir Supabase.
  */
 export async function listSancionesDeClubes(clubIds = []) {
-  const ids = (Array.isArray(clubIds) ? clubIds : []).filter(Boolean);
-  if (!isSupabaseConfigured || ids.length === 0) return { data: [], error: null };
-
-  const { data, error } = await supabase
-    .from('club_sanctions')
-    .select(COLUMNAS_SANCION)
-    .in('club_id', ids)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    if (esFaltaDeEsquemaSanciones(error)) return { data: [], error: null };
-    console.error('[FutFinder] listSancionesDeClubes:', error);
-    return { data: null, error: { message: error.message || 'No se pudieron leer las sanciones.' } };
-  }
-  return { data: data || [], error: null };
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  return leerSanciones(supabase, clubIds);
 }
 
 /**
@@ -156,20 +150,8 @@ export async function solicitarRevisionSancion(challengeId, motivo, sancionId = 
  * barra—, así que se devuelve la lista vacía sin ruido.
  */
 export async function listIncomparecenciasDeDesafio(challengeId) {
-  if (!isSupabaseConfigured || !challengeId) return { data: [], error: null };
-
-  const { data, error } = await supabase
-    .from('club_match_noshow_reports')
-    .select(COLUMNAS_INCOMPARECENCIA)
-    .eq('challenge_id', challengeId)
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    if (esFaltaDeEsquemaSanciones(error)) return { data: [], error: null };
-    console.error('[FutFinder] listIncomparecenciasDeDesafio:', error);
-    return { data: null, error: { message: error.message || 'No se pudieron leer los informes.' } };
-  }
-  return { data: data || [], error: null };
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  return leerIncomparecencias(supabase, challengeId);
 }
 
 /**
@@ -182,18 +164,27 @@ export async function listIncomparecenciasDeDesafio(challengeId) {
  * lo mismo que en `listSancionesDeClubes`.
  */
 export async function listRevisionesDeDesafio(challengeId) {
-  if (!isSupabaseConfigured || !challengeId) return { data: [], error: null };
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  return leerRevisiones(supabase, challengeId);
+}
 
-  const { data, error } = await supabase
-    .from('club_sanction_reviews')
-    .select(COLUMNAS_REVISION)
-    .eq('challenge_id', challengeId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    if (esFaltaDeEsquemaSanciones(error)) return { data: [], error: null };
-    console.error('[FutFinder] listRevisionesDeDesafio:', error);
-    return { data: null, error: { message: error.message || 'No se pudieron leer las revisiones.' } };
+/**
+ * El expediente entero del hilo, al día: sanciones, informes y revisiones.
+ *
+ * ES LO QUE CORRE EL SONDEO DE 15 SEGUNDOS, y por eso existe como una sola
+ * llamada. Hasta la 47 las tres lecturas estaban fuera del refresco periódico
+ * a propósito: una sanción sobre mi club sólo podía nacer de una acción de mi
+ * propio club. La 47c dio vuelta esa premisa —informar deja la sanción sobre
+ * el club CONTRARIO y pedir la revisión congela el desafío para los dos—, así
+ * que lo que mueve el expediente de una sesión es, casi siempre, la otra.
+ *
+ * `anterior` es el expediente ya pintado: una rebanada que no se pudo leer se
+ * conserva en vez de vaciarse, y sin novedades devuelve el mismo objeto para
+ * que la barra no se recalcule cada quince segundos.
+ */
+export async function refrescarExpedienteDeSancion(opciones = {}) {
+  if (!isSupabaseConfigured) {
+    return { expediente: opciones.anterior || EXPEDIENTE_VACIO, cambio: false, error: null };
   }
-  return { data: data || [], error: null };
+  return refrescarExpediente(supabase, opciones);
 }

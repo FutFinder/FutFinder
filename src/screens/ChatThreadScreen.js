@@ -78,13 +78,12 @@ import {
 import { accionesDeCambio, nombresDeLosClubes } from '../utils/cambioPartido';
 import {
   cancelarEncuentroClub,
-  listSancionesDeClubes,
+  refrescarExpedienteDeSancion,
   reportarIncomparecencia,
   solicitarRevisionSancion,
-  listIncomparecenciasDeDesafio,
-  listRevisionesDeDesafio,
 } from '../services/clubSanctions';
-import { accionesDeCancelacion, sancionVigente } from '../utils/cancelacionEncuentro';
+import { EXPEDIENTE_VACIO } from '../utils/expedienteSancion';
+import { accionesDeCancelacion } from '../utils/cancelacionEncuentro';
 import { accionesDeIncomparecencia, accionesDeRevision } from '../utils/revisionSancion';
 import { crearSondeo } from '../utils/sondeo';
 import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
@@ -173,29 +172,41 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [cambioBusy, setCambioBusy] = useState(false);
   const [cambioError, setCambioError] = useState(null);
 
-  // Cancelación del encuentro y sanción del club (migración 47). La sanción se
-  // lee de `club_sanctions` y no se pregunta por `club_esta_sancionado()`: esa
-  // función está revocada de `authenticated` a propósito, y la RLS de la tabla
-  // ya muestra sólo las sanciones de los clubes propios.
-  const [sancion, setSancion] = useState(null);
+  // Cancelación del encuentro (migración 47).
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState(null);
 
-  // Incomparecencia y revisión (migración 47c). `sanciones` es la lista
-  // completa de mis clubes y no sólo la vigente: para saber si esta medida se
-  // puede revisar hace falta la sanción ATADA A ESTE DESAFÍO, que puede no ser
-  // la que hoy bloquea al club.
-  const [sanciones, setSanciones] = useState([]);
-  // Dos informes como máximo, uno por club acusado: cada club puede decir que
-  // el otro no llegó, y las dos acusaciones conviven hasta que alguien las
-  // revise.
-  const [reportesNoShow, setReportesNoShow] = useState([]);
-  const [revisiones, setRevisiones] = useState([]);
+  /**
+   * El expediente de sanciones del hilo (migraciones 47 y 47c), en un solo
+   * estado porque se lee y se refresca de una sola vez.
+   *
+   * Todo sale de `club_sanctions`, `club_match_noshow_reports` y
+   * `club_sanction_reviews`, nunca de `club_esta_sancionado()`: esa función
+   * está revocada de `authenticated` a propósito, y la RLS de las tablas ya
+   * muestra sólo lo de los clubes propios.
+   *
+   *   · `sanciones` es la lista completa de mis clubes y no sólo la vigente:
+   *     para saber si esta medida se puede revisar hace falta la sanción ATADA
+   *     A ESTE DESAFÍO, que puede no ser la que hoy bloquea al club.
+   *   · `sancion` es la que hoy bloquea, que es lo que lee la cabecera.
+   *   · `informes` son dos como máximo, uno por club acusado: cada club puede
+   *     decir que el otro no llegó, y las dos acusaciones conviven hasta que
+   *     alguien las revise.
+   */
+  const [expediente, setExpediente] = useState(EXPEDIENTE_VACIO);
+  const { sancion, sanciones, informes: reportesNoShow, revisiones } = expediente;
   const [revisionBusy, setRevisionBusy] = useState(false);
   const [revisionError, setRevisionError] = useState(null);
   // Firma de la bitácora ya pintada, para que el sondeo no reemplace el
   // arreglo —y con él las burbujas— cuando no hay nada nuevo.
   const firmaEventosRef = useRef('');
+  // Lo mismo para la fila del desafío: se relee en cada vuelta, pero sólo se
+  // repinta —y sólo se vuelve a preguntar el permiso de escritura— cuando
+  // cambió de verdad.
+  const firmaChallengeRef = useRef('');
+  // El expediente ya pintado, para poder compararlo desde el sondeo sin que
+  // `cargarExpediente` se recree en cada cambio y reinicie el intervalo.
+  const expedienteRef = useRef(EXPEDIENTE_VACIO);
 
   const listRef = useRef(null);
   const mountedRef = useRef(true);
@@ -239,6 +250,8 @@ export default function ChatThreadScreen({ route, navigation }) {
     nearBottomRef.current = true;
     isPrependingRef.current = false;
     didInitialScrollRef.current = false;
+    firmaChallengeRef.current = '';
+    expedienteRef.current = EXPEDIENTE_VACIO;
 
     (async () => {
       try {
@@ -342,6 +355,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       const { data } = alDia ? { data: alDia } : await getChallenge(challengeId);
       if (!alive) return;
       setClubChallenge(data || null);
+      firmaChallengeRef.current = JSON.stringify(data ?? null);
 
       if (!isChallengeThread || !data) return;
 
@@ -785,75 +799,90 @@ export default function ChatThreadScreen({ route, navigation }) {
   }, [cargarCambio]);
 
   /**
-   * ¿Alguno de mis clubes está sancionado ahora mismo?
+   * El expediente de sanciones: las de mis clubes, los informes de
+   * incomparecencia del encuentro y las revisiones que pidió mi club.
    *
-   * NO ENTRA EN EL SONDEO DE 15 SEGUNDOS, a propósito. Una sanción sólo puede
-   * aparecer mientras el hilo está abierto si otro administrador de mi propio
-   * club cancela otro encuentro en ese preciso rato, y pagar una consulta cada
-   * quince segundos en todas las sesiones por ese caso no se justifica. Se
-   * recarga al abrir el hilo y después de cancelar, que son los dos momentos
-   * en que de verdad cambia. Y aunque quedara vieja, la autoridad sigue siendo
-   * el servidor: quien intente operar recibirá su negativa igual.
-   */
-  const cargarSancion = useCallback(async () => {
-    if (!isChallengeThread || myClubIds.length === 0) {
-      setSancion(null);
-      setSanciones([]);
-      return;
-    }
-    // Una sola consulta para las dos cosas: la que hoy bloquea al club (la
-    // cabecera del hilo) y la lista entera (la revisión, que necesita la
-    // sanción de ESTE encuentro aunque ya no sea la que bloquea).
-    const { data } = await listSancionesDeClubes(myClubIds);
-    if (!mountedRef.current) return;
-    setSanciones(data || []);
-    setSancion(sancionVigente(data || [], new Date()));
-  }, [isChallengeThread, myClubIds]);
-
-  useEffect(() => {
-    cargarSancion();
-  }, [cargarSancion]);
-
-  /**
-   * Los informes de incomparecencia de este encuentro y las revisiones que
-   * pidió mi club (migración 47c).
+   * SÍ ENTRA EN EL SONDEO DE 15 SEGUNDOS, y antes no. Hasta la 47 una sanción
+   * sobre mi club sólo podía nacer de que mi propio club cancelara algo, así
+   * que releerla en cada vuelta no valía la consulta y estaba excluida a
+   * propósito. La 47c invirtió esa premisa: informar una incomparecencia deja
+   * la sanción sobre el club CONTRARIO y pedir la revisión congela el desafío
+   * para los dos, así que lo que mueve mi expediente es casi siempre lo que
+   * hizo la otra sesión. Sin esto, después de la acusación cruzada el club
+   * acusado no veía «Solicitar revisión» hasta recargar la página —comprobado
+   * a mano el 2026-08-17—, y la resolución de la revisión, que la hace una
+   * persona con `service_role` y no la sesión de nadie, no llegaba nunca.
    *
-   * Tampoco entra en el sondeo de 15 segundos, por lo mismo que la sanción: son
-   * dos consultas que sólo cambian cuando alguien actúa, y quien actúa las
-   * recarga al terminar. Sin la migración aplicada las dos devuelven vacío sin
-   * ruido, así que el hilo se dibuja igual.
+   * El expediente vive además en un `ref` para que el sondeo pueda comparar
+   * contra lo ya pintado sin volver a crearse en cada cambio: recrearlo
+   * reiniciaría el intervalo y el refresco se aplazaría solo.
    */
-  const cargarRevisiones = useCallback(async () => {
+  const cargarExpediente = useCallback(async () => {
     if (!isChallengeThread || !challengeId || myClubIds.length === 0) {
-      setReportesNoShow([]);
-      setRevisiones([]);
+      expedienteRef.current = EXPEDIENTE_VACIO;
+      if (mountedRef.current) setExpediente(EXPEDIENTE_VACIO);
       return;
     }
-    const [{ data: informes }, { data: lista }] = await Promise.all([
-      listIncomparecenciasDeDesafio(challengeId),
-      listRevisionesDeDesafio(challengeId),
-    ]);
-    if (!mountedRef.current) return;
-    setReportesNoShow(informes || []);
-    setRevisiones(lista || []);
+    const { expediente: alDia, cambio } = await refrescarExpedienteDeSancion({
+      challengeId,
+      clubIds: myClubIds,
+      anterior: expedienteRef.current,
+    });
+    // Un fallo de red no vacía nada: `refrescarExpedienteDeSancion` conserva
+    // la rebanada que no se pudo leer y devuelve `cambio: false`, así que la
+    // barra se queda con lo último bueno y espera al siguiente tick. Un aviso
+    // permanente por cada corte sería peor que no refrescar.
+    if (!cambio || !mountedRef.current) return;
+    expedienteRef.current = alDia;
+    setExpediente(alDia);
   }, [isChallengeThread, challengeId, myClubIds]);
 
   useEffect(() => {
-    cargarRevisiones();
-  }, [cargarRevisiones]);
+    cargarExpediente();
+  }, [cargarExpediente]);
 
   /**
-   * Todo lo que puede haber cambiado por acción del OTRO club: los eventos
-   * del hilo y la solicitud de cambio con el partido al que apunta.
+   * Todo lo que puede haber cambiado por acción del OTRO club: la fila del
+   * desafío, los eventos del hilo, la solicitud de cambio con el partido al
+   * que apunta y el expediente de sanciones.
+   *
+   * LA FILA DEL DESAFÍO TAMBIÉN. Pedir una revisión lo pasa a
+   * `bloqueado_sancion` y resolver la última pendiente lo devuelve a su estado
+   * exacto; ninguna de las dos cosas la hace necesariamente esta sesión —la
+   * resolución no la hace ninguna, la ejecuta `service_role` desde el panel—,
+   * así que sin releerla el hilo seguiría ofreciendo acciones sobre un
+   * encuentro congelado. Se lee con `getChallenge` y no con `refrescar_desafio`
+   * porque esa RPC ESCRIBE los vencimientos: en el sondeo, con dos sesiones
+   * abiertas, serían dos escrituras cada quince segundos a cambio de nada.
    */
   const refrescarDesafio = useCallback(
     async ({ silencioso = false } = {}) => {
       if (!isChallengeThread || !challengeId) return;
-      const [{ data: eventos }] = await Promise.all([
+      const [{ data: eventos }, { data: fila }] = await Promise.all([
         listChallengeEvents(challengeId),
+        getChallenge(challengeId),
         cargarCambio({ silencioso }),
+        cargarExpediente(),
       ]);
       if (!mountedRef.current) return;
+
+      // El estado del desafío decide si el compositor escribe. `getThreadAccess`
+      // lo mira una sola vez al montar, así que cuando el rival congela el hilo
+      // hay que volver a preguntarlo — pero SÓLO cuando de verdad cambió, que
+      // es lo que evita tres consultas extra en cada vuelta tranquila.
+      const firmaChallenge = JSON.stringify(fila ?? null);
+      if (fila && firmaChallenge !== firmaChallengeRef.current) {
+        const estadoAnterior = firmaChallengeRef.current
+          ? JSON.parse(firmaChallengeRef.current)?.estado
+          : null;
+        firmaChallengeRef.current = firmaChallenge;
+        setClubChallenge(fila);
+        if (estadoAnterior && estadoAnterior !== fila.estado) {
+          const acc = await getThreadAccess(threadKey, { challengeId });
+          if (!mountedRef.current) return;
+          setAccess(acc);
+        }
+      }
 
       // Sólo se toca el estado si la bitácora de verdad cambió. Reemplazar el
       // arreglo cada 15 segundos volvería a montar las burbujas del hilo sin
@@ -864,7 +893,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       firmaEventosRef.current = firma;
       setChallengeEvents(eventos || []);
     },
-    [isChallengeThread, challengeId, cargarCambio]
+    [isChallengeThread, challengeId, threadKey, cargarCambio, cargarExpediente]
   );
 
   // Al volver de «Pedir un cambio» la pantalla se refresca sola: sin esto, el
@@ -887,7 +916,16 @@ export default function ChatThreadScreen({ route, navigation }) {
    *
    * Sin esto, la sesión de quien pidió un cambio seguía mostrando la
    * solicitud como pendiente después de que el club contrario la respondiera,
-   * hasta recargar a mano. Comprobado el 2026-08-13.
+   * hasta recargar a mano. Comprobado el 2026-08-13. Lo mismo volvió a pasar
+   * con la 47c y por la misma razón: `club_sanctions`,
+   * `club_match_noshow_reports` y `club_sanction_reviews` tampoco emiten nada,
+   * y el club acusado no veía «Solicitar revisión» hasta recargar. Comprobado
+   * el 2026-08-17. Por eso el expediente entró acá, y por eso todo lo que se
+   * refresca pasa por `refrescarDesafio`: dos caminos para el mismo dato
+   * terminan discrepando el día que sólo se arregla uno.
+   *
+   * `crearSondeo` se salta el tick si el anterior sigue en vuelo, así que las
+   * seis consultas de una vuelta no se apilan cuando la red va lenta.
    */
   useEffect(
     () =>
@@ -991,14 +1029,11 @@ export default function ChatThreadScreen({ route, navigation }) {
         return;
       }
 
-      // Se recarga TODO lo que la cancelación movió: el desafío (que pasó a
-      // cancelado), el partido y la bitácora, y además la sanción, que es la
-      // que a partir de ahora bloquea los desafíos nuevos de este club.
-      const { data: alDia } = await refreshChallenge(challengeId);
-      const { data: fila } = alDia ? { data: alDia } : await getChallenge(challengeId);
-      if (mountedRef.current) setClubChallenge(fila || null);
+      // Se recarga TODO lo que la cancelación movió —el desafío, el partido,
+      // la bitácora y la sanción, que es la que a partir de ahora bloquea los
+      // desafíos nuevos de este club— por el MISMO camino que el sondeo, para
+      // que no queden dos rutas distintas para el mismo dato.
       await refrescarDesafio();
-      await cargarSancion();
 
       if (mountedRef.current) {
         setCancelBusy(false);
@@ -1009,7 +1044,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         );
       }
     },
-    [cancelBusy, challengeId, refrescarDesafio, cargarSancion]
+    [cancelBusy, challengeId, refrescarDesafio]
   );
 
   // ── Incomparecencia y revisión (migración 47c) ──────────────────
@@ -1059,18 +1094,14 @@ export default function ChatThreadScreen({ route, navigation }) {
       // cambia de estado al informar —eso pasa recién si alguien pide la
       // revisión— pero se relee igual, que es barato y evita razonar sobre
       // qué quedó viejo.
-      const { data: fila } = await getChallenge(challengeId);
-      if (mountedRef.current) setClubChallenge(fila || null);
       await refrescarDesafio();
-      await cargarSancion();
-      await cargarRevisiones();
 
       if (mountedRef.current) {
         setRevisionBusy(false);
         notify('Incomparecencia informada. El club rival queda sancionado mientras se revisa.');
       }
     },
-    [revisionBusy, challengeId, refrescarDesafio, cargarSancion, cargarRevisiones]
+    [revisionBusy, challengeId, refrescarDesafio]
   );
 
   const pedirRevision = useCallback(
@@ -1090,10 +1121,9 @@ export default function ChatThreadScreen({ route, navigation }) {
 
       // Pedir la revisión SÍ congela el desafío: hay que releer la fila o la
       // pantalla seguiría ofreciendo acciones sobre un encuentro bloqueado.
-      const { data: fila } = await getChallenge(challengeId);
-      if (mountedRef.current) setClubChallenge(fila || null);
+      // `refrescarDesafio` la relee y, como el estado cambió, vuelve a pedir
+      // el permiso de escritura para que el compositor quede de solo lectura.
       await refrescarDesafio();
-      await cargarRevisiones();
 
       if (mountedRef.current) {
         setRevisionBusy(false);
@@ -1102,7 +1132,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         notify('Revisión enviada. Te avisaremos acá cuando esté resuelta.');
       }
     },
-    [revisionBusy, challengeId, refrescarDesafio, cargarRevisiones]
+    [revisionBusy, challengeId, refrescarDesafio]
   );
 
   const puedeAbrirPartido =
