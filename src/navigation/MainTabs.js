@@ -6,7 +6,7 @@ import {
   Home as HomeIcon,
   Plus,
   Shield,
-  Bell,
+  Calendar,
   MessageSquare,
   User as UserIcon,
 } from 'lucide-react-native';
@@ -14,13 +14,11 @@ import {
 import HomeScreen from '../screens/HomeScreen';
 import PartidosScreen from '../screens/PartidosScreen';
 import ClubsScreen from '../screens/ClubsScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
+import ReservasScreen from '../screens/ReservasScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchFootballIcon from '../components/SearchFootballIcon';
 import { tactical } from '../theme/colors';
-import { getCurrentUser } from '../services/auth';
-import { countUnread, subscribeToNotifications } from '../services/notifications';
 import { countUnreadTotal, subscribeToMessages } from '../services/messages';
 
 const Tab = createBottomTabNavigator();
@@ -28,7 +26,10 @@ const Tab = createBottomTabNavigator();
 const ICON_SIZE = 21;
 const ICON_STROKE = 1.9;
 const LEFT_TABS = ['HomeTab', 'SearchTab', 'ClubsTab'];
-const RIGHT_TABS = ['NotifTab', 'ChatTab', 'ProfileTab'];
+// Avisos deja de ser una pestaña (decisión del handoff de Reservas: la
+// campana de notificaciones pasa arriba a la derecha en cada pantalla, ver
+// `NotificationBell`) y su lugar en la barra lo toma Reservas.
+const RIGHT_TABS = ['ReservasTab', 'ChatTab', 'ProfileTab'];
 
 /**
  * Componente "vacío" que nunca se monta — las pestañas Crear y
@@ -44,36 +45,12 @@ function PlaceholderTab() {
  *   - Fondo negro puro con borde superior tenue
  *   - Iconos Lucide con peso óptico uniforme, verde flúor cuando activos
  *   - Botón Crear flotante circular verde flúor en el centro
- *   - Badge rojo de notificaciones no leídas sobre la campana
+ *   - Badge verde de mensajes sin leer sobre el ícono de Chat (el de
+ *     Avisos ya no vive acá — ver `NotificationBell` en el header)
  */
 function CustomTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
-  const [unread, setUnread] = useState(0);
   const [chatUnread, setChatUnread] = useState(0);
-
-  // Contador de notificaciones no leídas: carga inicial + realtime +
-  // refresco cuando cambia la navegación (p.ej. al volver del inbox).
-  useEffect(() => {
-    let mounted = true;
-    let unsubscribe = () => {};
-    const reload = async () => {
-      const n = await countUnread();
-      if (mounted) setUnread(n || 0);
-    };
-    reload();
-    (async () => {
-      const u = await getCurrentUser();
-      if (!u?.id || !mounted) return;
-      unsubscribe = subscribeToNotifications(u.id, reload);
-    })();
-    const parentUnsub =
-      navigation.getParent()?.addListener('state', reload) || (() => {});
-    return () => {
-      mounted = false;
-      unsubscribe();
-      parentUnsub();
-    };
-  }, [navigation]);
 
   // Mensajes sin leer del tab Chat. El total lo calcula el servidor
   // (`get_chat_unread_total`), que ya descuenta las conversaciones
@@ -112,8 +89,7 @@ function CustomTabBar({ state, navigation }) {
     const isFocused = state.index === index;
     const color = isFocused ? tactical.neon : 'rgba(255,255,255,0.42)';
     const Icon = iconFor(route.name);
-    const badge =
-      route.name === 'NotifTab' ? unread : route.name === 'ChatTab' ? chatUnread : 0;
+    const badge = route.name === 'ChatTab' ? chatUnread : 0;
 
     const onPress = () => {
       const event = navigation.emit({
@@ -141,18 +117,12 @@ function CustomTabBar({ state, navigation }) {
         <View>
           <Icon size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE} />
           {badge > 0 ? (
-            // Avisos en coral (alerta) y mensajes en verde (actividad), igual
-            // que en el diseño: el color distingue de qué badge se trata.
+            // Único badge que queda en la barra: mensajes sin leer del Chat.
             <View
               className="absolute -right-2 -top-1.5 min-w-[15px] items-center justify-center rounded-full px-1"
-              style={{
-                backgroundColor: route.name === 'ChatTab' ? tactical.neon : '#FF6B6B',
-              }}
+              style={{ backgroundColor: tactical.neon }}
             >
-              <Text
-                className="text-[9.5px] font-bold"
-                style={{ color: route.name === 'ChatTab' ? tactical.neonInk : '#FFFFFF' }}
-              >
+              <Text className="text-[9.5px] font-bold" style={{ color: tactical.neonInk }}>
                 {badge > 9 ? '9+' : String(badge)}
               </Text>
             </View>
@@ -199,7 +169,7 @@ function iconFor(name) {
     case 'HomeTab': return HomeIcon;
     case 'SearchTab': return SearchFootballIcon;
     case 'ClubsTab': return Shield;
-    case 'NotifTab': return Bell;
+    case 'ReservasTab': return Calendar;
     case 'ChatTab': return MessageSquare;
     case 'ProfileTab': return UserIcon;
     default: return HomeIcon;
@@ -211,7 +181,7 @@ function labelFor(name) {
     case 'HomeTab': return 'Inicio';
     case 'SearchTab': return 'Partidos';
     case 'ClubsTab': return 'Clubes';
-    case 'NotifTab': return 'Avisos';
+    case 'ReservasTab': return 'Reservas';
     case 'ChatTab': return 'Chat';
     case 'ProfileTab': return 'Perfil';
     default: return '';
@@ -228,7 +198,7 @@ export default function MainTabs() {
       <Tab.Screen name="SearchTab" component={PartidosScreen} />
       <Tab.Screen name="ClubsTab" component={ClubsScreen} />
       <Tab.Screen name="CreateTab" component={PlaceholderTab} />
-      <Tab.Screen name="NotifTab" component={NotificationsScreen} />
+      <Tab.Screen name="ReservasTab" component={ReservasScreen} />
       <Tab.Screen name="ChatTab" component={ChatScreen} />
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>

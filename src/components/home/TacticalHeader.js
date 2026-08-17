@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, ShieldCheck } from 'lucide-react-native';
 import StatusPill from './StatusPill';
+import NotificationBell from '../NotificationBell';
 import { tactical as t } from '../../theme/colors';
 
 export default function TacticalHeader({
@@ -23,6 +24,8 @@ export default function TacticalHeader({
             fut<Text className="text-[#00FF66]">finder</Text>
           </Text>
         </View>
+        <View className="flex-1" />
+        <NotificationBell />
       </View>
 
       <View className="mt-5">
