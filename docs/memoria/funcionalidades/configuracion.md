@@ -1,6 +1,6 @@
 # Configuración
 
-Última revisión: 2026-08-19
+Última revisión: 2026-08-19 (rediseño visual)
 
 ## Propósito
 
@@ -13,6 +13,8 @@ Centralizar preferencias de cuenta, privacidad, radio y categorías de avisos, a
 "Bloqueados" abre `BlockedUsersScreen`, que lista quién bloqueó el usuario (vía `blockedUsers.listBlockedUsers()`) y permite desbloquear. "Idioma" y "Tema" son filas fijas (Español / Oscuro): no son ajustables todavía, se muestran sin flecha a propósito para no insinuar que se puede tocar. La versión de la app (`APP_VERSION`, de `expo.version`) se muestra centrada bajo Soporte.
 
 "Exportar mis datos" arma un JSON con `dataExport.buildMyDataExport()` (perfil, historial de partidos, amigos, clubes — sin mensajes de chat) y lo entrega copiándolo al portapapeles en web o con `Share.share` en nativo, igual que el patrón ya usado para compartir el perfil.
+
+`SettingsScreen` se rediseñó visualmente (handoff `Ajustes.dc.html` de Claude Design, proyecto "Nueva estética y reservas") migrando de `colors`/`radius` (la paleta original de la app) a `reservas`/`reservasRadius`/`reservasFonts` — la misma familia de tokens que ya usan Reservas y Desafío entre clubes, y que comparte diseñador/paleta con `clubsExplorer`. Es un rediseño solo visual: ninguna lógica ni RPC cambió. El mockup traía dos cosas que NO se llevaron tal cual porque hubieran fabricado comportamiento inexistente: pills de Idioma/Tema realmente seleccionables (se dejaron como pastillas visuales sin `onPress`: no hay i18n ni tema claro implementados) y una quinta categoría de notificaciones "Reservas y pagos" que no tiene columna de preferencia en `profiles` (se omitió). La burbuja de icono verde (`icoSt` del handoff) es propia de esta pantalla — vive local en `SettingsScreen.js`, no en `components/reservas/ui.js`, porque el `ListRow` compartido usa una burbuja gris neutra en el resto de Reservas y no había que tocarlo.
 
 ## Reglas y permisos
 

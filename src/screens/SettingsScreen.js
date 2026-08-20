@@ -5,9 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Switch,
   TextInput,
-  Modal,
   Alert,
   Platform,
   Linking,
@@ -20,7 +18,6 @@ import {
   ArrowLeft,
   Mail,
   Lock,
-  LogOut,
   Trash2,
   Users,
   Eye,
@@ -33,22 +30,21 @@ import {
   FileText,
   Crown,
   ChevronRight,
-  X,
   SlidersHorizontal,
   FileLock,
   AlertTriangle,
   Globe,
   Moon,
   ShieldOff,
-  Info,
   Download,
 } from 'lucide-react-native';
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
 
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { Card, SectionLabel, Sheet, Button, IconButton } from '../components/reservas/ui';
+import NotificationBell from '../components/NotificationBell';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
 import { getMyProfileWithStatus, updateMyProfile } from '../services/profile';
 import { getMyClub } from '../services/clubs';
 import { signOut } from '../services/auth';
@@ -84,7 +80,7 @@ function confirmAction(title, message, onConfirm) {
 // onValueChange: llama en cada movimiento (UI en tiempo real)
 // onValueCommit: llama solo al soltar (persistir en DB)
 function RadiusSlider({ value, onValueChange, onValueCommit }) {
-  const MIN = 1, MAX = 50, THUMB = 24;
+  const MIN = 1, MAX = 50, THUMB = 22;
   const [width, setWidth] = useState(0);
   const widthRef = useRef(0);
   const valueRef = useRef(value);
@@ -127,27 +123,24 @@ function RadiusSlider({ value, onValueChange, onValueCommit }) {
 
   return (
     <View
-      style={{ height: THUMB, justifyContent: 'center', marginVertical: 6 }}
+      style={{ height: THUMB, justifyContent: 'center', marginTop: 13 }}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
         widthRef.current = w;
         setWidth(w);
       }}
     >
-      {/* Track background */}
       <View style={{
         position: 'absolute', left: 0, right: 0,
-        height: 4, backgroundColor: colors.borderSoft, borderRadius: 2,
-        top: (THUMB - 4) / 2,
+        height: 5, backgroundColor: '#20261F', borderRadius: 999,
+        top: (THUMB - 5) / 2,
       }} />
-      {/* Fill */}
       <View style={{
         position: 'absolute', left: 0,
         width: Math.max(0, thumbX + THUMB / 2),
-        height: 4, backgroundColor: colors.primary, borderRadius: 2,
-        top: (THUMB - 4) / 2,
+        height: 5, backgroundColor: C.green, borderRadius: 999,
+        top: (THUMB - 5) / 2,
       }} />
-      {/* Thumb */}
       <View
         {...pan.panHandlers}
         style={{
@@ -155,14 +148,92 @@ function RadiusSlider({ value, onValueChange, onValueCommit }) {
           left: thumbX, top: 0,
           width: THUMB, height: THUMB,
           borderRadius: THUMB / 2,
-          backgroundColor: colors.primary,
-          borderWidth: 2.5, borderColor: '#fff',
-          shadowColor: '#000', shadowOpacity: 0.3,
-          shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+          backgroundColor: C.green,
+          borderWidth: 3, borderColor: C.bg,
+          shadowColor: '#000', shadowOpacity: 0.35,
+          shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
           elevation: 4,
         }}
       />
     </View>
+  );
+}
+
+// ── Subcomponentes propios de esta pantalla ───────────────────────
+// (burbuja de icono verde + fila con divisor: rasgo propio del handoff de
+// Ajustes, distinto del `ListRow` gris neutro que ya usa el resto de
+// Reservas — por eso viven acá y no en components/reservas/ui.js)
+
+function IconBubble({ icon: Icon }) {
+  return (
+    <View style={styles.iconBubble}>
+      <Icon color={C.green} size={17} strokeWidth={1.9} />
+    </View>
+  );
+}
+
+function Row({ icon, title, subtitle, subtitleColor, value, showChevron, right, onPress, last, labelColor }) {
+  const content = (
+    <View style={[styles.row, !last && styles.rowDivider]}>
+      <IconBubble icon={icon} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowTitle, labelColor && { color: labelColor }]} numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text
+            style={[styles.rowSubtitle, subtitleColor && { color: subtitleColor }]}
+            numberOfLines={1}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {right != null ? right : (
+        <View style={styles.rowRight}>
+          {value ? <Text style={styles.rowValue} numberOfLines={1}>{value}</Text> : null}
+          {showChevron ? <ChevronRight color={C.textMuted} size={17} /> : null}
+        </View>
+      )}
+    </View>
+  );
+  if (!onPress) return content;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={title} style={({ pressed }) => pressed && { opacity: 0.75 }}>
+      {content}
+    </Pressable>
+  );
+}
+
+function Toggle({ value, onToggle }) {
+  return (
+    <Pressable
+      onPress={() => onToggle(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      style={[styles.toggleTrack, value ? styles.toggleOn : styles.toggleOff]}
+    >
+      <View style={[styles.toggleKnob, value ? styles.toggleKnobOn : styles.toggleKnobOff]} />
+    </Pressable>
+  );
+}
+
+/** Pastilla no interactiva: refleja el valor fijo actual (idioma/tema). */
+function StaticPill({ label, active }) {
+  return (
+    <View style={[styles.pill, active ? styles.pillActive : styles.pillIdle]}>
+      <Text style={[styles.pillText, active && styles.pillTextActive]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+
+function Input(props) {
+  return (
+    <TextInput
+      placeholderTextColor={C.textMuted}
+      style={styles.input}
+      {...props}
+    />
   );
 }
 
@@ -269,7 +340,7 @@ export default function SettingsScreen({ navigation }) {
     else setProfile((p) => ({ ...p, search_radius_km: km }));
   };
 
-  // ── Cambiar email (FIX 2) ─────────────────────────────────────
+  // ── Cambiar email ──────────────────────────────────────────────
   const handleChangeEmail = async () => {
     const email = emailInput.trim();
     if (!email.includes('@')) {
@@ -296,7 +367,7 @@ export default function SettingsScreen({ navigation }) {
     showBanner('success', 'Revisa tu bandeja', 'Te enviamos un link de confirmación al nuevo email.');
   };
 
-  // ── Cambiar contraseña (FIX 1) ────────────────────────────────
+  // ── Cambiar contraseña ─────────────────────────────────────────
   const handleChangePassword = async () => {
     if (!currentPwdInput) {
       showBanner('error', 'Falta la contraseña actual', 'Ingrésala para continuar.');
@@ -429,10 +500,10 @@ export default function SettingsScreen({ navigation }) {
         options,
         cancelButtonIndex: 2,
         title: '¿Quién puede enviarte solicitudes de amistad?',
-        containerStyle: { backgroundColor: colors.surface },
-        textStyle: { color: colors.textPrimary, fontSize: 15, fontWeight: '500' },
-        titleTextStyle: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-        separatorStyle: { backgroundColor: colors.borderSoft },
+        containerStyle: { backgroundColor: C.surface },
+        textStyle: { color: C.textPrimary, fontSize: 15, fontWeight: '500' },
+        titleTextStyle: { color: C.textSecondary, fontSize: 13, fontWeight: '600' },
+        separatorStyle: { backgroundColor: C.border },
       },
       (index) => {
         if (index === 0) toggleField('privacy_friend_requests', 'everyone');
@@ -460,7 +531,7 @@ export default function SettingsScreen({ navigation }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <Header navigation={navigation} />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       </SafeAreaView>
     );
@@ -471,7 +542,7 @@ export default function SettingsScreen({ navigation }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <Header navigation={navigation} />
         <View style={styles.loadingBox}>
-          <AlertTriangle color={colors.error} size={30} strokeWidth={1.8} />
+          <AlertTriangle color={C.red} size={30} strokeWidth={1.8} />
           <Text style={styles.errorTitle}>No pudimos cargar tus ajustes</Text>
           <Text style={styles.errorMsg}>
             {loadError?.message || 'Revisa tu conexión e intenta de nuevo.'}
@@ -490,9 +561,18 @@ export default function SettingsScreen({ navigation }) {
   const friendRequestLabel = profile?.privacy_friend_requests === 'nobody' ? 'Nadie' : 'Todos';
   const planLabel = misClub?.plan === 'premium' ? 'Premium' : 'Estándar';
 
+  const nombre = profile?.nombre?.trim();
+  const username = profile?.username;
+  const headerSubtitle = nombre && username ? `${nombre} · @${username}` : username ? `@${username}` : nombre || '';
+
+  const regionDefinida = Boolean(profile?.pref_comuna || profile?.comuna);
+  const regionValue = regionDefinida
+    ? `${profile.pref_comuna || profile.comuna}${(profile.pref_region || profile.region) ? `, ${profile.pref_region || profile.region}` : ''}`
+    : 'No definida';
+
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <Header navigation={navigation} />
+      <Header navigation={navigation} subtitle={headerSubtitle} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -500,109 +580,121 @@ export default function SettingsScreen({ navigation }) {
       >
         {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-        {/* ── PRIVACIDAD (FIX 3: ahora es primero) ─────────── */}
-        <SectionHeader title="Privacidad" />
-
-        <View style={styles.card}>
-          <ArrowRow
-            icon={<Users color={colors.primary} size={18} />}
-            label="Solicitudes de amistad"
+        {/* ── PRIVACIDAD ───────────────────────────────────── */}
+        <SectionLabel>Privacidad</SectionLabel>
+        <Card padded={false} style={styles.card}>
+          <Row
+            icon={Users}
+            title="Solicitudes de amistad"
+            subtitle="Quién puede enviarte solicitudes"
             value={friendRequestLabel}
+            showChevron
             onPress={openFriendRequestPicker}
           />
-          <Divider />
-          <ToggleRow
-            icon={<Eye color={colors.primary} size={18} />}
-            label="Visible en búsquedas"
-            value={profile?.privacy_visible_in_search ?? true}
-            onToggle={(v) => toggleField('privacy_visible_in_search', v)}
+          <Row
+            icon={Eye}
+            title="Visible en búsquedas"
+            subtitle="Tu perfil aparece al buscar jugadores"
+            right={
+              <Toggle
+                value={profile?.privacy_visible_in_search ?? true}
+                onToggle={(v) => toggleField('privacy_visible_in_search', v)}
+              />
+            }
           />
-          <Divider />
-          <ArrowRow
-            icon={<ShieldOff color={colors.primary} size={18} />}
-            label="Bloqueados"
+          <Row
+            icon={ShieldOff}
+            title="Bloqueados"
+            showChevron
+            last
             onPress={() => navigation.navigate('BlockedUsers')}
           />
-        </View>
+        </Card>
 
         {/* ── APARIENCIA ───────────────────────────────────── */}
-        <SectionHeader title="Apariencia" />
-
-        <View style={styles.card}>
-          <StaticRow
-            icon={<Globe color={colors.textMuted} size={18} />}
-            label="Idioma"
-            value="Español"
-          />
-          <Divider />
-          <StaticRow
-            icon={<Moon color={colors.textMuted} size={18} />}
-            label="Tema"
-            value="Oscuro"
-          />
-        </View>
+        <SectionLabel>Apariencia</SectionLabel>
+        <Card padded={false} style={styles.card}>
+          <View style={[styles.row, styles.rowDivider, { flexDirection: 'column', alignItems: 'stretch' }]}>
+            <View style={styles.rowTop}>
+              <IconBubble icon={Globe} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Idioma</Text>
+                <Text style={styles.rowSubtitle}>Idioma de la aplicación</Text>
+              </View>
+            </View>
+            <View style={styles.pillRow}>
+              <StaticPill label="Español" active />
+              <StaticPill label="English" />
+            </View>
+          </View>
+          <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch' }]}>
+            <View style={styles.rowTop}>
+              <IconBubble icon={Moon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Tema</Text>
+                <Text style={styles.rowSubtitle}>Siempre oscuro</Text>
+              </View>
+            </View>
+            <View style={styles.pillRow}>
+              <StaticPill label="Oscuro" active />
+              <StaticPill label="Claro" />
+              <StaticPill label="Automático" />
+            </View>
+          </View>
+        </Card>
 
         {/* ── NOTIFICACIONES ──────────────────────────────── */}
-        <SectionHeader title="Notificaciones" />
+        <SectionLabel>Notificaciones</SectionLabel>
+        <Card padded={false} style={styles.card}>
+          <Row
+            icon={Bell}
+            title="Partidos"
+            subtitle="Invitaciones, cambios y recordatorios"
+            right={<Toggle value={profile?.notif_matches ?? true} onToggle={(v) => toggleField('notif_matches', v)} />}
+          />
+          <Row
+            icon={Shield}
+            title="Clubes"
+            subtitle="Desafíos, propuestas y nóminas"
+            right={<Toggle value={profile?.notif_clubs ?? true} onToggle={(v) => toggleField('notif_clubs', v)} />}
+          />
+          <Row
+            icon={MessageCircle}
+            title="Chat"
+            subtitle="Mensajes de coordinación"
+            right={<Toggle value={profile?.notif_chat ?? true} onToggle={(v) => toggleField('notif_chat', v)} />}
+          />
+          <Row
+            icon={UserPlus}
+            title="Solicitudes de amistad"
+            subtitle="Cuando alguien te quiere agregar"
+            last
+            right={<Toggle value={profile?.notif_friends ?? true} onToggle={(v) => toggleField('notif_friends', v)} />}
+          />
+        </Card>
 
-        <View style={styles.card}>
-          <ToggleRow
-            icon={<Bell color={colors.primary} size={18} />}
-            label="Partidos"
-            value={profile?.notif_matches ?? true}
-            onToggle={(v) => toggleField('notif_matches', v)}
-          />
-          <Divider />
-          <ToggleRow
-            icon={<Shield color={colors.primary} size={18} />}
-            label="Clubes"
-            value={profile?.notif_clubs ?? true}
-            onToggle={(v) => toggleField('notif_clubs', v)}
-          />
-          <Divider />
-          <ToggleRow
-            icon={<MessageCircle color={colors.primary} size={18} />}
-            label="Chat"
-            value={profile?.notif_chat ?? true}
-            onToggle={(v) => toggleField('notif_chat', v)}
-          />
-          <Divider />
-          <ToggleRow
-            icon={<UserPlus color={colors.primary} size={18} />}
-            label="Solicitudes de amistad"
-            value={profile?.notif_friends ?? true}
-            onToggle={(v) => toggleField('notif_friends', v)}
-          />
-        </View>
-
-        {/* ── PREFERENCIAS (FIX 4 + FIX 5) ───────────────── */}
-        <SectionHeader title="Preferencias" />
-
-        <View style={styles.card}>
-          <ArrowRow
-            icon={<MapPin color={colors.primary} size={18} />}
-            label="Región y comuna de búsqueda"
-            value={
-              profile?.pref_comuna || profile?.comuna
-                ? `${profile.pref_comuna || profile.comuna}${(profile.pref_region || profile.region) ? `, ${profile.pref_region || profile.region}` : ''}`
-                : 'No definida'
-            }
+        {/* ── PREFERENCIAS ─────────────────────────────────── */}
+        <SectionLabel>Preferencias</SectionLabel>
+        <Card padded={false} style={styles.card}>
+          <Row
+            icon={MapPin}
+            title="Región y comuna"
+            subtitle={regionValue}
+            subtitleColor={regionDefinida ? C.green : undefined}
+            showChevron
             onPress={() => {
-              // FIX 4: fallback a profile.region / profile.comuna
               setRegionInput(profile?.pref_region || profile?.region || '');
               setComunaInput(profile?.pref_comuna || profile?.comuna || '');
               setModal('location');
             }}
           />
-          <Divider />
-          {/* FIX 5: Slider de radio */}
-          <View style={styles.sliderRow}>
-            <View style={styles.sliderHeader}>
-              <View style={styles.rowLeft}>
-                <SlidersHorizontal color={colors.primary} size={18} />
-                <Text style={styles.rowLabel}>Radio de búsqueda</Text>
+          <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch' }]}>
+            <View style={styles.rowTop}>
+              <IconBubble icon={SlidersHorizontal} />
+              <Text style={[styles.rowTitle, { flex: 1 }]}>Radio de búsqueda</Text>
+              <View style={styles.radiusBadge}>
+                <Text style={styles.radiusBadgeText}>{radiusKm} km</Text>
               </View>
-              <Text style={styles.radiusLabel}>{radiusKm} km</Text>
             </View>
             <RadiusSlider
               value={radiusKm}
@@ -614,114 +706,87 @@ export default function SettingsScreen({ navigation }) {
               <Text style={styles.tickLabel}>50 km</Text>
             </View>
           </View>
-        </View>
+        </Card>
 
         {/* ── SOPORTE ─────────────────────────────────────── */}
-        <SectionHeader title="Soporte" />
-
-        <View style={styles.card}>
-          <ArrowRow
-            icon={<Flag color={colors.primary} size={18} />}
-            label="Reportar un problema"
-            onPress={openSupportEmail}
-          />
-          <Divider />
-          <ArrowRow
-            icon={<FileText color={colors.primary} size={18} />}
-            label="Términos y condiciones"
+        <SectionLabel>Soporte</SectionLabel>
+        <Card padded={false} style={styles.card}>
+          <Row icon={Flag} title="Reportar un problema" showChevron onPress={openSupportEmail} />
+          <Row
+            icon={FileText}
+            title="Términos y condiciones"
+            showChevron
             onPress={() => {
               if (Platform.OS === 'web') { openURL(TERMS_URL); }
               else { navigation.navigate('Terms'); }
             }}
           />
-          <Divider />
-          {/* FIX 7: FileLock en lugar de Shield */}
-          <ArrowRow
-            icon={<FileLock color={colors.primary} size={18} />}
-            label="Política de privacidad"
+          <Row
+            icon={FileLock}
+            title="Política de privacidad"
+            showChevron
+            last
             onPress={() => openURL(PRIVACY_URL)}
           />
-        </View>
+        </Card>
 
-        {APP_VERSION && (
-          <View style={styles.versionRow}>
-            <Info color={colors.textMuted} size={13} />
-            <Text style={styles.versionText}>Versión {APP_VERSION}</Text>
-          </View>
-        )}
+        {APP_VERSION && <Text style={styles.versionText}>FutFinder {APP_VERSION}</Text>}
 
         {/* ── PLAN ────────────────────────────────────────── */}
-        <SectionHeader title="Mi Plan" />
-
-        <View style={styles.card}>
-          <View style={styles.planRow}>
-            <View style={styles.rowLeft}>
-              <Crown color={misClub && planLabel === 'Premium' ? '#F2C94C' : colors.textMuted} size={18} />
-              <Text style={styles.rowLabel}>Plan actual</Text>
-            </View>
-            <Text style={[styles.planBadge, misClub && planLabel === 'Premium' && { color: '#F2C94C' }]}>
-              {/* El plan es del CLUB, no tuyo: sin club no hay nada que
-                  mostrar acá — "Estándar" sería un dato inventado. */}
-              {misClub ? planLabel : 'Sin club'}
-            </Text>
-          </View>
-          <Divider />
-          <ArrowRow
-            icon={<Crown color={colors.primary} size={18} />}
-            label="Ver planes"
+        <SectionLabel>Mi Plan</SectionLabel>
+        <Card padded={false} style={styles.card}>
+          <Row
+            icon={Crown}
+            title="Plan actual"
+            right={
+              <Text style={[styles.rowValue, misClub && planLabel === 'Premium' && { color: '#F2C94C' }]}>
+                {/* El plan es del CLUB, no tuyo: sin club no hay nada que
+                    mostrar acá — "Estándar" sería un dato inventado. */}
+                {misClub ? planLabel : 'Sin club'}
+              </Text>
+            }
+          />
+          <Row
+            icon={Crown}
+            title="Ver planes"
+            showChevron
+            last
             onPress={() => navigation.navigate('ClubPlans', { clubId: misClub?.id })}
           />
-        </View>
+        </Card>
 
-        {/* ── CUENTA (FIX 3: movida al final) ─────────────── */}
-        <SectionHeader title="Cuenta" />
+        {/* ── CUENTA ──────────────────────────────────────── */}
+        <SectionLabel>Cuenta</SectionLabel>
+        <Card padded={false} style={styles.card}>
+          <Row icon={Mail} title="Cambiar email" showChevron onPress={() => setModal('email')} />
+          <Row icon={Lock} title="Cambiar contraseña" showChevron onPress={() => setModal('password')} />
+          <Row icon={Download} title="Exportar mis datos" showChevron last onPress={handleExportData} />
+        </Card>
 
-        <View style={styles.card}>
-          <ArrowRow
-            icon={<Mail color={colors.primary} size={18} />}
-            label="Cambiar email"
-            onPress={() => setModal('email')}
-          />
-          <Divider />
-          <ArrowRow
-            icon={<Lock color={colors.primary} size={18} />}
-            label="Cambiar contraseña"
-            onPress={() => setModal('password')}
-          />
-          <Divider />
-          {/* FIX 3: LogOut en gris, no rojo */}
-          <ArrowRow
-            icon={<LogOut color={colors.textSecondary} size={18} />}
-            label="Cerrar sesión"
-            labelStyle={{ color: colors.textSecondary }}
-            onPress={handleLogout}
-          />
-          <Divider />
-          <ArrowRow
-            icon={<Download color={colors.primary} size={18} />}
-            label="Exportar mis datos"
-            onPress={handleExportData}
-          />
-          <Divider />
-          <ArrowRow
-            icon={<Trash2 color={colors.error} size={18} />}
-            label="Eliminar cuenta"
-            labelStyle={{ color: colors.error }}
+        <View style={styles.footerBtns}>
+          <Button label="Cerrar sesión" variant="secondary" onPress={handleLogout} />
+          <Pressable
             onPress={handleDeleteAccount}
-          />
+            accessibilityRole="button"
+            accessibilityLabel="Eliminar cuenta"
+            style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.8 }]}
+          >
+            <Trash2 color={C.red} size={16} strokeWidth={2} />
+            <Text style={styles.deleteBtnText}>Eliminar cuenta</Text>
+          </Pressable>
         </View>
 
-        <View style={{ height: 32 }} />
+        <View style={{ height: 20 }} />
       </ScrollView>
 
       {saving && (
         <View style={styles.savingOverlay} pointerEvents="none">
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       )}
 
-      {/* ── Modal: Cambiar email (FIX 2) ─────────────────── */}
-      <SettingsModal
+      {/* ── Modal: Cambiar email ─────────────────────────── */}
+      <Sheet
         visible={modal === 'email'}
         title="Cambiar email"
         onClose={() => { setModal(null); setEmailInput(''); setCurrentPwdForEmail(''); }}
@@ -729,19 +794,16 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.modalHint}>
           Recibirás un enlace de confirmación en el nuevo email antes del cambio.
         </Text>
-        <TextInput
-          style={styles.input}
+        <Input
           placeholder="Contraseña actual"
-          placeholderTextColor={colors.textMuted}
           value={currentPwdForEmail}
           onChangeText={setCurrentPwdForEmail}
           secureTextEntry
           autoFocus
         />
-        <TextInput
+        <Input
           style={[styles.input, { marginTop: 10 }]}
           placeholder="Nuevo email"
-          placeholderTextColor={colors.textMuted}
           value={emailInput}
           onChangeText={setEmailInput}
           keyboardType="email-address"
@@ -751,12 +813,12 @@ export default function SettingsScreen({ navigation }) {
           label="Cambiar email"
           loading={saving}
           onPress={handleChangeEmail}
-          style={{ marginTop: 8 }}
+          style={{ marginTop: 14 }}
         />
-      </SettingsModal>
+      </Sheet>
 
-      {/* ── Modal: Cambiar contraseña (FIX 1) ───────────── */}
-      <SettingsModal
+      {/* ── Modal: Cambiar contraseña ────────────────────── */}
+      <Sheet
         visible={modal === 'password'}
         title="Cambiar contraseña"
         onClose={() => {
@@ -766,10 +828,8 @@ export default function SettingsScreen({ navigation }) {
           setPassword2Input('');
         }}
       >
-        <TextInput
-          style={styles.input}
+        <Input
           placeholder="Contraseña actual"
-          placeholderTextColor={colors.textMuted}
           value={currentPwdInput}
           onChangeText={setCurrentPwdInput}
           secureTextEntry
@@ -777,27 +837,25 @@ export default function SettingsScreen({ navigation }) {
         />
         <Pressable
           onPress={forgotCooldown > 0 ? undefined : handleForgotPassword}
-          style={{ marginTop: 6, marginBottom: 4 }}
+          style={{ marginTop: 8, marginBottom: 4 }}
           disabled={forgotCooldown > 0}
         >
-          <Text style={[styles.forgotLink, forgotCooldown > 0 && { color: colors.textMuted }]}>
+          <Text style={[styles.forgotLink, forgotCooldown > 0 && { color: C.textMuted }]}>
             {forgotCooldown > 0
               ? `Reenviar en ${forgotCooldown}s...`
               : '¿Olvidaste tu contraseña?'}
           </Text>
         </Pressable>
-        <TextInput
+        <Input
           style={[styles.input, { marginTop: 10 }]}
           placeholder="Nueva contraseña"
-          placeholderTextColor={colors.textMuted}
           value={passwordInput}
           onChangeText={setPasswordInput}
           secureTextEntry
         />
-        <TextInput
+        <Input
           style={[styles.input, { marginTop: 10 }]}
           placeholder="Repetir contraseña"
-          placeholderTextColor={colors.textMuted}
           value={password2Input}
           onChangeText={setPassword2Input}
           secureTextEntry
@@ -806,12 +864,12 @@ export default function SettingsScreen({ navigation }) {
           label="Cambiar contraseña"
           loading={saving}
           onPress={handleChangePassword}
-          style={{ marginTop: 8 }}
+          style={{ marginTop: 14 }}
         />
-      </SettingsModal>
+      </Sheet>
 
       {/* ── Modal: Región y comuna ───────────────────────── */}
-      <SettingsModal
+      <Sheet
         visible={modal === 'location'}
         title="Región y comuna de búsqueda"
         onClose={() => setModal(null)}
@@ -819,18 +877,15 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.modalHint}>
           Se usará como filtro por defecto al buscar partidos.
         </Text>
-        <TextInput
-          style={styles.input}
+        <Input
           placeholder="Región (ej: Metropolitana)"
-          placeholderTextColor={colors.textMuted}
           value={regionInput}
           onChangeText={setRegionInput}
           autoFocus
         />
-        <TextInput
+        <Input
           style={[styles.input, { marginTop: 10 }]}
           placeholder="Comuna (ej: Santiago)"
-          placeholderTextColor={colors.textMuted}
           value={comunaInput}
           onChangeText={setComunaInput}
         />
@@ -838,229 +893,141 @@ export default function SettingsScreen({ navigation }) {
           label="Guardar preferencia"
           loading={saving}
           onPress={handleSaveLocation}
-          style={{ marginTop: 8 }}
+          style={{ marginTop: 14 }}
         />
-      </SettingsModal>
+      </Sheet>
     </SafeAreaView>
   );
 }
 
 // ── Subcomponentes ────────────────────────────────────────────────
 
-function Header({ navigation }) {
+function Header({ navigation, subtitle }) {
   return (
     <View style={styles.header}>
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={12}
-        style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-      >
-        <ArrowLeft color={colors.textPrimary} size={20} />
-      </Pressable>
-      <Text style={styles.headerTitle}>Ajustes</Text>
-      <View style={{ width: 40 }} />
+      <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.headerTitle}>Ajustes</Text>
+        {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
+      </View>
+      <NotificationBell />
     </View>
-  );
-}
-
-function SectionHeader({ title }) {
-  return <Text style={styles.sectionHeader}>{title.toUpperCase()}</Text>;
-}
-
-function Divider() {
-  return <View style={styles.divider} />;
-}
-
-function ArrowRow({ icon, label, value, onPress, labelStyle }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-    >
-      <View style={styles.rowLeft}>
-        {icon}
-        <Text style={[styles.rowLabel, labelStyle]}>{label}</Text>
-      </View>
-      <View style={styles.rowRight}>
-        {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-        <ChevronRight color={colors.textMuted} size={16} />
-      </View>
-    </Pressable>
-  );
-}
-
-// Fila fija, sin acción: para preferencias que hoy son un valor único
-// (idioma, tema) y todavía no se pueden cambiar. Sin flecha a propósito,
-// para no insinuar que se puede tocar.
-function StaticRow({ icon, label, value }) {
-  return (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        {icon}
-        <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{label}</Text>
-      </View>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  );
-}
-
-function ToggleRow({ icon, label, value, onToggle }) {
-  return (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        {icon}
-        <Text style={styles.rowLabel}>{label}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onToggle}
-        trackColor={{ false: colors.borderSoft, true: colors.primary }}
-        thumbColor={value ? '#fff' : colors.textMuted}
-        ios_backgroundColor={colors.borderSoft}
-      />
-    </View>
-  );
-}
-
-function SettingsModal({ visible, title, onClose, children }) {
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <X color={colors.textMuted} size={20} />
-            </Pressable>
-          </View>
-          {children}
-        </Pressable>
-      </Pressable>
-    </Modal>
   );
 }
 
 // ── Estilos ───────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center', justifyContent: 'center',
-  },
   headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 18, fontWeight: '800', letterSpacing: -0.3,
+    fontFamily: F.extraBold,
+    color: C.textPrimary,
+    fontSize: 19, letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontFamily: F.medium,
+    color: C.textSecondary,
+    fontSize: 12, marginTop: 2,
   },
 
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 30 },
-  errorTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  errorMsg: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  errorTitle: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 16, textAlign: 'center' },
+  errorMsg: { fontFamily: F.medium, color: C.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   retryBtn: {
     marginTop: 4,
     height: 44,
     paddingHorizontal: 24,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+    borderRadius: R.pill,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  retryLabel: { color: '#0E0E0D', fontSize: 14, fontWeight: '800' },
+  retryLabel: { fontFamily: F.extraBold, color: C.textOnGreen, fontSize: 14 },
 
-  scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 },
+  scroll: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 32, gap: 11 },
 
-  sectionHeader: {
-    color: colors.textMuted,
-    fontSize: 11, fontWeight: '700', letterSpacing: 0.8,
-    marginTop: 20, marginBottom: 8, marginLeft: 4,
-  },
-
-  card: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    overflow: 'hidden',
-  },
-
-  divider: { height: 1, backgroundColor: colors.borderSoft, marginLeft: 48 },
+  card: { paddingHorizontal: 15, marginBottom: 2 },
 
   row: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 14,
   },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  rowLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
-  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rowValue: { color: colors.textMuted, fontSize: 13 },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: C.dividerInner },
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  rowTitle: { fontFamily: F.bold, color: C.textPrimary, fontSize: 14 },
+  rowSubtitle: { fontFamily: F.medium, color: C.textSecondary, fontSize: 11.5, marginTop: 2 },
+  rowValue: { fontFamily: F.bold, color: C.textSecondary, fontSize: 13, flexShrink: 1 },
 
-  // Slider row
-  sliderRow: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12 },
-  sliderHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 10,
+  iconBubble: {
+    width: 34, height: 34, borderRadius: 11, flexShrink: 0,
+    backgroundColor: C.shieldBg, borderWidth: 1, borderColor: C.greenDeepBorder,
+    alignItems: 'center', justifyContent: 'center',
   },
-  radiusLabel: {
-    color: colors.primary, fontSize: 14, fontWeight: '700',
-  },
-  sliderTicks: {
-    flexDirection: 'row', justifyContent: 'space-between', marginTop: 4,
-  },
-  tickLabel: { color: colors.textMuted, fontSize: 11 },
 
-  versionRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, marginTop: 14,
+  toggleTrack: {
+    width: 48, height: 28, borderRadius: 999, padding: 3, flexShrink: 0,
+    borderWidth: 1, justifyContent: 'center',
   },
-  versionText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  toggleOn: { backgroundColor: C.green, borderColor: C.greenDeepBorder, alignItems: 'flex-end' },
+  toggleOff: { backgroundColor: C.surfaceAlt, borderColor: C.border, alignItems: 'flex-start' },
+  toggleKnob: { width: 20, height: 20, borderRadius: 999 },
+  toggleKnobOn: { backgroundColor: C.textOnGreen },
+  toggleKnobOff: { backgroundColor: '#3A4139' },
 
-  planRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 14,
+  pillRow: { flexDirection: 'row', gap: 8, marginTop: 12, paddingBottom: 14 },
+  pill: {
+    flex: 1, height: 38, borderRadius: 13, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
   },
-  planBadge: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
+  pillActive: { backgroundColor: C.shieldBg, borderColor: C.green },
+  pillIdle: { backgroundColor: C.surfaceAlt, borderColor: C.border },
+  pillText: { fontFamily: F.extraBold, color: C.textSecondary, fontSize: 12.5 },
+  pillTextActive: { color: C.green },
+
+  radiusBadge: {
+    height: 28, paddingHorizontal: 11, borderRadius: 999,
+    backgroundColor: C.shieldBg, borderWidth: 1, borderColor: C.greenDeepBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  radiusBadgeText: { fontFamily: F.extraBold, color: C.green, fontSize: 12.5 },
+  sliderTicks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, paddingBottom: 14 },
+  tickLabel: { fontFamily: F.semiBold, color: C.textMuted, fontSize: 11 },
+
+  versionText: {
+    fontFamily: F.semiBold, color: C.textMuted, fontSize: 11,
+    textAlign: 'center', marginTop: 6,
+  },
+
+  footerBtns: { gap: 10, marginTop: 22 },
+  deleteBtn: {
+    height: 48, borderRadius: R.ctaSecondary, borderWidth: 1, borderColor: 'rgba(237,107,118,0.35)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  deleteBtnText: { fontFamily: F.bold, color: C.red, fontSize: 14.5 },
 
   savingOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
   },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    padding: 20, paddingBottom: 36,
-  },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  modalTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '800' },
   modalHint: {
-    color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 12,
+    fontFamily: F.medium, color: C.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 12,
   },
-  forgotLink: {
-    color: colors.primary, fontSize: 13, fontWeight: '600',
-  },
+  forgotLink: { fontFamily: F.semiBold, color: C.green, fontSize: 13 },
   input: {
-    backgroundColor: colors.background,
-    borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.md,
+    backgroundColor: C.bg,
+    borderWidth: 1, borderColor: C.border,
+    borderRadius: R.row,
     paddingHorizontal: 14, paddingVertical: 12,
-    color: colors.textPrimary, fontSize: 14,
+    color: C.textPrimary, fontFamily: F.medium, fontSize: 14,
   },
 });
