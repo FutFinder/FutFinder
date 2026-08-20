@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   Image as ImageIcon,
   Calendar,
+  ShieldCheck,
 } from 'lucide-react-native';
 
 import NotificationBell from '../components/NotificationBell';
@@ -26,10 +27,12 @@ const normalizar = (s) =>
     .replace(/[\u0300-\u036f]/g, '');
 
 /**
- * Pantalla «Reservas» (pantallas 2 y 3 del handoff `Reservas.dc.html`):
- * lista de complejos + hoy con horas libres, y su hoja de filtros. La
- * variante «mapa» (pantalla 4) todavía no está construida — ver el aviso
- * en su lugar en vez de una pestaña muerta.
+ * Pantalla «Reservas» (pantallas 2, 3 y 4 del handoff `Reservas.dc.html`):
+ * lista de complejos + hoy con horas libres, su hoja de filtros, y la vista
+ * de mapa con dos pines destacados que abren una vista previa. El mapa es
+ * esquemático a propósito (igual que el prototipo): no es un `MapView` real,
+ * así que no hereda el hueco pendiente de mapa real en web
+ * (`docs/memoria/operacion/pendientes.md`).
  *
  * `mostrarJuegaHoy`/`mostrarAccesoComplejos` en el prototipo son props del
  * editor de diseño; acá van fijas en `true` (son las que trae el handoff
@@ -50,6 +53,7 @@ export default function ReservasScreen({ navigation }) {
   const [complejos, setComplejos] = useState([]);
   const [horasHoy, setHorasHoy] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [mapSel, setMapSel] = useState(null); // índice del pin elegido en la vista de mapa
 
   useEffect(() => {
     (async () => {
@@ -67,6 +71,16 @@ export default function ReservasScreen({ navigation }) {
     setBanner(mensaje);
     setTimeout(() => setBanner(null), 2400);
   }, []);
+
+  const goComplejo = useCallback(
+    (complejoId) => navigation.navigate('ComplejoDetail', { complejoId }),
+    [navigation]
+  );
+
+  // Los dos pines destacados del mapa (pantalla 4 del handoff) muestran
+  // complejos reales, no datos aparte: A es el más cercano, B el segundo.
+  const mapPins = useMemo(() => [complejos[0], complejos[1]].filter(Boolean), [complejos]);
+  const mapCard = mapSel != null ? mapPins[mapSel] : null;
 
   const complejosFiltrados = useMemo(() => {
     const q = normalizar(query);
@@ -143,11 +157,84 @@ export default function ReservasScreen({ navigation }) {
         ) : null}
 
         {vista === 'mapa' ? (
-          <View style={styles.mapPlaceholder}>
-            <MapPin color={C.textMuted} size={32} strokeWidth={1.6} />
-            <Text style={styles.mapPlaceholderText}>
-              La vista de mapa todavía no está construida en esta versión. Usa la lista mientras tanto.
-            </Text>
+          <View style={styles.mapWrap}>
+            <View style={styles.mapArt}>
+              <View style={styles.mapStreetH} />
+              <View style={styles.mapStreetV} />
+              <View style={styles.mapUserDot} />
+
+              {mapPins.map((c, i) => {
+                const on = mapSel === i;
+                return (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => setMapSel(i)}
+                    style={[
+                      styles.mapPin,
+                      i === 0 ? styles.mapPinA : styles.mapPinB,
+                      on && styles.mapPinOn,
+                    ]}
+                  >
+                    <View style={styles.mapPinIcon}>
+                      <MapPin color={C.green} size={i === 0 ? 18 : 17} strokeWidth={1.9} />
+                    </View>
+                    <View>
+                      <Text style={[styles.mapPinPrecio, i !== 0 && { fontSize: 13.5 }]}>
+                        {formatCLP(c.desde)}
+                      </Text>
+                      <Text style={styles.mapPinMeta}>★ {c.rating} · {c.proximaHoraLibre}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {mapCard ? (
+              <View style={styles.mapPreview}>
+                <View style={styles.mapPreviewPhoto}>
+                  <ImageIcon color={C.textMuted} size={20} strokeWidth={1.6} />
+                  <View style={styles.mapPreviewRating}>
+                    <Text style={styles.mapPreviewRatingText}>★ {mapCard.rating}</Text>
+                  </View>
+                </View>
+                <View style={styles.mapPreviewBody}>
+                  <Pressable onPress={() => goComplejo(mapCard.id)} style={styles.mapPreviewTitleRow}>
+                    <Text style={styles.mapPreviewNombre} numberOfLines={1}>{mapCard.nombre}</Text>
+                    <ShieldCheck color={C.green} size={15} strokeWidth={2.1} />
+                    <Text style={styles.mapPreviewPrecioBig}>{formatCLP(mapCard.desde)}</Text>
+                  </Pressable>
+                  <Text style={styles.mapPreviewMeta} numberOfLines={1}>
+                    {mapCard.sector} · {mapCard.distanciaKm} km · {mapCard.tipos.join(' y ')}
+                  </Text>
+                  <View style={styles.mapPreviewTags}>
+                    {mapCard.servicios.slice(0, 3).map((s) => (
+                      <Badge key={s} label={s} tone="neutral" />
+                    ))}
+                  </View>
+                  {mapCard.proximaHoraLibre ? (
+                    <>
+                      <Text style={styles.mapPreviewLabel}>HOY, ÚLTIMAS HORAS LIBRES</Text>
+                      <View style={styles.mapPreviewHoraChip}>
+                        <Text style={styles.mapPreviewHoraChipText}>{mapCard.proximaHoraLibre}</Text>
+                      </View>
+                    </>
+                  ) : null}
+                  <Pressable
+                    onPress={() => goComplejo(mapCard.id)}
+                    style={({ pressed }) => [styles.mapPreviewCta, pressed && { opacity: 0.9 }]}
+                  >
+                    <Text style={styles.mapPreviewCtaText}>Ver disponibilidad</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.mapEmptyCard}>
+                <MapPin color={C.green} size={18} strokeWidth={1.9} />
+                <Text style={styles.mapEmptyText}>
+                  Toca un complejo del mapa para ver sus fotos, servicios y horas libres antes de entrar.
+                </Text>
+              </View>
+            )}
           </View>
         ) : (
           <>
@@ -159,11 +246,21 @@ export default function ReservasScreen({ navigation }) {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horasScroll}>
                   {horasHoy.map((h) => (
                     <Card key={h.id} style={styles.horaCard}>
-                      <Text style={styles.horaTime}>{h.hora}</Text>
-                      <Text style={styles.horaHoy}>hoy</Text>
+                      <View style={styles.horaTopRow}>
+                        <Text style={styles.horaTime}>{h.hora}</Text>
+                        <Text style={styles.horaHoy}>· hoy</Text>
+                      </View>
                       <Text style={styles.horaNombre} numberOfLines={1}>{h.nombre}</Text>
                       <Text style={styles.horaMeta} numberOfLines={1}>{h.meta}</Text>
-                      <Text style={styles.horaPrecio}>{formatCLP(h.precio)}</Text>
+                      <View style={styles.horaBottomRow}>
+                        <Text style={styles.horaPrecio}>{formatCLP(h.precio)}</Text>
+                        <Pressable
+                          onPress={() => goComplejo(h.complejoId)}
+                          style={({ pressed }) => [styles.horaReservarBtn, pressed && { opacity: 0.85 }]}
+                        >
+                          <Text style={styles.horaReservarText}>Reservar</Text>
+                        </Pressable>
+                      </View>
                     </Card>
                   ))}
                 </ScrollView>
@@ -182,11 +279,7 @@ export default function ReservasScreen({ navigation }) {
               ) : (
                 <View style={{ gap: 11 }}>
                   {complejosFiltrados.map((c) => (
-                    <ComplejoCard
-                      key={c.id}
-                      complejo={c}
-                      onPress={() => proximamente('Muy pronto vas a poder ver la disponibilidad completa de este complejo.')}
-                    />
+                    <ComplejoCard key={c.id} complejo={c} onPress={() => goComplejo(c.id)} />
                   ))}
                 </View>
               )}
@@ -307,14 +400,81 @@ const styles = StyleSheet.create({
 
   bannerWrap: { marginTop: 14 },
 
-  mapPlaceholder: {
-    marginTop: 24,
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 60,
-    paddingHorizontal: 30,
+  mapWrap: { marginTop: 16 },
+  mapArt: {
+    height: 260,
+    borderRadius: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: '#0B0E0B',
+    overflow: 'hidden',
   },
-  mapPlaceholderText: { fontFamily: F.medium, fontSize: 13, color: C.textMuted, textAlign: 'center', lineHeight: 19 },
+  mapStreetH: {
+    position: 'absolute', left: -20, top: 100, width: 430, height: 10,
+    backgroundColor: '#101510', transform: [{ rotate: '-8deg' }],
+  },
+  mapStreetV: {
+    position: 'absolute', left: 90, top: -20, width: 10, height: 300,
+    backgroundColor: '#101510', transform: [{ rotate: '6deg' }],
+  },
+  mapUserDot: {
+    position: 'absolute', left: 46, top: 170, width: 12, height: 12, borderRadius: 999,
+    backgroundColor: '#7FA9FF', shadowColor: '#7FA9FF', shadowOpacity: 0.5, shadowRadius: 10, elevation: 3,
+  },
+  mapPin: {
+    position: 'absolute',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    height: 42, paddingHorizontal: 10, borderRadius: 999, backgroundColor: C.green,
+    shadowColor: C.green, shadowOpacity: 0.35, shadowRadius: 12, elevation: 4,
+  },
+  mapPinA: { left: 16, top: 54 },
+  mapPinB: { left: 150, top: 150, height: 40 },
+  mapPinOn: { borderWidth: 2, borderColor: C.textPrimary },
+  mapPinIcon: {
+    width: 26, height: 26, borderRadius: 999, backgroundColor: C.textOnGreen,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mapPinPrecio: { fontFamily: F.extraBold, fontSize: 14, color: C.textOnGreen },
+  mapPinMeta: { fontFamily: F.bold, fontSize: 9.5, color: 'rgba(6,19,10,0.66)', marginTop: 2 },
+
+  mapPreview: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden',
+  },
+  mapPreviewPhoto: {
+    height: 110, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center',
+  },
+  mapPreviewRating: {
+    position: 'absolute', left: 12, top: 12, height: 24, paddingHorizontal: 9, borderRadius: 999,
+    backgroundColor: 'rgba(8,10,8,0.82)', borderWidth: 1, borderColor: C.border, justifyContent: 'center',
+  },
+  mapPreviewRatingText: { fontFamily: F.bold, fontSize: 11, color: C.textPrimary },
+  mapPreviewBody: { padding: 14 },
+  mapPreviewTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  mapPreviewNombre: { flex: 1, fontFamily: F.extraBold, fontSize: 16, color: C.textPrimary },
+  mapPreviewPrecioBig: { fontFamily: F.extraBold, fontSize: 16, color: C.textPrimary },
+  mapPreviewMeta: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 5 },
+  mapPreviewTags: { flexDirection: 'row', gap: 6, marginTop: 11, flexWrap: 'wrap' },
+  mapPreviewLabel: { fontFamily: F.bold, fontSize: 10, letterSpacing: 1.4, color: C.textSecondary, marginTop: 14, marginBottom: 9 },
+  mapPreviewHoraChip: {
+    height: 42, borderRadius: 13, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16,
+  },
+  mapPreviewHoraChipText: { fontFamily: F.extraBold, fontSize: 13.5, color: C.textOnGreen },
+  mapPreviewCta: {
+    height: 46, borderRadius: 15, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center', marginTop: 12,
+  },
+  mapPreviewCtaText: { fontFamily: F.extraBold, fontSize: 13.5, color: C.textOnGreen },
+
+  mapEmptyCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 20,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+  },
+  mapEmptyText: { flex: 1, fontFamily: F.medium, fontSize: 12.5, lineHeight: 18, color: C.textSecondary },
 
   section: { marginTop: 24 },
   sectionHeader: { marginBottom: 12 },
@@ -322,12 +482,20 @@ const styles = StyleSheet.create({
   loadingText: { fontFamily: F.medium, fontSize: 13, color: C.textMuted },
 
   horasScroll: { gap: 10, paddingRight: 4 },
-  horaCard: { width: 150 },
-  horaTime: { fontFamily: F.extraBold, fontSize: 18, color: C.textPrimary },
-  horaHoy: { fontFamily: F.bold, fontSize: 10.5, color: C.green, marginTop: 1 },
-  horaNombre: { fontFamily: F.bold, fontSize: 12.5, color: C.textPrimary, marginTop: 8 },
-  horaMeta: { fontFamily: F.medium, fontSize: 11, color: C.textSecondary, marginTop: 2 },
-  horaPrecio: { fontFamily: F.extraBold, fontSize: 13, color: C.green, marginTop: 8 },
+  horaCard: { width: 196 },
+  horaTopRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  horaTime: { fontFamily: F.extraBold, fontSize: 15, color: C.green },
+  horaHoy: { fontFamily: F.semiBold, fontSize: 12, color: C.textSecondary },
+  horaNombre: { fontFamily: F.bold, fontSize: 14.5, color: C.textPrimary, marginTop: 10, letterSpacing: -0.1 },
+  horaMeta: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 3 },
+  horaBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
+  horaPrecio: { fontFamily: F.extraBold, fontSize: 13.5, color: C.textPrimary },
+  horaReservarBtn: {
+    height: 34, paddingHorizontal: 14, borderRadius: 12,
+    backgroundColor: C.shieldBg, borderWidth: 1, borderColor: C.greenDeepBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  horaReservarText: { fontFamily: F.extraBold, fontSize: 12.5, color: C.green },
 
   photoPlaceholder: {
     height: 130,

@@ -58,6 +58,10 @@ import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
 import BlockedUsersScreen from '../screens/BlockedUsersScreen';
 import ReservasUiGalleryScreen from '../screens/ReservasUiGalleryScreen';
+import ComplejoDetailScreen from '../screens/ComplejoDetailScreen';
+import ElegirCanchaScreen from '../screens/ElegirCanchaScreen';
+import FechaHoraScreen from '../screens/FechaHoraScreen';
+import ResumenReservaScreen from '../screens/ResumenReservaScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
 import withErrorBoundary from './withErrorBoundary';
@@ -116,6 +120,10 @@ const GuardedClubInviteScreen = withAuthGuard(ClubInviteScreen, 'ClubInvite');
 const GuardedSettingsScreen = withAuthGuard(SettingsScreen, 'Settings');
 const GuardedTrustScoreHistoryScreen = withAuthGuard(TrustScoreHistoryScreen, 'TrustScoreHistory');
 const GuardedBlockedUsersScreen = withAuthGuard(BlockedUsersScreen, 'BlockedUsers');
+const GuardedComplejoDetailScreen = withAuthGuard(ComplejoDetailScreen, 'ComplejoDetail');
+const GuardedElegirCanchaScreen = withAuthGuard(ElegirCanchaScreen, 'ElegirCancha');
+const GuardedFechaHoraScreen = withAuthGuard(FechaHoraScreen, 'FechaHora');
+const GuardedResumenReservaScreen = withAuthGuard(ResumenReservaScreen, 'Resumen');
 
 // Extendemos DarkTheme (que ya trae fonts + colors completos)
 // y le pisamos solo los colores corporativos de FutFinder.
@@ -376,6 +384,26 @@ export default function AppNavigator() {
         <Stack.Screen
           name="BlockedUsers"
           component={GuardedBlockedUsersScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ComplejoDetail"
+          component={GuardedComplejoDetailScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ElegirCancha"
+          component={GuardedElegirCanchaScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="FechaHora"
+          component={GuardedFechaHoraScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Resumen"
+          component={GuardedResumenReservaScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

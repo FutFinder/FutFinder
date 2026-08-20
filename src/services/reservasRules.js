@@ -68,3 +68,56 @@ export function computeMitad(totalClp) {
 export function isValidTopupAmount(amountClp) {
   return amountClp >= MIN_TOPUP_CLP;
 }
+
+const DOW_ABBR = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+
+/**
+ * Fecha en "YYYY-MM-DD" a partir de los componentes LOCALES (no
+ * `toISOString()`, que serializa en UTC y en Chile —UTC-3/-4— puede
+ * mostrar el día siguiente pasado cierta hora de la tarde).
+ */
+function toLocalISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Tira de fechas para elegir día de reserva: hoy + los siguientes `days - 1`
+ * días, con fecha real (a diferencia del prototipo, que trae "HOY 12 ago",
+ * "JUE 13 ago"… fijos). Recibe `baseDate` para poder probarla sin depender
+ * del reloj del sistema; en la app se llama sin argumento.
+ */
+export function buildFechaOptions(baseDate = new Date(), days = 6) {
+  return Array.from({ length: days }, (_, i) => {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + i);
+    return {
+      dow: i === 0 ? 'HOY' : DOW_ABBR[d.getDay()],
+      num: String(d.getDate()),
+      mes: d.toLocaleDateString('es-CL', { month: 'short' }).replace('.', ''),
+      iso: toLocalISODate(d),
+      esHoy: i === 0,
+    };
+  });
+}
+
+/** Etiqueta legible de una fecha de `buildFechaOptions`: "Hoy" o "jue 14 ago". */
+export function fechaLabel(option) {
+  if (option.esHoy) return 'Hoy';
+  return `${option.dow.toLowerCase()} ${option.num} ${option.mes}`;
+}
+
+/**
+ * Hora de término dada una hora de inicio "HH:00" y una duración en minutos
+ * (60 o 90) — a diferencia del prototipo, que siempre suma 1 hora sin mirar
+ * la duración elegida.
+ */
+export function addMinutesToHora(horaInicio, minutos) {
+  const [h] = horaInicio.split(':').map(Number);
+  const totalMin = h * 60 + minutos;
+  const hh = Math.floor(totalMin / 60) % 24;
+  const mm = totalMin % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}

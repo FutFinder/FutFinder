@@ -30,6 +30,7 @@ Esta bóveda documenta la configuración, el código y las migraciones versionad
 | Chat | [Chat](funcionalidades/chat.md) | [Seguridad](arquitectura/seguridad-y-privacidad.md), [Base de datos](arquitectura/base-de-datos.md) |
 | Perfil o amigos | [Perfil y amigos](funcionalidades/perfil-y-amigos.md) | [Navegación](arquitectura/navegacion.md), [Seguridad](arquitectura/seguridad-y-privacidad.md), [Sistema visual](diseno/sistema-visual.md) |
 | Avisos o push | [Avisos y push](funcionalidades/avisos-y-push.md) | [Configuración](funcionalidades/configuracion.md), [Despliegue](arquitectura/despliegue-y-entornos.md) |
+| Reservas de canchas | [Reservas](funcionalidades/reservas.md) | [Sistema visual](diseno/sistema-visual.md), [Navegación](arquitectura/navegacion.md) |
 | Privacidad o ajustes | [Configuración](funcionalidades/configuracion.md) | [Seguridad](arquitectura/seguridad-y-privacidad.md) |
 | Datos, migraciones, RLS o RPC | [Base de datos](arquitectura/base-de-datos.md) | [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) |
 | Seguridad, privacidad o autorización | [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) | [Base de datos](arquitectura/base-de-datos.md) |

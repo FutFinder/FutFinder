@@ -104,3 +104,23 @@ export async function getComplejoById(id) {
   const complejo = DEMO_COMPLEJOS.find((c) => c.id === id) || null;
   return { data: complejo, error: null };
 }
+
+/**
+ * Franja horaria demo de una cancha: 12 bloques de 1 hora, con los mismos 5
+ * ocupados siempre — no varía todavía por cancha ni por fecha (misma
+ * limitación de datos de ejemplo que el resto de este archivo).
+ */
+const HORAS_DEMO = [
+  '11:00', '12:00', '15:00', '16:00', '17:00', '18:00',
+  '19:00', '20:00', '21:00', '22:00', '23:00', '00:00',
+];
+const HORAS_OCUPADAS_IDX = [1, 3, 4, 9, 11];
+
+/** Disponibilidad de una cancha para una fecha dada. */
+export async function getDisponibilidad(canchaId, fechaIso) {
+  const horas = HORAS_DEMO.map((hora, i) => ({
+    hora,
+    disponible: !HORAS_OCUPADAS_IDX.includes(i),
+  }));
+  return { data: { horas }, error: null };
+}
