@@ -62,6 +62,7 @@ import ComplejoDetailScreen from '../screens/ComplejoDetailScreen';
 import ElegirCanchaScreen from '../screens/ElegirCanchaScreen';
 import FechaHoraScreen from '../screens/FechaHoraScreen';
 import ResumenReservaScreen from '../screens/ResumenReservaScreen';
+import ReportarProblemaScreen from '../screens/ReportarProblemaScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
 import withErrorBoundary from './withErrorBoundary';
@@ -124,6 +125,7 @@ const GuardedComplejoDetailScreen = withAuthGuard(ComplejoDetailScreen, 'Complej
 const GuardedElegirCanchaScreen = withAuthGuard(ElegirCanchaScreen, 'ElegirCancha');
 const GuardedFechaHoraScreen = withAuthGuard(FechaHoraScreen, 'FechaHora');
 const GuardedResumenReservaScreen = withAuthGuard(ResumenReservaScreen, 'Resumen');
+const GuardedReportarProblemaScreen = withAuthGuard(ReportarProblemaScreen, 'ReportarProblema');
 
 // Extendemos DarkTheme (que ya trae fonts + colors completos)
 // y le pisamos solo los colores corporativos de FutFinder.
@@ -404,6 +406,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Resumen"
           component={GuardedResumenReservaScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ReportarProblema"
+          component={GuardedReportarProblemaScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

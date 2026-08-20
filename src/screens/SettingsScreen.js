@@ -54,12 +54,13 @@ import {
   deleteAccount,
   verifyPassword,
   requestPasswordReset,
+  requestEmailChangeOtp,
+  verifyEmailChangeOtp,
 } from '../services/settings';
 import { getProfileLoadStatus } from '../utils/profileEdit';
 import { APP_VERSION } from '../utils/appVersion';
 import { buildMyDataExport } from '../services/dataExport';
 
-const SUPPORT_EMAIL = 'futfindercl@gmail.com';
 const TERMS_URL = 'https://futfinder.cl/terminos';
 const PRIVACY_URL = 'https://futfinder.cl/privacidad';
 
@@ -237,6 +238,47 @@ function Input(props) {
   );
 }
 
+const OTP_LENGTH = 6;
+
+/** Seis casillas de un dígito para códigos de verificación por email. */
+function OtpBoxes({ digits, onChangeDigits, error }) {
+  const inputs = useRef([]);
+
+  const handleChange = (val, idx) => {
+    const clean = val.replace(/\D/g, '').slice(-1);
+    const next = [...digits];
+    next[idx] = clean;
+    onChangeDigits(next);
+    if (clean && idx < OTP_LENGTH - 1) inputs.current[idx + 1]?.focus();
+  };
+
+  const handleKey = (e, idx) => {
+    if (e.nativeEvent.key === 'Backspace' && !digits[idx] && idx > 0) {
+      inputs.current[idx - 1]?.focus();
+    }
+  };
+
+  return (
+    <View style={styles.otpRow}>
+      {digits.map((d, i) => (
+        <TextInput
+          key={i}
+          ref={(r) => { inputs.current[i] = r; }}
+          style={[styles.otpBox, d && styles.otpBoxFilled, error && styles.otpBoxError]}
+          value={d}
+          onChangeText={(v) => handleChange(v, i)}
+          onKeyPress={(e) => handleKey(e, i)}
+          keyboardType="number-pad"
+          maxLength={1}
+          textAlign="center"
+          selectTextOnFocus
+          autoFocus={i === 0}
+        />
+      ))}
+    </View>
+  );
+}
+
 // ── Pantalla principal ────────────────────────────────────────────
 
 export default function SettingsScreen({ navigation }) {
@@ -255,6 +297,11 @@ export default function SettingsScreen({ navigation }) {
   // Email modal
   const [emailInput, setEmailInput] = useState('');
   const [currentPwdForEmail, setCurrentPwdForEmail] = useState('');
+  const [emailStep, setEmailStep] = useState('input'); // 'input' | 'code'
+  const [emailOtpDigits, setEmailOtpDigits] = useState(Array(OTP_LENGTH).fill(''));
+  const [emailOtpError, setEmailOtpError] = useState(false);
+  const [emailOtpCooldown, setEmailOtpCooldown] = useState(0);
+  const emailOtpTimerRef = useRef(null);
 
   // Password modal
   const [currentPwdInput, setCurrentPwdInput] = useState('');
@@ -275,6 +322,7 @@ export default function SettingsScreen({ navigation }) {
   useEffect(() => {
     return () => {
       if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
+      if (emailOtpTimerRef.current) clearInterval(emailOtpTimerRef.current);
     };
   }, []);
 
@@ -341,10 +389,46 @@ export default function SettingsScreen({ navigation }) {
   };
 
   // ── Cambiar email ──────────────────────────────────────────────
-  const handleChangeEmail = async () => {
+  const closeEmailModal = () => {
+    setModal(null);
+    setEmailInput('');
+    setCurrentPwdForEmail('');
+    setEmailStep('input');
+    setEmailOtpDigits(Array(OTP_LENGTH).fill(''));
+    setEmailOtpError(false);
+    setEmailOtpCooldown(0);
+    if (emailOtpTimerRef.current) clearInterval(emailOtpTimerRef.current);
+  };
+
+  const handleOtpDigitsChange = (next) => {
+    setEmailOtpDigits(next);
+    setEmailOtpError(false);
+  };
+
+  const startEmailOtpCooldown = () => {
+    let remaining = 60;
+    setEmailOtpCooldown(remaining);
+    if (emailOtpTimerRef.current) clearInterval(emailOtpTimerRef.current);
+    emailOtpTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setEmailOtpCooldown(remaining);
+      if (remaining <= 0) {
+        clearInterval(emailOtpTimerRef.current);
+        emailOtpTimerRef.current = null;
+      }
+    }, 1000);
+  };
+
+  // Paso 1: valida el email nuevo y la contraseña, y pide el código al
+  // correo ACTUAL (no al nuevo — ese código llega después, de Supabase).
+  const handleRequestEmailOtp = async () => {
     const email = emailInput.trim();
     if (!email.includes('@')) {
       showBanner('error', 'Email inválido', 'Introduce un email válido.');
+      return;
+    }
+    if (email.toLowerCase() === (profile?.email || '').toLowerCase()) {
+      showBanner('error', 'Es el mismo email', 'Ingresa un email distinto al actual.');
       return;
     }
     if (!currentPwdForEmail) {
@@ -358,13 +442,54 @@ export default function SettingsScreen({ navigation }) {
       showBanner('error', 'Contraseña incorrecta', verifyErr.message);
       return;
     }
-    const { error } = await changeEmail(email);
+    const { error } = await requestEmailChangeOtp(profile?.email);
     setSaving(false);
-    if (error) { showBanner('error', 'No se pudo cambiar', error.message); return; }
-    setModal(null);
-    setEmailInput('');
-    setCurrentPwdForEmail('');
-    showBanner('success', 'Revisa tu bandeja', 'Te enviamos un link de confirmación al nuevo email.');
+    if (error) { showBanner('error', 'No se pudo enviar el código', error.message); return; }
+    setEmailStep('code');
+    setEmailOtpDigits(Array(OTP_LENGTH).fill(''));
+    setEmailOtpError(false);
+    startEmailOtpCooldown();
+  };
+
+  // Paso 2: verifica el código del correo actual y, sólo si es correcto,
+  // recién ahí pide el cambio al email nuevo.
+  const handleConfirmEmailOtp = async () => {
+    const token = emailOtpDigits.join('');
+    if (token.length < OTP_LENGTH) {
+      showBanner('error', 'Código incompleto', `Ingresa los ${OTP_LENGTH} dígitos.`);
+      return;
+    }
+    setSaving(true);
+    const { error: otpErr } = await verifyEmailChangeOtp({ currentEmail: profile?.email, token });
+    if (otpErr) {
+      setSaving(false);
+      setEmailOtpError(true);
+      showBanner('error', 'Código incorrecto', otpErr.message);
+      return;
+    }
+    const { error } = await changeEmail(emailInput.trim());
+    setSaving(false);
+    if (error) {
+      showBanner('error', 'No se pudo cambiar', error.message);
+      // El código ya se consumió: hay que pedir uno nuevo para reintentar.
+      setEmailStep('input');
+      setEmailOtpDigits(Array(OTP_LENGTH).fill(''));
+      setEmailOtpError(false);
+      return;
+    }
+    closeEmailModal();
+    showBanner('success', 'Revisa tu bandeja', 'Te enviamos un link de confirmación al nuevo email para terminar el cambio.');
+  };
+
+  const handleResendEmailOtp = async () => {
+    if (emailOtpCooldown > 0) return;
+    setSaving(true);
+    const { error } = await requestEmailChangeOtp(profile?.email);
+    setSaving(false);
+    if (error) { showBanner('error', 'No se pudo reenviar', error.message); return; }
+    setEmailOtpDigits(Array(OTP_LENGTH).fill(''));
+    setEmailOtpError(false);
+    startEmailOtpCooldown();
   };
 
   // ── Cambiar contraseña ─────────────────────────────────────────
@@ -509,14 +634,6 @@ export default function SettingsScreen({ navigation }) {
         if (index === 0) toggleField('privacy_friend_requests', 'everyone');
         else if (index === 1) toggleField('privacy_friend_requests', 'nobody');
       },
-    );
-  };
-
-  const openSupportEmail = () => {
-    const subject = encodeURIComponent('Reportar un problema — FutFinder');
-    const body = encodeURIComponent('Describe el problema que encontraste:\n\n');
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`).catch(() =>
-      showBanner('error', 'No se pudo abrir el email', `Escríbenos a ${SUPPORT_EMAIL}`)
     );
   };
 
@@ -711,7 +828,12 @@ export default function SettingsScreen({ navigation }) {
         {/* ── SOPORTE ─────────────────────────────────────── */}
         <SectionLabel>Soporte</SectionLabel>
         <Card padded={false} style={styles.card}>
-          <Row icon={Flag} title="Reportar un problema" showChevron onPress={openSupportEmail} />
+          <Row
+            icon={Flag}
+            title="Reportar un problema"
+            showChevron
+            onPress={() => navigation.navigate('ReportarProblema')}
+          />
           <Row
             icon={FileText}
             title="Términos y condiciones"
@@ -788,33 +910,63 @@ export default function SettingsScreen({ navigation }) {
       {/* ── Modal: Cambiar email ─────────────────────────── */}
       <Sheet
         visible={modal === 'email'}
-        title="Cambiar email"
-        onClose={() => { setModal(null); setEmailInput(''); setCurrentPwdForEmail(''); }}
+        title={emailStep === 'code' ? 'Confirma tu identidad' : 'Cambiar email'}
+        onClose={closeEmailModal}
       >
-        <Text style={styles.modalHint}>
-          Recibirás un enlace de confirmación en el nuevo email antes del cambio.
-        </Text>
-        <Input
-          placeholder="Contraseña actual"
-          value={currentPwdForEmail}
-          onChangeText={setCurrentPwdForEmail}
-          secureTextEntry
-          autoFocus
-        />
-        <Input
-          style={[styles.input, { marginTop: 10 }]}
-          placeholder="Nuevo email"
-          value={emailInput}
-          onChangeText={setEmailInput}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <Button
-          label="Cambiar email"
-          loading={saving}
-          onPress={handleChangeEmail}
-          style={{ marginTop: 14 }}
-        />
+        {emailStep === 'input' ? (
+          <>
+            <Text style={styles.modalHint}>
+              Primero te pedimos un código a tu correo actual; recién después se avisa al nuevo.
+            </Text>
+            <Input
+              placeholder="Contraseña actual"
+              value={currentPwdForEmail}
+              onChangeText={setCurrentPwdForEmail}
+              secureTextEntry
+              autoFocus
+            />
+            <Input
+              style={[styles.input, { marginTop: 10 }]}
+              placeholder="Nuevo email"
+              value={emailInput}
+              onChangeText={setEmailInput}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Button
+              label="Enviar código"
+              loading={saving}
+              onPress={handleRequestEmailOtp}
+              style={{ marginTop: 14 }}
+            />
+          </>
+        ) : (
+          <>
+            <Text style={styles.modalHint}>
+              Enviamos un código de {OTP_LENGTH} dígitos a {profile?.email}. Ingrésalo para
+              continuar el cambio a {emailInput.trim()}.
+            </Text>
+            <OtpBoxes digits={emailOtpDigits} onChangeDigits={handleOtpDigitsChange} error={emailOtpError} />
+            <Pressable
+              onPress={emailOtpCooldown > 0 ? undefined : handleResendEmailOtp}
+              style={{ marginTop: 10, marginBottom: 4 }}
+              disabled={emailOtpCooldown > 0}
+            >
+              <Text style={[styles.forgotLink, emailOtpCooldown > 0 && { color: C.textMuted }]}>
+                {emailOtpCooldown > 0 ? `Reenviar en ${emailOtpCooldown}s...` : 'Reenviar código'}
+              </Text>
+            </Pressable>
+            <Button
+              label="Confirmar cambio"
+              loading={saving}
+              onPress={handleConfirmEmailOtp}
+              style={{ marginTop: 10 }}
+            />
+            <Pressable onPress={() => setEmailStep('input')} style={{ marginTop: 12, alignSelf: 'center' }}>
+              <Text style={styles.otpBackLink}>‹ Volver</Text>
+            </Pressable>
+          </>
+        )}
       </Sheet>
 
       {/* ── Modal: Cambiar contraseña ────────────────────── */}
@@ -1023,6 +1175,15 @@ const styles = StyleSheet.create({
     fontFamily: F.medium, color: C.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 12,
   },
   forgotLink: { fontFamily: F.semiBold, color: C.green, fontSize: 13 },
+  otpRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
+  otpBox: {
+    width: 44, height: 54, borderRadius: R.iconBtn,
+    backgroundColor: C.bg, borderWidth: 1, borderColor: C.border,
+    color: C.textPrimary, fontFamily: F.extraBold, fontSize: 20,
+  },
+  otpBoxFilled: { borderColor: C.green, backgroundColor: C.shieldBg },
+  otpBoxError: { borderColor: C.red },
+  otpBackLink: { fontFamily: F.semiBold, color: C.textSecondary, fontSize: 13 },
   input: {
     backgroundColor: C.bg,
     borderWidth: 1, borderColor: C.border,

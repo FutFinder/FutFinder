@@ -1,6 +1,6 @@
 # Seguridad y privacidad
 
-Última revisión: 2026-08-19
+Última revisión: 2026-08-20
 
 ## Propósito
 
@@ -36,7 +36,7 @@ Las preferencias de solicitudes, descubribilidad, categorías de avisos y radio 
 
 ## Limitaciones conocidas
 
-Las políticas y pruebas versionadas no prueban que el proyecto Supabase desplegado tenga las migraciones 35 a 40 aplicadas. El Storage de avatares y galerías es de lectura pública por política; no debe usarse para contenido que requiera confidencialidad.
+Las políticas y pruebas versionadas no prueban que el proyecto Supabase desplegado tenga las migraciones 35 a 40 aplicadas. El Storage de avatares, galerías y capturas de "Reportar un problema" (`support-screenshots`, migración 52) es de lectura pública por política; no debe usarse para contenido que requiera confidencialidad.
 
 ## Fuentes principales
 

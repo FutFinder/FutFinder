@@ -344,5 +344,35 @@ export async function uploadBannerFile(asset) {
   return { url, path };
 }
 
+/**
+ * Sube la captura de pantalla adjunta a un reporte ("Reportar un
+ * problema") al bucket `support-screenshots`, en `<userId>/<timestamp>.<ext>`
+ * — un archivo por reporte, a diferencia de avatar/portada que ocupan un
+ * único slot fijo. No toca ninguna tabla: quien llama decide cuándo
+ * asociarla a la fila del reporte (mismo criterio que `uploadAvatarFile`).
+ * Devuelve { url, path, error }.
+ */
+export async function uploadSupportScreenshot(asset, userId) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!asset || !userId) return { error: { message: 'Faltan datos' } };
+
+  const processed = await resizeAndCompress(asset);
+  const ext = extFromAsset(processed);
+  const path = `${userId}/${Date.now()}.${ext}`;
+  const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const body = await getUploadBody(processed);
+  const { error, url } = await uploadToBucket('support-screenshots', path, body, contentType);
+  if (error) {
+    console.error('[FutFinder] uploadSupportScreenshot:', error);
+    return { error };
+  }
+
+  return { url, path };
+}
+
+/** Borra un archivo del bucket `support-screenshots` por su path. */
+export const removeSupportScreenshotFile = (path) => removeFromBucket('support-screenshots', path);
+
 /** Borra un archivo del bucket `avatars` (avatar o portada) por su path. */
 export const removeAvatarBucketFile = (path) => removeFromBucket('avatars', path);

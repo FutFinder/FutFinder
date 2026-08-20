@@ -19,6 +19,39 @@ export async function requestPasswordReset() {
   return { error, email };
 }
 
+/**
+ * Paso 1 de "cambiar email": envía un código de 6 dígitos al correo ACTUAL
+ * (no al nuevo) para confirmar que quien pide el cambio sigue controlando
+ * la cuenta. `shouldCreateUser: false` porque este correo ya es de un
+ * usuario existente — nunca debe crear una cuenta nueva.
+ *
+ * Distinto del cambio de email en sí: `changeEmail()` más abajo sigue
+ * enviando, además, la confirmación de Supabase al correo NUEVO — este
+ * código no la reemplaza, se suma como resguardo adicional.
+ */
+export async function requestEmailChangeOtp(currentEmail) {
+  if (!isSupabaseConfigured) return { error: null };
+  const { error } = await supabase.auth.signInWithOtp({
+    email: currentEmail,
+    options: { shouldCreateUser: false },
+  });
+  if (error) console.error('[FutFinder] requestEmailChangeOtp:', error);
+  return { error };
+}
+
+/** Paso 2: verifica el código de 6 dígitos enviado al correo actual. */
+export async function verifyEmailChangeOtp({ currentEmail, token }) {
+  if (!isSupabaseConfigured) return { error: null };
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: currentEmail,
+    token,
+    type: 'email',
+  });
+  if (error) return { error: { message: 'Código incorrecto o vencido' } };
+  return { session: data?.session ?? null, error: null };
+}
+
+/** Paso 3: recién aquí se pide el cambio al email nuevo. */
 export async function changeEmail(newEmail) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   const { data, error } = await supabase.auth.updateUser({
