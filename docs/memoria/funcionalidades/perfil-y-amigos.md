@@ -1,6 +1,6 @@
 # Perfil y amigos
 
-Última revisión: 2026-08-08
+Última revisión: 2026-08-20 (rediseño visual de Editar perfil)
 
 ## Propósito
 
@@ -9,6 +9,8 @@ Mantener identidad, historial y reputación del jugador, además de relaciones d
 ## Flujos actuales
 
 Perfil muestra datos propios o públicos, participación, Trust Score, club y acciones de amistad. Editar valida imágenes, mantiene avatar/portada como cambios locales y sólo reemplaza lo visible tras guardar perfil. Primero sube los archivos nuevos, compensa si falla la fila de perfil y sólo luego elimina archivos anteriores; galería limpia huérfanos y prioriza borrar la fila antes del archivo. Amigos lista recibidas, enviadas y aceptadas con actualización Realtime.
+
+`EditProfileScreen` se rediseñó visualmente (handoff `Editar perfil.dc.html`, mismo proyecto de Claude Design que Ajustes/Reservas) migrando a los tokens `reservas`. Es un rediseño solo visual, sin tocar `commitProfileSave`, la validación ni el guardado local de avatar/portada. La portada vacía reutiliza `BannerBackdrop` (`components/ds/BannerBackdrop.js`, ya usado en `PlayerHeroCard`) en vez de fabricar la textura a rayas del mockup con una librería nueva. La pastilla de "Modalidad" del mockup mostraba 3 opciones cortas ("Fútbol 5/7/11"), pero `OPCIONES_MODALIDAD` real solo tiene Fútbol 7 / Fútbol 11 / Fútbol 7 y Fútbol 11 — se usó el dato real (no el del mockup) y se cambió el layout de esa fila de pills iguales a pills de ancho libre para no truncar la opción combinada.
 
 ## Reglas y permisos
 

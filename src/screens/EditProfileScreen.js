@@ -16,19 +16,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
-  User as UserIcon,
   Camera,
-  Save,
   Plus,
   X as XIcon,
   Images,
   AlertTriangle,
+  ChevronDown,
 } from 'lucide-react-native';
 
-import Logo from '../components/Logo';
-import Button from '../components/Button';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { Card, SectionLabel, Button, IconButton } from '../components/reservas/ui';
+import NotificationBell from '../components/NotificationBell';
+import BannerBackdrop from '../components/ds/BannerBackdrop';
 import Banner from '../components/Banner';
-import { colors, radius } from '../theme/colors';
 import { getMyProfileWithStatus, updateMyProfile } from '../services/profile';
 import {
   pickImage,
@@ -45,7 +45,7 @@ import {
 } from '../services/gallery';
 import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
-import { OPCIONES_MODALIDAD, OPCIONES_NIVEL } from '../utils/playerMeta';
+import { OPCIONES_MODALIDAD, OPCIONES_NIVEL, inicialDe } from '../utils/playerMeta';
 import { validateImageAsset, commitProfileSave, getProfileLoadStatus } from '../utils/profileEdit';
 
 const POSICIONES = [
@@ -59,10 +59,62 @@ const POSICIONES = [
 ];
 
 const FLANCOS = [
-  { value: 'derecho', label: 'Derecho' },
-  { value: 'izquierdo', label: 'Izquierdo' },
+  { value: 'derecho', label: 'Der' },
+  { value: 'izquierdo', label: 'Izq' },
   { value: 'ambos', label: 'Ambos' },
 ];
+
+// ── Subcomponentes propios de esta pantalla ───────────────────────
+
+function Pill({ label, active, onPress, disabled, flex }) {
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active, disabled: !!disabled }}
+      style={({ pressed }) => [
+        styles.pill,
+        flex && { flex: 1 },
+        active ? styles.pillActive : styles.pillIdle,
+        disabled && styles.pillDisabled,
+        pressed && !disabled && { opacity: 0.8 },
+      ]}
+    >
+      <Text style={[styles.pillText, active && styles.pillTextActive]} numberOfLines={1}>
+        {active ? `✓ ${label}` : label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function NivelRow({ label, sub, active, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`${label}, ${sub}`}
+      style={({ pressed }) => [styles.nivelRow, active && styles.nivelRowActive, pressed && { opacity: 0.85 }]}
+    >
+      <View style={[styles.nivelDot, active && styles.nivelDotActive]}>
+        {active ? <View style={styles.nivelDotInner} /> : null}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.nivelLabel}>{label}</Text>
+        <Text style={styles.nivelSub}>{sub}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function FieldLabel({ children }) {
+  return <Text style={styles.fieldLabel}>{children}</Text>;
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
+}
 
 export default function EditProfileScreen({ navigation }) {
   const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
@@ -345,30 +397,28 @@ export default function EditProfileScreen({ navigation }) {
     setTimeout(() => navigation.goBack(), 800);
   };
 
+  const posTope = posiciones.filter((p) => p !== 'sin_definir').length >= 4;
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.root}
     >
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <View style={styles.header}>
+          <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Editar perfil</Text>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>Otros jugadores lo ven al inscribirse contigo</Text>
+          </View>
+          <NotificationBell />
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <Pressable
-              onPress={() => navigation.goBack()}
-              hitSlop={12}
-              style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-            >
-              <ArrowLeft color={colors.textPrimary} size={20} />
-            </Pressable>
-            <Logo size={26} />
-            <View style={{ width: 40 }} />
-          </View>
-
           {banner && (
             <Banner
               type={banner.type}
@@ -380,13 +430,11 @@ export default function EditProfileScreen({ navigation }) {
 
           {loadStatus === 'loading' ? (
             <View style={styles.center}>
-              <ActivityIndicator color={colors.primary} />
+              <ActivityIndicator color={C.green} />
             </View>
           ) : loadStatus === 'error' ? (
             <View style={styles.center}>
-              <View style={styles.errorIconWrap}>
-                <AlertTriangle color={colors.error} size={22} strokeWidth={1.8} />
-              </View>
+              <AlertTriangle color={C.red} size={30} strokeWidth={1.8} />
               <Text style={styles.errorTitle}>No pudimos cargar tu perfil</Text>
               <Text style={styles.errorMsg}>
                 {loadError?.message || 'Revisa tu conexión e intenta de nuevo.'}
@@ -400,753 +448,480 @@ export default function EditProfileScreen({ navigation }) {
             </View>
           ) : (
             <>
-          <Text style={styles.title}>Editar perfil</Text>
-          <Text style={styles.subtitle}>
-            Mantén tu información al día — otros jugadores la ven al inscribirse
-            contigo.
-          </Text>
+              {/* Portada + avatar */}
+              <View style={styles.identityCard}>
+                <Pressable
+                  onPress={handlePickBanner}
+                  disabled={saving}
+                  accessibilityRole="button"
+                  accessibilityLabel={bannerUrl || pendingBanner ? 'Cambiar la portada' : 'Subir una portada'}
+                  style={styles.bannerTap}
+                >
+                  {pendingBanner ? (
+                    <Image source={{ uri: pendingBanner.uri }} style={styles.bannerImg} resizeMode="cover" />
+                  ) : bannerUrl ? (
+                    <Image source={{ uri: bannerUrl }} style={styles.bannerImg} resizeMode="cover" />
+                  ) : (
+                    <BannerBackdrop variant="empty" />
+                  )}
+                  {(bannerUrl || pendingBanner) ? (
+                    <View style={styles.bannerChip}>
+                      <Camera color="#D2D8D3" size={13} strokeWidth={2} />
+                      <Text style={styles.bannerChipText}>Cambiar portada</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.bannerChip}>
+                      <Camera color="#D2D8D3" size={15} strokeWidth={1.9} />
+                      <Text style={styles.bannerChipText}>Subir portada</Text>
+                    </View>
+                  )}
+                </Pressable>
 
-          {/* Card 1: Identidad */}
-          <View style={styles.card}>
-            <Pressable
-              onPress={handlePickAvatar}
-              disabled={saving}
-              style={({ pressed }) => [
-                styles.avatarBig,
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              {pendingAvatar ? (
-                <Image source={{ uri: pendingAvatar.uri }} style={styles.avatarImage} />
-              ) : fotoUrl ? (
-                <Image source={{ uri: fotoUrl }} style={styles.avatarImage} />
-              ) : (
-                <UserIcon color={colors.primary} size={42} strokeWidth={1.5} />
-              )}
-              <View style={styles.avatarEditBtn}>
-                {saving && pendingAvatar ? (
-                  <ActivityIndicator color="#0E0E0D" size="small" />
-                ) : (
-                  <Camera color="#0E0E0D" size={14} strokeWidth={2.2} />
-                )}
-              </View>
-            </Pressable>
-            <Text style={styles.avatarHint}>
-              {pendingAvatar
-                ? 'Foto lista — pulsa «Guardar cambios» para aplicarla'
-                : 'Toca el avatar para cambiar tu foto'}
-            </Text>
-
-            <Label>Portada del perfil</Label>
-            <Pressable
-              onPress={handlePickBanner}
-              disabled={saving}
-              accessibilityRole="button"
-              accessibilityLabel={bannerUrl || pendingBanner ? 'Cambiar la portada' : 'Subir una portada'}
-              style={({ pressed }) => [styles.bannerTap, pressed && { opacity: 0.85 }]}
-            >
-              {pendingBanner ? (
-                <Image source={{ uri: pendingBanner.uri }} style={styles.bannerImg} resizeMode="cover" />
-              ) : bannerUrl ? (
-                <Image source={{ uri: bannerUrl }} style={styles.bannerImg} resizeMode="cover" />
-              ) : (
-                <View style={styles.bannerPlaceholder}>
-                  <Camera color={colors.textMuted} size={20} />
-                  <Text style={styles.bannerHint}>Subir portada (opcional)</Text>
-                </View>
-              )}
-              {(bannerUrl || pendingBanner) && (
-                <View style={styles.bannerEditChip}>
-                  <Camera color={colors.textPrimary} size={13} />
-                  <Text style={styles.bannerEditChipText}>
-                    {pendingBanner ? 'Lista para guardar' : 'Cambiar portada'}
+                <View style={styles.avatarWrap}>
+                  <Pressable
+                    onPress={handlePickAvatar}
+                    disabled={saving}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cambiar tu foto de perfil"
+                    style={({ pressed }) => [styles.avatarBig, pressed && { opacity: 0.88 }]}
+                  >
+                    {pendingAvatar ? (
+                      <Image source={{ uri: pendingAvatar.uri }} style={styles.avatarImage} />
+                    ) : fotoUrl ? (
+                      <Image source={{ uri: fotoUrl }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={styles.avatarInitial}>{inicialDe({ username })}</Text>
+                    )}
+                    <View style={styles.avatarEditBtn}>
+                      {saving && pendingAvatar ? (
+                        <ActivityIndicator color={C.textOnGreen} size="small" />
+                      ) : (
+                        <Camera color={C.textOnGreen} size={14} strokeWidth={2.2} />
+                      )}
+                    </View>
+                  </Pressable>
+                  <Text style={styles.avatarHint}>
+                    {pendingAvatar
+                      ? 'Foto lista — pulsa «Guardar cambios» para aplicarla'
+                      : 'Toca el avatar para cambiar tu foto'}
                   </Text>
                 </View>
-              )}
-            </Pressable>
+              </View>
 
-            <Label>@username</Label>
-            <TextInput
-              style={styles.input}
-              placeholder="ej: CarlosMendez_10"
-              placeholderTextColor={colors.textMuted}
-              value={username}
-              onChangeText={(v) => setUsername(v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20))}
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={20}
-            />
-            <Text style={styles.fieldHint}>
-              Letras (mayús/minús), números y guión bajo. No es sensible a
-              mayúsculas para detectar duplicados.
-            </Text>
-
-            <View style={styles.row2}>
-              <View style={{ flex: 1 }}>
-                <Label>Edad</Label>
+              {/* Identidad */}
+              <SectionLabel>Identidad</SectionLabel>
+              <Card>
+                <FieldLabel>@username</FieldLabel>
                 <TextInput
                   style={styles.input}
-                  placeholder="24"
-                  placeholderTextColor={colors.textMuted}
-                  value={edad}
-                  onChangeText={(v) => setEdad(v.replace(/\D/g, '').slice(0, 2))}
-                  keyboardType="number-pad"
+                  placeholder="ej: CarlosMendez_10"
+                  placeholderTextColor={C.textMuted}
+                  value={username}
+                  onChangeText={(v) => setUsername(v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20))}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={20}
                 />
-              </View>
-              <View style={{ width: 12 }} />
-              <View style={{ flex: 2 }}>
-                <Label>Flanco preferido</Label>
-                <Segmented
-                  options={FLANCOS}
-                  value={flanco}
-                  onChange={setFlanco}
-                />
-              </View>
-            </View>
-
-            <Label>Posiciones preferidas (puedes elegir varias)</Label>
-            <View style={styles.posGrid}>
-              {POSICIONES.map((p) => {
-                const selected = posiciones.includes(p.value);
-                return (
-                  <Pressable
-                    key={p.value}
-                    onPress={() => togglePosicion(p.value)}
-                    style={[styles.posChip, selected && styles.posChipActive]}
-                  >
-                    <Text
-                      style={[
-                        styles.posChipLabel,
-                        selected && styles.posChipLabelActive,
-                      ]}
-                    >
-                      {selected ? '✓ ' : ''}{p.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.fieldHint}>
-              Seleccionadas: {posiciones.length} · máx. 4
-            </Text>
-
-            <Label>Modalidad que juegas</Label>
-            <View style={styles.posGrid}>
-              {OPCIONES_MODALIDAD.map((op) => {
-                const selected = modalidad === op.value;
-                return (
-                  <Pressable
-                    key={op.value}
-                    // Volver a tocar la opción activa la deselecciona.
-                    onPress={() => setModalidad(selected ? null : op.value)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`Modalidad ${op.label}`}
-                    style={[styles.posChip, selected && styles.posChipActive]}
-                  >
-                    <Text style={[styles.posChipLabel, selected && styles.posChipLabelActive]}>
-                      {selected ? '✓ ' : ''}{op.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.fieldHint}>
-              Se muestra en tu perfil. Sin elegir aparece como “Fútbol N.A.”.
-            </Text>
-
-            <Label>Tu nivel</Label>
-            <View style={styles.posGrid}>
-              {OPCIONES_NIVEL.map((op) => {
-                const selected = nivel === op.value;
-                return (
-                  <Pressable
-                    key={op.value}
-                    onPress={() => setNivel(selected ? null : op.value)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${op.label}, ${op.hint}`}
-                    style={[styles.posChip, selected && styles.posChipActive]}
-                  >
-                    <Text style={[styles.posChipLabel, selected && styles.posChipLabelActive]}>
-                      {selected ? '✓ ' : ''}{op.label} · {op.hint}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.fieldHint}>
-              Lo declaras tú; no es un ranking calculado. Sin elegir aparece como “Nivel N.A.”.
-            </Text>
-
-            <Label>Descripción (bio)</Label>
-            <TextInput
-              style={[styles.input, styles.textarea]}
-              placeholder="Cuenta tu trayectoria, en qué ligas jugaste, qué buscas en un partido…"
-              placeholderTextColor={colors.textMuted}
-              value={bio}
-              onChangeText={setBio}
-              multiline
-              numberOfLines={4}
-              maxLength={400}
-              textAlignVertical="top"
-            />
-            <Text style={styles.charCount}>{bio.length}/400</Text>
-          </View>
-
-          {/* Card 2: Ubicación */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Ubicación habitual</Text>
-            <Text style={styles.sectionSub}>
-              Te ayuda a encontrar partidos cerca de donde sueles jugar.
-            </Text>
-
-            <Label>Región</Label>
-            <Pressable
-              onPress={() => {
-                setRegionOpen(!regionOpen);
-                setComunaOpen(false);
-              }}
-              style={styles.input}
-            >
-              <Text style={styles.pickerText} numberOfLines={1}>
-                {region || 'Selecciona una región'}
-              </Text>
-            </Pressable>
-            {regionOpen && (
-              <View style={styles.picker}>
-                <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
-                  {REGIONES.map((r) => (
-                    <Pressable
-                      key={r.nombre}
-                      onPress={() => {
-                        setRegion(r.nombre);
-                        if (!r.comunas.includes(comuna)) setComuna('');
-                        setRegionOpen(false);
-                      }}
-                      style={[
-                        styles.pickerOption,
-                        r.nombre === region && styles.pickerOptionActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          r.nombre === region && styles.pickerOptionTextActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {r.nombre} ({r.codigo})
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            <Label>Comuna</Label>
-            <Pressable
-              onPress={() => {
-                if (!region) return;
-                setComunaOpen(!comunaOpen);
-                setRegionOpen(false);
-              }}
-              style={[styles.input, !region && { opacity: 0.5 }]}
-            >
-              <Text style={styles.pickerText}>
-                {comuna || (region ? 'Selecciona una comuna' : 'Primero elige una región')}
-              </Text>
-            </Pressable>
-            {comunaOpen && region && (
-              <View style={styles.picker}>
-                <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
-                  {comunasOfRegion.map((c) => (
-                    <Pressable
-                      key={c}
-                      onPress={() => {
-                        setComuna(c);
-                        setComunaOpen(false);
-                      }}
-                      style={[
-                        styles.pickerOption,
-                        c === comuna && styles.pickerOptionActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          c === comuna && styles.pickerOptionTextActive,
-                        ]}
-                      >
-                        {c}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-
-          {/* Card 3: Galería de fotos */}
-          <View style={styles.card}>
-            <View style={editGalleryStyles.header}>
-              <Images color={colors.primary} size={16} />
-              <Text style={styles.sectionTitle}>Galería de fotos</Text>
-            </View>
-            <Text style={styles.sectionSub}>
-              Hasta {MAX_PHOTOS} fotos · {galleryPhotos.length}/{MAX_PHOTOS} usadas
-            </Text>
-
-            {/* Grid de fotos existentes */}
-            {galleryPhotos.length > 0 && (
-              <View style={editGalleryStyles.grid}>
-                {galleryPhotos.map((photo) => (
-                  <View key={photo.id} style={editGalleryStyles.thumbWrap}>
-                    <Image
-                      source={{ uri: photo.photo_url }}
-                      style={editGalleryStyles.thumb}
-                      resizeMode="cover"
-                    />
-                    <Pressable
-                      onPress={() => handleDeleteGalleryPhoto(photo)}
-                      style={editGalleryStyles.deleteBtn}
-                      hitSlop={4}
-                    >
-                      <XIcon color="#fff" size={12} strokeWidth={2.8} />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Botón añadir */}
-            {galleryPhotos.length < MAX_PHOTOS ? (
-              <Pressable
-                onPress={handleAddGalleryPhoto}
-                disabled={uploadingGallery}
-                style={({ pressed }) => [
-                  editGalleryStyles.addBtn,
-                  pressed && { opacity: 0.7 },
-                  uploadingGallery && { opacity: 0.5 },
-                ]}
-              >
-                {uploadingGallery ? (
-                  <ActivityIndicator color={colors.primary} size="small" />
-                ) : (
-                  <Plus color={colors.primary} size={18} />
-                )}
-                <Text style={editGalleryStyles.addLabel}>
-                  {uploadingGallery ? 'Subiendo…' : 'Añadir foto'}
+                <Text style={styles.fieldHint}>
+                  Letras, números y guión bajo. No distingue mayúsculas al detectar duplicados.
                 </Text>
-              </Pressable>
-            ) : (
-              <Text style={editGalleryStyles.limitMsg}>
-                Límite de {MAX_PHOTOS} fotos alcanzado
-              </Text>
-            )}
-          </View>
 
-          {/* Save */}
-          <Button
-            label={saving ? 'Guardando…' : 'Guardar cambios'}
-            variant="primary"
-            onPress={handleSave}
-            loading={saving}
-            disabled={saving}
-          />
+                <View style={styles.row2}>
+                  <View style={{ width: 104 }}>
+                    <FieldLabel>Edad</FieldLabel>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="24"
+                      placeholderTextColor={C.textMuted}
+                      value={edad}
+                      onChangeText={(v) => setEdad(v.replace(/\D/g, '').slice(0, 2))}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <FieldLabel>Flanco preferido</FieldLabel>
+                    <View style={styles.pillRow}>
+                      {FLANCOS.map((f) => (
+                        <Pill
+                          key={f.value}
+                          label={f.label}
+                          active={flanco === f.value}
+                          onPress={() => setFlanco(f.value)}
+                          flex
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              </Card>
 
-          <View style={{ height: 32 }} />
+              {/* Juego */}
+              <SectionLabel>Juego</SectionLabel>
+              <Card>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.blockTitle}>Posiciones preferidas</Text>
+                  <View style={[styles.countBadge, posTope && styles.countBadgeFull]}>
+                    <Text style={[styles.countBadgeText, posTope && styles.countBadgeTextFull]}>
+                      {posiciones.filter((p) => p !== 'sin_definir').length} de 4
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.wrapPills}>
+                  {POSICIONES.map((p) => {
+                    const selected = posiciones.includes(p.value);
+                    return (
+                      <Pill
+                        key={p.value}
+                        label={p.label}
+                        active={selected}
+                        disabled={!selected && posTope}
+                        onPress={() => togglePosicion(p.value)}
+                      />
+                    );
+                  })}
+                </View>
+
+                <Divider />
+
+                <Text style={styles.blockTitle}>Modalidad que juegas</Text>
+                <View style={styles.wrapPills}>
+                  {OPCIONES_MODALIDAD.map((op) => (
+                    <Pill
+                      key={op.value}
+                      label={op.label}
+                      active={modalidad === op.value}
+                      onPress={() => setModalidad(modalidad === op.value ? null : op.value)}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.fieldHint}>
+                  Se muestra en tu perfil. Sin elegir aparece como “Fútbol N.A.”.
+                </Text>
+
+                <Divider />
+
+                <Text style={styles.blockTitle}>Tu nivel</Text>
+                <View style={{ gap: 8, marginTop: 11 }}>
+                  {OPCIONES_NIVEL.map((op) => (
+                    <NivelRow
+                      key={op.value}
+                      label={op.label}
+                      sub={op.hint}
+                      active={nivel === op.value}
+                      onPress={() => setNivel(nivel === op.value ? null : op.value)}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.fieldHint}>
+                  Lo declaras tú; no es un ranking calculado. Sin elegir aparece como “Nivel N.A.”.
+                </Text>
+              </Card>
+
+              {/* Descripción */}
+              <SectionLabel>Descripción</SectionLabel>
+              <Card>
+                <TextInput
+                  style={styles.textarea}
+                  placeholder="Cuenta tu trayectoria, en qué ligas jugaste, qué buscas en un partido…"
+                  placeholderTextColor={C.textMuted}
+                  value={bio}
+                  onChangeText={setBio}
+                  multiline
+                  numberOfLines={4}
+                  maxLength={400}
+                  textAlignVertical="top"
+                />
+                <Text style={styles.charCount}>{bio.length}/400</Text>
+              </Card>
+
+              {/* Ubicación */}
+              <SectionLabel>Ubicación habitual</SectionLabel>
+              <Card>
+                <Text style={styles.locationHint}>
+                  Te ayuda a encontrar partidos cerca de donde sueles jugar.
+                </Text>
+
+                <FieldLabel>Región</FieldLabel>
+                <Pressable
+                  onPress={() => { setRegionOpen(!regionOpen); setComunaOpen(false); }}
+                  style={styles.pickerRow}
+                >
+                  <Text style={styles.pickerText} numberOfLines={1}>
+                    {region || 'Selecciona una región'}
+                  </Text>
+                  <ChevronDown color={C.textMuted} size={17} />
+                </Pressable>
+                {regionOpen && (
+                  <View style={styles.pickerList}>
+                    <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+                      {REGIONES.map((r) => (
+                        <Pressable
+                          key={r.nombre}
+                          onPress={() => {
+                            setRegion(r.nombre);
+                            if (!r.comunas.includes(comuna)) setComuna('');
+                            setRegionOpen(false);
+                          }}
+                          style={[styles.pickerOption, r.nombre === region && styles.pickerOptionActive]}
+                        >
+                          <Text
+                            style={[styles.pickerOptionText, r.nombre === region && styles.pickerOptionTextActive]}
+                            numberOfLines={1}
+                          >
+                            {r.nombre} ({r.codigo})
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                <FieldLabel>Comuna</FieldLabel>
+                <Pressable
+                  onPress={() => { if (!region) return; setComunaOpen(!comunaOpen); setRegionOpen(false); }}
+                  style={[styles.pickerRow, !region && { opacity: 0.5 }]}
+                >
+                  <Text style={styles.pickerText}>
+                    {comuna || (region ? 'Selecciona una comuna' : 'Primero elige una región')}
+                  </Text>
+                  <ChevronDown color={C.textMuted} size={17} />
+                </Pressable>
+                {comunaOpen && region && (
+                  <View style={styles.pickerList}>
+                    <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+                      {comunasOfRegion.map((c) => (
+                        <Pressable
+                          key={c}
+                          onPress={() => { setComuna(c); setComunaOpen(false); }}
+                          style={[styles.pickerOption, c === comuna && styles.pickerOptionActive]}
+                        >
+                          <Text style={[styles.pickerOptionText, c === comuna && styles.pickerOptionTextActive]}>
+                            {c}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </Card>
+
+              {/* Galería */}
+              <View style={styles.rowBetween}>
+                <SectionLabel>Galería de fotos</SectionLabel>
+                <Text style={styles.galleryCount}>{galleryPhotos.length} de {MAX_PHOTOS}</Text>
+              </View>
+              <Card>
+                <View style={editGalleryStyles.grid}>
+                  {galleryPhotos.map((photo) => (
+                    <View key={photo.id} style={editGalleryStyles.thumbWrap}>
+                      <Image source={{ uri: photo.photo_url }} style={editGalleryStyles.thumb} resizeMode="cover" />
+                      <Pressable
+                        onPress={() => handleDeleteGalleryPhoto(photo)}
+                        style={editGalleryStyles.deleteBtn}
+                        hitSlop={4}
+                        accessibilityRole="button"
+                        accessibilityLabel="Eliminar esta foto"
+                      >
+                        <XIcon color="#D2D8D3" size={12} strokeWidth={2.6} />
+                      </Pressable>
+                    </View>
+                  ))}
+                  {galleryPhotos.length < MAX_PHOTOS && (
+                    <Pressable
+                      onPress={handleAddGalleryPhoto}
+                      disabled={uploadingGallery}
+                      accessibilityRole="button"
+                      accessibilityLabel="Añadir foto a la galería"
+                      style={({ pressed }) => [
+                        editGalleryStyles.addTile,
+                        pressed && { opacity: 0.75 },
+                        uploadingGallery && { opacity: 0.5 },
+                      ]}
+                    >
+                      {uploadingGallery ? (
+                        <ActivityIndicator color={C.green} size="small" />
+                      ) : (
+                        <>
+                          <Plus color={C.green} size={20} strokeWidth={2} />
+                          <Text style={editGalleryStyles.addLabel}>Añadir foto</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  )}
+                </View>
+                {galleryPhotos.length === 0 && (
+                  <View style={editGalleryStyles.emptyRow}>
+                    <Images color={C.textMuted} size={14} />
+                    <Text style={editGalleryStyles.emptyText}>Aún no subes fotos a tu galería</Text>
+                  </View>
+                )}
+              </Card>
+
+              <View style={styles.footerSpace} />
             </>
           )}
         </ScrollView>
+
+        {loadStatus === 'ready' && (
+          <View style={styles.footer}>
+            <Button
+              label={saving ? 'Guardando…' : 'Guardar cambios'}
+              onPress={handleSave}
+              loading={saving}
+              disabled={saving}
+            />
+          </View>
+        )}
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
 
-function Label({ children }) {
-  return <Text style={styles.label}>{children}</Text>;
-}
-
-function Segmented({ options, value, onChange }) {
-  return (
-    <View style={styles.segmented}>
-      {options.map((o) => (
-        <Pressable
-          key={o.value}
-          onPress={() => onChange(o.value)}
-          style={[
-            styles.segmentBtn,
-            value === o.value && styles.segmentBtnActive,
-          ]}
-        >
-          <Text
-            style={[
-              styles.segmentLabel,
-              value === o.value && styles.segmentLabelActive,
-            ]}
-          >
-            {o.label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32, flexGrow: 1 },
-  center: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 24,
-    gap: 10,
-  },
-  errorIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: colors.errorSoft,
-    borderWidth: 1,
-    borderColor: colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  errorTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  errorMsg: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: 6,
-    height: 44,
-    paddingHorizontal: 24,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  retryLabel: {
-    color: '#0E0E0D',
-    fontSize: 14,
-    fontWeight: '800',
-  },
+  root: { flex: 1, backgroundColor: C.bg },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    marginBottom: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 10,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  card: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  sectionSub: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginBottom: 14,
-  },
+  headerTitle: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 19, letterSpacing: -0.3 },
+  headerSubtitle: { fontFamily: F.medium, color: C.textSecondary, fontSize: 12, marginTop: 2 },
 
+  scroll: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, gap: 11 },
+  center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 24, gap: 12 },
+  errorTitle: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 16, textAlign: 'center' },
+  errorMsg: { fontFamily: F.medium, color: C.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  retryBtn: {
+    marginTop: 4, height: 44, paddingHorizontal: 24, borderRadius: R.pill,
+    backgroundColor: C.green, alignItems: 'center', justifyContent: 'center',
+  },
+  retryLabel: { fontFamily: F.extraBold, color: C.textOnGreen, fontSize: 14 },
+
+  identityCard: {
+    borderRadius: R.card, overflow: 'hidden', borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
+  },
+  bannerTap: { height: 104, alignItems: 'center', justifyContent: 'center' },
+  bannerImg: { ...StyleSheet.absoluteFillObject },
+  bannerChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, height: 34, paddingHorizontal: 13,
+    borderRadius: R.pill, backgroundColor: 'rgba(8,10,8,0.8)', borderWidth: 1, borderColor: '#3A4139',
+  },
+  bannerChipText: { fontFamily: F.bold, color: '#D2D8D3', fontSize: 12 },
+
+  avatarWrap: { paddingHorizontal: 16, paddingBottom: 18, marginTop: -34, alignItems: 'center' },
   avatarBig: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 8,
-    position: 'relative',
-    overflow: 'hidden',
+    width: 84, height: 84, borderRadius: 42, backgroundColor: C.surfaceAlt,
+    borderWidth: 3, borderColor: C.green, alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden', position: 'relative',
   },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarInitial: { fontFamily: F.extraBold, color: C.textSecondary, fontSize: 26 },
   avatarEditBtn: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.surfaceAlt,
+    position: 'absolute', bottom: -2, right: -2, width: 30, height: 30, borderRadius: 15,
+    backgroundColor: C.green, borderWidth: 3, borderColor: C.surface, alignItems: 'center', justifyContent: 'center',
   },
-  avatarHint: {
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 11,
-    marginBottom: 18,
-  },
-  bannerTap: {
-    width: '100%',
-    height: 120,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  bannerImg: { width: '100%', height: '100%' },
-  bannerPlaceholder: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-  },
-  bannerHint: { color: colors.textMuted, fontSize: 13 },
-  bannerEditChip: {
-    position: 'absolute',
-    right: 10,
-    bottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  bannerEditChipText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
+  avatarHint: { fontFamily: F.medium, color: C.textMuted, fontSize: 11.5, marginTop: 10, textAlign: 'center' },
 
-  label: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 6,
-    marginTop: 6,
-  },
+  fieldLabel: { fontFamily: F.bold, color: C.textSecondary, fontSize: 12, marginTop: 14 },
   input: {
-    height: 48,
-    borderRadius: radius.md,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    color: colors.textPrimary,
-    fontSize: 14,
-    justifyContent: 'center',
+    height: 48, marginTop: 9, paddingHorizontal: 14, borderRadius: R.iconBtn,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+    color: C.textPrimary, fontFamily: F.bold, fontSize: 14.5,
   },
+  fieldHint: { fontFamily: F.medium, color: C.textMuted, fontSize: 11, lineHeight: 15, marginTop: 8 },
+  row2: { flexDirection: 'row', gap: 11, marginTop: 16 },
+
+  pillRow: { flexDirection: 'row', gap: 6, marginTop: 9 },
+  wrapPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 11 },
+  pill: {
+    height: 36, paddingHorizontal: 13, borderRadius: 12, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pillActive: { backgroundColor: C.shieldBg, borderColor: C.green },
+  pillIdle: { backgroundColor: C.surfaceAlt, borderColor: C.border },
+  pillDisabled: { opacity: 0.4 },
+  pillText: { fontFamily: F.extraBold, color: C.textSecondary, fontSize: 12.5 },
+  pillTextActive: { color: C.green },
+
+  rowBetween: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  blockTitle: { fontFamily: F.bold, color: C.textPrimary, fontSize: 13.5 },
+  countBadge: {
+    height: 24, paddingHorizontal: 9, borderRadius: R.pill, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
+  countBadgeFull: { backgroundColor: C.shieldBg, borderColor: C.greenDeepBorder },
+  countBadgeText: { fontFamily: F.extraBold, color: C.textSecondary, fontSize: 11 },
+  countBadgeTextFull: { color: C.green },
+
+  divider: { height: 1, backgroundColor: C.dividerInner, marginVertical: 17 },
+
+  nivelRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%',
+    paddingHorizontal: 14, paddingVertical: 12, borderRadius: R.iconBtn,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
+  nivelRowActive: { backgroundColor: C.selectedBg, borderColor: C.green },
+  nivelDot: {
+    width: 18, height: 18, borderRadius: 999, flexShrink: 0,
+    borderWidth: 2, borderColor: '#3A4139', backgroundColor: 'transparent',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  nivelDotActive: { borderColor: C.green, backgroundColor: C.green },
+  // Punto interior más oscuro: imita el box-shadow inset del handoff (un
+  // aro verde con el centro del color de la tarjeta seleccionada).
+  nivelDotInner: { width: 8, height: 8, borderRadius: 999, backgroundColor: C.selectedBg },
+  nivelLabel: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 13.5 },
+  nivelSub: { fontFamily: F.medium, color: C.textSecondary, fontSize: 11.5, marginTop: 2 },
+
   textarea: {
-    height: 110,
-    paddingTop: 12,
-    paddingBottom: 12,
+    height: 104, padding: 13, borderRadius: R.row, backgroundColor: C.surfaceAlt,
+    borderWidth: 1, borderColor: C.border, color: C.textPrimary, fontFamily: F.medium, fontSize: 13.5, lineHeight: 20,
   },
-  charCount: {
-    color: colors.textMuted,
-    fontSize: 11,
-    textAlign: 'right',
-    marginTop: 4,
-  },
-  fieldHint: {
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 4,
-    lineHeight: 15,
-  },
-  row2: { flexDirection: 'row' },
+  charCount: { fontFamily: F.semiBold, color: C.textMuted, fontSize: 11, textAlign: 'right', marginTop: 7 },
 
-  posGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 6,
+  locationHint: { fontFamily: F.medium, color: C.textSecondary, fontSize: 11.5, lineHeight: 17 },
+  pickerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, marginTop: 9,
+    paddingHorizontal: 14, borderRadius: R.iconBtn, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
   },
-  posChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+  pickerText: { flex: 1, fontFamily: F.bold, color: C.textPrimary, fontSize: 14 },
+  pickerList: {
+    marginTop: 6, backgroundColor: C.bg, borderRadius: R.iconBtn, borderWidth: 1, borderColor: C.border, overflow: 'hidden',
   },
-  posChipActive: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
-  },
-  posChipLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  posChipLabelActive: {
-    color: colors.primary,
-    fontWeight: '800',
-  },
+  pickerOption: { paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: C.dividerInner },
+  pickerOptionActive: { backgroundColor: C.selectedBg },
+  pickerOptionText: { fontFamily: F.medium, color: C.textPrimary, fontSize: 13 },
+  pickerOptionTextActive: { fontFamily: F.bold, color: C.green },
 
-  segmented: {
-    flexDirection: 'row',
-    gap: 6,
-    height: 48,
-  },
-  segmentBtn: {
-    flex: 1,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentBtnActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
-  },
-  segmentLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  segmentLabelActive: {
-    color: colors.primary,
-    fontWeight: '800',
-  },
+  galleryCount: { fontFamily: F.semiBold, color: C.textMuted, fontSize: 11.5 },
 
-  pickerText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  picker: {
-    marginTop: 6,
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  pickerOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-  },
-  pickerOptionActive: {
-    backgroundColor: colors.primarySoft,
-  },
-  pickerOptionText: {
-    color: colors.textPrimary,
-    fontSize: 13,
-  },
-  pickerOptionTextActive: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
+  footerSpace: { height: 4 },
+  footer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, backgroundColor: C.bg },
 });
 
 // Constantes y estilos para la galería de edición
 const EDIT_SCREEN_W = Dimensions.get('window').width;
-// scroll paddingHorizontal: 20 → card padding: 18 → útil = screenW - 40 - 36
-// 3 columnas con gap de 6
-const EDIT_THUMB = Math.floor((EDIT_SCREEN_W - 40 - 36 - 6 * 2) / 3);
+// scroll paddingHorizontal: 16 → card padding: 16 → útil = screenW - 32 - 32
+// 2 columnas con gap de 10, más la tarjeta "Añadir foto"
+const EDIT_THUMB = Math.floor((EDIT_SCREEN_W - 32 - 32 - 10) / 2);
 
 const editGalleryStyles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
-    marginTop: 8,
-  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   thumbWrap: {
-    width: EDIT_THUMB,
-    height: EDIT_THUMB,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    backgroundColor: colors.background,
-    position: 'relative',
+    width: EDIT_THUMB, height: EDIT_THUMB, borderRadius: 16, overflow: 'hidden',
+    backgroundColor: C.surfaceAlt, position: 'relative', borderWidth: 1, borderColor: C.border,
   },
   thumb: { width: '100%', height: '100%' },
   deleteBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 7, right: 7, width: 24, height: 24, borderRadius: 999,
+    backgroundColor: 'rgba(8,10,8,0.85)', borderWidth: 1, borderColor: '#3A4139',
+    alignItems: 'center', justifyContent: 'center',
   },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 44,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    backgroundColor: colors.primarySoft,
+  addTile: {
+    width: EDIT_THUMB, height: EDIT_THUMB, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed',
+    borderColor: '#3A4139', alignItems: 'center', justifyContent: 'center', gap: 7,
   },
-  addLabel: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  limitMsg: {
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 8,
-  },
+  addLabel: { fontFamily: F.bold, color: C.green, fontSize: 12 },
+  emptyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  emptyText: { fontFamily: F.medium, color: C.textMuted, fontSize: 12 },
 });
