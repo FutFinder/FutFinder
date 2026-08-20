@@ -61,6 +61,7 @@ import {
   removeFriend,
 } from '../services/friends';
 import { reportUser, countReportsAgainst, getMyPendingReportFor } from '../services/reports';
+import { isBlockedByMe, blockUser, unblockUser } from '../services/blockedUsers';
 import { isSupabaseConfigured } from '../services/supabase';
 import {
   playerBadges,
@@ -121,6 +122,7 @@ export default function ProfileScreen({ navigation, route }) {
   const [accountStatus, setAccountStatus] = useState({ suspended: false, suspended_until: null });
   const [reportesRecibidos, setReportesRecibidos] = useState(0);
   const [friendship, setFriendship] = useState(null);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [misClubs, setMisClubs] = useState([]);
   const [yaReportado, setYaReportado] = useState(false);
 
@@ -134,6 +136,7 @@ export default function ProfileScreen({ navigation, route }) {
   const [avatarViewer, setAvatarViewer] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(null);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [blockConfirm, setBlockConfirm] = useState(false);
 
   // Contexto único: se compara por identificador, nunca por nombre.
   const isOwnProfile = !viewUserId || (myId !== null && viewUserId === myId);
@@ -195,17 +198,20 @@ export default function ProfileScreen({ navigation, route }) {
       if (propio) {
         setFriendship(null);
         setYaReportado(false);
+        setIsBlocked(false);
         const clubs = await getMyClubs();
         setMisClubs(clubs.data || []);
       } else {
-        const [f, clubs, reporteMio] = await Promise.all([
+        const [f, clubs, reporteMio, bloqueado] = await Promise.all([
           getFriendshipWith(viewUserId),
           getMyClubs(),
           getMyPendingReportFor(viewUserId),
+          isBlockedByMe(viewUserId),
         ]);
         setFriendship(f);
         setMisClubs(clubs.data || []);
         setYaReportado(Boolean(reporteMio.data));
+        setIsBlocked(bloqueado);
       }
     } catch (e) {
       console.error('[FutFinder] ProfileScreen load:', e?.message || e);
@@ -305,6 +311,19 @@ export default function ProfileScreen({ navigation, route }) {
 
   const handleRemoveFriend = () =>
     runFriendAction(() => removeFriend(viewUserId), null, null, 'No pude eliminar');
+
+  const handleConfirmBlock = async () => {
+    setBlockConfirm(false);
+    await runFriendAction(
+      () => blockUser(viewUserId),
+      'Usuario bloqueado',
+      'Ya no podrá enviarte solicitudes ni escribirte.',
+      'No pude bloquear'
+    );
+  };
+
+  const handleUnblock = () =>
+    runFriendAction(() => unblockUser(viewUserId), 'Usuario desbloqueado', null, 'No pude desbloquear');
 
   const handleSendMessage = () => {
     if (!viewUserId || !profile) return;
@@ -482,6 +501,7 @@ export default function ProfileScreen({ navigation, route }) {
               busy={friendBusy}
               puedeInvitarAClub={puedeInvitarAClub}
               yaReportado={yaReportado}
+              isBlocked={isBlocked}
               onAdd={handleAddFriend}
               onAccept={handleAcceptFriend}
               onReject={handleRejectFriend}
@@ -490,6 +510,8 @@ export default function ProfileScreen({ navigation, route }) {
               onMessage={handleSendMessage}
               onInviteClub={handleInviteClub}
               onReport={() => setReportOpen(true)}
+              onBlock={() => setBlockConfirm(true)}
+              onUnblock={handleUnblock}
             />
           </View>
         )}
@@ -648,6 +670,40 @@ export default function ProfileScreen({ navigation, route }) {
             </Pressable>
             <Pressable
               onPress={() => setLogoutConfirm(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar"
+              style={({ pressed }) => [styles.dialogCancel, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.dialogCancelText}>Cancelar</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Confirmación de bloqueo */}
+      <Modal
+        visible={blockConfirm}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setBlockConfirm(false)}
+      >
+        <Pressable style={styles.dialogBackdrop} onPress={() => setBlockConfirm(false)}>
+          <Pressable style={styles.dialog} onPress={() => {}}>
+            <Text style={styles.dialogTitle}>¿Bloquear a @{profile.username || 'jugador'}?</Text>
+            <Text style={styles.dialogText}>
+              No podrá enviarte solicitudes de amistad ni escribirte. Puedes desbloquearlo cuando quieras.
+            </Text>
+            <Pressable
+              onPress={handleConfirmBlock}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar bloqueo"
+              style={({ pressed }) => [styles.dialogDanger, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.dialogDangerText}>Bloquear</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setBlockConfirm(false)}
               accessibilityRole="button"
               accessibilityLabel="Cancelar"
               style={({ pressed }) => [styles.dialogCancel, pressed && { opacity: 0.7 }]}

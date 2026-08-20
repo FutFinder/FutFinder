@@ -8,6 +8,7 @@ import {
   Clock,
   Shield,
   Flag,
+  Ban,
 } from 'lucide-react-native';
 
 import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
@@ -21,6 +22,14 @@ import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
  *
  * El estado de amistad se deriva de `friendship` + `myId`, igual que antes del
  * rediseño, para no cambiar el comportamiento del sistema de amigos.
+ *
+ * `isBlocked` (¿yo bloqueé a este jugador?) manda sobre todo lo demás: si es
+ * `true`, se esconden las acciones de amistad/invitación y solo queda
+ * "Desbloquear". Si ÉL me bloqueó a mí, `friendship.status` puede llegar en
+ * 'blocked' pero `isBlocked` es `false` — no hay forma de saberlo desde acá
+ * (por diseño, ver blockedUsers.js), así que se sigue mostrando "Agregar
+ * amigo" con normalidad: si lo intenta, la RLS lo rechaza igual que un
+ * perfil con privacidad cerrada, con el mismo mensaje genérico.
  */
 export default function PlayerPublicActions({
   friendship,
@@ -28,6 +37,7 @@ export default function PlayerPublicActions({
   busy,
   puedeInvitarAClub,
   yaReportado,
+  isBlocked,
   onAdd,
   onAccept,
   onReject,
@@ -36,6 +46,8 @@ export default function PlayerPublicActions({
   onMessage,
   onInviteClub,
   onReport,
+  onBlock,
+  onUnblock,
 }) {
   let estado = 'none';
   if (friendship) {
@@ -50,68 +62,70 @@ export default function PlayerPublicActions({
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.row}>
-        {estado === 'none' && (
-          <Primary
-            onPress={onAdd}
-            busy={busy}
-            icon={<UserPlus color={dsColors.greenInk} size={17} strokeWidth={2.4} />}
-            label="Agregar amigo"
-          />
-        )}
-
-        {estado === 'sent' && (
-          <Outline
-            onPress={onCancel}
-            busy={busy}
-            icon={<Clock color={dsColors.textSecondary} size={15} strokeWidth={2} />}
-            label="Solicitud enviada · cancelar"
-          />
-        )}
-
-        {estado === 'received' && (
-          <>
+      {!isBlocked && (
+        <View style={styles.row}>
+          {estado === 'none' && (
             <Primary
-              onPress={onAccept}
+              onPress={onAdd}
               busy={busy}
-              icon={<UserCheck color={dsColors.greenInk} size={17} strokeWidth={2.4} />}
-              label="Aceptar"
+              icon={<UserPlus color={dsColors.greenInk} size={17} strokeWidth={2.4} />}
+              label="Agregar amigo"
             />
-            <Pressable
-              onPress={onReject}
-              disabled={busy}
-              accessibilityRole="button"
-              accessibilityLabel="Rechazar la solicitud de amistad"
-              style={({ pressed }) => [
-                styles.iconBtn,
-                busy && styles.busy,
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <UserX color={dsColors.loss} size={17} strokeWidth={2.2} />
-            </Pressable>
-          </>
-        )}
+          )}
 
-        {sonAmigos && (
-          <>
+          {estado === 'sent' && (
             <Outline
-              onPress={onRemove}
+              onPress={onCancel}
               busy={busy}
-              icon={<UserCheck color={dsColors.green} size={15} strokeWidth={2.2} />}
-              label="Amigos · quitar"
-              tint={dsColors.green}
+              icon={<Clock color={dsColors.textSecondary} size={15} strokeWidth={2} />}
+              label="Solicitud enviada · cancelar"
             />
-            <Outline
-              onPress={onMessage}
-              icon={<MessageCircle color={dsColors.textPrimary} size={16} strokeWidth={2} />}
-              label="Contactar"
-            />
-          </>
-        )}
-      </View>
+          )}
 
-      {puedeInvitarAClub && (
+          {estado === 'received' && (
+            <>
+              <Primary
+                onPress={onAccept}
+                busy={busy}
+                icon={<UserCheck color={dsColors.greenInk} size={17} strokeWidth={2.4} />}
+                label="Aceptar"
+              />
+              <Pressable
+                onPress={onReject}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel="Rechazar la solicitud de amistad"
+                style={({ pressed }) => [
+                  styles.iconBtn,
+                  busy && styles.busy,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <UserX color={dsColors.loss} size={17} strokeWidth={2.2} />
+              </Pressable>
+            </>
+          )}
+
+          {sonAmigos && (
+            <>
+              <Outline
+                onPress={onRemove}
+                busy={busy}
+                icon={<UserCheck color={dsColors.green} size={15} strokeWidth={2.2} />}
+                label="Amigos · quitar"
+                tint={dsColors.green}
+              />
+              <Outline
+                onPress={onMessage}
+                icon={<MessageCircle color={dsColors.textPrimary} size={16} strokeWidth={2} />}
+                label="Contactar"
+              />
+            </>
+          )}
+        </View>
+      )}
+
+      {!isBlocked && puedeInvitarAClub && (
         <Pressable
           onPress={onInviteClub}
           accessibilityRole="button"
@@ -122,6 +136,24 @@ export default function PlayerPublicActions({
           <Text style={styles.clubText}>Invitar a mi club</Text>
         </Pressable>
       )}
+
+      <Pressable
+        onPress={isBlocked ? onUnblock : onBlock}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={isBlocked ? 'Desbloquear a este jugador' : 'Bloquear a este jugador'}
+        style={({ pressed }) => [
+          styles.blockBtn,
+          isBlocked && styles.blockBtnActive,
+          busy && styles.busy,
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        <Ban color={isBlocked ? dsColors.loss : dsColors.textMuted} size={16} strokeWidth={2} />
+        <Text style={[styles.blockText, isBlocked && styles.blockTextActive]}>
+          {isBlocked ? 'Bloqueado · Desbloquear' : 'Bloquear usuario'}
+        </Text>
+      </Pressable>
 
       <Pressable
         onPress={onReport}
@@ -239,6 +271,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   clubText: { color: dsColors.green, fontSize: 13.5, fontWeight: '700' },
+
+  blockBtn: {
+    minHeight: 44,
+    borderRadius: dsRadius.md,
+    borderWidth: 1,
+    borderColor: dsColors.border,
+    backgroundColor: dsColors.chip,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  blockBtnActive: {
+    borderColor: 'rgba(232, 115, 123, 0.35)',
+    backgroundColor: 'rgba(232, 115, 123, 0.08)',
+  },
+  blockText: { color: dsColors.textMuted, fontSize: 13.5, fontWeight: '700' },
+  blockTextActive: { color: dsColors.loss },
 
   reportBtn: {
     minHeight: 46,

@@ -1,6 +1,6 @@
 # Seguridad y privacidad
 
-Última revisión: 2026-08-17
+Última revisión: 2026-08-19
 
 ## Propósito
 
@@ -27,6 +27,8 @@ Auth de Supabase define la identidad; `AuthProvider` y `withAuthGuard` evitan mo
 - **El encuentro entre clubes tiene una sola puerta para cerrarse y otra para cancelarse** (migración 50). `matches.id_organizador` de un partido nacido de una propuesta es el administrador que la aprobó, y con eso pasaba por dos RPC genéricas que no se pensaron para este flujo: `save_match_attendance()` marcaba la asistencia con −15 de Trust Score por ausente y ponía `finalizado` sin mirar `club_match_results`, y `cancel_match()` cancelaba con penalización personal y sin sanción de club. Las dos rechazan ahora `challenge_proposal_id is not null`. La interfaz ya no las ofrecía —`MatchDetailScreen` calcula `isOrganizer` con `&& !usaNominaClub`—, pero esconder un botón es cortesía y no autorización: es el mismo razonamiento con el que la 44e cerró la escritura directa de `attendees` y con el que la 48b cerró su propia puerta trasera.
 - Responder una propuesta —aprobarla o rechazarla— pide dos condiciones, no una: ser administrador de un club del desafío distinto al proponente **y** no pertenecer al club proponente en ningún rol. La primera sola no basta: quien administra el club rival y además juega en el que propuso pasaba el filtro y se respondía a sí mismo. El trigger que impide crear un desafío entre clubes que comparten administrador no cubre esto, porque las membresías cambian después de creado el desafío; hay que volver a comprobarlo al responder. La interfaz espeja la regla (`getChallengeCta` devuelve `conflicto_pertenencia`) para no ofrecer un botón que el servidor va a rechazar, pero la protección es la del servidor.
 - Un token de idempotencia que genera el cliente no es una credencial. La primera versión de `crear_propuesta_oficial()` resolvía el reintento por `client_token` antes de autorizar, así que acertar un token entregaba la propuesta a cualquiera; la 43b mueve esa resolución después de derivar el club desde `club_members` y la ata al desafío pedido. En una función `security definer`, todo `return` temprano tiene que estar después de la autorización.
+- **Bloqueo de usuarios** (migración 51) vive en `blocked_users`, una tabla nueva, y NO reutiliza `friendships.status = 'blocked'` como fuente de verdad pese a que ese valor existe en el CHECK desde la migración 06 y `messages.js` ya sabía mostrar "Conversación no disponible" para él. El motivo: `friendships_delete` (migración 06) deja borrar la fila a cualquiera de los dos, así que si el bloqueo viviera solo ahí, la persona bloqueada podría desbloquearse a sí misma borrando la fila desde su propio cliente. `blocked_users` sólo se puede leer/crear/borrar como `blocker_id = auth.uid()`, así que la persona bloqueada nunca ve ni toca esa fila. `bloquear_usuario()`/`desbloquear_usuario()` (`security definer`) además escriben/limpian una fila de `friendships` en 'blocked' como EFECTO (no como registro) del bloqueo: eso basta para que `friendships_accepted()` (que sólo deja pasar 'accepted') corte el DM sin tocar la migración 36, y para heredar gratis el mensaje que `messages.js` ya tenía escrito. `friendships_insert` (migración 35) se extendió con `not is_blocked_pair(...)` para que un bloqueo también impida solicitudes de amistad nuevas en cualquier dirección; `is_blocked_pair()` es `security definer` a propósito (la RLS de `blocked_users` no deja ver la fila de la otra dirección) pero sólo devuelve un booleano, nunca revela quién bloqueó a quién.
+- Alcance del bloqueo, explícito porque no está cubierto: no filtra a la persona bloqueada de búsquedas, partidos ni chats grupales/de club, sigue viéndose ahí. Si eso hace falta es un alcance nuevo.
 
 ## Privacidad y avisos
 
@@ -39,8 +41,9 @@ Las políticas y pruebas versionadas no prueban que el proyecto Supabase despleg
 ## Fuentes principales
 
 - `src/contexts/AuthContext.js`, `src/navigation/withAuthGuard.js` y `src/utils/searchPlayersQuery.js`
-- `supabase/migrations/35_privacy_friend_requests_rls.sql`, `36_chat_seguridad_rls.sql`, `37_chat_helpers_security_invoker.sql` y `39_chat_mencion_todos.sql`
-- `supabase/functions/send-push/` y `supabase/tests/35_privacy_test.sql`
+- `supabase/migrations/35_privacy_friend_requests_rls.sql`, `36_chat_seguridad_rls.sql`, `37_chat_helpers_security_invoker.sql`, `39_chat_mencion_todos.sql` y `51_usuarios_bloqueados.sql`
+- `supabase/functions/send-push/`, `supabase/tests/35_privacy_test.sql` y `supabase/tests/51_usuarios_bloqueados_test.sql`
+- `src/services/blockedUsers.js`, `src/components/player/PlayerPublicActions.js` y `src/screens/BlockedUsersScreen.js`
 
 ## Revocar EXECUTE en una RPC: `public`, no `anon`
 

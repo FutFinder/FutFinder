@@ -56,6 +56,7 @@ import EditClubScreen from '../screens/EditClubScreen';
 import ClubInviteScreen from '../screens/ClubInviteScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
+import BlockedUsersScreen from '../screens/BlockedUsersScreen';
 import ReservasUiGalleryScreen from '../screens/ReservasUiGalleryScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
@@ -114,6 +115,7 @@ const GuardedEditClubScreen = withAuthGuard(EditClubScreen, 'EditClub');
 const GuardedClubInviteScreen = withAuthGuard(ClubInviteScreen, 'ClubInvite');
 const GuardedSettingsScreen = withAuthGuard(SettingsScreen, 'Settings');
 const GuardedTrustScoreHistoryScreen = withAuthGuard(TrustScoreHistoryScreen, 'TrustScoreHistory');
+const GuardedBlockedUsersScreen = withAuthGuard(BlockedUsersScreen, 'BlockedUsers');
 
 // Extendemos DarkTheme (que ya trae fonts + colors completos)
 // y le pisamos solo los colores corporativos de FutFinder.
@@ -369,6 +371,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="TrustScoreHistory"
           component={GuardedTrustScoreHistoryScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="BlockedUsers"
+          component={GuardedBlockedUsersScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

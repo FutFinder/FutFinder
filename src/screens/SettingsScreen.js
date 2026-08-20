@@ -13,6 +13,7 @@ import {
   Linking,
   ActivityIndicator,
   PanResponder,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -35,6 +36,12 @@ import {
   X,
   SlidersHorizontal,
   FileLock,
+  AlertTriangle,
+  Globe,
+  Moon,
+  ShieldOff,
+  Info,
+  Download,
 } from 'lucide-react-native';
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -42,7 +49,8 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { colors, radius } from '../theme/colors';
 import Banner from '../components/Banner';
 import Button from '../components/Button';
-import { getMyProfile, updateMyProfile } from '../services/profile';
+import { getMyProfileWithStatus, updateMyProfile } from '../services/profile';
+import { getMyClub } from '../services/clubs';
 import { signOut } from '../services/auth';
 import {
   changeEmail,
@@ -51,6 +59,9 @@ import {
   verifyPassword,
   requestPasswordReset,
 } from '../services/settings';
+import { getProfileLoadStatus } from '../utils/profileEdit';
+import { APP_VERSION } from '../utils/appVersion';
+import { buildMyDataExport } from '../services/dataExport';
 
 const SUPPORT_EMAIL = 'futfindercl@gmail.com';
 const TERMS_URL = 'https://futfinder.cl/terminos';
@@ -161,7 +172,9 @@ export default function SettingsScreen({ navigation }) {
   const { showActionSheetWithOptions } = useActionSheet();
 
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [misClub, setMisClub] = useState(null);
+  const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
+  const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
 
@@ -195,10 +208,23 @@ export default function SettingsScreen({ navigation }) {
   }, []);
 
   const load = useCallback(async () => {
-    const p = await getMyProfile();
+    setLoadStatus('loading');
+    setLoadError(null);
+    const { data: p, error } = await getMyProfileWithStatus();
+    if (error) {
+      setLoadError(error);
+      setLoadStatus(getProfileLoadStatus({ loading: false, error }));
+      return;
+    }
     setProfile(p);
     setRadiusKm(p?.search_radius_km ?? 10);
-    setLoading(false);
+    // El plan y el club de "Mi Plan" viven en `clubs`, no en `profiles` — no
+    // hay (ni debería haber) un profile.plan/profile.club_id que leer. Si
+    // esto falla, "Mi Plan" simplemente no muestra club (no bloquea el resto
+    // de Ajustes: no es la carga que importa para el resto de la pantalla).
+    const { data: club } = await getMyClub();
+    setMisClub(club);
+    setLoadStatus('ready');
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -347,6 +373,31 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
+  const handleExportData = async () => {
+    setSaving(true);
+    const { data, error } = await buildMyDataExport();
+    setSaving(false);
+    if (error) {
+      showBanner('error', 'No se pudo exportar', error.message);
+      return;
+    }
+    const json = JSON.stringify(data, null, 2);
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(json);
+        showBanner('success', 'Datos copiados', 'Pégalos en un archivo de texto para guardarlos.');
+      } catch {
+        showBanner('error', 'No se pudo copiar', 'Tu navegador no permitió copiar al portapapeles.');
+      }
+      return;
+    }
+    try {
+      await Share.share({ message: json, title: 'Mis datos — FutFinder' });
+    } catch {
+      showBanner('error', 'No se pudo compartir', 'Inténtalo de nuevo en unos segundos.');
+    }
+  };
+
   const handleDeleteAccount = () => {
     confirmAction(
       '¿Eliminar tu cuenta?',
@@ -404,7 +455,7 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
-  if (loading) {
+  if (loadStatus === 'loading') {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
         <Header navigation={navigation} />
@@ -415,8 +466,29 @@ export default function SettingsScreen({ navigation }) {
     );
   }
 
+  if (loadStatus === 'error') {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <Header navigation={navigation} />
+        <View style={styles.loadingBox}>
+          <AlertTriangle color={colors.error} size={30} strokeWidth={1.8} />
+          <Text style={styles.errorTitle}>No pudimos cargar tus ajustes</Text>
+          <Text style={styles.errorMsg}>
+            {loadError?.message || 'Revisa tu conexión e intenta de nuevo.'}
+          </Text>
+          <Pressable
+            onPress={load}
+            style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.retryLabel}>Reintentar</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const friendRequestLabel = profile?.privacy_friend_requests === 'nobody' ? 'Nadie' : 'Todos';
-  const planLabel = profile?.plan === 'premium' ? 'Premium' : 'Estándar';
+  const planLabel = misClub?.plan === 'premium' ? 'Premium' : 'Estándar';
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -444,6 +516,29 @@ export default function SettingsScreen({ navigation }) {
             label="Visible en búsquedas"
             value={profile?.privacy_visible_in_search ?? true}
             onToggle={(v) => toggleField('privacy_visible_in_search', v)}
+          />
+          <Divider />
+          <ArrowRow
+            icon={<ShieldOff color={colors.primary} size={18} />}
+            label="Bloqueados"
+            onPress={() => navigation.navigate('BlockedUsers')}
+          />
+        </View>
+
+        {/* ── APARIENCIA ───────────────────────────────────── */}
+        <SectionHeader title="Apariencia" />
+
+        <View style={styles.card}>
+          <StaticRow
+            icon={<Globe color={colors.textMuted} size={18} />}
+            label="Idioma"
+            value="Español"
+          />
+          <Divider />
+          <StaticRow
+            icon={<Moon color={colors.textMuted} size={18} />}
+            label="Tema"
+            value="Oscuro"
           />
         </View>
 
@@ -548,24 +643,33 @@ export default function SettingsScreen({ navigation }) {
           />
         </View>
 
+        {APP_VERSION && (
+          <View style={styles.versionRow}>
+            <Info color={colors.textMuted} size={13} />
+            <Text style={styles.versionText}>Versión {APP_VERSION}</Text>
+          </View>
+        )}
+
         {/* ── PLAN ────────────────────────────────────────── */}
         <SectionHeader title="Mi Plan" />
 
         <View style={styles.card}>
           <View style={styles.planRow}>
             <View style={styles.rowLeft}>
-              <Crown color={planLabel === 'Premium' ? '#F2C94C' : colors.textMuted} size={18} />
+              <Crown color={misClub && planLabel === 'Premium' ? '#F2C94C' : colors.textMuted} size={18} />
               <Text style={styles.rowLabel}>Plan actual</Text>
             </View>
-            <Text style={[styles.planBadge, planLabel === 'Premium' && { color: '#F2C94C' }]}>
-              {planLabel}
+            <Text style={[styles.planBadge, misClub && planLabel === 'Premium' && { color: '#F2C94C' }]}>
+              {/* El plan es del CLUB, no tuyo: sin club no hay nada que
+                  mostrar acá — "Estándar" sería un dato inventado. */}
+              {misClub ? planLabel : 'Sin club'}
             </Text>
           </View>
           <Divider />
           <ArrowRow
             icon={<Crown color={colors.primary} size={18} />}
             label="Ver planes"
-            onPress={() => navigation.navigate('ClubPlans', { clubId: profile?.club_id })}
+            onPress={() => navigation.navigate('ClubPlans', { clubId: misClub?.id })}
           />
         </View>
 
@@ -591,6 +695,12 @@ export default function SettingsScreen({ navigation }) {
             label="Cerrar sesión"
             labelStyle={{ color: colors.textSecondary }}
             onPress={handleLogout}
+          />
+          <Divider />
+          <ArrowRow
+            icon={<Download color={colors.primary} size={18} />}
+            label="Exportar mis datos"
+            onPress={handleExportData}
           />
           <Divider />
           <ArrowRow
@@ -779,6 +889,21 @@ function ArrowRow({ icon, label, value, onPress, labelStyle }) {
   );
 }
 
+// Fila fija, sin acción: para preferencias que hoy son un valor único
+// (idioma, tema) y todavía no se pueden cambiar. Sin flecha a propósito,
+// para no insinuar que se puede tocar.
+function StaticRow({ icon, label, value }) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowLeft}>
+        {icon}
+        <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{label}</Text>
+      </View>
+      <Text style={styles.rowValue}>{value}</Text>
+    </View>
+  );
+}
+
 function ToggleRow({ icon, label, value, onToggle }) {
   return (
     <View style={styles.row}>
@@ -842,7 +967,19 @@ const styles = StyleSheet.create({
     fontSize: 18, fontWeight: '800', letterSpacing: -0.3,
   },
 
-  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 30 },
+  errorTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  errorMsg: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  retryBtn: {
+    marginTop: 4,
+    height: 44,
+    paddingHorizontal: 24,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryLabel: { color: '#0E0E0D', fontSize: 14, fontWeight: '800' },
 
   scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 },
 
@@ -884,6 +1021,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', marginTop: 4,
   },
   tickLabel: { color: colors.textMuted, fontSize: 11 },
+
+  versionRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, marginTop: 14,
+  },
+  versionText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
 
   planRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
