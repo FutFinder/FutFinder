@@ -1,6 +1,13 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { esModalidadValida } from '../utils/clubMeta';
-import { buildRivalClubsQuery } from '../utils/rivalClubsQuery';
+import { buildClubPatch, slugClub } from '../utils/clubEdit';
+import {
+  crearRegistroDeColumnas,
+  esColumnaInexistente,
+  leerTolerandoColumnas,
+  escribirTolerandoColumnas,
+} from '../utils/columnasOpcionales';
+import { buildRivalClubsQuery, RIVAL_CLUB_COLUMNS } from '../utils/rivalClubsQuery';
 import { buildMisClubesAdminQuery } from '../utils/permisosDesafio';
 
 /**
@@ -25,37 +32,22 @@ export const CLUB_LIMITS = {
 };
 
 /**
- * Compatibilidad con la migración 29 (columna `clubs.modalidad`).
+ * Columnas de `clubs` que pueden no existir todavía en un entorno dado,
+ * porque las agregó una migración posterior a la creación de la tabla:
  *
- * Si la migración todavía no se aplicó en Supabase, Postgres responde 42703
- * ("column does not exist"). En vez de romper la pantalla, marcamos la
- * columna como ausente y reintentamos sin ella: la UI mostrará
- * "FÚTBOL N.A." hasta que se aplique la migración.
+ *   modalidad → migración 29 (la UI muestra "FÚTBOL N.A." mientras falte)
+ *   tema      → migración 53 (el club se ve verde mientras falte)
  *
- * Esta bandera se puede borrar una vez que la migración 29 esté aplicada
- * en todos los entornos.
+ * El mecanismo —descubrir el hueco, recordarlo y reintentar sin la columna,
+ * avisando de lo que quedó sin guardar— vive en `utils/columnasOpcionales.js`
+ * y está probado ahí. Este registro se puede borrar cuando las dos
+ * migraciones estén aplicadas en todos los entornos.
  */
-let modalidadDisponible = true;
-
-/** `true` si el error de Postgres es "la columna no existe". */
-function esColumnaInexistente(error) {
-  return error?.code === '42703' && /modalidad/i.test(error?.message || '');
-}
+const columnasClub = crearRegistroDeColumnas(['modalidad', 'tema']);
 
 async function getMe() {
   const { data: { user } } = await supabase.auth.getUser();
   return user?.id || null;
-}
-
-/** Convierte "Atlético La Reina" → "atletico-la-reina" (URL pública futura). */
-function slugify(nombre) {
-  return nombre
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // saca tildes
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
 }
 
 /**
@@ -85,7 +77,7 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
 
   const baseRow = {
     nombre: nombreClean,
-    slug: slugify(nombreClean),
+    slug: slugClub(nombreClean),
     descripcion: descripcion?.trim() || null,
     region: region || null,
     comuna: comuna || null,
@@ -95,14 +87,18 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
   const insertar = (row) =>
     supabase.from('clubs').insert(row).select().single();
 
+  // El club nace sin `tema`: el default 'green' de la migración 53 lo pone
+  // la base de datos, no el cliente.
   let { data: club, error } = await insertar(
-    modalidadDisponible ? { ...baseRow, modalidad: modalidad || null } : baseRow
+    columnasClub.esDisponible('modalidad')
+      ? { ...baseRow, modalidad: modalidad || null }
+      : baseRow
   );
 
   // Migración 29 sin aplicar: reintentamos sin `modalidad`.
-  if (error && esColumnaInexistente(error)) {
+  if (error && esColumnaInexistente(error, 'modalidad')) {
     console.warn('[FutFinder] clubs.modalidad no existe: aplica la migración 29.');
-    modalidadDisponible = false;
+    columnasClub.marcarAusente('modalidad');
     ({ data: club, error } = await insertar(baseRow));
   }
 
@@ -262,7 +258,8 @@ export async function getClubById(clubId) {
 export async function searchClubs(query = '') {
   if (!isSupabaseConfigured) return { data: [], error: null };
 
-  const BASE_COLS = 'id, nombre, slug, descripcion, foto_url, region, comuna, plan, verificado';
+  const BASE_COLS =
+    'id, nombre, slug, descripcion, foto_url, region, comuna, plan, verificado, modalidad, tema';
 
   const buscar = (cols) => {
     let q = supabase
@@ -276,16 +273,12 @@ export async function searchClubs(query = '') {
     return q;
   };
 
-  let { data, error } = await buscar(
-    modalidadDisponible ? `${BASE_COLS}, modalidad` : BASE_COLS
-  );
-
-  // Migración 29 sin aplicar: reintentamos sin `modalidad`.
-  if (error && esColumnaInexistente(error)) {
-    console.warn('[FutFinder] clubs.modalidad no existe: aplica la migración 29.');
-    modalidadDisponible = false;
-    ({ data, error } = await buscar(BASE_COLS));
-  }
+  // `modalidad` (29) y `tema` (53) se piden solo si este entorno las tiene.
+  const { data, error } = await leerTolerandoColumnas({
+    registro: columnasClub,
+    columnas: BASE_COLS,
+    leer: buscar,
+  });
 
   if (error) {
     console.error('[FutFinder] searchClubs:', error);
@@ -336,10 +329,12 @@ export async function listRivalCandidates({
     ...(mis || []).map((m) => m.club?.id),
   ].filter(Boolean);
 
-  const { data, error } = await buildRivalClubsQuery(supabase, {
-    excludeIds,
-    query,
-    limit,
+  // El tema del rival viaja en la consulta para que su tarjeta se pinte con
+  // SU color; si la migración 53 no está aplicada, se reintenta sin él.
+  const { data, error } = await leerTolerandoColumnas({
+    registro: columnasClub,
+    columnas: RIVAL_CLUB_COLUMNS,
+    leer: (columns) => buildRivalClubsQuery(supabase, { excludeIds, query, limit, columns }),
   });
 
   if (error) {
@@ -842,48 +837,69 @@ export function subscribeToPendingRequests(clubId, onChange) {
 }
 
 /**
- * Actualiza datos editables del club (solo admins, lo garantiza la RLS).
- * plan y verificado NO se tocan desde el cliente.
+ * Actualiza los datos editables del club.
+ *
+ * QUIÉN PUEDE: solo los administradores del club, y quien lo garantiza es la
+ * policy `clubs_update` (migración 20), no esta función. Un cliente
+ * modificado que llame directo a PostgREST no actualiza ninguna fila: la
+ * respuesta llega vacía y acá se traduce a «no tienes permiso». Esconder el
+ * botón «Editar» es comodidad; la puerta está en la base de datos.
+ *
+ * QUÉ NO SE TOCA: `plan` y `verificado` no salen nunca del cliente.
+ *
+ * `tema` es una de las cuatro claves de `theme/clubThemes.js`. La validación
+ * de forma vive en `utils/clubEdit.js` —probada sin red— y el CHECK de la
+ * migración 53 la repite en el servidor.
+ *
+ * @returns {{data, error, temaOmitido}} `temaOmitido` avisa de que la
+ *   migración 53 todavía no está aplicada en este entorno: el resto del
+ *   formulario se guardó, pero el color no. Sin ese aviso, la pantalla
+ *   diría «guardado» de un color que nunca se guardó.
  */
-export async function updateClub(clubId, { nombre, descripcion, region, comuna, modalidad }) {
-  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
-  const patch = {};
-  if (nombre !== undefined) {
-    const clean = nombre.trim();
-    if (clean.length < 3 || clean.length > 40) {
-      return { error: { message: 'El nombre debe tener entre 3 y 40 caracteres' } };
-    }
-    patch.nombre = clean;
-    patch.slug = slugify(clean);
-  }
-  if (descripcion !== undefined) patch.descripcion = descripcion?.trim() || null;
-  if (region !== undefined) patch.region = region;
-  if (comuna !== undefined) patch.comuna = comuna;
-  if (modalidad !== undefined && modalidadDisponible) {
-    if (modalidad != null && !esModalidadValida(modalidad)) {
-      return { error: { message: 'Modalidad no válida' } };
-    }
-    patch.modalidad = modalidad || null;
-  }
+export async function updateClub(clubId, campos = {}) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' }, temaOmitido: false };
 
-  const actualizar = (p) =>
-    supabase.from('clubs').update(p).eq('id', clubId).select().single();
+  const { patch, error: invalido } = buildClubPatch(campos);
+  if (invalido) return { data: null, error: invalido, temaOmitido: false };
 
-  let { data, error } = await actualizar(patch);
+  const { data, error, omitidas } = await escribirTolerandoColumnas({
+    registro: columnasClub,
+    patch,
+    escribir: (p) => supabase.from('clubs').update(p).eq('id', clubId).select().single(),
+  });
 
-  // Migración 29 sin aplicar: reintentamos sin `modalidad`.
-  if (error && esColumnaInexistente(error)) {
-    console.warn('[FutFinder] clubs.modalidad no existe: aplica la migración 29.');
-    modalidadDisponible = false;
-    const { modalidad: _omitida, ...resto } = patch;
-    ({ data, error } = await actualizar(resto));
-  }
+  const temaOmitido = 'tema' in patch && omitidas.includes('tema');
 
   if (error) {
     console.error('[FutFinder] updateClub:', error);
     if (error.code === '23505') {
-      return { error: { message: 'Ya existe un club con ese nombre' } };
+      return {
+        data: null,
+        error: { message: 'Ya existe un club con ese nombre' },
+        temaOmitido: false,
+      };
     }
+    // PGRST116: el update no alcanzó ninguna fila. Con la RLS de `clubs`
+    // eso solo pasa por falta de permiso (o porque el club ya no existe).
+    if (error.code === 'PGRST116') {
+      return {
+        data: null,
+        error: { message: 'No tienes permiso para editar este club.' },
+        temaOmitido: false,
+      };
+    }
+    // 23514: el CHECK del servidor rechazó un valor. Hoy solo puede ser
+    // `tema` o `modalidad`, y la validación del cliente ya los filtró: si
+    // llegó hasta acá, es que alguien saltó el formulario.
+    if (error.code === '23514') {
+      return {
+        data: null,
+        error: { message: 'Alguno de los valores enviados no es válido.' },
+        temaOmitido: false,
+      };
+    }
+    return { data: null, error, temaOmitido: false };
   }
-  return { data, error };
+
+  return { data, error: null, temaOmitido };
 }

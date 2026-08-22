@@ -1,6 +1,6 @@
 # Sistema visual
 
-Última revisión: 2026-08-08
+Última revisión: 2026-08-21
 
 ## Propósito
 
@@ -11,6 +11,8 @@ Mantener las convenciones visuales verificadas del código para que los cambios 
 `src/theme/colors.js` conserva la paleta global `colors`: fondos oscuro (`background`, `surface` y `surfaceAlt`), verdes corporativos (`primary`, `primaryDark` y `primarySoft`), jerarquía de texto, estados de error/éxito y bordes. Los tokens globales de geometría son `radius` (`sm` a `xl` y `pill`) y `spacing` (`xs` a `xxl`); la fuente declarada es `System` en los tres pesos disponibles.
 
 El rediseño compartido de Clubes y Perfil usa `dsColors`, `dsRadius` y `dsSizes`. Define sus propias superficies, verdes de acción, estados de resultado, dorado Premium, chips, bordes y divisor. `dsSizes` fija, cuando aplica, un gutter de 16, botón táctil de 44, botón de acción de 58 y logo de 72. Los alias `clubColors`, `clubRadius` y `clubSizes` mantienen compatibilidad con componentes de Clubes.
+
+`src/theme/clubThemes.js` es la única fuente del color de identidad de un club. Ofrece cuatro temas —`green` (el verde corporativo tal cual), `blue`, `red` y `yellow`— y de cada uno una escala: `main`, `pressed`, `soft`, `softStrong`, `border`, `glow`, `ink` (tinta de contraste sobre `main`) y `bannerRgb`/`bannerGlow` para el fondo del banner. Los componentes de club reciben esa escala por prop `tema` y su valor por defecto es el verde, de modo que las pantallas que no son de un club —perfil de jugador, historial— siguen igual. Ningún componente pregunta por una clave concreta ni escribe su propio `rgba`. Los colores semánticos (`win`, `draw`, `loss`, `gold`, error) NO forman parte del tema: sus pruebas exigen distancia de color contra derrota, empate y el dorado de Premium, además de 4,5:1 de contraste WCAG.
 
 Existen extensiones deliberadamente separadas: `chatColors` añade superficies y estados propios del chat; `tactical` corresponde a Inicio; y `clubsExplorer` y `clubsExplorerRadius` corresponden al explorador de clubes. No se debe sustituir la paleta global por una de estas familias de manera masiva: el propio código mantiene pantallas de distintos rediseños coexistiendo.
 

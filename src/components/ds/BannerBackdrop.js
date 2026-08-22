@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 import { dsColors } from '../../theme/colors';
+import { temaClub } from '../../theme/clubThemes';
 
 /** Nº de bandas del degradado diagonal (más bandas = transición más suave). */
 const RAMP_BANDS = 22;
@@ -23,11 +24,15 @@ const TEXTURE_STRIPES = 26;
  *  4. halo verde en la esquina superior derecha
  *
  * @param {'filled'|'empty'} variant
- *   'filled' → banner con identidad (verde, como en el perfil/club completo)
+ *   'filled' → banner con identidad (el color del club)
  *   'empty'  → aún sin portada: gris neutro, textura más marcada y leyenda
  * @param {string} [emptyLabel] Texto centrado en la variante 'empty'.
+ * @param {object} [tema] Escala de `theme/clubThemes.js`. El banner es el
+ *   acento más grande de la identidad del club, así que es lo primero que
+ *   cambia de color. La variante 'empty' NO lo usa: un club sin portada se
+ *   ve gris, tenga el tema que tenga.
  */
-export default function BannerBackdrop({ variant = 'filled', emptyLabel }) {
+export default function BannerBackdrop({ variant = 'filled', emptyLabel, tema = temaClub() }) {
   const empty = variant === 'empty';
 
   return (
@@ -39,7 +44,7 @@ export default function BannerBackdrop({ variant = 'filled', emptyLabel }) {
           // de apagarse a negro en la esquina opuesta.
           const t = 1 - i / (RAMP_BANDS - 1);
           const alpha = Math.round((0.18 + 0.82 * t) * 100) / 100;
-          const rgb = empty ? '27, 32, 29' : '23, 58, 28';
+          const rgb = empty ? '27, 32, 29' : tema.bannerRgb;
           return (
             <View
               key={`band-${i}`}
@@ -58,7 +63,7 @@ export default function BannerBackdrop({ variant = 'filled', emptyLabel }) {
         ))}
       </View>
 
-      {!empty && <View style={styles.glow} />}
+      {!empty && <View style={[styles.glow, { backgroundColor: tema.bannerGlow }]} />}
 
       {empty && emptyLabel ? (
         <View style={styles.emptyLabelWrap}>
@@ -92,8 +97,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   textureStripeEmpty: { width: 6, marginRight: 6 },
-  // Halo verde de la esquina superior derecha. Alfa muy bajo y radio grande
-  // para que no se lea como un círculo con borde definido.
+  // Halo del color del club en la esquina superior derecha. Alfa muy bajo y
+  // radio grande para que no se lea como un círculo con borde definido; el
+  // color lo pone `tema.bannerGlow`.
   glow: {
     position: 'absolute',
     right: -70,
@@ -101,7 +107,6 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: 'rgba(90, 224, 106, 0.07)',
   },
   emptyLabelWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   emptyLabel: {

@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Star } from 'lucide-react-native';
 
 import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import { temaDeClub } from '../../theme/clubThemes';
 import ClubLogo from './ClubLogo';
 
 /**
@@ -13,6 +14,12 @@ import ClubLogo from './ClubLogo';
  *
  * Los textos con posibles N.A. (`meta`, `ratingLabel`, `nivelLabel`) llegan
  * ya resueltos desde clubMeta.js.
+ *
+ * EL COLOR ES DEL RIVAL, NO DE QUIEN MIRA. Estas tarjetas viven dentro de
+ * «Mi club», así que pintarlas con el tema de la pantalla las volvería
+ * tarjetas de mi club con el nombre de otro. El tema sale de la propia fila
+ * (`club.tema`, columna que viaja en `RIVAL_CLUB_COLUMNS`); un rival sin
+ * tema —o traído por un entorno sin la migración 53— se ve verde.
  */
 export default function RivalClubCard({
   club,
@@ -23,6 +30,8 @@ export default function RivalClubCard({
   onChallenge,
   puedeDesafiar = true,
 }) {
+  const tema = temaDeClub(club);
+
   return (
     <View style={styles.card}>
       <Pressable
@@ -67,9 +76,13 @@ export default function RivalClubCard({
           hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
           accessibilityRole="button"
           accessibilityLabel={`Desafiar a ${club.nombre}`}
-          style={({ pressed }) => [styles.challengeBtn, pressed && styles.challengePressed]}
+          style={({ pressed }) => [
+            styles.challengeBtn,
+            { borderColor: tema.border, backgroundColor: tema.soft },
+            pressed && { backgroundColor: tema.softStrong },
+          ]}
         >
-          <Text style={styles.challengeText}>Desafiar</Text>
+          <Text style={[styles.challengeText, { color: tema.main }]}>Desafiar</Text>
         </Pressable>
       ) : null}
     </View>
@@ -118,14 +131,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     borderRadius: clubRadius.sm,
     borderWidth: 1,
-    borderColor: clubColors.greenBorder,
-    backgroundColor: clubColors.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  challengePressed: { backgroundColor: clubColors.greenSoftStrong },
   challengeText: {
-    color: clubColors.green,
     fontSize: 13,
     fontWeight: '700',
   },

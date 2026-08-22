@@ -22,6 +22,7 @@ import {
 } from 'lucide-react-native';
 
 import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import { temaDeClub } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import ClubHeaderBar from '../components/club/ClubHeaderBar';
 import ClubHeroCard from '../components/club/ClubHeroCard';
@@ -87,6 +88,13 @@ const TAB_BAR_HEIGHT = 88;
  * DATOS AÚN NO EXISTENTES EN EL BACKEND, mostrados como N.A. sin inventarse:
  *  - nivel del club        → "NIVEL N.A."
  *  - valoración del club   → "N.A." con estrella
+ *
+ * COLOR: los acentos de identidad —banner, escudo, «Crear desafío», iconos
+ * de acción, enlaces «Ver todos», «Añadir foto» y los botones atados al
+ * club— salen de `temaDeClub(club)` y de ningún otro lado. Lo que NO cambia
+ * de color: el fondo, los textos, la navegación, el dorado de Premium y el
+ * récord V/E/D, que es semántico. Las tarjetas de rival usan el tema DEL
+ * RIVAL, no el de esta pantalla.
  */
 export default function ClubDetailScreen({ navigation, route }) {
   const { clubId, viaClubesTab, initialBanner } = route.params || {};
@@ -108,6 +116,10 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [banner, setBanner] = useState(initialBanner || null);
   const [working, setWorking] = useState(false);
   const [challengeSheetOpen, setChallengeSheetOpen] = useState(false);
+
+  // Un club que todavía no cargó —o uno anterior a la migración 53— resuelve
+  // a verde, así la pantalla nunca se queda sin color.
+  const tema = temaDeClub(club);
 
   const soyMiembro = members.some((m) => m.user_id === me);
   const soyAdmin = members.some((m) => m.user_id === me && m.rol === 'admin');
@@ -278,7 +290,7 @@ export default function ClubDetailScreen({ navigation, route }) {
           </Pressable>
         </View>
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={clubColors.green} />
+          <ActivityIndicator color={tema.main} />
         </View>
       </SafeAreaView>
     );
@@ -321,8 +333,8 @@ export default function ClubDetailScreen({ navigation, route }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={clubColors.green}
-            colors={[clubColors.green]}
+            tintColor={tema.main}
+            colors={[tema.main]}
           />
         }
       >
@@ -340,6 +352,7 @@ export default function ClubDetailScreen({ navigation, route }) {
           record={estadisticas}
           ratingLabel={fmtRating(club.rating)}
           onPressMiembros={() => navigation.navigate('ClubMembers', { clubId: club.id })}
+          tema={tema}
         />
 
         {/* Acción principal, según mi relación con el club */}
@@ -348,6 +361,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             label="Crear desafío"
             onPress={() => setChallengeSheetOpen(true)}
             onSearch={goToElegirRival}
+            tema={tema}
           />
         ) : puedoDesafiar ? (
           <CreateChallengeButton
@@ -355,25 +369,28 @@ export default function ClubDetailScreen({ navigation, route }) {
             accessibilityLabel={`Desafiar a ${club.nombre}`}
             onPress={() => goToChallenge(club)}
             onSearch={goToElegirRival}
+            tema={tema}
           />
         ) : !soyMiembro && !tengoMaxClubs ? (
           <CreateChallengeButton
             label={myRequest ? 'Cancelar solicitud' : 'Solicitar unirme'}
             icon={
-              myRequest ? null : (
-                <UserPlus color={clubColors.greenInk} size={20} strokeWidth={2.4} />
-              )
+              myRequest
+                ? null
+                : (ink) => <UserPlus color={ink} size={20} strokeWidth={2.4} />
             }
             disabled={working}
             onPress={myRequest ? handleCancelRequest : handleJoin}
             onSearch={goToExplore}
+            tema={tema}
           />
         ) : soyMiembro ? (
           <CreateChallengeButton
             label="Buscar rivales"
-            icon={<Search color={clubColors.greenInk} size={20} strokeWidth={2.2} />}
+            icon={(ink) => <Search color={ink} size={20} strokeWidth={2.2} />}
             onPress={goToElegirRival}
             onSearch={goToElegirRival}
+            tema={tema}
           />
         ) : null}
 
@@ -389,8 +406,8 @@ export default function ClubDetailScreen({ navigation, route }) {
             }
             style={({ pressed }) => [styles.rowItem, pressed && styles.rowPressed]}
           >
-            <View style={styles.rowIcon}>
-              <Swords color={clubColors.green} size={17} strokeWidth={2} />
+            <View style={[styles.rowIcon, { backgroundColor: tema.soft }]}>
+              <Swords color={tema.main} size={17} strokeWidth={2} />
             </View>
             <Text style={styles.rowLabel}>Desafíos</Text>
             {pendingChallenges > 0 && (
@@ -409,6 +426,7 @@ export default function ClubDetailScreen({ navigation, route }) {
               title="Buscar rivales"
               actionLabel="Ver todos"
               onAction={goToElegirRival}
+              tema={tema}
             />
             {rivals.length === 0 ? (
               <EmptyStateCard
@@ -417,6 +435,7 @@ export default function ClubDetailScreen({ navigation, route }) {
                 subtitle="Amplía la búsqueda para encontrar más clubes"
                 actionLabel="Buscar clubes"
                 onAction={goToElegirRival}
+                tema={tema}
               />
             ) : (
               <ScrollView
@@ -456,6 +475,7 @@ export default function ClubDetailScreen({ navigation, route }) {
               ? () => navigation.navigate('ClubHistory', { clubId: club.id, clubNombre: club.nombre })
               : null
           }
+          tema={tema}
         />
         {historialError ? (
           // Un fallo de lectura NO se disfraza de historial vacío: decir «aún
@@ -467,6 +487,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             subtitle="Revisa tu conexión y vuelve a intentarlo"
             actionLabel="Reintentar"
             onAction={load}
+            tema={tema}
           />
         ) : historialVisible.length === 0 ? (
           <EmptyStateCard
@@ -476,6 +497,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             actionLabel={soyAdmin ? 'Buscar un rival' : null}
             onAction={soyAdmin ? goToExplore : null}
             variant="solid"
+            tema={tema}
           />
         ) : (
           <View style={styles.historyList}>
@@ -513,12 +535,14 @@ export default function ClubDetailScreen({ navigation, route }) {
           title="Fotos del club"
           actionLabel={photos.length > 0 ? 'Ver todas' : null}
           onAction={photos.length > 0 ? goToGallery : null}
+          tema={tema}
         />
         <ClubPhotoGallery
           photos={photos}
           puedeAñadir={soyAdmin}
           onAdd={goToGallery}
           onOpenPhoto={goToGallery}
+          tema={tema}
         />
 
         {/* ── Premium (solo integrantes del club) ── */}
@@ -575,9 +599,13 @@ export default function ClubDetailScreen({ navigation, route }) {
               }}
               accessibilityRole="button"
               accessibilityLabel="Elegir un club para desafiar"
-              style={({ pressed }) => [styles.sheetPrimary, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [
+                styles.sheetPrimary,
+                { backgroundColor: tema.main },
+                pressed && { opacity: 0.85 },
+              ]}
             >
-              <Text style={styles.sheetPrimaryText}>Elegir un club</Text>
+              <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Elegir un club</Text>
             </Pressable>
 
             <Pressable
@@ -642,7 +670,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: clubRadius.icon,
-    backgroundColor: clubColors.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -744,12 +771,10 @@ const styles = StyleSheet.create({
     height: 52,
     marginTop: 14,
     borderRadius: clubRadius.md,
-    backgroundColor: clubColors.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sheetPrimaryText: {
-    color: clubColors.greenInk,
     fontSize: 15,
     fontWeight: '800',
   },

@@ -152,3 +152,15 @@ test('pide las columnas mínimas para pintar una tarjeta de rival', () => {
     assert.ok(RIVAL_CLUB_COLUMNS.includes(col), `falta la columna ${col}`);
   }
 });
+
+test('la tarjeta de un rival trae SU tema, para no pintarla con el color del club propio', () => {
+  // Dos clubes con temas distintos conviven en la misma pantalla: el carrusel
+  // «Buscar rivales» vive dentro de «Mi club». Si el tema del rival no viaja
+  // en la consulta, su tarjeta se pinta con el color de quien la mira.
+  assert.ok(
+    RIVAL_CLUB_COLUMNS.split(',')
+      .map((c) => c.trim())
+      .includes('tema'),
+    `falta la columna tema en «${RIVAL_CLUB_COLUMNS}»`
+  );
+});

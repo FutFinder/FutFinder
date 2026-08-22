@@ -2,10 +2,13 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
 import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import { temaClub } from '../../theme/clubThemes';
 
 /**
  * Estado vacío de una sección (sin rivales, sin partidos).
  * Icono en recuadro, título, subtítulo y acción opcional.
+ *
+ * El botón es un botón secundario atado al club, así que toma su color.
  */
 export default function EmptyStateCard({
   icon,
@@ -13,7 +16,8 @@ export default function EmptyStateCard({
   subtitle,
   actionLabel,
   onAction,
-  variant = 'ghost', // 'ghost' (borde verde) | 'solid' (verde relleno)
+  variant = 'ghost', // 'ghost' (borde de color) | 'solid' (color relleno)
+  tema = temaClub(),
 }) {
   const solid = variant === 'solid';
 
@@ -31,11 +35,20 @@ export default function EmptyStateCard({
           accessibilityLabel={actionLabel}
           style={({ pressed }) => [
             styles.btn,
-            solid ? styles.btnSolid : styles.btnGhost,
+            solid
+              ? { backgroundColor: tema.main }
+              : { borderWidth: 1, borderColor: tema.border, backgroundColor: tema.soft },
             pressed && { opacity: 0.8 },
           ]}
         >
-          <Text style={solid ? styles.btnSolidText : styles.btnGhostText}>{actionLabel}</Text>
+          <Text
+            style={[
+              solid ? styles.btnSolidText : styles.btnGhostText,
+              { color: solid ? tema.ink : tema.main },
+            ]}
+          >
+            {actionLabel}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -83,12 +96,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnGhost: {
-    borderWidth: 1,
-    borderColor: dsColors.greenBorder,
-    backgroundColor: dsColors.greenSoft,
-  },
-  btnGhostText: { color: dsColors.green, fontSize: 12.5, fontWeight: '700' },
-  btnSolid: { backgroundColor: dsColors.green },
-  btnSolidText: { color: dsColors.greenInk, fontSize: 12.5, fontWeight: '800' },
+  btnGhostText: { fontSize: 12.5, fontWeight: '700' },
+  btnSolidText: { fontSize: 12.5, fontWeight: '800' },
 });

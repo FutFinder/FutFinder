@@ -15,9 +15,17 @@
  * cliente modificado puede saltarse esta consulta, pero no el trigger.
  */
 
-/** Columnas mínimas para pintar una tarjeta de club rival. */
+/**
+ * Columnas mínimas para pintar una tarjeta de club rival.
+ *
+ * `tema` está acá porque la tarjeta se pinta con el color del RIVAL, no con
+ * el del club que la mira: el carrusel «Buscar rivales» vive dentro de «Mi
+ * club», y sin esta columna dos clubes con temas distintos se contaminarían
+ * en la misma pantalla. Requiere la migración 53; `listRivalCandidates()`
+ * reintenta sin ella si todavía no está aplicada.
+ */
 export const RIVAL_CLUB_COLUMNS =
-  'id, nombre, slug, foto_url, region, comuna, plan, verificado';
+  'id, nombre, slug, foto_url, region, comuna, plan, verificado, tema';
 
 /**
  * @param client        cliente de Supabase (o uno falso, en pruebas)

@@ -3,13 +3,19 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Swords, Search } from 'lucide-react-native';
 
 import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import { temaClub } from '../../theme/clubThemes';
 
 /**
- * Fila de acción principal: botón verde grande + botón cuadrado de búsqueda.
+ * Fila de acción principal: botón grande del color del club + botón cuadrado
+ * de búsqueda.
  *
  * `label` cambia según el contexto (crear desafío / desafiar a este club /
  * solicitar unirme), pero la composición visual es siempre la de la referencia.
- * Si llega `icon` se usa ese en lugar de las espadas.
+ * Si llega `icon` se usa ese en lugar de las espadas; para que el icono
+ * contraste en cualquier tema, la función `icon` recibe el color de tinta.
+ *
+ * El botón cuadrado de la lupa queda neutro a propósito: es navegación, no
+ * identidad del club.
  */
 export default function CreateChallengeButton({
   label = 'Crear desafío',
@@ -19,6 +25,7 @@ export default function CreateChallengeButton({
   disabled = false,
   accessibilityLabel,
   searchAccessibilityLabel = 'Buscar clubes rivales',
+  tema = temaClub(),
 }) {
   return (
     <View style={styles.row}>
@@ -29,12 +36,15 @@ export default function CreateChallengeButton({
         accessibilityLabel={accessibilityLabel || label}
         style={({ pressed }) => [
           styles.primary,
+          { backgroundColor: tema.main, shadowColor: tema.main },
           disabled && styles.disabled,
-          pressed && !disabled && styles.primaryPressed,
+          pressed && !disabled && { backgroundColor: tema.pressed },
         ]}
       >
-        {icon || <Swords color={clubColors.greenInk} size={20} strokeWidth={2.2} />}
-        <Text style={styles.primaryLabel}>{label}</Text>
+        {(typeof icon === 'function' ? icon(tema.ink) : icon) || (
+          <Swords color={tema.ink} size={20} strokeWidth={2.2} />
+        )}
+        <Text style={[styles.primaryLabel, { color: tema.ink }]}>{label}</Text>
       </Pressable>
 
       <Pressable
@@ -60,22 +70,18 @@ const styles = StyleSheet.create({
     flex: 1,
     height: clubSizes.actionBtn,
     borderRadius: clubRadius.xl,
-    backgroundColor: clubColors.green,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 9,
-    // Resplandor verde sutil (iOS) + elevación (Android).
-    shadowColor: clubColors.green,
+    // Resplandor discreto del color del club (iOS) + elevación (Android).
     shadowOpacity: 0.28,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
   },
-  primaryPressed: { backgroundColor: clubColors.greenDark },
   disabled: { opacity: 0.45 },
   primaryLabel: {
-    color: clubColors.greenInk,
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: -0.2,

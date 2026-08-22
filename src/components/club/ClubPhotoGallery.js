@@ -3,6 +3,7 @@ import { View, Text, Image, Pressable, StyleSheet, useWindowDimensions } from 'r
 import { Plus, Image as ImageIcon } from 'lucide-react-native';
 
 import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import { temaClub } from '../../theme/clubThemes';
 
 const COLUMNS = 3;
 const GAP = 8;
@@ -10,10 +11,10 @@ const GAP = 8;
 export const VISIBLE_PHOTOS = 5;
 
 /**
- * Celda "Añadir": borde verde discontinuo, fondo verde muy oscuro, + y texto.
- * Conectada al selector de imágenes existente vía `onPress`.
+ * Celda "Añadir": borde discontinuo y fondo suave del color del club, + y
+ * texto. Conectada al selector de imágenes existente vía `onPress`.
  */
-function AddClubPhotoCard({ size, onPress }) {
+function AddClubPhotoCard({ size, onPress, tema }) {
   return (
     <Pressable
       onPress={onPress}
@@ -22,12 +23,12 @@ function AddClubPhotoCard({ size, onPress }) {
       style={({ pressed }) => [
         styles.cell,
         styles.addCell,
-        { width: size, height: size },
-        pressed && { backgroundColor: clubColors.greenSoftStrong },
+        { width: size, height: size, borderColor: tema.border, backgroundColor: tema.soft },
+        pressed && { backgroundColor: tema.softStrong },
       ]}
     >
-      <Plus color={clubColors.green} size={20} strokeWidth={2.4} />
-      <Text style={styles.addLabel}>Añadir</Text>
+      <Plus color={tema.main} size={20} strokeWidth={2.4} />
+      <Text style={[styles.addLabel, { color: tema.main }]}>Añadir</Text>
     </Pressable>
   );
 }
@@ -55,6 +56,7 @@ function PhotoPlaceholder({ size, label }) {
  * @param {boolean} showDemo   Si true y no hay fotos reales, muestra
  *                             placeholders (solo desarrollo).
  * @param {boolean} puedeAñadir  Muestra la celda "Añadir" (admins).
+ * @param {object} tema  Escala de color del club, para la celda "Añadir".
  */
 export default function ClubPhotoGallery({
   photos = [],
@@ -62,6 +64,7 @@ export default function ClubPhotoGallery({
   puedeAñadir = true,
   onAdd,
   onOpenPhoto,
+  tema = temaClub(),
 }) {
   const { width } = useWindowDimensions();
   const size = Math.floor(
@@ -74,7 +77,7 @@ export default function ClubPhotoGallery({
 
   return (
     <View style={styles.grid}>
-      {puedeAñadir && <AddClubPhotoCard size={size} onPress={onAdd} />}
+      {puedeAñadir && <AddClubPhotoCard size={size} onPress={onAdd} tema={tema} />}
 
       {reales.map((foto, idx) => {
         const esUltima = idx === reales.length - 1;
@@ -129,15 +132,12 @@ const styles = StyleSheet.create({
   },
   addCell: {
     borderWidth: 1.5,
-    borderColor: clubColors.greenBorder,
     borderStyle: 'dashed',
-    backgroundColor: 'rgba(90, 224, 106, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
   },
   addLabel: {
-    color: clubColors.green,
     fontSize: 11,
     fontWeight: '700',
   },

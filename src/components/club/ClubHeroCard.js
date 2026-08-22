@@ -3,6 +3,7 @@ import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { MapPin, BadgeCheck } from 'lucide-react-native';
 
 import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import { temaClub } from '../../theme/clubThemes';
 import ClubLogo from './ClubLogo';
 import TagBadge from '../ds/TagBadge';
 import BannerBackdrop from '../ds/BannerBackdrop';
@@ -14,6 +15,10 @@ import ClubStatsRow from './ClubStatsRow';
  *
  * Todos los textos llegan ya resueltos desde clubMeta.js (incluidos los N.A.),
  * este componente no decide qué mostrar cuando falta un dato.
+ *
+ * `tema` pinta el banner y el escudo provisional. El récord V/E/D NO lo usa:
+ * victoria, empate y derrota son semánticos y valen lo mismo para todos los
+ * clubes — un club rojo no puede hacer que una victoria parezca una derrota.
  */
 export default function ClubHeroCard({
   club,
@@ -23,6 +28,7 @@ export default function ClubHeroCard({
   record,
   ratingLabel,
   onPressMiembros,
+  tema = temaClub(),
 }) {
   return (
     <View style={styles.card}>
@@ -30,7 +36,7 @@ export default function ClubHeroCard({
         {club.banner_url ? (
           <Image source={{ uri: club.banner_url }} style={styles.bannerImg} resizeMode="cover" />
         ) : (
-          <BannerBackdrop />
+          <BannerBackdrop tema={tema} />
         )}
         <View style={styles.badgeRow}>
           {badges.map((b) => (
@@ -46,7 +52,7 @@ export default function ClubHeroCard({
             uri={club.foto_url}
             size={clubSizes.logo}
             borderRadius={22}
-            accent={clubColors.green}
+            tema={tema}
             style={styles.logo}
           />
           <View style={styles.nameCol}>
@@ -121,10 +127,11 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: -30,
   },
+  // El borde grueso recorta el logo contra el banner; el fondo suave del
+  // tema lo pone ClubLogo cuando no hay imagen.
   logo: {
     borderWidth: 2,
     borderColor: clubColors.surface,
-    backgroundColor: clubColors.surfaceAlt,
   },
   nameCol: { flex: 1, minWidth: 0, paddingBottom: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

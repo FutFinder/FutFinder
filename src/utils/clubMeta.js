@@ -12,24 +12,13 @@
 import { getComunaCoords } from '../data/comunas-coords';
 import { haversineKm } from '../services/matches';
 
-/** Valores válidos de `clubs.modalidad` (ver migración 29). */
-export const MODALIDADES = {
-  FUTBOL_7: 'futbol7',
-  FUTBOL_11: 'futbol11',
-  AMBOS: 'ambos',
-};
+// El vocabulario de modalidad vive en `clubModalidad.js` —puro, sin
+// Supabase— para que el formulario pueda validarlo sin arrastrar este
+// archivo, que sí depende de la red por el cálculo de distancias. Se
+// re-exporta acá para no cambiar los imports existentes.
+import { MODALIDADES } from './clubModalidad.js';
 
-/** Opciones para los selectores de crear/editar club. */
-export const OPCIONES_MODALIDAD = [
-  { value: MODALIDADES.FUTBOL_7, label: 'Fútbol 7' },
-  { value: MODALIDADES.FUTBOL_11, label: 'Fútbol 11' },
-  { value: MODALIDADES.AMBOS, label: 'Fútbol 7 y Fútbol 11' },
-];
-
-/** `true` si el valor es una modalidad conocida (para validar formularios). */
-export function esModalidadValida(valor) {
-  return Object.values(MODALIDADES).includes(valor);
-}
+export { MODALIDADES, OPCIONES_MODALIDAD, esModalidadValida } from './clubModalidad.js';
 
 /**
  * Etiquetas de modalidad para el banner del club (MAYÚSCULAS).
