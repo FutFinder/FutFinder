@@ -206,7 +206,7 @@ export default function HomeScreen({ navigation }) {
 
   const quickActions = [
     { label: 'Buscar partido', hint: 'Filtros avanzados', onPress: () => navigation.navigate('Main', { screen: 'SearchTab' }) },
-    { label: 'Crear partido',  hint: 'Organiza uno nuevo', onPress: () => navigation.navigate('CreateMatch') },
+    { label: '¿Te falta un jugador?', hint: '¡Encuentra al jugador que necesitas!', onPress: () => navigation.navigate('CreateMatch') },
     { label: 'Mi historial',   hint: 'Trust Score y reseñas', onPress: () => navigation.navigate('TrustScoreHistory') },
     { label: 'Explorar clubes', hint: 'Únete a un equipo', onPress: () => navigation.navigate('Main', { screen: 'ClubsTab' }) },
   ];
@@ -299,7 +299,7 @@ export default function HomeScreen({ navigation }) {
                 <MyClubCard
                   club={club}
                   onPressClub={() => navigation.navigate('ClubDetail', { clubId: club.id })}
-                  onCreateMatch={(id) => navigation.navigate('CreateMatch', { clubId: id })}
+                  onCreateMatch={(id) => navigation.navigate('ClubDetail', { clubId: id, openChallenge: true })}
                 />
               </View>
             ) : null}

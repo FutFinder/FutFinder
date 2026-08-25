@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -97,7 +97,7 @@ const TAB_BAR_HEIGHT = 88;
  * RIVAL, no el de esta pantalla.
  */
 export default function ClubDetailScreen({ navigation, route }) {
-  const { clubId, viaClubesTab, initialBanner } = route.params || {};
+  const { clubId, viaClubesTab, initialBanner, openChallenge } = route.params || {};
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
@@ -202,6 +202,16 @@ export default function ClubDetailScreen({ navigation, route }) {
       load();
     }, [load])
   );
+
+  // Llegar con { openChallenge: true } (p.ej. desde "Crear partido de club"
+  // en Inicio) abre directo la hoja "Crear desafío" — se limpia el param
+  // para que no se reabra sola si el usuario vuelve a esta pantalla.
+  useEffect(() => {
+    if (openChallenge && !loading && soyAdmin) {
+      setChallengeSheetOpen(true);
+      navigation.setParams({ openChallenge: undefined });
+    }
+  }, [openChallenge, loading, soyAdmin, navigation]);
 
   const onRefresh = async () => {
     setRefreshing(true);
