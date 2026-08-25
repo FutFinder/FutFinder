@@ -522,6 +522,20 @@ export const FIELD_ORDER = [
   'aprobacion',
 ];
 
+/**
+ * Decide si abrir `PublishMatchScreen` debe partir de un borrador limpio en
+ * el paso 1. Es «nueva» toda entrada salvo que traiga un `draftStep` válido
+ * (1-3) de un borrador guardado explícito; la ruta antigua con `matchId`
+ * redirige a edición y no pasa por el wizard, así que tampoco cuenta.
+ */
+export function isFreshPublishEntry(routeParams) {
+  const p = routeParams || {};
+  if (p.matchId) return false;
+  const step = p.draftStep;
+  const isSavedStep = Number.isInteger(step) && step >= 1 && step <= 3;
+  return !isSavedStep;
+}
+
 /** Combina `Date` (día) + 'HH:MM' en un `Date` completo. */
 export function combineDateTime(fecha, hora) {
   try {

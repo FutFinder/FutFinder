@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   AlertCircle,
@@ -71,6 +72,7 @@ import {
   combineDateTime,
   cuotaLabel,
   edadLabel,
+  isFreshPublishEntry,
   nivelLabel,
   trustLabel,
   validateDraft,
@@ -150,6 +152,28 @@ export default function PublishMatchScreen({ navigation, route }) {
       navigation.replace('EditMatch', { matchId: route.params.matchId });
     }
   }, [route?.params?.matchId]);
+
+  // La ruta CreateMatch se reutiliza para cada «Publicar partido»: si la
+  // pantalla no se remonta entre una publicación y la siguiente (recupera
+  // el foco con la instancia anterior aún viva), el paso y el borrador de
+  // la vez pasada quedarían pegados. Cada foco de una entrada nueva (sin
+  // `draftStep` de un borrador guardado) fuerza volver al paso 1 con un
+  // borrador limpio, para que «Publicar un partido» y el botón central
+  // nunca hereden el paso en el que quedó la publicación anterior.
+  useFocusEffect(
+    useCallback(() => {
+      if (!isFreshPublishEntry(route?.params)) return;
+      setStep(1);
+      setDraft(initialDraft());
+      setErrors({});
+      setTouchedStep(null);
+      setSubmitting(false);
+      setPublished(null);
+      setSubmitError(null);
+      setSheet(null);
+      clientToken.current = makeToken();
+    }, [route?.params])
+  );
 
   // Modo «partido de clubes»: prefija fecha, zona y título del desafío.
   useEffect(() => {
