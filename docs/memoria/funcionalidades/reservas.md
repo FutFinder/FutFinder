@@ -1,14 +1,16 @@
 # Reservas
 
-Última revisión: 2026-08-20
+Última revisión: 2026-08-25
 
 ## Propósito
 
 Vertical de reserva de canchas (handoff de Claude Design `Reservas.dc.html`, proyecto "Nueva estética y reservas", 33 pantallas): buscar complejo → elegir cancha → elegir fecha y hora → elegir modalidad de pago → cobrar → confirmar. Incluye el futuro Balance FutFinder (monedero interno) y tres modalidades de pago (completa, dividida entre 2 capitanes, dividida entre todos).
 
-## Estado actual — solo descubrimiento, sin pagos
+## Estado actual — backend real aplicado, frontend todavía en datos de ejemplo
 
-**Backend deliberadamente simulado.** No hay tablas de Supabase para complejos, canchas, reservas ni balance, ni pasarela de pago conectada — decisión explícita documentada en `src/services/reservas.js` y `reservasRules.js`. Todas las funciones de `reservas.js` devuelven siempre los mismos datos de ejemplo y no dependen de `isSupabaseConfigured`, a diferencia del resto de los servicios de la app.
+**El backend de Supabase ya existe y está aplicado en producción** (migraciones `54_reservas_complejos_canchas`, `55_reservas_core`, `56_reservas_balance`, `57_reservas_calificaciones`, `58_reservas_revoke_anon`): tablas `complejos`, `canchas_reservables`, `cancha_horario_reglas`, `reservas`, `reserva_participantes`, `autorizaciones_cobro`, `balance_movimientos`, `complejo_calificaciones`; RPC `get_disponibilidad_cancha`, `crear_reserva`, `invitar_participante_reserva`, `rechazar_invitacion_reserva`, `autorizar_cobro_reserva`, `confirmar_reserva`, `recalcular_cuota_reserva`, `cancelar_reserva`, `responder_cancelacion_desafio`, `vencer_reservas_pasadas` (sin agendar en cron todavía), `cargar_balance`, `get_mi_balance`. Con arneses de prueba en `supabase/tests/54_*` a `58_*` (todos en `begin;...rollback;`, sin dejar datos).
+
+**`src/services/reservas.js` NO consume nada de esto todavía** — sigue devolviendo los mismos datos de ejemplo del prototipo, sin depender de `isSupabaseConfigured`, igual que antes de estas migraciones. Conectar las pantallas al backend real (reemplazar los datos de ejemplo por llamadas a las RPC de arriba) es el próximo paso pendiente de este vertical, no algo que estas migraciones hayan hecho.
 
 Construido hasta ahora (pantallas 1 a 8 del handoff):
 - Fundaciones: tokens (`reservas`/`reservasRadius`/`reservasFonts`/`reservasSizes` en `theme/colors.js`, comparten paleta con `clubsExplorer`) y primitivas (`components/reservas/ui.js`: `Card`, `Button`, `IconButton`, `Chip`, `Badge`, `ListRow`, `SectionLabel`, `Sheet`, `Stepper`, `NoticeCard`, `StickyFooter`), validadas en `ReservasUiGalleryScreen` (pantalla interna de QA, no es parte del producto).
