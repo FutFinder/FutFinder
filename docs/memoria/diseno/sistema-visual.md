@@ -1,6 +1,6 @@
 # Sistema visual
 
-Última revisión: 2026-08-21
+Última revisión: 2026-08-27
 
 ## Propósito
 
@@ -28,6 +28,8 @@ El módulo Partidos no toma sus decisiones visuales de los tokens globales: usa 
 - `src/components/club/`: explorador, tarjetas de club/rival/historial, héroe, logo, galería, insignia de plan, estadísticas y CTA de desafío.
 - `src/components/player/`: héroe, biografía, estadísticas, reputación, participación, acciones públicas, tarjetas de cuenta/soporte, galería, reporte y skeleton de perfil.
 - `src/components/partidos/`: hojas, filtros, selectores, tarjeta de partido, vistas de estado y primitivas `ui`.
+- `src/components/BrandMark.js`: única fuente del logo "fut**finder**" (pin + wordmark) para el header de las pantallas ya logueadas. Sin props de tamaño ni color — usa siempre los tokens de `tactical` (`neon` y `text`), sea cual sea la pantalla que lo aloja. Se usa en Home, Partidos y Chat; el onboarding (`Logo.js`, el ícono de balón) es una marca distinta y no lo usa.
+- `src/components/NotificationBell.js`: campana de avisos global, con el mismo criterio de tokens fijos (`reservas`) que `BrandMark`. Vive arriba a la derecha en las 6 pantallas raíz de pestaña (Home, Partidos, Clubes cuando no hay club propio, Reservas, Chat, Perfil propio) y en varias pantallas internas que ya la traían. Nunca aparece en "Mi club" (`ClubHeaderBar`) ni al ver el perfil de otro jugador.
 
 El copy visible se mantiene en español. Los componentes reciben labels ya resueltos desde sus utilidades de dominio cuando corresponde: por ejemplo, `TagBadge` no decide modalidad, posición ni nivel, y sólo representa el label recibido.
 
@@ -47,4 +49,5 @@ Las capturas o handoffs específicos de una tarea permanecen fuera de esta memor
 
 - `src/theme/colors.js`
 - `src/components/ds/`, `src/components/club/`, `src/components/player/` y `src/components/partidos/`
+- `src/components/BrandMark.js` y `src/components/NotificationBell.js`
 - [Partidos](../funcionalidades/partidos.md), [Clubes](../funcionalidades/clubes.md) y [Perfil y amigos](../funcionalidades/perfil-y-amigos.md)
