@@ -41,3 +41,9 @@ test('Chat (ChatInboxHeader) usa BrandMark y tiene el bell de avisos', () => {
   );
   assert.match(src, /<NotificationBell\s*\/>/, 'ChatInboxHeader debe renderizar <NotificationBell/>');
 });
+
+test('Partidos (función Header de PartidosScreen) usa BrandMark y tiene el bell de avisos', () => {
+  const src = readSrc('../../screens/PartidosScreen.js');
+  assert.match(src, /<BrandMark\s*\/>/, 'PartidosScreen debe renderizar <BrandMark/> en su header');
+  assert.match(src, /<NotificationBell\s*\/>/, 'PartidosScreen debe renderizar <NotificationBell/> en su header');
+});

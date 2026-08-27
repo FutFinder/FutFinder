@@ -35,6 +35,8 @@ import FiltersSheet, {
   shorten,
 } from '../components/partidos/FiltersSheet';
 import PickerSheet from '../components/partidos/PickerSheet';
+import BrandMark from '../components/BrandMark';
+import NotificationBell from '../components/NotificationBell';
 import {
   EmptyByFilters,
   EmptyByRegion,
@@ -806,34 +808,30 @@ export default function PartidosScreen({ navigation, route }) {
 function Header({ onFilters, activeCount = 0, showFilters }) {
   return (
     <View style={styles.header}>
-      <View style={styles.brandRow}>
-        <MapPin color={P.green} size={21} strokeWidth={1.9} />
-        <Text style={styles.brand}>
-          fut<Text style={{ color: P.green }}>finder</Text>
-        </Text>
+      <BrandMark />
+      <View style={styles.headerActions}>
+        <NotificationBell />
+        {showFilters ? (
+          <Pressable
+            onPress={onFilters}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir filtros"
+            style={({ pressed }) => [
+              styles.headerBtn,
+              activeCount > 0 && styles.headerBtnActive,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Filter color={activeCount > 0 ? P.green : P.textDim} size={16} strokeWidth={2} />
+            {activeCount > 0 ? (
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>{activeCount}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        ) : null}
       </View>
-      {showFilters ? (
-        <Pressable
-          onPress={onFilters}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Abrir filtros"
-          style={({ pressed }) => [
-            styles.headerBtn,
-            activeCount > 0 && styles.headerBtnActive,
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <Filter color={activeCount > 0 ? P.green : P.textDim} size={16} strokeWidth={2} />
-          {activeCount > 0 ? (
-            <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeText}>{activeCount}</Text>
-            </View>
-          ) : null}
-        </Pressable>
-      ) : (
-        <View style={{ width: 34 }} />
-      )}
     </View>
   );
 }
@@ -872,8 +870,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 12,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  brand: { fontSize: 18, fontWeight: '700', color: P.text, letterSpacing: -0.4 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerBtn: {
     width: 34,
     height: 34,
