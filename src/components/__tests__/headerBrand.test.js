@@ -47,3 +47,14 @@ test('Partidos (función Header de PartidosScreen) usa BrandMark y tiene el bell
   assert.match(src, /<BrandMark\s*\/>/, 'PartidosScreen debe renderizar <BrandMark/> en su header');
   assert.match(src, /<NotificationBell\s*\/>/, 'PartidosScreen debe renderizar <NotificationBell/> en su header');
 });
+
+test('Perfil (PlayerProfileTopBar) tiene el bell solo en la rama de perfil propio', () => {
+  const src = readSrc('../player/PlayerProfileTopBar.js');
+  assert.match(src, /<NotificationBell\s*\/>/, 'PlayerProfileTopBar debe renderizar <NotificationBell/>');
+  const ownProfileBranch = src.split('isOwnProfile ?')[1] || '';
+  assert.match(
+    ownProfileBranch,
+    /<NotificationBell\s*\/>/,
+    'el bell debe estar dentro de la rama isOwnProfile (perfil propio)'
+  );
+});

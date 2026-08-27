@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MapPin, ArrowLeft, Share2, Pencil, Settings, MoreVertical } from 'lucide-react-native';
 
 import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import NotificationBell from '../NotificationBell';
 
 /**
  * Barra superior del perfil.
@@ -24,12 +25,15 @@ export default function PlayerProfileTopBar({
   return (
     <View style={styles.bar}>
       {isOwnProfile ? (
-        <View style={styles.titleWrap}>
-          <MapPin color={dsColors.green} size={20} strokeWidth={1.8} />
-          <Text style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-        </View>
+        <>
+          <View style={styles.titleWrap}>
+            <MapPin color={dsColors.green} size={20} strokeWidth={1.8} />
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+          </View>
+          <NotificationBell />
+        </>
       ) : (
         <>
           <Pressable
