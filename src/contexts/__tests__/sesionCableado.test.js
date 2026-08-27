@@ -106,6 +106,37 @@ test('la pantalla de login no registra usuarios al iniciar sesión', () => {
   );
 });
 
+test('el registro no usa auth.signUp en ninguna parte (dejaría cuentas usables sin verificar)', () => {
+  const usos = fuentesDeLaApp()
+    .filter(({ texto }) => /\bauth\.signUp\(|authClient\.signUp\(/.test(soloCodigo(texto)))
+    .map(({ ruta }) => ruta);
+  assert.deepEqual(
+    usos,
+    [],
+    `signUp crea una cuenta con contraseña que, con la autoconfirmación activa, sirve para iniciar sesión sin haber demostrado el correo: ${usos.join(', ')}`
+  );
+});
+
+test('el registro manda un código con signInWithOtp y no crea contraseña usable antes de verificar', () => {
+  const politica = leer('services/authPolicy.js');
+  assert.match(politica, /authClient\.signInWithOtp\(/, 'performSignUp debe usar signInWithOtp');
+  assert.match(politica, /shouldCreateUser:\s*true/, 'el registro sí crea la cuenta, pero sin contraseña');
+});
+
+test('la contraseña en tránsito vive solo en memoria, nunca en disco ni en la navegación', () => {
+  const holder = soloCodigo(leer('services/pendingSignUp.js'));
+  assert.doesNotMatch(holder, /AsyncStorage|localStorage|sessionStorage/, 'no se persiste');
+  assert.match(holder, /pendiente = null/, 'se borra al consumirla');
+
+  // La contraseña no puede viajar como parámetro de navegación.
+  const login = leer('screens/LoginScreen.js');
+  assert.doesNotMatch(
+    login,
+    /navigation\.navigate\('Verification',\s*\{[^}]*password/,
+    'la contraseña no se pasa por parámetros de navegación'
+  );
+});
+
 test('el login solo navega a una ruta privada usando decideAuthDestination', () => {
   const fuente = leer('screens/LoginScreen.js');
   assert.match(fuente, /decideAuthDestination/, 'el destino lo decide la política, no la pantalla');

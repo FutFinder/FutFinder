@@ -1,5 +1,10 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { performLogin, performSignUp, describeAuthError, MENSAJES } from './authPolicy';
+import {
+  guardarPasswordPendiente,
+  consumirPasswordPendiente,
+  olvidarPasswordPendiente,
+} from './pendingSignUp';
 
 /**
  * Servicio de autenticación de FutFinder.
@@ -38,10 +43,44 @@ export async function loginWithEmail({ email, password }) {
   return performLogin({ email, password }, supabase.auth);
 }
 
-/** Crea una cuenta nueva. Solo se llama desde el modo «registrarse». */
+/**
+ * Empieza un registro: manda un código de 6 dígitos al correo y NO deja
+ * ninguna cuenta usable hasta que ese código se verifique. Un correo
+ * inventado no recibe nada, así que no puede entrar ni registrándose ni
+ * después iniciando sesión.
+ *
+ * La contraseña queda en memoria (nunca en disco ni en la navegación) para
+ * fijarla al verificar, en `completeSignUpPassword`.
+ */
 export async function registerWithEmail({ email, password, username }) {
   if (!isSupabaseConfigured) return faltaConfiguracion();
-  return performSignUp({ email, password, username }, supabase.auth);
+  const result = await performSignUp({ email, password, username }, supabase.auth);
+  if (!result.error) {
+    guardarPasswordPendiente(result.email, password);
+  } else {
+    olvidarPasswordPendiente();
+  }
+  return result;
+}
+
+/**
+ * Fija la contraseña del registro, ya con la sesión que emitió `verifyOtp`.
+ * Se llama una sola vez y solo si ese correo tenía un registro en curso.
+ *
+ * @returns {{ error: {message: string}|null, applied: boolean }}
+ */
+export async function completeSignUpPassword({ email }) {
+  const password = consumirPasswordPendiente(email);
+  if (!password) return { error: null, applied: false };
+  if (!isSupabaseConfigured) return { error: { message: MENSAJES.faltaConfiguracion }, applied: false };
+
+  const { error } = await supabase.auth.updateUser({ password });
+  return { error: error ? { message: describeAuthError(error) } : null, applied: !error };
+}
+
+/** Descarta un registro a medias (por ejemplo, al salir de la verificación). */
+export function abandonSignUp() {
+  olvidarPasswordPendiente();
 }
 
 /**
@@ -63,11 +102,18 @@ export async function verifyEmailOtp({ email, token }) {
   };
 }
 
+/**
+ * Reenvía el código. Va por `signInWithOtp` (no por `resend({type:'signup'})`)
+ * porque el registro ahora se inicia con OTP: `resend` de tipo signup no
+ * aplica a una cuenta creada así y respondía con error.
+ *
+ * `shouldCreateUser: false` para que reenviar no cree cuentas por su cuenta.
+ */
 export async function resendOtp({ email }) {
   if (!isSupabaseConfigured) return { error: { message: MENSAJES.faltaConfiguracion } };
-  const { error } = await supabase.auth.resend({
+  const { error } = await supabase.auth.signInWithOtp({
     email: String(email || '').trim().toLowerCase(),
-    type: 'signup',
+    options: { shouldCreateUser: false },
   });
   return { error: error ? { message: describeAuthError(error) } : null };
 }

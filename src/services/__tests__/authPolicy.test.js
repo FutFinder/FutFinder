@@ -29,7 +29,7 @@ const {
  * Cliente de auth falso que registra qué métodos se llamaron. Reemplaza a
  * `supabase.auth` sin tocar la red ni React Native.
  */
-function fakeAuthClient({ signIn, signUp } = {}) {
+function fakeAuthClient({ signIn, signUp, otp } = {}) {
   const calls = [];
   return {
     calls,
@@ -40,6 +40,10 @@ function fakeAuthClient({ signIn, signUp } = {}) {
     async signUp(args) {
       calls.push({ method: 'signUp', args });
       return signUp ?? { data: { user: null, session: null }, error: null };
+    },
+    async signInWithOtp(args) {
+      calls.push({ method: 'signInWithOtp', args });
+      return otp ?? { data: {}, error: null };
     },
   };
 }
@@ -135,7 +139,7 @@ test('el error de correo no confirmado del proveedor se traduce a pedir verifica
   assert.equal(res.needsVerification, true);
 });
 
-// --- Registro ------------------------------------------------------------
+// --- Registro: el correo tiene que existir de verdad ---------------------
 
 test('el registro con contraseña débil no llega al proveedor', async () => {
   const client = fakeAuthClient();
@@ -144,23 +148,57 @@ test('el registro con contraseña débil no llega al proveedor', async () => {
   assert.equal(res.error.message, MENSAJES.passwordDebil);
 });
 
-test('el registro de un correo ya existente avisa que la cuenta existe', async () => {
-  const client = fakeAuthClient({
-    signUp: { data: { user: null, session: null }, error: { code: 'user_already_exists', message: 'User already registered' } },
-  });
-  const res = await performSignUp({ email: 'jugador@futfinder.cl', password: 'contrasena123' }, client);
-  assert.equal(res.error.message, MENSAJES.yaRegistrado);
-  assert.equal(res.session, null);
+test('el registro pide un código por correo (signInWithOtp), NO crea una cuenta con contraseña usable', async () => {
+  const client = fakeAuthClient({ otp: { data: {}, error: null } });
+  await performSignUp({ email: 'nuevo@futfinder.cl', password: 'contrasena123' }, client);
+
+  const metodos = client.calls.map((c) => c.method);
+  assert.deepEqual(metodos, ['signInWithOtp'], 'el registro solo manda el código');
+  assert.ok(!metodos.includes('signUp'), 'signUp dejaría una cuenta que sirve para iniciar sesión sin verificar');
+  assert.equal(client.calls[0].args.options.shouldCreateUser, true);
 });
 
-test('un registro que queda pendiente de confirmación no devuelve sesión', async () => {
-  const usuarioNuevo = { id: 'uuid-3', email: 'nuevo@futfinder.cl', email_confirmed_at: null };
+test('el registro NUNCA devuelve sesión: sin el código del correo no se entra', async () => {
+  const client = fakeAuthClient({ otp: { data: {}, error: null } });
+  const res = await performSignUp({ email: 'nuevo@futfinder.cl', password: 'contrasena123' }, client);
+  assert.equal(res.session, null, 'no puede haber sesión antes de verificar');
+  assert.equal(res.needsVerification, true);
+  assert.equal(res.email, 'nuevo@futfinder.cl');
+});
+
+test('un correo de un dominio que no existe se rechaza con un mensaje claro', async () => {
   const client = fakeAuthClient({
-    signUp: { data: { user: usuarioNuevo, session: null }, error: null },
+    otp: { data: {}, error: { code: 'email_address_invalid', message: 'Email address "x@y.cl" is invalid' } },
+  });
+  const res = await performSignUp({ email: 'jugador@dominio-inventado.cl', password: 'contrasena123' }, client);
+  assert.equal(res.error.message, MENSAJES.correoNoRecibeMensajes);
+  assert.equal(res.session, null);
+  assert.equal(res.needsVerification, false);
+});
+
+test('registrar un correo que ya existe no revela que existe: pide el código igual', async () => {
+  // signInWithOtp responde lo mismo exista o no la cuenta; no hay nada que filtrar.
+  const client = fakeAuthClient({ otp: { data: {}, error: null } });
+  const res = await performSignUp({ email: 'jugador@futfinder.cl', password: 'contrasena123' }, client);
+  assert.equal(res.error, null);
+  assert.equal(res.needsVerification, true);
+});
+
+test('si el trigger de la base de datos falla, el mensaje es comprensible y no un 500 crudo', async () => {
+  const client = fakeAuthClient({
+    otp: { data: {}, error: { code: 'unexpected_failure', message: 'Database error saving new user' } },
   });
   const res = await performSignUp({ email: 'nuevo@futfinder.cl', password: 'contrasena123' }, client);
-  assert.equal(res.session, null);
-  assert.equal(res.needsVerification, true);
+  assert.equal(res.error.message, MENSAJES.inesperado);
+  assert.ok(!/Database error/i.test(res.error.message), 'no se muestra el error crudo del servidor');
+});
+
+test('demasiados envíos de código dan el mensaje de esperar, no un error genérico', async () => {
+  const client = fakeAuthClient({
+    otp: { data: {}, error: { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' } },
+  });
+  const res = await performSignUp({ email: 'nuevo@futfinder.cl', password: 'contrasena123' }, client);
+  assert.equal(res.error.message, MENSAJES.demasiadosIntentos);
 });
 
 // --- Sesión: nadie entra sin una de verdad -------------------------------

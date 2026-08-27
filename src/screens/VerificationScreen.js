@@ -16,7 +16,12 @@ import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
 import { APP_VERSION } from '../utils/appVersion';
-import { verifyEmailOtp, resendOtp } from '../services/auth';
+import {
+  verifyEmailOtp,
+  resendOtp,
+  completeSignUpPassword,
+  abandonSignUp,
+} from '../services/auth';
 import { isSessionUsable } from '../services/authPolicy';
 import { isSupabaseConfigured } from '../services/supabase';
 
@@ -62,16 +67,28 @@ export default function VerificationScreen({ navigation, route }) {
 
     setLoading(true);
     const { error: err, session } = await verifyEmailOtp({ email, token: code });
-    setLoading(false);
 
     if (err) {
+      setLoading(false);
       setError(err.message || 'Código incorrecto. Intente de nuevo');
       return;
     }
 
     // Sin sesión no se avanza: el código lo valida Supabase, no esta pantalla.
     if (!isSessionUsable(session)) {
+      setLoading(false);
       setError('Código incorrecto. Intente de nuevo');
+      return;
+    }
+
+    // Recién ahora, con el correo demostrado, la cuenta recibe su contraseña.
+    const { error: errPassword } = await completeSignUpPassword({ email });
+    setLoading(false);
+
+    if (errPassword) {
+      setError(
+        `Tu correo quedó verificado, pero no pudimos guardar tu contraseña: ${errPassword.message}`
+      );
       return;
     }
 
@@ -103,7 +120,12 @@ export default function VerificationScreen({ navigation, route }) {
         >
           <View style={styles.header}>
             <Pressable
-              onPress={() => navigation.goBack()}
+              onPress={() => {
+                // Salir sin verificar descarta el registro a medias y borra la
+                // contraseña que estaba esperando en memoria.
+                abandonSignUp();
+                navigation.goBack();
+              }}
               hitSlop={12}
               style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
             >

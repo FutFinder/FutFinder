@@ -28,8 +28,11 @@ export const MENSAJES = {
   correoSinConfirmar:
     'Todavía no confirmas tu correo. Te enviamos un código para activar tu cuenta.',
   yaRegistrado: 'Ya existe una cuenta con este correo. Inicia sesión.',
+  correoNoRecibeMensajes:
+    'Ese correo no existe o no puede recibir mensajes. Revisa que esté bien escrito.',
   passwordDebil: `Tu contraseña es muy débil: usa al menos ${MIN_PASSWORD_SIGNUP} caracteres.`,
   demasiadosIntentos: 'Demasiados intentos. Espera un momento y vuelve a intentar.',
+  codigoInvalido: 'El código no es correcto o ya venció. Pide uno nuevo.',
   sinConexion: 'Sin conexión. Revisa tu internet e intenta de nuevo.',
   inesperado: 'No pudimos completar la operación. Intenta de nuevo.',
   faltaConfiguracion:
@@ -50,6 +53,11 @@ const POR_CODIGO = {
   over_request_rate_limit: MENSAJES.demasiadosIntentos,
   over_email_send_rate_limit: MENSAJES.demasiadosIntentos,
   too_many_requests: MENSAJES.demasiadosIntentos,
+  // Supabase valida el destino al mandar un código: un dominio que no existe
+  // se rechaza acá, antes de crear nada.
+  email_address_invalid: MENSAJES.correoNoRecibeMensajes,
+  validation_failed: MENSAJES.correoNoRecibeMensajes,
+  otp_expired: MENSAJES.codigoInvalido,
 };
 
 const PARECE_DE_RED = /network|fetch|load failed|timeout|econn|offline/i;
@@ -188,13 +196,29 @@ export async function performLogin({ email, password } = {}, authClient) {
 }
 
 /**
- * Crea una cuenta. Acto explícito: solo se llama desde el modo "registrarse".
+ * Empieza un registro pidiendo un código al correo. Acto explícito: solo se
+ * llama desde el modo «registrarse».
  *
- * Cuando la confirmación de correo está activada, Supabase responde a un
- * correo ya registrado con un usuario sin `identities` y sin sesión —
- * idéntico a un registro nuevo— justamente para que no se pueda averiguar
- * quién tiene cuenta. Respetamos eso: ese caso sigue el mismo camino que un
- * registro nuevo, pidiendo el código.
+ * Usa `signInWithOtp` en vez de `signUp` a propósito, y esto es el corazón de
+ * «solo se entra con correos que existen»:
+ *
+ *  - `signUp` crea una cuenta CON contraseña. Si el proyecto tiene la
+ *    confirmación de correo desactivada, Supabase la autoconfirma y emite
+ *    sesión al instante: un correo inventado entraba, y peor, quedaba
+ *    confirmado para siempre, así que después servía para iniciar sesión con
+ *    su contraseña. Ninguna validación en el cliente puede tapar eso.
+ *  - `signInWithOtp` crea la cuenta SIN contraseña usable y sin confirmar, y
+ *    manda un código de 6 dígitos. Sin acceso al buzón no hay código, no hay
+ *    sesión y no hay contraseña: la cuenta no sirve para nada. Además
+ *    Supabase valida el destino y rechaza dominios que no existen.
+ *
+ * La contraseña que la persona escribió se fija recién después de verificar
+ * el código (ver `pendingSignUp.js` y `completeSignUpPassword` en auth.js).
+ *
+ * Responde igual exista o no la cuenta, así que no se puede averiguar qué
+ * correos están registrados. Para quien ya tiene cuenta, verificar el código
+ * equivale a recuperar el acceso y fijar una contraseña nueva: exige el
+ * buzón, así que no es una vía para entrar a la cuenta de otro.
  */
 export async function performSignUp({ email, password, username } = {}, authClient) {
   const check = validateCredentials({ email, password, mode: 'signup' });
@@ -202,10 +226,12 @@ export async function performSignUp({ email, password, username } = {}, authClie
     return { user: null, session: null, error: { message: check.message, field: check.field }, needsVerification: false };
   }
 
-  const { data, error } = await authClient.signUp({
+  const { error } = await authClient.signInWithOtp({
     email: check.email,
-    password: check.password,
-    options: { data: { username: username || check.email.split('@')[0] } },
+    options: {
+      shouldCreateUser: true,
+      data: { username: username || check.email.split('@')[0] },
+    },
   });
 
   if (error) {
@@ -218,13 +244,9 @@ export async function performSignUp({ email, password, username } = {}, authClie
     };
   }
 
-  const session = data?.session ?? null;
-  if (isSessionUsable(session)) {
-    return { user: session.user, session, error: null, needsVerification: false, email: check.email };
-  }
-
+  // Nunca hay sesión acá: la sesión la emite `verifyOtp` con el código.
   return {
-    user: data?.user ?? null,
+    user: null,
     session: null,
     error: null,
     needsVerification: true,

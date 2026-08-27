@@ -141,7 +141,7 @@ export default function LoginScreen({ navigation }) {
             </Text>
             <Text style={styles.subtitle}>
               {isSignUp
-                ? 'Regístrate y empieza a jugar en minutos'
+                ? 'Te enviaremos un código a tu correo para confirmarlo'
                 : 'Accede a partidos cerca de ti en minutos'}
             </Text>
 
