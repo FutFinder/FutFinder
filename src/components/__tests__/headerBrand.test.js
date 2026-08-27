@@ -58,3 +58,13 @@ test('Perfil (PlayerProfileTopBar) tiene el bell solo en la rama de perfil propi
     'el bell debe estar después del botón de Configuración, dentro de la rama isOwnProfile'
   );
 });
+
+test('Clubes (ClubExplorer) tiene el bell solo cuando actúa como raíz de pestaña (!showBackButton)', () => {
+  const src = readSrc('../club/ClubExplorer.js');
+  assert.match(src, /<NotificationBell\s*\/>/, 'ClubExplorer debe renderizar <NotificationBell/>');
+  assert.match(
+    src,
+    /!showBackButton\s*&&\s*<NotificationBell\s*\/>/,
+    'el bell debe estar condicionado a !showBackButton, para no aparecer cuando se empuja sobre el stack'
+  );
+});

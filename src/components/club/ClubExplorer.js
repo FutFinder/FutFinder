@@ -28,6 +28,7 @@ import {
 import { clubsExplorer as CE, clubsExplorerRadius as CER } from '../../theme/colors';
 import Banner from '../Banner';
 import ClubExplorerCard from './ClubExplorerCard';
+import NotificationBell from '../NotificationBell';
 import {
   searchClubs,
   getMyClubs,
@@ -199,17 +200,22 @@ export default function ClubExplorer({
           contentContainerStyle={[styles.listContent, { paddingBottom: fabBottom + 80 }]}
           ListHeaderComponent={
             <View>
-              {showBackButton && (
-                <Pressable
-                  onPress={onBack}
-                  hitSlop={10}
-                  accessibilityRole="button"
-                  accessibilityLabel="Volver"
-                  style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
-                >
-                  <ArrowLeft color={CE.textPrimary} size={20} strokeWidth={2.2} />
-                </Pressable>
-              )}
+              <View style={styles.topRow}>
+                {showBackButton ? (
+                  <Pressable
+                    onPress={onBack}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel="Volver"
+                    style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <ArrowLeft color={CE.textPrimary} size={20} strokeWidth={2.2} />
+                  </Pressable>
+                ) : (
+                  <View style={styles.topRowSpacer} />
+                )}
+                {!showBackButton && <NotificationBell />}
+              </View>
 
               <Text style={styles.title}>Clubes</Text>
 
@@ -542,6 +548,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   listContent: { paddingHorizontal: 20 },
 
+  topRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 8 },
+  topRowSpacer: { flex: 1 },
   backBtn: {
     width: 40,
     height: 40,
@@ -551,8 +559,6 @@ const styles = StyleSheet.create({
     borderColor: CE.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 8,
   },
   title: {
     fontSize: 32,
