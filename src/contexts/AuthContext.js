@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { isSessionUsable } from '../services/authPolicy';
 
 /**
  * Fuente única de verdad de la sesión, usada por el guard de navegación
@@ -7,9 +8,14 @@ import { supabase, isSupabaseConfigured } from '../services/supabase';
  * volver a golpear la red (`supabase.auth.getUser()` puede fallar por
  * conexión, y eso no es lo mismo que "no hay sesión").
  *
- * En modo demo (sin Supabase configurado) no existe concepto de sesión real:
- * el resto de la app ya está diseñado para funcionar con datos de muestra,
- * así que acá se trata como "autenticado" para no romper ese flujo.
+ * Sin Supabase configurado no hay sesión posible, así que tampoco hay acceso:
+ * `isAuthenticated` queda en false y las rutas privadas mandan a Login. Antes
+ * este caso se trataba como "autenticado" para que la interfaz renderizara
+ * con datos de muestra, y eso abría la app entera en cualquier build al que
+ * le faltaran las variables de entorno.
+ *
+ * "Autenticado" exige una sesión usable: token, usuario y correo verificado
+ * (ver `isSessionUsable` en services/authPolicy.js).
  */
 const AuthContext = createContext(null);
 
@@ -51,7 +57,7 @@ export function AuthProvider({ children }) {
     return destination;
   };
 
-  const isAuthenticated = !isSupabaseConfigured || !!session;
+  const isAuthenticated = isSessionUsable(session);
 
   const value = {
     session,

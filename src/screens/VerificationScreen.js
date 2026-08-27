@@ -17,6 +17,7 @@ import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
 import { APP_VERSION } from '../utils/appVersion';
 import { verifyEmailOtp, resendOtp } from '../services/auth';
+import { isSessionUsable } from '../services/authPolicy';
 import { isSupabaseConfigured } from '../services/supabase';
 
 const CODE_LENGTH = 6;
@@ -59,24 +60,21 @@ export default function VerificationScreen({ navigation, route }) {
       return;
     }
 
-    // Modo demo: si Supabase no está configurado, aceptamos 472000
-    if (!isSupabaseConfigured) {
-      if (code !== '472000') {
-        setError('Código incorrecto. Intente de nuevo');
-        return;
-      }
-      navigation.navigate('LocationPermission');
-      return;
-    }
-
     setLoading(true);
-    const { error: err } = await verifyEmailOtp({ email, token: code });
+    const { error: err, session } = await verifyEmailOtp({ email, token: code });
     setLoading(false);
 
     if (err) {
       setError(err.message || 'Código incorrecto. Intente de nuevo');
       return;
     }
+
+    // Sin sesión no se avanza: el código lo valida Supabase, no esta pantalla.
+    if (!isSessionUsable(session)) {
+      setError('Código incorrecto. Intente de nuevo');
+      return;
+    }
+
     navigation.navigate('LocationPermission');
   };
 
@@ -204,10 +202,8 @@ export default function VerificationScreen({ navigation, route }) {
 
             {!isSupabaseConfigured && (
               <Text style={styles.hint}>
-                💡 Modo demo: el código válido es{' '}
-                <Text style={{ color: colors.primary, fontWeight: '700' }}>
-                  472000
-                </Text>
+                ⚠️ Faltan las variables de entorno de Supabase: no se puede
+                verificar el código. Revisa el archivo .env.
               </Text>
             )}
           </View>

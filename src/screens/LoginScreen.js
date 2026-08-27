@@ -15,60 +15,99 @@ import { ArrowLeft, AlertCircle } from 'lucide-react-native';
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
-import { signInOrUp } from '../services/auth';
+import { loginWithEmail, registerWithEmail } from '../services/auth';
+import {
+  validateCredentials,
+  decideAuthDestination,
+  MENSAJES,
+  MIN_PASSWORD_SIGNUP,
+} from '../services/authPolicy';
 import { getOnboardingState } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { APP_VERSION } from '../utils/appVersion';
 
+/**
+ * Iniciar sesión y registrarse son dos acciones distintas en la misma
+ * pantalla, elegidas con el enlace de abajo (`mode`). Antes eran una sola:
+ * un login que fallaba caía a `signUp`, y como Supabase autoconfirma cuando
+ * la confirmación de correo está desactivada, cualquier correo inventado
+ * entraba a la app creando una cuenta real de paso. Ahora el login solo
+ * inicia sesión, y solo se navega a una ruta privada si Supabase devolvió
+ * una sesión usable.
+ */
 export default function LoginScreen({ navigation }) {
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const { consumePendingDestination } = useAuth();
 
-  const handleLogin = async () => {
+  const isSignUp = mode === 'signup';
+
+  const toggleMode = () => {
+    setMode(isSignUp ? 'login' : 'signup');
+    setErrorMsg(null);
+  };
+
+  const handleSubmit = async () => {
     setErrorMsg(null);
 
-    if (!email.trim() || password.length < 6) {
-      setErrorMsg('Ingresa tu correo y una contraseña de al menos 6 caracteres');
+    // Los campos vacíos o mal escritos no se envían al proveedor.
+    const check = validateCredentials({ email, password, mode });
+    if (!check.valid) {
+      setErrorMsg(check.message);
       return;
     }
 
     setLoading(true);
-    const result = await signInOrUp({ email: email.trim(), password });
+    const result = isSignUp
+      ? await registerWithEmail({ email, password })
+      : await loginWithEmail({ email, password });
     setLoading(false);
 
     if (result.error) {
-      setErrorMsg(result.error.message || 'No pudimos iniciar sesión');
+      setErrorMsg(result.error.message || MENSAJES.inesperado);
       return;
     }
 
-    // Caso 1: sesión activa
-    if (result.session) {
-      // ¿Ya completó el onboarding alguna vez? → directo al Home
-      const done = await getOnboardingState();
-      if (done) {
-        // Si el guard nos mandó acá desde una ruta privada, volvemos a ella
-        // en vez de caer siempre en el Home.
-        const pending = consumePendingDestination();
-        if (pending && pending.name && pending.name !== 'Main') {
-          navigation.reset({
-            index: 1,
-            routes: [{ name: 'Main' }, { name: pending.name, params: pending.params }],
-          });
-        } else {
-          navigation.reset({ index: 0, routes: [{ name: 'Main', params: pending?.params }] });
-        }
-      } else {
-        navigation.navigate('LocationPermission');
-      }
+    // Cuenta creada o sin confirmar todavía → código de verificación.
+    if (result.needsVerification) {
+      navigation.navigate('Verification', { email: result.email });
       return;
     }
 
-    // Caso 2: signUp creado, falta confirmar email vía OTP
-    navigation.navigate('Verification', { email: email.trim() });
+    const done = await getOnboardingState();
+    const destino = decideAuthDestination({ session: result.session, onboardingDone: done });
+
+    if (destino === 'verify-email') {
+      navigation.navigate('Verification', { email: result.email });
+      return;
+    }
+
+    // Sin sesión usable no se entra, pase lo que pase.
+    if (destino === 'login') {
+      setErrorMsg(MENSAJES.credencialesInvalidas);
+      return;
+    }
+
+    if (destino === 'onboarding') {
+      navigation.navigate('LocationPermission');
+      return;
+    }
+
+    // Si el guard nos mandó acá desde una ruta privada, volvemos a ella
+    // en vez de caer siempre en el Home.
+    const pending = consumePendingDestination();
+    if (pending && pending.name && pending.name !== 'Main') {
+      navigation.reset({
+        index: 1,
+        routes: [{ name: 'Main' }, { name: pending.name, params: pending.params }],
+      });
+    } else {
+      navigation.reset({ index: 0, routes: [{ name: 'Main', params: pending?.params }] });
+    }
   };
 
   return (
@@ -97,9 +136,13 @@ export default function LoginScreen({ navigation }) {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.title}>Iniciar sesión o registrarse</Text>
+            <Text style={styles.title}>
+              {isSignUp ? 'Crear tu cuenta' : 'Iniciar sesión'}
+            </Text>
             <Text style={styles.subtitle}>
-              Accede a partidos cerca de ti en minutos
+              {isSignUp
+                ? 'Regístrate y empieza a jugar en minutos'
+                : 'Accede a partidos cerca de ti en minutos'}
             </Text>
 
             <Text style={styles.label}>Correo electrónico</Text>
@@ -122,8 +165,14 @@ export default function LoginScreen({ navigation }) {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              autoComplete="password"
+              autoComplete={isSignUp ? 'new-password' : 'password'}
             />
+
+            {isSignUp && (
+              <Text style={styles.hintPassword}>
+                Usa al menos {MIN_PASSWORD_SIGNUP} caracteres.
+              </Text>
+            )}
 
             {errorMsg && (
               <View style={styles.errorBox}>
@@ -135,20 +184,26 @@ export default function LoginScreen({ navigation }) {
             <View style={{ height: 18 }} />
 
             <Button
-              label={loading ? 'Conectando…' : 'Iniciar sesión'}
+              label={loading ? 'Conectando…' : isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}
               variant="primary"
               loading={loading}
-              onPress={handleLogin}
+              onPress={handleSubmit}
             />
 
             <View style={styles.linksRow}>
-              <Pressable hitSlop={8}>
-                <Text style={styles.linkSmall}>¿Olvidaste tu contraseña?</Text>
+              {!isSignUp && (
+                <Pressable hitSlop={8}>
+                  <Text style={styles.linkSmall}>¿Olvidaste tu contraseña?</Text>
+                </Pressable>
+              )}
+              <Pressable hitSlop={8} onPress={toggleMode}>
+                <Text style={styles.linkSmallMuted}>
+                  {isSignUp ? '¿Ya tienes cuenta? ' : '¿No tienes cuenta? '}
+                  <Text style={styles.linkSmall}>
+                    {isSignUp ? 'Inicia sesión' : 'Regístrate'}
+                  </Text>
+                </Text>
               </Pressable>
-              <Text style={styles.linkSmallMuted}>
-                ¿No tienes cuenta?{' '}
-                <Text style={styles.linkSmall}>Regístrate</Text>
-              </Text>
             </View>
 
             <View style={styles.dividerRow}>
@@ -173,8 +228,8 @@ export default function LoginScreen({ navigation }) {
 
             {!isSupabaseConfigured && (
               <Text style={styles.demoBanner}>
-                ⚠️ Modo demo — Supabase no configurado. Cualquier email/password
-                avanzará al onboarding.
+                ⚠️ Faltan las variables de entorno de Supabase, así que no se
+                puede iniciar sesión. Revisa el archivo .env.
               </Text>
             )}
           </View>
@@ -239,6 +294,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     color: colors.textPrimary,
     fontSize: 15,
+  },
+  hintPassword: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 6,
   },
   errorBox: {
     marginTop: 14,

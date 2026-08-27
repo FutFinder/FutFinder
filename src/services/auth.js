@@ -1,55 +1,47 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { performLogin, performSignUp, describeAuthError, MENSAJES } from './authPolicy';
 
 /**
  * Servicio de autenticación de FutFinder.
+ *
+ * Solo conecta el cliente real de Supabase Auth con la política pura de
+ * `authPolicy.js`. Supabase verifica las credenciales contra su tabla de
+ * usuarios: acá no se comparan contraseñas ni se fabrican sesiones.
+ *
+ * Sin configuración (faltan las variables de entorno) estas funciones fallan
+ * con un mensaje claro. Antes devolvían un usuario inventado y, junto con el
+ * `isAuthenticated` del contexto, eso dejaba la app entera abierta a
+ * cualquiera en un build sin `.env`.
  *
  * El trigger `handle_new_user` de la base de datos (ver supabase/schema.sql)
  * crea automáticamente un row en `profiles` cada vez que alguien se registra,
  * con username derivado del email y trust_score inicial de 100.
  */
 
-export async function signInWithEmail({ email, password }) {
-  if (!isSupabaseConfigured) {
-    return { user: { email }, error: null, demo: true };
-  }
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.trim().toLowerCase(),
-    password,
-  });
-  return { user: data?.user ?? null, session: data?.session ?? null, error };
-}
-
-export async function signUpWithEmail({ email, password, username }) {
-  if (!isSupabaseConfigured) {
-    return { user: { email }, error: null, demo: true };
-  }
-  const { data, error } = await supabase.auth.signUp({
-    email: email.trim().toLowerCase(),
-    password,
-    options: {
-      data: { username: username || email.split('@')[0] },
-    },
-  });
-  return { user: data?.user ?? null, session: data?.session ?? null, error };
+function faltaConfiguracion() {
+  return {
+    user: null,
+    session: null,
+    error: { message: MENSAJES.faltaConfiguracion },
+    needsVerification: false,
+  };
 }
 
 /**
- * Login inteligente:
- *  - Intenta signIn con la contraseña.
- *  - Si el usuario no existe → hace signUp con esa misma contraseña.
- *  - Devuelve { user, session, isNewUser, error }.
+ * Inicia sesión con correo y contraseña.
+ *
+ * NUNCA crea una cuenta. Si las credenciales no coinciden con un usuario
+ * real, devuelve error. Registrarse es un acto aparte: `registerWithEmail`.
  */
-export async function signInOrUp({ email, password }) {
-  if (!isSupabaseConfigured) {
-    return { user: { email }, session: null, isNewUser: false, error: null, demo: true };
-  }
-  const signIn = await signInWithEmail({ email, password });
-  if (signIn.user && !signIn.error) {
-    return { ...signIn, isNewUser: false };
-  }
-  // Credenciales inválidas o usuario no existe → probamos signUp
-  const signUp = await signUpWithEmail({ email, password });
-  return { ...signUp, isNewUser: true };
+export async function loginWithEmail({ email, password }) {
+  if (!isSupabaseConfigured) return faltaConfiguracion();
+  return performLogin({ email, password }, supabase.auth);
+}
+
+/** Crea una cuenta nueva. Solo se llama desde el modo «registrarse». */
+export async function registerWithEmail({ email, password, username }) {
+  if (!isSupabaseConfigured) return faltaConfiguracion();
+  return performSignUp({ email, password, username }, supabase.auth);
 }
 
 /**
@@ -58,22 +50,26 @@ export async function signInOrUp({ email, password }) {
  * el template "Confirm signup" use {{ .Token }} en vez de link.
  */
 export async function verifyEmailOtp({ email, token }) {
-  if (!isSupabaseConfigured) return { error: null, demo: true };
+  if (!isSupabaseConfigured) return faltaConfiguracion();
   const { data, error } = await supabase.auth.verifyOtp({
-    email: email.trim().toLowerCase(),
+    email: String(email || '').trim().toLowerCase(),
     token,
     type: 'email',
   });
-  return { user: data?.user ?? null, session: data?.session ?? null, error };
+  return {
+    user: data?.user ?? null,
+    session: data?.session ?? null,
+    error: error ? { message: describeAuthError(error) } : null,
+  };
 }
 
 export async function resendOtp({ email }) {
-  if (!isSupabaseConfigured) return { error: null, demo: true };
+  if (!isSupabaseConfigured) return { error: { message: MENSAJES.faltaConfiguracion } };
   const { error } = await supabase.auth.resend({
-    email: email.trim().toLowerCase(),
+    email: String(email || '').trim().toLowerCase(),
     type: 'signup',
   });
-  return { error };
+  return { error: error ? { message: describeAuthError(error) } : null };
 }
 
 export async function signOut() {
