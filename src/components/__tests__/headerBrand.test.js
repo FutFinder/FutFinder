@@ -30,3 +30,14 @@ test('Home (TacticalHeader) usa BrandMark, no una copia inline del logo', () => 
     'TacticalHeader todavía dibuja el wordmark a mano — debería venir de BrandMark'
   );
 });
+
+test('Chat (ChatInboxHeader) usa BrandMark y tiene el bell de avisos', () => {
+  const src = readSrc('../chat/ChatInboxHeader.js');
+  assert.match(src, /<BrandMark\s*\/>/, 'ChatInboxHeader debe renderizar <BrandMark/>');
+  assert.doesNotMatch(
+    src,
+    /fut<Text/,
+    'ChatInboxHeader todavía dibuja el wordmark a mano — debería venir de BrandMark'
+  );
+  assert.match(src, /<NotificationBell\s*\/>/, 'ChatInboxHeader debe renderizar <NotificationBell/>');
+});

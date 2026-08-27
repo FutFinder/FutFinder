@@ -1,47 +1,49 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { MapPin, UserPlus } from 'lucide-react-native';
+import { UserPlus } from 'lucide-react-native';
 
 import { chatColors, dsRadius, dsSizes } from '../../theme/colors';
+import BrandMark from '../BrandMark';
+import NotificationBell from '../NotificationBell';
 
 /**
- * Cabecera de la bandeja: marca, acceso a «Amigos y solicitudes» con el
- * contador de solicitudes recibidas, y el título grande.
+ * Cabecera de la bandeja: marca, bell de avisos, acceso a «Amigos y
+ * solicitudes» con el contador de solicitudes recibidas, y el título
+ * grande.
  *
- * El botón mide 38 px pero lleva `hitSlop` para llegar a los 44 px táctiles
- * que exige el diseño.
+ * El botón de amigos mide 38 px pero lleva `hitSlop` para llegar a los
+ * 44 px táctiles que exige el diseño.
  */
 export default function ChatInboxHeader({ pendingRequests = 0, onPressFriends }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <View style={styles.brand}>
-          <MapPin color={chatColors.green} size={18} strokeWidth={2} />
-          <Text style={styles.brandText}>
-            fut<Text style={styles.brandAccent}>finder</Text>
-          </Text>
-        </View>
+        <BrandMark />
 
-        <Pressable
-          onPress={onPressFriends}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={
-            pendingRequests > 0
-              ? `Amigos y solicitudes, ${pendingRequests} pendientes`
-              : 'Amigos y solicitudes'
-          }
-          style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
-        >
-          <UserPlus color="rgba(255,255,255,0.8)" size={18} strokeWidth={1.8} />
-          {pendingRequests > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {pendingRequests > 9 ? '9+' : pendingRequests}
-              </Text>
-            </View>
-          )}
-        </Pressable>
+        <View style={styles.rightGroup}>
+          <NotificationBell />
+
+          <Pressable
+            onPress={onPressFriends}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={
+              pendingRequests > 0
+                ? `Amigos y solicitudes, ${pendingRequests} pendientes`
+                : 'Amigos y solicitudes'
+            }
+            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
+          >
+            <UserPlus color="rgba(255,255,255,0.8)" size={18} strokeWidth={1.8} />
+            {pendingRequests > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {pendingRequests > 9 ? '9+' : pendingRequests}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
       </View>
 
       <Text style={styles.title} accessibilityRole="header">
@@ -54,14 +56,7 @@ export default function ChatInboxHeader({ pendingRequests = 0, onPressFriends })
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: dsSizes.gutter + 4, paddingTop: 4, paddingBottom: 14 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  brandText: {
-    color: chatColors.textPrimary,
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  brandAccent: { color: chatColors.green },
+  rightGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   iconBtn: {
     width: 38,
