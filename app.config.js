@@ -21,7 +21,11 @@ module.exports = {
     userInterfaceStyle: 'dark',
     splash: {
       resizeMode: 'contain',
-      backgroundColor: '#201F1D',
+      backgroundColor: '#0A0C0A',
+    },
+    androidStatusBar: {
+      backgroundColor: '#0A0C0A',
+      barStyle: 'light-content',
     },
     ios: {
       supportsTablet: true,
@@ -61,7 +65,7 @@ module.exports = {
       name: 'FutFinder',
       shortName: 'FutFinder',
       themeColor: '#71B533',
-      backgroundColor: '#201F1D',
+      backgroundColor: '#0A0C0A',
     },
     plugins: [
       [
