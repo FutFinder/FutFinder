@@ -20,3 +20,13 @@ test('BrandMark.js es la fuente única del wordmark "fut...finder"', () => {
   assert.match(src, /fut<Text/, 'BrandMark debe dibujar el wordmark "fut...finder"');
   assert.match(src, /export default function BrandMark/);
 });
+
+test('Home (TacticalHeader) usa BrandMark, no una copia inline del logo', () => {
+  const src = readSrc('../home/TacticalHeader.js');
+  assert.match(src, /<BrandMark\s*\/>/, 'TacticalHeader debe renderizar <BrandMark/>');
+  assert.doesNotMatch(
+    src,
+    /fut<Text/,
+    'TacticalHeader todavía dibuja el wordmark a mano — debería venir de BrandMark'
+  );
+});

@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, ShieldCheck } from 'lucide-react-native';
 import StatusPill from './StatusPill';
+import BrandMark from '../BrandMark';
 import NotificationBell from '../NotificationBell';
 import { tactical as t } from '../../theme/colors';
 
@@ -18,12 +19,7 @@ export default function TacticalHeader({
       className="px-5 pb-5 pt-3"
     >
       <View className="mt-2 flex-row items-center">
-        <View className="flex-row items-center gap-2">
-          <MapPin size={26} color={t.neon} strokeWidth={2.2} />
-          <Text className="text-[21px] font-extrabold tracking-tight text-white">
-            fut<Text className="text-[#00FF66]">finder</Text>
-          </Text>
-        </View>
+        <BrandMark />
         <View className="flex-1" />
         <NotificationBell />
       </View>
