@@ -25,14 +25,12 @@ export default function PlayerProfileTopBar({
   return (
     <View style={styles.bar}>
       {isOwnProfile ? (
-        <>
-          <View style={styles.titleWrap}>
-            <MapPin color={dsColors.green} size={20} strokeWidth={1.8} />
-            <Text style={styles.title} numberOfLines={1}>
-              {title}
-            </Text>
-          </View>
-        </>
+        <View style={styles.titleWrap}>
+          <MapPin color={dsColors.green} size={20} strokeWidth={1.8} />
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
       ) : (
         <>
           <Pressable
