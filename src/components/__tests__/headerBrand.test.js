@@ -1,0 +1,22 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+/**
+ * REGRESIÓN — el logo "fut...finder" y el bell de avisos estaban
+ * duplicados/ausentes de forma inconsistente entre pantallas (Home,
+ * Partidos, Chat, Perfil, Clubes). Cada test de este archivo se activa en
+ * la tarea del plan que migra su pantalla; hasta entonces se espera que
+ * falle — es la prueba roja de esa tarea.
+ */
+
+function readSrc(relativePath) {
+  return fs.readFileSync(path.join(__dirname, relativePath), 'utf8');
+}
+
+test('BrandMark.js es la fuente única del wordmark "fut...finder"', () => {
+  const src = readSrc('../BrandMark.js');
+  assert.match(src, /fut<Text/, 'BrandMark debe dibujar el wordmark "fut...finder"');
+  assert.match(src, /export default function BrandMark/);
+});
