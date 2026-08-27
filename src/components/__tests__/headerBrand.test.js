@@ -51,10 +51,10 @@ test('Partidos (función Header de PartidosScreen) usa BrandMark y tiene el bell
 test('Perfil (PlayerProfileTopBar) tiene el bell solo en la rama de perfil propio', () => {
   const src = readSrc('../player/PlayerProfileTopBar.js');
   assert.match(src, /<NotificationBell\s*\/>/, 'PlayerProfileTopBar debe renderizar <NotificationBell/>');
-  const ownProfileBranch = src.split('isOwnProfile ?')[1] || '';
+  const afterSettings = src.split('onSettings &&')[1] || '';
   assert.match(
-    ownProfileBranch,
+    afterSettings,
     /<NotificationBell\s*\/>/,
-    'el bell debe estar dentro de la rama isOwnProfile (perfil propio)'
+    'el bell debe estar después del botón de Configuración, dentro de la rama isOwnProfile'
   );
 });
