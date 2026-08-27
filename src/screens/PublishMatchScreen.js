@@ -86,7 +86,7 @@ function initialDraft() {
   const d = startOfDay(new Date());
   return {
     // Paso 1 · formato y cupos
-    cupos: 3,
+    cupos: 1,
     cuota: '5000',
     nivel: 'intermedio',
     duracion: 90,
