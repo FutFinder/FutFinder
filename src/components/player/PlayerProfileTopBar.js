@@ -32,7 +32,6 @@ export default function PlayerProfileTopBar({
               {title}
             </Text>
           </View>
-          <NotificationBell />
         </>
       ) : (
         <>
@@ -83,6 +82,7 @@ export default function PlayerProfileTopBar({
               <Settings color={dsColors.textPrimary} size={17} strokeWidth={1.9} />
             </Pressable>
           )}
+          <NotificationBell />
         </>
       ) : (
         <Pressable
