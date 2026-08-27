@@ -49,7 +49,7 @@ export default function SplashScreen({ navigation }) {
     const sessionPromise = (async () => {
       const state = await getOnboardingState();
       destRef.current = getInitialRouteName(state);
-    })();
+    })().catch(() => {});
 
     const runAnimation = async () => {
       const reduceMotion = await AccessibilityInfo.isReduceMotionEnabled();
@@ -119,7 +119,7 @@ export default function SplashScreen({ navigation }) {
       });
     };
 
-    const animationPromise = runAnimation();
+    const animationPromise = runAnimation().catch(() => {});
 
     // Espera tanto la animación como la sesión: si la sesión tarda más, el
     // logo queda quieto en su estado final (nada se repite) hasta que

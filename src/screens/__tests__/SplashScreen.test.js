@@ -62,3 +62,24 @@ test('conserva el contrato de navegación hacia Main/LocationPermission/Welcome'
   assert.match(src, /navigation\.reset\(\{ index: 0, routes: \[\{ name: 'LocationPermission' \}\] \}\)/);
   assert.match(src, /navigation\.replace\('Welcome'\)/);
 });
+
+test('los valores del pin y el wordmark coinciden con BrandMark.js (mismo ícono oficial)', () => {
+  const splashSrc = readSplashSrc();
+  const brandMarkSrc = fs.readFileSync(path.join(__dirname, '../../components/BrandMark.js'), 'utf8');
+
+  const sharedValues = [
+    /strokeWidth={2\.2}/,
+    /fontSize: 21/,
+    /fontWeight: '800'/,
+    /letterSpacing: -0\.4/,
+    /gap: 8/,
+  ];
+
+  for (const pattern of sharedValues) {
+    assert.match(brandMarkSrc, pattern, `BrandMark.js debería tener ${pattern}`);
+    assert.match(splashSrc, pattern, `SplashScreen.js debería reproducir ${pattern} de BrandMark.js`);
+  }
+
+  assert.match(splashSrc, /ICON_SIZE = 26/, 'el tamaño del ícono debe coincidir con el size={26} de BrandMark');
+  assert.match(brandMarkSrc, /size=\{26\}/, 'BrandMark.js debe seguir usando tamaño 26 (si cambia, SplashScreen debe seguirlo)');
+});

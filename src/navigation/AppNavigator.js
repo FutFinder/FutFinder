@@ -68,7 +68,7 @@ import withAuthGuard from './withAuthGuard';
 import withErrorBoundary from './withErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 
-import { colors } from '../theme/colors';
+import { colors, clubsExplorer } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
 
@@ -135,8 +135,8 @@ const navTheme = {
   colors: {
     ...NavDarkTheme.colors,
     primary: colors.primary,
-    background: colors.background,
-    card: colors.background,
+    background: clubsExplorer.bg,
+    card: clubsExplorer.bg,
     text: colors.textPrimary,
     border: colors.border,
     notification: colors.primary,
@@ -212,7 +212,7 @@ export default function AppNavigator() {
         initialRouteName="Splash"
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
+          contentStyle: { backgroundColor: clubsExplorer.bg },
           animation: 'slide_from_right',
         }}
       >
@@ -424,5 +424,5 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  authLoading: { flex: 1, backgroundColor: colors.background },
+  authLoading: { flex: 1, backgroundColor: clubsExplorer.bg },
 });
