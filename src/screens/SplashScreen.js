@@ -4,10 +4,12 @@ import {
   Easing,
   AccessibilityInfo,
   StyleSheet,
+  Text,
+  View,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import BrandMark from '../components/BrandMark';
+import { MapPin } from 'lucide-react-native';
 import { clubsExplorer, tactical } from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
 import { getInitialRouteName } from '../utils/routing';
@@ -16,23 +18,26 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+// El ícono y el wordmark reproducen exactamente los valores de
+// BrandMark.js (pin + "fut...finder"): mismo ícono, mismo tamaño 26, mismo
+// color tactical.neon, mismo estilo de texto. Se reconstruyen acá — en vez
+// de renderizar <BrandMark /> — porque esta pantalla necesita animar el
+// pin y el texto en momentos distintos (el pin se asienta, luego el texto
+// se desliza a su derecha), algo que un <BrandMark /> fusionado no puede
+// coreografiar. BrandMark.js no se modifica.
+const ICON_SIZE = 26;
+
 export default function SplashScreen({ navigation }) {
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
 
-  // Escala del logo hero: cabe con margen entre 320px (teléfono chico) y
-  // pantallas anchas de tablet/web, sin desbordar ni verse minúsculo.
-  const logoScaleBase = clamp(width * 0.0058, 1.7, 2.4);
+  // Escala del conjunto hero: cabe con margen entre 320px (teléfono chico)
+  // y pantallas anchas de tablet/web, sin desbordar ni verse minúsculo.
+  const heroScale = clamp(width * 0.0058, 1.7, 2.4);
 
-  const haloBase = Math.min(width, height);
-  const haloOuterSize = haloBase * 0.85;
-  const haloInnerSize = haloBase * 0.45;
-  const haloPulseSize = haloInnerSize * 1.15;
-
-  const haloOpacity = useRef(new Animated.Value(0)).current;
-  const pulseOpacity = useRef(new Animated.Value(0)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(1)).current;
-  const logoTranslateY = useRef(new Animated.Value(0)).current;
+  const iconOpacity = useRef(new Animated.Value(0)).current;
+  const iconScale = useRef(new Animated.Value(0.86)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const textTranslateX = useRef(new Animated.Value(28)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   const destRef = useRef(null);
@@ -51,70 +56,65 @@ export default function SplashScreen({ navigation }) {
       if (!isMounted) return;
 
       if (reduceMotion) {
-        // Alternativa reducida: solo un fundido corto, sin escala ni pulso.
+        // Alternativa reducida: pin y texto ya en su lugar final, solo un
+        // fundido conjunto corto — sin desliz, sin secuencia pin→texto.
+        iconScale.setValue(1);
+        textTranslateX.setValue(0);
         await new Promise((resolve) => {
-          Animated.timing(logoOpacity, {
-            toValue: 1,
-            duration: 250,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }).start(resolve);
+          Animated.parallel([
+            Animated.timing(iconOpacity, {
+              toValue: 1,
+              duration: 250,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(textOpacity, {
+              toValue: 1,
+              duration: 250,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ]).start(resolve);
         });
         return;
       }
 
-      logoScale.setValue(0.86);
-      logoTranslateY.setValue(8);
-
       await new Promise((resolve) => {
         Animated.sequence([
+          // 1. El pin se asienta primero.
           Animated.parallel([
-            Animated.timing(haloOpacity, {
+            Animated.timing(iconOpacity, {
               toValue: 1,
-              duration: 280,
-              easing: Easing.out(Easing.quad),
+              duration: 380,
+              easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }),
-            Animated.sequence([
-              Animated.delay(120),
-              Animated.parallel([
-                Animated.timing(logoOpacity, {
-                  toValue: 1,
-                  duration: 380,
-                  easing: Easing.out(Easing.cubic),
-                  useNativeDriver: true,
-                }),
-                Animated.timing(logoScale, {
-                  toValue: 1,
-                  duration: 380,
-                  easing: Easing.out(Easing.cubic),
-                  useNativeDriver: true,
-                }),
-                Animated.timing(logoTranslateY, {
-                  toValue: 0,
-                  duration: 380,
-                  easing: Easing.out(Easing.cubic),
-                  useNativeDriver: true,
-                }),
-              ]),
-            ]),
+            Animated.timing(iconScale, {
+              toValue: 1,
+              duration: 380,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
           ]),
-          // Pulso único de iluminación — ocurre una sola vez.
-          Animated.sequence([
-            Animated.timing(pulseOpacity, {
+          Animated.delay(120),
+          // 2. El wordmark se desliza a su lugar (a la derecha del pin) y
+          // se desvanece hacia dentro.
+          Animated.parallel([
+            Animated.timing(textOpacity, {
               toValue: 1,
-              duration: 130,
-              easing: Easing.out(Easing.quad),
+              duration: 460,
+              easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }),
-            Animated.timing(pulseOpacity, {
+            Animated.timing(textTranslateX, {
               toValue: 0,
-              duration: 130,
-              easing: Easing.in(Easing.quad),
+              duration: 460,
+              easing: Easing.out(Easing.cubic),
               useNativeDriver: true,
             }),
           ]),
-          Animated.delay(350),
+          // 3. Hold breve con el logo completo, estático (nada se repite).
+          Animated.delay(280),
         ]).start(resolve);
       });
     };
@@ -152,63 +152,27 @@ export default function SplashScreen({ navigation }) {
 
   return (
     <Animated.View style={[styles.root, { opacity: screenOpacity }]}>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.haloCircle,
-          {
-            backgroundColor: tactical.neonSoft,
-            width: haloOuterSize,
-            height: haloOuterSize,
-            borderRadius: haloOuterSize / 2,
-            top: (height - haloOuterSize) / 2,
-            left: (width - haloOuterSize) / 2,
-            opacity: haloOpacity,
-          },
-        ]}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.haloCircle,
-          {
-            backgroundColor: tactical.neonBorder,
-            width: haloInnerSize,
-            height: haloInnerSize,
-            borderRadius: haloInnerSize / 2,
-            top: (height - haloInnerSize) / 2,
-            left: (width - haloInnerSize) / 2,
-            opacity: haloOpacity,
-          },
-        ]}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.haloCircle,
-          {
-            backgroundColor: tactical.neonBorder,
-            width: haloPulseSize,
-            height: haloPulseSize,
-            borderRadius: haloPulseSize / 2,
-            top: (height - haloPulseSize) / 2,
-            left: (width - haloPulseSize) / 2,
-            opacity: pulseOpacity,
-          },
-        ]}
-      />
       <SafeAreaView style={styles.safeArea}>
-        <Animated.View
-          style={{
-            opacity: logoOpacity,
-            transform: [
-              { scale: Animated.multiply(logoScale, logoScaleBase) },
-              { translateY: logoTranslateY },
-            ],
-          }}
-        >
-          <BrandMark />
-        </Animated.View>
+        <View style={[styles.row, { transform: [{ scale: heroScale }] }]}>
+          <Animated.View
+            style={{
+              opacity: iconOpacity,
+              transform: [{ scale: iconScale }],
+            }}
+          >
+            <MapPin size={ICON_SIZE} color={tactical.neon} strokeWidth={2.2} />
+          </Animated.View>
+          <Animated.View
+            style={{
+              opacity: textOpacity,
+              transform: [{ translateX: textTranslateX }],
+            }}
+          >
+            <Text style={styles.word}>
+              fut<Text style={styles.wordAccent}>finder</Text>
+            </Text>
+          </Animated.View>
+        </View>
       </SafeAreaView>
     </Animated.View>
   );
@@ -219,12 +183,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: clubsExplorer.bg,
   },
-  haloCircle: {
-    position: 'absolute',
-  },
   safeArea: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  word: {
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    color: tactical.text,
+  },
+  wordAccent: {
+    color: tactical.neon,
   },
 });

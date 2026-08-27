@@ -7,9 +7,11 @@ function readSplashSrc() {
   return fs.readFileSync(path.join(__dirname, '../SplashScreen.js'), 'utf8');
 }
 
-test('usa el logo oficial compartido (BrandMark), no un ícono propio', () => {
+test('usa el mismo ícono y wordmark oficiales que BrandMark, no un ícono propio', () => {
   const src = readSplashSrc();
-  assert.match(src, /<BrandMark\s*\/>/, 'SplashScreen debe renderizar <BrandMark />');
+  assert.match(src, /MapPin/, 'debe usar el ícono MapPin, igual que BrandMark');
+  assert.match(src, /tactical\.neon/, 'el ícono y el acento del wordmark deben usar tactical.neon');
+  assert.match(src, /fut<Text/, 'el wordmark "fut...finder" debe estar presente');
   assert.doesNotMatch(
     src,
     /<Svg/,
