@@ -1,137 +1,230 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
-import Svg, { Path, Circle, G } from 'react-native-svg';
-import { colors } from '../theme/colors';
+import {
+  Animated,
+  Easing,
+  AccessibilityInfo,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import BrandMark from '../components/BrandMark';
+import { clubsExplorer, tactical } from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
 import { getInitialRouteName } from '../utils/routing';
 
-const ICON_SIZE = 56;
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
 
 export default function SplashScreen({ navigation }) {
-  const iconOpacity  = useRef(new Animated.Value(0)).current;
-  const textOpacity  = useRef(new Animated.Value(0)).current;
-  const textX        = useRef(new Animated.Value(70)).current;
+  const { width, height } = useWindowDimensions();
+
+  // Escala del logo hero: cabe con margen entre 320px (teléfono chico) y
+  // pantallas anchas de tablet/web, sin desbordar ni verse minúsculo.
+  const logoScaleBase = clamp(width * 0.0058, 1.7, 2.4);
+
+  const haloBase = Math.min(width, height);
+  const haloOuterSize = haloBase * 0.85;
+  const haloInnerSize = haloBase * 0.45;
+  const haloPulseSize = haloInnerSize * 1.15;
+
+  const haloOpacity = useRef(new Animated.Value(0)).current;
+  const pulseOpacity = useRef(new Animated.Value(0)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(1)).current;
+  const logoTranslateY = useRef(new Animated.Value(0)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   const destRef = useRef(null);
 
   useEffect(() => {
-    // Chequeo de sesión en paralelo con la animación
-    (async () => {
+    let isMounted = true;
+
+    // Chequeo de sesión en paralelo con la animación, igual que antes.
+    const sessionPromise = (async () => {
       const state = await getOnboardingState();
       destRef.current = getInitialRouteName(state);
     })();
 
-    Animated.sequence([
-      // 1. Ícono fade-in
-      Animated.timing(iconOpacity, {
-        toValue: 1,
-        duration: 420,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      // 2. Pausa breve
-      Animated.delay(80),
-      // 3. Texto slide-in desde la derecha + fade-in
-      Animated.parallel([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 580,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(textX, {
-          toValue: 0,
-          duration: 580,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
-      // 4. Hold
-      Animated.delay(480),
-      // 5. Fade-out suave de toda la pantalla
+    const runAnimation = async () => {
+      const reduceMotion = await AccessibilityInfo.isReduceMotionEnabled();
+      if (!isMounted) return;
+
+      if (reduceMotion) {
+        // Alternativa reducida: solo un fundido corto, sin escala ni pulso.
+        await new Promise((resolve) => {
+          Animated.timing(logoOpacity, {
+            toValue: 1,
+            duration: 250,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }).start(resolve);
+        });
+        return;
+      }
+
+      logoScale.setValue(0.86);
+      logoTranslateY.setValue(8);
+
+      await new Promise((resolve) => {
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(haloOpacity, {
+              toValue: 1,
+              duration: 280,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.sequence([
+              Animated.delay(120),
+              Animated.parallel([
+                Animated.timing(logoOpacity, {
+                  toValue: 1,
+                  duration: 380,
+                  easing: Easing.out(Easing.cubic),
+                  useNativeDriver: true,
+                }),
+                Animated.timing(logoScale, {
+                  toValue: 1,
+                  duration: 380,
+                  easing: Easing.out(Easing.cubic),
+                  useNativeDriver: true,
+                }),
+                Animated.timing(logoTranslateY, {
+                  toValue: 0,
+                  duration: 380,
+                  easing: Easing.out(Easing.cubic),
+                  useNativeDriver: true,
+                }),
+              ]),
+            ]),
+          ]),
+          // Pulso único de iluminación — ocurre una sola vez.
+          Animated.sequence([
+            Animated.timing(pulseOpacity, {
+              toValue: 1,
+              duration: 130,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseOpacity, {
+              toValue: 0,
+              duration: 130,
+              easing: Easing.in(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.delay(350),
+        ]).start(resolve);
+      });
+    };
+
+    const animationPromise = runAnimation();
+
+    // Espera tanto la animación como la sesión: si la sesión tarda más, el
+    // logo queda quieto en su estado final (nada se repite) hasta que
+    // resuelva — recién ahí se desvanece la pantalla y se navega.
+    Promise.all([animationPromise, sessionPromise]).then(() => {
+      if (!isMounted) return;
+
       Animated.timing(screenOpacity, {
         toValue: 0,
-        duration: 320,
+        duration: 260,
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
-      }),
-    ]).start(() => {
-      const dest = destRef.current || 'Welcome';
-      if (dest === 'Main') {
-        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-      } else if (dest === 'LocationPermission') {
-        navigation.reset({ index: 0, routes: [{ name: 'LocationPermission' }] });
-      } else {
-        navigation.replace('Welcome');
-      }
+      }).start(() => {
+        if (!isMounted) return;
+        const dest = destRef.current || 'Welcome';
+        if (dest === 'Main') {
+          navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+        } else if (dest === 'LocationPermission') {
+          navigation.reset({ index: 0, routes: [{ name: 'LocationPermission' }] });
+        } else {
+          navigation.replace('Welcome');
+        }
+      });
     });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
-    <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
-      <View style={styles.logoRow}>
-        {/* Ícono */}
-        <Animated.View style={{ opacity: iconOpacity }}>
-          <Svg
-            width={ICON_SIZE}
-            height={ICON_SIZE * 1.2}
-            viewBox="0 0 100 120"
-          >
-            <Path
-              d="M50 5 C25 5 8 22 8 47 C8 78 50 115 50 115 C50 115 92 78 92 47 C92 22 75 5 50 5 Z"
-              fill="none"
-              stroke={colors.primary}
-              strokeWidth={6}
-            />
-            <G>
-              <Circle cx={50} cy={47} r={22} fill={colors.background} stroke={colors.primary} strokeWidth={3} />
-              <Path d="M50 35 L60 42 L56 53 L44 53 L40 42 Z" fill={colors.primary} />
-              <Path d="M50 35 L50 28" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-              <Path d="M60 42 L67 39" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-              <Path d="M56 53 L60 60" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-              <Path d="M44 53 L40 60" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-              <Path d="M40 42 L33 39" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-            </G>
-          </Svg>
-        </Animated.View>
-
-        {/* Texto "futfinder" con slide desde la derecha */}
+    <Animated.View style={[styles.root, { opacity: screenOpacity }]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.haloCircle,
+          {
+            backgroundColor: tactical.neonSoft,
+            width: haloOuterSize,
+            height: haloOuterSize,
+            borderRadius: haloOuterSize / 2,
+            top: (height - haloOuterSize) / 2,
+            left: (width - haloOuterSize) / 2,
+            opacity: haloOpacity,
+          },
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.haloCircle,
+          {
+            backgroundColor: tactical.neonBorder,
+            width: haloInnerSize,
+            height: haloInnerSize,
+            borderRadius: haloInnerSize / 2,
+            top: (height - haloInnerSize) / 2,
+            left: (width - haloInnerSize) / 2,
+            opacity: haloOpacity,
+          },
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.haloCircle,
+          {
+            backgroundColor: tactical.neonBorder,
+            width: haloPulseSize,
+            height: haloPulseSize,
+            borderRadius: haloPulseSize / 2,
+            top: (height - haloPulseSize) / 2,
+            left: (width - haloPulseSize) / 2,
+            opacity: pulseOpacity,
+          },
+        ]}
+      />
+      <SafeAreaView style={styles.safeArea}>
         <Animated.View
           style={{
-            opacity: textOpacity,
-            transform: [{ translateX: textX }],
+            opacity: logoOpacity,
+            transform: [
+              { scale: Animated.multiply(logoScale, logoScaleBase) },
+              { translateY: logoTranslateY },
+            ],
           }}
         >
-          <Text style={styles.text}>
-            fut<Text style={styles.textGreen}>finder</Text>
-          </Text>
+          <BrandMark />
         </Animated.View>
-      </View>
+      </SafeAreaView>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: clubsExplorer.bg,
+  },
+  haloCircle: {
+    position: 'absolute',
+  },
+  safeArea: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  text: {
-    color: '#FFFFFF',
-    fontSize: ICON_SIZE * 0.78,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    includeFontPadding: false,
-  },
-  textGreen: {
-    color: colors.primary,
   },
 });
