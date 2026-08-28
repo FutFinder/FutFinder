@@ -1,4 +1,15 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { crearRegistroDeColumnas, leerTolerandoColumnas } from '../utils/columnasOpcionales';
+
+/**
+ * `tema` → migración 53. Sin ella, pedirla en el `select` explícito de
+ * `withClubs()` (abajo) tumba la consulta ENTERA con 42703: no es una
+ * columna que falte en un club, es una columna que falta en la tabla, y
+ * `.in('id', ids)` no vuelve con nada. Eso dejaría los partidos de clubes
+ * sin nombre ni escudo en Inicio y Partidos, no sólo sin color. Mismo
+ * mecanismo y mismo registro por proceso que `services/clubs.js`.
+ */
+const columnasClub = crearRegistroDeColumnas(['tema']);
 
 /**
  * Distancia haversine en km entre dos coords {lat, lng}.
@@ -85,10 +96,14 @@ export async function withClubs(matches) {
   ];
   if (!ids.length) return list;
 
-  const { data: clubs } = await supabase
-    .from('clubs')
-    .select('id, nombre, foto_url')
-    .in('id', ids);
+  // `tema` viaja para que la tarjeta pinte con el color del club; si la
+  // migración 53 no está aplicada en este entorno, se reintenta sin ella y
+  // el club se ve verde, que es el default de `temaDeClub()`.
+  const { data: clubs } = await leerTolerandoColumnas({
+    registro: columnasClub,
+    columnas: 'id, nombre, foto_url, tema',
+    leer: (columns) => supabase.from('clubs').select(columns).in('id', ids),
+  });
 
   const byId = new Map((clubs || []).map((c) => [c.id, c]));
   return list.map((m) =>
