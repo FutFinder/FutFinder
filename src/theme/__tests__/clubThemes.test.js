@@ -280,3 +280,16 @@ test('la escala que se entrega no puede modificar el catálogo', () => {
   assert.equal(escala.main, original);
   assert.equal(T.temaClub('blue').main, original);
 });
+
+test('los alfas del acento son los que fija el handoff de la portada', () => {
+  // Estos tres números son una decisión, no un detalle: el handoff los pide
+  // así y `dsColors.winSoft` ya usa .14. Sin esta prueba, el próximo retoque
+  // de color los pierde en silencio y la portada deja de calzar con el resto.
+  const alfa = (c) => Number(c.match(/,\s*([\d.]+)\)$/)[1]);
+  for (const clave of CLAVES) {
+    const escala = T.temaClub(clave);
+    assert.equal(alfa(escala.soft), 0.14, `${clave}.soft`);
+    assert.equal(alfa(escala.border), 0.42, `${clave}.border`);
+    assert.equal(alfa(escala.glow), 0.3, `${clave}.glow`);
+  }
+});

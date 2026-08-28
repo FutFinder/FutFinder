@@ -86,10 +86,10 @@ const DEFINICIONES = [
 
 /** Opacidades compartidas por los cuatro temas. */
 const ALFA = {
-  soft: 0.12,
+  soft: 0.14,
   softStrong: 0.2,
-  border: 0.35,
-  glow: 0.22,
+  border: 0.42,
+  glow: 0.3,
   bannerGlow: 0.07,
 };
 
