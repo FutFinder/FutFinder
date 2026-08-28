@@ -26,10 +26,7 @@ import { buildMisClubesAdminQuery } from '../utils/permisosDesafio';
  * que reemplazó el límite anterior de un club por persona.
  */
 
-export const CLUB_LIMITS = {
-  estandar: { miembros: 15, admins: 1 },
-  premium: { miembros: 26, admins: 3 },
-};
+export { CLUB_LIMITS } from '../utils/clubPlanLimits.js';
 
 /**
  * Columnas de `clubs` que pueden no existir todavía en un entorno dado,
