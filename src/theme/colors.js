@@ -444,7 +444,18 @@ export const clubTonos = Object.freeze({
   info: Object.freeze({ soft: 'rgba(255, 255, 255, 0.07)', fg: '#D6D6DA' }),
 });
 
-/** Superficies de la portada de Clubes. */
+/**
+ * Superficies de la portada de Clubes: niveles de elevación y estructura.
+ *
+ * Como `clubTonos`, no se tematizan. El tema del club no puede pintar las
+ * superficies de fondo porque su paleta oscila solo sobre el color principal
+ * (un rojo oscuro es distinto de un azul oscuro, aunque ambos sean "fondo").
+ *
+ * `card` y `cardAlta` son dos elevaciones: card es la superficie base de una
+ * tarjeta, cardAlta es más clara para resaltar contenido crítico. `barra` es
+ * semitransparente para flotar sobre el fondo, `header` es el fondo más oscuro,
+ * `separador` divide secciones y `borde` marca límites.
+ */
 export const clubSuperficies = Object.freeze({
   card: '#101012',
   cardAlta: '#0D0E0D',
