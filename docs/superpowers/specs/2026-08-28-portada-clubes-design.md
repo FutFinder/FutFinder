@@ -53,11 +53,13 @@ glow:   0.22 → 0.30
 menciona y tienen uso propio. Los cuatro hexes y las cuatro tintas no se
 tocan.
 
-**`src/theme/__tests__/clubThemes.test.js`** — la prueba «el fondo suave, el
-borde y el resplandor se derivan del color principal» fija los alfas viejos;
-se actualiza a los nuevos. Las de contraste y distancia siguen pasando sin
-cambios, y deben seguir pasando: son la razón por la que no adoptamos los
-hexes del handoff.
+**`src/theme/__tests__/clubThemes.test.js`** — ninguna prueba actual fija los
+alfas: solo comprueban que deriven del color principal y que
+`softStrong > soft`, que sigue siendo cierto (.20 > .14). El cambio no rompe
+nada, y por eso mismo hay que **agregar** una prueba que fije los tres valores
+del handoff: si nadie los guarda, el próximo retoque los pierde en silencio.
+Las de contraste y distancia siguen intactas y deben seguir pasando: son la
+razón por la que no adoptamos los hexes del handoff.
 
 **`src/theme/colors.js`** — se agrega una familia `clubTonos` con los tonos
 semánticos que el handoff declara **no tematizables** (conservan su color en
