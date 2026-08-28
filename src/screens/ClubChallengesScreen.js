@@ -7,6 +7,7 @@ import { ArrowLeft, Shield, Swords, Check, X, Clock, MessageCircle } from 'lucid
 import Banner from '../components/Banner';
 import { IconButton, Badge } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { temaDeClub } from '../theme/clubThemes';
 import { getMisClubesAdmin, getClubById } from '../services/clubs';
 import { puedeResponderDesafio, puedeCancelarDesafio } from '../utils/permisosDesafio';
 import {
@@ -74,6 +75,10 @@ export default function ClubChallengesScreen({ navigation, route }) {
   // Hace falta para armar el título «Retador vs Retado» del hilo grupal:
   // las filas de desafío solo traen el club RIVAL, no el propio.
   const [nombreDeMiClub, setNombreDeMiClub] = useState('Mi club');
+  // El club propio completo (no solo el nombre): de acá sale el acento de
+  // la pantalla. Mientras no cargue, `temaDeClub(null)` ya cae al verde por
+  // defecto, así que no hay un instante sin color.
+  const [clubActual, setClubActual] = useState(null);
 
   const load = useCallback(async () => {
     const [{ data }, { data: clubesAdmin, error: eRol }, { data: miClub }] = await Promise.all([
@@ -92,6 +97,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
     setErrorRol(clubesAdmin ? null : eRol?.message || 'No se pudo comprobar tu rol en el club.');
 
     if (miClub?.nombre) setNombreDeMiClub(miClub.nombre);
+    setClubActual(miClub || null);
     setLoading(false);
   }, [clubId]);
 
@@ -173,12 +179,16 @@ export default function ClubChallengesScreen({ navigation, route }) {
     await load();
   };
 
+  // Escala del club propio: resuelta una sola vez y en línea donde haga
+  // falta, porque `StyleSheet.create` no puede depender de un valor dinámico.
+  const tema = temaDeClub(clubActual);
+
   if (loading) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
         <Header navigation={navigation} />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={C.green} />
+          <ActivityIndicator color={tema.main} />
         </View>
       </SafeAreaView>
     );
@@ -192,7 +202,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.green} colors={[C.green]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tema.main} colors={[tema.main]} />
         }
       >
         {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
@@ -229,9 +239,13 @@ export default function ClubChallengesScreen({ navigation, route }) {
                       disabled={working}
                       onPress={() => handleRespond(c, true)}
                       hitSlop={6}
-                      style={({ pressed }) => [styles.actBtn, styles.actAccept, pressed && { opacity: 0.7 }]}
+                      style={({ pressed }) => [
+                        styles.actBtn,
+                        { backgroundColor: tema.main },
+                        pressed && { opacity: 0.7 },
+                      ]}
                     >
-                      <Check color={C.textOnGreen} size={16} strokeWidth={2.6} />
+                      <Check color={tema.ink} size={16} strokeWidth={2.6} />
                     </Pressable>
                     <Pressable
                       disabled={working}
@@ -250,7 +264,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     accessibilityLabel="Abrir el chat de negociación del desafío"
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <Swords color={C.green} size={16} />
+                    <Swords color={tema.main} size={16} />
                   </Pressable>
                 ) : c.estado === 'aceptado' ? (
                   <Pressable
@@ -258,7 +272,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     hitSlop={6}
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <MessageCircle color={C.green} size={16} />
+                    <MessageCircle color={tema.main} size={16} />
                   </Pressable>
                 ) : (
                   <Badge label={estadoLabel(c.estado)} tone={ESTADO_TONE[c.estado] || 'neutral'} />
@@ -290,7 +304,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     accessibilityLabel="Abrir el chat de negociación del desafío"
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <Swords color={C.green} size={16} />
+                    <Swords color={tema.main} size={16} />
                   </Pressable>
                 ) : c.estado === 'aceptado' ? (
                   <Pressable
@@ -298,7 +312,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
                     hitSlop={6}
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <MessageCircle color={C.green} size={16} />
+                    <MessageCircle color={tema.main} size={16} />
                   </Pressable>
                 ) : (
                   <Badge label={estadoLabel(c.estado)} tone={ESTADO_TONE[c.estado] || 'neutral'} />
@@ -399,7 +413,6 @@ const styles = StyleSheet.create({
 
   actionsRow: { flexDirection: 'row', gap: 8 },
   actBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  actAccept: { backgroundColor: C.green },
   actReject: { backgroundColor: 'rgba(237,107,118,0.14)', borderWidth: 1, borderColor: 'rgba(237,107,118,0.4)' },
   chatBtn: {
     width: 36,
