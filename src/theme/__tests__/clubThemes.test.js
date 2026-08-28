@@ -293,3 +293,31 @@ test('los alfas del acento son los que fija el handoff de la portada', () => {
     assert.equal(alfa(escala.glow), 0.3, `${clave}.glow`);
   }
 });
+
+// ── Tonos que NO se tematizan ────────────────────────────────────────
+
+const { clubTonos, clubSuperficies } = require('../colors.js');
+
+test('los tonos semánticos existen y no dependen del tema del club', () => {
+  for (const tono of ['warn', 'danger', 'info']) {
+    assert.equal(typeof clubTonos[tono].soft, 'string', `${tono}.soft`);
+    assert.equal(typeof clubTonos[tono].fg, 'string', `${tono}.fg`);
+  }
+  // Ninguno deriva de un color principal de tema: son constantes.
+  const mains = CLAVES.map((c) => T.temaClub(c).main.toLowerCase());
+  for (const tono of ['warn', 'danger', 'info']) {
+    assert.ok(!mains.includes(clubTonos[tono].fg.toLowerCase()), tono);
+  }
+});
+
+test('el peligro no se confunde con el tema rojo', () => {
+  // Si fueran el mismo color, un club rojo no podría distinguir «tu acento»
+  // de «esto destruye algo».
+  assert.notEqual(clubTonos.danger.fg.toLowerCase(), T.temaClub('red').main.toLowerCase());
+});
+
+test('las superficies de la portada están definidas', () => {
+  for (const clave of ['card', 'cardAlta', 'barra', 'header', 'separador', 'borde']) {
+    assert.equal(typeof clubSuperficies[clave], 'string', clave);
+  }
+});
