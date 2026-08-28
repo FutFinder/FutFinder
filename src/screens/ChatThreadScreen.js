@@ -46,6 +46,7 @@ import IncomparecenciaYRevisionBar from '../components/clubes/IncomparecenciaYRe
 import Banner from '../components/Banner';
 
 import { chatColors } from '../theme/colors';
+import { temaDeClub } from '../theme/clubThemes';
 import {
   listThreadMessages,
   sendMessage,
@@ -162,6 +163,9 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [challengeBusy, setChallengeBusy] = useState(false);
   const [myClubIds, setMyClubIds] = useState([]);
   const [myClubIdsTodos, setMyClubIdsTodos] = useState([]);
+  // El club propio del desafío (con su `tema`), para pintar la cabecera y la
+  // tarjeta de cambio con el acento de MI club, no el del rival.
+  const [miClub, setMiClub] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
 
   // Cambios negociados del partido publicado (migración 46). El partido se
@@ -1003,6 +1007,46 @@ export default function ChatThreadScreen({ route, navigation }) {
     [cambioPartido, cambioPendiente]
   );
 
+  /**
+   * Cuál de los dos clubes del desafío es el mío, para pintar la cabecera y
+   * la tarjeta de cambio con SU acento. `club_challenges` no trae los clubes
+   * embebidos (ver nota de `nombresClubes`), así que hay que decidir el id
+   * con las membresías ya cargadas y traer esa fila aparte.
+   *
+   * `myClubIdsTodos` es cualquier membresía (jugador o admin): un jugador sin
+   * cargo también ve el chat con el color de SU club, no del rival.
+   */
+  const miClubId = useMemo(() => {
+    if (!clubChallenge) return null;
+    if (myClubIdsTodos.includes(clubChallenge.club_retador_id)) {
+      return clubChallenge.club_retador_id;
+    }
+    if (myClubIdsTodos.includes(clubChallenge.club_retado_id)) {
+      return clubChallenge.club_retado_id;
+    }
+    return null;
+  }, [clubChallenge, myClubIdsTodos]);
+
+  useEffect(() => {
+    if (!miClubId) {
+      setMiClub(null);
+      return undefined;
+    }
+    let alive = true;
+    (async () => {
+      const { data } = await getClubById(miClubId);
+      if (alive) setMiClub(data || null);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [miClubId]);
+
+  // Sin club propio resuelto (todavía cargando, o un caso sin membresía
+  // reconocible), `temaDeClub` cae sola al verde de siempre: nunca se queda
+  // sin color mientras se espera la consulta.
+  const temaDesafio = useMemo(() => temaDeClub(miClub), [miClub]);
+
   const responderCambio = useCallback(
     async (aceptar, motivo) => {
       if (cambioBusy || !cambioPendiente?.id) return;
@@ -1584,6 +1628,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                 error={cambioError}
                 onAceptar={() => responderCambio(true)}
                 onRechazar={(motivo) => responderCambio(false, motivo)}
+                tema={temaDesafio}
               />
             )}
 
@@ -1618,6 +1663,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                 onPressCta={ctaAccionable ? handleChallengeCta : null}
                 onResponderProrroga={handleResponderProrroga}
                 ocupado={challengeBusy}
+                tema={temaDesafio}
               />
             )}
 
