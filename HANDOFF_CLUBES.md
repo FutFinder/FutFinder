@@ -45,6 +45,9 @@ Las cinco pasaron implementación **y** revisión independiente.
 | 3 | Tematizar las pantallas de desafío | `8d4e555` + `97246c7` | Limpia, 1 Menor diferido |
 | 4 | Tematizar historial y tarjeta de partido | `cd8fde1` | Limpia, 1 Menor diferido |
 | 5 | `clubsHomeTasks.js`, la derivación pura | `e5a76cf` | 1 Crítico + 2 Importantes + 3 Menores, **los seis corregidos**, ver §10 |
+| 6 | `useClubsHome` → `ClubsHomeProvider` | `d786fe6` | Auditada, conservada, 7 defectos corregidos, ver §3 |
+| 7 | `VerifiedBadge`, `ClubsHeader`, `ClubSwitcher` | `649decc` | Sin revisión independiente todavía |
+| 8 | Los 7 componentes de contenido | pendiente de commit | Sin revisión independiente todavía |
 
 > La tarea 5 está commiteada y **sus seis hallazgos están corregidos**, con pruebas que fijan cada uno. Ver §10.
 
@@ -82,8 +85,6 @@ El repo no tiene pruebas de render, así que **todo lo que decide algo salió de
 
 | # | Tarea | Depende de |
 |---|---|---|
-| 7 | `VerifiedBadge`, `ClubsHeader`, `ClubSwitcher` | — |
-| 8 | Los 7 componentes de contenido de la portada | tarea 5 (tipo `Task`) |
 | 9 | La portada: `ClubsScreen` + los 6 estados | tareas 7, 8 (la 6 ya está) |
 | 10 | Badge de pendientes en la barra inferior | ninguna: `useClubsHome()` ya está disponible en `MainTabs` |
 
@@ -181,6 +182,8 @@ Por eso los límites viven en `src/utils/clubPlanLimits.js` y el servicio los re
 **Ampliación de alcance en la tarea 3: `ChatThreadScreen.js`.** El plan pedía tematizar `ChallengeHeader` y `CambioPartidoCard`, pero esos componentes solo reciben la fila del desafío, que no trae clubes embebidos. `ChatThreadScreen` sí tiene `myClubIds`, `clubChallenge` y `getClubById`, así que resuelve el tema ahí y lo pasa como prop. Dejar el chat de un desafío en verde mientras la pantalla de al lado va con el color del club era la inconsistencia que este rediseño existe para borrar.
 
 **Ampliación de alcance en la tarea 4: `services/matches.js`.** `withClubs()` hacía `select('id, nombre, foto_url')` **sin la columna `tema`**, así que `temaDeClub()` habría devuelto verde siempre y el trabajo de la tarea habría sido invisible. Al agregarla, el implementador reutilizó `src/utils/columnasOpcionales.js` en vez de confiar en el fallback: con un `select` explícito, si falta la migración 53 Postgres devuelve 42703 y la consulta **entera** falla, dejando `club_local` y `club_visitante` en `null` para todos los partidos de clubes. No «sin color»: sin nombre y sin escudo.
+
+**«V» va en el acento del club; «D» se queda en el rojo semántico.** Lo pide el handoff de diseño (README línea 192) y es el único punto donde el acento toca algo con carga de resultado, así que roza la regla de arriba. Se aplicó tal cual porque el handoff manda en colores, pero **en el tema rojo `V` (`#FF4B2E`) y `D` (`#FF6E4F`) quedan parecidos**: lo que distingue es la letra, y por eso el rótulo se dibujó tan legible como el número. **Para triar en la revisión final.**
 
 **Los implementadores commitean pero no pushean.** El plan escrito dice `git push` en cada tarea; se anuló. El push va al final, con el merge.
 
@@ -281,7 +284,8 @@ La tarea de nómina se generaba solo si `confirmados < cupos`. Con `cupos: 0` o 
 | Tras arreglar el crítico de la 5 | **845** | verde |
 | Tras arreglar los tres menores de la 5 | **856** | verde |
 | Tras cerrar la tarea 6 | **874** | verde |
-| **Ahora** | **874** | **verde, 0 fallos** |
+| Tras las tareas 7 y 8 | **881** | verde |
+| **Ahora** | **881** | **verde, 0 fallos** |
 
 `npm run lint`: **0 errores**, 24 avisos preexistentes. `useClubsHome.js` también linta limpio.
 
