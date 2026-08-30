@@ -95,9 +95,8 @@ El repo no tiene pruebas de render, así que **todo lo que decide algo salió de
 ## 4. Qué falta antes del merge
 
 1. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo.
-2. **Triar los tres menores diferidos**: la barra verde de `ChatThreadScreen`, la prueba de integración de `withClubs` sin la columna `tema`, y el color de «V» en el tema rojo (§8).
-3. **Reducciones declaradas de la tarea 9**, ver §3.
-4. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
+2. **Reducciones declaradas de la tarea 9**, ver §3 — decidir si se aceptan.
+3. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
 
 ---
 
@@ -228,11 +227,22 @@ Los doce se verificaron contra el código antes de aceptarlos; ninguno era un fa
 | 11 | En `SkeletonHome` el desfase estaba DENTRO del bucle, así que se reaplicaba cada vuelta y la onda se desarmaba a los pocos segundos | El desfase sale del bucle |
 | 12 | El lector de pantalla decía «Clubes, 3 sin leer» sobre tareas por hacer | La etiqueta se bifurca igual que el badge |
 
-### Diferidos, para triar antes del merge
+### Diferidos — triados y cerrados
 
-**Tarea 3, Menor.** La barra «Ver / Crear partido de club» en `ChatThreadScreen.js` (~1669-1695) sigue con `chatColors.green` fijo, pese a depender del mismo `clubChallenge` que sí se tematizó. Queda un icono verde al lado de una cabecera con el color del club. Es barato porque `temaDesafio` ya está calculado en ese archivo.
+**Tarea 3, Menor. CORREGIDO.** La barra «Ver / Crear partido de club» de `ChatThreadScreen` toma `temaDesafio`, el mismo que ya usaba la cabecera justo encima: `tema.border`/`tema.soft` en la variante secundaria, `tema.main`/`tema.ink` en la solida.
 
-**Tarea 4, Menor.** No hay prueba que fije el contrato «falta la columna `tema` → `withClubs` degrada con nombre y escudo». El mecanismo genérico sí está probado en `columnasOpcionales.test.js`, pero la integración no. Si eso regresa, el síntoma no es cosmético: **todos los partidos de clubes pierden nombre y escudo en Inicio y en Partidos**.
+**Tarea 4, Menor. CORREGIDO.** No se podia escribir la prueba donde estaba el codigo: `services/matches.js` importa `./supabase` sin extension y no carga bajo `node --test`. La consulta salio a `src/utils/clubesDePartidoQuery.js` con el cliente inyectado —el patron que el repo ya usa en `rivalClubsQuery.js` y `nominaQuery.js`— y tiene **7 pruebas** con un cliente falso que responde 42703. Fijan el contrato entero: con la migracion 53 llega el tema; sin ella se reintenta una vez y **los clubes conservan nombre y escudo**; un registro que ya sabe que falta no vuelve a pedirla; y un error que no es de columna no se disfraza de columna ausente.
+
+**«V» en el tema rojo. NO SE CAMBIA, con la medicion hecha.** Distancia perceptual (DeltaE76) entre el acento de cada tema y el `#FF6E4F` de «D»:
+
+| Tema | Acento | DeltaE con «D» |
+|---|---|---|
+| verde | `#5AE06A` | 114,8 |
+| azul | `#4DA3FF` | 109,7 |
+| amarillo | `#FFBE1A` | 57,5 |
+| **rojo** | `#FF4B2E` | **17,8** |
+
+El rojo queda seis veces mas cerca que cualquier otro tema, pero **por encima del umbral de confusion de un vistazo (DeltaE 10)**. No alcanza para contradecir al handoff de diseno, que es la fuente de verdad en color, y una excepcion por tema («V es verde solo si el club es rojo») seria una regla sorprendente para quien venga despues. Se deja como esta, con el rotulo tan legible como el numero. **Si se decide lo contrario es una linea en `ClubSummaryCard.js`: `color={escala.main}` -> `color={dsColors.win}`.**
 
 ---
 
@@ -315,7 +325,9 @@ La tarea de nómina se generaba solo si `confirmados < cupos`. Con `cupos: 0` o 
 | Tras arreglar los tres menores de la 5 | **856** | verde |
 | Tras cerrar la tarea 6 | **874** | verde |
 | Tras las tareas 7 y 8 | **881** | verde |
-| **Ahora** | **881** | **verde, 0 fallos** |
+| Tras la revisión y sus 12 arreglos | **886** | verde |
+| Tras cerrar los tres menores | **893** | verde |
+| **Ahora** | **893** | **verde, 0 fallos** |
 
 `npm run lint`: **0 errores**, 24 avisos preexistentes. `useClubsHome.js` también linta limpio.
 
