@@ -472,3 +472,105 @@ test('un partido sin hora usable se anuncia sin plazo, pero se anuncia', () => {
   assert.equal(t.title, 'Próximo partido');
   assert.equal(t.status, 'abierta');
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// LA NÓMINA, CUANDO LOS DATOS VIENEN INCOMPLETOS
+//
+// La tarea se genera si faltan cupos por confirmar. El riesgo no es que
+// no aparezca: es que aparezca diciendo «null de 11 cupos confirmados».
+//
+// `cupos_por_club` tiene `check (between 4 and 15)` en la migración
+// 43_desafios_plazos_y_propuesta.sql:177, así que 0 o nulo NUNCA es un
+// partido de club legítimo: es un dato que llegó a medias.
+// ═══════════════════════════════════════════════════════════════════
+
+function tareaNomina(nomina) {
+  const f = fuentes({ nomina });
+  return D.normalizarTareas(f, { rol: 'admin', ahora: AHORA })[0] || null;
+}
+
+test('con cupos por llenar, la nómina dice cuántos van de cuántos', () => {
+  const t = tareaNomina({ matchId: 'm1', confirmados: 9, cupos: 11 });
+  assert.equal(t.type, 'nomina');
+  assert.equal(t.subtitle, '9 de 11 cupos confirmados');
+  assert.equal(t.status, 'abierta');
+});
+
+test('la nómina completa no deja tarea: no hay nada que confirmar', () => {
+  assert.equal(tareaNomina({ matchId: 'm1', confirmados: 11, cupos: 11 }), null);
+});
+
+test('cupos en 0 no genera tarea: es un dato incompleto, no un partido sin cupos', () => {
+  // `resumenNomina` devuelve `cupos: 0` cuando `cupos_por_club` no es un
+  // número, así que este es el 0 que de verdad llega.
+  assert.equal(tareaNomina({ matchId: 'm1', confirmados: 0, cupos: 0 }), null);
+});
+
+test('cupos nulos no generan tarea', () => {
+  assert.equal(tareaNomina({ matchId: 'm1', confirmados: 3, cupos: null }), null);
+});
+
+test('cupos negativos no generan tarea', () => {
+  assert.equal(tareaNomina({ matchId: 'm1', confirmados: 0, cupos: -4 }), null);
+});
+
+test('confirmados nulos no inventan un «null de 11»', () => {
+  // `null < 11` es `true` en JavaScript, así que sin una guardia explícita
+  // esto pintaba la tarea con la palabra «null» dentro del subtítulo.
+  assert.equal(tareaNomina({ matchId: 'm1', confirmados: null, cupos: 11 }), null);
+});
+
+test('confirmados ausentes tampoco generan tarea', () => {
+  assert.equal(tareaNomina({ matchId: 'm1', cupos: 11 }), null);
+});
+
+test('un confirmados que no es número no se cuela como si lo fuera', () => {
+  assert.equal(tareaNomina({ matchId: 'm1', confirmados: '9', cupos: 11 }), null);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// EL ORDEN Y SU DESEMPATE
+//
+// El contrato: entre tipos manda ORDEN; dentro de un tipo manda el
+// orden en que vino la fuente, que es el que ya trae el servidor.
+// No estaba escrito ni probado, y depende de que `Array.sort` sea
+// estable — lo es desde ES2019, pero eso hay que fijarlo.
+// ═══════════════════════════════════════════════════════════════════
+
+test('dos desafíos del mismo tipo conservan el orden en que vino la fuente', () => {
+  const f = fuentes({
+    desafiosRecibidos: [
+      { ...DESAFIO, id: 'primero' },
+      { ...DESAFIO, id: 'segundo' },
+      { ...DESAFIO, id: 'tercero' },
+    ],
+  });
+  const ids = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA }).map((t) => t.id);
+  assert.deepEqual(ids, ['desafio:primero', 'desafio:segundo', 'desafio:tercero']);
+});
+
+test('el desempate sobrevive a que haya varias tareas de varios tipos', () => {
+  const f = fuentes({
+    desafiosRecibidos: [{ ...DESAFIO, id: 'd1' }, { ...DESAFIO, id: 'd2' }],
+    propuestas: [{ id: 'p1', estado: 'pendiente' }, { id: 'p2', estado: 'pendiente' }],
+    cambiosDePartido: [{ id: 'cb1', estado: 'pendiente' }],
+  });
+  const ids = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA }).map((t) => t.id);
+  assert.deepEqual(ids, [
+    'desafio:d1', 'desafio:d2', 'propuesta:p1', 'propuesta:p2', 'cambio:cb1',
+  ]);
+});
+
+test('una tarea vencida no se va al fondo: el orden es por tipo, no por estado', () => {
+  // Importa para el tope de cuatro: si lo vencido se hundiera, «Ver N más»
+  // escondería tareas accionables detrás de avisos muertos.
+  const f = fuentes({
+    desafiosRecibidos: [
+      { ...DESAFIO, id: 'muerto', estado: 'cancelado' },
+      { ...DESAFIO, id: 'vivo', estado: 'pendiente' },
+    ],
+  });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.deepEqual(tareas.map((t) => t.id), ['desafio:muerto', 'desafio:vivo']);
+  assert.equal(D.contarConAccion(tareas), 1);
+});

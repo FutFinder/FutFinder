@@ -44,9 +44,9 @@ Las cinco pasaron implementación **y** revisión independiente.
 | 2 | Tonos semánticos y superficies | `387e8f9` + `9ea84bd` | 1 Importante + 2 Menores, **corregidos** |
 | 3 | Tematizar las pantallas de desafío | `8d4e555` + `97246c7` | Limpia, 1 Menor diferido |
 | 4 | Tematizar historial y tarjeta de partido | `cd8fde1` | Limpia, 1 Menor diferido |
-| 5 | `clubsHomeTasks.js`, la derivación pura | `e5a76cf` | 1 Crítico + 2 Importantes + 3 Menores. **Crítico e Importantes corregidos**, ver §10 |
+| 5 | `clubsHomeTasks.js`, la derivación pura | `e5a76cf` | 1 Crítico + 2 Importantes + 3 Menores, **los seis corregidos**, ver §10 |
 
-> La tarea 5 está commiteada. La revisión encontró un defecto crítico y dos importantes: **los tres están corregidos**. Quedan abiertos sus tres Menores. Ver §10.
+> La tarea 5 está commiteada y **sus seis hallazgos están corregidos**, con pruebas que fijan cada uno. Ver §10.
 
 Con las tareas 1 a 4 el **paso 1 del handoff queda cerrado**.
 
@@ -274,21 +274,21 @@ El mismo archivo sí resuelve singular y plural en `etiquetaVerMas`, pero no ac�
 
 **Arreglo aplicado.** `diasHasta` se sustituyó por `diasDeCalendario` + `plazoDePartido` + `tituloPartido`. Se cuenta por **día de calendario en hora local**, no por bloques de 24 horas: un partido de esta noche es «hoy» aunque falten once horas. Sale «Próximo partido hoy», «… mañana» o «… en N días» —el plural nunca se equivoca porque N siempre es ≥ 2—, y **un partido que ya empezó no genera tarea**: anunciarlo como «el próximo» manda al usuario a algo que no va a alcanzar.
 
-### Siguen abiertos
-
-### MENOR — Documentación que cita el trigger equivocado
+### ✅ CORREGIDO — MENOR: documentación que citaba el trigger equivocado
 
 `src/utils/clubPlanLimits.js:9` dice que `check_user_club_limit` de la migración 11 valida estos límites. **Es falso.** El trigger de cupos por plan es `check_club_limits()` / `trg_check_club_limits`, de la migración 11. `check_user_club_limit` es otra función, de la migración 24, y valida «máximo 3 clubes por jugador».
 
-`CLAUDE.md` pide expresamente verificar este tipo de dato contra el código.
+**Arreglo aplicado.** El comentario nombra `check_club_limits()` / `trg_check_club_limits` sobre `club_members` (migración 11), leído del archivo, y avisa expresamente de no confundirlo con `check_user_club_limit()` de la 24, que limita a 3 los clubes por jugador. Verificado también que los números del trigger (15/1 y 26/3) coinciden con `CLUB_LIMITS`.
 
-### MENOR — Nómina con `cupos` en 0 o nulo
+### ✅ CORREGIDO — MENOR: nómina con `cupos` en 0 o nulo
 
-La tarea de nómina se genera solo si `confirmados < cupos`. Con `cupos: 0` o `null` la comparación nunca es verdadera y la tarea desaparece **en silencio**, sin distinguir «no hace falta nómina» de «los datos vinieron incompletos». Sin prueba.
+La tarea de nómina se generaba solo si `confirmados < cupos`. Con `cupos: 0` o `null` desaparecía en silencio; peor, con `confirmados: null` **sí** se generaba, porque `null < 11` es `true` en JavaScript, y la tarjeta salía con «null de 11 cupos confirmados».
 
-### MENOR — Desempate entre tareas del mismo tipo
+**Arreglo aplicado.** Una guardia `nominaAccionable()` exige dos cuentas de verdad. `cupos` en 0 o nulo se trata como **dato incompleto**, no como «partido sin cupos»: la migración 43:177 tiene `check (cupos_por_club between 4 and 15)`, así que esos valores no existen en un partido legítimo. Ante datos a medias, callar en vez de inventar una cifra. Ocho pruebas nuevas.
 
-`tareas.sort((a,b) => ORDEN.indexOf(a.type) - ORDEN.indexOf(b.type))` depende de que `Array.prototype.sort` sea estable (lo es desde ES2019). Pero el contrato de desempate —si hay dos desafíos recibidos, ¿cuál va primero?— no está documentado ni probado.
+### ✅ CORREGIDO — MENOR: desempate entre tareas del mismo tipo
+
+**Arreglo aplicado.** El contrato queda escrito junto al comparador: **entre tipos manda `ORDEN`; dentro de un tipo manda el orden en que vino la fuente**, que es el que ya trae el servidor, y se apoya en que `Array.prototype.sort` es estable desde ES2019. Tres pruebas lo fijan, incluida una que comprueba que **el estado no entra en el orden**: hundir lo vencido al fondo escondería tareas accionables detrás de avisos muertos cuando se aplica el tope de cuatro visibles.
 
 ---
 
@@ -302,7 +302,8 @@ La tarea de nómina se genera solo si `confirmados < cupos`. Con `cupos: 0` o `n
 | Tras las tareas 3 y 4 | 800 | verde |
 | Tras la tarea 5 | **822** | verde |
 | Tras arreglar el crítico de la 5 | **845** | verde |
-| **Ahora** | **845** | **verde, 0 fallos** |
+| Tras arreglar los tres menores de la 5 | **856** | verde |
+| **Ahora** | **856** | **verde, 0 fallos** |
 
 `npm run lint`: **0 errores**, 24 avisos preexistentes. `useClubsHome.js` también linta limpio.
 
@@ -354,7 +355,7 @@ Por orden. **No empieces por la tarea 7.**
 
 **Paso 0.** `git pull` en `main`, comprobar que `rediseno/portada-clubes` sigue en `e5a76cf`, y leer `.superpowers/sdd/2026-08-28-portada-clubes/progress.md` entero. Ese registro es el mapa: los commits que nombra existen en git aunque nadie los recuerde.
 
-**Paso 1 — Arreglar `clubsHomeTasks.js` (§10). HECHO en lo Crítico e Importante.** Quedan solo los tres Menores (pasos 5 y 6 de abajo).
+**Paso 1 — Arreglar `clubsHomeTasks.js` (§10). HECHO, los seis hallazgos.** Nada pendiente acá; el siguiente paso real es el 2.
 
 1. Leer los `check (estado in (...))` de `club_challenges` y `club_challenge_proposals` en `supabase/migrations/43_desafios_plazos_y_propuesta.sql`, y de `club_match_changes` en `46_cambios_de_partido.sql`. **Copiar los valores de ahí, no escribirlos de memoria.**
 2. Sustituir `ESTADOS_MUERTOS` por un vocabulario terminal **por dominio**.

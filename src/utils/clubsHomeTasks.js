@@ -91,6 +91,30 @@ function agregarSiQuedaAlgo(tareas, tarea) {
   if (tarea.status !== 'resuelta') tareas.push(tarea);
 }
 
+/**
+ * ¿Hay cupos que confirmar, y los números para decirlo?
+ *
+ * La tarea de nómina promete «9 de 11 cupos confirmados», así que sin dos
+ * cuentas de verdad no se dibuja: `null < 11` es `true` en JavaScript y sin
+ * esta guardia la tarjeta salía con la palabra «null» adentro.
+ *
+ * `cupos` en 0 o nulo tampoco es «un partido sin cupos»: la migración 43
+ * (`check (cupos_por_club between 4 and 15)`, línea 177) no admite esos
+ * valores, y `resumenNomina()` devuelve 0 justamente cuando `cupos_por_club`
+ * no era un número. Es un dato que llegó a medias, y ante eso callamos en vez
+ * de inventar una cifra.
+ */
+function esCuenta(v) {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0;
+}
+
+function nominaAccionable(nomina) {
+  if (!nomina) return false;
+  if (!esCuenta(nomina.cupos) || nomina.cupos <= 0) return false;
+  if (!esCuenta(nomina.confirmados)) return false;
+  return nomina.confirmados < nomina.cupos;
+}
+
 /** El CTA depende del rol: el jugador ve, el admin resuelve. */
 function accion(esAdmin, etiquetaAdmin) {
   return esAdmin ? etiquetaAdmin : 'Ver';
@@ -191,7 +215,7 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
     });
   }
 
-  if (f.nomina && f.nomina.confirmados < f.nomina.cupos) {
+  if (nominaAccionable(f.nomina)) {
     tareas.push({
       id: `nomina:${f.nomina.matchId}`,
       type: 'nomina',
@@ -251,6 +275,15 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
     }
   }
 
+  // EL ORDEN, Y SU DESEMPATE. Entre tipos manda `ORDEN`. Dentro de un tipo
+  // manda el orden en que vino la fuente —que es el que ya trae el servidor—
+  // porque `Array.prototype.sort` es estable desde ES2019 y no reordena lo
+  // que empata. Hay pruebas que lo fijan: si alguien cambia el comparador por
+  // uno que desempate solo, se entera.
+  //
+  // El estado NO entra en el orden. Hundir lo vencido al fondo parece
+  // amable, pero con el tope de cuatro visibles escondería tareas
+  // accionables detrás de avisos muertos.
   return tareas.sort((a, b) => ORDEN.indexOf(a.type) - ORDEN.indexOf(b.type));
 }
 

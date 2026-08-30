@@ -6,8 +6,14 @@
  * resuelve Metro, así que requerirlo bajo `node --test` falla. El servicio los
  * re-exporta para que sus llamadores no cambien.
  *
- * El servidor manda: el trigger `check_user_club_limit` de la migración 11
- * valida lo mismo. Estos números son para AVISAR antes, no para autorizar.
+ * El servidor manda: `check_club_limits()`, colgado del trigger
+ * `trg_check_club_limits` sobre `club_members` (migración 11), valida estos
+ * mismos números y lanza excepción si se pasan. Estos son para AVISAR antes,
+ * no para autorizar.
+ *
+ * NO CONFUNDIR con `check_user_club_limit()` de la migración 24, que es otra
+ * cosa: limita a 3 los clubes a los que puede pertenecer UN JUGADOR. Este
+ * archivo no habla de eso.
  */
 export const CLUB_LIMITS = Object.freeze({
   estandar: Object.freeze({ miembros: 15, admins: 1 }),
