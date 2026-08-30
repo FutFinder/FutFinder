@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { clubsExplorer as CE } from '../theme/colors';
+import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { getMyClubs } from '../services/clubs';
 import ClubDetailScreen from './ClubDetailScreen';
 import ClubExplorer from '../components/club/ClubExplorer';
@@ -36,6 +37,7 @@ export default function ClubsScreen({ navigation, route }) {
   const [status, setStatus] = useState('loading'); // 'loading' | 'member' | 'guest'
   const [myClubId, setMyClubId] = useState(null);
   const [pendingBanner, setPendingBanner] = useState(null);
+  const { reload: reloadClubsHome } = useClubsHome();
 
   // Extraída para poder llamarla también apenas se acepta una invitación
   // dentro del explorador embebido: como ahí no hay navegación de por medio,
@@ -52,10 +54,15 @@ export default function ClubsScreen({ navigation, route }) {
     }
   }, []);
 
+  // Al enfocar se refresca lo propio de esta pantalla Y el estado compartido
+  // de Clubes, que alimenta el badge de la barra inferior. Sin esto, volver
+  // de responder un desafío dejaba los datos como estaban: el estado
+  // compartido solo carga al montar y `MainTabs` no se desmonta nunca.
   useFocusEffect(
     useCallback(() => {
       checkMembership();
-    }, [checkMembership])
+      reloadClubsHome();
+    }, [checkMembership, reloadClubsHome])
   );
 
   // Banner de éxito que viene de ClubMembersScreen al salir/eliminar un club

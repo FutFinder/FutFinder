@@ -21,6 +21,8 @@ import SearchFootballIcon from '../components/SearchFootballIcon';
 import { tactical } from '../theme/colors';
 import { countUnreadTotal, subscribeToMessages } from '../services/messages';
 
+import { ClubsHomeProvider } from '../contexts/ClubsHomeContext';
+
 const Tab = createBottomTabNavigator();
 
 const ICON_SIZE = 21;
@@ -188,19 +190,27 @@ function labelFor(name) {
   }
 }
 
+/**
+ * El proveedor de la portada de Clubes envuelve las pestañas enteras, no solo
+ * `ClubsTab`: la barra inferior también lee de él para su badge, y montarlo
+ * más adentro dejaría a la barra fuera. Más arriba tampoco sirve — acá ya
+ * estamos detrás del guard de sesión, así que no se consulta sin usuario.
+ */
 export default function MainTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{ headerShown: false }}
-      tabBar={(props) => <CustomTabBar {...props} />}
-    >
-      <Tab.Screen name="HomeTab" component={HomeScreen} />
-      <Tab.Screen name="SearchTab" component={PartidosScreen} />
-      <Tab.Screen name="ClubsTab" component={ClubsScreen} />
-      <Tab.Screen name="CreateTab" component={PlaceholderTab} />
-      <Tab.Screen name="ReservasTab" component={ReservasScreen} />
-      <Tab.Screen name="ChatTab" component={ChatScreen} />
-      <Tab.Screen name="ProfileTab" component={ProfileScreen} />
-    </Tab.Navigator>
+    <ClubsHomeProvider>
+      <Tab.Navigator
+        screenOptions={{ headerShown: false }}
+        tabBar={(props) => <CustomTabBar {...props} />}
+      >
+        <Tab.Screen name="HomeTab" component={HomeScreen} />
+        <Tab.Screen name="SearchTab" component={PartidosScreen} />
+        <Tab.Screen name="ClubsTab" component={ClubsScreen} />
+        <Tab.Screen name="CreateTab" component={PlaceholderTab} />
+        <Tab.Screen name="ReservasTab" component={ReservasScreen} />
+        <Tab.Screen name="ChatTab" component={ChatScreen} />
+        <Tab.Screen name="ProfileTab" component={ProfileScreen} />
+      </Tab.Navigator>
+    </ClubsHomeProvider>
   );
 }

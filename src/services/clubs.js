@@ -586,6 +586,56 @@ export async function listMyInvitations() {
 }
 
 /**
+ * Solicitudes de ingreso que YO envié y siguen esperando respuesta.
+ *
+ * Espejo de `listMyInvitations()` con el otro `tipo`. Existe porque la
+ * portada de Clubes necesita saber si alguien sin club está esperando una
+ * respuesta, y `getMyRequestTo()` no sirve para eso: exige saber a qué club
+ * preguntarle, y quien postula a su primer club no tiene ese id en ninguna
+ * parte.
+ *
+ * La consulta no necesita `club_id`: la RLS de `club_join_requests` deja al
+ * jugador leer sus propias solicitudes (`tipo = 'solicitud' and auth.uid() =
+ * user_id`, migración 11) y el índice `(user_id, status)` de esa misma
+ * migración es justo el que usa.
+ */
+export async function listMyRequests() {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  const me = await getMe();
+  if (!me) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('club_join_requests')
+    .select('id, club_id, created_at')
+    .eq('user_id', me)
+    .eq('status', 'pending')
+    .eq('tipo', 'solicitud')
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('[FutFinder] listMyRequests:', error);
+    return { data: [], error };
+  }
+  if (!data || data.length === 0) return { data: [], error: null };
+
+  const ids = data.map((r) => r.club_id);
+  const { data: clubs } = await supabase
+    .from('clubs')
+    .select('id, nombre, foto_url, comuna, plan, verificado')
+    .in('id', ids);
+  const byId = new Map((clubs || []).map((c) => [c.id, c]));
+
+  return {
+    data: data.map((r) => ({
+      request_id: r.id,
+      club_id: r.club_id,
+      created_at: r.created_at,
+      club: byId.get(r.club_id) || null,
+    })).filter((r) => r.club),
+    error: null,
+  };
+}
+
+/**
  * Cancela mi solicitud pendiente a un club.
  */
 export async function cancelRequest(requestId) {

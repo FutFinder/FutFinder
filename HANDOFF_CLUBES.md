@@ -50,65 +50,42 @@ Las cinco pasaron implementación **y** revisión independiente.
 
 Con las tareas 1 a 4 el **paso 1 del handoff queda cerrado**.
 
-## 3. Tareas parcialmente completadas
+## 3. Tarea 6 — cerrada tras auditoría
 
-**Tarea 6 — `useClubsHome`: INTERRUMPIDA, NO TERMINADA.**
+**`useClubsHome` se auditó, se conservó y se convirtió en contexto compartido.**
 
-El agente que la implementaba murió por límite de sesión de la API, no por un fallo del código. Dejó `src/utils/useClubsHome.js` (352 líneas) **sin commitear y sin informe**.
+La auditoría comprobó una por una las **14 llamadas a servicios** contra la firma real de cada `export`: forma `{data, error}`, argumentos y campos leídos. Todas calzaban. En un caso el hook **corregía al brief**: el brief prescribía `listRivalCandidates({ clubId })` y la firma real es `{ retadorClubId, ... }` — con el brief, los rivales sugeridos habrían salido sin filtrar.
 
-**Está sin commitear a propósito.** Es trabajo coherente, no basura, pero **nadie lo ha revisado** y por eso no entra al historial como si estuviera terminado.
+También se verificó contra las migraciones que `clubId`/`clubRetadorId`/`clubRetadoId` son marcas reales y siempre presentes (13, 14, 16, 26, 28, 42, 43, 47, 47c).
 
-### Lo que se verificó (auditoría del controlador, 2026-08-29)
+Hallazgo colateral que valida el arreglo del badge: `getPropuestaVigente()` devuelve *«la propuesta abierta del desafío, o la última que hubo»*, sin filtrar estado. Una propuesta `rechazada` o `caducada` **sí llega**. Con el `ESTADOS_MUERTOS` viejo habría quedado abierta para siempre: el defecto crítico tenía este camino real.
 
-Estos puntos están comprobados, no supuestos:
+### Los siete defectos, todos corregidos
 
-- **El archivo está completo.** No hay funciones cortadas, ni `TODO`, ni código muerto. Termina en `return { ...state, retry, setActiveClub }`.
-- **Los 22 símbolos que importa existen.** Comprobado mecánicamente contra los `export` de cada módulo de destino, incluidos `usaNominaPorClub` y `resumenNomina` de `clubMatchRules.js`.
-- **`npx eslint src/utils/useClubsHome.js`** → cero errores y cero avisos.
-- **`npm test`** → 822/822, igual que sin el archivo. No tiene pruebas propias, así que **ese número no dice nada sobre él**.
-- **`ESTADO_INICIAL` expone las 17 claves del contrato acordado:** `loading`, `error`, `membership`, `clubs`, `activeClubId`, `club`, `role`, `can`, `limits`, `tasks`, `reparto`, `badgeCount`, `nextMatch`, `activity`, `suggestedRivals`, `invitations`, `pendingRequests`.
-- **Guarda `vivo` en los nueve `await`** y devuelve la función de limpieza del efecto.
-- **El error solo se enciende si falla `getMyClubs`.** Las demás fuentes pasan por un helper `segura()` que registra en `console.error` y devuelve un valor por defecto, así que un fallo secundario no tumba la portada. Cumple lo que pedía el brief.
-- **Las consultas van en dos rondas**, la segunda dependiente de la primera. No hay consulta por render: el efecto depende solo de `reloadToken`.
+| | Defecto | Arreglo |
+|---|---|---|
+| A | La decisión «no existe un lístame-mis-solicitudes sin clubId» era **falsa**: `listMyInvitations()` hace esa consulta sin `club_id`. `membership: 'pending'` por solicitud enviada era inalcanzable para quien postula a su primer club | `listMyRequests()` en `services/clubs.js`, espejo con `tipo='solicitud'`. RLS `11:238` y el índice `11:71` lo respaldan |
+| B | No se refrescaba nunca: ni al enfocar ni por Realtime. El `ClubsScreen` de hoy sí usa `useFocusEffect`, así que el rediseño **perdía** el refresco | `reload()` expuesto por el contexto y llamado desde `ClubsScreen` con `useFocusEffect` |
+| C | Las tareas 9 y 10 llamaban al hook por separado: ~22 consultas por montaje y dos `badgeCount` que podían divergir | `ClubsHomeProvider` en `src/contexts/ClubsHomeContext.js`, montado en `MainTabs` |
+| D | Dos `new Date()` con una ronda de red en medio: un partido a minutos de empezar podía quedar como `nextMatch` y a la vez descartado como tarea | Un solo `ahora` |
+| E | El cambio de partido colgaba de `usaNominaPorClub()`, que exige `cupos_por_club != null`; la migración 46:395 solo exige `challenge_proposal_id` | `partidoAdmiteCambio()`, probada |
+| F | `listOpenMatches({limit:50})` traía los 50 partidos abiertos más próximos **de toda la app** y excluía los `'lleno'`: el partido del club desaparecía sin avisar | `listPartidosDeClub()` en `services/matches.js`, filtrada por club en la base. La RLS 44d lo permite |
+| G | `futfinder:clubActivo` significaba dos cosas | Resuelto con A: la clave vuelve a significar solo «club activo» |
 
-### Las seis decisiones SÍ están documentadas
+### Qué se puede probar y qué no
 
-Corrige una afirmación anterior de este documento: aunque no existe `task-6-report.md`, **el agente documentó su razonamiento en la cabecera del propio archivo** (líneas 29-96). Están las tres que el brief le exigía justificar, y tres más:
+El repo no tiene pruebas de render, así que **todo lo que decide algo salió del hook** a `src/utils/clubsHomeSources.js` (`avisoDelClub`, `elegirClubActivo`, `derivarMembresia`, `partidoAdmiteCambio`) con **18 pruebas**. Lo que queda en el contexto es atar servicios y ordenar rondas: eso está verificado por lectura y lint, **no por prueba automática**, y conviene decirlo así.
 
-1. `listOpenMatches()` sirve para el próximo partido porque los partidos nacidos de una propuesta nacen en `'abierto'` igual que uno normal. **Límite que él mismo anota:** si el partido se llena pasa a `'lleno'` y esta consulta deja de traerlo — el mismo límite que ya tiene `HomeScreen` hoy.
-2. Los avisos se filtran por `clubId`, `clubRetadorId` o `clubRetadoId` dentro de `data`, no adivinando el `type`. Los que solo llevan `matchId` quedan fuera a propósito: *«una lista corta y cierta es mejor que una completa y adivinada»*.
-3. El orden de las dos rondas.
-4. Solo se pide `getPropuestaVigente()` para desafíos en `'esperando_aprobacion'`.
-5. Sin clubes, una solicitud enviada solo se puede rastrear por el id guardado en `AsyncStorage`; sin ese id el estado es `'none'`.
-6. Las estadísticas viajan colgadas de `club.estadisticas` en vez de inventar una clave que las tareas 7-10 no pidieron.
-
-### Lo que un revisor tiene que adjudicar
-
-**La consulta de cambio de partido está condicionada a la nómina** (líneas ~270 y ~279):
-
-```js
-const conNomina = !!proximoPartido && usaNominaPorClub(proximoPartido);
-// ...
-conNomina ? getCambioPendiente(proximoPartido.id) : Promise.resolve(null)
-```
-
-`usaNominaPorClub()` exige `challenge_proposal_id` **y** `cupos_por_club != null`. Un cambio de partido, en cambio, solo exige lo primero (migración 46, línea 396). Y `cupos_por_club` puede quedar nulo (`clubChallengeRules.js:464`).
-
-O sea: **un partido nacido de una propuesta pero sin cupos por club nunca mostraría su cambio pendiente.** La brecha es estrecha, pero acopla dos conceptos que no tienen por qué ir juntos. Hay que decidir si se separa la condición.
-
-Que linte limpio, esté completo y razone bien **no es evidencia de que funcione**. No tiene una sola prueba ni una sola revisión detrás.
-
-> **Riesgo de pérdida:** el archivo está sin seguir por git. Un `git clean -fdx` lo borra. Si vas a limpiar el árbol, respáldalo antes.
+`listMyRequests()` y `listPartidosDeClub()` tampoco tienen prueba: importan `./supabase`, que no carga bajo `node --test`.
 
 ## 4. Tareas pendientes
 
 | # | Tarea | Depende de |
 |---|---|---|
-| 6 | `useClubsHome` — **rehacer o auditar** | tarea 5 corregida |
 | 7 | `VerifiedBadge`, `ClubsHeader`, `ClubSwitcher` | — |
 | 8 | Los 7 componentes de contenido de la portada | tarea 5 (tipo `Task`) |
-| 9 | La portada: `ClubsScreen` + los 6 estados | tareas 6, 7, 8 |
-| 10 | Badge de pendientes en la barra inferior | tarea 6 |
+| 9 | La portada: `ClubsScreen` + los 6 estados | tareas 7, 8 (la 6 ya está) |
+| 10 | Badge de pendientes en la barra inferior | ninguna: `useClubsHome()` ya está disponible en `MainTabs` |
 
 ---
 
@@ -303,7 +280,8 @@ La tarea de nómina se generaba solo si `confirmados < cupos`. Con `cupos: 0` o 
 | Tras la tarea 5 | **822** | verde |
 | Tras arreglar el crítico de la 5 | **845** | verde |
 | Tras arreglar los tres menores de la 5 | **856** | verde |
-| **Ahora** | **856** | **verde, 0 fallos** |
+| Tras cerrar la tarea 6 | **874** | verde |
+| **Ahora** | **874** | **verde, 0 fallos** |
 
 `npm run lint`: **0 errores**, 24 avisos preexistentes. `useClubsHome.js` también linta limpio.
 
