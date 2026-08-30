@@ -16,6 +16,12 @@ import VerifiedBadge from './VerifiedBadge';
  * ni valoración, y esa es la mayoría de los clubes durante sus primeras
  * semanas. Un 0 en su lugar diría que jugó y perdió.
  *
+ * Y HAY QUE MIRAR `pj`, NO `v`. `club_estadisticas()` devuelve siempre un
+ * objeto numérico —`ESTADISTICAS_VACIAS` es `{ pj: 0, v: 0, ... }` y es lo
+ * que sale también ante un error—, así que comprobar si `v` es un número
+ * nunca da «no hay datos» y el club nuevo mostraba «0 · 0 · 0»: exactamente
+ * lo que este comentario dice que no puede pasar.
+ *
  * SOBRE EL COLOR DE «V». Va en el acento del club, siguiendo el handoff de
  * diseño; «D» se queda en el rojo semántico fijo. En el tema rojo los dos
  * quedan parecidos, y ahí la letra es lo que distingue — por eso el rótulo
@@ -46,6 +52,8 @@ export default function ClubSummaryCard({
 
   const esAdmin = rol === 'admin';
   const esPremium = club.plan === 'premium';
+  // Sin partidos jugados no hay récord que mostrar, ni siquiera un cero.
+  const hayRecord = Number.isFinite(stats?.pj) && stats.pj > 0;
 
   return (
     <View style={styles.tarjeta}>
@@ -86,9 +94,9 @@ export default function ClubSummaryCard({
       </View>
 
       <View style={styles.stats}>
-        <StatTile valor={stats?.v} rotulo="V" color={escala.main} />
-        <StatTile valor={stats?.e} rotulo="E" />
-        <StatTile valor={stats?.d} rotulo="D" color={clubTonos.danger.fg} />
+        <StatTile valor={hayRecord ? stats.v : null} rotulo="V" color={escala.main} />
+        <StatTile valor={hayRecord ? stats.e : null} rotulo="E" />
+        <StatTile valor={hayRecord ? stats.d : null} rotulo="D" color={clubTonos.danger.fg} />
         <StatTile texto={ratingLabel} rotulo="RATING" />
       </View>
 

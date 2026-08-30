@@ -51,7 +51,7 @@ Las cinco pasaron implementación **y** revisión independiente.
 | 9 | La portada: `ClubsScreen` + los 6 estados | este commit | Sin revisión independiente todavía |
 | 10 | Badge de pendientes en la barra | este commit | Sin revisión independiente todavía |
 
-**Las diez tareas del plan están implementadas.** Ninguna de la 7 a la 10 pasó revisión independiente: eso es lo que queda antes del merge.
+**Las diez tareas del plan están implementadas y revisadas.** La revisión independiente de las tareas 7 a 10 encontró **12 hallazgos, todos verificados y todos corregidos**. Ver §9.
 
 > La tarea 5 está commiteada y **sus seis hallazgos están corregidos**, con pruebas que fijan cada uno. Ver §10.
 
@@ -94,11 +94,10 @@ El repo no tiene pruebas de render, así que **todo lo que decide algo salió de
 
 ## 4. Qué falta antes del merge
 
-1. **Revisión independiente de las tareas 7 a 10** — son ~1.400 líneas de interfaz sin revisar y sin pruebas de render. El repo no tiene esa infraestructura; se verificaron con lint, con una comprobación mecánica de que los 29 archivos resuelven todos sus imports relativos, y con `npm run build:web`, que compila el bundle entero. Nada de eso prueba que la pantalla se vea bien.
-2. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo.
-3. **Triar los tres menores diferidos**: la barra verde de `ChatThreadScreen`, la prueba de integración de `withClubs` sin la columna `tema`, y el color de «V» en el tema rojo (§8).
-4. **Reducciones declaradas de la tarea 9**, ver §3.
-5. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
+1. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo.
+2. **Triar los tres menores diferidos**: la barra verde de `ChatThreadScreen`, la prueba de integración de `withClubs` sin la columna `tema`, y el color de «V» en el tema rojo (§8).
+3. **Reducciones declaradas de la tarea 9**, ver §3.
+4. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
 
 ---
 
@@ -209,6 +208,25 @@ Por eso los límites viven en `src/utils/clubPlanLimits.js` y el servicio los re
 **El defecto venía del plan, no del implementador.**
 
 **Tarea 2, dos Menores.** Comentario de `clubSuperficies` que no explicaba nada, y un `require` a mitad de archivo. Corregidos.
+
+### Revisión de las tareas 7 a 10 — 12 hallazgos, todos corregidos
+
+Los doce se verificaron contra el código antes de aceptarlos; ninguno era un falso positivo. Los dos primeros son los que de verdad dolían.
+
+| # | Hallazgo | Arreglo |
+|---|---|---|
+| 1 | **La portada se reemplazaba entera por el esqueleto en CADA foco** de la pestaña: `reload()` encendía `loading` y la pantalla dibuja `SkeletonHome` mientras dure. Volver del detalle de un club borraba la portada durante dos rondas de consultas | El contexto distingue `loading` (primera carga) de `refreshing` (recarga con datos ya en pantalla) |
+| 2 | **Un fallo de red al refrescar borraba una portada completa.** El contexto conservaba los datos, pero la pantalla mostraba el error a pantalla completa igual | El error ocupa la pantalla sólo si `!cargado`; con datos previos avisa con un banner y deja lo que había |
+| 3 | «Desafiar» a un rival sugerido pasaba `retadorClubId`, que `ClubChallengeScreen` no lee, y omitía `rivalNombre` y `rivalFotoUrl`, que sí | Se pasan los tres params reales |
+| 4 | «Buscar rivales» y «Ver todos» iban a `ExploreClubs` sin `modoRival: true`, así que salía el catálogo completo —clubes propios incluidos— y `retadorClubId` se ignoraba | Se pasa `modoRival: true` |
+| 5 | Los cupos de la tarjeta destacada se sacaban con una expresión regular del subtítulo de la tarea, y esa tarea no existe con la nómina llena: **la barra desaparecía justo al llegar al 100 %** | Ya corregido en `906a2d1`: el contexto expone `nextMatchCupos`, que no depende de que haya tarea |
+| 6 | El badge de la sección se encendía con `tasks.length` pero mostraba `badgeCount`: con una única tarea vencida decía «0» | Se enciende con `badgeCount > 0` |
+| 7 | «Ajustes del club» llevaba a `ClubDetail`, el mismo destino que el tile «Mi club» de al lado | Va a `EditClub`, que es lo que promete la etiqueta |
+| 8 | El subtítulo decía «Solicitud en revisión» a quien solo tenía una invitación recibida: le atribuía algo que no hizo | Distingue solicitud enviada de invitación recibida |
+| 9 | La sección de actividad dejaba un hueco de 23px cuando `ActivityList` devolvía `null` | La sección no se dibuja sin actividad |
+| 10 | «N.A.» era **inalcanzable** para V/E/D: `club_estadisticas()` siempre devuelve numérico, así que un club nuevo mostraba «0 · 0 · 0» — justo lo que el comentario del archivo dice que no puede pasar | Se mira `pj > 0`, no si `v` es un número |
+| 11 | En `SkeletonHome` el desfase estaba DENTRO del bucle, así que se reaplicaba cada vuelta y la onda se desarmaba a los pocos segundos | El desfase sale del bucle |
+| 12 | El lector de pantalla decía «Clubes, 3 sin leer» sobre tareas por hacer | La etiqueta se bifurca igual que el badge |
 
 ### Diferidos, para triar antes del merge
 

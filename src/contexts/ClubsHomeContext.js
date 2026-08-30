@@ -106,6 +106,8 @@ const TOPE_ACTIVIDAD = 3;
 
 const ESTADO_INICIAL = {
   loading: true,
+  refreshing: false,
+  cargado: false,
   error: false,
   membership: 'none',
   clubs: [],
@@ -168,7 +170,17 @@ export function ClubsHomeProvider({ children }) {
 
   useEffect(() => {
     let vivo = true;
-    setState((s) => ({ ...s, loading: true, error: false }));
+    // PRIMERA CARGA NO ES LO MISMO QUE REFRESCO. La portada se recarga en
+    // cada foco de la pestaña; si eso encendiera `loading`, el contenido
+    // entero se reemplazaría por el esqueleto cada vez que el usuario vuelve
+    // del detalle de un club. `refreshing` deja el contenido en pantalla
+    // mientras los datos se renuevan por debajo.
+    setState((s) => ({
+      ...s,
+      loading: !s.cargado,
+      refreshing: s.cargado,
+      error: false,
+    }));
 
     (async () => {
       try {
@@ -177,7 +189,9 @@ export function ClubsHomeProvider({ children }) {
         if (!vivo) return;
         if (errClubes) {
           console.error('[FutFinder] ClubsHome getMyClubs:', errClubes);
-          setState((s) => ({ ...s, loading: false, error: true }));
+          // Se conserva lo que ya había: un corte de red al volver a la
+          // pestaña no puede borrar una portada que estaba completa.
+          setState((s) => ({ ...s, loading: false, refreshing: false, error: true }));
           return;
         }
 
@@ -205,6 +219,7 @@ export function ClubsHomeProvider({ children }) {
           setState({
             ...ESTADO_INICIAL,
             loading: false,
+            cargado: true,
             membership,
             clubs: misClubes,
             invitations,
@@ -305,6 +320,8 @@ export function ClubsHomeProvider({ children }) {
 
         setState({
           loading: false,
+          refreshing: false,
+          cargado: true,
           error: false,
           membership,
           clubs: misClubes,
@@ -339,7 +356,7 @@ export function ClubsHomeProvider({ children }) {
       } catch (e) {
         if (!vivo) return;
         console.error('[FutFinder] ClubsHome:', e);
-        setState((s) => ({ ...s, loading: false, error: true }));
+        setState((s) => ({ ...s, loading: false, refreshing: false, error: true }));
       }
     })();
 

@@ -47,23 +47,28 @@ function Bloque({ indice, style }) {
   const opacidad = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
-    const bucle = Animated.loop(
-      Animated.sequence([
-        Animated.delay(indice * DESFASE),
-        Animated.timing(opacidad, {
-          toValue: 0.75,
-          duration: DURACION / 2,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacidad, {
-          toValue: 0.35,
-          duration: DURACION / 2,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
+    // El desfase va FUERA del bucle. Dentro, se volvía a aplicar en cada
+    // vuelta: el ciclo de cada bloque duraba 1400 + indice*100 ms y la onda
+    // se desarmaba a los pocos segundos, latiendo cada uno por su cuenta.
+    const bucle = Animated.sequence([
+      Animated.delay(indice * DESFASE),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(opacidad, {
+            toValue: 0.75,
+            duration: DURACION / 2,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacidad, {
+            toValue: 0.35,
+            duration: DURACION / 2,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+    ]);
     bucle.start();
     return () => bucle.stop();
   }, [indice, opacidad]);

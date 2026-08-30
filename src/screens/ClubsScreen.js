@@ -57,6 +57,7 @@ export default function ClubsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const {
     loading,
+    cargado,
     error,
     membership,
     clubs,
@@ -113,17 +114,23 @@ export default function ClubsScreen({ navigation, route }) {
       const destinos = {
         club: ['ClubDetail', { clubId: activeClubId }],
         desafios: ['ClubChallenges', { clubId: activeClubId }],
-        rivales: ['ExploreClubs', { retadorClubId: can?.responderDesafios ? activeClubId : null }],
+        // `modoRival: true` es lo que hace que ExploreClubs deje de ser el
+        // catálogo completo y liste sólo clubes desafiables; sin él,
+        // `retadorClubId` se ignora y aparecen hasta los clubes propios.
+        rivales: [
+          'ExploreClubs',
+          { modoRival: true, retadorClubId: can?.responderDesafios ? activeClubId : null },
+        ],
         partido: nextMatch
           ? ['ClubMatchRoster', { matchId: nextMatch.id }]
           : ['ClubChallenges', { clubId: activeClubId }],
         integrantes: ['ClubMembers', { clubId: activeClubId }],
-        ajustes: ['ClubDetail', { clubId: activeClubId }],
+        ajustes: ['EditClub', { club }],
       };
       const destino = destinos[clave];
       if (destino) irA(destino[0], destino[1]);
     },
-    [activeClubId, can, nextMatch, irA]
+    [activeClubId, can, club, nextMatch, irA]
   );
 
   const onTarea = useCallback(
@@ -143,7 +150,7 @@ export default function ClubsScreen({ navigation, route }) {
 
   const cabecera = (
     <ClubsHeader
-      subtitulo={subtituloDe({ membership, clubs, club })}
+      subtitulo={subtituloDe({ membership, clubs, club, sentRequests, invitations })}
       tema={tema}
       hayPendientes={badgeCount > 0}
       onBuscar={() => irA('ExploreClubs')}
@@ -160,7 +167,11 @@ export default function ClubsScreen({ navigation, route }) {
     );
   }
 
-  if (error) {
+  // El error ocupa la pantalla sólo si nunca llegó a haber datos. Si ya
+  // había una portada, un corte de red al volver a la pestaña deja lo que
+  // estaba y avisa con un banner: borrarla sería perder información buena
+  // por un fallo pasajero.
+  if (error && !cargado) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
         {cabecera}
@@ -246,6 +257,16 @@ export default function ClubsScreen({ navigation, route }) {
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       {cabecera}
+      {error ? (
+        <View style={styles.bannerHueco}>
+          <Banner
+            type="error"
+            title="No pudimos actualizar"
+            message="Estás viendo los últimos datos que alcanzamos a cargar."
+            onClose={retry}
+          />
+        </View>
+      ) : null}
       {banner ? (
         <View style={styles.bannerHueco}>
           <Banner {...banner} onClose={() => setBanner(null)} />
@@ -309,11 +330,14 @@ function Portada({
         <View style={styles.cabeceraSeccion}>
           <View style={styles.tituloConBadge}>
             <Text style={styles.tituloSeccion}>Pendiente para ti</Text>
-            {sinTareas ? null : (
+            {/* El badge se enciende con el número que muestra, no con la
+                cantidad de tarjetas: con una única tarea vencida había
+                tareas que enseñar pero el badge decía «0». */}
+            {badgeCount > 0 ? (
               <View style={[styles.badge, { backgroundColor: tema.main }]}>
                 <Text style={[styles.badgeTexto, { color: tema.ink }]}>{badgeCount}</Text>
               </View>
-            )}
+            ) : null}
           </View>
           {sinTareas ? null : (
             <Pressable
@@ -393,21 +417,25 @@ function Portada({
         />
       </View>
 
-      <View style={styles.seccion}>
-        <ActivityList
-          items={activity}
-          tema={tema}
-          onVerToda={() => irA('Notifications')}
-          onPressItem={() => irA('Notifications')}
-        />
-      </View>
+      {/* `ActivityList` devuelve null sin actividad, pero el margen del
+          contenedor no: sin esta guardia quedaba un hueco de 23px. */}
+      {(activity || []).length > 0 ? (
+        <View style={styles.seccion}>
+          <ActivityList
+            items={activity}
+            tema={tema}
+            onVerToda={() => irA('Notifications')}
+            onPressItem={() => irA('Notifications')}
+          />
+        </View>
+      ) : null}
 
       {(suggestedRivals || []).length > 0 ? (
         <View style={styles.seccionSuelta}>
           <View style={[styles.cabeceraSeccion, styles.conMargenLateral]}>
             <Text style={styles.tituloSeccion}>Rivales sugeridos</Text>
             <Pressable
-              onPress={() => irA('ExploreClubs', { retadorClubId: activeClubId })}
+              onPress={() => irA('ExploreClubs', { modoRival: true, retadorClubId: activeClubId })}
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="Ver todos los rivales"
@@ -429,7 +457,14 @@ function Portada({
                   nivelLabel={nivelInline(rival.nivel)}
                   onPress={() => irA('ClubDetail', { clubId: rival.id })}
                   onChallenge={() =>
-                    irA('ClubChallenge', { retadorClubId: activeClubId, rivalClubId: rival.id })
+                    // `ClubChallengeScreen` lee estos tres y elige el club
+                    // retador por su cuenta. Sin el nombre y el escudo, el
+                    // formulario abre con «Club rival» y el escudo genérico.
+                    irA('ClubChallenge', {
+                      rivalClubId: rival.id,
+                      rivalNombre: rival.nombre,
+                      rivalFotoUrl: rival.foto_url,
+                    })
                   }
                   puedeDesafiar={!!can?.responderDesafios}
                 />
@@ -622,8 +657,16 @@ function EntradaSuave({ children }) {
  * datos que solo ella tiene juntos: en qué situación está el usuario y
  * cuántos clubes hay.
  */
-function subtituloDe({ membership, clubs, club }) {
-  if (membership === 'pending') return 'Solicitud en revisión';
+function subtituloDe({ membership, clubs, club, sentRequests, invitations }) {
+  if (membership === 'pending') {
+    // `'pending'` cubre dos situaciones distintas y no dan el mismo texto:
+    // quien envió una solicitud espera respuesta, y a quien lo invitaron le
+    // toca responder a él. Decirle «Solicitud en revisión» a alguien que
+    // nunca postuló le atribuye algo que no hizo.
+    if ((sentRequests || []).length > 0) return 'Solicitud en revisión';
+    if ((invitations || []).length > 0) return 'Tienes una invitación';
+    return 'Aún sin club';
+  }
   if (membership !== 'member' || !club) return 'Aún sin club';
   return (clubs || []).length > 1 ? `Club activo · ${club.nombre}` : club.nombre;
 }

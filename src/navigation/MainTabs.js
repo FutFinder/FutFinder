@@ -124,7 +124,14 @@ function CustomTabBar({ state, navigation }) {
         accessibilityRole="tab"
         accessibilityState={{ selected: isFocused }}
         accessibilityLabel={
-          badge > 0 ? `${labelFor(route.name)}, ${badge} sin leer` : labelFor(route.name)
+          badge > 0
+            ? `${labelFor(route.name)}, ${badge} ${
+                // Los pendientes del club son tareas por hacer, no mensajes
+                // por leer: quien navega con lector de pantalla escuchaba
+                // «Clubes, 3 sin leer» sobre desafíos sin responder.
+                route.name === 'ClubsTab' ? 'pendientes' : 'sin leer'
+              }`
+            : labelFor(route.name)
         }
         className="flex-1 items-center gap-1 active:opacity-70"
       >
