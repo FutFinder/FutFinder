@@ -56,23 +56,49 @@ Con las tareas 1 a 4 el **paso 1 del handoff queda cerrado**.
 
 El agente que la implementaba murió por límite de sesión de la API, no por un fallo del código. Dejó `src/utils/useClubsHome.js` (352 líneas) **sin commitear y sin informe**.
 
-**No la des por buena.** Concretamente:
+**Está sin commitear a propósito.** Es trabajo coherente, no basura, pero **nadie lo ha revisado** y por eso no entra al historial como si estuviera terminado.
 
-- No existe `.superpowers/sdd/2026-08-28-portada-clubes/task-6-report.md`, así que **no hay constancia de qué decidió ni de qué dejó a medias**.
-- Nadie la revisó.
-- No se sabe si el agente había terminado o estaba a mitad de una función cuando lo cortaron.
-- El brief le pedía justificar tres decisiones —de dónde saca los partidos, cómo filtra los avisos por club, y el orden de las consultas— y esa justificación se perdió con el agente.
+### Lo que se verificó (auditoría del controlador, 2026-08-29)
 
-Lo que **sí** se puede afirmar, porque lo verifiqué:
+Estos puntos están comprobados, no supuestos:
 
-- `npx eslint src/utils/useClubsHome.js` → **cero errores y cero avisos**.
-- `npm test` → 822/822, igual que antes. El archivo no tiene pruebas propias, así que ese número **no dice nada sobre él**.
-- Estructuralmente parece completo: exporta `useClubsHome()` por defecto y devuelve `{ ...state, retry, setActiveClub }`.
-- Su `ESTADO_INICIAL` expone las 17 claves del contrato acordado: `loading`, `error`, `membership`, `clubs`, `activeClubId`, `club`, `role`, `can`, `limits`, `tasks`, `reparto`, `badgeCount`, `nextMatch`, `activity`, `suggestedRivals`, `invitations`, `pendingRequests`.
-- Usa `AsyncStorage` bajo la clave `futfinder:clubActivo`, con los fallos de almacenamiento capturados.
-- Tiene un helper `avisoDelClub()` que atribuye un aviso a un club por `clubId`, `clubRetadorId` o `clubRetadoId`, y descarta los que no tienen ninguna de las tres.
+- **El archivo está completo.** No hay funciones cortadas, ni `TODO`, ni código muerto. Termina en `return { ...state, retry, setActiveClub }`.
+- **Los 22 símbolos que importa existen.** Comprobado mecánicamente contra los `export` de cada módulo de destino, incluidos `usaNominaPorClub` y `resumenNomina` de `clubMatchRules.js`.
+- **`npx eslint src/utils/useClubsHome.js`** → cero errores y cero avisos.
+- **`npm test`** → 822/822, igual que sin el archivo. No tiene pruebas propias, así que **ese número no dice nada sobre él**.
+- **`ESTADO_INICIAL` expone las 17 claves del contrato acordado:** `loading`, `error`, `membership`, `clubs`, `activeClubId`, `club`, `role`, `can`, `limits`, `tasks`, `reparto`, `badgeCount`, `nextMatch`, `activity`, `suggestedRivals`, `invitations`, `pendingRequests`.
+- **Guarda `vivo` en los nueve `await`** y devuelve la función de limpieza del efecto.
+- **El error solo se enciende si falla `getMyClubs`.** Las demás fuentes pasan por un helper `segura()` que registra en `console.error` y devuelve un valor por defecto, así que un fallo secundario no tumba la portada. Cumple lo que pedía el brief.
+- **Las consultas van en dos rondas**, la segunda dependiente de la primera. No hay consulta por render: el efecto depende solo de `reloadToken`.
 
-Que linte limpio y parezca completo **no es evidencia de que funcione**. No hay una sola prueba ni una sola revisión detrás.
+### Las seis decisiones SÍ están documentadas
+
+Corrige una afirmación anterior de este documento: aunque no existe `task-6-report.md`, **el agente documentó su razonamiento en la cabecera del propio archivo** (líneas 29-96). Están las tres que el brief le exigía justificar, y tres más:
+
+1. `listOpenMatches()` sirve para el próximo partido porque los partidos nacidos de una propuesta nacen en `'abierto'` igual que uno normal. **Límite que él mismo anota:** si el partido se llena pasa a `'lleno'` y esta consulta deja de traerlo — el mismo límite que ya tiene `HomeScreen` hoy.
+2. Los avisos se filtran por `clubId`, `clubRetadorId` o `clubRetadoId` dentro de `data`, no adivinando el `type`. Los que solo llevan `matchId` quedan fuera a propósito: *«una lista corta y cierta es mejor que una completa y adivinada»*.
+3. El orden de las dos rondas.
+4. Solo se pide `getPropuestaVigente()` para desafíos en `'esperando_aprobacion'`.
+5. Sin clubes, una solicitud enviada solo se puede rastrear por el id guardado en `AsyncStorage`; sin ese id el estado es `'none'`.
+6. Las estadísticas viajan colgadas de `club.estadisticas` en vez de inventar una clave que las tareas 7-10 no pidieron.
+
+### Lo que un revisor tiene que adjudicar
+
+**La consulta de cambio de partido está condicionada a la nómina** (líneas ~270 y ~279):
+
+```js
+const conNomina = !!proximoPartido && usaNominaPorClub(proximoPartido);
+// ...
+conNomina ? getCambioPendiente(proximoPartido.id) : Promise.resolve(null)
+```
+
+`usaNominaPorClub()` exige `challenge_proposal_id` **y** `cupos_por_club != null`. Un cambio de partido, en cambio, solo exige lo primero (migración 46, línea 396). Y `cupos_por_club` puede quedar nulo (`clubChallengeRules.js:464`).
+
+O sea: **un partido nacido de una propuesta pero sin cupos por club nunca mostraría su cambio pendiente.** La brecha es estrecha, pero acopla dos conceptos que no tienen por qué ir juntos. Hay que decidir si se separa la condición.
+
+Que linte limpio, esté completo y razone bien **no es evidencia de que funcione**. No tiene una sola prueba ni una sola revisión detrás.
+
+> **Riesgo de pérdida:** el archivo está sin seguir por git. Un `git clean -fdx` lo borra. Si vas a limpiar el árbol, respáldalo antes.
 
 ## 4. Tareas pendientes
 
@@ -293,7 +319,9 @@ Detalles que importan:
 
 `docs/Rediseno-Clubes-FutFinder.md` **estaba sin seguir desde antes de empezar** y no es parte de este trabajo. No lo toques ni lo añadas.
 
-`src/utils/useClubsHome.js` es el resultado parcial de la tarea 6. Ver §3 antes de decidir qué hacer con él.
+`src/utils/useClubsHome.js` es el resultado de la tarea 6. **Se decidió NO commitearlo**, aunque la auditoría de §3 no encontró nada roto, porque el criterio acordado es que lo que todavía debe revisarse no entra al historial como trabajo terminado. Meterlo ahora lo haría pasar por hecho: quedaría en el árbol de la rama, la tarea 9 construiría contra él y nadie volvería a mirarlo.
+
+No está en git, así que **un `git clean -fdx` lo borra**. Respáldalo antes de limpiar el árbol.
 
 ---
 
