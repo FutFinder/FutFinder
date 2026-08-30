@@ -149,19 +149,45 @@ function diasDeCalendario(fecha, ahora) {
  * `'pasado'` se mide con el instante exacto, no con el día: un partido de
  * hoy a las 08:00 visto a las 09:00 ya empezó, aunque sea el mismo día.
  */
-function plazoDePartido(iso, ahora) {
+export function plazoDePartido(iso, ahora = new Date()) {
   const t = new Date(iso);
   if (!Number.isFinite(t.getTime())) return { tipo: 'sin_fecha' };
   if (t.getTime() <= ahora.getTime()) return { tipo: 'pasado' };
   return { tipo: 'futuro', dias: diasDeCalendario(t, ahora) };
 }
 
+/**
+ * El plazo en palabras: `'hoy'`, `'mañana'` o `'en N días'`. `null` si el
+ * partido ya pasó o no tiene fecha usable.
+ *
+ * Es la única cuenta de días que se redacta, y de ella salen las dos cosas
+ * que la ven: el título de la tarea y la pastilla de la tarjeta destacada.
+ * Separarlas era cómo terminaban diciendo plazos distintos del mismo partido.
+ */
+function plazoEnPalabras(plazo) {
+  if (!plazo || plazo.tipo !== 'futuro') return null;
+  if (plazo.dias <= 0) return 'hoy';
+  if (plazo.dias === 1) return 'mañana';
+  return `en ${plazo.dias} días`;
+}
+
 /** El título del próximo partido, ya resuelto el singular y el plural. */
 function tituloPartido(plazo) {
-  if (plazo.tipo === 'sin_fecha') return 'Próximo partido';
-  if (plazo.dias <= 0) return 'Próximo partido hoy';
-  if (plazo.dias === 1) return 'Próximo partido mañana';
-  return `Próximo partido en ${plazo.dias} días`;
+  const palabras = plazoEnPalabras(plazo);
+  return palabras ? `Próximo partido ${palabras}` : 'Próximo partido';
+}
+
+/**
+ * El mismo plazo en corto y en mayúsculas, para la pastilla de
+ * `NextMatchCard`: `'HOY'`, `'MAÑANA'`, `'EN 4 DÍAS'`.
+ *
+ * Se exporta en vez de dejar que la pantalla recorte el título con una
+ * expresión regular. Un recorte se rompe en silencio en cuanto el título
+ * cambia; esto rompe una prueba.
+ */
+export function etiquetaPlazo(plazo) {
+  const palabras = plazoEnPalabras(plazo);
+  return palabras ? palabras.toUpperCase() : null;
 }
 
 /**

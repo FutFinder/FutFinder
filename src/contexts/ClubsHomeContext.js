@@ -30,6 +30,8 @@ import {
   repartirTareas,
   cuposDelPlan,
   permisosDeClub,
+  plazoDePartido,
+  etiquetaPlazo,
 } from '../utils/clubsHomeTasks.js';
 
 /**
@@ -116,6 +118,8 @@ const ESTADO_INICIAL = {
   reparto: repartirTareas([]),
   badgeCount: 0,
   nextMatch: null,
+  nextMatchCupos: null,
+  nextMatchPlazo: null,
   activity: [],
   suggestedRivals: [],
   invitations: [],
@@ -319,6 +323,13 @@ export function ClubsHomeProvider({ children }) {
           reparto: repartirTareas(tasks),
           badgeCount: contarConAccion(tasks),
           nextMatch: proximoPartido,
+          // Los dos se calculan acá, con el MISMO `ahora` que las tareas, y
+          // viajan resueltos. La pantalla no tiene que deducirlos del texto
+          // que ya se redactó para otra cosa.
+          nextMatchCupos: nomina,
+          nextMatchPlazo: proximoPartido
+            ? etiquetaPlazo(plazoDePartido(proximoPartido.hora, ahora))
+            : null,
           activity: notifsData.filter((n) => avisoDelClub(n, activeId)).slice(0, TOPE_ACTIVIDAD),
           suggestedRivals: rivalesData,
           invitations,

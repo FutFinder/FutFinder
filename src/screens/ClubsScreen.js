@@ -69,6 +69,8 @@ export default function ClubsScreen({ navigation, route }) {
     reparto,
     badgeCount,
     nextMatch,
+    nextMatchCupos,
+    nextMatchPlazo,
     activity,
     suggestedRivals,
     invitations,
@@ -181,6 +183,8 @@ export default function ClubsScreen({ navigation, route }) {
           reparto,
           badgeCount,
           nextMatch,
+          nextMatchCupos,
+          nextMatchPlazo,
           activity,
           suggestedRivals,
           tema,
@@ -272,6 +276,8 @@ function Portada({
   reparto,
   badgeCount,
   nextMatch,
+  nextMatchCupos,
+  nextMatchPlazo,
   activity,
   suggestedRivals,
   tema,
@@ -355,8 +361,8 @@ function Portada({
             partido={nextMatch}
             tema={tema}
             miClubId={activeClubId}
-            cupos={cuposDelProximo(tasks)}
-            plazo={plazoDe(tasks)}
+            cupos={nextMatchCupos}
+            plazo={nextMatchPlazo}
             fecha={fechaLegible(nextMatch.hora)}
             lugar={lugarLabel(nextMatch, [activeClubId])}
             onVerPartido={() => irA('MatchDetail', { matchId: nextMatch.id })}
@@ -622,20 +628,12 @@ function subtituloDe({ membership, clubs, club }) {
   return (clubs || []).length > 1 ? `Club activo · ${club.nombre}` : club.nombre;
 }
 
-/** Los cupos y el plazo salen de las tareas ya derivadas, no se recalculan. */
-function cuposDelProximo(tasks) {
-  const nomina = (tasks || []).find((t) => t.type === 'nomina');
-  if (!nomina) return null;
-  const [confirmados, cupos] = String(nomina.subtitle).match(/\d+/g)?.map(Number) || [];
-  return Number.isFinite(confirmados) && Number.isFinite(cupos) ? { confirmados, cupos } : null;
-}
-
-function plazoDe(tasks) {
-  const partido = (tasks || []).find((t) => t.type === 'partido');
-  if (!partido) return null;
-  return partido.title.replace(/^Próximo partido\s*/i, '').toUpperCase() || null;
-}
-
+/**
+ * Cuántas tareas accionables hay de un tipo, para el badge de un tile.
+ *
+ * Esto sí se puede contar acá: lee `type` y `status`, que son campos del
+ * contrato, no el texto que se le muestra a alguien.
+ */
 function contarPorTipo(tasks, tipo) {
   return (tasks || []).filter((t) => t.type === tipo && t.status === 'abierta').length;
 }

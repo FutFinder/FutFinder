@@ -574,3 +574,46 @@ test('una tarea vencida no se va al fondo: el orden es por tipo, no por estado',
   assert.deepEqual(tareas.map((t) => t.id), ['desafio:muerto', 'desafio:vivo']);
   assert.equal(D.contarConAccion(tareas), 1);
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// LA ETIQUETA DEL PLAZO, PARA QUIEN NO ES LA LISTA DE TAREAS
+//
+// La tarjeta del próximo partido lleva una pastilla con el mismo plazo
+// que el título de la tarea, pero en corto y en mayúsculas. Se exporta
+// en vez de dejar que la pantalla recorte el título con una expresión
+// regular: si el título cambia, un recorte se rompe en silencio y esto
+// falla acá.
+// ═══════════════════════════════════════════════════════════════════
+
+test('el plazo de un partido de hoy se etiqueta «HOY»', () => {
+  assert.equal(D.etiquetaPlazo(D.plazoDePartido(localISO(HOY_09, 0, 21), HOY_09)), 'HOY');
+});
+
+test('el plazo de mañana se etiqueta «MAÑANA»', () => {
+  assert.equal(D.etiquetaPlazo(D.plazoDePartido(localISO(HOY_09, 1, 8), HOY_09)), 'MAÑANA');
+});
+
+test('a partir de dos días la etiqueta cuenta los días', () => {
+  assert.equal(D.etiquetaPlazo(D.plazoDePartido(localISO(HOY_09, 4, 20), HOY_09)), 'EN 4 DÍAS');
+});
+
+test('un partido pasado o sin fecha no tiene etiqueta de plazo', () => {
+  assert.equal(D.etiquetaPlazo(D.plazoDePartido(localISO(HOY_09, -1, 20), HOY_09)), null);
+  assert.equal(D.etiquetaPlazo(D.plazoDePartido('vaya uno a saber', HOY_09)), null);
+  assert.equal(D.etiquetaPlazo(null), null);
+});
+
+test('la etiqueta y el título del partido cuentan los mismos días', () => {
+  // El punto de exportarlas juntas: si divergen, la pastilla dice una cosa
+  // y la tarea de abajo otra sobre el mismo partido.
+  for (const dias of [0, 1, 2, 5, 30]) {
+    const hora = localISO(HOY_09, dias, 20);
+    const etiqueta = D.etiquetaPlazo(D.plazoDePartido(hora, HOY_09));
+    const titulo = tareaPartido(hora)?.title;
+    assert.equal(
+      titulo.replace(/^Próximo partido\s*/, '').toUpperCase(),
+      etiqueta,
+      `a ${dias} días`
+    );
+  }
+});
