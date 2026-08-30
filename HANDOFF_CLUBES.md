@@ -47,7 +47,11 @@ Las cinco pasaron implementación **y** revisión independiente.
 | 5 | `clubsHomeTasks.js`, la derivación pura | `e5a76cf` | 1 Crítico + 2 Importantes + 3 Menores, **los seis corregidos**, ver §10 |
 | 6 | `useClubsHome` → `ClubsHomeProvider` | `d786fe6` | Auditada, conservada, 7 defectos corregidos, ver §3 |
 | 7 | `VerifiedBadge`, `ClubsHeader`, `ClubSwitcher` | `649decc` | Sin revisión independiente todavía |
-| 8 | Los 7 componentes de contenido | pendiente de commit | Sin revisión independiente todavía |
+| 8 | Los 7 componentes de contenido | `f2d845c` | Sin revisión independiente todavía |
+| 9 | La portada: `ClubsScreen` + los 6 estados | este commit | Sin revisión independiente todavía |
+| 10 | Badge de pendientes en la barra | este commit | Sin revisión independiente todavía |
+
+**Las diez tareas del plan están implementadas.** Ninguna de la 7 a la 10 pasó revisión independiente: eso es lo que queda antes del merge.
 
 > La tarea 5 está commiteada y **sus seis hallazgos están corregidos**, con pruebas que fijan cada uno. Ver §10.
 
@@ -75,18 +79,26 @@ Hallazgo colateral que valida el arreglo del badge: `getPropuestaVigente()` devu
 | F | `listOpenMatches({limit:50})` traía los 50 partidos abiertos más próximos **de toda la app** y excluía los `'lleno'`: el partido del club desaparecía sin avisar | `listPartidosDeClub()` en `services/matches.js`, filtrada por club en la base. La RLS 44d lo permite |
 | G | `futfinder:clubActivo` significaba dos cosas | Resuelto con A: la clave vuelve a significar solo «club activo» |
 
+### Reducciones declaradas en la tarea 9
+
+Dos cosas del brief no se implementaron tal cual, y conviene que se sepan:
+
+- **«Clubes sugeridos» en el estado sin club.** El brief los pedía con botón «Unirse». El contexto no trae esa lista —`listRivalCandidates` necesita un club de referencia y quien no tiene club no lo tiene—, y añadirla significaba otra consulta y otra clave del contrato. En su lugar, «Explorar clubes» lleva a `ExploreClubs`, que es el explorador completo con búsqueda y listado: la capacidad queda a un toque, no se pierde.
+- **«Ver estado del servicio»** en el estado de error: el propio plan ya lo había descartado por no tener respaldo en la app.
+
 ### Qué se puede probar y qué no
 
 El repo no tiene pruebas de render, así que **todo lo que decide algo salió del hook** a `src/utils/clubsHomeSources.js` (`avisoDelClub`, `elegirClubActivo`, `derivarMembresia`, `partidoAdmiteCambio`) con **18 pruebas**. Lo que queda en el contexto es atar servicios y ordenar rondas: eso está verificado por lectura y lint, **no por prueba automática**, y conviene decirlo así.
 
 `listMyRequests()` y `listPartidosDeClub()` tampoco tienen prueba: importan `./supabase`, que no carga bajo `node --test`.
 
-## 4. Tareas pendientes
+## 4. Qué falta antes del merge
 
-| # | Tarea | Depende de |
-|---|---|---|
-| 9 | La portada: `ClubsScreen` + los 6 estados | tareas 7, 8 (la 6 ya está) |
-| 10 | Badge de pendientes en la barra inferior | ninguna: `useClubsHome()` ya está disponible en `MainTabs` |
+1. **Revisión independiente de las tareas 7 a 10** — son ~1.400 líneas de interfaz sin revisar y sin pruebas de render. El repo no tiene esa infraestructura; se verificaron con lint, con una comprobación mecánica de que los 29 archivos resuelven todos sus imports relativos, y con `npm run build:web`, que compila el bundle entero. Nada de eso prueba que la pantalla se vea bien.
+2. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo.
+3. **Triar los tres menores diferidos**: la barra verde de `ChatThreadScreen`, la prueba de integración de `withClubs` sin la columna `tema`, y el color de «V» en el tema rojo (§8).
+4. **Reducciones declaradas de la tarea 9**, ver §3.
+5. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
 
 ---
 

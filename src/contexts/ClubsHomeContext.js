@@ -92,6 +92,13 @@ const CLUB_ACTIVO_KEY = 'futfinder:clubActivo';
 /** Estados del desafío en los que existe una propuesta oficial por revisar. */
 const ESTADO_ESPERANDO_PROPUESTA = 'esperando_aprobacion';
 
+/**
+ * `pendingRequests` son las solicitudes que OTROS enviaron a mi club y yo
+ * administro; `sentRequests` son las que YO envié y espero respuesta. Se
+ * parecen en el nombre y no tienen nada que ver: la portada usa la primera
+ * para la lista de tareas y la segunda para el estado «solicitud en revisión».
+ */
+
 /** Cuántos avisos entran en «Actividad reciente». */
 const TOPE_ACTIVIDAD = 3;
 
@@ -113,6 +120,7 @@ const ESTADO_INICIAL = {
   suggestedRivals: [],
   invitations: [],
   pendingRequests: [],
+  sentRequests: [],
 };
 
 /** Lee el club activo guardado. Un fallo de almacenamiento no tumba la portada. */
@@ -196,6 +204,7 @@ export function ClubsHomeProvider({ children }) {
             membership,
             clubs: misClubes,
             invitations,
+            sentRequests: solicitudesEnviadas,
           });
           return;
         }
@@ -314,6 +323,7 @@ export function ClubsHomeProvider({ children }) {
           suggestedRivals: rivalesData,
           invitations,
           pendingRequests: solicitudesData,
+          sentRequests: solicitudesEnviadas,
         });
       } catch (e) {
         if (!vivo) return;
