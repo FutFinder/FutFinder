@@ -226,3 +226,249 @@ test('no revienta con fuentes ausentes', () => {
   assert.deepEqual(D.normalizarTareas(undefined, { rol: 'admin', ahora: AHORA }), []);
   assert.deepEqual(D.normalizarTareas({}, {}), []);
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// VOCABULARIOS TERMINALES, UNO POR TABLA
+//
+// El defecto que estas pruebas fijan: un único conjunto de «estados
+// muertos» aplicado a tres tablas que no comparten vocabulario. Una
+// propuesta `rechazada` (femenino) o un cambio `caducado` quedaban
+// abiertos PARA SIEMPRE y el badge los contaba.
+//
+// Los estados de cada tabla salen del `check` de su migración, no de
+// memoria:
+//   club_challenges           → 41_desafios_estados_y_chat.sql:38-55
+//   club_challenge_proposals  → 43_desafios_plazos_y_propuesta.sql:157
+//   club_match_changes        → 46_cambios_de_partido.sql:102
+// ═══════════════════════════════════════════════════════════════════
+
+const { ESTADOS } = require('../../services/clubChallengeRules.js');
+
+/** Qué espera la portada de cada estado real de `club_challenges`. */
+const ESPERADO_DESAFIO = {
+  pendiente: 'abierta',
+  negociacion: 'abierta',
+  esperando_aprobacion: 'abierta',
+  publicado: 'abierta',
+  en_juego: 'abierta',
+  esperando_resultado: 'abierta',
+  resultado_en_disputa: 'abierta',
+  bloqueado_sancion: 'abierta',
+  finalizado: 'resuelta',
+  aceptado: 'resuelta',
+  rechazado: 'vencida',
+  sin_acuerdo: 'vencida',
+  cancelado: 'vencida',
+  expirado: 'vencida',
+};
+
+const ESPERADO_PROPUESTA = {
+  pendiente: 'abierta',
+  aprobada: 'resuelta',
+  rechazada: 'vencida',
+  caducada: 'vencida',
+};
+
+const ESPERADO_CAMBIO = {
+  pendiente: 'abierta',
+  aceptado: 'resuelta',
+  rechazado: 'vencida',
+  caducado: 'vencida',
+};
+
+test('la tabla de estados del desafío cubre exactamente los de la migración 41', () => {
+  // Si una migración agrega un estado y alguien lo suma a `ESTADOS`, esta
+  // prueba falla hasta que la portada decida qué hacer con él. Es la red
+  // que faltaba: el hueco anterior fue justo un estado sin clasificar.
+  assert.deepEqual(
+    Object.keys(ESPERADO_DESAFIO).sort(),
+    Object.values(ESTADOS).sort()
+  );
+});
+
+test('cada estado real de club_challenges se clasifica como corresponde', () => {
+  for (const [estado, esperado] of Object.entries(ESPERADO_DESAFIO)) {
+    assert.equal(D.estadoDeTarea('desafio', estado), esperado, `desafío en '${estado}'`);
+  }
+});
+
+test('cada estado real de club_challenge_proposals se clasifica como corresponde', () => {
+  for (const [estado, esperado] of Object.entries(ESPERADO_PROPUESTA)) {
+    assert.equal(D.estadoDeTarea('propuesta', estado), esperado, `propuesta en '${estado}'`);
+  }
+});
+
+test('cada estado real de club_match_changes se clasifica como corresponde', () => {
+  for (const [estado, esperado] of Object.entries(ESPERADO_CAMBIO)) {
+    assert.equal(D.estadoDeTarea('cambio', estado), esperado, `cambio en '${estado}'`);
+  }
+});
+
+test('el vocabulario de una tabla no contamina el de otra', () => {
+  // 'caducada' es de propuestas y 'caducado' de cambios: ni uno ni otro
+  // significan nada en `club_challenges`, así que ahí no cierran nada.
+  assert.equal(D.estadoDeTarea('desafio', 'caducada'), 'abierta');
+  assert.equal(D.estadoDeTarea('desafio', 'caducado'), 'abierta');
+  // 'sin_acuerdo' es de desafíos; una propuesta nunca lo tiene.
+  assert.equal(D.estadoDeTarea('propuesta', 'sin_acuerdo'), 'abierta');
+  // 'aceptado' cierra un cambio pero 'aprobada' no existe ahí.
+  assert.equal(D.estadoDeTarea('cambio', 'aprobada'), 'abierta');
+});
+
+// ── Los tres estados que el conjunto único dejaba abiertos ──────────
+
+test('un desafío sin_acuerdo queda vencido y no suma al badge', () => {
+  const f = fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'sin_acuerdo' }] });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas[0].status, 'vencida');
+  assert.equal(D.contarConAccion(tareas), 0);
+});
+
+test('una propuesta rechazada queda vencida y no suma al badge', () => {
+  // El femenino es el punto: el conjunto viejo tenía 'rechazado'.
+  const f = fuentes({ propuestas: [{ id: 'p1', estado: 'rechazada' }] });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas[0].status, 'vencida');
+  assert.equal(D.contarConAccion(tareas), 0);
+});
+
+test('una propuesta caducada queda vencida y no suma al badge', () => {
+  const f = fuentes({ propuestas: [{ id: 'p1', estado: 'caducada' }] });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas[0].status, 'vencida');
+  assert.equal(D.contarConAccion(tareas), 0);
+});
+
+test('un cambio de partido caducado queda vencido y no suma al badge', () => {
+  const f = fuentes({ cambiosDePartido: [{ id: 'cb1', estado: 'caducado' }] });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas[0].status, 'vencida');
+  assert.equal(D.contarConAccion(tareas), 0);
+});
+
+test('un desafío bloqueado por sanción sigue vivo: no es un estado terminal', () => {
+  // Retirar la sanción lo devuelve al estado en que estaba
+  // (`TRANSICIONES.bloqueado_sancion`), así que marcarlo vencido mentiría.
+  const f = fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'bloqueado_sancion' }] });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas[0].status, 'abierta');
+});
+
+// ── «Aceptado» salió bien: no es un fracaso, y no queda en la lista ──
+
+test('un cambio de partido aceptado desaparece: se aplicó, no venció', () => {
+  const f = fuentes({ cambiosDePartido: [{ id: 'cb1', estado: 'aceptado' }] });
+  assert.deepEqual(D.normalizarTareas(f, { rol: 'admin', ahora: AHORA }), []);
+});
+
+test('una propuesta aprobada desaparece: se aprobó, no venció', () => {
+  const f = fuentes({ propuestas: [{ id: 'p1', estado: 'aprobada' }] });
+  assert.deepEqual(D.normalizarTareas(f, { rol: 'admin', ahora: AHORA }), []);
+});
+
+test('un desafío finalizado desaparece: se jugó', () => {
+  const f = fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'finalizado' }] });
+  assert.deepEqual(D.normalizarTareas(f, { rol: 'admin', ahora: AHORA }), []);
+});
+
+test('un desafío aceptado del flujo legado desaparece: ya no hay qué responder', () => {
+  const f = fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'aceptado' }] });
+  assert.deepEqual(D.normalizarTareas(f, { rol: 'admin', ahora: AHORA }), []);
+});
+
+test('lo resuelto no ocupa lugar en el tope de cuatro visibles', () => {
+  // Si «resuelta» se colara en la lista, empujaría fuera de las cuatro
+  // visibles a una tarea que el usuario sí puede accionar.
+  const f = fuentes({
+    desafiosRecibidos: [
+      { ...DESAFIO, id: 'd1', estado: 'aceptado' },
+      { ...DESAFIO, id: 'd2', estado: 'finalizado' },
+      { ...DESAFIO, id: 'd3', estado: 'pendiente' },
+    ],
+  });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas.length, 1);
+  assert.equal(tareas[0].id, 'desafio:d3');
+  assert.equal(D.contarConAccion(tareas), 1);
+});
+
+test('el badge no cuenta una propuesta rechazada ni un cambio caducado', () => {
+  // La regresión completa del defecto crítico, en una sola prueba.
+  const f = fuentes({
+    desafiosRecibidos: [DESAFIO],
+    propuestas: [{ id: 'p1', estado: 'rechazada' }],
+    cambiosDePartido: [{ id: 'cb1', estado: 'caducado' }],
+  });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas.length, 3);
+  assert.equal(D.contarConAccion(tareas), 1);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// EL TÍTULO DEL PRÓXIMO PARTIDO
+//
+// Se cuenta por día de calendario, no por bloques de 24 horas: un
+// partido esta noche es «hoy» aunque falten 11 horas, y uno mañana
+// temprano es «mañana» aunque falten 9. Es lo que dice la gente.
+//
+// Las fechas se arman con setDate/setHours, que trabajan en hora
+// local, para que la prueba no dependa del huso donde se ejecute.
+// ═══════════════════════════════════════════════════════════════════
+
+/** Un instante en hora local: `dias` desde `base`, a las `hora` en punto. */
+function localISO(base, dias, hora) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + dias);
+  d.setHours(hora, 0, 0, 0);
+  return d.toISOString();
+}
+
+/** Las 9:00 en punto del día de AHORA, en hora local. */
+const HOY_09 = (() => {
+  const d = new Date(AHORA);
+  d.setHours(9, 0, 0, 0);
+  return d;
+})();
+
+function tareaPartido(hora, ahora = HOY_09) {
+  const f = fuentes({ proximoPartido: { id: 'm1', hora } });
+  return D.normalizarTareas(f, { rol: 'admin', ahora })[0] || null;
+}
+
+test('un partido más tarde hoy dice «hoy», no «en 1 días»', () => {
+  const t = tareaPartido(localISO(HOY_09, 0, 21));
+  assert.equal(t.title, 'Próximo partido hoy');
+});
+
+test('un partido del día siguiente dice «mañana»', () => {
+  const t = tareaPartido(localISO(HOY_09, 1, 8));
+  assert.equal(t.title, 'Próximo partido mañana');
+});
+
+test('un partido de pasado mañana dice «en 2 días», en plural', () => {
+  const t = tareaPartido(localISO(HOY_09, 2, 20));
+  assert.equal(t.title, 'Próximo partido en 2 días');
+});
+
+test('un partido de la semana que viene cuenta los días de calendario', () => {
+  const t = tareaPartido(localISO(HOY_09, 6, 11));
+  assert.equal(t.title, 'Próximo partido en 6 días');
+});
+
+test('un partido que ya empezó no es una tarea pendiente', () => {
+  // Empezó hace media hora: «Próximo partido» sería mentira, y «en 0
+  // días» ni siquiera es castellano.
+  const t = tareaPartido(new Date(HOY_09.getTime() - 30 * 60000).toISOString());
+  assert.equal(t, null);
+});
+
+test('un partido de anteayer tampoco genera tarea', () => {
+  const t = tareaPartido(localISO(HOY_09, -2, 20));
+  assert.equal(t, null);
+});
+
+test('un partido sin hora usable se anuncia sin plazo, pero se anuncia', () => {
+  const t = tareaPartido('vaya uno a saber');
+  assert.equal(t.title, 'Próximo partido');
+  assert.equal(t.status, 'abierta');
+});

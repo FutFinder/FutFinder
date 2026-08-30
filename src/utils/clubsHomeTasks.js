@@ -9,10 +9,13 @@
  * Supabase ni montar una pantalla.
  *
  * LA REGLA QUE MÁS SE EQUIVOCA: el badge cuenta tareas CON ACCIÓN. Una tarea
- * resuelta o vencida sigue en pantalla un rato, pero no suma. El badge de la
- * sección y el de la barra inferior usan este mismo número.
+ * vencida sigue en pantalla un rato para explicar qué pasó, pero no suma; una
+ * tarea resuelta ni siquiera se dibuja, porque salió bien y no hay nada que
+ * hacer con ella. El badge de la sección y el de la barra inferior usan este
+ * mismo número.
  */
 
+import { ESTADOS_CERRADOS } from '../services/clubChallengeRules.js';
 import { CLUB_LIMITS } from './clubPlanLimits.js';
 
 /** Prioridad de la lista: es el orden del handoff, no alfabético. */
@@ -20,11 +23,72 @@ const ORDEN = ['desafio', 'propuesta', 'cambio', 'nomina', 'solicitud', 'sancion
 
 const TOPE_VISIBLE = 4;
 
-/** Estados de la base que ya no admiten acción. */
-const ESTADOS_MUERTOS = new Set(['expirado', 'cancelado', 'rechazado', 'aceptado']);
+/**
+ * ESTADOS TERMINALES, UNO POR TABLA.
+ *
+ * Antes había un solo conjunto para las tres, y las tres usan vocabularios
+ * distintos: una propuesta se `caducada` en femenino, un cambio se `caducado`
+ * en masculino y un desafío se queda `sin_acuerdo`. Ninguno de esos tres
+ * entraba, así que esas tareas quedaban abiertas para siempre y el badge las
+ * contaba — justo lo que este archivo dice defender.
+ *
+ * Los valores salen del `check (estado in (...))` de cada migración:
+ *   club_challenges           → 41_desafios_estados_y_chat.sql:38-55
+ *   club_challenge_proposals  → 43_desafios_plazos_y_propuesta.sql:157
+ *   club_match_changes        → 46_cambios_de_partido.sql:102
+ *
+ * SALIÓ BIEN NO ES LO MISMO QUE VENCIÓ. Un cambio `aceptado` se aplicó, una
+ * propuesta `aprobada` publicó su partido y un desafío `finalizado` se jugó.
+ * Pintarlos «vencida» diría que algo falló. Esas tareas se retiran de la
+ * lista: ya no hay nada que mirar ahí.
+ */
+const RESUELTOS = {
+  desafio: new Set([
+    'finalizado',
+    // Legado anterior a la migración 41: alguien ya aceptó el desafío, así
+    // que la tarea «Desafío recibido / Responder» no tiene qué responder.
+    'aceptado',
+  ]),
+  propuesta: new Set(['aprobada']),
+  cambio: new Set(['aceptado']),
+};
 
-function estadoDeTarea(estado) {
-  return ESTADOS_MUERTOS.has(estado) ? 'vencida' : 'abierta';
+/**
+ * Lo terminal que NO salió bien.
+ *
+ * Para el desafío se deriva de `ESTADOS_CERRADOS`, la lista que ya mantiene
+ * la máquina de estados en `clubChallengeRules.js`: si una migración cierra
+ * un estado nuevo, esto lo hereda en vez de quedarse atrás en silencio.
+ *
+ * `bloqueado_sancion` y `resultado_en_disputa` no están acá a propósito: no
+ * son terminales —retirar la sanción devuelve el desafío al estado en que
+ * estaba— y darlos por vencidos escondería un desafío que sigue vivo.
+ */
+const VENCIDOS = {
+  desafio: new Set(ESTADOS_CERRADOS.filter((e) => !RESUELTOS.desafio.has(e))),
+  propuesta: new Set(['rechazada', 'caducada']),
+  cambio: new Set(['rechazado', 'caducado']),
+};
+
+/**
+ * En qué situación está una tarea: `'abierta'`, `'vencida'` o `'resuelta'`.
+ *
+ * `dominio` es cuál de las tres tablas manda. Sin él no se puede responder:
+ * `'aceptado'` cierra bien un cambio de partido y `'rechazado'` cierra mal un
+ * desafío, pero ninguno de los dos significa nada en la otra tabla.
+ *
+ * Un estado desconocido cuenta como `'abierta'`: preferimos mostrar de más a
+ * esconder algo que el usuario todavía puede accionar.
+ */
+export function estadoDeTarea(dominio, estado) {
+  if (RESUELTOS[dominio]?.has(estado)) return 'resuelta';
+  if (VENCIDOS[dominio]?.has(estado)) return 'vencida';
+  return 'abierta';
+}
+
+/** Lo resuelto no se dibuja: salió bien y no hay nada que hacer con ello. */
+function agregarSiQuedaAlgo(tareas, tarea) {
+  if (tarea.status !== 'resuelta') tareas.push(tarea);
 }
 
 /** El CTA depende del rol: el jugador ve, el admin resuelve. */
@@ -37,10 +101,43 @@ function coletilla(esAdmin, subtitulo) {
   return esAdmin ? subtitulo : `${subtitulo} · responde un admin`;
 }
 
-function diasHasta(iso, ahora) {
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return null;
-  return Math.ceil((t - ahora.getTime()) / 86400000);
+/**
+ * Días de calendario entre dos instantes, en hora local.
+ *
+ * No son bloques de 24 horas: un partido de esta noche es «hoy» aunque
+ * falten once horas, y uno de mañana temprano es «mañana» aunque falten
+ * nueve. Es lo que dice la gente, y contar por bloques daba «en 1 días»
+ * para un partido de esta tarde.
+ *
+ * `Math.round` y no una división directa porque un día con cambio de hora
+ * dura 23 o 25 horas.
+ */
+function diasDeCalendario(fecha, ahora) {
+  const a = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const b = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+/**
+ * Cuánto falta para el próximo partido: `'sin_fecha'`, `'pasado'` o los días
+ * que quedan.
+ *
+ * `'pasado'` se mide con el instante exacto, no con el día: un partido de
+ * hoy a las 08:00 visto a las 09:00 ya empezó, aunque sea el mismo día.
+ */
+function plazoDePartido(iso, ahora) {
+  const t = new Date(iso);
+  if (!Number.isFinite(t.getTime())) return { tipo: 'sin_fecha' };
+  if (t.getTime() <= ahora.getTime()) return { tipo: 'pasado' };
+  return { tipo: 'futuro', dias: diasDeCalendario(t, ahora) };
+}
+
+/** El título del próximo partido, ya resuelto el singular y el plural. */
+function tituloPartido(plazo) {
+  if (plazo.tipo === 'sin_fecha') return 'Próximo partido';
+  if (plazo.dias <= 0) return 'Próximo partido hoy';
+  if (plazo.dias === 1) return 'Próximo partido mañana';
+  return `Próximo partido en ${plazo.dias} días`;
 }
 
 /**
@@ -56,7 +153,7 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
   const tareas = [];
 
   for (const d of f.desafiosRecibidos || []) {
-    tareas.push({
+    agregarSiQuedaAlgo(tareas, {
       id: `desafio:${d.id}`,
       type: 'desafio',
       tone: 'accent',
@@ -64,12 +161,12 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
       subtitle: coletilla(esAdmin, d.otroClub?.nombre || 'Un club te desafió'),
       cta: accion(esAdmin, 'Responder'),
       target: 'ClubChallenges',
-      status: estadoDeTarea(d.estado),
+      status: estadoDeTarea('desafio', d.estado),
     });
   }
 
   for (const p of f.propuestas || []) {
-    tareas.push({
+    agregarSiQuedaAlgo(tareas, {
       id: `propuesta:${p.id}`,
       type: 'propuesta',
       tone: 'info',
@@ -77,12 +174,12 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
       subtitle: coletilla(esAdmin, 'Fecha, lugar y modalidad por confirmar'),
       cta: accion(esAdmin, 'Revisar'),
       target: 'ClubChallenges',
-      status: estadoDeTarea(p.estado),
+      status: estadoDeTarea('propuesta', p.estado),
     });
   }
 
   for (const c of f.cambiosDePartido || []) {
-    tareas.push({
+    agregarSiQuedaAlgo(tareas, {
       id: `cambio:${c.id}`,
       type: 'cambio',
       tone: 'warn',
@@ -90,7 +187,7 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
       subtitle: coletilla(esAdmin, 'El rival propuso mover el encuentro'),
       cta: accion(esAdmin, 'Responder'),
       target: 'ClubMatchChange',
-      status: estadoDeTarea(c.estado),
+      status: estadoDeTarea('cambio', c.estado),
     });
   }
 
@@ -137,17 +234,21 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
   }
 
   if (f.proximoPartido) {
-    const dias = diasHasta(f.proximoPartido.hora, ahora);
-    tareas.push({
-      id: `partido:${f.proximoPartido.id}`,
-      type: 'partido',
-      tone: 'accent',
-      title: dias === null ? 'Próximo partido' : `Próximo partido en ${dias} días`,
-      subtitle: 'Revisa la nómina y confirma tu asistencia',
-      cta: 'Ir ahora',
-      target: 'ClubMatchRoster',
-      status: 'abierta',
-    });
+    const plazo = plazoDePartido(f.proximoPartido.hora, ahora);
+    // Un partido que ya empezó no es una tarea pendiente: anunciarlo como
+    // «el próximo» manda al usuario a algo que no va a alcanzar.
+    if (plazo.tipo !== 'pasado') {
+      tareas.push({
+        id: `partido:${f.proximoPartido.id}`,
+        type: 'partido',
+        tone: 'accent',
+        title: tituloPartido(plazo),
+        subtitle: 'Revisa la nómina y confirma tu asistencia',
+        cta: 'Ir ahora',
+        target: 'ClubMatchRoster',
+        status: 'abierta',
+      });
+    }
   }
 
   return tareas.sort((a, b) => ORDEN.indexOf(a.type) - ORDEN.indexOf(b.type));

@@ -44,9 +44,9 @@ Las cinco pasaron implementación **y** revisión independiente.
 | 2 | Tonos semánticos y superficies | `387e8f9` + `9ea84bd` | 1 Importante + 2 Menores, **corregidos** |
 | 3 | Tematizar las pantallas de desafío | `8d4e555` + `97246c7` | Limpia, 1 Menor diferido |
 | 4 | Tematizar historial y tarjeta de partido | `cd8fde1` | Limpia, 1 Menor diferido |
-| 5 | `clubsHomeTasks.js`, la derivación pura | `e5a76cf` | **NO aprobada: 1 Crítico + 2 Importantes + 3 Menores, sin corregir** |
+| 5 | `clubsHomeTasks.js`, la derivación pura | `e5a76cf` | 1 Crítico + 2 Importantes + 3 Menores. **Crítico e Importantes corregidos**, ver §10 |
 
-> La tarea 5 está **commiteada pero no aprobada**. Su código está en el repo y sus pruebas pasan, pero la revisión encontró un defecto crítico. Ver §9.
+> La tarea 5 está commiteada. La revisión encontró un defecto crítico y dos importantes: **los tres están corregidos**. Quedan abiertos sus tres Menores. Ver §10.
 
 Con las tareas 1 a 4 el **paso 1 del handoff queda cerrado**.
 
@@ -226,11 +226,11 @@ Por eso los límites viven en `src/utils/clubPlanLimits.js` y el servicio los re
 
 ---
 
-## 10. Bugs pendientes de corregir
+## 10. Bugs de la tarea 5
 
 Todos en `src/utils/clubsHomeTasks.js`, commiteado en `e5a76cf`. **Son defectos de diseño del plan**, no del implementador: el plan traía el código escrito y él lo transcribió literalmente, como se le pidió.
 
-### CRÍTICO — `ESTADOS_MUERTOS` no coincide con los estados terminales reales
+### ✅ CORREGIDO — CRÍTICO: `ESTADOS_MUERTOS` no coincidía con los estados terminales reales
 
 `src/utils/clubsHomeTasks.js:24-27`, usado en las líneas 67, 80 y 93.
 
@@ -248,17 +248,19 @@ Eso rompe justo el invariante que el encabezado del archivo declara defender: *�
 
 **Por qué las 22 pruebas no lo atrapan:** el único caso terminal probado es `estado: 'expirado'` sobre un desafío, reusando el mismo objeto de prueba. Nunca se prueba una propuesta ni un cambio con el vocabulario de *su* tabla.
 
-**Arreglo:** un vocabulario terminal **por dominio**, no uno compartido. Y pruebas que usen los estados reales de cada tabla, leídos de las migraciones.
+**Arreglo aplicado.** `ESTADOS_MUERTOS` se sustituyó por `RESUELTOS` y `VENCIDOS`, **un vocabulario por dominio**, y `estadoDeTarea(dominio, estado)` ahora exige saber de qué tabla habla. Los valores se copiaron del `check` de cada migración; los del desafío se **derivan** de `ESTADOS_CERRADOS` de `clubChallengeRules.js` para que un estado cerrado nuevo se herede solo. Hay una prueba que compara la tabla de expectativas contra `ESTADOS` y falla si aparece un estado sin clasificar.
 
-### IMPORTANTE — `'aceptado'` no debe tratarse como vencido
+`bloqueado_sancion` y `resultado_en_disputa` quedan **abiertos** a propósito: no son terminales según `TRANSICIONES` —retirar la sanción devuelve el desafío al estado en que estaba— y darlos por vencidos escondería un desafío vivo.
+
+### ✅ CORREGIDO — IMPORTANTE: `'aceptado'` no debe tratarse como vencido
 
 Para `club_match_changes`, `'aceptado'` es el resultado **exitoso** de aceptar un cambio (migración 46): mostrarlo como «vencida» miente, el cambio se aplicó. Para `club_challenges`, `'aceptado'` es `ACEPTADO_LEGADO` — filas anteriores a la migración 41, que el código nuevo ya no produce (ver `clubChallengeRules.js`).
 
 En los dos casos la tarea debe **desaparecer de la lista**, no aparecer como vencida. «Vencida» implica que algo falló o expiró; aquí salió bien.
 
-Esto probablemente pide un tercer estado además de `'abierta'` y `'vencida'`, o retirar la tarea antes de normalizar.
+**Arreglo aplicado.** Hay un tercer estado, `'resuelta'`, y `normalizarTareas` **no dibuja** esas tareas: salieron bien y no hay nada que hacer con ellas. Es `{finalizado, aceptado}` en el desafío, `{aprobada}` en la propuesta y `{aceptado}` en el cambio. Que no ocupen lugar importa además para el tope de cuatro visibles.
 
-### IMPORTANTE — `diasHasta` con valores 0 y negativos
+### ✅ CORREGIDO — IMPORTANTE: `diasHasta` con valores 0 y negativos
 
 `src/utils/clubsHomeTasks.js`, función `diasHasta` y el título de la tarea `partido`. Verificado ejecutando la función:
 
@@ -270,7 +272,9 @@ Esto probablemente pide un tercer estado además de `'abierta'` y `'vencida'`, o
 
 El mismo archivo sí resuelve singular y plural en `etiquetaVerMas`, pero no acá. Ninguna de las 22 pruebas verifica el **texto** de esa tarea, solo su `type`.
 
-**Arreglo:** singular/plural, un caso «hoy» u «ahora» para menos de un día, y decidir qué pasa con un partido ya empezado — probablemente no es una tarea pendiente en absoluto.
+**Arreglo aplicado.** `diasHasta` se sustituyó por `diasDeCalendario` + `plazoDePartido` + `tituloPartido`. Se cuenta por **día de calendario en hora local**, no por bloques de 24 horas: un partido de esta noche es «hoy» aunque falten once horas. Sale «Próximo partido hoy», «… mañana» o «… en N días» —el plural nunca se equivoca porque N siempre es ≥ 2—, y **un partido que ya empezó no genera tarea**: anunciarlo como «el próximo» manda al usuario a algo que no va a alcanzar.
+
+### Siguen abiertos
 
 ### MENOR — Documentación que cita el trigger equivocado
 
@@ -297,7 +301,8 @@ La tarea de nómina se genera solo si `confirmados < cupos`. Con `cupos: 0` o `n
 | Tras la tarea 2 | 800 | verde |
 | Tras las tareas 3 y 4 | 800 | verde |
 | Tras la tarea 5 | **822** | verde |
-| **Ahora** | **822** | **verde, 0 fallos** |
+| Tras arreglar el crítico de la 5 | **845** | verde |
+| **Ahora** | **845** | **verde, 0 fallos** |
 
 `npm run lint`: **0 errores**, 24 avisos preexistentes. `useClubsHome.js` también linta limpio.
 
@@ -327,7 +332,7 @@ No está en git, así que **un `git clean -fdx` lo borra**. Respáldalo antes de
 
 ## 13. Riesgos técnicos
 
-**El badge miente hoy.** El defecto crítico de §10 está commiteado. Cualquier trabajo que se apoye en `contarConAccion()` hereda el error, y las tareas 9 y 10 lo consumen las dos. **Hay que arreglarlo antes de seguir.**
+**El badge ya no miente.** El crítico de §10 está corregido con 23 pruebas nuevas. Las tareas 9 y 10 pueden apoyarse en `contarConAccion()`.
 
 **Un módulo probado no es un módulo correcto.** El caso de `clubsHomeTasks.js` es la lección de esta sesión: 22 pruebas verdes, ejecutadas de verdad, y aun así el invariante principal roto. Las pruebas del plan las escribió quien escribió el código, y compartían el mismo punto ciego. Cuando escribas pruebas para los estados de una tabla, **léelos de la migración**, no de tu memoria.
 
@@ -349,7 +354,7 @@ Por orden. **No empieces por la tarea 7.**
 
 **Paso 0.** `git pull` en `main`, comprobar que `rediseno/portada-clubes` sigue en `e5a76cf`, y leer `.superpowers/sdd/2026-08-28-portada-clubes/progress.md` entero. Ese registro es el mapa: los commits que nombra existen en git aunque nadie los recuerde.
 
-**Paso 1 — Arreglar `clubsHomeTasks.js` (§10).** Es lo primero porque las tareas 9 y 10 dependen de él y hoy el badge miente.
+**Paso 1 — Arreglar `clubsHomeTasks.js` (§10). HECHO en lo Crítico e Importante.** Quedan solo los tres Menores (pasos 5 y 6 de abajo).
 
 1. Leer los `check (estado in (...))` de `club_challenges` y `club_challenge_proposals` en `supabase/migrations/43_desafios_plazos_y_propuesta.sql`, y de `club_match_changes` en `46_cambios_de_partido.sql`. **Copiar los valores de ahí, no escribirlos de memoria.**
 2. Sustituir `ESTADOS_MUERTOS` por un vocabulario terminal **por dominio**.
