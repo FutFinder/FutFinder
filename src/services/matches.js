@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { crearRegistroDeColumnas, leerTolerandoColumnas } from '../utils/columnasOpcionales';
+import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
+import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
 
 /**
  * `tema` → migración 53. Sin ella, pedirla en el `select` explícito de
@@ -134,16 +135,10 @@ export async function withClubs(matches) {
   ];
   if (!ids.length) return list;
 
-  // `tema` viaja para que la tarjeta pinte con el color del club; si la
-  // migración 53 no está aplicada en este entorno, se reintenta sin ella y
-  // el club se ve verde, que es el default de `temaDeClub()`.
-  const { data: clubs } = await leerTolerandoColumnas({
-    registro: columnasClub,
-    columnas: 'id, nombre, foto_url, tema',
-    leer: (columns) => supabase.from('clubs').select(columns).in('id', ids),
-  });
-
-  const byId = new Map((clubs || []).map((c) => [c.id, c]));
+  // La consulta vive en `utils/clubesDePartidoQuery.js` con el cliente
+  // inyectado, para que su tolerancia a la columna `tema` ausente se pueda
+  // probar: acá no, porque este módulo no carga bajo `node --test`.
+  const byId = await cargarClubesDePartido(supabase, { registro: columnasClub, ids });
   return list.map((m) =>
     m.club_local_id || m.club_visitante_id
       ? {

@@ -1675,10 +1675,20 @@ export default function ChatThreadScreen({ route, navigation }) {
                   }
                   accessibilityRole="button"
                   accessibilityLabel="Ver el partido de club creado"
-                  style={({ pressed }) => [styles.challengeBar, pressed && { opacity: 0.85 }]}
+                  style={({ pressed }) => [
+                    styles.challengeBar,
+                    // Misma regla que la cabecera de arriba: el color sale de
+                    // MI club. Dejar esta barra verde al lado de una cabecera
+                    // ya tematizada era la incoherencia que el rediseño de
+                    // Clubes existe para borrar.
+                    { borderColor: temaDesafio.border, backgroundColor: temaDesafio.soft },
+                    pressed && { opacity: 0.85 },
+                  ]}
                 >
-                  <Swords color={chatColors.green} size={18} />
-                  <Text style={styles.challengeBarText}>Ver el partido de club creado</Text>
+                  <Swords color={temaDesafio.main} size={18} />
+                  <Text style={[styles.challengeBarText, { color: temaDesafio.main }]}>
+                    Ver el partido de club creado
+                  </Text>
                 </Pressable>
               ) : (
                 <Pressable
@@ -1690,11 +1700,14 @@ export default function ChatThreadScreen({ route, navigation }) {
                   style={({ pressed }) => [
                     styles.challengeBar,
                     styles.challengeBarCreate,
+                    { borderColor: temaDesafio.main, backgroundColor: temaDesafio.main },
                     pressed && { opacity: 0.85 },
                   ]}
                 >
-                  <Swords color={chatColors.inkOnGreen} size={18} strokeWidth={2.4} />
-                  <Text style={styles.challengeBarCreateText}>Crear partido de club</Text>
+                  <Swords color={temaDesafio.ink} size={18} strokeWidth={2.4} />
+                  <Text style={[styles.challengeBarCreateText, { color: temaDesafio.ink }]}>
+                    Crear partido de club
+                  </Text>
                 </Pressable>
               )
             )}
