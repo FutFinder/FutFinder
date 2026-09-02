@@ -82,3 +82,116 @@ export function derivarMembresia({ clubes, invitaciones, solicitudes } = {}) {
 export function partidoAdmiteCambio(match) {
   return !!(match && match.challenge_proposal_id);
 }
+
+/**
+ * CUÁNTO DURA UN DESENLACE EN LA PORTADA.
+ *
+ * `clubsHomeTasks.js` clasifica tres situaciones —abierta, vencida y
+ * resuelta— y `PendingTaskCard` sabe dibujar la vencida: opacidad .55, sin
+ * botón y chip «Expiró». Nada la producía. El contexto sólo dejaba pasar lo
+ * accionable (`estado === 'pendiente'` en los desafíos, `estado =
+ * 'pendiente'` en la consulta del cambio), así que ese estado era
+ * inalcanzable desde el flujo real y el «rato» que promete el encabezado de
+ * `clubsHomeTasks.js` no existía.
+ *
+ * POR QUÉ HAY QUE ACOTARLO. `listChallengesForClub()` devuelve el historial
+ * COMPLETO del club, sin límite y ordenado por fecha. Dejar pasar todo lo
+ * cerrado pondría cada desenlace de la historia del club en la portada para
+ * siempre. Siete días es lo que dura la explicación; después el hilo del
+ * desafío sigue siendo el sitio donde mirar.
+ */
+export const DIAS_DESENLACE_VISIBLE = 7;
+
+/**
+ * `true` si `iso` cae dentro de los últimos `dias`.
+ *
+ * Una fecha FUTURA cuenta como dentro, y no es un descuido: un desafío que se
+ * cierra con un «No» a la prórroga (migración 43, línea 733) se cierra en el
+ * acto, con su `prorroga_vence_at` todavía por delante. Acaba de pasar.
+ *
+ * Una fecha ausente o ilegible devuelve `false`. Ante un desenlace que no se
+ * puede fechar preferimos no mostrarlo: dejarlo entrar sería volver al
+ * historial sin fin por la puerta de atrás.
+ */
+function dentroDeVentana(iso, ahora, dias) {
+  const t = new Date(iso ?? NaN).getTime();
+  if (!Number.isFinite(t)) return false;
+  return ahora.getTime() - t <= dias * 86400000;
+}
+
+/**
+ * Los desafíos recibidos que la portada tiene que enseñar: los que esperan
+ * respuesta, y los que se cerraron sin acuerdo hace poco.
+ *
+ * QUÉ DESENLACE ENTRA, Y POR QUÉ SÓLO UNO. De los cuatro cierres malos de
+ * `club_challenges`, `sin_acuerdo` es el único que cumple las tres cosas que
+ * hacen falta:
+ *
+ *   - `sin_acuerdo` — no lo decidió nadie, lo decidió el reloj, y el servidor
+ *     avisa a los DOS clubes (`desafio_avisar` con `club_challenge_closed`).
+ *     Es noticia, y «Expiró» es exactamente lo que pasó.
+ *   - `expirado` — nadie respondió, y ese nadie es mi club. La 43 avisa sólo
+ *     al retador y lo argumenta: «el retado nunca respondió, y avisarle de
+ *     algo que decidió ignorar es ruido». La portada no contradice eso.
+ *   - `rechazado` — lo decide el retado, o sea yo (migración 26, línea 75).
+ *     Contarme lo que acabo de decidir es el mismo ruido.
+ *   - `cancelado` — la 47 sólo lo aplica desde `publicado` o `en_juego` y no
+ *     escribe fecha de cierre, así que no hay con qué fecharlo; y el texto de
+ *     la tarea, «Desafío recibido», no es lo que ocurrió: se canceló un
+ *     encuentro ya publicado. Eso lo cuenta el hilo.
+ *
+ * CON QUÉ FECHA SE MIDE. `sin_acuerdo` se escribe cuando vence la prórroga
+ * (43:395) o cuando un club responde que no se juega (43:733), y ninguno de
+ * los dos toca `responded_at`. El plazo de la prórroga manda sobre el de la
+ * negociación porque es el que corría al cerrarse; con el otro, un desafío
+ * cerrado ayer contaría como cerrado hace tres días.
+ *
+ * LO QUE SIGUE VIVO Y NO ENTRA. `negociacion`, `esperando_aprobacion`,
+ * `publicado`, `bloqueado_sancion`: son desafíos abiertos, pero esta tarea
+ * dice «Desafío recibido / Responder» y ahí no hay nada que responder. Se
+ * atienden en el hilo, no en la portada.
+ */
+export function desafiosRecibidosParaTareas(
+  recibidos,
+  { ahora = new Date(), dias = DIAS_DESENLACE_VISIBLE } = {}
+) {
+  return (Array.isArray(recibidos) ? recibidos : []).filter((d) => {
+    if (d?.estado === 'pendiente') return true;
+    if (d?.estado !== 'sin_acuerdo') return false;
+    return dentroDeVentana(d.prorroga_vence_at || d.negociacion_vence_at, ahora, dias);
+  });
+}
+
+/**
+ * La solicitud de cambio que la portada tiene que enseñar del próximo
+ * partido, o `null`. Una como máximo, igual que antes.
+ *
+ * LA PENDIENTE MANDA. Si hay una esperando respuesta, es la única que
+ * importa; el índice único parcial de la 46 garantiza que no hay dos.
+ *
+ * SI NO, EL ÚLTIMO CADUCADO. `caducado` es el plazo de dos horas que se
+ * cumplió sin que nadie respondiera: no lo decidió ningún club, y por eso es
+ * noticia. `rechazado` sí lo decidió uno de los dos y ya tuvo su respuesta y
+ * su evento en el hilo; `aceptado` salió bien y `normalizarTareas` ni lo
+ * dibuja. Ninguno de los dos vuelve como aviso.
+ *
+ * Se compara `respondida_at` en vez de confiar en el orden de la consulta:
+ * `getCambiosDelPartido` ordena de más nuevo a más viejo hoy, y una función
+ * que se apoya en eso se rompe en silencio si mañana ordena distinto.
+ */
+export function cambioParaTareas(
+  cambios,
+  { ahora = new Date(), dias = DIAS_DESENLACE_VISIBLE } = {}
+) {
+  const lista = Array.isArray(cambios) ? cambios : [];
+  const pendiente = lista.find((c) => c?.estado === 'pendiente');
+  if (pendiente) return pendiente;
+
+  let ultimo = null;
+  for (const c of lista) {
+    if (c?.estado !== 'caducado') continue;
+    if (!dentroDeVentana(c.respondida_at, ahora, dias)) continue;
+    if (!ultimo || new Date(c.respondida_at) > new Date(ultimo.respondida_at)) ultimo = c;
+  }
+  return ultimo;
+}

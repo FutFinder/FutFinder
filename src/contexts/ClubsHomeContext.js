@@ -12,7 +12,7 @@ import {
 import { getClubEstadisticas } from '../services/clubMatches';
 import { listChallengesForClub } from '../services/clubChallenges';
 import { getPropuestaVigente } from '../services/clubProposals';
-import { getCambioPendiente } from '../services/clubMatchChanges';
+import { getCambiosDelPartido } from '../services/clubMatchChanges';
 import { getNominaPartido } from '../services/clubRoster';
 import { getSancionVigente } from '../services/clubSanctions';
 import { listNotifications } from '../services/notifications';
@@ -20,7 +20,9 @@ import { listPartidosDeClub } from '../services/matches';
 import { proximoPartidoDeClub, resumenNomina } from '../services/clubMatchRules';
 import {
   avisoDelClub,
+  cambioParaTareas,
   derivarMembresia,
+  desafiosRecibidosParaTareas,
   elegirClubActivo,
   partidoAdmiteCambio,
 } from '../utils/clubsHomeSources.js';
@@ -78,6 +80,22 @@ import {
  *    Ojo: `getPropuestaVigente()` devuelve la última propuesta aunque esté
  *    rechazada o caducada, así que `normalizarTareas` la clasifica por su
  *    estado y no la da por abierta.
+ *
+ * 4bis. QUÉ LLEGA A LA LISTA DE TAREAS, Y NO SÓLO LO ACCIONABLE. Antes este
+ *    archivo filtraba `estado === 'pendiente'` en los desafíos y pedía sólo
+ *    el cambio de partido en `'pendiente'`. Con eso, el estado `'vencida'`
+ *    que `clubsHomeTasks.js` sabe clasificar y `PendingTaskCard` sabe dibujar
+ *    —opacidad .55, sin botón, chip «Expiró»— era INALCANZABLE desde el flujo
+ *    real: la portada no explicaba nunca por qué algo dejó de estar. Ahora
+ *    quién entra lo deciden `desafiosRecibidosParaTareas()` y
+ *    `cambioParaTareas()`, que además acotan los desenlaces a siete días
+ *    —`listChallengesForClub()` devuelve el historial completo y sin límite—
+ *    y son puras, así que las reglas están probadas y acá sólo se llaman.
+ *
+ *    Por eso el cambio de partido se pide con `getCambiosDelPartido()` y no
+ *    con `getCambioPendiente()`: la segunda filtra `estado = 'pendiente'` en
+ *    la base y no puede devolver un cambio caducado ni aunque se quiera.
+ *    Sigue viajando UNO como máximo; lo elige `cambioParaTareas()`.
  *
  * 5. UN SOLO RELOJ. `ahora` se toma una vez y se usa para elegir el próximo
  *    partido y para redactar su plazo. Con dos relojes y una ronda de red en
@@ -264,22 +282,25 @@ export function ClubsHomeProvider({ children }) {
         ]);
         if (!vivo) return;
 
+        // Un solo reloj: elige el partido, redacta su plazo y mide la ventana
+        // de los desenlaces. Con dos, un desafío cerrado justo en el borde
+        // podría entrar en la lista y quedar fuera del conteo.
+        const ahora = new Date();
+
         const recibidos = desafiosRes.data?.recibidos || [];
         const enviados = desafiosRes.data?.enviados || [];
-        const desafiosRecibidosPendientes = recibidos.filter((d) => d.estado === 'pendiente');
+        const desafiosParaTareas = desafiosRecibidosParaTareas(recibidos, { ahora });
         const desafiosEsperandoPropuesta = [...recibidos, ...enviados].filter(
           (d) => d.estado === ESTADO_ESPERANDO_PROPUESTA
         );
 
-        // Un solo reloj para elegir el partido y para redactar su plazo.
-        const ahora = new Date();
         const proximoPartido = proximoPartidoDeClub(partidosData, [activeId], { ahora });
         const admiteCambio = partidoAdmiteCambio(proximoPartido);
         const cuposPorClub = proximoPartido?.cupos_por_club;
         const conNomina = Number.isFinite(cuposPorClub) && cuposPorClub > 0;
 
         // ── Segunda ronda: depende de la primera ─────────────────
-        const [propuestasRes, cambioData, nominaData] = await Promise.all([
+        const [propuestasRes, cambiosData, nominaData] = await Promise.all([
           Promise.all(
             desafiosEsperandoPropuesta.map((d) =>
               segura(getPropuestaVigente(d.id).then((r) => r.data), null, 'getPropuestaVigente')
@@ -287,11 +308,11 @@ export function ClubsHomeProvider({ children }) {
           ),
           admiteCambio
             ? segura(
-                getCambioPendiente(proximoPartido.id).then((r) => r.data || null),
-                null,
-                'getCambioPendiente'
+                getCambiosDelPartido(proximoPartido.id).then((r) => r.data || []),
+                [],
+                'getCambiosDelPartido'
               )
-            : Promise.resolve(null),
+            : Promise.resolve([]),
           conNomina
             ? segura(getNominaPartido(proximoPartido.id).then((r) => r.data || []), [], 'getNominaPartido')
             : Promise.resolve([]),
@@ -305,11 +326,13 @@ export function ClubsHomeProvider({ children }) {
             })()
           : null;
 
+        const cambio = cambioParaTareas(cambiosData, { ahora });
+
         const tasks = normalizarTareas(
           {
-            desafiosRecibidos: desafiosRecibidosPendientes,
+            desafiosRecibidos: desafiosParaTareas,
             propuestas: propuestasRes.filter(Boolean),
-            cambiosDePartido: cambioData ? [cambioData] : [],
+            cambiosDePartido: cambio ? [cambio] : [],
             nomina,
             solicitudes: solicitudesData,
             sancion: sancionData,

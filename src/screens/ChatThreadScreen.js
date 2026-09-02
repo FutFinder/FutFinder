@@ -88,7 +88,11 @@ import { EXPEDIENTE_VACIO } from '../utils/expedienteSancion';
 import { accionesDeCancelacion } from '../utils/cancelacionEncuentro';
 import { accionesDeIncomparecencia, accionesDeRevision } from '../utils/revisionSancion';
 import { crearSondeo } from '../utils/sondeo';
-import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
+import {
+  parseChallengeThread,
+  challengeCtaContext,
+  clubPropioDelDesafio,
+} from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
@@ -1009,23 +1013,18 @@ export default function ChatThreadScreen({ route, navigation }) {
 
   /**
    * Cuál de los dos clubes del desafío es el mío, para pintar la cabecera y
-   * la tarjeta de cambio con SU acento. `club_challenges` no trae los clubes
-   * embebidos (ver nota de `nombresClubes`), así que hay que decidir el id
-   * con las membresías ya cargadas y traer esa fila aparte.
+   * la tarjeta de cambio con SU acento. La regla vive en `challengeThread.js`
+   * y está probada ahí: este archivo tiene JSX y `node --test` no lo carga,
+   * así que decidirlo acá dejaba sin prueba el contrato que más importa del
+   * color —que sea el de mi club y no el del rival—.
    *
    * `myClubIdsTodos` es cualquier membresía (jugador o admin): un jugador sin
-   * cargo también ve el chat con el color de SU club, no del rival.
+   * cargo también ve el chat con el color de SU club.
    */
-  const miClubId = useMemo(() => {
-    if (!clubChallenge) return null;
-    if (myClubIdsTodos.includes(clubChallenge.club_retador_id)) {
-      return clubChallenge.club_retador_id;
-    }
-    if (myClubIdsTodos.includes(clubChallenge.club_retado_id)) {
-      return clubChallenge.club_retado_id;
-    }
-    return null;
-  }, [clubChallenge, myClubIdsTodos]);
+  const miClubId = useMemo(
+    () => clubPropioDelDesafio(clubChallenge, myClubIdsTodos),
+    [clubChallenge, myClubIdsTodos]
+  );
 
   useEffect(() => {
     if (!miClubId) {

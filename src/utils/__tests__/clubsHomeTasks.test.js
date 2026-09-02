@@ -617,3 +617,40 @@ test('la etiqueta y el título del partido cuentan los mismos días', () => {
     );
   }
 });
+
+// ── El subtítulo de una tarea que ya no se puede accionar ────────────
+//
+// «· responde un admin» explica al jugador por qué no ve un botón. En una
+// tarea vencida el botón no falta por su rol: no hay nada que responder, ni
+// para él ni para el admin. Mandarlo a buscar a un administrador que tampoco
+// puede hacer nada es la promesa vacía que estas tarjetas existen para no
+// hacer. Sólo se vuelve visible ahora que el contexto deja pasar los
+// desenlaces recientes.
+
+test('a una tarea vencida no se le pega «responde un admin»', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'sin_acuerdo' }] }),
+    { rol: 'jugador', ahora: AHORA }
+  );
+  assert.equal(t.status, 'vencida');
+  assert.doesNotMatch(t.subtitle, /responde un admin/);
+});
+
+test('la coletilla sigue apareciendo en la misma tarea si está abierta', () => {
+  // El contraste con la de arriba: lo que cambia es el estado, no el rol.
+  const [t] = D.normalizarTareas(fuentes({ desafiosRecibidos: [DESAFIO] }), {
+    rol: 'jugador',
+    ahora: AHORA,
+  });
+  assert.equal(t.status, 'abierta');
+  assert.match(t.subtitle, /responde un admin/);
+});
+
+test('un cambio de partido caducado tampoco manda a buscar a un admin', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({ cambiosDePartido: [{ id: 'c1', estado: 'caducado' }] }),
+    { rol: 'jugador', ahora: AHORA }
+  );
+  assert.equal(t.status, 'vencida');
+  assert.doesNotMatch(t.subtitle, /responde un admin/);
+});

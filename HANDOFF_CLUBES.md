@@ -94,7 +94,7 @@ El repo no tiene pruebas de render, así que **todo lo que decide algo salió de
 
 ## 4. Qué falta antes del merge
 
-1. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo.
+1. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo. Ahora también: con un desafío cerrado **sin acuerdo** en los últimos siete días, que la tarjeta salga apagada, con el chip «Expiró», sin botón y **sin sumar al badge** (§15).
 2. **Reducciones declaradas de la tarea 9**, ver §3 — decidir si se aceptan.
 3. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
 
@@ -327,7 +327,8 @@ La tarea de nómina se generaba solo si `confirmados < cupos`. Con `cupos: 0` o 
 | Tras las tareas 7 y 8 | **881** | verde |
 | Tras la revisión y sus 12 arreglos | **886** | verde |
 | Tras cerrar los tres menores | **893** | verde |
-| **Ahora** | **893** | **verde, 0 fallos** |
+| Tras la revisión final (§15) | **923** | verde |
+| **Ahora** | **923** | **verde, 0 fallos** |
 
 `npm run lint`: **0 errores**, 24 avisos preexistentes. `useClubsHome.js` también linta limpio.
 
@@ -403,6 +404,60 @@ Si lo auditas, comprueba en particular lo que el brief le pedía justificar y cu
 
 Ojo con el plan: dice `git push` al final de cada tarea. **Se anuló.** Commit local; el push va con el merge.
 
-**Paso 4 — Antes del merge.** Triar los dos menores diferidos de §9, correr una revisión de toda la rama, y recién ahí presentar el merge a `main`.
+**Paso 4 — Antes del merge.** Triar los dos menores diferidos de §9 **(hecho, §9)**, correr una revisión de toda la rama **(hecha, §15)**, y recién ahí presentar el merge a `main`.
 
 Y actualizar `docs/memoria/funcionalidades/clubes.md` (cambia la entrada de la pestaña) y `docs/memoria/diseno/sistema-visual.md` (tonos nuevos). Solo esas dos.
+
+---
+
+## 15. La revisión final: un hallazgo real y uno descartado
+
+Una revisión de toda la rama levantó dos puntos. Los dos se comprobaron contra el código, las migraciones y los briefs de `.superpowers/sdd/2026-08-28-portada-clubes/` antes de tocar nada.
+
+### ✅ CORREGIDO — El estado `'vencida'` era inalcanzable desde el flujo real
+
+`clubsHomeTasks.js` clasifica tres situaciones —abierta, vencida, resuelta— y `PendingTaskCard` sabe dibujar la vencida: opacidad .55, chip «Expiró», sin botón, y `contarConAccion()` no la suma. **Nada la producía.** `ClubsHomeContext` filtraba `estado === 'pendiente'` sobre los desafíos recibidos, y el cambio de partido se pedía con `getCambioPendiente()`, que filtra `estado = 'pendiente'` **en la base**. Las pruebas puras pasaban porque inyectaban tareas vencidas a mano; el cableado real no las dejaba nacer.
+
+Con las propuestas pasaba lo mismo por un camino distinto: sólo se pide `getPropuestaVigente()` para desafíos en `esperando_aprobacion`, y de ahí una propuesta no puede salir vencida. Una `rechazada` devuelve el desafío a `negociacion` (43d:130) y una `caducada` sólo existe junto a una `aprobada`, que lo pasa a `publicado` (44:328). **Se deja así**: «Propuesta pendiente · Revisar · Expiró» no describe ninguna de las dos situaciones, y `VENCIDOS.propuesta` se queda como segunda línea de defensa.
+
+**Arreglo aplicado.** Quién entra en la lista sale de dos funciones puras nuevas en `clubsHomeSources.js`, con **ventana de 7 días** (`DIAS_DESENLACE_VISIBLE`) y 20 pruebas:
+
+| Función | Qué deja pasar |
+|---|---|
+| `desafiosRecibidosParaTareas()` | `pendiente` siempre; `sin_acuerdo` cerrado hace ≤ 7 días |
+| `cambioParaTareas()` | el `pendiente` si lo hay; si no, el último `caducado` de ≤ 7 días |
+
+**Por qué hace falta la ventana.** `listChallengesForClub()` devuelve el historial **completo y sin límite** del club. Sin acotarlo, cada desenlace de la historia del club se quedaría en la portada para siempre.
+
+**Por qué sólo `sin_acuerdo`, y no los otros tres cierres malos.**
+
+| Estado | Veredicto |
+|---|---|
+| `sin_acuerdo` | **entra.** No lo decidió nadie, lo decidió el reloj, y el servidor avisa a los **dos** clubes. «Expiró» es exactamente lo que pasó |
+| `expirado` | fuera. La 43 avisa **sólo al retador** y lo argumenta: «el retado nunca respondió, y avisarle de algo que decidió ignorar es ruido». La portada no contradice al servidor |
+| `rechazado` | fuera. Lo decide el retado, o sea yo (26:75). Contarme lo que acabo de decidir es el mismo ruido |
+| `cancelado` | fuera. La 47 sólo lo aplica desde `publicado`/`en_juego` y **no escribe fecha de cierre**, así que el único ancla sería un `created_at` de hace semanas; y «Desafío recibido» no es lo que pasó — se canceló un encuentro ya publicado, y eso lo cuenta el hilo |
+
+**Con qué fecha se mide.** `sin_acuerdo` no toca `responded_at`: 43:395 y 43:733 escriben sólo `estado` y `motivo_cierre`. La ventana se ancla en `prorroga_vence_at || negociacion_vence_at`, el plazo que corría al cerrarse. La prórroga manda sobre la negociación: con el otro, un desafío cerrado ayer contaría como cerrado hace tres días. Un desenlace **sin fecha usable no entra** —dejarlo pasar sería volver al historial sin fin por la puerta de atrás—, y una fecha en el **futuro** sí entra: un «No» a la prórroga cierra en el acto (43:733) con el plazo todavía por delante.
+
+**Un cambio de copy que sólo se vuelve visible ahora.** `coletilla()` le pegaba «· responde un admin» a toda tarea de un jugador. En una vencida el botón no falta por su rol —tampoco lo tiene el admin—, así que mandarlo a buscar a alguien que tampoco puede hacer nada es la promesa vacía que estas tarjetas existen para no hacer. Ahora sólo se pega si `status === 'abierta'`.
+
+**Y un cambio de consulta.** `getCambioPendiente()` → `getCambiosDelPartido()`, porque la primera no puede devolver un caducado ni aunque se quiera. Sigue viajando **uno como máximo**; lo elige `cambioParaTareas()`, comparando `respondida_at` en vez de fiarse del orden de la consulta.
+
+**Lo que sigue sin aparecer, a propósito.** `bloqueado_sancion` y `resultado_en_disputa` están vivos y el clasificador los da por `abierta`, pero la tarea dice «Desafío recibido / Responder» y ahí no hay nada que responder: se atienden en el hilo. Y un desafío **enviado** que expiró —del que el servidor **sí** avisa al retador— tampoco entra: la portada sólo construye tareas desde `recibidos`, y añadir «Desafío enviado» es alcance nuevo.
+
+### ❌ DESCARTADO — «La tematización de `ChallengeHeader` es parcial»
+
+La revisión pedía teñir también el icono `Swords`, el borde y el fondo de la barra con el color del club. **No es un defecto: es un contrato que no existe.**
+
+`task-3-brief.md` define la tematización como una **tabla de sustitución de tokens verdes**, y lista `ChallengeHeader.js` con «2 usos de verde»: el fondo del CTA (`chatColors.green` → `tema.main`) y su tinta (`chatColors.inkOnGreen` → `tema.ink`). **Los dos están convertidos.** El paso 3 del propio brief dice que lo único que puede quedar sin tematizar son `win`/`winSoft`.
+
+Los tres puntos señalados no son verdes: salen de `chatColors.neon` = `#FF2D55`, `challengeBorder` = `rgba(255,45,85,0.22)` y `cardChallenge` = `#141013`. Ese neón es la identidad del **módulo de chat de desafío**, compartida con `ChallengeEventBubble` en el mismo hilo. Y `theme/clubThemes.js:16-21` excluye las superficies con todas sus letras: «El fondo oscuro, los textos, la navegación… siguen siendo los de `dsColors` para todos los clubes». Teñirlas sería una decisión de diseño nueva, no un arreglo.
+
+Queda una inconsistencia menor y real, anotada por si alguien la quiere: el `Swords` de la cabecera va en neón mientras el `Swords` de la barra de abajo (`ChatThreadScreen.js`, «Ver / Crear partido de club») va en `temaDesafio.main`. Son cosas distintas —indicador de estado vs. botón del club— y el neón de la cabecera hace juego con su propio borde.
+
+### ✅ CORREGIDO — El contrato del color no tenía prueba
+
+Lo que la revisión sí destapó: **de qué club sale el acento del hilo no estaba probado en ninguna parte.** `miClubId` se decidía en línea dentro de `ChatThreadScreen.js`, un archivo con JSX que `node --test` no carga — el mismo muro que ya obligó a sacar `clubesDePartidoQuery.js`.
+
+La regla salió a `clubPropioDelDesafio()` en `utils/challengeThread.js`, con **7 pruebas**. La que importa fija el contrato de frente: con un solo bando en la lista de membresías, la respuesta **no puede ser el otro** — que es el fallo que un `find` invertido produciría en silencio. Las demás cubren el hilo abierto sin membresía (cae a `null`, y `temaDeClub(null)` es verde), el desafío todavía sin cargar, y pertenecer a los dos clubes: gana el retador, siempre el mismo, para que el hilo no cambie de color entre dos aperturas.

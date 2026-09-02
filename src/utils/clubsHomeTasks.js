@@ -120,9 +120,17 @@ function accion(esAdmin, etiquetaAdmin) {
   return esAdmin ? etiquetaAdmin : 'Ver';
 }
 
-/** El jugador necesita saber por qué no puede accionar. */
-function coletilla(esAdmin, subtitulo) {
-  return esAdmin ? subtitulo : `${subtitulo} · responde un admin`;
+/**
+ * El jugador necesita saber por qué no puede accionar.
+ *
+ * Salvo cuando ya no hay nada que accionar: en una tarea vencida el botón no
+ * falta por su rol —tampoco lo tiene el admin—, y mandarlo a buscar a alguien
+ * que tampoco puede hacer nada es justo la promesa vacía que estas tarjetas
+ * existen para no hacer.
+ */
+function coletilla(esAdmin, subtitulo, status = 'abierta') {
+  if (esAdmin || status !== 'abierta') return subtitulo;
+  return `${subtitulo} · responde un admin`;
 }
 
 /**
@@ -203,41 +211,44 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
   const tareas = [];
 
   for (const d of f.desafiosRecibidos || []) {
+    const status = estadoDeTarea('desafio', d.estado);
     agregarSiQuedaAlgo(tareas, {
       id: `desafio:${d.id}`,
       type: 'desafio',
       tone: 'accent',
       title: 'Desafío recibido',
-      subtitle: coletilla(esAdmin, d.otroClub?.nombre || 'Un club te desafió'),
+      subtitle: coletilla(esAdmin, d.otroClub?.nombre || 'Un club te desafió', status),
       cta: accion(esAdmin, 'Responder'),
       target: 'ClubChallenges',
-      status: estadoDeTarea('desafio', d.estado),
+      status,
     });
   }
 
   for (const p of f.propuestas || []) {
+    const status = estadoDeTarea('propuesta', p.estado);
     agregarSiQuedaAlgo(tareas, {
       id: `propuesta:${p.id}`,
       type: 'propuesta',
       tone: 'info',
       title: 'Propuesta pendiente',
-      subtitle: coletilla(esAdmin, 'Fecha, lugar y modalidad por confirmar'),
+      subtitle: coletilla(esAdmin, 'Fecha, lugar y modalidad por confirmar', status),
       cta: accion(esAdmin, 'Revisar'),
       target: 'ClubChallenges',
-      status: estadoDeTarea('propuesta', p.estado),
+      status,
     });
   }
 
   for (const c of f.cambiosDePartido || []) {
+    const status = estadoDeTarea('cambio', c.estado);
     agregarSiQuedaAlgo(tareas, {
       id: `cambio:${c.id}`,
       type: 'cambio',
       tone: 'warn',
       title: 'Cambio de partido',
-      subtitle: coletilla(esAdmin, 'El rival propuso mover el encuentro'),
+      subtitle: coletilla(esAdmin, 'El rival propuso mover el encuentro', status),
       cta: accion(esAdmin, 'Responder'),
       target: 'ClubMatchChange',
-      status: estadoDeTarea('cambio', c.estado),
+      status,
     });
   }
 
