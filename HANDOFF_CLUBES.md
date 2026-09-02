@@ -95,7 +95,7 @@ El repo no tiene pruebas de render, así que **todo lo que decide algo salió de
 ## 4. Qué falta antes del merge
 
 1. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo. Ahora también: con un desafío cerrado **sin acuerdo** en los últimos siete días, que la tarjeta salga apagada, con el chip «Expiró», sin botón, titulada **«Desafío sin acuerdo»** y **sin sumar al badge** (§15 y §16). Y con **diez o más** pendientes, que la barra inferior y «Pendiente para ti» digan los dos «9+».
-2. **Reducciones declaradas de la tarea 9**, ver §3 — decidir si se aceptan.
+2. **Reducciones declaradas de la tarea 9**, ver §3 — decidir si se aceptan. (El otro punto que esperaba decisión, el contraste del tema rojo, quedó **cerrado sin cambio**: §17.)
 3. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
 
 ---
@@ -193,7 +193,7 @@ Por eso los límites viven en `src/utils/clubPlanLimits.js` y el servicio los re
 
 **Ampliación de alcance en la tarea 4: `services/matches.js`.** `withClubs()` hacía `select('id, nombre, foto_url')` **sin la columna `tema`**, así que `temaDeClub()` habría devuelto verde siempre y el trabajo de la tarea habría sido invisible. Al agregarla, el implementador reutilizó `src/utils/columnasOpcionales.js` en vez de confiar en el fallback: con un `select` explícito, si falta la migración 53 Postgres devuelve 42703 y la consulta **entera** falla, dejando `club_local` y `club_visitante` en `null` para todos los partidos de clubes. No «sin color»: sin nombre y sin escudo.
 
-**«V» va en el acento del club; «D» se queda en el rojo semántico.** Lo pide el handoff de diseño (README línea 192) y es el único punto donde el acento toca algo con carga de resultado, así que roza la regla de arriba. Se aplicó tal cual porque el handoff manda en colores, pero **en el tema rojo `V` (`#FF4B2E`) y `D` (`#FF6E4F`) quedan parecidos**: lo que distingue es la letra, y por eso el rótulo se dibujó tan legible como el número. **Para triar en la revisión final.**
+**«V» va en el acento del club; «D» se queda en el rojo semántico.** Lo pide el handoff de diseño (README línea 192) y es el único punto donde el acento toca algo con carga de resultado, así que roza la regla de arriba. Se aplicó tal cual porque el handoff manda en colores, pero **en el tema rojo `V` (`#FF4B2E`) y `D` (`#FF6E4F`) quedan parecidos**: lo que distingue es la letra, y por eso el rótulo se dibujó tan legible como el número. **Triado y CERRADO por decisión de diseño: ver §9 y §17.**
 
 **Los implementadores commitean pero no pushean.** El plan escrito dice `git push` en cada tarea; se anuló. El push va al final, con el merge.
 
@@ -233,7 +233,7 @@ Los doce se verificaron contra el código antes de aceptarlos; ninguno era un fa
 
 **Tarea 4, Menor. CORREGIDO.** No se podia escribir la prueba donde estaba el codigo: `services/matches.js` importa `./supabase` sin extension y no carga bajo `node --test`. La consulta salio a `src/utils/clubesDePartidoQuery.js` con el cliente inyectado —el patron que el repo ya usa en `rivalClubsQuery.js` y `nominaQuery.js`— y tiene **7 pruebas** con un cliente falso que responde 42703. Fijan el contrato entero: con la migracion 53 llega el tema; sin ella se reintenta una vez y **los clubes conservan nombre y escudo**; un registro que ya sabe que falta no vuelve a pedirla; y un error que no es de columna no se disfraza de columna ausente.
 
-**«V» en el tema rojo. NO SE CAMBIA, con la medicion hecha.** Distancia perceptual (DeltaE76) entre el acento de cada tema y el `#FF6E4F` de «D»:
+**«V» en el tema rojo. CERRADO: no se cambia. Decisión de diseño tomada el 2026-09-02 (§17), sobre la medición de abajo.** Distancia perceptual (DeltaE76) entre el acento de cada tema y el `#FF6E4F` de «D»:
 
 | Tema | Acento | DeltaE con «D» |
 |---|---|---|
@@ -242,7 +242,7 @@ Los doce se verificaron contra el código antes de aceptarlos; ninguno era un fa
 | amarillo | `#FFBE1A` | 57,5 |
 | **rojo** | `#FF4B2E` | **17,8** |
 
-El rojo queda seis veces mas cerca que cualquier otro tema, pero **por encima del umbral de confusion de un vistazo (DeltaE 10)**. No alcanza para contradecir al handoff de diseno, que es la fuente de verdad en color, y una excepcion por tema («V es verde solo si el club es rojo») seria una regla sorprendente para quien venga despues. Se deja como esta, con el rotulo tan legible como el numero. **Si se decide lo contrario es una linea en `ClubSummaryCard.js`: `color={escala.main}` -> `color={dsColors.win}`.**
+El rojo queda seis veces mas cerca que cualquier otro tema, pero **por encima del umbral de confusion de un vistazo (DeltaE 10)**. No alcanza para contradecir al handoff de diseno, que es la fuente de verdad en color, y una excepcion por tema («V es verde solo si el club es rojo») seria una regla sorprendente para quien venga despues. Se deja como esta, con el rotulo tan legible como el numero. La linea que habria que tocar para revertirlo es `ClubSummaryCard.js`: `color={escala.main}` -> `color={dsColors.win}`. **No se tocó: el contraste actual se acepta tal cual.**
 
 ---
 
@@ -466,7 +466,7 @@ La regla salió a `clubPropioDelDesafio()` en `utils/challengeThread.js`, con **
 
 ## 16. F10 y N4: la conducta definitiva
 
-La auditoría de los 92 puntos del checklist dejó **2 fallos confirmados**. Los otros 90 quedaron en 71 aprobados contra el código y las pruebas, 18 bloqueados por falta de sesión y datos sembrados, y 1 —el ΔE del tema rojo, §9— pendiente de tu decisión. Ningún punto se verificó con los ojos: no hay automatización de navegador que llegue más allá del login.
+La auditoría de los 92 puntos del checklist dejó **2 fallos confirmados**. Los otros 90 quedaron en 71 aprobados contra el código y las pruebas, 18 bloqueados por falta de sesión y datos sembrados, y 1 —el ΔE del tema rojo— que necesitaba una decisión de producto y ya la tiene: **cerrado sin cambio, §17**. Ningún punto se verificó con los ojos: no hay automatización de navegador que llegue más allá del login.
 
 ### F10 — el contenido de la tarjeta vencida
 
@@ -544,4 +544,29 @@ Lo fija una prueba que **lee el fuente de los dos archivos** (`navigation/__test
 
 ### Lo que sigue pendiente
 
-Los **18 puntos bloqueados** del checklist necesitan sesión iniciada y datos sembrados: E6-E9 (varios clubes y persistencia), H5-H6 (pila de navegación), K1 (los cuatro temas), L1-L2 (error total), M2-M6 (responsive), C3-C4, D7, N3. No se tocaron.
+Los **18 puntos bloqueados** del checklist necesitan sesión iniciada y datos sembrados: E6-E9 (varios clubes y persistencia), H5-H6 (pila de navegación), K1 (los cuatro temas), L1-L2 (error total), M2-M6 (responsive), C3-C4, D7, N3. No se tocaron. **K3 ya no está en esta lista: se cerró por decisión, no por arreglo (§17).**
+
+---
+
+## 17. K3 — decisión de diseño: el tema rojo se queda como está
+
+**Cerrado el 2026-09-02. No es una corrección técnica: no se tocó una sola línea de código.**
+
+El punto K3 del checklist pedía mirar los tiles V y D del resumen con el tema rojo puesto y decidir si molestaban. La medición está en §9 y no cambia:
+
+| Tema | Acento | ΔE76 con el `#FF6E4F` de «D» |
+|---|---|---|
+| verde | `#5AE06A` | 114,8 |
+| azul | `#4DA3FF` | 109,7 |
+| amarillo | `#FFBE1A` | 57,5 |
+| **rojo** | `#FF4B2E` | **17,8** |
+
+**La decisión es aceptar ese contraste tal cual.** El rojo queda seis veces más cerca que cualquier otro tema, y eso está medido y asumido a conciencia, no pasado por alto. Sigue por encima del umbral de confusión de un vistazo (ΔE 10), lo que distingue los dos tiles es la letra —dibujada tan legible como el número— y una excepción por tema («V es verde sólo si el club es rojo») sería una regla sorprendente para quien venga después. El handoff de diseño manda en color y no se contradice por un caso.
+
+Qué significa esto para quien lea después:
+
+- **K3 no vuelve a la lista de pendientes.** No es deuda ni un «ya lo veremos»: es una decisión de producto tomada con el número delante.
+- **No hay arreglo asociado**, ni prueba nueva, ni cambio de tokens. `ClubSummaryCard.js` sigue con `color={escala.main}` en el tile V.
+- **Si alguien quiere revertirlo** —cambiar de opinión es legítimo— es una línea: `color={escala.main}` → `color={dsColors.win}`. Pero entonces sería un cambio de diseño nuevo, con su propia justificación, no la corrección de un defecto pendiente.
+
+Lo que **sí** sigue abierto es K1, que es otra cosa: comprobar con los cuatro temas puestos que la portada entera los sigue. Está entre los 18 controles bloqueados de §16 porque necesita sesión y datos sembrados, y no se puede dar por aprobado desde el código.
