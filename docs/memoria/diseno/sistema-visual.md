@@ -1,6 +1,6 @@
 # Sistema visual
 
-Última revisión: 2026-08-27
+Última revisión: 2026-09-02
 
 ## Propósito
 
@@ -33,6 +33,10 @@ El módulo Partidos no toma sus decisiones visuales de los tokens globales: usa 
 
 El copy visible se mantiene en español. Los componentes reciben labels ya resueltos desde sus utilidades de dominio cuando corresponde: por ejemplo, `TagBadge` no decide modalidad, posición ni nivel, y sólo representa el label recibido.
 
+`PendingTaskCard` tiene tres estados y cada uno cambia el CONTENIDO, no sólo el aspecto. Abierta lleva su botón; resuelta se apaga con chip «Listo ✓»; vencida se apaga al 55 % de opacidad, pierde el botón y lleva chip «Expiró». En la vencida el texto también cambia: el título nombra el ESTADO —«Desafío sin acuerdo», «Propuesta rechazada», «Cambio sin respuesta»— en vez del tipo de tarea, con un texto por cierre en vez de uno genérico, y `cta` viaja en `null` para que el objeto no siga prometiendo «Responder» en un campo que otro consumidor pueda leer. Apagar una tarjeta no basta si el texto sigue invitando a responder algo que ya no existe. Los títulos son sustantivos de estado, no verbos: hay una prueba que rechaza cualquier verbo de acción en el título o el subtítulo de una vencida.
+
+El rótulo de un badge numérico se decide en un solo sitio, `etiquetaBadge()` de `src/utils/clubsHomeTasks.js`: por encima de nueve muestra «9+». Lo usan la barra inferior (`MainTabs`) y «Pendiente para ti» (`ClubsScreen`), que antes escribían la regla por separado y con diez o más pendientes mostraban textos distintos del mismo dato. El tope es del rótulo y nunca del conteo: el número exacto es el que llega al lector de pantalla.
+
 ## Objetivos táctiles
 
 La medida mínima sólo se afirma donde el código la define. `dsSizes.tapBtn` es 44, y `dsSizes.iconBtn` es 40 con `hitSlop` para llegar a 44. `EmptyStateCard` mantiene un botón visual de 38 con `hitSlop` vertical de 4 para alcanzar 44. En Partidos, las primitivas de botón usan 48 o más por defecto; `IconButton` usa tamaño 36 con `hitSlop` de 8. Otros controles deben conservar su medida o `hitSlop` comprobando el componente afectado, en vez de inferir un mínimo global.
@@ -43,7 +47,7 @@ La medida mínima sólo se afirma donde el código la define. `dsSizes.tapBtn` e
 
 ## Referencias visuales
 
-Las capturas o handoffs específicos de una tarea permanecen fuera de esta memoria. Esta nota sólo registra tokens, familias y reglas que estén presentes en el código; una tarea visual debe conservar sus imágenes de referencia en su contexto externo y traducir a código únicamente las decisiones verificadas.
+Las capturas o handoffs específicos de una tarea permanecen fuera de esta memoria. Esta nota sólo registra tokens, familias y reglas que estén presentes en el código; una tarea visual debe conservar sus imágenes de referencia en su contexto externo y traducir a código únicamente las decisiones verificadas. Por lo mismo, el estado de verificación de una rama —suite, lint, build y los controles que siguen pendientes— vive en [Clubes](../funcionalidades/clubes.md) y no acá.
 
 ## Rutas relacionadas
 
