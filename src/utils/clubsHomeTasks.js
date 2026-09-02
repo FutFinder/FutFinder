@@ -71,6 +71,57 @@ const VENCIDOS = {
 };
 
 /**
+ * CÓMO SE LEE UNA TARJETA VENCIDA.
+ *
+ * Apagarla al 55 % y cambiarle el botón por un chip «Expiró» no arregla que
+ * el texto siga siendo el de una tarea pendiente. Un desafío cerrado sin
+ * acuerdo se titulaba «Desafío recibido» —lo que invita a responder algo que
+ * ya no existe— y una propuesta caducada se titulaba, literalmente,
+ * «Propuesta pendiente» junto al chip que dice que expiró.
+ *
+ * El título nombra el ESTADO, no el tipo de tarea, y cada cierre tiene el
+ * suyo: si los cuatro dijeran «Desafío cerrado», la tarjeta explicaría menos
+ * que el chip. El subtítulo cuenta qué pasó, sin verbos de acción.
+ *
+ * El respaldo por dominio existe porque `VENCIDOS.desafio` se DERIVA de
+ * `ESTADOS_CERRADOS`: una migración puede añadir un cierre nuevo sin que
+ * nadie escriba su texto, y ese día la tarjeta tiene que decir algo cierto.
+ */
+const VENCIDO = {
+  desafio: {
+    sin_acuerdo: { title: 'Desafío sin acuerdo', subtitle: 'La negociación se cerró sin acuerdo' },
+    expirado: { title: 'Desafío expirado', subtitle: 'Nadie respondió dentro del plazo' },
+    rechazado: { title: 'Desafío rechazado', subtitle: 'El desafío no se aceptó' },
+    cancelado: { title: 'Desafío cancelado', subtitle: 'El encuentro se canceló' },
+  },
+  propuesta: {
+    rechazada: {
+      title: 'Propuesta rechazada',
+      subtitle: 'El rival no aceptó la propuesta oficial',
+    },
+    // No nace del cableado —ver `propuestasParaTareas()`—, pero el estado
+    // existe en la migración 43 y la tarjeta tiene que saber decirlo.
+    caducada: { title: 'Propuesta caducada', subtitle: 'Se aprobó otra propuesta del desafío' },
+  },
+  cambio: {
+    caducado: { title: 'Cambio sin respuesta', subtitle: 'El plazo se cumplió sin que nadie contestara' },
+    rechazado: { title: 'Cambio rechazado', subtitle: 'El cambio no se aceptó' },
+  },
+};
+
+const VENCIDO_RESPALDO = {
+  desafio: { title: 'Desafío cerrado', subtitle: 'El desafío ya no sigue en curso' },
+  propuesta: { title: 'Propuesta cerrada', subtitle: 'La propuesta ya no está vigente' },
+  cambio: { title: 'Cambio cerrado', subtitle: 'La solicitud ya no está vigente' },
+};
+
+/** El título y la línea de una tarea vencida, o `null` si no lo está. */
+function textoVencido(dominio, estado, status) {
+  if (status !== 'vencida') return null;
+  return VENCIDO[dominio]?.[estado] || VENCIDO_RESPALDO[dominio];
+}
+
+/**
  * En qué situación está una tarea: `'abierta'`, `'vencida'` o `'resuelta'`.
  *
  * `dominio` es cuál de las tres tablas manda. Sin él no se puede responder:
@@ -212,13 +263,18 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
 
   for (const d of f.desafiosRecibidos || []) {
     const status = estadoDeTarea('desafio', d.estado);
+    const cerrado = textoVencido('desafio', d.estado, status);
     agregarSiQuedaAlgo(tareas, {
       id: `desafio:${d.id}`,
       type: 'desafio',
       tone: 'accent',
-      title: 'Desafío recibido',
-      subtitle: coletilla(esAdmin, d.otroClub?.nombre || 'Un club te desafió', status),
-      cta: accion(esAdmin, 'Responder'),
+      title: cerrado ? cerrado.title : 'Desafío recibido',
+      // Con el título contando el estado, lo útil acá es con quién era. Dos
+      // desafíos cerrados el mismo día serían la misma tarjeta sin esto.
+      subtitle: cerrado
+        ? d.otroClub?.nombre || cerrado.subtitle
+        : coletilla(esAdmin, d.otroClub?.nombre || 'Un club te desafió', status),
+      cta: cerrado ? null : accion(esAdmin, 'Responder'),
       target: 'ClubChallenges',
       status,
     });
@@ -226,13 +282,16 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
 
   for (const p of f.propuestas || []) {
     const status = estadoDeTarea('propuesta', p.estado);
+    const cerrada = textoVencido('propuesta', p.estado, status);
     agregarSiQuedaAlgo(tareas, {
       id: `propuesta:${p.id}`,
       type: 'propuesta',
       tone: 'info',
-      title: 'Propuesta pendiente',
-      subtitle: coletilla(esAdmin, 'Fecha, lugar y modalidad por confirmar', status),
-      cta: accion(esAdmin, 'Revisar'),
+      title: cerrada ? cerrada.title : 'Propuesta pendiente',
+      subtitle: cerrada
+        ? cerrada.subtitle
+        : coletilla(esAdmin, 'Fecha, lugar y modalidad por confirmar', status),
+      cta: cerrada ? null : accion(esAdmin, 'Revisar'),
       target: 'ClubChallenges',
       status,
     });
@@ -240,13 +299,16 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
 
   for (const c of f.cambiosDePartido || []) {
     const status = estadoDeTarea('cambio', c.estado);
+    const cerrado = textoVencido('cambio', c.estado, status);
     agregarSiQuedaAlgo(tareas, {
       id: `cambio:${c.id}`,
       type: 'cambio',
       tone: 'warn',
-      title: 'Cambio de partido',
-      subtitle: coletilla(esAdmin, 'El rival propuso mover el encuentro', status),
-      cta: accion(esAdmin, 'Responder'),
+      title: cerrado ? cerrado.title : 'Cambio de partido',
+      subtitle: cerrado
+        ? cerrado.subtitle
+        : coletilla(esAdmin, 'El rival propuso mover el encuentro', status),
+      cta: cerrado ? null : accion(esAdmin, 'Responder'),
       target: 'ClubMatchChange',
       status,
     });
@@ -331,6 +393,24 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
  */
 export function contarConAccion(tareas) {
   return (tareas || []).filter((t) => t.status === 'abierta').length;
+}
+
+/**
+ * El badge, ya rotulado. Un solo sitio decide también el TEXTO.
+ *
+ * `contarConAccion()` garantizaba que la barra inferior y «Pendiente para ti»
+ * contaran lo mismo, pero cada una escribía el rótulo por su cuenta:
+ * `MainTabs` cortaba en `'9+'` y la portada pintaba el número entero. Con
+ * doce pendientes la barra decía «9+» y la portada «12» — el mismo dato,
+ * contado una vez, con dos rótulos que se contradicen a diez píxeles de
+ * distancia.
+ *
+ * El tope es del rótulo, no del conteo: el número exacto sigue viajando en
+ * `badgeCount` y es el que oye un lector de pantalla.
+ */
+export function etiquetaBadge(n) {
+  const total = Number(n) || 0;
+  return total > 9 ? '9+' : String(total);
 }
 
 /**

@@ -365,3 +365,116 @@ test('sin solicitudes devuelve null, no undefined', () => {
   assert.equal(S.cambioParaTareas([], { ahora: AHORA }), null);
   assert.equal(S.cambioParaTareas(null, { ahora: AHORA }), null);
 });
+
+// —— propuestas ——
+//
+// La otra mitad de F10. La propuesta era el único de los tres dominios donde
+// `'vencida'` seguía sin poder nacer: sólo se pedía la propuesta de los
+// desafíos en `esperando_aprobacion`, y de ese estado no sale ninguna
+// vencida —una rechazada devuelve el desafío a `negociacion` (43d:130)—.
+
+test('una propuesta pendiente siempre entra', () => {
+  const lista = S.propuestasParaTareas([{ id: 'p1', estado: 'pendiente' }], {
+    clubId: 'mio',
+    ahora: AHORA,
+  });
+  assert.equal(lista.length, 1);
+});
+
+test('una propuesta MÍA que el rival rechazó hace poco entra como vencida', () => {
+  // Es noticia: la propuesta oficial que mandó mi club no prosperó, y el
+  // desafío volvió a negociación sin que yo decidiera nada.
+  const lista = S.propuestasParaTareas(
+    [
+      {
+        id: 'p1',
+        estado: 'rechazada',
+        club_proponente_id: 'mio',
+        respondida_at: haceDias(2),
+      },
+    ],
+    { clubId: 'mio', ahora: AHORA }
+  );
+  assert.deepEqual(
+    lista.map((p) => p.id),
+    ['p1']
+  );
+});
+
+test('la que rechazó MI club no vuelve como aviso', () => {
+  // Responder la propuesta le toca al club que NO la propuso (43:1078). Si
+  // el proponente es el rival, el que rechazó fui yo — y contarme lo que
+  // acabo de decidir es el mismo ruido que en los desafíos.
+  const lista = S.propuestasParaTareas(
+    [
+      {
+        id: 'p1',
+        estado: 'rechazada',
+        club_proponente_id: 'rival',
+        respondida_at: haceDias(1),
+      },
+    ],
+    { clubId: 'mio', ahora: AHORA }
+  );
+  assert.deepEqual(lista, []);
+});
+
+test('un rechazo de hace más de una semana desaparece', () => {
+  const lista = S.propuestasParaTareas(
+    [
+      {
+        id: 'p1',
+        estado: 'rechazada',
+        club_proponente_id: 'mio',
+        respondida_at: haceDias(8),
+      },
+    ],
+    { clubId: 'mio', ahora: AHORA }
+  );
+  assert.deepEqual(lista, []);
+});
+
+test('una propuesta aprobada no entra: salió bien', () => {
+  const lista = S.propuestasParaTareas(
+    [{ id: 'p1', estado: 'aprobada', club_proponente_id: 'mio', respondida_at: haceDias(1) }],
+    { clubId: 'mio', ahora: AHORA }
+  );
+  assert.deepEqual(lista, []);
+});
+
+test('una propuesta CADUCADA tampoco entra, y es lo contrario de un olvido', () => {
+  // Las tres únicas escrituras de `caducada` —44:329, 44b:438 y 45:855— son
+  // la misma sentencia dentro del RPC de aprobación: «las demás propuestas
+  // del desafío que siguieran abiertas quedan caducadas». No hay cron ni
+  // plazo. Una caducada implica que OTRA se aprobó y el partido se publicó.
+  // Pintarla «Expiró» diría que la negociación falló cuando terminó bien.
+  const lista = S.propuestasParaTareas(
+    [{ id: 'p1', estado: 'caducada', club_proponente_id: 'mio', respondida_at: haceDias(1) }],
+    { clubId: 'mio', ahora: AHORA }
+  );
+  assert.deepEqual(lista, []);
+});
+
+test('un rechazo sin fecha de respuesta no se muestra', () => {
+  const lista = S.propuestasParaTareas(
+    [{ id: 'p1', estado: 'rechazada', club_proponente_id: 'mio' }],
+    { clubId: 'mio', ahora: AHORA }
+  );
+  assert.deepEqual(lista, []);
+});
+
+test('sin club activo no se atribuye ninguna propuesta rechazada', () => {
+  // Sin saber cuál es mi club no se puede decidir quién rechazó a quién.
+  const lista = S.propuestasParaTareas(
+    [{ id: 'p1', estado: 'rechazada', club_proponente_id: 'mio', respondida_at: haceDias(1) }],
+    { clubId: null, ahora: AHORA }
+  );
+  assert.deepEqual(lista, []);
+});
+
+test('los nulos de la ronda de red se descartan sin caerse', () => {
+  // `getPropuestaVigente()` devuelve `null` cuando el desafío no tiene
+  // propuesta, y la ronda entera llega con huecos.
+  assert.deepEqual(S.propuestasParaTareas([null, undefined], { clubId: 'mio', ahora: AHORA }), []);
+  assert.deepEqual(S.propuestasParaTareas(null, { clubId: 'mio' }), []);
+});

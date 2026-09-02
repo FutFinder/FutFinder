@@ -195,3 +195,46 @@ export function cambioParaTareas(
   }
   return ultimo;
 }
+
+/**
+ * Las propuestas oficiales que la portada tiene que enseñar: la que espera
+ * decisión, y la que MI club mandó y el rival rechazó hace poco.
+ *
+ * POR QUÉ ESTA ERA LA QUE FALTABA. De los tres dominios de la portada, la
+ * propuesta era el único donde `'vencida'` no podía nacer ni cambiando el
+ * cableado a medias: sólo se pedía la propuesta de los desafíos en
+ * `esperando_aprobacion`, y de ese estado no sale ninguna vencida. Un rechazo
+ * devuelve el desafío a `negociacion` (43d:130). Por eso el contexto ahora
+ * también pide la propuesta de los desafíos en `negociacion`: es donde queda
+ * el rechazo que hay que contar.
+ *
+ * `rechazada` ENTRA SÓLO SI LA PROPUSE YO. Responder una propuesta le toca al
+ * club que NO la propuso (43:1078). Si el proponente es el rival, quien
+ * rechazó fue mi propio club, y contarme lo que acabo de decidir es el mismo
+ * ruido que un desafío `rechazado`. Sin `clubId` no se puede saber quién fue
+ * quién, así que no entra ninguna.
+ *
+ * `caducada` NO ENTRA, Y ES LO CONTRARIO DE UN OLVIDO. Las tres únicas
+ * escrituras de ese estado —44:329, 44b:438 y 45:855— son la misma sentencia
+ * dentro del RPC de aprobación: «las demás propuestas del desafío que
+ * siguieran abiertas quedan caducadas». No hay cron ni plazo que la produzca.
+ * Una propuesta caducada implica que OTRA se aprobó y el partido se publicó,
+ * así que pintarla «Expiró» diría que la negociación falló justo cuando
+ * terminó bien — el error que `RESUELTOS` existe para impedir. El texto sí
+ * está escrito en `clubsHomeTasks.js` por si una reparación manual en la base
+ * deja una suelta.
+ *
+ * `aprobada` tampoco: salió bien, y `normalizarTareas` ni la dibuja.
+ */
+export function propuestasParaTareas(
+  propuestas,
+  { clubId = null, ahora = new Date(), dias = DIAS_DESENLACE_VISIBLE } = {}
+) {
+  return (Array.isArray(propuestas) ? propuestas : []).filter((p) => {
+    if (!p) return false;
+    if (p.estado === 'pendiente') return true;
+    if (p.estado !== 'rechazada') return false;
+    if (!clubId || p.club_proponente_id !== clubId) return false;
+    return dentroDeVentana(p.respondida_at, ahora, dias);
+  });
+}

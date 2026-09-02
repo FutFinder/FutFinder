@@ -18,6 +18,7 @@ import { respondToRequest, cancelRequest } from '../services/clubs';
 import { lugarLabel } from '../services/clubMatchRules';
 import { ratingLabel as formatearRating, metaRival, nivelInline } from '../utils/clubMeta';
 import { haceCuanto } from '../utils/tiempoRelativo.js';
+import { etiquetaBadge } from '../utils/clubsHomeTasks.js';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 
 import ClubsHeader from '../components/club/ClubsHeader';
@@ -332,10 +333,17 @@ function Portada({
             <Text style={styles.tituloSeccion}>Pendiente para ti</Text>
             {/* El badge se enciende con el número que muestra, no con la
                 cantidad de tarjetas: con una única tarea vencida había
-                tareas que enseñar pero el badge decía «0». */}
+                tareas que enseñar pero el badge decía «0».
+
+                Y el ROTULO sale de `etiquetaBadge()`, el mismo que usa la
+                barra inferior: acá se pintaba el número entero mientras la
+                barra cortaba en «9+», así que con doce pendientes los dos
+                badges del mismo dato decían cosas distintas. */}
             {badgeCount > 0 ? (
               <View style={[styles.badge, { backgroundColor: tema.main }]}>
-                <Text style={[styles.badgeTexto, { color: tema.ink }]}>{badgeCount}</Text>
+                <Text style={[styles.badgeTexto, { color: tema.ink }]}>
+                  {etiquetaBadge(badgeCount)}
+                </Text>
               </View>
             ) : null}
           </View>

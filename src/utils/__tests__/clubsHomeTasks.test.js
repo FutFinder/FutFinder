@@ -654,3 +654,158 @@ test('un cambio de partido caducado tampoco manda a buscar a un admin', () => {
   assert.equal(t.status, 'vencida');
   assert.doesNotMatch(t.subtitle, /responde un admin/);
 });
+
+// ── F10: qué DICE una tarjeta vencida ────────────────────────────────
+//
+// El checklist pide que una tarea vencida salga «al 55% de opacidad, sin
+// botón, con chip Expiró». `PendingTaskCard` ya lo dibuja así, pero el
+// CONTENIDO seguía siendo el de una tarea pendiente: un desafío cerrado sin
+// acuerdo se titulaba «Desafío recibido» y llevaba un `cta` «Responder»; una
+// propuesta caducada se titulaba, literalmente, «Propuesta pendiente».
+// Apagar una tarjeta no arregla que el texto describa otra cosa.
+
+const VERBOS_DE_ACCION = /responder|revisar|ver nómina|ir ahora|pendiente|por confirmar/i;
+
+test('un desafío sin acuerdo no se titula «Desafío recibido»', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'sin_acuerdo' }] }),
+    { rol: 'admin', ahora: AHORA }
+  );
+  assert.equal(t.status, 'vencida');
+  assert.equal(t.title, 'Desafío sin acuerdo');
+});
+
+test('una propuesta vencida no se titula «Propuesta pendiente»', () => {
+  // Era el texto más contradictorio de los tres: «Propuesta pendiente» junto
+  // a un chip que dice «Expiró».
+  const [rechazada] = D.normalizarTareas(
+    fuentes({ propuestas: [{ id: 'p1', estado: 'rechazada' }] }),
+    { rol: 'admin', ahora: AHORA }
+  );
+  assert.equal(rechazada.status, 'vencida');
+  assert.equal(rechazada.title, 'Propuesta rechazada');
+
+  const [caducada] = D.normalizarTareas(
+    fuentes({ propuestas: [{ id: 'p2', estado: 'caducada' }] }),
+    { rol: 'admin', ahora: AHORA }
+  );
+  assert.equal(caducada.title, 'Propuesta caducada');
+});
+
+test('un cambio de partido vencido dice qué pasó, no qué proponen', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({ cambiosDePartido: [{ id: 'c1', estado: 'caducado' }] }),
+    { rol: 'admin', ahora: AHORA }
+  );
+  assert.equal(t.status, 'vencida');
+  assert.equal(t.title, 'Cambio sin respuesta');
+});
+
+test('cada desenlace se titula por SU estado, no todos igual', () => {
+  // El título tiene que describir el estado. Si los cuatro cierres del
+  // desafío dijeran lo mismo, la tarjeta explicaría menos que el chip.
+  const titulo = (estado) =>
+    D.normalizarTareas(fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado }] }), {
+      rol: 'admin',
+      ahora: AHORA,
+    })[0].title;
+  const titulos = ['sin_acuerdo', 'expirado', 'rechazado', 'cancelado'].map(titulo);
+  assert.equal(new Set(titulos).size, 4, `se repiten: ${titulos.join(' | ')}`);
+});
+
+test('ninguna tarea vencida lleva CTA', () => {
+  // No basta con que la tarjeta no lo dibuje: el objeto no puede seguir
+  // prometiendo «Responder» en un campo que alguien más podría leer.
+  const f = fuentes({
+    desafiosRecibidos: [{ ...DESAFIO, estado: 'sin_acuerdo' }],
+    propuestas: [{ id: 'p1', estado: 'rechazada' }],
+    cambiosDePartido: [{ id: 'c1', estado: 'caducado' }],
+  });
+  const vencidas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(vencidas.length, 3);
+  for (const t of vencidas) {
+    assert.equal(t.status, 'vencida');
+    assert.equal(t.cta, null, `${t.id} todavía trae cta «${t.cta}»`);
+  }
+});
+
+test('ni el título ni el subtítulo de una vencida hablan de algo por hacer', () => {
+  const f = fuentes({
+    desafiosRecibidos: [{ ...DESAFIO, estado: 'sin_acuerdo' }],
+    propuestas: [{ id: 'p1', estado: 'rechazada' }],
+    cambiosDePartido: [{ id: 'c1', estado: 'caducado' }],
+  });
+  for (const rol of ['admin', 'jugador']) {
+    for (const t of D.normalizarTareas(f, { rol, ahora: AHORA })) {
+      assert.doesNotMatch(t.title, VERBOS_DE_ACCION, `${t.id} título: ${t.title}`);
+      assert.doesNotMatch(t.subtitle, VERBOS_DE_ACCION, `${t.id} subtítulo: ${t.subtitle}`);
+    }
+  }
+});
+
+test('una tarea ABIERTA conserva su CTA y su texto de siempre', () => {
+  // El contraste: lo de arriba no puede haberse llevado por delante el caso
+  // normal, que es el 99% de las tarjetas.
+  const [t] = D.normalizarTareas(fuentes({ desafiosRecibidos: [DESAFIO] }), {
+    rol: 'admin',
+    ahora: AHORA,
+  });
+  assert.equal(t.status, 'abierta');
+  assert.equal(t.title, 'Desafío recibido');
+  assert.equal(t.cta, 'Responder');
+});
+
+test('y la vencida sigue sin sumar al badge', () => {
+  // La otra mitad de F10, por si un cambio de copy se llevara el status.
+  const f = fuentes({
+    desafiosRecibidos: [{ ...DESAFIO, estado: 'sin_acuerdo' }],
+    propuestas: [{ id: 'p1', estado: 'rechazada' }],
+  });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas.length, 2);
+  assert.equal(D.contarConAccion(tareas), 0);
+});
+
+// ── N4: el badge de la barra y el de la portada dicen lo mismo ───────
+
+test('el badge se rotula igual hasta 9 y se corta en «9+»', () => {
+  assert.equal(D.etiquetaBadge(1), '1');
+  assert.equal(D.etiquetaBadge(9), '9');
+  assert.equal(D.etiquetaBadge(10), '9+');
+  assert.equal(D.etiquetaBadge(99), '9+');
+});
+
+test('un cierre nuevo que nadie redactó igual describe el estado', () => {
+  // `VENCIDOS.desafio` se DERIVA de `ESTADOS_CERRADOS`, así que una
+  // migración puede meter un estado cerrado nuevo sin que nadie escriba su
+  // texto. El respaldo tiene que decir algo cierto, no «Desafío recibido».
+  const [t] = D.normalizarTareas(
+    fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'bloqueado_por_fuerza_mayor' }] }),
+    { rol: 'admin', ahora: AHORA }
+  );
+  // Un estado desconocido cuenta como abierta, que es la regla vigente.
+  assert.equal(t.status, 'abierta');
+
+  // Pero uno que SÍ está en VENCIDOS y no tiene copy propio, no.
+  const conCopy = D.normalizarTareas(
+    fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'sin_acuerdo' }] }),
+    { rol: 'admin', ahora: AHORA }
+  )[0];
+  assert.notEqual(conCopy.title, 'Desafío recibido');
+});
+
+test('el subtítulo de un desafío vencido nombra al rival cuando se sabe', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({ desafiosRecibidos: [{ ...DESAFIO, estado: 'sin_acuerdo' }] }),
+    { rol: 'admin', ahora: AHORA }
+  );
+  assert.equal(t.subtitle, 'lagardere fcv');
+});
+
+test('y explica el cierre cuando no se sabe con quién era', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({ desafiosRecibidos: [{ id: 'd9', estado: 'sin_acuerdo' }] }),
+    { rol: 'admin', ahora: AHORA }
+  );
+  assert.match(t.subtitle, /sin acuerdo/i);
+});

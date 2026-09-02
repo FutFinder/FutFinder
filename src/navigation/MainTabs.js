@@ -22,6 +22,7 @@ import { tactical } from '../theme/colors';
 import { countUnreadTotal, subscribeToMessages } from '../services/messages';
 
 import { ClubsHomeProvider, useClubsHome } from '../contexts/ClubsHomeContext';
+import { etiquetaBadge } from '../utils/clubsHomeTasks.js';
 
 const Tab = createBottomTabNavigator();
 
@@ -148,7 +149,7 @@ function CustomTabBar({ state, navigation }) {
               style={{ backgroundColor: tactical.neon }}
             >
               <Text className="text-[9.5px] font-bold" style={{ color: tactical.neonInk }}>
-                {badge > 9 ? '9+' : String(badge)}
+                {etiquetaBadge(badge)}
               </Text>
             </View>
           ) : null}

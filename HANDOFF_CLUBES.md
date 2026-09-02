@@ -94,7 +94,7 @@ El repo no tiene pruebas de render, así que **todo lo que decide algo salió de
 
 ## 4. Qué falta antes del merge
 
-1. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo. Ahora también: con un desafío cerrado **sin acuerdo** en los últimos siete días, que la tarjeta salga apagada, con el chip «Expiró», sin botón y **sin sumar al badge** (§15).
+1. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo. Ahora también: con un desafío cerrado **sin acuerdo** en los últimos siete días, que la tarjeta salga apagada, con el chip «Expiró», sin botón, titulada **«Desafío sin acuerdo»** y **sin sumar al badge** (§15 y §16). Y con **diez o más** pendientes, que la barra inferior y «Pendiente para ti» digan los dos «9+».
 2. **Reducciones declaradas de la tarea 9**, ver §3 — decidir si se aceptan.
 3. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
 
@@ -418,7 +418,7 @@ Una revisión de toda la rama levantó dos puntos. Los dos se comprobaron contra
 
 `clubsHomeTasks.js` clasifica tres situaciones —abierta, vencida, resuelta— y `PendingTaskCard` sabe dibujar la vencida: opacidad .55, chip «Expiró», sin botón, y `contarConAccion()` no la suma. **Nada la producía.** `ClubsHomeContext` filtraba `estado === 'pendiente'` sobre los desafíos recibidos, y el cambio de partido se pedía con `getCambioPendiente()`, que filtra `estado = 'pendiente'` **en la base**. Las pruebas puras pasaban porque inyectaban tareas vencidas a mano; el cableado real no las dejaba nacer.
 
-Con las propuestas pasaba lo mismo por un camino distinto: sólo se pide `getPropuestaVigente()` para desafíos en `esperando_aprobacion`, y de ahí una propuesta no puede salir vencida. Una `rechazada` devuelve el desafío a `negociacion` (43d:130) y una `caducada` sólo existe junto a una `aprobada`, que lo pasa a `publicado` (44:328). **Se deja así**: «Propuesta pendiente · Revisar · Expiró» no describe ninguna de las dos situaciones, y `VENCIDOS.propuesta` se queda como segunda línea de defensa.
+Con las propuestas pasaba lo mismo por un camino distinto: sólo se pedía `getPropuestaVigente()` para desafíos en `esperando_aprobacion`, y de ahí una propuesta no puede salir vencida. **Esto se cerró después, en la pasada de F10/N4: ver §16.**
 
 **Arreglo aplicado.** Quién entra en la lista sale de dos funciones puras nuevas en `clubsHomeSources.js`, con **ventana de 7 días** (`DIAS_DESENLACE_VISIBLE`) y 20 pruebas:
 
@@ -440,7 +440,7 @@ Con las propuestas pasaba lo mismo por un camino distinto: sólo se pide `getPro
 
 **Con qué fecha se mide.** `sin_acuerdo` no toca `responded_at`: 43:395 y 43:733 escriben sólo `estado` y `motivo_cierre`. La ventana se ancla en `prorroga_vence_at || negociacion_vence_at`, el plazo que corría al cerrarse. La prórroga manda sobre la negociación: con el otro, un desafío cerrado ayer contaría como cerrado hace tres días. Un desenlace **sin fecha usable no entra** —dejarlo pasar sería volver al historial sin fin por la puerta de atrás—, y una fecha en el **futuro** sí entra: un «No» a la prórroga cierra en el acto (43:733) con el plazo todavía por delante.
 
-**Un cambio de copy que sólo se vuelve visible ahora.** `coletilla()` le pegaba «· responde un admin» a toda tarea de un jugador. En una vencida el botón no falta por su rol —tampoco lo tiene el admin—, así que mandarlo a buscar a alguien que tampoco puede hacer nada es la promesa vacía que estas tarjetas existen para no hacer. Ahora sólo se pega si `status === 'abierta'`.
+**Un cambio de copy que sólo se vuelve visible ahora.** `coletilla()` le pegaba «· responde un admin» a toda tarea de un jugador. En una vencida el botón no falta por su rol —tampoco lo tiene el admin—, así que mandarlo a buscar a alguien que tampoco puede hacer nada es la promesa vacía que estas tarjetas existen para no hacer. Ahora sólo se pega si `status === 'abierta'`. **Fue el primer parche de un problema mayor —el texto entero de la tarjeta vencida era el de una tarea pendiente— que se resolvió en §16.**
 
 **Y un cambio de consulta.** `getCambioPendiente()` → `getCambiosDelPartido()`, porque la primera no puede devolver un caducado ni aunque se quiera. Sigue viajando **uno como máximo**; lo elige `cambioParaTareas()`, comparando `respondida_at` en vez de fiarse del orden de la consulta.
 
@@ -461,3 +461,87 @@ Queda una inconsistencia menor y real, anotada por si alguien la quiere: el `Swo
 Lo que la revisión sí destapó: **de qué club sale el acento del hilo no estaba probado en ninguna parte.** `miClubId` se decidía en línea dentro de `ChatThreadScreen.js`, un archivo con JSX que `node --test` no carga — el mismo muro que ya obligó a sacar `clubesDePartidoQuery.js`.
 
 La regla salió a `clubPropioDelDesafio()` en `utils/challengeThread.js`, con **7 pruebas**. La que importa fija el contrato de frente: con un solo bando en la lista de membresías, la respuesta **no puede ser el otro** — que es el fallo que un `find` invertido produciría en silencio. Las demás cubren el hilo abierto sin membresía (cae a `null`, y `temaDeClub(null)` es verde), el desafío todavía sin cargar, y pertenecer a los dos clubes: gana el retador, siempre el mismo, para que el hilo no cambie de color entre dos aperturas.
+
+---
+
+## 16. F10 y N4: la conducta definitiva
+
+La auditoría de los 92 puntos del checklist dejó **2 fallos confirmados**. Los otros 90 quedaron en 71 aprobados contra el código y las pruebas, 18 bloqueados por falta de sesión y datos sembrados, y 1 —el ΔE del tema rojo, §9— pendiente de tu decisión. Ningún punto se verificó con los ojos: no hay automatización de navegador que llegue más allá del login.
+
+### F10 — el contenido de la tarjeta vencida
+
+**Lo que fallaba.** §15 hizo alcanzable el estado `'vencida'`, pero sólo arregló el cableado. El TEXTO seguía siendo el de una tarea pendiente:
+
+| Antes | Chip que lo acompañaba |
+|---|---|
+| «Desafío recibido» · cta `Responder` | «Expiró» |
+| «Propuesta pendiente» · cta `Revisar` | «Expiró» |
+| «Cambio de partido» · «El rival propuso mover el encuentro» | «Expiró» |
+
+Apagar la tarjeta al 55 % no arregla que invite a responder algo que ya no existe.
+
+**Ahora el título nombra el estado, y cada cierre tiene el suyo.** Si los cuatro dijeran «Desafío cerrado», la tarjeta explicaría menos que el chip.
+
+| Dominio | Estado | Título | Subtítulo |
+|---|---|---|---|
+| desafío | `sin_acuerdo` | Desafío sin acuerdo | el rival, o «La negociación se cerró sin acuerdo» |
+| desafío | `expirado` | Desafío expirado | Nadie respondió dentro del plazo |
+| desafío | `rechazado` | Desafío rechazado | El desafío no se aceptó |
+| desafío | `cancelado` | Desafío cancelado | El encuentro se canceló |
+| propuesta | `rechazada` | Propuesta rechazada | El rival no aceptó la propuesta oficial |
+| propuesta | `caducada` | Propuesta caducada | Se aprobó otra propuesta del desafío |
+| cambio | `caducado` | Cambio sin respuesta | El plazo se cumplió sin que nadie contestara |
+| cambio | `rechazado` | Cambio rechazado | El cambio no se aceptó |
+
+`cta` viaja en `null`: no basta con que la tarjeta no lo dibuje, el objeto no puede seguir prometiendo «Responder» en un campo que otro consumidor podría leer.
+
+El **subtítulo del desafío nombra al rival** cuando se sabe quién era, y cae a la explicación cuando no. Con el título ya contando el estado, lo útil es con quién fue: dos desafíos cerrados el mismo día serían la misma tarjeta sin eso.
+
+Hay **respaldo por dominio** («Desafío cerrado», «Propuesta cerrada», «Cambio cerrado») porque `VENCIDOS.desafio` se **deriva** de `ESTADOS_CERRADOS`: una migración puede añadir un cierre nuevo sin que nadie escriba su texto, y ese día la tarjeta tiene que decir algo cierto.
+
+### F10 — la propuesta vencida ya puede nacer
+
+De los tres dominios, la propuesta era el único donde `'vencida'` seguía siendo inalcanzable. Se cerró por la vía que sí existe:
+
+- `ESTADOS_CON_PROPUESTA` pasa a ser `['esperando_aprobacion', 'negociacion']`. El segundo es donde **cae** el desafío cuando una propuesta se rechaza (43d:130), y por tanto el único sitio donde queda ese rechazo.
+- `propuestasParaTareas()` deja pasar la `pendiente` siempre, y la `rechazada` **sólo si la propuso mi club**, dentro de la ventana de 7 días. Responder una propuesta le toca al club que NO la propuso (43:1078): si el proponente era el rival, quien rechazó fue mi propio club, y contarme lo que acabo de decidir es el mismo ruido que un desafío `rechazado`.
+
+### F10 — por qué `caducada` NO se cablea
+
+El checklist nombra «una propuesta caducada» como disparador. **Ese estado no significa lo que el checklist asume, y verificarlo cambió el arreglo.**
+
+Las **tres únicas** escrituras de `caducada` en todo el esquema —`44:329`, `44b:438` y `45:855`— son la misma sentencia, dentro del RPC de aprobación:
+
+```sql
+update public.club_challenge_proposals set estado = 'caducada'
+ where challenge_id = v_row.id and id <> v_prop.id and estado = 'pendiente';
+```
+
+No hay cron, no hay plazo, no hay otra puerta. Una propuesta `caducada` implica que **otra se aprobó y el partido se publicó**. Pintarla «Expiró» diría que la negociación falló justo cuando terminó bien — exactamente el error que `RESUELTOS` existe para impedir («Pintarlos «vencida» diría que algo falló»).
+
+Así que el estado **no entra por cableado**, pero **su texto sí está escrito y probado**, por si una reparación manual en la base deja una suelta — que es el caso que el propio comentario de la migración 44 dice estar cubriendo.
+
+**Contra la letra del checklist esto es una desviación declarada, no un aprobado.** F10 queda cumplido como contrato de interfaz: cualquier tarea vencida, en los tres dominios, sale al 55 %, sin botón, con chip «Expiró», con texto que describe su estado y sin sumar al badge.
+
+### N4 — un solo rótulo para el badge
+
+`contarConAccion()` ya garantizaba que la barra inferior y «Pendiente para ti» **contaran** lo mismo. Lo que no estaba compartido era el **rótulo**: `MainTabs` cortaba en `'9+'` y la portada pintaba el número entero, así que con doce pendientes los dos badges del mismo dato se contradecían a diez píxeles de distancia.
+
+`etiquetaBadge()` vive en `clubsHomeTasks.js`, junto al conteo, y la usan los dos. El tope es del rótulo, no del conteo: `badgeCount` sigue viajando exacto y es el que oye un lector de pantalla («Clubes, 12 pendientes»).
+
+Lo fija una prueba que **lee el fuente de los dos archivos** (`navigation/__tests__/badgeDeClubes.test.js`), porque el defecto no estaba dentro de ninguna función: estaba en que dos archivos escribían la misma regla por separado. Ninguna prueba de lógica pura puede ver eso. El repo ya prueba cableado así en `rutasPrivadas.test.js` y `sesionCableado.test.js`.
+
+### Pruebas
+
+**25 nuevas, escritas antes del arreglo y vistas fallar** (7 rojas tras el bloque de copy, 10 tras el del badge, 19 tras el de propuestas, 21 tras los respaldos). Una de ellas —«ni el título ni el subtítulo de una vencida hablan de algo por hacer»— rechazó el primer título que se puso al cambio caducado, «Cambio sin **responder**», por contener el verbo. Quedó «Cambio sin respuesta», que además es mejor castellano para un estado.
+
+| Momento | Suite | Resultado |
+|---|---|---|
+| Tras la revisión final (§15) | 923 | verde |
+| **Tras F10 y N4 (§16)** | **948** | **verde, 0 fallos** |
+
+`npm run lint`: 0 errores, 24 avisos preexistentes. `npm run build:web`: código de salida 0.
+
+### Lo que sigue pendiente
+
+Los **18 puntos bloqueados** del checklist necesitan sesión iniciada y datos sembrados: E6-E9 (varios clubes y persistencia), H5-H6 (pila de navegación), K1 (los cuatro temas), L1-L2 (error total), M2-M6 (responsive), C3-C4, D7, N3. No se tocaron.

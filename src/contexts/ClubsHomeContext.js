@@ -25,6 +25,7 @@ import {
   desafiosRecibidosParaTareas,
   elegirClubActivo,
   partidoAdmiteCambio,
+  propuestasParaTareas,
 } from '../utils/clubsHomeSources.js';
 import {
   normalizarTareas,
@@ -74,12 +75,13 @@ import {
  *    propuesta vigente de cada desafío esperando aprobación, y el cambio
  *    pendiente y la nómina del próximo partido.
  *
- * 4. QUÉ DESAFÍOS PIDEN PROPUESTA. Solo los que están en
- *    `'esperando_aprobacion'`: es el único estado con una propuesta oficial
- *    esperando decisión. Pedirla en `'negociacion'` sería un viaje perdido.
- *    Ojo: `getPropuestaVigente()` devuelve la última propuesta aunque esté
- *    rechazada o caducada, así que `normalizarTareas` la clasifica por su
- *    estado y no la da por abierta.
+ * 4. QUÉ DESAFÍOS PIDEN PROPUESTA. Los que están en `'esperando_aprobacion'`,
+ *    donde vive la propuesta que espera decisión, y los que están en
+ *    `'negociacion'`, que es donde CAE el desafío cuando una propuesta se
+ *    rechaza (43d:130) y por tanto el único sitio donde queda el rechazo que
+ *    hay que contar. `getPropuestaVigente()` devuelve la última propuesta sea
+ *    cual sea su estado; cuál de ellas entra en la lista lo decide
+ *    `propuestasParaTareas()`, que además distingue quién rechazó a quién.
  *
  * 4bis. QUÉ LLEGA A LA LISTA DE TAREAS, Y NO SÓLO LO ACCIONABLE. Antes este
  *    archivo filtraba `estado === 'pendiente'` en los desafíos y pedía sólo
@@ -109,8 +111,16 @@ import {
 
 const CLUB_ACTIVO_KEY = 'futfinder:clubActivo';
 
-/** Estados del desafío en los que existe una propuesta oficial por revisar. */
-const ESTADO_ESPERANDO_PROPUESTA = 'esperando_aprobacion';
+/**
+ * Estados del desafío en los que hay una propuesta oficial que mirar.
+ *
+ * `esperando_aprobacion` es donde vive la propuesta que espera decisión.
+ * `negociacion` es donde CAE el desafío cuando una propuesta se rechaza
+ * (43d:130), así que es el único sitio donde se puede encontrar el rechazo
+ * que hay que contar. Sin él, la tarea de propuesta no podía salir vencida
+ * jamás. Qué se hace con lo que llega lo decide `propuestasParaTareas()`.
+ */
+const ESTADOS_CON_PROPUESTA = ['esperando_aprobacion', 'negociacion'];
 
 /**
  * `pendingRequests` son las solicitudes que OTROS enviaron a mi club y yo
@@ -290,8 +300,8 @@ export function ClubsHomeProvider({ children }) {
         const recibidos = desafiosRes.data?.recibidos || [];
         const enviados = desafiosRes.data?.enviados || [];
         const desafiosParaTareas = desafiosRecibidosParaTareas(recibidos, { ahora });
-        const desafiosEsperandoPropuesta = [...recibidos, ...enviados].filter(
-          (d) => d.estado === ESTADO_ESPERANDO_PROPUESTA
+        const desafiosConPropuesta = [...recibidos, ...enviados].filter((d) =>
+          ESTADOS_CON_PROPUESTA.includes(d.estado)
         );
 
         const proximoPartido = proximoPartidoDeClub(partidosData, [activeId], { ahora });
@@ -302,7 +312,7 @@ export function ClubsHomeProvider({ children }) {
         // ── Segunda ronda: depende de la primera ─────────────────
         const [propuestasRes, cambiosData, nominaData] = await Promise.all([
           Promise.all(
-            desafiosEsperandoPropuesta.map((d) =>
+            desafiosConPropuesta.map((d) =>
               segura(getPropuestaVigente(d.id).then((r) => r.data), null, 'getPropuestaVigente')
             )
           ),
@@ -331,7 +341,7 @@ export function ClubsHomeProvider({ children }) {
         const tasks = normalizarTareas(
           {
             desafiosRecibidos: desafiosParaTareas,
-            propuestas: propuestasRes.filter(Boolean),
+            propuestas: propuestasParaTareas(propuestasRes, { clubId: activeId, ahora }),
             cambiosDePartido: cambio ? [cambio] : [],
             nomina,
             solicitudes: solicitudesData,
