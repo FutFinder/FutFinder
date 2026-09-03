@@ -478,3 +478,129 @@ test('los nulos de la ronda de red se descartan sin caerse', () => {
   assert.deepEqual(S.propuestasParaTareas([null, undefined], { clubId: 'mio', ahora: AHORA }), []);
   assert.deepEqual(S.propuestasParaTareas(null, { clubId: 'mio' }), []);
 });
+
+// ── Rivales sugeridos: distancia y orden por cercanía ────────────────
+//
+// LA REGRESIÓN QUE FIJAN. `ClubDetailScreen` enriquece los candidatos con
+// `distanciaKm` y los ORDENA por cercanía; la portada tomaba la lista cruda
+// de `listRivalCandidates()`, que no calcula distancia y viene ordenada por
+// «verificados primero, luego los más nuevos». Pero `ClubsScreen` sí LEÍA
+// `rival.distanciaKm`, así que cada tarjeta del carrusel decía «Distancia
+// N.A.» y el orden no tenía nada que ver con la cercanía. La portada
+// reemplazó al detalle como entrada del módulo y mostraba peor información
+// que él.
+//
+// La función recibe el cálculo por parámetro en vez de importarlo:
+// `clubMeta.js` trae `haversineKm` de `services/matches`, que arrastra
+// `./supabase` y no carga bajo `node --test`. Es el mismo patrón de
+// inyección de `rivalClubsQuery` y `nominaQuery`.
+
+/** Cálculo falso: la distancia es la diferencia entre dos números. */
+const distanciaFalsa = (a, b) =>
+  typeof a?.km === 'number' && typeof b?.km === 'number' ? Math.abs(a.km - b.km) : null;
+
+const MI_CLUB = { id: 'mio', km: 0 };
+const cercania = (rivales, club = MI_CLUB) =>
+  S.rivalesPorCercania(rivales, { club, distancia: distanciaFalsa });
+
+test('los rivales salen de más cerca a más lejos', () => {
+  const lista = cercania([
+    { id: 'lejos', km: 30 },
+    { id: 'cerca', km: 2 },
+    { id: 'medio', km: 11 },
+  ]);
+  assert.deepEqual(
+    lista.map((r) => r.id),
+    ['cerca', 'medio', 'lejos']
+  );
+});
+
+test('cada rival recibe su distanciaKm, que es lo que la tarjeta lee', () => {
+  // Sin este campo `metaRival()` cae a «Distancia N.A.» para todos.
+  const [r] = cercania([{ id: 'a', km: 4 }]);
+  assert.equal(r.distanciaKm, 4);
+});
+
+test('los rivales sin comuna conocida van al final, no al principio', () => {
+  const lista = cercania([
+    { id: 'sin-comuna' },
+    { id: 'lejos', km: 30 },
+    { id: 'cerca', km: 2 },
+  ]);
+  assert.deepEqual(
+    lista.map((r) => r.id),
+    ['cerca', 'lejos', 'sin-comuna']
+  );
+  assert.equal(lista[2].distanciaKm, null);
+});
+
+test('entre dos sin distancia se conserva el orden en que vinieron', () => {
+  // El comparador de `ClubDetailScreen` devuelve 1 cuando los DOS son null,
+  // que es un comparador inconsistente. Acá empatan y no se reordenan.
+  const lista = cercania([{ id: 'primero' }, { id: 'segundo' }, { id: 'tercero' }]);
+  assert.deepEqual(
+    lista.map((r) => r.id),
+    ['primero', 'segundo', 'tercero']
+  );
+});
+
+test('a igual distancia manda el orden del servicio, que ya prioriza verificados', () => {
+  const lista = cercania([
+    { id: 'verificado', km: 5 },
+    { id: 'nuevo', km: 5 },
+  ]);
+  assert.deepEqual(
+    lista.map((r) => r.id),
+    ['verificado', 'nuevo']
+  );
+});
+
+test('sin club activo no se inventan distancias ni se reordena', () => {
+  const lista = S.rivalesPorCercania([{ id: 'a', km: 9 }, { id: 'b', km: 1 }], {
+    club: null,
+    distancia: distanciaFalsa,
+  });
+  assert.deepEqual(
+    lista.map((r) => r.id),
+    ['a', 'b']
+  );
+  assert.equal(lista[0].distanciaKm, null);
+});
+
+test('un cálculo que no devuelve un número se trata como sin distancia', () => {
+  // `distanciaEntreClubesKm` devuelve null sin comuna, pero un NaN colado
+  // envenenaría el orden entero: NaN nunca es mayor ni menor que nada.
+  const raro = () => NaN;
+  const lista = S.rivalesPorCercania([{ id: 'a' }, { id: 'b' }], {
+    club: MI_CLUB,
+    distancia: raro,
+  });
+  assert.equal(lista[0].distanciaKm, null);
+  assert.equal(lista[1].distanciaKm, null);
+});
+
+test('no se pierde ningún campo del rival', () => {
+  // La tarjeta lee nombre, escudo y tema; si el enriquecido los tirara, el
+  // carrusel saldría con el escudo genérico.
+  const [r] = cercania([{ id: 'a', km: 1, nombre: 'Rival FC', foto_url: 'u', tema: 'red' }]);
+  assert.equal(r.nombre, 'Rival FC');
+  assert.equal(r.foto_url, 'u');
+  assert.equal(r.tema, 'red');
+});
+
+test('la lista que llega del servicio no se muta', () => {
+  const original = [{ id: 'lejos', km: 30 }, { id: 'cerca', km: 2 }];
+  cercania(original);
+  assert.deepEqual(
+    original.map((r) => r.id),
+    ['lejos', 'cerca']
+  );
+  assert.equal('distanciaKm' in original[0], false);
+});
+
+test('sin lista, sin cálculo o sin nada no se cae', () => {
+  assert.deepEqual(S.rivalesPorCercania(null, { club: MI_CLUB }), []);
+  assert.deepEqual(S.rivalesPorCercania(undefined), []);
+  const sinCalculo = S.rivalesPorCercania([{ id: 'a', km: 3 }], { club: MI_CLUB });
+  assert.equal(sinCalculo[0].distanciaKm, null);
+});

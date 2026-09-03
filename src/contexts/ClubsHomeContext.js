@@ -26,7 +26,9 @@ import {
   elegirClubActivo,
   partidoAdmiteCambio,
   propuestasParaTareas,
+  rivalesPorCercania,
 } from '../utils/clubsHomeSources.js';
+import { distanciaEntreClubesKm } from '../utils/clubMeta';
 import {
   normalizarTareas,
   contarConAccion,
@@ -107,6 +109,15 @@ import {
  * 6. ESTADÍSTICAS DEL CLUB. Viajan colgadas de `club.estadisticas`
  *    (`{ pj, v, e, d, gf, gc }`) en vez de inventar una clave que las tareas
  *    7-10 no pidieron.
+ *
+ * 7. LOS RIVALES VIAJAN CON SU DISTANCIA. `listRivalCandidates()` no la
+ *    calcula y ordena por «verificados primero, luego los más nuevos», pero
+ *    la portada LEE `rival.distanciaKm` para la meta de la tarjeta: exponer
+ *    la lista cruda dejaba «Distancia N.A.» en todas y un carrusel que no
+ *    ordenaba por cercanía, mientras `ClubDetailScreen` sí mostraba
+ *    kilómetros. `rivalesPorCercania()` hace las dos cosas; el cálculo entra
+ *    inyectado porque `clubMeta.js` arrastra `services/matches` y con él
+ *    `./supabase`, que no carga bajo `node --test`.
  */
 
 const CLUB_ACTIVO_KEY = 'futfinder:clubActivo';
@@ -381,7 +392,10 @@ export function ClubsHomeProvider({ children }) {
             ? etiquetaPlazo(plazoDePartido(proximoPartido.hora, ahora))
             : null,
           activity: notifsData.filter((n) => avisoDelClub(n, activeId)).slice(0, TOPE_ACTIVIDAD),
-          suggestedRivals: rivalesData,
+          suggestedRivals: rivalesPorCercania(rivalesData, {
+            club: membresiaActiva?.club,
+            distancia: distanciaEntreClubesKm,
+          }),
           invitations,
           pendingRequests: solicitudesData,
           sentRequests: solicitudesEnviadas,

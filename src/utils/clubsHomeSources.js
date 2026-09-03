@@ -238,3 +238,48 @@ export function propuestasParaTareas(
     return dentroDeVentana(p.respondida_at, ahora, dias);
   });
 }
+
+/**
+ * Los rivales sugeridos, con su distancia y ordenados de más cerca a más
+ * lejos.
+ *
+ * QUÉ ARREGLA. `listRivalCandidates()` no calcula distancia y devuelve la
+ * lista ordenada por «verificados primero, luego los más nuevos». La portada
+ * la exponía cruda, pero `ClubsScreen` sí lee `rival.distanciaKm` para
+ * componer la meta de la tarjeta, así que todas decían «Distancia N.A.» y el
+ * carrusel no tenía nada que ver con la cercanía. `ClubDetailScreen` sí hacía
+ * las dos cosas: la pantalla que este rediseño puso como entrada del módulo
+ * mostraba peor información que la que reemplazó.
+ *
+ * POR QUÉ EL CÁLCULO ENTRA POR PARÁMETRO. `distanciaEntreClubesKm()` vive en
+ * `clubMeta.js`, que importa `haversineKm` de `services/matches`, que arrastra
+ * `./supabase` y no carga bajo `node --test`. Inyectarlo deja la regla
+ * probable sin mover el cálculo de sitio — el mismo patrón de
+ * `rivalClubsQuery.js` y `nominaQuery.js` con el cliente de Supabase.
+ *
+ * EL ORDEN DE LOS QUE NO SE PUEDEN MEDIR. Van al final, y entre ellos se
+ * conserva el orden en que vinieron, que ya prioriza a los verificados. El
+ * comparador de `ClubDetailScreen` devuelve `1` cuando los dos son `null`,
+ * que es un comparador inconsistente: acá empatan de verdad y `sort` los deja
+ * como estaban, porque es estable desde ES2019.
+ *
+ * Un resultado que no sea un número finito se trata como «sin distancia». Un
+ * `NaN` colado envenenaría el orden entero: nunca es mayor ni menor que nada,
+ * así que el comparador dejaría de ser transitivo.
+ */
+export function rivalesPorCercania(rivales, { club = null, distancia = null } = {}) {
+  const lista = Array.isArray(rivales) ? rivales : [];
+  const medible = club && typeof distancia === 'function';
+
+  const conDistancia = lista.map((rival) => {
+    const km = medible ? distancia(club, rival) : null;
+    return { ...rival, distanciaKm: Number.isFinite(km) ? km : null };
+  });
+
+  return conDistancia.sort((a, b) => {
+    if (a.distanciaKm === b.distanciaKm) return 0;
+    if (a.distanciaKm === null) return 1;
+    if (b.distanciaKm === null) return -1;
+    return a.distanciaKm - b.distanciaKm;
+  });
+}
