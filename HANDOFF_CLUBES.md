@@ -79,12 +79,30 @@ Hallazgo colateral que valida el arreglo del badge: `getPropuestaVigente()` devu
 | F | `listOpenMatches({limit:50})` traía los 50 partidos abiertos más próximos **de toda la app** y excluía los `'lleno'`: el partido del club desaparecía sin avisar | `listPartidosDeClub()` en `services/matches.js`, filtrada por club en la base. La RLS 44d lo permite |
 | G | `futfinder:clubActivo` significaba dos cosas | Resuelto con A: la clave vuelve a significar solo «club activo» |
 
-### Reducciones declaradas en la tarea 9
+### Reducciones de la tarea 9 — auditadas y resueltas el 2026-09-02
 
-Dos cosas del brief no se implementaron tal cual, y conviene que se sepan:
+**«Clubes sugeridos» con botón «Unirse». ACEPTADA. La conducta se queda; la justificación estaba mal y se reescribe.**
 
-- **«Clubes sugeridos» en el estado sin club.** El brief los pedía con botón «Unirse». El contexto no trae esa lista —`listRivalCandidates` necesita un club de referencia y quien no tiene club no lo tiene—, y añadirla significaba otra consulta y otra clave del contrato. En su lugar, «Explorar clubes» lleva a `ExploreClubs`, que es el explorador completo con búsqueda y listado: la capacidad queda a un toque, no se pierde.
-- **«Ver estado del servicio»** en el estado de error: el propio plan ya lo había descartado por no tener respaldo en la app.
+El brief los pedía en DOS estados, no en uno: `membership === 'none'` («clubes sugeridos (Unirse)») y `membership === 'pending'` («+ sugeridos»). **No aparecen en ninguno de los dos.** La declaración anterior sólo mencionaba el primero y subdeclaraba su propio alcance.
+
+El motivo que se dio antes —«`listRivalCandidates` necesita un club de referencia y quien no tiene club no lo tiene»— **es falso**, y conviene decirlo para que nadie lo herede:
+
+- `clubs.js:316` declara `listRivalCandidates({ retadorClubId = null, ... } = {})`: el parámetro es **opcional**.
+- Con `retadorClubId: null` y sin clubes, `excludeIds` queda vacío, y `rivalClubsQuery.js:44-49` contempla ese caso **a propósito**: «Sin ids que excluir no se agrega el filtro».
+- Existe además `searchClubs('')` (`clubs.js:255`), que es lo que `ClubExplorer.js:88` usa en modo no-rival y no necesita ningún club.
+- Y «Unirse» tendría acción: `requestToJoin()` (`clubs.js:403`) está completo, con el tope de 3 clubes y el duplicado `23505` ya cubiertos.
+
+**La razón verdadera es otra: en este código «sugeridos» no significa nada.** `buildRivalClubsQuery` (`rivalClubsQuery.js:57-60`) ordena por `verificado desc, created_at desc`. No hay geografía, ni afinidad, ni nivel. Rotular «Clubes sugeridos» sobre «los verificados y los más nuevos» le promete al usuario un criterio que no existe. En cambio `ExploreClubs` —a un toque desde «Explorar clubes»— trae buscador y filtros de región y comuna, que es más de lo que daría un carrusel arbitrario. La capacidad no se pierde: se ofrece con la herramienta que sí sabe filtrar. Coincide con el punto **B4** del checklist, que da esa ruta por buena.
+
+**«Ver estado del servicio». ACEPTADA, y NO pertenece a la tarea 9.** Está mal listada aquí. `task-9-brief.md` ya la excluía por escrito antes de que nadie implementara nada —«no tiene respaldo en la app y el handoff prohíbe construir pantalla nueva sin confirmarlo»—, así que el implementador cumplió su encargo al pie de la letra. Es una desviación respecto del **handoff de diseño**, decidida antes y por dos vías, no una reducción de esta tarea. Se verificó que no existe página de estado ni health-check en el repo. El resto del estado de error calza literalmente con el brief, copy incluido.
+
+### Lo que la auditoría encontró SIN declarar
+
+**Regresión en el carrusel de rivales. CORREGIDA.** `ClubDetailScreen.js:171-180` enriquece los candidatos con `distanciaKm` y los ordena por cercanía. `ClubsScreen` tomaba la lista cruda del contexto, pero **sí leía** `rival.distanciaKm` para la meta de la tarjeta (`ClubsScreen.js:463`), así que `formatDistanciaKm(undefined)` devolvía «Distancia N.A.» en TODAS las tarjetas y el orden era «verificados primero, luego los más nuevos». La portada, que este rediseño puso como entrada del módulo, mostraba peor información que la pantalla que reemplazó. Un campo que se lee y no se escribe no lo ve ninguna prueba de lógica pura.
+
+Arreglado con `rivalesPorCercania()` en `clubsHomeSources.js`, con **10 pruebas puras** y **3 de cableado** que leen el fuente. El cálculo entra **inyectado**: `clubMeta.js` importa `haversineKm` de `services/matches`, que arrastra `./supabase` y no carga bajo `node --test` — el mismo muro que ya obligó a sacar `clubesDePartidoQuery.js`. De paso se corrigió el comparador: el de `ClubDetailScreen` devuelve `1` cuando los dos son `null`, que es inconsistente; acá empatan y `sort` conserva el orden del servicio.
+
+**Preexistentes, fuera del alcance de la tarea 9 y SIN corregir.** `RIVAL_CLUB_COLUMNS` (`rivalClubsQuery.js:27`) no pide `modalidad`, `rating` ni `nivel`, así que las tarjetas de rival dicen «Fútbol N.A.» y «Nivel N.A.» **en las dos pantallas**, no sólo en la portada. `rating` y `nivel` ni siquiera existen en el esquema —lo dicen los comentarios de `clubMeta.js:62` y `:47`—, así que no es cosa de añadir una columna al `select`. `modalidad` sí existe y `searchClubs` la pide; que el modo rival no lo haga parece un olvido, pero es anterior a este rediseño. Queda anotado, no tocado.
 
 ### Qué se puede probar y qué no
 
@@ -95,7 +113,7 @@ El repo no tiene pruebas de render, así que **todo lo que decide algo salió de
 ## 4. Qué falta antes del merge
 
 1. **Recorrido manual** (`npm run web`): pestaña Clubes → abre la portada, no el detalle → «Ver club» lleva al detalle → el back vuelve a la portada. Y con un desafío recibido pendiente, comprobar que el badge de la barra y el de «Pendiente para ti» muestran lo mismo. Ahora también: con un desafío cerrado **sin acuerdo** en los últimos siete días, que la tarjeta salga apagada, con el chip «Expiró», sin botón, titulada **«Desafío sin acuerdo»** y **sin sumar al badge** (§15 y §16). Y con **diez o más** pendientes, que la barra inferior y «Pendiente para ti» digan los dos «9+».
-2. **Reducciones declaradas de la tarea 9**, ver §3 — decidir si se aceptan. (El otro punto que esperaba decisión, el contraste del tema rojo, quedó **cerrado sin cambio**: §17.)
+2. ~~**Reducciones declaradas de la tarea 9**~~ — **auditadas y resueltas** el 2026-09-02: las dos se aceptan, con la justificación de la primera reescrita, y la regresión no declarada que salió de la auditoría quedó corregida. Ver §3. (El otro punto que esperaba decisión, el contraste del tema rojo, quedó **cerrado sin cambio**: §17.)
 3. Actualizar `docs/memoria/funcionalidades/clubes.md` y `docs/memoria/diseno/sistema-visual.md`.
 
 ---
