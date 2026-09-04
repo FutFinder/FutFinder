@@ -1,4 +1,16 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
+import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
+
+/**
+ * `tema` → migración 53. Sin ella, pedirla en el `select` explícito de
+ * `withClubs()` (abajo) tumba la consulta ENTERA con 42703: no es una
+ * columna que falte en un club, es una columna que falta en la tabla, y
+ * `.in('id', ids)` no vuelve con nada. Eso dejaría los partidos de clubes
+ * sin nombre ni escudo en Inicio y Partidos, no sólo sin color. Mismo
+ * mecanismo y mismo registro por proceso que `services/clubs.js`.
+ */
+const columnasClub = crearRegistroDeColumnas(['tema']);
 
 /**
  * Distancia haversine en km entre dos coords {lat, lng}.
@@ -49,6 +61,44 @@ export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
 }
 
 /**
+ * Los próximos partidos de un club, del más cercano al más lejano.
+ *
+ * POR QUÉ NO SIRVE `listOpenMatches()` PARA ESTO. Esa consulta trae los N
+ * partidos abiertos más próximos de TODA la app y después el cliente busca
+ * entre ellos alguno de su club. Con la app llena, cincuenta partidos ajenos
+ * empiezan antes que el tuyo y el partido de tu club sale de la ventana: la
+ * portada dejaría de mostrarlo sin decir por qué. Acá el filtro por club va
+ * en la base, así que el tope se aplica sobre los partidos que importan.
+ *
+ * ADEMÁS NO FILTRA POR `'abierto'`. Un partido de club que llenó sus cupos
+ * pasa a `'lleno'` y seguía siendo el próximo partido: esconderlo justo
+ * cuando el club terminó de armarse era el peor momento posible. Se excluyen
+ * los cancelados y los finalizados, que sí dejaron de estar por venir.
+ *
+ * La RLS lo permite: desde la migración 44d un integrante de cualquiera de
+ * los dos clubes ve estas filas en cualquier estado.
+ */
+export async function listPartidosDeClub(clubId, { limit = 10 } = {}) {
+  if (!isSupabaseConfigured || !clubId) return { data: [], error: null };
+
+  const ahora = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('matches')
+    .select('*')
+    .or(`club_local_id.eq.${clubId},club_visitante_id.eq.${clubId}`)
+    .not('estado', 'in', '(cancelado,finalizado)')
+    .gt('hora', ahora)
+    .order('hora', { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    console.error('[FutFinder] listPartidosDeClub:', error);
+    return { data: [], error };
+  }
+  return { data: await withClubs(data || []), error: null };
+}
+
+/**
  * Adjunta `organizador: { username, foto_url, trust_score }` a una lista de
  * partidos con una sola consulta. Las tarjetas del listado necesitan mostrar
  * quién organiza, y sin esto haría una consulta por tarjeta.
@@ -85,12 +135,10 @@ export async function withClubs(matches) {
   ];
   if (!ids.length) return list;
 
-  const { data: clubs } = await supabase
-    .from('clubs')
-    .select('id, nombre, foto_url')
-    .in('id', ids);
-
-  const byId = new Map((clubs || []).map((c) => [c.id, c]));
+  // La consulta vive en `utils/clubesDePartidoQuery.js` con el cliente
+  // inyectado, para que su tolerancia a la columna `tema` ausente se pueda
+  // probar: acá no, porque este módulo no carga bajo `node --test`.
+  const byId = await cargarClubesDePartido(supabase, { registro: columnasClub, ids });
   return list.map((m) =>
     m.club_local_id || m.club_visitante_id
       ? {

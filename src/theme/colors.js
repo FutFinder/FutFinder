@@ -426,3 +426,41 @@ export const spacing = {
   xl: 32,
   xxl: 48,
 };
+
+/**
+ * Tonos semánticos del módulo Clubes que NO se tematizan.
+ *
+ * El tema del club pinta su identidad —escudo, banner, botones—, pero no
+ * puede pintar el significado: un club rojo no puede hacer que una victoria
+ * parezca una derrota ni que un aviso parezca una sanción. Estos cuatro roles
+ * conservan su color en los cuatro temas.
+ *
+ * El tono `accent` no vive acá: sale de `temaDeClub()`, porque sí depende del
+ * club.
+ */
+export const clubTonos = Object.freeze({
+  warn: Object.freeze({ soft: 'rgba(255, 197, 49, 0.14)', fg: '#FFC531' }),
+  danger: Object.freeze({ soft: 'rgba(255, 75, 43, 0.15)', fg: '#FF6E4F' }),
+  info: Object.freeze({ soft: 'rgba(255, 255, 255, 0.07)', fg: '#D6D6DA' }),
+});
+
+/**
+ * Superficies de la portada de Clubes: niveles de elevación y estructura.
+ *
+ * Como `clubTonos`, no se tematizan. El tema del club no puede pintar las
+ * superficies de fondo porque su paleta oscila solo sobre el color principal
+ * (un rojo oscuro es distinto de un azul oscuro, aunque ambos sean "fondo").
+ *
+ * `card` y `cardAlta` son dos elevaciones: card es la superficie base de una
+ * tarjeta, cardAlta es más clara para resaltar contenido crítico. `barra` es
+ * semitransparente para flotar sobre el fondo, `header` es el fondo más oscuro,
+ * `separador` divide secciones y `borde` marca límites.
+ */
+export const clubSuperficies = Object.freeze({
+  card: '#101012',
+  cardAlta: '#0D0E0D',
+  barra: 'rgba(9, 9, 10, 0.94)',
+  header: 'rgba(0, 0, 0, 0.9)',
+  separador: 'rgba(255, 255, 255, 0.05)',
+  borde: 'rgba(255, 255, 255, 0.08)',
+});

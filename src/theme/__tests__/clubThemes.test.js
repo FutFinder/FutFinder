@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const T = require('../clubThemes.js');
-const { dsColors } = require('../colors.js');
+const { dsColors, clubTonos, clubSuperficies } = require('../colors.js');
 
 /**
  * Tema de color del club.
@@ -279,4 +279,67 @@ test('la escala que se entrega no puede modificar el catálogo', () => {
 
   assert.equal(escala.main, original);
   assert.equal(T.temaClub('blue').main, original);
+});
+
+test('los alfas del acento son los que fija el handoff de la portada', () => {
+  // Estos tres números son una decisión, no un detalle: el handoff los pide
+  // así y `dsColors.winSoft` ya usa .14. Sin esta prueba, el próximo retoque
+  // de color los pierde en silencio y la portada deja de calzar con el resto.
+  const alfa = (c) => Number(c.match(/,\s*([\d.]+)\)$/)[1]);
+  for (const clave of CLAVES) {
+    const escala = T.temaClub(clave);
+    assert.equal(alfa(escala.soft), 0.14, `${clave}.soft`);
+    assert.equal(alfa(escala.border), 0.42, `${clave}.border`);
+    assert.equal(alfa(escala.glow), 0.3, `${clave}.glow`);
+  }
+});
+
+// ── Tonos que NO se tematizan ────────────────────────────────────────
+
+test('los valores de tonos semánticos y superficies están fijados en el handoff', () => {
+  // Los tonos semánticos y superficies son constantes, no derivadas del tema:
+  // si alguien los convirtiera en funciones del club, estos valores literales
+  // dejarían de coincidir y la prueba lo atraparía. Eso es lo que de verdad
+  // protege contra la tematización.
+  const esperados = {
+    'clubTonos.warn.soft': 'rgba(255, 197, 49, 0.14)',
+    'clubTonos.warn.fg': '#FFC531',
+    'clubTonos.danger.soft': 'rgba(255, 75, 43, 0.15)',
+    'clubTonos.danger.fg': '#FF6E4F',
+    'clubTonos.info.soft': 'rgba(255, 255, 255, 0.07)',
+    'clubTonos.info.fg': '#D6D6DA',
+    'clubSuperficies.card': '#101012',
+    'clubSuperficies.cardAlta': '#0D0E0D',
+    'clubSuperficies.barra': 'rgba(9, 9, 10, 0.94)',
+    'clubSuperficies.header': 'rgba(0, 0, 0, 0.9)',
+    'clubSuperficies.separador': 'rgba(255, 255, 255, 0.05)',
+    'clubSuperficies.borde': 'rgba(255, 255, 255, 0.08)',
+  };
+
+  for (const [clave, valor] of Object.entries(esperados)) {
+    const [familia, tono, propiedad] = clave.split('.');
+    const actual = familia === 'clubTonos'
+      ? clubTonos[tono][propiedad]
+      : clubSuperficies[propiedad || tono];
+    assert.equal(actual, valor, clave);
+  }
+});
+
+test('los tonos semánticos y superficies están congelados contra mutación', () => {
+  // Object.freeze es el mecanismo real que protege contra tematización:
+  // una familia congelada no puede recibir nuevas propiedades ni cambiar
+  // las existentes en caliente. Sin esto, alguien podría sobrescribir
+  // clubTonos.warn en memoria.
+  assert.equal(Object.isFrozen(clubTonos), true, 'clubTonos debe estar congelado');
+  assert.equal(Object.isFrozen(clubTonos.warn), true, 'clubTonos.warn debe estar congelado');
+  assert.equal(Object.isFrozen(clubTonos.danger), true, 'clubTonos.danger debe estar congelado');
+  assert.equal(Object.isFrozen(clubTonos.info), true, 'clubTonos.info debe estar congelado');
+  assert.equal(Object.isFrozen(clubSuperficies), true, 'clubSuperficies debe estar congelado');
+});
+
+test('el peligro no colisiona con el tema rojo', () => {
+  // Si `danger.fg` fuera igual a `temaClub('red').main`, un club rojo no podría
+  // distinguir visualmente su acento de una acción destructiva. Esta prueba
+  // verifica que los colores son distintos (distancia de color, no solo hex).
+  assert.notEqual(clubTonos.danger.fg.toLowerCase(), T.temaClub('red').main.toLowerCase());
 });

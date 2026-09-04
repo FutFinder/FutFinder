@@ -435,3 +435,55 @@ test('la propuesta del rival me deja revisarla; la mía, esperando', () => {
   });
   assert.equal(getChallengeCta(propia).kind, 'esperar_aprobacion');
 });
+
+// ── Cuál de los dos clubes del desafío es el mío ─────────────────────
+//
+// De acá sale el acento con el que se pintan `ChallengeHeader`,
+// `CambioPartidoCard` y la barra «Ver / Crear partido de club»: el del club
+// de UNO, nunca el del rival. La decisión vivía dentro de `ChatThreadScreen`,
+// un archivo con JSX que `node --test` no puede cargar, así que el contrato
+// que más importa del color no tenía ninguna prueba que lo fijara.
+
+const DESAFIO = { id: 'd1', club_retador_id: 'retador', club_retado_id: 'retado' };
+
+test('si desafío yo, mi club es el retador', () => {
+  assert.equal(T.clubPropioDelDesafio(DESAFIO, ['retador']), 'retador');
+});
+
+test('si me desafían, mi club es el retado', () => {
+  assert.equal(T.clubPropioDelDesafio(DESAFIO, ['retado']), 'retado');
+});
+
+test('el rival NUNCA es la respuesta: es el color de mi club, no del suyo', () => {
+  // El fallo que esta prueba existe para atrapar es devolver «el otro club»
+  // por un `find` invertido. Con un solo bando en la lista, la única salida
+  // correcta es ese bando.
+  assert.notEqual(T.clubPropioDelDesafio(DESAFIO, ['retado']), 'retador');
+  assert.notEqual(T.clubPropioDelDesafio(DESAFIO, ['retador']), 'retado');
+});
+
+test('sin membresía reconocible devuelve null y el color cae al verde de siempre', () => {
+  // Un moderador o un administrador de la app pueden abrir el hilo sin
+  // pertenecer a ninguno de los dos clubes. `temaDeClub(null)` es verde.
+  assert.equal(T.clubPropioDelDesafio(DESAFIO, ['otro']), null);
+  assert.equal(T.clubPropioDelDesafio(DESAFIO, []), null);
+  assert.equal(T.clubPropioDelDesafio(DESAFIO, null), null);
+});
+
+test('sin desafío cargado todavía tampoco hay club propio', () => {
+  assert.equal(T.clubPropioDelDesafio(null, ['retador']), null);
+  assert.equal(T.clubPropioDelDesafio(undefined, ['retador']), null);
+});
+
+test('perteneciendo a los DOS clubes gana el retador, y no es un empate al azar', () => {
+  // Pasa de verdad en pruebas y en cuentas de staff. Se devuelve siempre el
+  // mismo lado para que el color del hilo no cambie entre dos aperturas.
+  assert.equal(T.clubPropioDelDesafio(DESAFIO, ['retado', 'retador']), 'retador');
+  assert.equal(T.clubPropioDelDesafio(DESAFIO, ['retador', 'retado']), 'retador');
+});
+
+test('la membresía vale sea de jugador o de admin', () => {
+  // Un jugador sin cargo también ve el hilo con el color de SU club: la
+  // lista que entra es la de cualquier membresía, no la de las que mandan.
+  assert.equal(T.clubPropioDelDesafio(DESAFIO, ['retado']), 'retado');
+});

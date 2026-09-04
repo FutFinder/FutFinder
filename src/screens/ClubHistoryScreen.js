@@ -16,6 +16,8 @@ import { clubColors, clubRadius, clubSizes } from '../theme/colors';
 import MatchHistoryCard from '../components/club/MatchHistoryCard';
 import EmptyStateCard from '../components/ds/EmptyStateCard';
 import { getClubMatchHistory, getClubEstadisticas, ESTADISTICAS_VACIAS } from '../services/clubMatches';
+import { getClubById } from '../services/clubs';
+import { temaDeClub } from '../theme/clubThemes';
 import { resumenEstadisticas, HISTORIAL_LIMITE_MAX } from '../utils/historialClub';
 
 /**
@@ -45,16 +47,19 @@ export default function ClubHistoryScreen({ navigation, route }) {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [club, setClub] = useState(null);
   const [partidos, setPartidos] = useState([]);
   const [error, setError] = useState(null);
   const [estadisticas, setEstadisticas] = useState(ESTADISTICAS_VACIAS);
 
   const load = useCallback(async () => {
-    const [{ data, error: err }, { data: stats }] = await Promise.all([
+    const [{ data: c }, { data, error: err }, { data: stats }] = await Promise.all([
+      getClubById(clubId),
       // El tope real de la RPC, no los tres del perfil.
       getClubMatchHistory(clubId, { limit: HISTORIAL_LIMITE_MAX }),
       getClubEstadisticas(clubId),
     ]);
+    setClub(c);
     setPartidos(data || []);
     // «No se pudo leer» y «no hay partidos» son cosas distintas: confundirlas
     // le diría a un club con historial que nunca jugó.
@@ -76,6 +81,11 @@ export default function ClubHistoryScreen({ navigation, route }) {
   };
 
   const resumen = resumenEstadisticas(estadisticas);
+
+  // Un club que todavía no cargó —o uno anterior a la migración 53— resuelve
+  // a verde, igual que en `ClubDetailScreen`: esta pantalla mira un solo
+  // club, así que el acento es directo, sin la regla de «solo si es mío».
+  const tema = temaDeClub(club);
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -103,7 +113,7 @@ export default function ClubHistoryScreen({ navigation, route }) {
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={clubColors.green} />
+          <ActivityIndicator color={tema.main} />
         </View>
       ) : (
         <FlatList
@@ -114,8 +124,8 @@ export default function ClubHistoryScreen({ navigation, route }) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={clubColors.green}
-              colors={[clubColors.green]}
+              tintColor={tema.main}
+              colors={[tema.main]}
             />
           }
           ListHeaderComponent={

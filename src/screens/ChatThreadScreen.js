@@ -46,6 +46,7 @@ import IncomparecenciaYRevisionBar from '../components/clubes/IncomparecenciaYRe
 import Banner from '../components/Banner';
 
 import { chatColors } from '../theme/colors';
+import { temaDeClub } from '../theme/clubThemes';
 import {
   listThreadMessages,
   sendMessage,
@@ -87,7 +88,11 @@ import { EXPEDIENTE_VACIO } from '../utils/expedienteSancion';
 import { accionesDeCancelacion } from '../utils/cancelacionEncuentro';
 import { accionesDeIncomparecencia, accionesDeRevision } from '../utils/revisionSancion';
 import { crearSondeo } from '../utils/sondeo';
-import { parseChallengeThread, challengeCtaContext } from '../utils/challengeThread';
+import {
+  parseChallengeThread,
+  challengeCtaContext,
+  clubPropioDelDesafio,
+} from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
@@ -162,6 +167,9 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [challengeBusy, setChallengeBusy] = useState(false);
   const [myClubIds, setMyClubIds] = useState([]);
   const [myClubIdsTodos, setMyClubIdsTodos] = useState([]);
+  // El club propio del desafío (con su `tema`), para pintar la cabecera y la
+  // tarjeta de cambio con el acento de MI club, no el del rival.
+  const [miClub, setMiClub] = useState(null);
   const [busyAction, setBusyAction] = useState(false);
 
   // Cambios negociados del partido publicado (migración 46). El partido se
@@ -1003,6 +1011,41 @@ export default function ChatThreadScreen({ route, navigation }) {
     [cambioPartido, cambioPendiente]
   );
 
+  /**
+   * Cuál de los dos clubes del desafío es el mío, para pintar la cabecera y
+   * la tarjeta de cambio con SU acento. La regla vive en `challengeThread.js`
+   * y está probada ahí: este archivo tiene JSX y `node --test` no lo carga,
+   * así que decidirlo acá dejaba sin prueba el contrato que más importa del
+   * color —que sea el de mi club y no el del rival—.
+   *
+   * `myClubIdsTodos` es cualquier membresía (jugador o admin): un jugador sin
+   * cargo también ve el chat con el color de SU club.
+   */
+  const miClubId = useMemo(
+    () => clubPropioDelDesafio(clubChallenge, myClubIdsTodos),
+    [clubChallenge, myClubIdsTodos]
+  );
+
+  useEffect(() => {
+    if (!miClubId) {
+      setMiClub(null);
+      return undefined;
+    }
+    let alive = true;
+    (async () => {
+      const { data } = await getClubById(miClubId);
+      if (alive) setMiClub(data || null);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [miClubId]);
+
+  // Sin club propio resuelto (todavía cargando, o un caso sin membresía
+  // reconocible), `temaDeClub` cae sola al verde de siempre: nunca se queda
+  // sin color mientras se espera la consulta.
+  const temaDesafio = useMemo(() => temaDeClub(miClub), [miClub]);
+
   const responderCambio = useCallback(
     async (aceptar, motivo) => {
       if (cambioBusy || !cambioPendiente?.id) return;
@@ -1584,6 +1627,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                 error={cambioError}
                 onAceptar={() => responderCambio(true)}
                 onRechazar={(motivo) => responderCambio(false, motivo)}
+                tema={temaDesafio}
               />
             )}
 
@@ -1618,6 +1662,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                 onPressCta={ctaAccionable ? handleChallengeCta : null}
                 onResponderProrroga={handleResponderProrroga}
                 ocupado={challengeBusy}
+                tema={temaDesafio}
               />
             )}
 
@@ -1629,10 +1674,20 @@ export default function ChatThreadScreen({ route, navigation }) {
                   }
                   accessibilityRole="button"
                   accessibilityLabel="Ver el partido de club creado"
-                  style={({ pressed }) => [styles.challengeBar, pressed && { opacity: 0.85 }]}
+                  style={({ pressed }) => [
+                    styles.challengeBar,
+                    // Misma regla que la cabecera de arriba: el color sale de
+                    // MI club. Dejar esta barra verde al lado de una cabecera
+                    // ya tematizada era la incoherencia que el rediseño de
+                    // Clubes existe para borrar.
+                    { borderColor: temaDesafio.border, backgroundColor: temaDesafio.soft },
+                    pressed && { opacity: 0.85 },
+                  ]}
                 >
-                  <Swords color={chatColors.green} size={18} />
-                  <Text style={styles.challengeBarText}>Ver el partido de club creado</Text>
+                  <Swords color={temaDesafio.main} size={18} />
+                  <Text style={[styles.challengeBarText, { color: temaDesafio.main }]}>
+                    Ver el partido de club creado
+                  </Text>
                 </Pressable>
               ) : (
                 <Pressable
@@ -1644,11 +1699,14 @@ export default function ChatThreadScreen({ route, navigation }) {
                   style={({ pressed }) => [
                     styles.challengeBar,
                     styles.challengeBarCreate,
+                    { borderColor: temaDesafio.main, backgroundColor: temaDesafio.main },
                     pressed && { opacity: 0.85 },
                   ]}
                 >
-                  <Swords color={chatColors.inkOnGreen} size={18} strokeWidth={2.4} />
-                  <Text style={styles.challengeBarCreateText}>Crear partido de club</Text>
+                  <Swords color={temaDesafio.ink} size={18} strokeWidth={2.4} />
+                  <Text style={[styles.challengeBarCreateText, { color: temaDesafio.ink }]}>
+                    Crear partido de club
+                  </Text>
                 </Pressable>
               )
             )}
