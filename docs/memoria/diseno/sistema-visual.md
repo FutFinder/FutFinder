@@ -37,6 +37,8 @@ El copy visible se mantiene en español. Los componentes reciben labels ya resue
 
 `PendingTaskCard` tiene tres estados y cada uno cambia el CONTENIDO, no sólo el aspecto. Abierta lleva su botón; resuelta se apaga con chip «Listo ✓»; vencida se apaga al 55 % de opacidad, pierde el botón y lleva chip «Expiró». En la vencida el texto también cambia: el título nombra el ESTADO —«Desafío sin acuerdo», «Propuesta rechazada», «Cambio sin respuesta»— en vez del tipo de tarea, con un texto por cierre en vez de uno genérico, y `cta` viaja en `null` para que el objeto no siga prometiendo «Responder» en un campo que otro consumidor pueda leer. Apagar una tarjeta no basta si el texto sigue invitando a responder algo que ya no existe. Los títulos son sustantivos de estado, no verbos: hay una prueba que rechaza cualquier verbo de acción en el título o el subtítulo de una vencida.
 
+Una tarea puede traer `acciones` en vez de `cta`: entonces `PendingTaskCard` dibuja esos botones —el primero con el acento del club, el segundo en gris, porque no son un par simétrico— y **deja de navegar** al pulsar la tarjeta, para que un toque al lado de un botón no dispare un destino que nadie pidió. Hoy la usa la invitación a un club, que se resuelve en la propia tarjeta.
+
 El rótulo de un badge numérico se decide en un solo sitio, `etiquetaBadge()` de `src/utils/clubsHomeTasks.js`: por encima de nueve muestra «9+». Lo usan la barra inferior (`MainTabs`) y «Pendiente para ti» (`ClubsScreen`), que antes escribían la regla por separado y con diez o más pendientes mostraban textos distintos del mismo dato. El tope es del rótulo y nunca del conteo: el número exacto es el que llega al lector de pantalla.
 
 ## Objetivos táctiles

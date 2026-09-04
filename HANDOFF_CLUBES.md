@@ -587,4 +587,121 @@ Qué significa esto para quien lea después:
 - **No hay arreglo asociado**, ni prueba nueva, ni cambio de tokens. `ClubSummaryCard.js` sigue con `color={escala.main}` en el tile V.
 - **Si alguien quiere revertirlo** —cambiar de opinión es legítimo— es una línea: `color={escala.main}` → `color={dsColors.win}`. Pero entonces sería un cambio de diseño nuevo, con su propia justificación, no la corrección de un defecto pendiente.
 
-Lo que **sí** sigue abierto es K1, que es otra cosa: comprobar con los cuatro temas puestos que la portada entera los sigue. Está entre los 18 controles bloqueados de §16 porque necesita sesión y datos sembrados, y no se puede dar por aprobado desde el código.
+Lo que **sí** sigue abierto es K1, que es otra cosa: comprobar con los cuatro temas puestos que la portada entera los sigue. Está entre los 18 controles bloqueados de §16 porque necesita sesión y datos sembrados, y no se puede dar por aprobado desde el código. *(Ya no: K1 se aprobó en el recorrido manual — §18.)*
+
+---
+
+## 18. Bloqueador: la invitación invisible
+
+**El recorrido manual de los 18 controles bloqueados destapó un defecto de producto que no es cosmético, y se corrigió antes del merge.**
+
+### Qué pasaba
+
+Una invitación a alguien que **ya pertenece a un club** no se veía en ninguna parte. La cadena, verificada entera:
+
+1. **La migración 13 no crea aviso, y es deliberado.** Su línea 32 lo dice: «solo solicitudes (las invitaciones las ve el jugador en su pestaña)». El sistema de avisos está bien y **no se toca**.
+2. **Pero la pestaña no las mostraba.** `<Invitaciones>` se montaba en `SinClub` y en `SolicitudEnRevision`. Dentro de `Portada` —el estado de quien ya es miembro— aparecía **cero veces**.
+3. **Y a quien invita se le prometía lo contrario:** `ClubInviteScreen` responde «*verá tu invitación en su pestaña Clubes*».
+
+Como se puede pertenecer hasta a **3 clubes** (migración 24), el caso roto era el normal. Comprobado en la app: con la invitación enviada, la portada no la mostraba y Avisos seguía en 14 sin nada nuevo. El único sitio donde asomaba era el explorador, al que nadie entra si no sabe que tiene una invitación.
+
+### El arreglo
+
+La invitación pasa a ser **una tarea más** de «Pendiente para ti». No hay consulta nueva: `listMyInvitations()` ya se pedía en la primera ronda para derivar la membresía.
+
+- **`ORDEN` la pone primera.** Es la única tarea que el usuario decide solo —no depende de un rival, de un admin ni de un plazo— y la única que cambia a qué clubes pertenece. Al final quedaría escondida tras el tope de cuatro visibles. **No altera el orden relativo del resto, que es el de D3**, ni el orden de las secciones.
+- **Dos acciones, no un CTA.** `cta: null` y `acciones: [{aceptar}, {rechazar}]`. `PendingTaskCard` dibuja los dos botones —el primero con el acento del club, el segundo en gris— y **deja de navegar** al pulsar la tarjeta: con un destino y dos botones encima, un toque al lado haría algo que nadie pidió.
+- **No depende del rol.** Una invitación es personal: no la responde un admin del club al que ya pertenezco, así que tampoco lleva la coletilla «· responde un admin».
+- **Se deduplica por `request_id`**, para que dos rondas de red solapadas no pinten dos tarjetas ni cuenten dos en el badge.
+- **El badge las cuenta en TODOS los estados.** La rama «sin club activo» del contexto devolvía el estado inicial entero, con el badge forzado a 0: quien tenía una invitación y ningún club veía un 0 en la barra teniendo algo que responder. Ahora esa rama también deriva tareas. Quien las **dibuja** ahí sigue siendo `SinClub` / `SolicitudEnRevision`; el contexto sólo las cuenta, así que no hay duplicado en ningún estado.
+
+### El tope de 3 clubes: la regla es del servidor y no se toca
+
+`check_user_club_limit` (migración 24, líneas 18-43) es un **BEFORE INSERT sobre `club_members`** que lanza «Ya perteneces al máximo de 3 clubes permitidos». Aceptar la cuarta falla ahí, y `respondToRequest()` (`clubs.js:500`) propaga ese mensaje tal cual.
+
+**La invitación NO se esconde en el cliente.** Esconderla sería inventar una política que el servidor no tiene: la invitación existe, sigue pendiente, **rechazarla funciona igual** y aceptarla devuelve el motivo real, que es exactamente lo que hay que leer. Hay una prueba que lo fija para que nadie «optimice» ocultándola.
+
+### El conteo de integrantes
+
+`listMyInvitations()` no traía `total_miembros` y `ClubExplorerCard` cae a 0, así que la tarjeta del explorador decía «**0 integrantes**» de un club con dos. Se cierra con el mismo patrón de `searchClubs()` y `listRivalCandidates()`: una sola consulta a `club_members`.
+
+Se descartó a propósito el mismo cambio en `listMyRequests()` —su espejo byte a byte— porque **nadie muestra ese dato ahí**: `SolicitudEnRevision` dibuja su propia tarjeta sin conteo, y habría sido una consulta por carga para nada.
+
+### Verificación
+
+**17 pruebas nuevas**, escritas antes y vistas fallar (11 rojas de golpe). Nueve puras sobre la derivación, siete de cableado que leen el fuente —el defecto era que un archivo no montaba lo que otro esperaba, y eso no lo ve ninguna prueba de lógica— y una que fija una trampa latente: la tarea llevaba `target: 'ClubDetail'` y el mapa mandaba siempre `activeClubId`, así que si alguien le devolviera el `onPress` iría al club equivocado (y a `null` en el estado sin club).
+
+Comprobado además **en la app**, con dos cuentas reales:
+
+| | Resultado |
+|---|---|
+| Invitación visible en «Pendiente para ti» | «Invitación a un club / Los Papi Pasty te invitó a unirte» + Aceptar / Rechazar |
+| Badge de la barra vs. de la sección | **1 y 1**, y el lector de pantalla oye «Clubes, 1 pendientes» |
+| Duplicados | 1 sola aparición |
+| Aceptar | «Ya eres parte del club», la tarjeta desaparece, el selector pasa a dos clubes y el badge vuelve a 0 |
+| Rechazar | «Invitación rechazada», desaparece y **no** se une |
+| Orden D3 | Pendiente para ti → accesos → resumen → actividad → rivales, intacto |
+
+977/977 en verde, `npm run lint` con 0 errores y 24 avisos preexistentes, `npm run build:web` con código de salida 0.
+
+### Resultado del recorrido manual
+
+**18 de 18 controles aprobados.** N3 se cerró el 2026-09-04, en una segunda pasada; N1 y N2 —que no forman parte de los 18— quedaron además validados en pantalla. El recorrido usó Playwright con clics por JS: la comprobación de estabilidad no funciona con las animaciones de React Native web.
+
+- **C3 / C4** — aceptar y rechazar, verificados dos veces: desde el explorador y desde la tarjeta nueva.
+- **E6 / E7 / E8 / E9** — cambio de club, persistencia al salir de la pestaña, persistencia tras F5 y caída al club restante al salir del activo.
+- **D7** — el último elemento termina 82 px por encima de la barra.
+- **H5 / H6** — tres idas y vueltas al detalle, siempre vuelve a la portada.
+- **K1** — los cuatro temas. Los elementos que se quedan verdes son las tarjetas de rival, que usan **el tema del rival**: es la conducta documentada, no un fallo.
+- **L1 / L2** — error total y recuperación con «Reintentar».
+- **M2 / M3 / M6** — 390, 360 y 1280 px sin desborde horizontal.
+- **M4** — nombre de 76 caracteres: tres apariciones, todas con elipsis, ninguna se sale.
+- **M5** — el carrusel desplaza 1850 px sobre 390 visibles.
+
+**N3 — APROBADO el 2026-09-04.** La primera pasada lo dejó a medias: no por no ejecutarse, sino porque **la base no tenía ni un solo partido futuro** —el más reciente era del 24 de agosto—, así que el único chat de partido disponible era «Partido de Clubes», de un partido de clubes ya jugado y en solo lectura. Se sembró entonces un partido **normal** y **futuro** con las dos cuentas inscritas, y el control se ejecutó entero, en los dos sentidos:
+
+| | Historial | Compositor | Enviar | Recibir |
+|---|---|---|---|---|
+| Mensaje directo (`dm:`) | ✅ | ✅ | ✅ | ✅ |
+| Partido normal futuro (`match:`) | ✅ | ✅ | ✅ | ✅ |
+
+- **Partido normal.** Hilo `match:aaaa1111-0000-4000-8000-000000000001`, cabecera «Chat del partido · 2 confirmados». La cuenta 2 abrió el historial ya escrito por la cuenta 1, escribió y envió; la cuenta 1 abrió después y **vio el mensaje de la cuenta 2** antes de responder. Compositor activo, nada de solo lectura.
+- **Mensaje directo.** Hilos `dm:8fd92aa9-…` y `dm:6494036a-…`, el mismo ida y vuelta entre las dos cuentas.
+- **Navegación intacta.** Los dos hilos vuelven a «Chats y amigos» con el gesto de atrás, con la barra de pestañas de nuevo en pantalla, y el chat del partido ya jugado sigue **sin compositor**, igual que antes. **0 `pageerror`** en las cuatro sesiones.
+
+**N1 / N2 — validados en pantalla el 2026-09-04.** No forman parte de los 18, pero hasta esa fecha sólo tenían respaldo automatizado. Ahora tienen las dos cosas, que responden preguntas distintas:
+
+- **Automatizado.** Las **7 pruebas** de `clubesDePartidoQuery.test.js` ejercitan con un cliente falso que responde 42703 el contrato «falta la columna `tema` → los clubes conservan nombre y escudo». Eso demuestra que la consulta degrada bien.
+- **Visual.** Que Inicio y Partidos *pinten* ese nombre y ese escudo no lo demuestra ninguna prueba, y hasta ahora nadie lo había mirado porque ninguna cuenta tenía un partido de clubes visible. Con un partido de clubes futuro entre **Los Papi Pasty** y **SixSiete** —los dos con logo real— se comprobó en pantalla: **N1** en «Próximo partido de tu club» de Inicio y **N2** en la lista de Partidos, ambas con los dos nombres y los **dos escudos cargados desde `club-logos`**, no la inicial de reserva.
+
+### Y el arreglo de la distancia, demostrado
+
+El carrusel de rivales (§3) se comprobó con datos reales: **8,4 km → 1664,4 km → los «Distancia N.A.» al final**, y al cambiar de club activo las distancias se recalculan desde el otro club. Para lograrlo hubo que ponerle comuna a un club de prueba: sin comuna, `distanciaEntreClubesKm()` no puede medir y **el detalle del club mostraba «Distancia N.A.» igual que la portada**, que es lo que confirma que el arreglo estaba bien y lo que faltaba era el dato.
+
+### Estado de los datos de prueba
+
+Las dos pasadas escribieron en la base. **Todo está restaurado; no queda nada temporal.**
+
+| Dato | Estado |
+|---|---|
+| «Club prueba» — tema | Rojo → Azul → Amarillo → Verde → **Rojo**. Restaurado |
+| «Club prueba» — **comuna** | Vacía → «Arica» → **vacía otra vez**. Restaurada el 2026-09-04 |
+| «Los Papi Pasty» — nombre | Nombre largo de 76 caracteres → **«Los Papi Pasty»**. Restaurado |
+| Membresías de `vicente22` | Entró y salió de «Los Papi Pasty». Vuelve a un solo club |
+| Invitaciones de prueba | Todas respondidas: ninguna queda pendiente |
+| Partido normal, desafío, propuesta, partido de clubes | Sembrados con UUID `aaaa1111-…`. **Eliminados** |
+| Amistad temporal entre las dos cuentas | Necesaria para los DM (`chat_are_friends`). **Eliminada** |
+| Mensajes, inscritos, `chat_reads`, avisos y la cancha «Cancha verificación N3» | Todo lo que dispararon los triggers. **Eliminado** |
+
+Sobre la comuna, que era el dato en duda: **volvió a vacía y la región quedó intacta**, que era la parte delicada. «Región de Arica y Parinacota» **ya estaba puesta antes** del recorrido —lo único que se había tocado era la comuna—, así que borrar las dos habría destruido un dato ajeno en vez de restaurar el propio.
+
+La cuenta de partidos cuadra: **24 antes de sembrar y 24 después de limpiar**. Los dos temporales vivieron sólo lo que duró la comprobación, y el de clubes llevaba `challenge_proposal_id`, así que la RLS (`matches_read_publico_o_de_mi_club`) lo escondió de todos menos de los integrantes de los dos clubes.
+
+### Hallazgos separados, NO incluidos en este arreglo
+
+Son cosas distintas y se dejan anotadas aparte, sin tocar:
+
+1. **`window.confirm`.** La confirmación de «Salir del club» usa `window.confirm` en web (`ClubMembersScreen.js:57`). Funciona, pero un navegador que bloquee diálogos deja al usuario sin poder salir.
+2. **Accesibilidad.** Los radios de tema declaran `role="radio"` **sin `aria-checked`**: un lector de pantalla no puede decir cuál está elegido. Las filas de «Invitar jugadores» son `div[tabindex="0"]` sin rol ni nombre accesible, y el botón que de verdad invita es un icono anidado sin etiqueta.
+3. **Perfil público.** El de un administrador de club muestra «CLUB — Sin club». Puede ser privacidad deliberada; hay que comprobarlo antes de tocar nada.
+4. **`EditClub?club=[object Object]`.** La ruta pasa el club como objeto: funciona en memoria, pero el enlace no sobrevive a compartirse ni a una recarga profunda.
