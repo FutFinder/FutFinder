@@ -134,6 +134,41 @@ export default function ClubsScreen({ navigation, route }) {
     [activeClubId, can, club, nextMatch, irA]
   );
 
+  /**
+   * Aceptar o rechazar una invitación desde su tarjeta.
+   *
+   * Vive acá y no en la tarjeta porque después hay que RECARGAR: aceptar
+   * cambia a qué clubes pertenece el usuario, y con ello el selector, el
+   * club activo y el badge. La tarjeta sólo avisa qué se pulsó.
+   *
+   * El error se muestra tal cual lo devuelve el servidor. El caso que más
+   * importa es el tope: `check_user_club_limit` (migración 24) rechaza la
+   * cuarta membresía con «Ya perteneces al máximo de 3 clubes permitidos», y
+   * ese es exactamente el motivo que hay que leer. Inventar un texto propio
+   * acá lo escondería.
+   */
+  const [respondiendo, setRespondiendo] = useState(null);
+  const onAccionTarea = useCallback(
+    async (tarea, clave) => {
+      if (tarea.type !== 'invitacion' || respondiendo) return;
+      const aceptar = clave === 'aceptar';
+      setRespondiendo(tarea.id);
+      const { error: err } = await respondToRequest(tarea.requestId, aceptar);
+      setRespondiendo(null);
+      setBanner(
+        err
+          ? { type: 'error', title: 'No se pudo responder', message: err.message || '' }
+          : {
+              type: 'success',
+              title: aceptar ? 'Ya eres parte del club' : 'Invitación rechazada',
+              message: '',
+            }
+      );
+      reload();
+    },
+    [respondiendo, reload]
+  );
+
   const onTarea = useCallback(
     (tarea) => {
       // `target` lo decide `clubsHomeTasks.js` y son nombres de ruta reales.
@@ -142,7 +177,9 @@ export default function ClubsScreen({ navigation, route }) {
         ClubMatchChange: nextMatch ? { matchId: nextMatch.id } : {},
         ClubMatchRoster: nextMatch ? { matchId: nextMatch.id } : {},
         ClubMembers: { clubId: activeClubId },
-        ClubDetail: { clubId: activeClubId },
+        // El club de LA TAREA, no el activo: una invitación es de otro club,
+        // y en el estado sin club activo `activeClubId` es null.
+        ClubDetail: { clubId: tarea.clubId || activeClubId },
       };
       irA(tarea.target, params[tarea.target] || {});
     },
@@ -203,6 +240,8 @@ export default function ClubsScreen({ navigation, route }) {
           setActiveClub,
           onAccionRapida,
           onTarea,
+          onAccionTarea,
+          respondiendo,
           irA,
         }}
       />
@@ -306,6 +345,8 @@ function Portada({
   setActiveClub,
   onAccionRapida,
   onTarea,
+  onAccionTarea,
+  respondiendo,
   irA,
 }) {
   const sinTareas = (tasks || []).length === 0;
@@ -370,6 +411,8 @@ function Portada({
                 tema={tema}
                 esPrimaria={i === 0}
                 onPress={() => onTarea(tarea)}
+                onAccion={(clave) => onAccionTarea(tarea, clave)}
+                ocupado={respondiendo === tarea.id}
               />
             ))}
             {reparto.etiquetaVerMas ? (

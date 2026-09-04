@@ -8,6 +8,14 @@
  * rompen —el badge, el «ver más», los cupos y los permisos— sin levantar
  * Supabase ni montar una pantalla.
  *
+ * EL TOPE DE CLUBES NO SE COMPRUEBA ACÁ. Un usuario puede pertenecer hasta a
+ * 3 clubes, y quien ya está en 3 sigue viendo sus invitaciones: la regla la
+ * aplica el trigger `check_user_club_limit` (migración 24, líneas 18-43), un
+ * BEFORE INSERT sobre `club_members` que lanza «Ya perteneces al máximo de 3
+ * clubes permitidos». Esconder la invitación en el cliente sería inventar una
+ * política que el servidor no tiene: la invitación existe y sigue pendiente,
+ * rechazarla funciona igual, y aceptarla devuelve el motivo real.
+ *
  * LA REGLA QUE MÁS SE EQUIVOCA: el badge cuenta tareas CON ACCIÓN. Una tarea
  * vencida sigue en pantalla un rato para explicar qué pasó, pero no suma; una
  * tarea resuelta ni siquiera se dibuja, porque salió bien y no hay nada que
@@ -18,8 +26,26 @@
 import { ESTADOS_CERRADOS } from '../services/clubChallengeRules.js';
 import { CLUB_LIMITS } from './clubPlanLimits.js';
 
-/** Prioridad de la lista: es el orden del handoff, no alfabético. */
-const ORDEN = ['desafio', 'propuesta', 'cambio', 'nomina', 'solicitud', 'sancion', 'partido'];
+/**
+ * Prioridad de la lista: es el orden del handoff, no alfabético.
+ *
+ * `invitacion` va PRIMERA y es un añadido posterior al handoff: es la única
+ * tarea que el usuario decide por sí solo —no depende de un rival, de un
+ * admin ni de un plazo— y la única que puede cambiar a qué clubes pertenece.
+ * Ponerla al final la escondería detrás del tope de cuatro visibles.
+ *
+ * No altera el orden relativo del resto, que es el que fija D3.
+ */
+const ORDEN = [
+  'invitacion',
+  'desafio',
+  'propuesta',
+  'cambio',
+  'nomina',
+  'solicitud',
+  'sancion',
+  'partido',
+];
 
 const TOPE_VISIBLE = 4;
 
@@ -260,6 +286,44 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
   const f = fuentes || {};
   const esAdmin = rol === 'admin';
   const tareas = [];
+
+  /**
+   * INVITACIONES. Van antes que nada porque encabezan `ORDEN`.
+   *
+   * Son la tarea más rara del archivo: no tiene `cta` sino DOS acciones, y
+   * no depende del rol —una invitación es personal, no la responde un admin
+   * del club al que ya pertenezco—. Por eso tampoco lleva coletilla.
+   *
+   * Se deduplican por `request_id`: si dos rondas de red se solapan, la
+   * misma invitación no puede salir dos veces ni contar dos en el badge.
+   *
+   * SIN CLUB RESUELTO NO SE DIBUJA. `listMyInvitations()` ya descarta esas
+   * filas, pero sin la guardia la tarjeta diría «Te invitó undefined».
+   */
+  const invitacionesVistas = new Set();
+  for (const inv of f.invitaciones || []) {
+    const id = inv?.request_id;
+    if (!id || !inv.club?.nombre || invitacionesVistas.has(id)) continue;
+    invitacionesVistas.add(id);
+    tareas.push({
+      id: `invitacion:${id}`,
+      type: 'invitacion',
+      tone: 'accent',
+      title: 'Invitación a un club',
+      subtitle: `${inv.club.nombre} te invitó a unirte`,
+      // Aceptar y rechazar son dos salidas y ninguna es «la principal»:
+      // con un `cta` único la tarjeta tendría que inventarse la otra.
+      cta: null,
+      acciones: [
+        { clave: 'aceptar', label: 'Aceptar' },
+        { clave: 'rechazar', label: 'Rechazar' },
+      ],
+      requestId: id,
+      clubId: inv.club_id,
+      target: 'ClubDetail',
+      status: 'abierta',
+    });
+  }
 
   for (const d of f.desafiosRecibidos || []) {
     const status = estadoDeTarea('desafio', d.estado);

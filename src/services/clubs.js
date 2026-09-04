@@ -574,13 +574,29 @@ export async function listMyInvitations() {
     .in('id', ids);
   const byId = new Map((clubs || []).map((c) => [c.id, c]));
 
+  // Los integrantes, en una sola consulta. Sin esto la tarjeta del
+  // explorador decía «0 integrantes» de un club con dos: `ClubExplorerCard`
+  // lee `club.total_miembros` y cae a 0 cuando no llega. Es el mismo cierre
+  // que ya hacen `searchClubs()` y `listRivalCandidates()`.
+  const countById = new Map();
+  const { data: members } = await supabase
+    .from('club_members')
+    .select('club_id')
+    .in('club_id', ids);
+  for (const m of members || []) {
+    countById.set(m.club_id, (countById.get(m.club_id) || 0) + 1);
+  }
+
   return {
-    data: data.map((r) => ({
-      request_id: r.id,
-      club_id: r.club_id,
-      created_at: r.created_at,
-      club: byId.get(r.club_id) || null,
-    })).filter((r) => r.club),
+    data: data.map((r) => {
+      const club = byId.get(r.club_id);
+      return {
+        request_id: r.id,
+        club_id: r.club_id,
+        created_at: r.created_at,
+        club: club ? { ...club, total_miembros: countById.get(r.club_id) || 0 } : null,
+      };
+    }).filter((r) => r.club),
     error: null,
   };
 }

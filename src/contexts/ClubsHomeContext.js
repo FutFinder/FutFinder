@@ -255,12 +255,25 @@ export function ClubsHomeProvider({ children }) {
         if (!vivo) return;
 
         if (!activeId) {
+          // SIN CLUB TAMPOCO SE MIENTE. Antes esta rama devolvía el estado
+          // inicial entero, con `tasks: []` y `badgeCount: 0`: quien tenía
+          // una invitación encima veía un 0 en la barra. Las invitaciones no
+          // dependen de ningún club, así que se derivan igual. Quien las
+          // DIBUJA en este estado es `SinClub` / `SolicitudEnRevision`, que
+          // ya montan `<Invitaciones>`; acá sólo se cuentan.
+          const tareasSinClub = normalizarTareas(
+            { invitaciones: invitations },
+            { rol: null, ahora: new Date() }
+          );
           setState({
             ...ESTADO_INICIAL,
             loading: false,
             cargado: true,
             membership,
             clubs: misClubes,
+            tasks: tareasSinClub,
+            reparto: repartirTareas(tareasSinClub),
+            badgeCount: contarConAccion(tareasSinClub),
             invitations,
             sentRequests: solicitudesEnviadas,
           });
@@ -351,6 +364,10 @@ export function ClubsHomeProvider({ children }) {
 
         const tasks = normalizarTareas(
           {
+            // No dependen del club activo: son del usuario. Quien ya tiene
+            // club sólo las ve acá, porque la portada no monta el bloque
+            // `<Invitaciones>` que sí tienen los estados sin club.
+            invitaciones: invitations,
             desafiosRecibidos: desafiosParaTareas,
             propuestas: propuestasParaTareas(propuestasRes, { clubId: activeId, ahora }),
             cambiosDePartido: cambio ? [cambio] : [],

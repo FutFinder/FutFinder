@@ -809,3 +809,143 @@ test('y explica el cierre cuando no se sabe con quién era', () => {
   );
   assert.match(t.subtitle, /sin acuerdo/i);
 });
+
+// ── Invitaciones recibidas ───────────────────────────────────────────
+//
+// EL BLOQUEADOR QUE FIJAN. Una invitación a alguien que YA tiene club era
+// invisible. La cadena entera:
+//
+//   1. La migración 13 no crea aviso a propósito —«solo solicitudes (las
+//      invitaciones las ve el jugador en su pestaña)»—, así que Avisos no
+//      la muestra y eso es deliberado.
+//   2. Pero `<Invitaciones>` sólo se dibujaba en `SinClub` y en
+//      `SolicitudEnRevision`. En la portada de quien YA es miembro, cero.
+//   3. Y a quien invita se le prometía lo contrario: «verá tu invitación en
+//      su pestaña Clubes» (ClubInviteScreen).
+//
+// Como se puede pertenecer hasta a 3 clubes (migración 24), el caso roto es
+// el normal, no el raro. La invitación pasa a ser una tarea más.
+
+const INVITACION = {
+  request_id: 'inv-1',
+  club_id: 'c-inv',
+  created_at: '2026-08-27T12:00:00Z',
+  club: { id: 'c-inv', nombre: 'Los Papi Pasty' },
+};
+
+test('una invitación recibida se convierte en tarea', () => {
+  const [t] = D.normalizarTareas(fuentes({ invitaciones: [INVITACION] }), {
+    rol: 'jugador',
+    ahora: AHORA,
+  });
+  assert.equal(t.type, 'invitacion');
+  assert.equal(t.id, 'invitacion:inv-1');
+  assert.equal(t.status, 'abierta');
+  assert.match(t.title, /invitación/i);
+  assert.match(t.subtitle, /Los Papi Pasty/);
+});
+
+test('la invitación trae DOS acciones, no un cta único', () => {
+  // Aceptar y rechazar son salidas distintas y ninguna es «la principal».
+  // Con un solo `cta` la tarjeta tendría que inventarse la segunda.
+  const [t] = D.normalizarTareas(fuentes({ invitaciones: [INVITACION] }), {
+    rol: 'jugador',
+    ahora: AHORA,
+  });
+  assert.equal(t.cta, null);
+  assert.deepEqual(
+    (t.acciones || []).map((a) => a.clave),
+    ['aceptar', 'rechazar']
+  );
+  assert.equal(t.acciones[0].label, 'Aceptar');
+  assert.equal(t.acciones[1].label, 'Rechazar');
+});
+
+test('la invitación va PRIMERA: es la única que decide el usuario por sí solo', () => {
+  const f = fuentes({
+    invitaciones: [INVITACION],
+    desafiosRecibidos: [DESAFIO],
+    cambiosDePartido: [{ id: 'c1', estado: 'pendiente' }],
+  });
+  const tareas = D.normalizarTareas(f, { rol: 'admin', ahora: AHORA });
+  assert.equal(tareas[0].type, 'invitacion');
+  // Y no altera el orden relativo de las demás, que es el de D3.
+  assert.deepEqual(
+    tareas.map((t) => t.type),
+    ['invitacion', 'desafio', 'cambio']
+  );
+});
+
+test('la invitación SUMA al badge', () => {
+  const tareas = D.normalizarTareas(fuentes({ invitaciones: [INVITACION] }), {
+    rol: 'jugador',
+    ahora: AHORA,
+  });
+  assert.equal(D.contarConAccion(tareas), 1);
+  assert.equal(D.etiquetaBadge(D.contarConAccion(tareas)), '1');
+});
+
+test('el jugador sin cargo también la ve, y sin «responde un admin»', () => {
+  // Una invitación es personal: no la responde un administrador del club al
+  // que ya pertenezco, la respondo yo.
+  const [t] = D.normalizarTareas(fuentes({ invitaciones: [INVITACION] }), {
+    rol: 'jugador',
+    ahora: AHORA,
+  });
+  assert.doesNotMatch(t.subtitle, /responde un admin/);
+  assert.deepEqual(
+    t.acciones.map((a) => a.clave),
+    ['aceptar', 'rechazar']
+  );
+});
+
+test('dos invitaciones son dos tareas, y ninguna se repite', () => {
+  const otra = { ...INVITACION, request_id: 'inv-2', club: { id: 'c2', nombre: 'SixSiete' } };
+  const tareas = D.normalizarTareas(fuentes({ invitaciones: [INVITACION, otra] }), {
+    rol: 'jugador',
+    ahora: AHORA,
+  });
+  const ids = tareas.map((t) => t.id);
+  assert.deepEqual(ids, ['invitacion:inv-1', 'invitacion:inv-2']);
+  assert.equal(new Set(ids).size, ids.length, 'hay ids repetidos');
+  assert.equal(D.contarConAccion(tareas), 2);
+});
+
+test('la misma invitación repetida en la fuente no se dibuja dos veces', () => {
+  // `listMyInvitations` no debería devolver duplicados, pero si la ronda de
+  // red se solapa consigo misma, la portada no puede mostrar dos tarjetas
+  // idénticas ni contar dos veces en el badge.
+  const tareas = D.normalizarTareas(fuentes({ invitaciones: [INVITACION, { ...INVITACION }] }), {
+    rol: 'jugador',
+    ahora: AHORA,
+  });
+  assert.equal(tareas.length, 1);
+  assert.equal(D.contarConAccion(tareas), 1);
+});
+
+test('una invitación sin club resuelto no se dibuja', () => {
+  // `listMyInvitations` ya filtra las que no resuelven club, pero sin esto
+  // la tarjeta diría «Te invitó undefined».
+  const tareas = D.normalizarTareas(
+    fuentes({ invitaciones: [{ request_id: 'x', club_id: 'c', club: null }] }),
+    { rol: 'jugador', ahora: AHORA }
+  );
+  assert.deepEqual(tareas, []);
+});
+
+test('con el máximo de clubes la invitación NO se esconde', () => {
+  // LA REGLA VIVE EN EL SERVIDOR, no acá. El trigger `check_user_club_limit`
+  // (migración 24, líneas 18-43) es un BEFORE INSERT sobre `club_members`
+  // que lanza «Ya perteneces al máximo de 3 clubes permitidos». Aceptar la
+  // cuarta falla ahí y `respondToRequest()` propaga ese mensaje tal cual.
+  //
+  // Esconder la invitación en el cliente sería inventar una política que el
+  // servidor no tiene: la invitación EXISTE y sigue pendiente. Se muestra, y
+  // quien la acepte recibe el motivo real. Rechazarla sí funciona siempre.
+  const tareas = D.normalizarTareas(
+    fuentes({ invitaciones: [INVITACION] }),
+    { rol: 'jugador', ahora: AHORA, clubesActuales: 3 }
+  );
+  assert.equal(tareas.length, 1);
+  assert.equal(tareas[0].status, 'abierta');
+});

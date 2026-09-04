@@ -29,18 +29,36 @@ import { clubTonos, clubSuperficies } from '../../theme/colors';
  * El tono sale de `clubTonos[tarea.tone]`, salvo `'accent'`, que sale del
  * tema del club. Los tres tonos semánticos no se tematizan.
  *
- * @param {object} tarea        `{ type, tone, title, subtitle, cta, status }`.
+ * DOS ACCIONES EN VEZ DE UNA. Casi todas las tareas llevan un `cta` y llevan
+ * a una pantalla; la invitación a un club se resuelve en la propia tarjeta y
+ * tiene DOS salidas —aceptar y rechazar— sin que ninguna sea la principal.
+ * Cuando la tarea trae `acciones`, se dibujan esos botones en lugar del CTA y
+ * la tarjeta deja de navegar al pulsarla: con un destino y dos botones
+ * encima, un toque a un lado del botón haría algo que nadie pidió.
+ *
+ * @param {object} tarea        `{ type, tone, title, subtitle, cta, status }`,
+ *                              y opcionalmente `acciones: [{clave, label}]`.
  * @param {object} [tema]       Escala de `theme/clubThemes.js`.
  * @param {boolean} [esPrimaria]
  * @param {Function} [onPress]
+ * @param {Function} [onAccion] `(clave)` de `tarea.acciones`.
+ * @param {boolean} [ocupado]   Deshabilita las acciones mientras responde.
  */
-export default function PendingTaskCard({ tarea, tema, esPrimaria = false, onPress }) {
+export default function PendingTaskCard({
+  tarea,
+  tema,
+  esPrimaria = false,
+  onPress,
+  onAccion,
+  ocupado = false,
+}) {
   const escala = tema || temaClub('green');
   if (!tarea) return null;
 
   const resuelta = tarea.status === 'resuelta';
   const vencida = tarea.status === 'vencida';
   const inerte = resuelta || vencida;
+  const acciones = !inerte && tarea.acciones?.length ? tarea.acciones : null;
 
   const tono = resuelta ? acento(escala) : tonoDe(tarea.tone, escala);
   const Icono = resuelta ? Check : ICONOS[tarea.type] || Trophy;
@@ -49,8 +67,8 @@ export default function PendingTaskCard({ tarea, tema, esPrimaria = false, onPre
 
   return (
     <Pressable
-      onPress={inerte ? undefined : onPress}
-      disabled={inerte}
+      onPress={inerte || acciones ? undefined : onPress}
+      disabled={inerte || !!acciones}
       accessibilityRole="button"
       accessibilityLabel={`${tarea.title}. ${subtitulo || ''}`}
       accessibilityState={{ disabled: inerte }}
@@ -58,7 +76,7 @@ export default function PendingTaskCard({ tarea, tema, esPrimaria = false, onPre
         styles.tarjeta,
         { borderColor: esPrimaria && !inerte ? escala.border : clubSuperficies.borde },
         inerte && styles.inerte,
-        pressed && !inerte && styles.press,
+        pressed && !inerte && !acciones && styles.press,
       ]}
     >
       <View style={[styles.icono, { backgroundColor: tono.soft }]}>
@@ -83,6 +101,34 @@ export default function PendingTaskCard({ tarea, tema, esPrimaria = false, onPre
         <Chip texto="Listo ✓" />
       ) : vencida ? (
         <Chip texto="Expiró" />
+      ) : acciones ? (
+        <View style={styles.acciones}>
+          {acciones.map((a, i) => {
+            // La primera es la afirmativa y lleva el acento del club; la
+            // segunda descarta y va en gris. No son un par simétrico.
+            const principal = i === 0;
+            return (
+              <Pressable
+                key={a.clave}
+                onPress={() => onAccion?.(a.clave)}
+                disabled={ocupado}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel={`${a.label}: ${tarea.title}. ${tarea.subtitle || ''}`}
+                style={({ pressed }) => [
+                  styles.boton,
+                  principal ? { backgroundColor: escala.main } : styles.botonSecundario,
+                  ocupado && { opacity: 0.5 },
+                  pressed && !ocupado && { opacity: 0.8 },
+                ]}
+              >
+                <Text style={[styles.botonTexto, principal && { color: escala.ink }]}>
+                  {a.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       ) : (
         <View
           style={[
@@ -144,6 +190,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: clubSuperficies.card,
   },
+  acciones: { flexDirection: 'row', gap: 6 },
   inerte: { opacity: 0.55 },
   press: { opacity: 0.8 },
   icono: {
