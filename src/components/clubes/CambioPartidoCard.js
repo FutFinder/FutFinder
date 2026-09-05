@@ -3,6 +3,7 @@ import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from 
 import { ArrowRight, RefreshCw, TriangleAlert } from 'lucide-react-native';
 
 import { chatColors, dsRadius } from '../../theme/colors';
+import { temaDeClub } from '../../theme/clubThemes';
 import { filasDeComparacion, mensajeDeEspera } from '../../utils/cambioPartido';
 
 /**
@@ -34,6 +35,9 @@ export default function CambioPartidoCard({
   error = null,
   onAceptar,
   onRechazar,
+  // Sin club propio resuelto todavía (o un caso sin membresía reconocible),
+  // `temaDeClub()` cae sola al verde de siempre.
+  tema = temaDeClub(),
 }) {
   const [rechazando, setRechazando] = useState(false);
   const [motivo, setMotivo] = useState('');
@@ -108,7 +112,13 @@ export default function CambioPartidoCard({
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Volver sin rechazar el cambio"
-                style={({ pressed }) => [styles.btn, styles.btnMitad, styles.btnGhost, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.btn,
+                  { backgroundColor: tema.main },
+                  styles.btnMitad,
+                  styles.btnGhost,
+                  pressed && styles.pressed,
+                ]}
               >
                 <Text style={styles.btnGhostTxt}>Volver</Text>
               </Pressable>
@@ -116,7 +126,13 @@ export default function CambioPartidoCard({
                 onPress={() => onRechazar(motivo)}
                 accessibilityRole="button"
                 accessibilityLabel="Confirmar el rechazo del cambio"
-                style={({ pressed }) => [styles.btn, styles.btnMitad, styles.btnGhost, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.btn,
+                  { backgroundColor: tema.main },
+                  styles.btnMitad,
+                  styles.btnGhost,
+                  pressed && styles.pressed,
+                ]}
               >
                 <Text style={styles.btnGhostTxt}>Confirmar rechazo</Text>
               </Pressable>
@@ -128,15 +144,26 @@ export default function CambioPartidoCard({
               onPress={onAceptar}
               accessibilityRole="button"
               accessibilityLabel="Aceptar el cambio y actualizar el partido"
-              style={({ pressed }) => [styles.btn, styles.btnMitad, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.btn,
+                { backgroundColor: tema.main },
+                styles.btnMitad,
+                pressed && styles.pressed,
+              ]}
             >
-              <Text style={styles.btnTxt}>Aceptar cambio</Text>
+              <Text style={[styles.btnTxt, { color: tema.ink }]}>Aceptar cambio</Text>
             </Pressable>
             <Pressable
               onPress={() => setRechazando(true)}
               accessibilityRole="button"
               accessibilityLabel="Rechazar el cambio"
-              style={({ pressed }) => [styles.btn, styles.btnMitad, styles.btnGhost, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.btn,
+                { backgroundColor: tema.main },
+                styles.btnMitad,
+                styles.btnGhost,
+                pressed && styles.pressed,
+              ]}
             >
               <Text style={styles.btnGhostTxt}>Rechazar</Text>
             </Pressable>
@@ -239,12 +266,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: dsRadius.lg,
-    backgroundColor: chatColors.green,
+    // El fondo es el acento del club: sale por estilo en línea en el JSX.
     paddingHorizontal: 12,
   },
   btnMitad: { flex: 1 },
   btnTxt: {
-    color: chatColors.inkOnGreen,
+    // La tinta es el acento del club: sale por estilo en línea en el JSX.
     fontSize: 13,
     fontWeight: '800',
     includeFontPadding: false,

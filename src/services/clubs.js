@@ -26,10 +26,7 @@ import { buildMisClubesAdminQuery } from '../utils/permisosDesafio';
  * que reemplazó el límite anterior de un club por persona.
  */
 
-export const CLUB_LIMITS = {
-  estandar: { miembros: 15, admins: 1 },
-  premium: { miembros: 26, admins: 3 },
-};
+export { CLUB_LIMITS } from '../utils/clubPlanLimits.js';
 
 /**
  * Columnas de `clubs` que pueden no existir todavía en un entorno dado,
@@ -566,6 +563,72 @@ export async function listMyInvitations() {
     .order('created_at', { ascending: false });
   if (error) {
     console.error('[FutFinder] listMyInvitations:', error);
+    return { data: [], error };
+  }
+  if (!data || data.length === 0) return { data: [], error: null };
+
+  const ids = data.map((r) => r.club_id);
+  const { data: clubs } = await supabase
+    .from('clubs')
+    .select('id, nombre, foto_url, comuna, plan, verificado')
+    .in('id', ids);
+  const byId = new Map((clubs || []).map((c) => [c.id, c]));
+
+  // Los integrantes, en una sola consulta. Sin esto la tarjeta del
+  // explorador decía «0 integrantes» de un club con dos: `ClubExplorerCard`
+  // lee `club.total_miembros` y cae a 0 cuando no llega. Es el mismo cierre
+  // que ya hacen `searchClubs()` y `listRivalCandidates()`.
+  const countById = new Map();
+  const { data: members } = await supabase
+    .from('club_members')
+    .select('club_id')
+    .in('club_id', ids);
+  for (const m of members || []) {
+    countById.set(m.club_id, (countById.get(m.club_id) || 0) + 1);
+  }
+
+  return {
+    data: data.map((r) => {
+      const club = byId.get(r.club_id);
+      return {
+        request_id: r.id,
+        club_id: r.club_id,
+        created_at: r.created_at,
+        club: club ? { ...club, total_miembros: countById.get(r.club_id) || 0 } : null,
+      };
+    }).filter((r) => r.club),
+    error: null,
+  };
+}
+
+/**
+ * Solicitudes de ingreso que YO envié y siguen esperando respuesta.
+ *
+ * Espejo de `listMyInvitations()` con el otro `tipo`. Existe porque la
+ * portada de Clubes necesita saber si alguien sin club está esperando una
+ * respuesta, y `getMyRequestTo()` no sirve para eso: exige saber a qué club
+ * preguntarle, y quien postula a su primer club no tiene ese id en ninguna
+ * parte.
+ *
+ * La consulta no necesita `club_id`: la RLS de `club_join_requests` deja al
+ * jugador leer sus propias solicitudes (`tipo = 'solicitud' and auth.uid() =
+ * user_id`, migración 11) y el índice `(user_id, status)` de esa misma
+ * migración es justo el que usa.
+ */
+export async function listMyRequests() {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  const me = await getMe();
+  if (!me) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('club_join_requests')
+    .select('id, club_id, created_at')
+    .eq('user_id', me)
+    .eq('status', 'pending')
+    .eq('tipo', 'solicitud')
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('[FutFinder] listMyRequests:', error);
     return { data: [], error };
   }
   if (!data || data.length === 0) return { data: [], error: null };

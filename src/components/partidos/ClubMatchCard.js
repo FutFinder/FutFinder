@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Users, Swords, Wallet } from 'lucide-react-native';
 
 import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import { temaDeClub, temaClub } from '../../theme/clubThemes';
 import { cuotaLabel } from '../../services/matchRules';
 import {
   cuposLabel,
@@ -17,11 +18,20 @@ import { whenLabel } from './PartidoCard';
  * Tarjeta del partido entre clubes.
  *
  * Tiene que destacar sobre un partido normal sin salirse de la estética de
- * FutFinder, así que la jerarquía se construye con lo que ya existe —el verde
- * `P.green` y la familia `partidos`— llevado al máximo: borde verde marcado,
- * un halo verde contenido alrededor y una franja superior con degradado. Nada
- * de rojo: ese color está reservado a lo que necesita atención (una
- * negociación trabada) y este partido es una buena noticia.
+ * FutFinder, así que la jerarquía se construye llevada al máximo: borde
+ * marcado, un halo contenido alrededor y una franja superior con degradado.
+ * El resto de la tarjeta —fondo, textos, divisores— sigue siendo la familia
+ * `partidos` de siempre; solo el acento se tematiza.
+ *
+ * EL ACENTO ES DE MI CLUB, Y SOLO SI EL PARTIDO ES MÍO. Esta tarjeta siempre
+ * muestra dos clubes, así que no puede tomar «el tema del club» a secas: hay
+ * que decidir de cuál. Se busca el mío entre los dos —`misClubIds`— y solo si
+ * aparece se usa `temaDeClub()`; si no soy de ninguno, se queda con el verde
+ * de siempre (`temaClub('green')`) para no hacer creer que el partido es mío.
+ * Esto también quiere decir que un club de tema rojo SÍ puede pintar esta
+ * tarjeta de rojo cuando es su partido: la regla de «nada de rojo, es para
+ * alertas» era del verde fijo de antes, no del tema que un club eligió para
+ * sí mismo.
  *
  * LOS CUPOS NO SE MUESTRAN COMO COMPARTIDOS. Un 9 por club da
  * `cupos_totales = 18`, y «18 de 18 cupos» haría creer que cualquiera puede
@@ -44,6 +54,13 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
   const { local, visitante } = clubesDelPartido(match);
   const cancelado = match?.estado === 'cancelado';
 
+  // El acento sale de MI club, y solo si el partido es mío. Un partido entre
+  // dos clubes ajenos pintado con mi color diría que me pertenece.
+  const miClub = [match?.club_local, match?.club_visitante].find(
+    (c) => c && misClubIds?.includes(c.id)
+  );
+  const tema = miClub ? temaDeClub(miClub) : temaClub('green');
+
   return (
     <Pressable
       onPress={onPress}
@@ -53,33 +70,36 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
       )}. ${cuposLabel(match, misClubIds)}.`}
       style={({ pressed }) => [
         styles.glow,
+        { shadowColor: tema.main },
         compacta && styles.glowCompacta,
         cancelado && styles.glowApagado,
         pressed && { opacity: 0.92 },
       ]}
     >
-      <View style={[styles.card, cancelado && styles.cardCancelado]}>
+      <View style={[styles.card, { borderColor: tema.border }, cancelado && styles.cardCancelado]}>
         {/* Franja superior: es lo que separa de un vistazo este partido de
-            una pichanga cualquiera. */}
+            una pichanga cualquiera. El segundo color del degradado es
+            'transparent' y no un rgba del tema: la franja tiene que apagarse
+            hacia la nada sin importar de qué color venga. */}
         <LinearGradient
-          colors={[P.greenSoftStrong, 'rgba(90,224,106,0.02)']}
+          colors={[tema.softStrong, 'transparent']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.franja}
+          style={[styles.franja, { borderBottomColor: tema.border }]}
         >
-          <Swords color={P.green} size={13} strokeWidth={2.6} />
-          <Text style={styles.franjaText}>PARTIDO DE CLUBES</Text>
+          <Swords color={tema.main} size={13} strokeWidth={2.6} />
+          <Text style={[styles.franjaText, { color: tema.main }]}>PARTIDO DE CLUBES</Text>
           <View style={{ flex: 1 }} />
           {cancelado ? <Text style={styles.canceladoText}>CANCELADO</Text> : null}
         </LinearGradient>
 
         {/* Los dos escudos con el VS al medio. */}
         <View style={[styles.enfrentamiento, compacta && styles.enfrentamientoCompacto]}>
-          <Escudo club={local} compacta={compacta} />
+          <Escudo club={local} compacta={compacta} tema={tema} />
           <View style={styles.vsCol}>
-            <Text style={styles.vs}>VS</Text>
+            <Text style={[styles.vs, { color: tema.main }]}>VS</Text>
           </View>
-          <Escudo club={visitante} compacta={compacta} alineadoDerecha />
+          <Escudo club={visitante} compacta={compacta} tema={tema} alineadoDerecha />
         </View>
 
         {/* Cuándo, con más peso que en la tarjeta normal: en un partido de
@@ -107,8 +127,8 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
 
         <View style={styles.bottomRow}>
           <View style={styles.datoRow}>
-            <Users color={P.green} size={13} strokeWidth={2} />
-            <Text style={styles.cupos} numberOfLines={1}>
+            <Users color={tema.main} size={13} strokeWidth={2} />
+            <Text style={[styles.cupos, { color: tema.main }]} numberOfLines={1}>
               {cuposLabel(match, misClubIds)}
             </Text>
           </View>
@@ -120,8 +140,8 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
               </Text>
             </View>
           ) : null}
-          <View style={styles.cta}>
-            <Text style={styles.ctaText}>Ver partido</Text>
+          <View style={[styles.cta, { backgroundColor: tema.main }]}>
+            <Text style={[styles.ctaText, { color: tema.ink }]}>Ver partido</Text>
           </View>
         </View>
       </View>
@@ -137,11 +157,16 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
  * medio nunca se lo coma— porque los nombres largos son la norma, no la
  * excepción.
  */
-function Escudo({ club, compacta, alineadoDerecha }) {
+function Escudo({ club, compacta, alineadoDerecha, tema }) {
   const lado = compacta ? 34 : 44;
   return (
     <View style={[styles.clubCol, alineadoDerecha && styles.clubColDerecha]}>
-      <View style={[styles.escudo, { width: lado, height: lado, borderRadius: lado / 2 }]}>
+      <View
+        style={[
+          styles.escudo,
+          { width: lado, height: lado, borderRadius: lado / 2, borderColor: tema.border },
+        ]}
+      >
         {club.fotoUrl ? (
           <Image
             source={{ uri: club.fotoUrl }}
@@ -149,7 +174,11 @@ function Escudo({ club, compacta, alineadoDerecha }) {
             accessibilityIgnoresInvertColors
           />
         ) : (
-          <Text style={[styles.inicialesText, compacta && { fontSize: 12 }]}>{club.iniciales}</Text>
+          <Text
+            style={[styles.inicialesText, { color: tema.main }, compacta && { fontSize: 12 }]}
+          >
+            {club.iniciales}
+          </Text>
         )}
       </View>
       <Text
@@ -172,9 +201,11 @@ const styles = StyleSheet.create({
   // Sin margen propio: el espaciado lo pone la lista que la contiene, igual
   // que `PartidoCard`. Si la tarjeta trajera el suyo, en una lista con `gap`
   // quedaría separada del resto.
+  // El color del acento (`shadowColor`, `borderColor`, etc.) no va acá: lo
+  // pone el tema del club en cada instancia, así que estas reglas solo traen
+  // la forma —radio, ancho, opacidad— y nunca un verde fijo.
   glow: {
     borderRadius: R.card + 2,
-    shadowColor: P.green,
     shadowOpacity: 0.34,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 0 },
@@ -187,7 +218,6 @@ const styles = StyleSheet.create({
     backgroundColor: P.surface,
     borderRadius: R.card,
     borderWidth: 1.5,
-    borderColor: P.greenBorderStrong,
     overflow: 'hidden',
   },
   cardCancelado: { borderColor: P.border, opacity: 0.72 },
@@ -199,10 +229,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: P.greenBorder,
   },
   franjaText: {
-    color: P.green,
     fontSize: 10.5,
     fontWeight: '900',
     letterSpacing: 1.1,
@@ -234,12 +262,11 @@ const styles = StyleSheet.create({
   escudo: {
     backgroundColor: P.chip,
     borderWidth: 1,
-    borderColor: P.greenBorder,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  inicialesText: { color: P.green, fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
+  inicialesText: { fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
 
   clubNombre: {
     color: P.textStrong,
@@ -252,7 +279,6 @@ const styles = StyleSheet.create({
 
   vsCol: { width: 34, alignItems: 'center', paddingTop: 12 },
   vs: {
-    color: P.green,
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 1,
@@ -300,7 +326,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   datoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0, flexShrink: 1 },
-  cupos: { color: P.green, fontSize: 12.5, fontWeight: '800', flexShrink: 1 },
+  cupos: { fontSize: 12.5, fontWeight: '800', flexShrink: 1 },
   cuota: { color: P.textDim, fontSize: 12.5, fontWeight: '600', flexShrink: 1 },
 
   cta: {
@@ -311,9 +337,8 @@ const styles = StyleSheet.create({
     height: 34,
     paddingHorizontal: 16,
     borderRadius: R.pill,
-    backgroundColor: P.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { color: P.greenInk, fontSize: 12.5, fontWeight: '900', letterSpacing: 0.2 },
+  ctaText: { fontSize: 12.5, fontWeight: '900', letterSpacing: 0.2 },
 });

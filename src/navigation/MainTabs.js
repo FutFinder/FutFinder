@@ -21,6 +21,9 @@ import SearchFootballIcon from '../components/SearchFootballIcon';
 import { tactical } from '../theme/colors';
 import { countUnreadTotal, subscribeToMessages } from '../services/messages';
 
+import { ClubsHomeProvider, useClubsHome } from '../contexts/ClubsHomeContext';
+import { etiquetaBadge } from '../utils/clubsHomeTasks.js';
+
 const Tab = createBottomTabNavigator();
 
 const ICON_SIZE = 21;
@@ -45,12 +48,19 @@ function PlaceholderTab() {
  *   - Fondo negro puro con borde superior tenue
  *   - Iconos Lucide con peso óptico uniforme, verde flúor cuando activos
  *   - Botón Crear flotante circular verde flúor en el centro
- *   - Badge verde de mensajes sin leer sobre el ícono de Chat (el de
- *     Avisos ya no vive acá — ver `NotificationBell` en el header)
+ *   - Badges sobre Chat (mensajes sin leer) y Clubes (pendientes con
+ *     acción del club activo). El de Avisos ya no vive acá — ver
+ *     `NotificationBell` en el header
  */
 function CustomTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
   const [chatUnread, setChatUnread] = useState(0);
+
+  // El MISMO número que la sección «Pendiente para ti» de la portada: sale
+  // del estado compartido, no de un conteo propio. Con dos cuentas del mismo
+  // dato, la barra y la portada terminan discrepando y ninguna de las dos se
+  // puede creer.
+  const { badgeCount: clubPendientes } = useClubsHome();
 
   // Mensajes sin leer del tab Chat. El total lo calcula el servidor
   // (`get_chat_unread_total`), que ya descuenta las conversaciones
@@ -89,7 +99,12 @@ function CustomTabBar({ state, navigation }) {
     const isFocused = state.index === index;
     const color = isFocused ? tactical.neon : 'rgba(255,255,255,0.42)';
     const Icon = iconFor(route.name);
-    const badge = route.name === 'ChatTab' ? chatUnread : 0;
+    const badge =
+      route.name === 'ChatTab'
+        ? chatUnread
+        : route.name === 'ClubsTab'
+          ? clubPendientes
+          : 0;
 
     const onPress = () => {
       const event = navigation.emit({
@@ -110,20 +125,31 @@ function CustomTabBar({ state, navigation }) {
         accessibilityRole="tab"
         accessibilityState={{ selected: isFocused }}
         accessibilityLabel={
-          badge > 0 ? `${labelFor(route.name)}, ${badge} sin leer` : labelFor(route.name)
+          badge > 0
+            ? `${labelFor(route.name)}, ${badge} ${
+                // Los pendientes del club son tareas por hacer, no mensajes
+                // por leer: quien navega con lector de pantalla escuchaba
+                // «Clubes, 3 sin leer» sobre desafíos sin responder.
+                route.name === 'ClubsTab' ? 'pendientes' : 'sin leer'
+              }`
+            : labelFor(route.name)
         }
         className="flex-1 items-center gap-1 active:opacity-70"
       >
         <View>
           <Icon size={ICON_SIZE} color={color} strokeWidth={ICON_STROKE} />
           {badge > 0 ? (
-            // Único badge que queda en la barra: mensajes sin leer del Chat.
+            // Dos badges en la barra: mensajes sin leer del Chat y pendientes
+            // con acción del club activo. El de Clubes sale del mismo
+            // `badgeCount` que muestra «Pendiente para ti» en la portada, no
+            // de un conteo aparte: dos cuentas del mismo número acaban
+            // discrepando.
             <View
               className="absolute -right-2 -top-1.5 min-w-[15px] items-center justify-center rounded-full px-1"
               style={{ backgroundColor: tactical.neon }}
             >
               <Text className="text-[9.5px] font-bold" style={{ color: tactical.neonInk }}>
-                {badge > 9 ? '9+' : String(badge)}
+                {etiquetaBadge(badge)}
               </Text>
             </View>
           ) : null}
@@ -188,19 +214,27 @@ function labelFor(name) {
   }
 }
 
+/**
+ * El proveedor de la portada de Clubes envuelve las pestañas enteras, no solo
+ * `ClubsTab`: la barra inferior también lee de él para su badge, y montarlo
+ * más adentro dejaría a la barra fuera. Más arriba tampoco sirve — acá ya
+ * estamos detrás del guard de sesión, así que no se consulta sin usuario.
+ */
 export default function MainTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{ headerShown: false }}
-      tabBar={(props) => <CustomTabBar {...props} />}
-    >
-      <Tab.Screen name="HomeTab" component={HomeScreen} />
-      <Tab.Screen name="SearchTab" component={PartidosScreen} />
-      <Tab.Screen name="ClubsTab" component={ClubsScreen} />
-      <Tab.Screen name="CreateTab" component={PlaceholderTab} />
-      <Tab.Screen name="ReservasTab" component={ReservasScreen} />
-      <Tab.Screen name="ChatTab" component={ChatScreen} />
-      <Tab.Screen name="ProfileTab" component={ProfileScreen} />
-    </Tab.Navigator>
+    <ClubsHomeProvider>
+      <Tab.Navigator
+        screenOptions={{ headerShown: false }}
+        tabBar={(props) => <CustomTabBar {...props} />}
+      >
+        <Tab.Screen name="HomeTab" component={HomeScreen} />
+        <Tab.Screen name="SearchTab" component={PartidosScreen} />
+        <Tab.Screen name="ClubsTab" component={ClubsScreen} />
+        <Tab.Screen name="CreateTab" component={PlaceholderTab} />
+        <Tab.Screen name="ReservasTab" component={ReservasScreen} />
+        <Tab.Screen name="ChatTab" component={ChatScreen} />
+        <Tab.Screen name="ProfileTab" component={ProfileScreen} />
+      </Tab.Navigator>
+    </ClubsHomeProvider>
   );
 }

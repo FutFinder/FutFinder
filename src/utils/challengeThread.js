@@ -200,3 +200,34 @@ export function challengeCardLabel(thread) {
   if (thread?.estado === 'negociacion') return 'Negociación activa';
   return estadoLabel(thread?.estado);
 }
+
+/**
+ * Cuál de los dos clubes del desafío es el mío, o `null`.
+ *
+ * DE ACÁ SALE EL ACENTO DEL HILO. `ChallengeHeader`, `CambioPartidoCard` y la
+ * barra «Ver / Crear partido de club» se pintan con `temaDeClub()` del club
+ * que devuelve esta función. Pintar con el del rival sería exactamente el
+ * error que el rediseño de Clubes existe para borrar: el color es identidad,
+ * y en un desafío hay dos identidades enfrentadas.
+ *
+ * `club_challenges` no trae los clubes embebidos, así que la decisión se toma
+ * con las membresías ya cargadas y la fila se trae aparte.
+ *
+ * `misClubIds` es CUALQUIER membresía, de jugador o de admin: un jugador sin
+ * cargo también ve el hilo con el color de su club aunque no pueda responder
+ * nada.
+ *
+ * Pertenecer a los dos clubes pasa —cuentas de staff, pruebas— y gana el
+ * retador. No es un desempate al azar: es fijo para que el hilo no cambie de
+ * color entre dos aperturas.
+ *
+ * Sin desafío cargado o sin membresía reconocible devuelve `null`, y
+ * `temaDeClub(null)` cae sola al verde de siempre: nunca se queda sin color.
+ */
+export function clubPropioDelDesafio(desafio, misClubIds) {
+  if (!desafio) return null;
+  const mios = Array.isArray(misClubIds) ? misClubIds : [];
+  if (mios.includes(desafio.club_retador_id)) return desafio.club_retador_id;
+  if (mios.includes(desafio.club_retado_id)) return desafio.club_retado_id;
+  return null;
+}

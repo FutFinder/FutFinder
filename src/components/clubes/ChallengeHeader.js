@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Swords, Clock, TriangleAlert } from 'lucide-react-native';
 
 import { chatColors, dsRadius } from '../../theme/colors';
+import { temaDeClub } from '../../theme/clubThemes';
 import { estadoLabel, esEstadoCerrado } from '../../services/clubChallengeRules';
 import { challengeCountdown } from '../../utils/challengeThread';
 
@@ -42,6 +43,9 @@ export default function ChallengeHeader({
   onPressCta,
   onResponderProrroga,
   ocupado = false,
+  // Sin club propio resuelto todavía (o un caso sin membresía reconocible),
+  // `temaDeClub()` cae sola al verde de siempre.
+  tema = temaDeClub(),
 }) {
   if (!challenge) return null;
 
@@ -95,12 +99,13 @@ export default function ChallengeHeader({
               accessibilityLabel="Sí, el partido se disputará"
               style={({ pressed }) => [
                 styles.cta,
+                { backgroundColor: tema.main },
                 styles.ctaMitad,
                 pressed && { opacity: 0.85 },
                 ocupado && styles.ctaOcupado,
               ]}
             >
-              <Text style={styles.ctaText}>Sí, se juega</Text>
+              <Text style={[styles.ctaText, { color: tema.ink }]}>Sí, se juega</Text>
             </Pressable>
             <Pressable
               onPress={() => onResponderProrroga(false)}
@@ -109,13 +114,14 @@ export default function ChallengeHeader({
               accessibilityLabel="No, el partido no se disputará"
               style={({ pressed }) => [
                 styles.cta,
+                { backgroundColor: tema.main },
                 styles.ctaMitad,
                 styles.ctaNo,
                 pressed && { opacity: 0.85 },
                 ocupado && styles.ctaOcupado,
               ]}
             >
-              <Text style={[styles.ctaText, styles.ctaTextNo]}>No se juega</Text>
+              <Text style={[styles.ctaText, { color: tema.ink }, styles.ctaTextNo]}>No se juega</Text>
             </Pressable>
           </View>
           {!!cta.hint && (
@@ -132,11 +138,12 @@ export default function ChallengeHeader({
           accessibilityLabel={cta.label}
           style={({ pressed }) => [
             styles.cta,
+            { backgroundColor: tema.main },
             pressed && { opacity: 0.85 },
             ocupado && styles.ctaOcupado,
           ]}
         >
-          <Text style={styles.ctaText}>{cta.label}</Text>
+          <Text style={[styles.ctaText, { color: tema.ink }]}>{cta.label}</Text>
         </Pressable>
       ) : cta?.hint ? (
         <Text style={styles.hint} numberOfLines={2}>
@@ -193,11 +200,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: dsRadius.lg,
-    backgroundColor: chatColors.green,
+    // El fondo es el acento del club: sale por estilo en línea en el JSX.
     paddingHorizontal: 14,
   },
   ctaText: {
-    color: chatColors.inkOnGreen,
+    // La tinta es el acento del club: sale por estilo en línea en el JSX.
     fontSize: 14,
     fontWeight: '800',
     includeFontPadding: false,

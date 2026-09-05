@@ -10,7 +10,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowLeft,
@@ -64,13 +64,6 @@ import {
 const MAX_RIVALES = 10;
 /** Partidos visibles en la muestra del historial. */
 const MAX_HISTORIAL = 3;
-/**
- * Altura de la tab bar flotante custom (MainTabs.js) + su inset inferior.
- * Cuando ClubsScreen embebe esta pantalla como raíz de la pestaña «Clubes»
- * (`viaClubesTab`), esa tab bar real sigue dibujándose encima del contenido,
- * así que el scroll necesita despejarla igual que hace ClubsScreen.
- */
-const TAB_BAR_HEIGHT = 88;
 
 /**
  * Detalle del club ("Mi club").
@@ -97,8 +90,7 @@ const TAB_BAR_HEIGHT = 88;
  * RIVAL, no el de esta pantalla.
  */
 export default function ClubDetailScreen({ navigation, route }) {
-  const { clubId, viaClubesTab, initialBanner, openChallenge } = route.params || {};
-  const insets = useSafeAreaInsets();
+  const { clubId, initialBanner, openChallenge } = route.params || {};
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -290,7 +282,7 @@ export default function ClubDetailScreen({ navigation, route }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <View style={styles.loadingBar}>
           <Pressable
-            onPress={viaClubesTab ? goToExplore : () => navigation.goBack()}
+            onPress={() => navigation.goBack()}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Volver"
@@ -327,17 +319,14 @@ export default function ClubDetailScreen({ navigation, route }) {
         title={soyMiembro ? 'Mi club' : club.nombre}
         esPremium={esPremium}
         puedeEditar={soyAdmin}
-        onBack={viaClubesTab ? goToExplore : () => navigation.goBack()}
+        onBack={() => navigation.goBack()}
         onShare={handleShare}
         onEdit={() => navigation.navigate('EditClub', { club })}
         onPlan={soyMiembro ? () => navigation.navigate('ClubPlans', { clubId: club.id }) : undefined}
       />
 
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          viaClubesTab && { paddingBottom: 40 + TAB_BAR_HEIGHT + insets.bottom },
-        ]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

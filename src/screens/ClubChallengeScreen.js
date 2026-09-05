@@ -17,6 +17,7 @@ import { X, Shield, Swords, Check } from 'lucide-react-native';
 import Banner from '../components/Banner';
 import { Button, IconButton, Chip } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { temaDeClub } from '../theme/clubThemes';
 import { getMyClubs } from '../services/clubs';
 import { createChallenge } from '../services/clubChallenges';
 
@@ -123,6 +124,11 @@ export default function ClubChallengeScreen({ navigation, route }) {
     }, 1200);
   };
 
+  // El club propio es con el que se desafía (el retador elegido, o el único
+  // admin si no hay que elegir): de ahí sale el acento de esta pantalla.
+  const clubRetador = misClubs.find((c) => c.id === retadorId) || null;
+  const tema = temaDeClub(clubRetador);
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
       <View style={styles.header}>
@@ -135,7 +141,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={C.green} />
+          <ActivityIndicator color={tema.main} />
         </View>
       ) : misClubs.length === 0 ? (
         <View style={styles.content}>
@@ -154,8 +160,8 @@ export default function ClubChallengeScreen({ navigation, route }) {
             {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
             {/* Rival */}
-            <View style={styles.rivalCard}>
-              <Swords color={C.green} size={18} strokeWidth={2} />
+            <View style={[styles.rivalCard, { borderColor: tema.border }]}>
+              <Swords color={tema.main} size={18} strokeWidth={2} />
               <Text style={styles.rivalLabel}>Desafías a</Text>
               <View style={styles.rivalChip}>
                 {rivalFotoUrl ? (
@@ -186,10 +192,16 @@ export default function ClubChallengeScreen({ navigation, route }) {
                         pressed && { opacity: 0.7 },
                       ]}
                     >
-                      <Text style={[styles.optionText, c.id === retadorId && styles.optionTextActive]}>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          c.id === retadorId && styles.optionTextActive,
+                          c.id === retadorId && { color: tema.main },
+                        ]}
+                      >
                         {c.nombre}
                       </Text>
-                      {c.id === retadorId && <Check color={C.green} size={16} strokeWidth={2.4} />}
+                      {c.id === retadorId && <Check color={tema.main} size={16} strokeWidth={2.4} />}
                     </Pressable>
                   ))}
                 </View>
@@ -286,7 +298,7 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: C.shieldBg,
     borderWidth: 1,
-    borderColor: C.greenDeepBorder,
+    // El borde es el acento del club: sale por estilo en línea en el JSX.
     borderRadius: R.row,
     padding: 14,
     marginBottom: 20,
@@ -349,7 +361,8 @@ const styles = StyleSheet.create({
   },
   optionActive: { backgroundColor: C.shieldBg },
   optionText: { fontFamily: F.medium, color: C.textPrimary, fontSize: 14 },
-  optionTextActive: { fontFamily: F.extraBold, color: C.green },
+  // El color activo es el acento del club: sale por estilo en línea en el JSX.
+  optionTextActive: { fontFamily: F.extraBold },
 
   submitBtn: { marginTop: 8 },
 });
