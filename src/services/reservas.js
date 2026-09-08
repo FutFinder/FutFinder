@@ -12,13 +12,13 @@
  * cualquier otro servicio de la app.
  */
 
-import { computeTotal } from './reservasRules';
-
 const LOS_ROBLES_CANCHAS = [
   { id: 'cancha-1', nombre: 'Cancha 1', tipo: 'Fútbol 7', nota: 'Sintética · techada', base: 28500, jugadoresHabitual: 14 },
   { id: 'cancha-2', nombre: 'Cancha 2', tipo: 'Fútbol 7', nota: 'Sintética · iluminación LED', base: 26500, jugadoresHabitual: 14 },
   { id: 'cancha-3', nombre: 'Cancha 3', tipo: 'Fútbol 11', nota: 'Sintética · graderías', base: 43500, jugadoresHabitual: 22 },
-].map((k) => ({ ...k, total: computeTotal(k.base) }));
+// El total es el precio de la cancha: la comisión la paga el recinto y el
+// jugador no la ve (migración 62).
+].map((k) => ({ ...k, total: k.base }));
 
 const LOS_ROBLES_SERVICIOS = [
   'Estacionamiento',

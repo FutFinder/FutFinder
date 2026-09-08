@@ -6,7 +6,7 @@ import { ArrowLeft, Info } from 'lucide-react-native';
 import { reservas as C, reservasFonts as F } from '../theme/colors';
 import { IconButton, Card, NoticeCard, StickyFooter, Button } from '../components/reservas/ui';
 import { getComplejoById } from '../services/reservas';
-import { formatCLP, SERVICE_FEE_CLP } from '../services/reservasRules';
+import { formatCLP } from '../services/reservasRules';
 
 /** Pantalla 8 del handoff `Reservas.dc.html`: resumen antes de pagar. */
 export default function ResumenReservaScreen({ navigation, route }) {
@@ -77,13 +77,9 @@ export default function ResumenReservaScreen({ navigation, route }) {
         </Card>
 
         <Card>
-          <View style={styles.precioRow}>
+          <View style={[styles.precioRow, styles.precioDivider]}>
             <Text style={styles.precioK}>Cancha · {duracion} min</Text>
             <Text style={styles.precioV}>{cancha ? formatCLP(cancha.base) : '—'}</Text>
-          </View>
-          <View style={[styles.precioRow, styles.precioDivider]}>
-            <Text style={styles.precioK}>Cargo por servicio FutFinder</Text>
-            <Text style={styles.precioV}>{formatCLP(SERVICE_FEE_CLP)}</Text>
           </View>
           <View style={styles.totalRow}>
             <Text style={styles.totalK}>Total a pagar</Text>

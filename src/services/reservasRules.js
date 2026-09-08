@@ -2,21 +2,24 @@
  * Reglas centralizadas del vertical Reservas (handoff `Reservas.dc.html`).
  *
  * Puro: sin React, sin Supabase. Toda la UI de Reservas lee de aquí — ningún
- * componente vuelve a escribir el cargo de servicio, el redondeo de la cuota
- * ni los límites de jugadores por su cuenta.
+ * componente vuelve a escribir el redondeo de la cuota ni los límites de
+ * jugadores por su cuenta.
  *
- * IMPORTANTE: el backend de este vertical todavía es simulado (decisión
- * explícita: no hay pasarela de pago real conectada ni tablas de Supabase
- * para complejos/canchas/reservas/balance todavía — ver
- * docs/memoria/operacion/pendientes.md cuando se documente). Estos valores
- * son los que usa el prototipo (`Component.renderVals()` en
- * `Reservas.dc.html`), no un reflejo de una función de Postgres como en
- * `matchRules.js` — cuando exista backend real, hay que verificar que estos
- * números sigan coincidiendo.
+ * NO HAY CARGO DE SERVICIO AL JUGADOR, y este archivo decía lo contrario.
+ * Tenía `SERVICE_FEE_CLP = 1500` sumado ARRIBA del precio de la cancha, que
+ * venía del prototipo. El modelo de negocio es el inverso: FutFinder le cobra
+ * una comisión al RECINTO (5% del total, piso $1.000, techo $2.500 — migración
+ * 62), el jugador paga el precio de la cancha y NUNCA ve la comisión. Por eso
+ * se eliminaron `SERVICE_FEE_CLP` y `computeTotal()`: el total que paga el
+ * jugador ES el precio de la cancha.
+ *
+ * PENDIENTE conocido, y es un bug: `computeCuota()` redondea al múltiplo de
+ * $50 más cercano, mientras `crear_reserva` en Postgres usa `ceil()` sin
+ * redondear. No coinciden, y redondear hacia el más cercano puede dejar la
+ * suma POR DEBAJO del total — $20.000 entre 3 da $6.650 cada uno, o sea
+ * $19.950, y faltan $50. Hay que unificarlo redondeando hacia arriba en los
+ * dos lados; es una regla que el jugador ve, así que se decide aparte.
  */
-
-/** Cargo de servicio FutFinder, fijo, sumado al precio base de la cancha. */
-export const SERVICE_FEE_CLP = 1500;
 
 /** Cuántos jugadores puede tener una convocatoria dividida entre todos. */
 export const JUGADORES_LIMITS = { min: 2, max: 30 };
@@ -38,11 +41,6 @@ export function formatCLP(amount) {
 /** Redondea al múltiplo de 50 más cercano — así se calcula toda cuota por jugador. */
 export function roundToNearest50(amount) {
   return Math.round(amount / 50) * 50;
-}
-
-/** Total a pagar por la cancha: precio base + cargo de servicio fijo. */
-export function computeTotal(basePriceClp) {
-  return basePriceClp + SERVICE_FEE_CLP;
 }
 
 /**

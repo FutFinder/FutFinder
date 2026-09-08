@@ -1,7 +1,9 @@
 /**
- * Pruebas de las reglas puras del vertical Reservas: formato CLP, cargo de
- * servicio fijo, redondeo de cuota, límites de jugadores y validación de
- * carga de Balance — los mismos números que usa `Reservas.dc.html`.
+ * Pruebas de las reglas puras del vertical Reservas: formato CLP, redondeo de
+ * cuota, límites de jugadores y validación de carga de Balance.
+ *
+ * Ya no se prueba un cargo de servicio al jugador porque no existe: la
+ * comisión la paga el recinto y el jugador no la ve (migración 62).
  *
  * Se ejecutan con: npm test
  */
@@ -10,12 +12,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  SERVICE_FEE_CLP,
   JUGADORES_LIMITS,
   MIN_TOPUP_CLP,
   formatCLP,
   roundToNearest50,
-  computeTotal,
   clampJugadores,
   computeCuota,
   computeMitad,
@@ -41,11 +41,6 @@ test('roundToNearest50: redondea al múltiplo de 50 más cercano', () => {
   assert.equal(roundToNearest50(2025), 2050); // Math.round redondea .5 hacia arriba
 });
 
-test('computeTotal: suma el cargo de servicio fijo de $1.500 al precio base', () => {
-  assert.equal(computeTotal(28500), 28500 + SERVICE_FEE_CLP);
-  assert.equal(computeTotal(28500), 30000);
-});
-
 test('clampJugadores: usa el valor pasado si está dentro del rango', () => {
   assert.equal(clampJugadores(14, 10), 14);
 });
@@ -69,9 +64,17 @@ test('computeCuota: total 30.000 entre 14 jugadores redondea a $50', () => {
   assert.equal(computeCuota(30000, 14), 2150);
 });
 
-test('computeCuota: coincide con el ejemplo del handoff (cancha 1, 14 jugadores habituales)', () => {
-  const total = computeTotal(28500); // 30.000
-  assert.equal(computeCuota(total, 14), 2150);
+test('el jugador no paga ningún cargo de servicio: el total es el precio de la cancha', () => {
+  // REGRESIÓN: `computeTotal()` sumaba $1.500 arriba del precio. La comisión
+  // la paga el recinto (migración 62) y el jugador nunca la ve, así que ese
+  // helper se eliminó. Si alguien lo vuelve a agregar, esta prueba lo caza.
+  const reglas = require('../reservasRules.js');
+  assert.equal(reglas.computeTotal, undefined, 'computeTotal no debe volver');
+  assert.equal(reglas.SERVICE_FEE_CLP, undefined, 'SERVICE_FEE_CLP no debe volver');
+});
+
+test('computeCuota: 30.000 entre 14 da 2.150 (el ejemplo del handoff)', () => {
+  assert.equal(computeCuota(30000, 14), 2150);
 });
 
 test('computeMitad: exactamente la mitad, sin redondear a $50', () => {
