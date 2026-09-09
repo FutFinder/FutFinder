@@ -362,3 +362,35 @@ test('bloquesDeTarifa: datos incompletos devuelven vacío y no revientan', () =>
     { dentro: [], elDelBorde: null }
   );
 });
+
+// ---------------------------------------------------------------------------
+// Contacto de la reserva
+// ---------------------------------------------------------------------------
+
+const { formatoTelefono, enlacesDeContacto } = require('../recintoAgenda.js');
+
+test('formatoTelefono: el guardado se muestra como se lee en Chile', () => {
+  assert.equal(formatoTelefono('+56987654321'), '+56 9 8765 4321');
+});
+
+test('formatoTelefono: sin teléfono devuelve null, y algo raro se muestra tal cual', () => {
+  assert.equal(formatoTelefono(null), null);
+  assert.equal(formatoTelefono(''), null);
+  assert.equal(formatoTelefono('+1 555 0100'), '+1 555 0100', 'mejor un número raro que «undefined»');
+});
+
+test('enlacesDeContacto: arma el tel: y el de WhatsApp desde el número guardado', () => {
+  const c = enlacesDeContacto({ contacto_nombre: 'Matías Correa', contacto_telefono: '+56987654321' });
+  assert.equal(c.nombre, 'Matías Correa');
+  assert.equal(c.telefonoLegible, '+56 9 8765 4321');
+  assert.equal(c.llamar, 'tel:+56987654321');
+  assert.equal(c.whatsapp, 'https://wa.me/56987654321', 'wa.me va sin el + ni espacios');
+});
+
+test('enlacesDeContacto: fuera de la ventana de 12 h no hay contacto, y eso NO es un error', () => {
+  // El servidor devuelve el contacto en null cuando la ventana se cerró o la
+  // reserva se canceló. La pantalla ahí muestra solo el @usuario.
+  assert.equal(enlacesDeContacto({ contacto_nombre: null, contacto_telefono: null }), null);
+  assert.equal(enlacesDeContacto({}), null);
+  assert.equal(enlacesDeContacto(null), null);
+});

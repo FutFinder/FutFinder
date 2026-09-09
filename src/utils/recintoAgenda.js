@@ -280,3 +280,43 @@ export function bloquesDeTarifa({ horaDesde, horaHasta, horaApertura, horaCierre
   }
   return { dentro, elDelBorde };
 }
+
+/* ── Contacto de la reserva (migración 67) ──────────────────────────────── */
+
+/**
+ * `+56987654321` → `+56 9 8765 4321`, que es como se lee en Chile.
+ *
+ * El teléfono se guarda siempre normalizado, así que esta función solo lo
+ * espacia. Si llega algo que no tiene esa forma, se devuelve tal cual en vez
+ * de romper: mostrar un número raro es mejor que mostrar `undefined`.
+ */
+export function formatoTelefono(telefono) {
+  if (!telefono) return null;
+  const m = String(telefono).match(/^\+56(9)(\d{4})(\d{4})$/);
+  if (!m) return String(telefono);
+  return `+56 ${m[1]} ${m[2]} ${m[3]}`;
+}
+
+/**
+ * Lo que necesita el componente de contacto: el número para mostrar, y los
+ * dos enlaces con los que el recinto resuelve un problema el día del partido.
+ *
+ * WhatsApp va PRIMERO en la interfaz aunque acá el orden no importe: en Chile
+ * un problema de cancha se resuelve por mensaje, no marcando.
+ *
+ * Devuelve `null` cuando no hay contacto — que es el caso normal fuera de la
+ * ventana de 12 horas, no un error. La pantalla ahí muestra solo el
+ * `@usuario`.
+ */
+export function enlacesDeContacto(reserva) {
+  const tel = reserva?.contacto_telefono;
+  if (!tel) return null;
+  const soloDigitos = String(tel).replace(/\D/g, '');
+  return {
+    nombre: reserva.contacto_nombre || null,
+    telefono: tel,
+    telefonoLegible: formatoTelefono(tel),
+    llamar: `tel:${tel}`,
+    whatsapp: `https://wa.me/${soloDigitos}`,
+  };
+}
