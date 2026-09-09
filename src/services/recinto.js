@@ -218,8 +218,20 @@ export async function eliminarHorario(reglaId) {
  *
  * El `motivo` es privado del recinto: el jugador nunca lo ve, solo ve esas
  * horas como no disponibles.
+ *
+ * `tipo` distingue los dos motivos por los que un recinto marca una hora
+ * (migración 69): `'cerrado'` es mantención —la cancha no se puede usar— y
+ * `'externo'` es que alguien la arrendó por teléfono o en el mesón, o sea que
+ * la cancha SÍ se va a usar y va a llegar gente. Solo en `'externo'` se pueden
+ * anotar `contactoNombre` y `contactoTelefono`; en una mantención se descartan,
+ * porque no hay a quién llamar.
+ *
+ * Para el jugador los dos son idénticos: la hora simplemente no está.
  */
-export async function crearBloqueo(canchaId, { fecha, horaInicio, horaFin, motivo } = {}) {
+export async function crearBloqueo(
+  canchaId,
+  { fecha, horaInicio, horaFin, motivo, tipo = 'cerrado', contactoNombre, contactoTelefono } = {}
+) {
   if (!isSupabaseConfigured) return DEMO;
   if (!canchaId) return { data: null, error: { message: 'Falta la cancha' } };
   const { data, error } = await supabase.rpc('admin_crear_bloqueo', {
@@ -228,6 +240,9 @@ export async function crearBloqueo(canchaId, { fecha, horaInicio, horaFin, motiv
     p_hora_inicio: horaInicio ?? null,
     p_hora_fin: horaFin ?? null,
     p_motivo: motivo ?? null,
+    p_tipo: tipo ?? 'cerrado',
+    p_contacto_nombre: contactoNombre ?? null,
+    p_contacto_telefono: contactoTelefono ?? null,
   });
   return comoResultadoRecinto(data, error, 'crearBloqueo');
 }
@@ -301,7 +316,10 @@ export async function reservasProximas(complejoId, limite = 20) {
  * Rechaza mover el bloqueo encima de una reserva confirmada, igual que al
  * crearlo.
  */
-export async function actualizarBloqueo(bloqueoId, { fecha, horaInicio, horaFin, motivo } = {}) {
+export async function actualizarBloqueo(
+  bloqueoId,
+  { fecha, horaInicio, horaFin, motivo, tipo, contactoNombre, contactoTelefono } = {}
+) {
   if (!isSupabaseConfigured) return DEMO;
   if (!bloqueoId) return { data: null, error: { message: 'Falta el bloqueo' } };
   const { data, error } = await supabase.rpc('admin_actualizar_bloqueo', {
@@ -310,8 +328,83 @@ export async function actualizarBloqueo(bloqueoId, { fecha, horaInicio, horaFin,
     p_hora_inicio: horaInicio ?? null,
     p_hora_fin: horaFin ?? null,
     p_motivo: motivo ?? null,
+    p_tipo: tipo ?? null,
+    p_contacto_nombre: contactoNombre ?? null,
+    p_contacto_telefono: contactoTelefono ?? null,
   });
   return comoResultadoRecinto(data, error, 'actualizarBloqueo');
+}
+
+/* ── Cobros adicionales ────────────────────────────────────────── */
+
+/**
+ * Crea un cobro adicional del recinto: balón, petos, árbitro, botiquín.
+ *
+ * SIEMPRE OPCIONALES para el jugador — no hay forma de marcarlos obligatorios,
+ * y no la habrá: un recinto no puede convertirlos en un peaje para reservar.
+ *
+ * Son del partido completo, no por persona: se cobran una vez por reserva.
+ *
+ * Hay un tope de 8 ACTIVOS por recinto. Los apagados no cuentan, así que el
+ * recinto puede tener un historial largo sin chocar con el límite. El tope
+ * existe porque con más, la pantalla donde el jugador los elige se vuelve un
+ * catálogo y baja la conversión de la reserva.
+ *
+ * OJO CON LA COMISIÓN: se calcula sobre el total de la reserva, cancha +
+ * adicionales. Una hora de $14.000 con un árbitro de $12.000 paga comisión
+ * sobre $26.000, no sobre $14.000. Si la pantalla muestra la comisión de una
+ * tarifa, tiene que decir que es sin adicionales.
+ */
+export async function crearCobro(complejoId, { nombre, precio } = {}) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase.rpc('admin_crear_cobro', {
+    p_complejo_id: complejoId,
+    p_nombre: nombre ?? null,
+    p_precio: precio ?? null,
+  });
+  return comoResultadoRecinto(data, error, 'crearCobro');
+}
+
+/**
+ * Edita un cobro. No hay borrado: `activo: false` lo apaga.
+ *
+ * Apagar NO lo saca del historial — las reservas que ya lo incluyen lo siguen
+ * mostrando, con el precio que tenían ese día. Y cambiar el precio tampoco
+ * toca las reservas ya hechas: el nombre y el precio quedan congelados en cada
+ * reserva al momento de reservar.
+ *
+ * Encenderlo cuenta contra el tope de 8 activos.
+ */
+export async function actualizarCobro(cobroId, { nombre, precio, activo } = {}) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!cobroId) return { data: null, error: { message: 'Falta el cobro' } };
+  const { data, error } = await supabase.rpc('admin_actualizar_cobro', {
+    p_cobro_id: cobroId,
+    p_nombre: nombre ?? null,
+    p_precio: precio ?? null,
+    p_activo: activo ?? null,
+  });
+  return comoResultadoRecinto(data, error, 'actualizarCobro');
+}
+
+/**
+ * Los cobros de un recinto. Como `complejo_cobros` sí tiene lectura directa
+ * —a diferencia de las reservas— esto es una consulta normal y no una RPC.
+ *
+ * Quien administra el recinto recibe TODOS, incluidos los apagados, para poder
+ * volver a encenderlos. Un jugador recibe solo los activos, y solo si el
+ * recinto está publicado.
+ */
+export async function cobrosDelRecinto(complejoId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase
+    .from('complejo_cobros')
+    .select('id, nombre, precio, activo')
+    .eq('complejo_id', complejoId)
+    .order('nombre');
+  return comoListaRecinto(data, error, 'cobrosDelRecinto');
 }
 
 /* ── Publicar el recinto ───────────────────────────────────────── */
