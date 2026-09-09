@@ -239,6 +239,147 @@ export async function eliminarBloqueo(bloqueoId) {
   return comoResultadoRecinto(data, error, 'eliminarBloqueo');
 }
 
+/* ── Cancelar, y qué queda vendido ─────────────────────────────── */
+
+/**
+ * Cancela una reserva del recinto. Es la acción más cara de toda la
+ * administración y el servidor la trata como tal.
+ *
+ * El `motivo` es OBLIGATORIO y tiene que decir algo: el servidor rechaza menos
+ * de diez caracteres, porque es lo único que el jugador va a saber y lo lee
+ * tal cual. No lo rellenes con un texto por defecto desde la interfaz — que la
+ * persona lo escriba.
+ *
+ * Devuelve `{ devuelto }` con el total que volvió a los balances. La
+ * devolución va a CADA persona que puso plata, no al organizador: en un pago
+ * dividido entre diez, los ocho que ya pagaron reciben lo suyo. Y no se cobra
+ * comisión.
+ *
+ * Se puede cancelar también una reserva sin confirmar, y hay que poder: en el
+ * pago dividido cada parte se cobra al aceptar unirse, así que un grupo a medio
+ * armar ya tiene plata puesta.
+ *
+ * No se puede cancelar un partido que ya empezó. El corte lo hace el servidor
+ * en hora de Chile, no en UTC.
+ */
+export async function cancelarReserva(reservaId, motivo) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!reservaId) return { data: null, error: { message: 'Falta la reserva' } };
+  const { data, error } = await supabase.rpc('admin_cancelar_reserva', {
+    p_reserva_id: reservaId,
+    p_motivo: motivo ?? null,
+  });
+  return comoResultadoRecinto(data, error, 'cancelarReserva');
+}
+
+/**
+ * Las reservas confirmadas que le quedan por jugar al recinto completo, de
+ * todas las fechas y todas las canchas.
+ *
+ * Es lo que necesita la hoja de despublicar: antes de apagar el recinto, el
+ * dueño tiene que ver QUÉ le queda vendido, no solo cuántas.
+ *
+ * OJO con `total`: cuenta TODAS las que quedan, no las que trae la lista. Si
+ * hay doce y pides diez, `total` dice 12 y `reservas` trae 10 — mostrá el
+ * `total` en el texto y la lista como muestra, nunca `reservas.length`.
+ */
+export async function reservasProximas(complejoId, limite = 20) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase.rpc('admin_reservas_proximas', {
+    p_complejo_id: complejoId,
+    p_limite: limite,
+  });
+  return comoResultadoRecinto(data, error, 'reservasProximas');
+}
+
+/**
+ * Corrige un bloqueo ya creado. Un campo en `null` significa no cambiarlo,
+ * salvo `motivo`: ahí una cadena vacía sí lo borra, porque el motivo es
+ * opcional.
+ *
+ * Rechaza mover el bloqueo encima de una reserva confirmada, igual que al
+ * crearlo.
+ */
+export async function actualizarBloqueo(bloqueoId, { fecha, horaInicio, horaFin, motivo } = {}) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!bloqueoId) return { data: null, error: { message: 'Falta el bloqueo' } };
+  const { data, error } = await supabase.rpc('admin_actualizar_bloqueo', {
+    p_bloqueo_id: bloqueoId,
+    p_fecha: fecha ?? null,
+    p_hora_inicio: horaInicio ?? null,
+    p_hora_fin: horaFin ?? null,
+    p_motivo: motivo ?? null,
+  });
+  return comoResultadoRecinto(data, error, 'actualizarBloqueo');
+}
+
+/* ── Publicar el recinto ───────────────────────────────────────── */
+
+/**
+ * Publica o despublica el recinto.
+ *
+ * No publicado: no aparece en el buscador, sus canchas tampoco, y nadie puede
+ * reservar. Pero **las reservas ya confirmadas se respetan** — despublicar es
+ * dejar de recibir, no cancelar. Mostrá eso en la confirmación, junto con
+ * `reservasProximas()`, que es el dato con el que el dueño decide.
+ *
+ * Para publicar hace falta al menos una cancha activa con horario cargado; si
+ * no, el servidor lo rechaza con el mensaje que hay que mostrar tal cual.
+ */
+export async function publicarRecinto(complejoId, publicado) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase.rpc('admin_publicar_complejo', {
+    p_complejo_id: complejoId,
+    p_publicado: !!publicado,
+  });
+  return comoResultadoRecinto(data, error, 'publicarRecinto');
+}
+
+/* ── Tarifas por horario ───────────────────────────────────────── */
+
+/**
+ * Crea o corrige una tarifa por franja horaria.
+ *
+ * `diaSemana` en `null` significa TODOS los días, y es el caso habitual; con un
+ * número (0 = domingo) la tarifa aplica solo a ese día y **gana** sobre la de
+ * todos los días. Así "toda la semana barato hasta las 16:00, pero el sábado
+ * todo el día caro" son dos tarifas y no siete.
+ *
+ * El rango es SEMIABIERTO en la hora de inicio: de 11:00 a 16:00 cubre los
+ * bloques que empiezan 11, 12, 13, 14 y 15. El de las 16:00 ya es de la
+ * siguiente. Usá `bloquesDeTarifa()` de `utils/recintoAgenda` para mostrarlo.
+ *
+ * El servidor rechaza tarifas que se cruzan DENTRO del mismo alcance, pero
+ * permite que una de un día se cruce con una de todos los días: eso no es un
+ * choque, es sobrescribir.
+ */
+export async function guardarTarifa(canchaId, { horaDesde, horaHasta, precio, diaSemana, tarifaId } = {}) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!canchaId) return { data: null, error: { message: 'Falta la cancha' } };
+  const { data, error } = await supabase.rpc('admin_upsert_tarifa', {
+    p_cancha_id: canchaId,
+    p_hora_desde: horaDesde ?? null,
+    p_hora_hasta: horaHasta ?? null,
+    p_precio: precio ?? null,
+    p_dia_semana: diaSemana ?? null,
+    p_tarifa_id: tarifaId ?? null,
+  });
+  return comoResultadoRecinto(data, error, 'guardarTarifa');
+}
+
+/**
+ * Borra una tarifa. La cancha no queda sin precio: cae en su precio base, que
+ * es obligatorio.
+ */
+export async function eliminarTarifa(tarifaId) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!tarifaId) return { data: null, error: { message: 'Falta la tarifa' } };
+  const { data, error } = await supabase.rpc('admin_eliminar_tarifa', { p_tarifa_id: tarifaId });
+  return comoResultadoRecinto(data, error, 'eliminarTarifa');
+}
+
 /* ── Administradores (solo el dueño) ───────────────────────────── */
 
 /**

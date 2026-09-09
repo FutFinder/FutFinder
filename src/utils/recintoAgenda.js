@@ -215,3 +215,68 @@ export function resumenDelPanel(resumen) {
     neto: Number(resumen.neto_confirmado) || 0,
   };
 }
+
+/* ── Tarifas por franja horaria (migración 64) ──────────────────────────── */
+
+/** '11:00' → 660. Devuelve null si la hora no es válida. */
+export function horaAMinutos(hora) {
+  if (!hora) return null;
+  const [hh, mm] = String(hora).split(':').map(Number);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  return hh * 60 + mm;
+}
+
+/** 660 → '11:00'. */
+export function minutosAHora(min) {
+  if (!Number.isFinite(min)) return null;
+  const hh = Math.floor(min / 60);
+  const mm = min % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+/**
+ * Qué bloques concretos caen dentro de una tarifa.
+ *
+ * Es la vista previa que la pantalla de tarifas necesita para que el borde
+ * semiabierto no sea una sorpresa: una tarifa de 11:00 a 16:00 con bloques de
+ * 60 min cubre los que EMPIEZAN a las 11, 12, 13, 14 y 15 — el de las 16:00 ya
+ * pertenece a la franja siguiente, aunque la tarifa "llegue" hasta las 16:00.
+ *
+ * POR QUÉ SE DERIVA ACÁ Y NO EN EL SERVIDOR, y cuál es el límite: el servidor
+ * devuelve la tarifa como rango y precio, no como lista de bloques. Esta
+ * función replica su regla para PREVISUALIZAR, nunca para cobrar. El precio que
+ * se cobra sale siempre de la base (`precio_de_bloque`, y ya congelado en la
+ * reserva). Si esto alguna vez divergiera del servidor, el daño es una
+ * previsualización equivocada y no un cobro equivocado — que es exactamente la
+ * razón por la que el cargo de servicio del jugador no podía vivir en el
+ * cliente.
+ *
+ * Devuelve `{ dentro, elDelBorde }`: los bloques de la tarifa, y el primero que
+ * queda afuera justo en el límite (el que la interfaz muestra en punteado para
+ * explicar la regla). `elDelBorde` es null si la tarifa termina donde cierra la
+ * cancha.
+ */
+export function bloquesDeTarifa({ horaDesde, horaHasta, horaApertura, horaCierre, duracionSlotMin } = {}) {
+  const desde = horaAMinutos(horaDesde);
+  const hasta = horaAMinutos(horaHasta);
+  const abre = horaAMinutos(horaApertura);
+  const cierra = horaAMinutos(horaCierre);
+  const paso = Number(duracionSlotMin);
+
+  if ([desde, hasta, abre, cierra].some((v) => v === null) || !Number.isFinite(paso) || paso <= 0) {
+    return { dentro: [], elDelBorde: null };
+  }
+
+  const dentro = [];
+  let elDelBorde = null;
+  // El bloque existe solo si TERMINA antes del cierre: una cancha que cierra a
+  // las 22:00 con bloques de una hora tiene su último bloque a las 21:00.
+  for (let inicio = abre; inicio + paso <= cierra; inicio += paso) {
+    if (inicio >= desde && inicio < hasta) {
+      dentro.push(minutosAHora(inicio));
+    } else if (inicio === hasta && elDelBorde === null) {
+      elDelBorde = minutosAHora(inicio);
+    }
+  }
+  return { dentro, elDelBorde };
+}

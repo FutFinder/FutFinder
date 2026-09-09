@@ -275,3 +275,90 @@ test('resumenDelPanel: un resumen en cero no produce NaN en ninguna parte', () =
     assert.ok(Number.isFinite(v), `${k} debería ser un número, es ${v}`);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tarifas por franja: el borde semiabierto
+// ---------------------------------------------------------------------------
+
+const { horaAMinutos, minutosAHora, bloquesDeTarifa } = require('../recintoAgenda.js');
+
+test('horaAMinutos y minutosAHora son inversas', () => {
+  assert.equal(horaAMinutos('11:00'), 660);
+  assert.equal(horaAMinutos('21:30'), 1290);
+  assert.equal(minutosAHora(660), '11:00');
+  assert.equal(minutosAHora(1290), '21:30');
+  assert.equal(minutosAHora(540), '09:00');
+});
+
+test('horaAMinutos: basura devuelve null y no NaN', () => {
+  assert.equal(horaAMinutos(null), null);
+  assert.equal(horaAMinutos('no-es-hora'), null);
+});
+
+test('bloquesDeTarifa: MaiClub · la tarifa barata son cinco bloques, 11 a 15', () => {
+  // El caso real: abre 11:00, cierra 22:00, bloques de 60 min, tarifa
+  // 11:00-16:00. El bloque de las 16:00 queda AFUERA aunque la tarifa llegue
+  // hasta las 16:00 — es el borde semiabierto de la migración 64.
+  const r = bloquesDeTarifa({
+    horaDesde: '11:00', horaHasta: '16:00',
+    horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 60,
+  });
+  assert.deepEqual(r.dentro, ['11:00', '12:00', '13:00', '14:00', '15:00']);
+  assert.equal(r.elDelBorde, '16:00', 'el de las 16:00 es el que se muestra en punteado');
+});
+
+test('bloquesDeTarifa: MaiClub · la tarifa de noche son seis bloques, 16 a 21', () => {
+  const r = bloquesDeTarifa({
+    horaDesde: '16:00', horaHasta: '22:00',
+    horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 60,
+  });
+  assert.deepEqual(r.dentro, ['16:00', '17:00', '18:00', '19:00', '20:00', '21:00']);
+  assert.equal(r.elDelBorde, null, 'termina donde cierra la cancha: no hay bloque del borde');
+});
+
+test('bloquesDeTarifa: los dos tramos suman los 11 bloques del día, sin repetir ninguno', () => {
+  const base = { horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 60 };
+  const barata = bloquesDeTarifa({ ...base, horaDesde: '11:00', horaHasta: '16:00' }).dentro;
+  const noche = bloquesDeTarifa({ ...base, horaDesde: '16:00', horaHasta: '22:00' }).dentro;
+  assert.equal(barata.length + noche.length, 11);
+  assert.equal(new Set([...barata, ...noche]).size, 11, 'ningún bloque en dos tarifas a la vez');
+});
+
+test('bloquesDeTarifa: con bloques de 90 min cambian qué bloques caen en cada tarifa', () => {
+  // Es la pregunta que dejó abierta el diseño: cambiar la duración mueve el
+  // reparto. Con 90 min desde las 11:00 los inicios son 11:00, 12:30, 14:00,
+  // 15:30, 17:00, 18:30, 20:00 — y el de 15:30 sigue siendo barato.
+  const r = bloquesDeTarifa({
+    horaDesde: '11:00', horaHasta: '16:00',
+    horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 90,
+  });
+  assert.deepEqual(r.dentro, ['11:00', '12:30', '14:00', '15:30']);
+  assert.equal(r.elDelBorde, null, 'ningún bloque empieza exactamente a las 16:00');
+});
+
+test('bloquesDeTarifa: el último bloque tiene que TERMINAR antes del cierre', () => {
+  // Cierra 22:00 con bloques de 60: el último empieza 21:00, no 22:00.
+  const r = bloquesDeTarifa({
+    horaDesde: '11:00', horaHasta: '23:00',
+    horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 60,
+  });
+  assert.equal(r.dentro[r.dentro.length - 1], '21:00');
+  assert.equal(r.dentro.length, 11);
+});
+
+test('bloquesDeTarifa: una tarifa fuera del horario de la cancha no cubre nada', () => {
+  const r = bloquesDeTarifa({
+    horaDesde: '06:00', horaHasta: '09:00',
+    horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 60,
+  });
+  assert.deepEqual(r.dentro, []);
+});
+
+test('bloquesDeTarifa: datos incompletos devuelven vacío y no revientan', () => {
+  assert.deepEqual(bloquesDeTarifa(), { dentro: [], elDelBorde: null });
+  assert.deepEqual(bloquesDeTarifa({ horaDesde: '11:00' }), { dentro: [], elDelBorde: null });
+  assert.deepEqual(
+    bloquesDeTarifa({ horaDesde: '11:00', horaHasta: '16:00', horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 0 }),
+    { dentro: [], elDelBorde: null }
+  );
+});
