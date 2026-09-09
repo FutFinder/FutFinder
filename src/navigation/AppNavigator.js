@@ -63,6 +63,12 @@ import ElegirCanchaScreen from '../screens/ElegirCanchaScreen';
 import FechaHoraScreen from '../screens/FechaHoraScreen';
 import ResumenReservaScreen from '../screens/ResumenReservaScreen';
 import ReportarProblemaScreen from '../screens/ReportarProblemaScreen';
+import MisRecintosScreen from '../screens/MisRecintosScreen';
+import PanelRecintoScreen from '../screens/PanelRecintoScreen';
+import AgendaRecintoScreen from '../screens/AgendaRecintoScreen';
+import ReservaRecintoScreen from '../screens/ReservaRecintoScreen';
+import CalendarioCanchaScreen from '../screens/CalendarioCanchaScreen';
+import OcuparHorarioScreen from '../screens/OcuparHorarioScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
 import withErrorBoundary from './withErrorBoundary';
@@ -126,6 +132,14 @@ const GuardedElegirCanchaScreen = withAuthGuard(ElegirCanchaScreen, 'ElegirCanch
 const GuardedFechaHoraScreen = withAuthGuard(FechaHoraScreen, 'FechaHora');
 const GuardedResumenReservaScreen = withAuthGuard(ResumenReservaScreen, 'Resumen');
 const GuardedReportarProblemaScreen = withAuthGuard(ReportarProblemaScreen, 'ReportarProblema');
+// Administración del recinto: todas detrás del guard porque muestran datos de
+// reservas de terceros (nombre y teléfono de contacto incluidos).
+const GuardedMisRecintosScreen = withAuthGuard(MisRecintosScreen, 'MisRecintos');
+const GuardedPanelRecintoScreen = withAuthGuard(PanelRecintoScreen, 'PanelRecinto');
+const GuardedAgendaRecintoScreen = withAuthGuard(AgendaRecintoScreen, 'AgendaRecinto');
+const GuardedReservaRecintoScreen = withAuthGuard(ReservaRecintoScreen, 'ReservaRecinto');
+const GuardedCalendarioCanchaScreen = withAuthGuard(CalendarioCanchaScreen, 'CalendarioCancha');
+const GuardedOcuparHorarioScreen = withAuthGuard(OcuparHorarioScreen, 'OcuparHorario');
 
 // Extendemos DarkTheme (que ya trae fonts + colors completos)
 // y le pisamos solo los colores corporativos de FutFinder.
@@ -416,6 +430,36 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ReservasUiGallery"
           component={SafeReservasUiGalleryScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="MisRecintos"
+          component={GuardedMisRecintosScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="PanelRecinto"
+          component={GuardedPanelRecintoScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="AgendaRecinto"
+          component={GuardedAgendaRecintoScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ReservaRecinto"
+          component={GuardedReservaRecintoScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="CalendarioCancha"
+          component={GuardedCalendarioCanchaScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="OcuparHorario"
+          component={GuardedOcuparHorarioScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

@@ -52,6 +52,25 @@ export async function misRecintos() {
 }
 
 /**
+ * Las canchas de un recinto, con lo que hace falta para administrarlas.
+ *
+ * NO se leen de la tabla y no es una convención: desde la migración 65 la
+ * policy de `canchas_reservables` solo deja ver las de un complejo PUBLICADO,
+ * así que un `select` directo devuelve cero filas justo en el estado en que se
+ * carga un recinto nuevo. La RPC de la migración 72 es la única vía.
+ *
+ * Trae además `tiene_horario` —la condición que exige publicar— y
+ * `tiene_tarifas`, para distinguir una cancha de precio único de una con
+ * franjas.
+ */
+export async function canchasDelRecinto(complejoId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase.rpc('admin_canchas_complejo', { p_complejo_id: complejoId });
+  return comoListaRecinto(data, error, 'canchasDelRecinto');
+}
+
+/**
  * Agenda de un día completo del recinto, más los contadores del panel.
  *
  * Trae `resumen`, `reservas` y `bloqueos` en una sola llamada para que la

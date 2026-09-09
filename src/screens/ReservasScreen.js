@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Search,
   MapPin,
@@ -9,6 +10,8 @@ import {
   Image as ImageIcon,
   Calendar,
   ShieldCheck,
+  Building2,
+  ChevronRight,
 } from 'lucide-react-native';
 
 import NotificationBell from '../components/NotificationBell';
@@ -17,6 +20,9 @@ import { Card, Chip, Badge, NoticeCard } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { listComplejosCerca, listHorasLibresHoy } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
+import { misRecintos, agendaDelDia } from '../services/recinto';
+import { resumenDelPanel } from '../utils/recintoAgenda';
+import { hoyISO } from '../utils/recintoPantallas';
 
 // Búsqueda sin distinguir tilde/mayúscula ("maipu" debe encontrar "Maipú") —
 // mismo patrón que ya usa PickerSheet en el módulo Partidos.
@@ -67,6 +73,38 @@ export default function ReservasScreen({ navigation }) {
     })();
   }, []);
 
+  // Acceso de administración (artboards 1a y 1b): solo aparece si de verdad
+  // administras algún recinto. Con uno se entra directo al panel; con dos o
+  // más, a la lista. Es una llamada de más solo para quien administra.
+  const [recintos, setRecintos] = useState([]);
+  const [reservasHoy, setReservasHoy] = useState(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let vivo = true;
+      (async () => {
+        const { data } = await misRecintos();
+        if (!vivo) return;
+        setRecintos(data || []);
+        if ((data || []).length === 1) {
+          const { data: agenda } = await agendaDelDia(data[0].id, hoyISO());
+          if (vivo) setReservasHoy(resumenDelPanel(agenda?.resumen)?.reservasConfirmadas ?? null);
+        } else {
+          setReservasHoy(null);
+        }
+      })();
+      return () => { vivo = false; };
+    }, []),
+  );
+
+  const irAlRecinto = useCallback(() => {
+    if (recintos.length === 1) {
+      navigation.navigate('PanelRecinto', { complejoId: recintos[0].id, nombre: recintos[0].nombre });
+    } else {
+      navigation.navigate('MisRecintos');
+    }
+  }, [navigation, recintos]);
+
   const proximamente = useCallback((mensaje) => {
     setBanner(mensaje);
     setTimeout(() => setBanner(null), 2400);
@@ -100,6 +138,32 @@ export default function ReservasScreen({ navigation }) {
           <Text style={styles.headerTitle}>Reservas</Text>
           <NotificationBell />
         </View>
+
+        {recintos.length > 0 ? (
+          <Card onPress={irAlRecinto} style={styles.recintoCard}>
+            <View style={styles.recintoFila}>
+              <View style={styles.recintoIcono}>
+                <Building2 color={C.green} size={18} strokeWidth={2.2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.recintoNombre} numberOfLines={1}>
+                  {recintos.length === 1 ? recintos[0].nombre : `${recintos.length} recintos`}
+                </Text>
+                <Text style={styles.recintoSub} numberOfLines={1}>
+                  {recintos.length === 1
+                    ? [
+                        reservasHoy === null
+                          ? null
+                          : reservasHoy === 1 ? '1 reserva hoy' : `${reservasHoy} reservas hoy`,
+                        recintos[0].rol === 'dueño' ? 'eres dueño' : 'eres administrador',
+                      ].filter(Boolean).join(' · ')
+                    : 'Administras más de un recinto'}
+                </Text>
+              </View>
+              <ChevronRight color={C.textSecondary} size={18} strokeWidth={2.2} />
+            </View>
+          </Card>
+        ) : null}
 
         <Text style={styles.h1}>Reserva una cancha</Text>
 
@@ -353,6 +417,16 @@ function ComplejoCard({ complejo, onPress }) {
 }
 
 const styles = StyleSheet.create({
+  recintoCard: { marginBottom: 16, borderColor: C.greenDeepBorder },
+  recintoFila: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  recintoIcono: {
+    width: 38, height: 38, borderRadius: 13,
+    backgroundColor: C.shieldBg, borderWidth: 1, borderColor: C.greenDeepBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  recintoNombre: { fontFamily: F.bold, fontSize: 14.5, color: C.textPrimary },
+  recintoSub: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 2 },
+
   root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 4 },
   header: {
