@@ -29,6 +29,7 @@ const {
   fechaLarga,
   fechaRelativa,
   rotuloDeSemana,
+  pluraliza,
   duracionEnMinutos,
   etiquetaDuracion,
   resumenDeAgenda,
@@ -148,6 +149,15 @@ test('rotuloDeSemana nombra los dos meses cuando la semana los cruza', () => {
     rotuloDeSemana('2026-09-30'),
     'Semana del 28 de septiembre al 4 de octubre',
   );
+});
+
+test('pluraliza acierta el singular, que es el que se olvida', () => {
+  // REGRESIÓN: el panel decía «1 horas ocupadas hoy». Un recinto que recién
+  // parte tiene uno de casi todo, así que es el caso más visible.
+  assert.equal(pluraliza(1, 'hora', 'horas'), '1 hora');
+  assert.equal(pluraliza(2, 'hora', 'horas'), '2 horas');
+  assert.equal(pluraliza(0, 'hora', 'horas'), '0 horas');
+  assert.equal(pluraliza(null, 'día', 'días'), '0 días');
 });
 
 // ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@ import {
   misRecintos, agendaDelDia, reservasProximas, canchasDelRecinto, publicarRecinto,
 } from '../services/recinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
-import { hoyISO, fechaRelativa } from '../utils/recintoPantallas';
+import { hoyISO, fechaRelativa, pluraliza } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
 
 /**
@@ -106,7 +106,9 @@ export default function PanelRecintoScreen({ navigation, route }) {
 
       <View style={styles.header}>
         <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
-        <Text style={styles.headerTitle} numberOfLines={1}>
+        {/* Dos líneas: el nombre de un recinto puede ser largo y con
+            «Cambiar» y la campana al lado, en una sola se corta siempre. */}
+        <Text style={styles.headerTitle} numberOfLines={2}>
           {recinto?.nombre || route.params?.nombre || 'Mi recinto'}
         </Text>
         {varios ? (
@@ -187,7 +189,7 @@ export default function PanelRecintoScreen({ navigation, route }) {
                 <ListRow
                   icon={CalendarClock}
                   title="Calendario y bloqueos"
-                  subtitle={resumen?.bloqueos ? `${resumen.bloqueos} horas ocupadas hoy` : 'Ocupar horas cancha por cancha'}
+                  subtitle={resumen?.bloqueos ? `${pluraliza(resumen.bloqueos, 'hora ocupada', 'horas ocupadas')} hoy` : 'Ocupar horas cancha por cancha'}
                   right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
                   onPress={() => navigation.navigate('CalendarioCancha', { complejoId, nombre: recinto.nombre })}
                 />
@@ -196,9 +198,9 @@ export default function PanelRecintoScreen({ navigation, route }) {
                   title="Canchas"
                   subtitle={
                     resumen
-                      ? `${resumen.canchasTotal} ${resumen.canchasTotal === 1 ? 'cancha' : 'canchas'}`
+                      ? pluraliza(resumen.canchasTotal, 'cancha', 'canchas')
                         + (resumen.canchasTotal - resumen.canchasActivas > 0
-                          ? ` · ${resumen.canchasTotal - resumen.canchasActivas} inactiva${resumen.canchasTotal - resumen.canchasActivas === 1 ? '' : 's'}`
+                          ? ` · ${pluraliza(resumen.canchasTotal - resumen.canchasActivas, 'inactiva', 'inactivas')}`
                           : '')
                       : 'Crear, editar y activar canchas'
                   }
@@ -438,13 +440,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     paddingHorizontal: S.screenPadding,
     paddingTop: 6,
     paddingBottom: 12,
   },
-  headerTitle: { flex: 1, fontFamily: F.extraBold, fontSize: 20, color: C.textPrimary },
-  cambiar: { fontFamily: F.bold, fontSize: 13, color: C.green },
+  headerTitle: { flex: 1, fontFamily: F.extraBold, fontSize: 18.5, lineHeight: 23, color: C.textPrimary },
+  cambiar: { flexShrink: 0, fontFamily: F.bold, fontSize: 13, color: C.green },
   scroll: { paddingHorizontal: S.screenPadding, paddingBottom: 40 },
 
   nombre: { fontFamily: F.extraBold, fontSize: 19, color: C.textPrimary },

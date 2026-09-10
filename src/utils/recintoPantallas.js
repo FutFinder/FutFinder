@@ -134,6 +134,16 @@ export function rotuloDeSemana(fecha) {
   return `Semana del ${a.getDate()} de ${MESES[a.getMonth()]} al ${b.getDate()} de ${MESES[b.getMonth()]}`;
 }
 
+/**
+ * «1 hora» / «2 horas». Existe porque ya se coló un «1 horas ocupadas hoy»
+ * en el panel: el singular se olvida justo en el caso más común de un
+ * recinto que recién parte, que es tener uno de algo.
+ */
+export function pluraliza(n, singular, plural) {
+  const cantidad = Number(n) || 0;
+  return `${cantidad} ${cantidad === 1 ? singular : plural}`;
+}
+
 /* ── Duraciones ─────────────────────────────────────────────────────────── */
 
 /**

@@ -203,6 +203,11 @@ const linking = {
       MatchRequestStatus: 'p/:matchId/mi-solicitud',
       EditMatch: 'p/:matchId/editar',
       CreateMatch: 'publicar',
+      // La galería de QA del vertical de Reservas, con URL propia para
+      // poder revisar los componentes en el navegador sin iniciar sesión.
+      // No muestra datos de nadie: son las primitivas con textos de
+      // ejemplo (por eso tampoco pasa por `withAuthGuard`).
+      ReservasUiGallery: 'ui-reservas',
     },
   },
 };

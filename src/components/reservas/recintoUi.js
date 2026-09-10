@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   bloqueCont: { borderStyle: 'dashed', paddingVertical: 9 },
-  bloqueHora: { width: 46, fontFamily: F.extraBold, fontSize: 13.5, color: C.textPrimary },
+  bloqueHora: { minWidth: 46, fontFamily: F.extraBold, fontSize: 13.5, color: C.textPrimary },
   bloqueTitulo: { fontFamily: F.bold, fontSize: 13.5, color: C.textPrimary },
   bloqueTituloCont: { fontFamily: F.medium, fontSize: 12.5, color: C.textSecondary },
   bloqueDetalle: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary, marginTop: 2, lineHeight: 15 },

@@ -91,9 +91,13 @@ export default function CalendarioCanchaScreen({ navigation, route }) {
       </View>
 
       {canchas.length > 1 ? (
+        // `flexGrow: 0` es obligatorio: un ScrollView horizontal dentro de una
+        // columna se estira a lo alto de todo el espacio libre y se come lo
+        // que viene abajo — acá, la tira de días.
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.canchasScroll}
           contentContainerStyle={styles.canchasTira}
         >
           {canchas.map((k) => (
@@ -251,7 +255,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontFamily: F.extraBold, fontSize: 20, color: C.textPrimary },
   headerSub: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 2 },
-  canchasTira: { paddingHorizontal: S.screenPadding, gap: 8, paddingBottom: 12 },
+  canchasScroll: { flexGrow: 0, flexShrink: 0 },
+  canchasTira: { paddingHorizontal: S.screenPadding, gap: 8, paddingBottom: 12, alignItems: 'center' },
   semanaWrap: { paddingHorizontal: S.screenPadding, paddingBottom: 12 },
   scroll: { paddingHorizontal: S.screenPadding, paddingBottom: 110 },
   diaRotulo: { fontFamily: F.semiBold, fontSize: 12, color: C.textSecondary, marginBottom: 3 },

@@ -8,6 +8,7 @@ import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/
 import { Card, IconButton, Button, Chip, Badge, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { Skeleton } from '../components/reservas/recintoUi';
 import { canchasDelRecinto } from '../services/recinto';
+import { pluraliza } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
 
 const TIPOS = {
@@ -128,7 +129,7 @@ export default function CanchasScreen({ navigation, route }) {
                   )}
                   {k.tiene_horario ? (
                     <Badge
-                      label={k.dias_con_horario === 7 ? 'Todos los días' : `${k.dias_con_horario} días con horario`}
+                      label={k.dias_con_horario === 7 ? 'Todos los días' : `${pluraliza(k.dias_con_horario, 'día', 'días')} con horario`}
                       tone="neutral"
                     />
                   ) : (

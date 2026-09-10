@@ -124,7 +124,10 @@ export function Chip({ label, active, onPress, icon: Icon, style }) {
       {Icon ? <Icon color={active ? C.textOnGreen : C.textSecondary} size={14} strokeWidth={2.2} /> : null}
       <Text
         numberOfLines={1}
+        // `flexShrink` para que una etiqueta larga se recorte con puntos
+        // suspensivos en vez de estirar el chip fuera de la pantalla.
         style={{
+          flexShrink: 1,
           fontFamily: F.bold,
           fontSize: 12.5,
           color: active ? C.textOnGreen : C.textSecondary,
@@ -161,7 +164,10 @@ export function Badge({ label, tone = 'green' }) {
   return (
     <View
       style={{
-        height: S.badge,
+        // minHeight y no height, por lo mismo que el chip: con la letra
+        // grande del sistema una altura fija recorta el texto.
+        minHeight: S.badge,
+        paddingVertical: 3,
         paddingHorizontal: 9,
         borderRadius: R.pill,
         borderWidth: 1,
@@ -169,10 +175,13 @@ export function Badge({ label, tone = 'green' }) {
         backgroundColor: map.bg,
         alignItems: 'center',
         justifyContent: 'center',
+        alignSelf: 'center',
       }}
     >
       <Text
+        numberOfLines={1}
         style={{
+          flexShrink: 1,
           fontFamily: F.extraBold,
           fontSize: 10,
           letterSpacing: 0.8,
@@ -380,10 +389,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    height: S.chip,
+    // `minHeight` y no `height`: con el tamaño de letra grande del sistema
+    // una altura fija recorta el texto por arriba y por abajo. Con padding
+    // vertical el chip se ve igual al tamaño normal y crece cuando hace falta.
+    minHeight: S.chip,
+    paddingVertical: 6,
     paddingHorizontal: 13,
     borderRadius: R.pill,
     borderWidth: 1,
+    // `center` y no `flex-start`: sin alignSelf el chip se estira a lo alto
+    // del contenedor (el `alignItems` por defecto en React Native es
+    // `stretch`), y con `flex-start` quedaría pegado arriba en las filas que
+    // sí centran. `center` evita las dos cosas.
+    alignSelf: 'center',
   },
   chipActive: { backgroundColor: C.green, borderColor: C.green },
   chipIdle: { backgroundColor: C.surfaceAlt, borderColor: C.border },
