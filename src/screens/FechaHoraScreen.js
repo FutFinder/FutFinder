@@ -8,7 +8,6 @@ import { IconButton, StickyFooter } from '../components/reservas/ui';
 import { getComplejoById, getDisponibilidad } from '../services/reservas';
 import { formatCLP, buildFechaOptions, fechaLabel, addMinutesToHora } from '../services/reservasRules';
 
-const DURACIONES = [60, 90];
 
 /** Pantalla 7 del handoff `Reservas.dc.html`: elegir fecha y horario. */
 export default function FechaHoraScreen({ navigation, route }) {
@@ -19,21 +18,23 @@ export default function FechaHoraScreen({ navigation, route }) {
 
   const fechas = useMemo(() => buildFechaOptions(), []);
   const [fechaIdx, setFechaIdx] = useState(0);
-  const [duracion, setDuracion] = useState(60);
   const [horaIdx, setHoraIdx] = useState(null);
 
+  // La disponibilidad se vuelve a pedir CADA VEZ que cambia la fecha. Con los
+  // datos de ejemplo daba lo mismo —la grilla era siempre la misma— pero
+  // contra la base cada día tiene sus reservas y sus bloqueos.
   const load = useCallback(async () => {
     setLoading(true);
     const [{ data: c }, { data: disp }] = await Promise.all([
       getComplejoById(complejoId),
-      getDisponibilidad(canchaId, fechas[0].iso),
+      getDisponibilidad(canchaId, fechas[fechaIdx].iso),
     ]);
     setComplejo(c);
     setHoras(disp?.horas || []);
     const primeraDisponible = (disp?.horas || []).findIndex((h) => h.disponible);
     setHoraIdx(primeraDisponible >= 0 ? primeraDisponible : null);
     setLoading(false);
-  }, [complejoId, canchaId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [complejoId, canchaId, fechas, fechaIdx]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -50,7 +51,9 @@ export default function FechaHoraScreen({ navigation, route }) {
   const cancha = (complejo?.canchas || []).find((k) => k.id === canchaId) || complejo?.canchas?.[0] || null;
   const dispCount = horas.filter((h) => h.disponible).length;
   const horaSel = horaIdx != null ? horas[horaIdx] : null;
-  const horaFin = horaSel ? addMinutesToHora(horaSel.hora, duracion) : null;
+  // El término lo dice el propio bloque: la duración es de la cancha, no algo
+  // que el jugador elija.
+  const horaFin = horaSel ? (horaSel.horaFin || addMinutesToHora(horaSel.hora, cancha?.duracionSlotMin || 60)) : null;
   const fechaTxt = fechaLabel(fechas[fechaIdx]);
 
   return (
@@ -86,21 +89,6 @@ export default function FechaHoraScreen({ navigation, route }) {
           <Text style={styles.dispCount}>{dispCount} de {horas.length} libres</Text>
         </View>
 
-        <View style={styles.duracionRow}>
-          {DURACIONES.map((d) => {
-            const on = d === duracion;
-            return (
-              <Pressable
-                key={d}
-                onPress={() => setDuracion(d)}
-                style={[styles.duracionPill, on && styles.duracionPillOn]}
-              >
-                <Text style={[styles.duracionText, on && styles.duracionTextOn]}>{d} min</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
         <View style={styles.slotsGrid}>
           {horas.map((h, i) => {
             const on = i === horaIdx;
@@ -123,6 +111,18 @@ export default function FechaHoraScreen({ navigation, route }) {
                 ]}>
                   {h.hora}
                 </Text>
+                {/* El precio por bloque: con tarifas por franja la misma
+                    cancha vale distinto según la hora, y elegir sin ver el
+                    valor no se sostiene. */}
+                {h.precio ? (
+                  <Text style={[
+                    styles.slotPrecio,
+                    !h.disponible && styles.slotTextOcupado,
+                    on && styles.slotTextOn,
+                  ]}>
+                    {formatCLP(h.precio)}
+                  </Text>
+                ) : null}
               </Pressable>
             );
           })}
@@ -131,7 +131,7 @@ export default function FechaHoraScreen({ navigation, route }) {
         <View style={styles.legendRow}>
           <Legend color={C.surface} border={C.border} label="Disponible" />
           <Legend color={C.green} label="Seleccionado" />
-          <Legend color="#0E110E" border="#1C201D" label="Ocupado" />
+          <Legend color="#0E110E" border="#1C201D" label="No disponible" />
         </View>
       </ScrollView>
 
@@ -141,17 +141,18 @@ export default function FechaHoraScreen({ navigation, route }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.resumenHora}>{horaSel.hora} – {horaFin}</Text>
               <Text style={styles.resumenFecha} numberOfLines={1}>
-                {fechaTxt} · {cancha ? formatCLP(cancha.total) : ''}
+                {fechaTxt} · {horaSel.precio ? formatCLP(horaSel.precio) : ''}
               </Text>
             </View>
             <Pressable
               onPress={() => navigation.navigate('Resumen', {
                 complejoId,
                 canchaId: cancha?.id,
+                fecha: fechas[fechaIdx].iso,
                 fechaLabel: fechaTxt,
                 horaInicio: horaSel.hora,
                 horaFin,
-                duracion,
+                precioBloque: horaSel.precio,
               })}
               style={({ pressed }) => [styles.continuarBtn, pressed && { opacity: 0.9 }]}
             >
@@ -195,14 +196,6 @@ const styles = StyleSheet.create({
   fechaNum: { fontFamily: F.extraBold, fontSize: 19, color: C.textPrimary },
   fechaNumOn: { color: C.textOnGreen },
 
-  duracionRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  duracionPill: {
-    height: 30, paddingHorizontal: 11, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
-  },
-  duracionPillOn: { backgroundColor: C.shieldBg, borderColor: C.green },
-  duracionText: { fontFamily: F.bold, fontSize: 11.5, color: C.textSecondary },
-  duracionTextOn: { color: C.green },
 
   slotsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
   slot: {
@@ -214,6 +207,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.green, borderWidth: 1, borderColor: C.green,
     shadowColor: C.green, shadowOpacity: 0.28, shadowRadius: 10, elevation: 3,
   },
+  slotPrecio: { fontFamily: F.medium, fontSize: 10, color: C.textSecondary, marginTop: 2 },
   slotText: { fontFamily: F.bold, fontSize: 15, color: C.textPrimary },
   slotTextOcupado: { color: '#454A46', textDecorationLine: 'line-through' },
   slotTextOn: { fontFamily: F.extraBold, color: C.textOnGreen },

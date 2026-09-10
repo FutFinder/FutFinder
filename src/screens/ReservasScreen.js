@@ -125,7 +125,7 @@ export default function ReservasScreen({ navigation }) {
     return complejos.filter((c) => {
       if (q && !normalizar(c.nombre).includes(q)) return false;
       if (soloFutbol7 && !c.tipos.includes('Fútbol 7')) return false;
-      if (hasta30k && c.desde > 30000) return false;
+      if (hasta30k && (c.desde == null || c.desde > 30000)) return false;
       if (soloHoy && !c.proximaHoraLibre) return false;
       return true;
     });
@@ -246,7 +246,10 @@ export default function ReservasScreen({ navigation }) {
                       <Text style={[styles.mapPinPrecio, i !== 0 && { fontSize: 13.5 }]}>
                         {formatCLP(c.desde)}
                       </Text>
-                      <Text style={styles.mapPinMeta}>★ {c.rating} · {c.proximaHoraLibre}</Text>
+                      <Text style={styles.mapPinMeta}>
+                        {[c.reseñas > 0 ? `★ ${Number(c.rating).toFixed(1)}` : null, c.proximaHoraLibre]
+                          .filter(Boolean).join(' · ')}
+                      </Text>
                     </View>
                   </Pressable>
                 );
@@ -258,7 +261,9 @@ export default function ReservasScreen({ navigation }) {
                 <View style={styles.mapPreviewPhoto}>
                   <ImageIcon color={C.textMuted} size={20} strokeWidth={1.6} />
                   <View style={styles.mapPreviewRating}>
-                    <Text style={styles.mapPreviewRatingText}>★ {mapCard.rating}</Text>
+                    <Text style={styles.mapPreviewRatingText}>
+                      {mapCard.reseñas > 0 ? `★ ${Number(mapCard.rating).toFixed(1)}` : 'nuevo'}
+                    </Text>
                   </View>
                 </View>
                 <View style={styles.mapPreviewBody}>
@@ -268,11 +273,13 @@ export default function ReservasScreen({ navigation }) {
                     <Text style={styles.mapPreviewPrecioBig}>{formatCLP(mapCard.desde)}</Text>
                   </Pressable>
                   <Text style={styles.mapPreviewMeta} numberOfLines={1}>
-                    {mapCard.sector} · {mapCard.distanciaKm} km · {mapCard.tipos.join(' y ')}
+                    {[mapCard.sector,
+                      mapCard.distanciaKm != null ? `${mapCard.distanciaKm} km` : null,
+                      mapCard.tipos.join(' y ')].filter(Boolean).join(' · ')}
                   </Text>
                   <View style={styles.mapPreviewTags}>
-                    {mapCard.servicios.slice(0, 3).map((s) => (
-                      <Badge key={s} label={s} tone="neutral" />
+                    {mapCard.tipos.slice(0, 3).map((t) => (
+                      <Badge key={t} label={t} tone="neutral" />
                     ))}
                   </View>
                   {mapCard.proximaHoraLibre ? (
@@ -391,15 +398,26 @@ function ComplejoCard({ complejo, onPress }) {
     <Card padded={false} onPress={onPress} radius={R.hero}>
       <View style={styles.photoPlaceholder}>
         <ImageIcon color={C.textMuted} size={22} strokeWidth={1.6} />
-        <Badge label={`Desde ${formatCLP(complejo.desde)}`} tone="neutral" />
+        {complejo.desde != null ? (
+          <Badge label={`Desde ${formatCLP(complejo.desde)}`} tone="neutral" />
+        ) : null}
       </View>
       <View style={styles.complejoBody}>
         <View style={styles.complejoTopRow}>
-          <View style={styles.ratingRow}>
-            <Star color={C.amber} size={13} strokeWidth={0} fill={C.amber} />
-            <Text style={styles.ratingText}>{complejo.rating}</Text>
-          </View>
-          <Text style={styles.distText}>{complejo.distanciaKm} km</Text>
+          {/* Un recinto recién publicado no tiene calificaciones, y sin
+              permiso de ubicación no hay distancia. Se omiten en vez de
+              mostrar «★ null» o «null km». */}
+          {complejo.reseñas > 0 ? (
+            <View style={styles.ratingRow}>
+              <Star color={C.amber} size={13} strokeWidth={0} fill={C.amber} />
+              <Text style={styles.ratingText}>{Number(complejo.rating).toFixed(1)}</Text>
+            </View>
+          ) : (
+            <Text style={styles.distText}>Sin calificaciones</Text>
+          )}
+          {complejo.distanciaKm != null ? (
+            <Text style={styles.distText}>{complejo.distanciaKm} km</Text>
+          ) : null}
         </View>
         <Text style={styles.complejoNombre}>{complejo.nombre}</Text>
         <Text style={styles.complejoSector}>{complejo.sector}</Text>

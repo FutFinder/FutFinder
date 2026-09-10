@@ -79,22 +79,43 @@ export default function ComplejoDetailScreen({ navigation, route }) {
         <View style={styles.body}>
           <Text style={styles.nombre}>{complejo.nombre}</Text>
           <View style={styles.metaRow}>
-            <Text style={styles.metaText}>★ {complejo.rating}</Text>
-            <Text style={styles.metaDot}>·</Text>
-            <Text style={styles.metaText}>({complejo.reseñas})</Text>
-            <Text style={styles.metaDot}>·</Text>
-            <Text style={styles.metaText}>{complejo.sector}</Text>
-            <Text style={styles.metaDot}>·</Text>
-            <Text style={styles.metaText}>{complejo.distanciaKm} km</Text>
+            {/* Un recinto recién publicado no tiene calificaciones todavía, y
+                sin permiso de ubicación no hay distancia. Se omiten en vez de
+                mostrar «★ null». */}
+            <Text style={styles.metaText}>
+              {complejo.reseñas > 0
+                ? `★ ${Number(complejo.rating).toFixed(1)} (${complejo.reseñas})`
+                : 'Sin calificaciones todavía'}
+            </Text>
+            {complejo.sector ? (
+              <>
+                <Text style={styles.metaDot}>·</Text>
+                <Text style={styles.metaText}>{complejo.sector}</Text>
+              </>
+            ) : null}
+            {complejo.distanciaKm != null ? (
+              <>
+                <Text style={styles.metaDot}>·</Text>
+                <Text style={styles.metaText}>{complejo.distanciaKm} km</Text>
+              </>
+            ) : null}
           </View>
-          <Text style={styles.descripcion}>{complejo.descripcion}</Text>
+          {complejo.descripcion ? (
+            <Text style={styles.descripcion}>{complejo.descripcion}</Text>
+          ) : null}
 
-          <Text style={styles.sectionLabel}>SERVICIOS</Text>
-          <View style={styles.tagsRow}>
-            {complejo.servicios.map((s) => (
-              <Badge key={s} label={s} tone="neutral" />
-            ))}
-          </View>
+          {/* Todavía no existe una tabla de servicios del recinto: en vez de
+              inventarlos, se muestran los tipos de cancha, que sí son reales. */}
+          {complejo.tipos.length > 0 ? (
+            <>
+              <Text style={styles.sectionLabel}>QUÉ HAY</Text>
+              <View style={styles.tagsRow}>
+                {complejo.tipos.map((t) => (
+                  <Badge key={t} label={t} tone="neutral" />
+                ))}
+              </View>
+            </>
+          ) : null}
 
           <Text style={styles.sectionLabel}>CANCHAS · {complejo.canchas.length}</Text>
           {hayCanchas ? (
@@ -154,7 +175,9 @@ export default function ComplejoDetailScreen({ navigation, route }) {
           <View style={styles.footerRow}>
             <View>
               <Text style={styles.desdeLabel}>DESDE</Text>
-              <Text style={styles.desdePrecio}>{formatCLP(complejo.desde)}</Text>
+              <Text style={styles.desdePrecio}>
+                {complejo.desde != null ? formatCLP(complejo.desde) : '—'}
+              </Text>
             </View>
             <View style={{ flex: 1 }}>
               <Button label="Ver horarios" onPress={() => goHorarios(complejo.canchas[0].id)} />
