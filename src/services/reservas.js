@@ -3,6 +3,7 @@ import { comoListaRecinto, comoResultadoRecinto } from '../utils/recintoAgenda';
 import {
   nombreDeTipo, jugadoresDeTipo, notaDeCancha, comoComplejoDeLista, comoCancha,
 } from '../utils/reservasJugador';
+import { nombresDeServicios } from '../utils/serviciosRecinto';
 
 /**
  * Servicio del vertical Reservas, LADO DEL JUGADOR.
@@ -99,7 +100,11 @@ export async function getComplejoById(id) {
   if (!isSupabaseConfigured) return { data: null, error: null };
   if (!id) return { data: null, error: { message: 'Falta el complejo' } };
 
-  const [{ data: complejo, error: e1 }, { data: canchas, error: e2 }] = await Promise.all([
+  const [
+    { data: complejo, error: e1 },
+    { data: canchas, error: e2 },
+    { data: servicios, error: e3 },
+  ] = await Promise.all([
     supabase
       .from('complejos')
       .select('id, nombre, descripcion, direccion, comuna, region, latitud, longitud, foto_url, verificado_futfinder, rating_avg, rating_count')
@@ -111,11 +116,15 @@ export async function getComplejoById(id) {
       .eq('complejo_id', id)
       .eq('activa', true)
       .order('nombre'),
+    supabase
+      .from('complejo_servicios')
+      .select('servicio')
+      .eq('complejo_id', id),
   ]);
 
-  if (e1 || e2) {
-    console.error('[FutFinder] getComplejoById:', e1 || e2);
-    return { data: null, error: { message: (e1 || e2).message || 'No se pudo cargar el complejo.' } };
+  if (e1 || e2 || e3) {
+    console.error('[FutFinder] getComplejoById:', e1 || e2 || e3);
+    return { data: null, error: { message: (e1 || e2 || e3).message || 'No se pudo cargar el complejo.' } };
   }
   if (!complejo) return { data: null, error: null };
 
@@ -133,9 +142,9 @@ export async function getComplejoById(id) {
       latitud: complejo.latitud,
       longitud: complejo.longitud,
       fotoUrl: complejo.foto_url,
-      // Todavía no existe una tabla de servicios del recinto; la ficha no los
-      // pide. Se devuelve vacío en vez de inventarlos.
-      servicios: [],
+      // Traducidos y en el orden del catálogo, para que dos recintos con los
+      // mismos servicios los muestren igual (migración 75).
+      servicios: nombresDeServicios((servicios || []).map((f) => f.servicio)),
       canchas: kanchas,
       desde: kanchas.length ? Math.min(...kanchas.map((k) => k.base)) : null,
       tipos: [...new Set(kanchas.map((k) => k.tipo))],

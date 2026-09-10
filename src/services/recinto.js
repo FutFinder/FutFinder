@@ -227,6 +227,59 @@ export async function actualizarFicha(complejoId, { nombre, descripcion, direcci
   return comoResultadoRecinto(data, error, 'actualizarFicha');
 }
 
+/**
+ * Los servicios del recinto: estacionamiento, camarines, quincho.
+ *
+ * Lectura directa: la policy ya deja ver los de un complejo publicado a
+ * cualquiera, y los propios a quien lo administra aunque no esté publicado —
+ * que es justo lo que hace falta para revisar la ficha antes de publicar.
+ */
+export async function serviciosDelRecinto(complejoId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  if (!complejoId) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('complejo_servicios')
+    .select('servicio')
+    .eq('complejo_id', complejoId);
+  const res = comoListaRecinto(data, error, 'serviciosDelRecinto');
+  if (res.error) return res;
+  return { data: (res.data || []).map((f) => f.servicio), error: null };
+}
+
+/**
+ * Guarda la lista COMPLETA de servicios: lo que no viene, se quita.
+ *
+ * Es un conjunto de chips que se encienden y apagan, así que mandar el estado
+ * final evita que dos toques rápidos dejen la base en algo que la pantalla no
+ * está mostrando. Un servicio fuera del catálogo lo rechaza el servidor en vez
+ * de ignorarlo — y lo rechaza ANTES de borrar nada.
+ */
+export async function guardarServicios(complejoId, servicios = []) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase.rpc('admin_actualizar_servicios', {
+    p_complejo_id: complejoId,
+    p_servicios: servicios || [],
+  });
+  return comoResultadoRecinto(data, error, 'guardarServicios');
+}
+
+/**
+ * Quita la foto de portada.
+ *
+ * Tiene función propia porque `admin_actualizar_complejo` no puede: su
+ * `coalesce` trata el null como «no cambiar», así que por ahí no hay forma de
+ * vaciar el campo. Cambiarle el significado al null habría roto los otros.
+ */
+export async function quitarFotoRecinto(complejoId) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase.rpc('admin_quitar_foto_complejo', {
+    p_complejo_id: complejoId,
+  });
+  return comoResultadoRecinto(data, error, 'quitarFotoRecinto');
+}
+
 /* ── Canchas ───────────────────────────────────────────────────── */
 
 /** Crea una cancha. `tipo` es `futbol_5`, `futbol_7` o `futbol_11`. */

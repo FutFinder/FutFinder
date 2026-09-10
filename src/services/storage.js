@@ -376,3 +376,52 @@ export const removeSupportScreenshotFile = (path) => removeFromBucket('support-s
 
 /** Borra un archivo del bucket `avatars` (avatar o portada) por su path. */
 export const removeAvatarBucketFile = (path) => removeFromBucket('avatars', path);
+
+/**
+ * Sube la portada del recinto al bucket `complejo-fotos` y actualiza
+ * `complejos.foto_url` (migración 75).
+ *
+ * La ruta es `<complejoId>/portada.<ext>` y esa primera carpeta es lo que
+ * mira la política de storage: escribe solo quien administra ESE complejo,
+ * comprobado con `es_admin_complejo()`. La lectura es pública porque la foto
+ * es lo primero que se ve en el buscador.
+ *
+ * Se redimensiona antes de subir, igual que las otras portadas: una foto de
+ * cámara moderna pesa más que el límite de 5 MB del bucket, y subirla entera
+ * también castiga a quien la mira desde el celular.
+ *
+ * `upsert` en el mismo path: cambiar la foto reemplaza la anterior en vez de
+ * ir dejando archivos huérfanos. La URL no cambia, así que se le agrega un
+ * parámetro con la hora para que el caché no siga mostrando la vieja.
+ */
+export async function uploadComplejoFoto(complejoId, asset) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!asset || !complejoId) return { error: { message: 'Faltan datos' } };
+
+  const processed = await resizeAndCompress(asset, { maxDimension: 1600 });
+  const ext = extFromAsset(processed);
+  const path = `${complejoId}/portada.${ext}`;
+  const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const body = await getUploadBody(processed);
+  const { error, url } = await uploadToBucket('complejo-fotos', path, body, contentType);
+  if (error) {
+    console.error('[FutFinder] uploadComplejoFoto:', error);
+    return { error };
+  }
+
+  const conVersion = `${url}?v=${Date.now()}`;
+  const { error: errorFicha } = await supabase.rpc('admin_actualizar_complejo', {
+    p_complejo_id: complejoId,
+    p_nombre: null,
+    p_descripcion: null,
+    p_direccion: null,
+    p_foto_url: conVersion,
+  });
+  if (errorFicha) {
+    console.error('[FutFinder] uploadComplejoFoto (ficha):', errorFicha);
+    return { error: { message: errorFicha.message || 'La foto se subió pero no se pudo guardar.' } };
+  }
+
+  return { url: conVersion };
+}

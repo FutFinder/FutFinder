@@ -104,14 +104,17 @@ export default function ComplejoDetailScreen({ navigation, route }) {
             <Text style={styles.descripcion}>{complejo.descripcion}</Text>
           ) : null}
 
-          {/* Todavía no existe una tabla de servicios del recinto: en vez de
-              inventarlos, se muestran los tipos de cancha, que sí son reales. */}
-          {complejo.tipos.length > 0 ? (
+          {complejo.servicios.length > 0 || complejo.tipos.length > 0 ? (
             <>
               <Text style={styles.sectionLabel}>QUÉ HAY</Text>
               <View style={styles.tagsRow}>
+                {/* Los tipos de cancha primero: es lo que define si el
+                    partido cabe. Después los servicios del recinto. */}
                 {complejo.tipos.map((t) => (
-                  <Badge key={t} label={t} tone="neutral" />
+                  <Badge key={t} label={t} tone="green" />
+                ))}
+                {complejo.servicios.map((sv) => (
+                  <Badge key={sv} label={sv} tone="neutral" />
                 ))}
               </View>
             </>

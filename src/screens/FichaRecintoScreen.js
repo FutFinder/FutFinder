@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, AlertTriangle, MapPin, Info } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle, MapPin, ImagePlus, Trash2 } from 'lucide-react-native';
 
-import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import { Card, IconButton, Button, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { Skeleton, FieldLabel, TextField } from '../components/reservas/recintoUi';
-import { misRecintos, actualizarFicha } from '../services/recinto';
+import {
+  misRecintos, actualizarFicha, serviciosDelRecinto, guardarServicios, quitarFotoRecinto,
+} from '../services/recinto';
+import { pickImage, uploadComplejoFoto } from '../services/storage';
+import { SERVICIOS } from '../utils/serviciosRecinto';
 
 /**
  * Ficha del recinto (artboards 1i y 1j).
@@ -25,9 +29,12 @@ import { misRecintos, actualizarFicha } from '../services/recinto';
  * para todos, así que los cambia el equipo de FutFinder. La RPC ni siquiera
  * los recibe.
  *
- * LA FOTO TODAVÍA NO SE PUEDE SUBIR desde acá. `actualizarFicha` acepta una
- * `fotoUrl`, pero falta el paso de subida a Storage; se muestra lo que hay y
- * se dice que está pendiente, en vez de ofrecer un botón que no funciona.
+ * LOS SERVICIOS SON UN CATÁLOGO CERRADO, no texto libre (migración 75): con
+ * texto libre un recinto escribe «Estacionamiento» y otro «parking», y
+ * filtrar por «con estacionamiento» deja de ser posible. Se guardan todos
+ * juntos —la lista completa reemplaza a la anterior— porque son chips que se
+ * encienden y apagan y mandar el estado final evita que dos toques seguidos
+ * dejen la base en algo que la pantalla no muestra.
  */
 export default function FichaRecintoScreen({ navigation, route }) {
   const { complejoId } = route.params || {};
@@ -39,9 +46,15 @@ export default function FichaRecintoScreen({ navigation, route }) {
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [servicios, setServicios] = useState([]);
+  const [serviciosGuardados, setServiciosGuardados] = useState([]);
+  const [subiendo, setSubiendo] = useState(false);
 
   const cargar = useCallback(async () => {
-    const { data, error: err } = await misRecintos();
+    const [{ data, error: err }, { data: servs }] = await Promise.all([
+      misRecintos(),
+      serviciosDelRecinto(complejoId),
+    ]);
     const mio = (data || []).find((r) => r.id === complejoId) || null;
     setRecinto(mio);
     setError(err?.message || null);
@@ -50,17 +63,44 @@ export default function FichaRecintoScreen({ navigation, route }) {
       setDescripcion(mio.descripcion || '');
       setDireccion(mio.direccion || '');
     }
+    setServicios(servs || []);
+    setServiciosGuardados(servs || []);
     setCargando(false);
   }, [complejoId]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
   const nombreOk = nombre.trim().length > 0;
+  const mismosServicios = servicios.length === serviciosGuardados.length
+    && servicios.every((x) => serviciosGuardados.includes(x));
   const cambio = recinto && (
     nombre.trim() !== (recinto.nombre || '')
     || descripcion.trim() !== (recinto.descripcion || '')
     || direccion.trim() !== (recinto.direccion || '')
+    || !mismosServicios
   );
+
+  const alternarServicio = (clave) =>
+    setServicios((prev) => (prev.includes(clave) ? prev.filter((x) => x !== clave) : [...prev, clave]));
+
+  const cambiarFoto = async () => {
+    const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.8, base64: false });
+    if (!ok) { if (reason) setError(reason); return; }
+    setSubiendo(true);
+    setError(null);
+    const { error: err } = await uploadComplejoFoto(complejoId, asset);
+    setSubiendo(false);
+    if (err) { setError(err.message); return; }
+    cargar();
+  };
+
+  const borrarFoto = async () => {
+    setSubiendo(true);
+    const { error: err } = await quitarFotoRecinto(complejoId);
+    setSubiendo(false);
+    if (err) { setError(err.message); return; }
+    cargar();
+  };
   const puedeGuardar = nombreOk && cambio && !enviando;
 
   const guardar = async () => {
@@ -76,8 +116,13 @@ export default function FichaRecintoScreen({ navigation, route }) {
       direccion: direccion.trim() && direccion.trim() !== (recinto.direccion || '')
         ? direccion.trim() : null,
     });
+    if (err) { setEnviando(false); setError(err.message); return; }
+
+    if (!mismosServicios) {
+      const { error: errServ } = await guardarServicios(complejoId, servicios);
+      if (errServ) { setEnviando(false); setError(errServ.message); return; }
+    }
     setEnviando(false);
-    if (err) { setError(err.message); return; }
     navigation.goBack();
   };
 
@@ -159,14 +204,59 @@ export default function FichaRecintoScreen({ navigation, route }) {
             </Card>
 
             <Card>
+              <FieldLabel>Servicios</FieldLabel>
+              <Text style={styles.ayuda}>
+                Lo que el jugador ve en tu ficha antes de reservar. Toca para encender y apagar.
+              </Text>
+              <View style={styles.serviciosGrid}>
+                {SERVICIOS.map((sv) => {
+                  const on = servicios.includes(sv.clave);
+                  return (
+                    <Pressable
+                      key={sv.clave}
+                      onPress={() => alternarServicio(sv.clave)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: on }}
+                      style={({ pressed }) => [styles.servicio, on && styles.servicioOn, pressed && { opacity: 0.85 }]}
+                    >
+                      <Text style={[styles.servicioTexto, on && styles.servicioTextoOn]}>{sv.nombre}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Card>
+
+            <Card>
               <FieldLabel>Foto de portada</FieldLabel>
-              <View style={styles.fotoCaja}>
-                <Info color={C.textSecondary} size={15} strokeWidth={2.2} />
-                <Text style={styles.fotoTexto}>
-                  {recinto.foto_url
-                    ? 'Tu recinto ya tiene foto. Cambiarla desde la app está pendiente.'
-                    : 'Subir la foto desde la app está pendiente. Mándanosla y la cargamos: horizontal, con la cancha completa.'}
-                </Text>
+              <Text style={styles.ayuda}>
+                Horizontal, con la cancha completa. Es la primera impresión del recinto en el
+                buscador.
+              </Text>
+              {recinto.foto_url ? (
+                <Image
+                  source={{ uri: recinto.foto_url }}
+                  style={styles.foto}
+                  resizeMode="cover"
+                  accessibilityLabel={`Portada de ${recinto.nombre}`}
+                />
+              ) : (
+                <View style={[styles.foto, styles.fotoVacia]}>
+                  <ImagePlus color={C.textMuted} size={26} strokeWidth={1.7} />
+                  <Text style={styles.fotoVaciaTexto}>Sin foto todavía</Text>
+                </View>
+              )}
+              <View style={styles.fotoBotones}>
+                <Button
+                  label={recinto.foto_url ? 'Cambiar foto' : 'Subir foto'}
+                  variant="secondary"
+                  icon={ImagePlus}
+                  loading={subiendo}
+                  onPress={cambiarFoto}
+                  style={{ flex: 1 }}
+                />
+                {recinto.foto_url ? (
+                  <IconButton icon={Trash2} onPress={borrarFoto} accessibilityLabel="Quitar la foto" />
+                ) : null}
               </View>
             </Card>
 
@@ -209,6 +299,21 @@ const styles = StyleSheet.create({
   errorCampo: { fontFamily: F.semiBold, fontSize: 11.5, color: C.red, marginTop: 7 },
   ubicacion: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 11 },
   ubicacionTexto: { fontFamily: F.bold, fontSize: 12.5, color: C.textSecondary },
-  fotoCaja: { flexDirection: 'row', gap: 9, alignItems: 'flex-start' },
-  fotoTexto: { flex: 1, fontFamily: F.medium, fontSize: 12, color: C.textSecondary, lineHeight: 17 },
+  serviciosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 13 },
+  servicio: {
+    paddingHorizontal: 13, paddingVertical: 9,
+    borderRadius: R.pill, borderWidth: 1,
+    borderColor: C.border, backgroundColor: C.surface,
+  },
+  servicioOn: { borderColor: C.green, backgroundColor: C.selectedBg },
+  servicioTexto: { fontFamily: F.semiBold, fontSize: 12.5, color: C.textSecondary },
+  servicioTextoOn: { color: C.green, fontFamily: F.bold },
+
+  foto: { width: '100%', aspectRatio: 16 / 9, borderRadius: R.cardSm, marginTop: 13 },
+  fotoVacia: {
+    alignItems: 'center', justifyContent: 'center', gap: 7,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.dashedBorder, borderStyle: 'dashed',
+  },
+  fotoVaciaTexto: { fontFamily: F.medium, fontSize: 12, color: C.textMuted },
+  fotoBotones: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12 },
 });
