@@ -40,6 +40,12 @@ const {
   reservasQueChocan,
   rangoSinChoque,
   etiquetaOcupar,
+  DIAS_SEMANA,
+  horasDelReloj,
+  rangosSeCruzan,
+  choqueDeHorario,
+  horariosDelDia,
+  rangoLegible,
   normalizaTelefonoCl,
   telefonoAceptable,
 } = require('../recintoPantallas.js');
@@ -294,6 +300,79 @@ test('etiquetaOcupar dice cuánto se está marcando', () => {
   assert.equal(etiquetaOcupar('11:00', '13:00'), 'Ocupar 2 horas');
   assert.equal(etiquetaOcupar('11:00', '12:00'), 'Ocupar 1 hora');
   assert.equal(etiquetaOcupar('11:00', '12:30'), 'Ocupar 1 h 30 min');
+});
+
+// ---------------------------------------------------------------------------
+// Horarios de atención
+// ---------------------------------------------------------------------------
+
+test('DIAS_SEMANA va de lunes a domingo pero conserva la numeración de Postgres', () => {
+  // El orden es para mostrar; el número es el de extract(dow), 0 = domingo.
+  // Renumerar rompería las reglas ya cargadas.
+  assert.deepEqual(DIAS_SEMANA.map((d) => d.dia), [1, 2, 3, 4, 5, 6, 0]);
+  assert.equal(DIAS_SEMANA[0].corto, 'Lun');
+  assert.equal(DIAS_SEMANA[6].corto, 'Dom');
+});
+
+test('horasDelReloj ofrece medias horas y puede incluir la medianoche', () => {
+  const sinMedianoche = horasDelReloj();
+  assert.equal(sinMedianoche[0], '00:00');
+  assert.equal(sinMedianoche[1], '00:30');
+  assert.equal(sinMedianoche[sinMedianoche.length - 1], '23:30');
+  assert.equal(sinMedianoche.length, 48);
+
+  // '24:00' solo para el cierre: Postgres lo acepta y es la única forma de
+  // cargar una cancha abierta hasta la medianoche sin perder la última hora.
+  const conMedianoche = horasDelReloj({ incluirMedianoche: true });
+  assert.equal(conMedianoche[conMedianoche.length - 1], '24:00');
+});
+
+test('rangosSeCruzan: pegados NO se cruzan', () => {
+  // 14:00-16:00 justo después de 10:00-14:00 es válido, y el servidor también
+  // lo acepta. Si esto diera true, la pantalla bloquearía horarios legítimos.
+  assert.equal(rangosSeCruzan('14:00', '16:00', '10:00', '14:00'), false);
+  assert.equal(rangosSeCruzan('10:00', '14:00', '14:00', '16:00'), false);
+});
+
+test('rangosSeCruzan: solapados sí', () => {
+  assert.equal(rangosSeCruzan('12:00', '16:00', '10:00', '14:00'), true);
+  assert.equal(rangosSeCruzan('11:00', '12:00', '10:00', '14:00'), true); // contenido
+  assert.equal(rangosSeCruzan('09:00', '23:00', '10:00', '14:00'), true); // contiene
+});
+
+const REGLAS = [
+  { id: 'r1', dia_semana: 1, hora_apertura: '10:00', hora_cierre: '14:00' },
+  { id: 'r2', dia_semana: 1, hora_apertura: '16:00', hora_cierre: '23:00' },
+  { id: 'r3', dia_semana: 2, hora_apertura: '09:00', hora_cierre: '23:00' },
+];
+
+test('choqueDeHorario encuentra la regla que se cruza, en su propio día', () => {
+  const choque = choqueDeHorario(REGLAS, 1, '12:00', '17:00');
+  assert.equal(choque.id, 'r1');
+});
+
+test('choqueDeHorario no mira los otros días', () => {
+  // El mismo rango que choca el lunes está libre el jueves.
+  assert.equal(choqueDeHorario(REGLAS, 4, '12:00', '17:00'), null);
+});
+
+test('choqueDeHorario: una regla no choca consigo misma al editarla', () => {
+  assert.equal(choqueDeHorario(REGLAS, 1, '10:00', '15:00', 'r1'), null);
+});
+
+test('choqueDeHorario: un hueco entre dos reglas no choca', () => {
+  assert.equal(choqueDeHorario(REGLAS, 1, '14:00', '16:00'), null);
+});
+
+test('horariosDelDia ordena por hora de apertura', () => {
+  const desordenadas = [REGLAS[1], REGLAS[0]];
+  assert.deepEqual(horariosDelDia(desordenadas, 1).map((r) => r.id), ['r1', 'r2']);
+  assert.deepEqual(horariosDelDia(REGLAS, 4), []);
+});
+
+test('rangoLegible recorta los segundos que devuelve Postgres', () => {
+  assert.equal(rangoLegible('09:00:00', '14:00:00'), '09:00\u201314:00');
+  assert.equal(rangoLegible(null, '14:00'), null);
 });
 
 // ---------------------------------------------------------------------------

@@ -13,12 +13,23 @@
  * se eliminaron `SERVICE_FEE_CLP` y `computeTotal()`: el total que paga el
  * jugador ES el precio de la cancha.
  *
- * PENDIENTE conocido, y es un bug: `computeCuota()` redondea al múltiplo de
- * $50 más cercano, mientras `crear_reserva` en Postgres usa `ceil()` sin
- * redondear. No coinciden, y redondear hacia el más cercano puede dejar la
- * suma POR DEBAJO del total — $20.000 entre 3 da $6.650 cada uno, o sea
- * $19.950, y faltan $50. Hay que unificarlo redondeando hacia arriba en los
- * dos lados; es una regla que el jugador ve, así que se decide aparte.
+ * LA CUOTA SE REDONDEA HACIA ARRIBA AL PESO, IGUAL QUE POSTGRES, y esto era
+ * un bug de verdad hasta que se corrigió. `computeCuota()` redondeaba al
+ * múltiplo de $50 más cercano mientras `crear_reserva` y `recalcular_cuota`
+ * usan `ceil(precio_total / n)`. No es que los números quedaran feos: la
+ * pantalla mostraba una cuota que el servidor RECHAZA, porque
+ * `autorizar_cobro_reserva` compara `p_monto <> v_monto_esperado` y responde
+ * «El monto no coincide con la cuota vigente». $20.000 entre 3 mostraba
+ * $6.650 y el servidor esperaba $6.667.
+ *
+ * NO se redondea a $50 y vale la pena decir por qué, porque es lo primero que
+ * uno quiere hacer: el pago sale del Balance FutFinder, que es digital. El
+ * múltiplo de $50 es una costumbre del efectivo y acá no hay efectivo. Y
+ * cuesta plata: redondear hacia arriba a $50 le suma hasta $49 a cada
+ * jugador, o sea hasta ~$700 en una convocatoria de 14, y ese excedente hoy
+ * no queda registrado en ningún lado (ver el TODO de `confirmar_reserva` en
+ * la migración 55, que lo asume «un par de pesos»). Al peso, el excedente
+ * máximo es de n-1 pesos.
  */
 
 /** Cuántos jugadores puede tener una convocatoria dividida entre todos. */
@@ -38,11 +49,6 @@ export function formatCLP(amount) {
   return '$' + Math.round(amount).toLocaleString('es-CL');
 }
 
-/** Redondea al múltiplo de 50 más cercano — así se calcula toda cuota por jugador. */
-export function roundToNearest50(amount) {
-  return Math.round(amount / 50) * 50;
-}
-
 /**
  * Cantidad de jugadores válida para dividir el pago entre todos: no puede
  * ser menor a 2 (no hay con quién dividir) ni mayor a 30 (tope del
@@ -52,9 +58,20 @@ export function clampJugadores(n, fallback) {
   return Math.min(Math.max(n || fallback, JUGADORES_LIMITS.min), JUGADORES_LIMITS.max);
 }
 
-/** Cuota por jugador cuando se divide entre todos — siempre redondeada a $50. */
+/**
+ * Cuota por jugador cuando se divide entre todos.
+ *
+ * `Math.ceil` al peso, que es EXACTAMENTE lo que hace `ceil()` en
+ * `crear_reserva` y `recalcular_cuota`. Tiene que ser idéntico: el servidor
+ * rechaza un pago cuyo monto no calce con la cuota vigente, así que cualquier
+ * diferencia acá se ve como «El monto no coincide con la cuota vigente» al
+ * intentar pagar.
+ *
+ * Hacia arriba y no al más cercano para que la suma nunca quede bajo el total:
+ * si faltara un peso, la reserva no se podría completar.
+ */
 export function computeCuota(totalClp, jugadores) {
-  return roundToNearest50(totalClp / jugadores);
+  return Math.ceil(totalClp / jugadores);
 }
 
 /** Cuánto paga cada capitán cuando se divide 50/50 — sin redondeo a $50, es exactamente la mitad. */

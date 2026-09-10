@@ -69,6 +69,9 @@ import AgendaRecintoScreen from '../screens/AgendaRecintoScreen';
 import ReservaRecintoScreen from '../screens/ReservaRecintoScreen';
 import CalendarioCanchaScreen from '../screens/CalendarioCanchaScreen';
 import OcuparHorarioScreen from '../screens/OcuparHorarioScreen';
+import CanchasScreen from '../screens/CanchasScreen';
+import CanchaScreen from '../screens/CanchaScreen';
+import HorariosScreen from '../screens/HorariosScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
 import withErrorBoundary from './withErrorBoundary';
@@ -140,6 +143,9 @@ const GuardedAgendaRecintoScreen = withAuthGuard(AgendaRecintoScreen, 'AgendaRec
 const GuardedReservaRecintoScreen = withAuthGuard(ReservaRecintoScreen, 'ReservaRecinto');
 const GuardedCalendarioCanchaScreen = withAuthGuard(CalendarioCanchaScreen, 'CalendarioCancha');
 const GuardedOcuparHorarioScreen = withAuthGuard(OcuparHorarioScreen, 'OcuparHorario');
+const GuardedCanchasScreen = withAuthGuard(CanchasScreen, 'Canchas');
+const GuardedCanchaScreen = withAuthGuard(CanchaScreen, 'Cancha');
+const GuardedHorariosScreen = withAuthGuard(HorariosScreen, 'Horarios');
 
 // Extendemos DarkTheme (que ya trae fonts + colors completos)
 // y le pisamos solo los colores corporativos de FutFinder.
@@ -460,6 +466,21 @@ export default function AppNavigator() {
         <Stack.Screen
           name="OcuparHorario"
           component={GuardedOcuparHorarioScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Canchas"
+          component={GuardedCanchasScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Cancha"
+          component={GuardedCanchaScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Horarios"
+          component={GuardedHorariosScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

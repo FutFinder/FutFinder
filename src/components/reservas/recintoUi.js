@@ -324,6 +324,67 @@ export function TimeField({ valor, opciones = [], onChange, titulo = 'Elegir hor
   );
 }
 
+/* ── Switch ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Interruptor de activa/inactiva (artboard 1m).
+ *
+ * Propio y no el `Switch` de React Native: el nativo no se deja pintar con
+ * los tokens del handoff y se ve distinto en cada plataforma, que es
+ * exactamente lo que este vertical evita.
+ */
+export function Switch({ valor, onChange, etiqueta, descripcion, deshabilitado }) {
+  return (
+    <Pressable
+      onPress={() => !deshabilitado && onChange?.(!valor)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: !!valor, disabled: !!deshabilitado }}
+      accessibilityLabel={etiqueta}
+      style={({ pressed }) => [styles.switchFila, deshabilitado && { opacity: 0.5 }, pressed && { opacity: 0.9 }]}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={styles.switchEtiqueta}>{etiqueta}</Text>
+        {descripcion ? <Text style={styles.switchDesc}>{descripcion}</Text> : null}
+      </View>
+      <View style={[styles.switchPista, valor && styles.switchPistaOn]}>
+        <View style={[styles.switchBolita, valor && styles.switchBolitaOn]} />
+      </View>
+    </Pressable>
+  );
+}
+
+/* ── DayToggleGroup ─────────────────────────────────────────────────────── */
+
+/**
+ * L M X J V S D con selección múltiple (artboard 1o).
+ *
+ * Es la forma de no cargar siete veces el mismo horario: se marcan los días y
+ * la misma regla se crea en todos. El orden es de lunes a domingo (como se
+ * lee en Chile) pero cada botón devuelve el número de `extract(dow)`, que es
+ * el que entiende la base.
+ */
+export function DayToggleGroup({ dias = [], seleccionados = [], onToggle }) {
+  return (
+    <View style={styles.diasFila}>
+      {dias.map((d) => {
+        const on = seleccionados.includes(d.dia);
+        return (
+          <Pressable
+            key={d.dia}
+            onPress={() => onToggle?.(d.dia)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: on }}
+            accessibilityLabel={d.largo}
+            style={({ pressed }) => [styles.diaBoton, on && styles.diaBotonOn, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={[styles.diaLetra, on && styles.diaLetraOn]}>{d.letra}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 /* ── Bloque del calendario ──────────────────────────────────────────────── */
 
 /**
@@ -515,6 +576,31 @@ const styles = StyleSheet.create({
   opcionHoraTexto: { fontFamily: F.bold, fontSize: 15, color: C.textPrimary },
   opcionHoraTextoOn: { color: C.green },
   sinOpciones: { fontFamily: F.medium, fontSize: 13, color: C.textSecondary, textAlign: 'center', paddingVertical: 18 },
+
+  switchFila: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  switchEtiqueta: { fontFamily: F.bold, fontSize: 14.5, color: C.textPrimary },
+  switchDesc: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, lineHeight: 16.5, marginTop: 4 },
+  switchPista: {
+    width: 46, height: 28, borderRadius: 14,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+    justifyContent: 'center', paddingHorizontal: 3,
+  },
+  switchPistaOn: { backgroundColor: C.green, borderColor: C.green },
+  switchBolita: {
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: C.textSecondary, alignSelf: 'flex-start',
+  },
+  switchBolitaOn: { backgroundColor: C.textOnGreen, alignSelf: 'flex-end' },
+
+  diasFila: { flexDirection: 'row', gap: 7 },
+  diaBoton: {
+    flex: 1, height: 42, borderRadius: R.chip,
+    borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  diaBotonOn: { borderColor: C.green, backgroundColor: C.green },
+  diaLetra: { fontFamily: F.extraBold, fontSize: 14, color: C.textSecondary },
+  diaLetraOn: { color: C.textOnGreen },
 
   bloque: {
     flexDirection: 'row',

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowLeft, MapPin, Star, ShieldCheck, CalendarDays, CalendarClock,
-  ChevronRight, AlertTriangle,
+  ChevronRight, AlertTriangle, LayoutGrid, Clock,
 } from 'lucide-react-native';
 
 import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
@@ -153,8 +153,29 @@ export default function PanelRecintoScreen({ navigation, route }) {
                   title="Calendario y bloqueos"
                   subtitle={resumen?.bloqueos ? `${resumen.bloqueos} horas ocupadas hoy` : 'Ocupar horas cancha por cancha'}
                   right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
-                  last
                   onPress={() => navigation.navigate('CalendarioCancha', { complejoId, nombre: recinto.nombre })}
+                />
+                <ListRow
+                  icon={LayoutGrid}
+                  title="Canchas"
+                  subtitle={
+                    resumen
+                      ? `${resumen.canchasTotal} ${resumen.canchasTotal === 1 ? 'cancha' : 'canchas'}`
+                        + (resumen.canchasTotal - resumen.canchasActivas > 0
+                          ? ` · ${resumen.canchasTotal - resumen.canchasActivas} inactiva${resumen.canchasTotal - resumen.canchasActivas === 1 ? '' : 's'}`
+                          : '')
+                      : 'Crear, editar y activar canchas'
+                  }
+                  right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
+                  onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
+                />
+                <ListRow
+                  icon={Clock}
+                  title="Horarios de atención"
+                  subtitle="Por cancha y día de la semana"
+                  right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
+                  last
+                  onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
                 />
               </Card>
             </View>

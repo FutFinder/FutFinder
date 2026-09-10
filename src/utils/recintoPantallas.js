@@ -313,6 +313,83 @@ export function etiquetaOcupar(desde, hasta) {
   return dur ? `Ocupar ${dur}` : 'Ocupar';
 }
 
+/* ── Horarios de atención (migración 60) ────────────────────────────────── */
+
+/**
+ * Los días de la semana en el orden en que se leen en Chile: lunes primero.
+ *
+ * `dia` es el número que usa Postgres (`extract(dow)`, 0 = domingo), y no se
+ * reordena en la base: se reordena SOLO para mostrar. Cambiar la numeración
+ * rompería las reglas ya cargadas.
+ */
+export const DIAS_SEMANA = [
+  { dia: 1, corto: 'Lun', letra: 'L', largo: 'lunes' },
+  { dia: 2, corto: 'Mar', letra: 'M', largo: 'martes' },
+  { dia: 3, corto: 'Mié', letra: 'X', largo: 'miércoles' },
+  { dia: 4, corto: 'Jue', letra: 'J', largo: 'jueves' },
+  { dia: 5, corto: 'Vie', letra: 'V', largo: 'viernes' },
+  { dia: 6, corto: 'Sáb', letra: 'S', largo: 'sábado' },
+  { dia: 0, corto: 'Dom', letra: 'D', largo: 'domingo' },
+];
+
+/**
+ * Las horas que se pueden elegir como apertura o cierre, de a `paso` minutos.
+ *
+ * `incluirMedianoche` agrega '24:00' al final y solo tiene sentido para el
+ * CIERRE. No es un truco: Postgres acepta `time '24:00'`, pasa la validación
+ * de «el cierre tiene que ser posterior a la apertura» y genera los bloques
+ * correctos. Sin ella, una cancha abierta hasta la medianoche no se podría
+ * cargar — habría que poner 23:00 y perder la última hora.
+ */
+export function horasDelReloj({ paso = 30, incluirMedianoche = false } = {}) {
+  const horas = [];
+  for (let m = 0; m < 24 * 60; m += paso) horas.push(minutosAHora(m));
+  if (incluirMedianoche) horas.push('24:00');
+  return horas;
+}
+
+/** ¿Se cruzan dos rangos horarios? Pegados NO se cruzan: 14:00–16:00 después de 10:00–14:00 vale. */
+export function rangosSeCruzan(unoDesde, unoHasta, otroDesde, otroHasta) {
+  const a1 = horaAMinutos(unoDesde);
+  const a2 = horaAMinutos(unoHasta);
+  const b1 = horaAMinutos(otroDesde);
+  const b2 = horaAMinutos(otroHasta);
+  if ([a1, a2, b1, b2].some((v) => v === null)) return false;
+  return a1 < b2 && a2 > b1;
+}
+
+/**
+ * La regla ya cargada que chocaría con este horario nuevo, o `null`.
+ *
+ * Anticipa lo que el servidor rechaza con «Ya hay un horario que se cruza con
+ * este ese día» (migración 60). Se comprueba acá para poder ofrecer las dos
+ * salidas —empezar donde termina la otra, o editarla— en vez de mostrar el
+ * error y dejar a la persona adivinando. El mensaje que se muestra si igual
+ * se envía es el del servidor.
+ *
+ * `reglaId` es la regla que se está editando: no choca consigo misma.
+ */
+export function choqueDeHorario(reglas = [], diaSemana, apertura, cierre, reglaId = null) {
+  return (reglas || []).find(
+    (r) => r.dia_semana === diaSemana
+      && r.id !== reglaId
+      && rangosSeCruzan(apertura, cierre, r.hora_apertura, r.hora_cierre),
+  ) || null;
+}
+
+/** Las reglas de un día, ordenadas por hora de apertura. */
+export function horariosDelDia(reglas = [], diaSemana) {
+  return (reglas || [])
+    .filter((r) => r.dia_semana === diaSemana)
+    .sort((a, b) => (horaAMinutos(a.hora_apertura) ?? 0) - (horaAMinutos(b.hora_apertura) ?? 0));
+}
+
+/** '09:00–14:00'. Guion largo, que es como se escribe un rango. */
+export function rangoLegible(desde, hasta) {
+  if (!desde || !hasta) return null;
+  return `${String(desde).slice(0, 5)}\u2013${String(hasta).slice(0, 5)}`;
+}
+
 /* ── Teléfono (migraciones 67 y 69) ─────────────────────────────────────── */
 
 /**

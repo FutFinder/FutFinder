@@ -130,6 +130,32 @@ export async function parametrosDeComision() {
   return comoResultadoRecinto(data, error, 'parametrosDeComision');
 }
 
+/**
+ * Las reglas de horario de una cancha, con su `id` para poder editarlas.
+ *
+ * ES LA ÚNICA LECTURA DEL RECINTO QUE VA DIRECTO A LA TABLA, y va así a
+ * propósito: `cancha_horario_reglas_select` es `using (true)` desde la
+ * migración 54 —el horario de atención es información pública, la necesita
+ * cualquier jugador para ver la grilla— y la 65 no lo acotó como sí hizo con
+ * `complejos` y `canchas_reservables`. Así que no hay nada que una RPC
+ * pudiera autorizar mejor: quien tiene el `cancha_id` ya puede leerlas.
+ *
+ * Las ESCRITURAS sí pasan por RPC (`admin_upsert_horario_regla` y
+ * `admin_eliminar_horario_regla`): la tabla no tiene ninguna política de
+ * insert, update ni delete.
+ */
+export async function horariosDeCancha(canchaId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  if (!canchaId) return { data: null, error: { message: 'Falta la cancha' } };
+  const { data, error } = await supabase
+    .from('cancha_horario_reglas')
+    .select('id, cancha_id, dia_semana, hora_apertura, hora_cierre')
+    .eq('cancha_id', canchaId)
+    .order('dia_semana')
+    .order('hora_apertura');
+  return comoListaRecinto(data, error, 'horariosDeCancha');
+}
+
 /* ── Ficha del recinto ─────────────────────────────────────────── */
 
 /**

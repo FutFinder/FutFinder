@@ -15,7 +15,6 @@ const {
   JUGADORES_LIMITS,
   MIN_TOPUP_CLP,
   formatCLP,
-  roundToNearest50,
   clampJugadores,
   computeCuota,
   computeMitad,
@@ -35,10 +34,37 @@ test('formatCLP: redondea antes de formatear', () => {
   assert.equal(formatCLP(1999.6), '$2.000');
 });
 
-test('roundToNearest50: redondea al múltiplo de 50 más cercano', () => {
-  assert.equal(roundToNearest50(2032), 2050);
-  assert.equal(roundToNearest50(2010), 2000);
-  assert.equal(roundToNearest50(2025), 2050); // Math.round redondea .5 hacia arriba
+test('computeCuota: redondea hacia arriba AL PESO, igual que ceil() en Postgres', () => {
+  // Si esto no calza con `ceil(precio_total / n)` del servidor, la pantalla
+  // muestra una cuota que `autorizar_cobro_reserva` rechaza con «El monto no
+  // coincide con la cuota vigente». No es cosmético: no se puede pagar.
+  assert.equal(computeCuota(20000, 3), 6667);
+  assert.equal(computeCuota(30000, 14), 2143);
+  assert.equal(computeCuota(28000, 14), 2000); // divisible: sin resto
+});
+
+test('computeCuota: la suma de las cuotas NUNCA queda bajo el total', () => {
+  // REGRESIÓN del bug que tenía este archivo: redondear al $50 más cercano
+  // daba $6.650 × 3 = $19.950 para una cancha de $20.000, y faltaban $50.
+  for (const total of [20000, 28000, 30000, 14000, 43000, 26500]) {
+    for (const n of [2, 3, 5, 7, 10, 14, 22]) {
+      assert.ok(
+        computeCuota(total, n) * n >= total,
+        `${total} entre ${n}: la suma quedó bajo el total`,
+      );
+    }
+  }
+});
+
+test('computeCuota: el excedente por redondeo es de a lo más n-1 pesos', () => {
+  // Al peso el sobrante es calderilla. Redondeando a $50 serían hasta $49 por
+  // jugador —~$700 en una convocatoria de 14— y ese excedente no queda
+  // registrado en ningún lado.
+  for (const total of [20000, 30000, 43000]) {
+    for (const n of [3, 7, 14]) {
+      assert.ok(computeCuota(total, n) * n - total <= n - 1);
+    }
+  }
 });
 
 test('clampJugadores: usa el valor pasado si está dentro del rango', () => {
@@ -59,9 +85,10 @@ test('clampJugadores: sin valor, usa el "habitual" de la cancha (fallback)', () 
   assert.equal(clampJugadores(0, 14), 14); // 0 es falsy: cae al fallback, no se interpreta como "0 jugadores"
 });
 
-test('computeCuota: total 30.000 entre 14 jugadores redondea a $50', () => {
-  // 30000 / 14 = 2142.86 → redondeado a 2150
-  assert.equal(computeCuota(30000, 14), 2150);
+test('computeCuota: 30.000 entre 14 da 2.143, no 2.150', () => {
+  // 30000 / 14 = 2142.86 → ceil = 2143. El prototipo decía $2.150 (múltiplo
+  // de $50), pero ese número el servidor no lo acepta.
+  assert.equal(computeCuota(30000, 14), 2143);
 });
 
 test('el jugador no paga ningún cargo de servicio: el total es el precio de la cancha', () => {
@@ -73,9 +100,7 @@ test('el jugador no paga ningún cargo de servicio: el total es el precio de la 
   assert.equal(reglas.SERVICE_FEE_CLP, undefined, 'SERVICE_FEE_CLP no debe volver');
 });
 
-test('computeCuota: 30.000 entre 14 da 2.150 (el ejemplo del handoff)', () => {
-  assert.equal(computeCuota(30000, 14), 2150);
-});
+
 
 test('computeMitad: exactamente la mitad, sin redondear a $50', () => {
   assert.equal(computeMitad(30000), 15000);
