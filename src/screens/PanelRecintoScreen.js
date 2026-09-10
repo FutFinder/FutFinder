@@ -5,13 +5,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowLeft, MapPin, Star, ShieldCheck, CalendarDays, CalendarClock,
   ChevronRight, AlertTriangle, LayoutGrid, Clock, ShoppingBag,
+  FileText, Users, Globe, EyeOff,
 } from 'lucide-react-native';
 
 import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
-import { Card, IconButton, Badge, ListRow, SectionLabel, NoticeCard } from '../components/reservas/ui';
+import { Card, IconButton, Button, Badge, ListRow, SectionLabel, Sheet, NoticeCard } from '../components/reservas/ui';
 import { Skeleton, StatTrio, StatusBanner } from '../components/reservas/recintoUi';
 import NotificationBell from '../components/NotificationBell';
-import { misRecintos, agendaDelDia, reservasProximas } from '../services/recinto';
+import {
+  misRecintos, agendaDelDia, reservasProximas, canchasDelRecinto, publicarRecinto,
+} from '../services/recinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO, fechaRelativa } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
@@ -39,21 +42,27 @@ export default function PanelRecintoScreen({ navigation, route }) {
   const [varios, setVarios] = useState(false);
   const [resumen, setResumen] = useState(null);
   const [proximas, setProximas] = useState(null);
+  const [canchas, setCanchas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const [hoja, setHoja] = useState(false);
+  const [publicando, setPublicando] = useState(false);
+  const [errorPublicar, setErrorPublicar] = useState(null);
 
   const cargar = useCallback(async () => {
     const hoy = hoyISO();
-    const [lista, agenda, prox] = await Promise.all([
+    const [lista, agenda, prox, ks] = await Promise.all([
       misRecintos(),
       agendaDelDia(complejoId, hoy),
-      reservasProximas(complejoId, 3),
+      reservasProximas(complejoId, 20),
+      canchasDelRecinto(complejoId),
     ]);
     const mio = (lista.data || []).find((r) => r.id === complejoId) || null;
     setRecinto(mio);
     setVarios((lista.data || []).length > 1);
     setResumen(resumenDelPanel(agenda.data?.resumen));
     setProximas(prox.data || null);
+    setCanchas(ks.data || []);
     setError(lista.error?.message || agenda.error?.message || prox.error?.message || null);
     setCargando(false);
   }, [complejoId]);
@@ -61,11 +70,38 @@ export default function PanelRecintoScreen({ navigation, route }) {
   useFocusEffect(useCallback(() => { cargar(); }, [cargar]));
 
   const publicado = recinto?.publicado;
+  const esDueno = recinto?.rol === 'dueño';
+
+  // La misma condición que exige `admin_publicar_complejo`. Se comprueba acá
+  // para poder decir QUÉ falta antes de que el servidor rechace; el mensaje
+  // que se muestra si igual se envía es el del servidor.
+  const listaParaPublicar = canchas.some((k) => k.activa && k.tiene_horario);
+  // El servidor PERMITE estar publicado con todas las canchas apagadas, así
+  // que la app tiene que empujar a salir de ahí: el jugador te encuentra y ve
+  // el recinto vacío, que se lee peor que no aparecer.
+  const publicadoSinCanchas = publicado && canchas.length > 0 && !canchas.some((k) => k.activa);
+
+  const cambiarPublicado = async (aPublicar) => {
+    setPublicando(true);
+    setErrorPublicar(null);
+    const { error: err } = await publicarRecinto(complejoId, aPublicar);
+    setPublicando(false);
+    if (err) { setErrorPublicar(err.message); return; }
+    setHoja(false);
+    cargar();
+  };
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       {!cargando && recinto && !publicado ? (
         <StatusBanner texto="No estás publicado · nadie puede reservarte" tono="amber" />
+      ) : !cargando && publicadoSinCanchas ? (
+        <StatusBanner
+          texto="Apareces, pero sin ninguna hora para reservar: todas tus canchas están inactivas"
+          tono="red"
+          accion="Activar"
+          onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto?.nombre })}
+        />
       ) : null}
 
       <View style={styles.header}>
@@ -181,11 +217,82 @@ export default function PanelRecintoScreen({ navigation, route }) {
                   title="Cobros adicionales"
                   subtitle="Balón, petos, árbitro · opcionales para el jugador"
                   right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
-                  last
                   onPress={() => navigation.navigate('Cobros', { complejoId, nombre: recinto.nombre })}
                 />
+                <ListRow
+                  icon={FileText}
+                  title="Ficha del recinto"
+                  subtitle="Nombre, descripción, dirección y foto"
+                  right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
+                  last={!esDueno}
+                  onPress={() => navigation.navigate('FichaRecinto', { complejoId })}
+                />
+                {esDueno ? (
+                  <ListRow
+                    icon={Users}
+                    title="Administradores"
+                    subtitle="Solo tú puedes cambiar esta lista"
+                    right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
+                    last
+                    onPress={() => navigation.navigate('Administradores', { complejoId, nombre: recinto.nombre })}
+                  />
+                ) : null}
               </Card>
             </View>
+
+            <Card>
+              {publicado ? (
+                <>
+                  <Text style={styles.publicarTitulo}>Estás recibiendo reservas</Text>
+                  <Text style={styles.publicarTexto}>
+                    Apareces en el buscador y cualquiera puede reservar tus canchas disponibles.
+                  </Text>
+                  <Button
+                    label="Dejar de recibir reservas"
+                    variant="secondary"
+                    icon={EyeOff}
+                    style={{ marginTop: 13 }}
+                    onPress={() => { setErrorPublicar(null); setHoja(true); }}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.publicarTitulo}>Todavía no apareces en la app</Text>
+                  <Text style={styles.publicarTexto}>
+                    {listaParaPublicar
+                      ? 'Ya tienes al menos una cancha activa con horario cargado: puedes publicar cuando quieras.'
+                      : 'Para publicar necesitas al menos una cancha activa con horario cargado.'}
+                  </Text>
+                  {!listaParaPublicar ? (
+                    <View style={styles.faltaCaja}>
+                      <Text style={styles.faltaTexto}>
+                        {canchas.length === 0
+                          ? 'Todavía no tienes canchas.'
+                          : `${canchas.filter((k) => k.activa).length} de ${canchas.length} canchas activas, y ninguna con horario cargado.`}
+                      </Text>
+                      <Button
+                        label={canchas.length === 0 ? 'Crear la primera cancha' : 'Cargar horarios'}
+                        variant="secondary"
+                        onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
+                      />
+                    </View>
+                  ) : (
+                    <Button
+                      label="Publicar recinto"
+                      icon={Globe}
+                      style={{ marginTop: 13 }}
+                      loading={publicando}
+                      onPress={() => cambiarPublicado(true)}
+                    />
+                  )}
+                  {errorPublicar ? (
+                    <View style={{ marginTop: 12 }}>
+                      <NoticeCard tone="warning" icon={AlertTriangle}>{errorPublicar}</NoticeCard>
+                    </View>
+                  ) : null}
+                </>
+              )}
+            </Card>
 
             {resumen?.bruto ? (
               <Card>
@@ -199,7 +306,94 @@ export default function PanelRecintoScreen({ navigation, route }) {
           </View>
         )}
       </ScrollView>
+
+      <HojaDespublicar
+        visible={hoja}
+        nombre={recinto?.nombre}
+        proximas={proximas}
+        enviando={publicando}
+        error={errorPublicar}
+        onCerrar={() => setHoja(false)}
+        onConfirmar={() => cambiarPublicado(false)}
+      />
     </SafeAreaView>
+  );
+}
+
+/**
+ * La hoja de despublicar (artboard 4h). Es donde el dueño decide si confía en
+ * la app, así que dice exactamente qué pasa — y sobre todo qué NO pasa.
+ *
+ * DESPUBLICAR NO CANCELA NADA. Es justo lo que se teme al apretar el
+ * interruptor, y lista las reservas que quedan por jugar con su monto: el dato
+ * que decide no es «tienes 3 pendientes», es cuáles y cuánto.
+ */
+function HojaDespublicar({ visible, nombre, proximas, enviando, error, onCerrar, onConfirmar }) {
+  const reservas = proximas?.reservas || [];
+  const total = Number(proximas?.total) || 0;
+
+  return (
+    <Sheet visible={visible} onClose={onCerrar} title="¿Dejar de recibir reservas?">
+      <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
+        <View style={{ gap: 15, paddingBottom: 6 }}>
+          <View style={{ gap: 9 }}>
+            <Consecuencia>{nombre} deja de aparecer en el buscador</Consecuencia>
+            <Consecuencia>No entran reservas nuevas en ninguna cancha</Consecuencia>
+            <Consecuencia fuerte>Las reservas ya confirmadas se respetan tal cual</Consecuencia>
+          </View>
+
+          {total > 0 ? (
+            <Card>
+              <Text style={styles.porJugarTitulo}>
+                Tienes por jugar {total} {total === 1 ? 'reserva' : 'reservas'}
+              </Text>
+              <View style={{ gap: 9, marginTop: 11 }}>
+                {reservas.slice(0, 5).map((r) => (
+                  <View key={r.id} style={styles.porJugarFila}>
+                    <Text style={styles.porJugarHora}>
+                      {fechaRelativa(r.fecha).toLowerCase()} {r.hora_inicio}
+                    </Text>
+                    <Text style={styles.porJugarQuien} numberOfLines={1}>
+                      {r.cancha_nombre} · @{r.organizador_username}
+                    </Text>
+                    <Text style={styles.porJugarMonto}>{formatCLP(r.precio_total)}</Text>
+                  </View>
+                ))}
+                {total > 5 ? (
+                  <Text style={styles.porJugarMas}>y {total - 5} más</Text>
+                ) : null}
+              </View>
+              <Text style={styles.porJugarNota}>
+                Las vas a seguir viendo en tu agenda y el jugador también. Si necesitas liberar una de
+                esas horas, tienes que cancelar esa reserva, que es otra cosa.
+              </Text>
+            </Card>
+          ) : null}
+
+          <NoticeCard tone="info">
+            Desactivar una cancha saca esa cancha y las otras siguen recibiendo. Despublicar saca el
+            recinto completo del buscador.
+          </NoticeCard>
+
+          {error ? <NoticeCard tone="warning" icon={AlertTriangle}>{error}</NoticeCard> : null}
+
+          <View style={{ gap: 9 }}>
+            <Button label="Despublicar" variant="destructive" loading={enviando} onPress={onConfirmar} />
+            <Button label="Seguir publicado" variant="secondary" onPress={onCerrar} />
+          </View>
+          <Text style={styles.volverNota}>Puedes volver a publicar cuando quieras, con un toque.</Text>
+        </View>
+      </ScrollView>
+    </Sheet>
+  );
+}
+
+function Consecuencia({ children, fuerte }) {
+  return (
+    <View style={styles.consecuencia}>
+      <View style={[styles.punto, fuerte && { backgroundColor: C.green }]} />
+      <Text style={[styles.consecuenciaTexto, fuerte && styles.consecuenciaFuerte]}>{children}</Text>
+    </View>
   );
 }
 
@@ -264,6 +458,31 @@ const styles = StyleSheet.create({
     fontFamily: F.medium, fontSize: 13, color: C.textSecondary,
     lineHeight: 18, paddingHorizontal: 15, paddingVertical: 18,
   },
+  publicarTitulo: { fontFamily: F.extraBold, fontSize: 15.5, color: C.textPrimary },
+  publicarTexto: { fontFamily: F.medium, fontSize: 12.5, color: C.textSecondary, lineHeight: 18, marginTop: 6 },
+  faltaCaja: {
+    marginTop: 13, padding: 12, gap: 11,
+    borderRadius: 18, backgroundColor: C.amberSoft, borderWidth: 1, borderColor: C.amberBorder,
+  },
+  faltaTexto: { fontFamily: F.semiBold, fontSize: 12.5, color: C.textAmber, lineHeight: 17.5 },
+
+  consecuencia: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  punto: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.textSecondary, marginTop: 6 },
+  consecuenciaTexto: { flex: 1, fontFamily: F.medium, fontSize: 13, color: C.textSecondary, lineHeight: 18.5 },
+  consecuenciaFuerte: { fontFamily: F.bold, color: C.textPrimary },
+
+  porJugarTitulo: { fontFamily: F.extraBold, fontSize: 14, color: C.textPrimary },
+  porJugarFila: { flexDirection: 'row', alignItems: 'baseline', gap: 9 },
+  porJugarHora: { width: 78, fontFamily: F.bold, fontSize: 12, color: C.textPrimary },
+  porJugarQuien: { flex: 1, fontFamily: F.medium, fontSize: 12, color: C.textSecondary },
+  porJugarMonto: { fontFamily: F.semiBold, fontSize: 12, color: C.textPrimary },
+  porJugarMas: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary },
+  porJugarNota: {
+    fontFamily: F.medium, fontSize: 11, color: C.textSecondary, lineHeight: 15.5,
+    marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.dividerInner,
+  },
+  volverNota: { fontFamily: F.medium, fontSize: 11, color: C.textMuted, textAlign: 'center' },
+
   dineroTitulo: { fontFamily: F.extraBold, fontSize: 16, color: C.textPrimary },
   dineroDetalle: { fontFamily: F.medium, fontSize: 12.5, color: C.textSecondary, lineHeight: 18, marginTop: 6 },
 });

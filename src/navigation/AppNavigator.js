@@ -74,6 +74,8 @@ import CanchaScreen from '../screens/CanchaScreen';
 import HorariosScreen from '../screens/HorariosScreen';
 import TarifasScreen from '../screens/TarifasScreen';
 import CobrosScreen from '../screens/CobrosScreen';
+import FichaRecintoScreen from '../screens/FichaRecintoScreen';
+import AdministradoresScreen from '../screens/AdministradoresScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
 import withErrorBoundary from './withErrorBoundary';
@@ -150,6 +152,8 @@ const GuardedCanchaScreen = withAuthGuard(CanchaScreen, 'Cancha');
 const GuardedHorariosScreen = withAuthGuard(HorariosScreen, 'Horarios');
 const GuardedTarifasScreen = withAuthGuard(TarifasScreen, 'Tarifas');
 const GuardedCobrosScreen = withAuthGuard(CobrosScreen, 'Cobros');
+const GuardedFichaRecintoScreen = withAuthGuard(FichaRecintoScreen, 'FichaRecinto');
+const GuardedAdministradoresScreen = withAuthGuard(AdministradoresScreen, 'Administradores');
 
 // Extendemos DarkTheme (que ya trae fonts + colors completos)
 // y le pisamos solo los colores corporativos de FutFinder.
@@ -495,6 +499,16 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Cobros"
           component={GuardedCobrosScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="FichaRecinto"
+          component={GuardedFichaRecintoScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Administradores"
+          component={GuardedAdministradoresScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

@@ -569,6 +569,69 @@ export async function eliminarTarifa(tarifaId) {
 /* ── Administradores (solo el dueño) ───────────────────────────── */
 
 /**
+ * Quiénes administran el recinto, con su `@usuario`.
+ *
+ * `complejo_admins_select` ya deja leer estas filas a quien administra el
+ * complejo, y `profiles` es de lectura pública, así que el embed alcanza sin
+ * una RPC nueva.
+ */
+export async function administradoresDelRecinto(complejoId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase
+    .from('complejo_admins')
+    .select('id, user_id, rol, created_at, profiles!inner(username, foto_url, created_at)')
+    .eq('complejo_id', complejoId)
+    .order('created_at');
+  if (error) {
+    console.error('[FutFinder] administradoresDelRecinto:', error);
+    return { data: null, error: { message: error.message || 'No se pudo cargar la lista.' } };
+  }
+  const filas = (data || []).map((f) => ({
+    id: f.id,
+    userId: f.user_id,
+    rol: f.rol,
+    username: f.profiles?.username || null,
+    fotoUrl: f.profiles?.foto_url || null,
+    enFutfinderDesde: f.profiles?.created_at || null,
+  }));
+  // Los dueños primero: sus filas no traen acción y conviene verlas arriba.
+  // No se ordena en Postgres porque `order by rol` compara texto y deja
+  // 'admin' antes que 'dueño'.
+  filas.sort((a, b) => (a.rol === b.rol ? 0 : a.rol === 'dueño' ? -1 : 1));
+  return { data: filas, error: null };
+}
+
+/**
+ * Busca a alguien por su `@usuario` exacto, para poder agregarlo (artboard 1s).
+ *
+ * SOLO SE AGREGA A QUIEN YA TIENE CUENTA, y no hay creación de cuentas desde
+ * acá: crear una cuenta a nombre de otra persona, sin que esa persona la
+ * pida, es justamente lo que no corresponde. Si es alguien del equipo del
+ * recinto, se registra y pasa su usuario.
+ *
+ * Coincidencia EXACTA y no parcial: esto sirve para confirmar un usuario que
+ * la persona ya te dio, no para explorar quién existe en FutFinder.
+ */
+export async function buscarUsuarioPorUsername(username) {
+  if (!isSupabaseConfigured) return { data: null, error: null };
+  const u = String(username || '').trim().replace(/^@/, '');
+  if (u.length < 2) return { data: null, error: null };
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, foto_url, created_at')
+    .ilike('username', u)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error('[FutFinder] buscarUsuarioPorUsername:', error);
+    return { data: null, error: { message: error.message || 'No se pudo buscar.' } };
+  }
+  return { data: data || null, error: null };
+}
+
+
+/**
  * Suma un administrador. `userId` es el id de una persona que YA tiene cuenta
  * en FutFinder: se la busca por su nombre de usuario, porque el modelo de
  * perfiles no tiene correo.
