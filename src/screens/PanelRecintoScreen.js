@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowLeft, MapPin, Star, ShieldCheck, CalendarDays, CalendarClock,
-  ChevronRight, AlertTriangle, LayoutGrid, Clock,
+  ChevronRight, AlertTriangle, LayoutGrid, Clock, ShoppingBag,
 } from 'lucide-react-native';
 
 import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
@@ -171,11 +171,18 @@ export default function PanelRecintoScreen({ navigation, route }) {
                 />
                 <ListRow
                   icon={Clock}
-                  title="Horarios de atención"
-                  subtitle="Por cancha y día de la semana"
+                  title="Horarios y tarifas"
+                  subtitle="Por cancha: cuándo abre y cuánto cobra"
+                  right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
+                  onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
+                />
+                <ListRow
+                  icon={ShoppingBag}
+                  title="Cobros adicionales"
+                  subtitle="Balón, petos, árbitro · opcionales para el jugador"
                   right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
                   last
-                  onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
+                  onPress={() => navigation.navigate('Cobros', { complejoId, nombre: recinto.nombre })}
                 />
               </Card>
             </View>

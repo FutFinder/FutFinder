@@ -252,6 +252,7 @@ export default function CanchaScreen({ navigation, route }) {
                       : 'Precio único · todavía sin tarifas por franja'
                   }
                   last
+                  onPress={() => navigation.navigate('Tarifas', { complejoId, canchaId })}
                 />
               </Card>
             ) : null}

@@ -390,6 +390,88 @@ export function rangoLegible(desde, hasta) {
   return `${String(desde).slice(0, 5)}\u2013${String(hasta).slice(0, 5)}`;
 }
 
+/* ── Tarifas por franja (migración 64) ──────────────────────────────────── */
+
+/**
+ * La tarifa ya cargada que chocaría con esta, o `null`.
+ *
+ * OJO CON EL ALCANCE, que es lo que confunde: el servidor solo considera
+ * cruce entre tarifas del MISMO alcance (`dia_semana is not distinct from`).
+ * Una tarifa del sábado nunca choca con una de todos los días — la pisa, que
+ * es exactamente cómo se cobra distinto un día sin cargar siete tarifas.
+ *
+ * Por eso el alcance se pregunta ANTES que las horas: con esa respuesta la
+ * pantalla sabe contra qué validar.
+ *
+ * `diaSemana` es `null` para «todos los días», o 0-6 para un día. `tarifaId`
+ * es la que se está editando: no choca consigo misma.
+ */
+export function choqueDeTarifa(tarifas = [], diaSemana, desde, hasta, tarifaId = null) {
+  const mismoAlcance = (t) => (t.dia_semana ?? null) === (diaSemana ?? null);
+  return (tarifas || []).find(
+    (t) => mismoAlcance(t)
+      && t.id !== tarifaId
+      && rangosSeCruzan(desde, hasta, t.hora_desde, t.hora_hasta),
+  ) || null;
+}
+
+/**
+ * Qué tarifa aplica a un bloque, con la MISMA regla que `precio_de_bloque()`
+ * en Postgres: gana la del día específico sobre la de todos los días, y el
+ * rango es semiabierto (cuenta la hora en que EMPIEZA el bloque).
+ *
+ * SE DERIVA ACÁ SOLO PARA PREVISUALIZAR, igual que `bloquesDeTarifa()`. El
+ * precio que se cobra sale siempre de la base. Si esto divergiera del
+ * servidor, el daño es una vista previa equivocada y no un cobro equivocado.
+ */
+export function tarifaDeBloque(tarifas = [], diaSemana, hora) {
+  const m = horaAMinutos(hora);
+  if (m === null) return null;
+  const aplica = (tarifas || []).filter((t) => {
+    const d = horaAMinutos(t.hora_desde);
+    const h = horaAMinutos(t.hora_hasta);
+    if (d === null || h === null) return false;
+    const alcanza = t.dia_semana === null || t.dia_semana === undefined || t.dia_semana === diaSemana;
+    return alcanza && m >= d && m < h;
+  });
+  if (aplica.length === 0) return null;
+  // La del día específico manda: `order by dia_semana nulls last` en el servidor.
+  return aplica.find((t) => t.dia_semana !== null && t.dia_semana !== undefined) || aplica[0];
+}
+
+/**
+ * El precio de cada bloque de un día, para la barra de «cómo queda el día».
+ *
+ * Los bloques que ninguna tarifa cubre caen en el precio base de la cancha,
+ * que es obligatorio: por eso una cancha sin ninguna tarifa igual tiene
+ * precio y no se rompe nada.
+ */
+export function preciosDelDia({
+  tarifas = [], diaSemana = null, horaApertura, horaCierre, duracionSlotMin, precioBase,
+} = {}) {
+  const abre = horaAMinutos(horaApertura);
+  const cierra = horaAMinutos(horaCierre);
+  const paso = Number(duracionSlotMin);
+  if (abre === null || cierra === null || !Number.isFinite(paso) || paso <= 0) return [];
+
+  const bloques = [];
+  for (let inicio = abre; inicio + paso <= cierra; inicio += paso) {
+    const hora = minutosAHora(inicio);
+    const t = tarifaDeBloque(tarifas, diaSemana, hora);
+    bloques.push({ hora, precio: t ? t.precio : Number(precioBase) || 0, tarifaId: t?.id || null });
+  }
+  return bloques;
+}
+
+/** Cuántos bloques hay de cada precio, ordenados de más barato a más caro. */
+export function tramosDelDia(bloques = []) {
+  const porPrecio = new Map();
+  for (const b of bloques) porPrecio.set(b.precio, (porPrecio.get(b.precio) || 0) + 1);
+  return [...porPrecio.entries()]
+    .map(([precio, bloquesN]) => ({ precio, bloques: bloquesN }))
+    .sort((a, b) => a.precio - b.precio);
+}
+
 /* ── Teléfono (migraciones 67 y 69) ─────────────────────────────────────── */
 
 /**

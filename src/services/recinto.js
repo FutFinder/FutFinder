@@ -156,6 +156,54 @@ export async function horariosDeCancha(canchaId) {
   return comoListaRecinto(data, error, 'horariosDeCancha');
 }
 
+/**
+ * Las tarifas por franja de una cancha, con su `id` para poder editarlas.
+ *
+ * Direct select por la misma razón que los horarios: `cancha_tarifas_select`
+ * es `using (true)` desde la migración 64 —el precio es justo lo que el
+ * jugador necesita ver antes de reservar, incluso sin sesión— así que no hay
+ * nada que una RPC pudiera autorizar mejor. Las escrituras sí pasan por
+ * `admin_upsert_tarifa` / `admin_eliminar_tarifa`.
+ *
+ * `dia_semana` en `null` es «todos los días»; 0-6 es un día concreto, y ese
+ * manda sobre el general.
+ */
+export async function tarifasDeCancha(canchaId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  if (!canchaId) return { data: null, error: { message: 'Falta la cancha' } };
+  const { data, error } = await supabase
+    .from('cancha_tarifas')
+    .select('id, cancha_id, dia_semana, hora_desde, hora_hasta, precio')
+    .eq('cancha_id', canchaId)
+    .order('dia_semana', { nullsFirst: true })
+    .order('hora_desde');
+  return comoListaRecinto(data, error, 'tarifasDeCancha');
+}
+
+/**
+ * Cuánto sería la comisión sobre un monto, PARA MOSTRARLO ANTES de que exista
+ * la reserva (artboards 4a y 4c).
+ *
+ * Llama a `calcular_comision()` en vez de replicar la fórmula acá, y es a
+ * propósito: la migración 62 dice explícitamente que el cliente no debe
+ * reproducirla. El día que la tasa, el piso o el techo cambien, esta pantalla
+ * cambia sola.
+ *
+ * NO sirve para leer la comisión de una reserva concreta: esa va congelada en
+ * su fila y la traen la agenda y el detalle ya desglosada.
+ */
+export async function comisionDe(base) {
+  if (!isSupabaseConfigured) return { data: null, error: null };
+  const monto = Number(base);
+  if (!Number.isFinite(monto) || monto <= 0) return { data: 0, error: null };
+  const { data, error } = await supabase.rpc('calcular_comision', { p_base: Math.round(monto) });
+  if (error) {
+    console.error('[FutFinder] comisionDe:', error);
+    return { data: null, error: { message: error.message || 'No se pudo calcular la comisión.' } };
+  }
+  return { data: Number(data) || 0, error: null };
+}
+
 /* ── Ficha del recinto ─────────────────────────────────────────── */
 
 /**

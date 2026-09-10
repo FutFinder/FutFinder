@@ -46,6 +46,10 @@ const {
   choqueDeHorario,
   horariosDelDia,
   rangoLegible,
+  choqueDeTarifa,
+  tarifaDeBloque,
+  preciosDelDia,
+  tramosDelDia,
   normalizaTelefonoCl,
   telefonoAceptable,
 } = require('../recintoPantallas.js');
@@ -373,6 +377,101 @@ test('horariosDelDia ordena por hora de apertura', () => {
 test('rangoLegible recorta los segundos que devuelve Postgres', () => {
   assert.equal(rangoLegible('09:00:00', '14:00:00'), '09:00\u201314:00');
   assert.equal(rangoLegible(null, '14:00'), null);
+});
+
+// ---------------------------------------------------------------------------
+// Tarifas por franja
+// ---------------------------------------------------------------------------
+
+const TARIFAS = [
+  { id: 't1', dia_semana: null, hora_desde: '11:00', hora_hasta: '16:00', precio: 14000 },
+  { id: 't2', dia_semana: null, hora_desde: '16:00', hora_hasta: '22:00', precio: 28000 },
+  { id: 't3', dia_semana: 6, hora_desde: '11:00', hora_hasta: '22:00', precio: 28000 }, // sábado
+];
+
+test('choqueDeTarifa: dos tarifas de todos los días que se pisan sí chocan', () => {
+  const choque = choqueDeTarifa(TARIFAS, null, '14:00', '18:00');
+  assert.equal(choque.id, 't1');
+});
+
+test('choqueDeTarifa: una tarifa de UN DÍA no choca con la de todos los días', () => {
+  // Es la regla que más confunde: la del viernes no choca con la general que
+  // cubre esas horas, la PISA. El servidor compara con
+  // `dia_semana is not distinct from`, o sea solo dentro del mismo alcance.
+  // Viernes = 5, que no tiene ninguna tarifa propia todavía.
+  assert.equal(choqueDeTarifa(TARIFAS, 5, '14:00', '18:00'), null);
+});
+
+test('choqueDeTarifa: dos tarifas del mismo día sí chocan entre ellas', () => {
+  assert.equal(choqueDeTarifa(TARIFAS, 6, '12:00', '13:00').id, 't3');
+});
+
+test('choqueDeTarifa: pegadas no chocan', () => {
+  assert.equal(choqueDeTarifa(TARIFAS, null, '22:00', '23:00'), null);
+});
+
+test('choqueDeTarifa: una tarifa no choca consigo misma al editarla', () => {
+  assert.equal(choqueDeTarifa(TARIFAS, null, '11:00', '15:00', 't1'), null);
+});
+
+test('tarifaDeBloque: el rango es semiabierto — las 16:00 caen en la tarifa siguiente', () => {
+  // El borde que confunde a todo el mundo la primera vez.
+  assert.equal(tarifaDeBloque(TARIFAS, 1, '15:00').id, 't1');
+  assert.equal(tarifaDeBloque(TARIFAS, 1, '16:00').id, 't2');
+});
+
+test('tarifaDeBloque: la del día específico le gana a la de todos los días', () => {
+  // Mismo bloque, distinto día: el lunes paga $14.000 y el sábado $28.000.
+  assert.equal(tarifaDeBloque(TARIFAS, 1, '12:00').precio, 14000);
+  assert.equal(tarifaDeBloque(TARIFAS, 6, '12:00').precio, 28000);
+});
+
+test('tarifaDeBloque: una hora que ninguna cubre no tiene tarifa', () => {
+  assert.equal(tarifaDeBloque(TARIFAS, 1, '23:00'), null);
+});
+
+test('preciosDelDia: los bloques sin tarifa caen en el precio base', () => {
+  const bloques = preciosDelDia({
+    tarifas: TARIFAS, diaSemana: 1,
+    horaApertura: '11:00', horaCierre: '23:00',
+    duracionSlotMin: 60, precioBase: 30000,
+  });
+  assert.equal(bloques.length, 12);
+  assert.equal(bloques[0].precio, 14000);   // 11:00
+  assert.equal(bloques[5].precio, 28000);   // 16:00
+  assert.equal(bloques[11].precio, 30000);  // 22:00, ninguna tarifa: precio base
+});
+
+test('preciosDelDia: una cancha sin ninguna tarifa cobra su precio base todo el día', () => {
+  const bloques = preciosDelDia({
+    tarifas: [], horaApertura: '11:00', horaCierre: '22:00',
+    duracionSlotMin: 60, precioBase: 28000,
+  });
+  assert.equal(bloques.length, 11);
+  assert.ok(bloques.every((b) => b.precio === 28000));
+});
+
+test('preciosDelDia: el último bloque tiene que TERMINAR antes del cierre', () => {
+  // Una cancha que cierra a las 22:00 con bloques de una hora tiene su último
+  // bloque a las 21:00, no a las 22:00.
+  const bloques = preciosDelDia({
+    tarifas: [], horaApertura: '11:00', horaCierre: '22:00',
+    duracionSlotMin: 60, precioBase: 28000,
+  });
+  assert.equal(bloques[bloques.length - 1].hora, '21:00');
+});
+
+test('tramosDelDia cuenta los bloques de cada precio, del más barato al más caro', () => {
+  const bloques = preciosDelDia({
+    tarifas: TARIFAS, diaSemana: 1,
+    horaApertura: '11:00', horaCierre: '22:00',
+    duracionSlotMin: 60, precioBase: 28000,
+  });
+  // MaiClub: cinco bloques a $14.000 (11 a 15) y seis a $28.000 (16 a 21).
+  assert.deepEqual(tramosDelDia(bloques), [
+    { precio: 14000, bloques: 5 },
+    { precio: 28000, bloques: 6 },
+  ]);
 });
 
 // ---------------------------------------------------------------------------
