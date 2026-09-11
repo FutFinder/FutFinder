@@ -14,7 +14,7 @@ El registro **no usa `signUp`**: usa `signInWithOtp` con `shouldCreateUser: true
 
 Una sesión con onboarding completo abre `Main`; una incompleta continúa en ubicación. `AuthProvider` resuelve la sesión antes de montar la navegación y escucha cambios. Una ruta guardada por `withAuthGuard` se consume después del login terminado.
 
-Entre Portada y Crear cuenta/Iniciar sesión hay un carrusel de 5 pasos (`TutorialScreen`, handoff `FutFinder Inicio.dc.html`) que solo se ve una vez por visita: no guarda estado de "ya lo vi", así que quien vuelve a Portada sin sesión lo recorre de nuevo. Se navega con botones y puntos, sin gesto de arrastre (el propio handoff lo deja para después). El botón «Saltar» y, en el último paso, «Ya tengo cuenta» llevan a Login; «Comenzar ahora» en el último paso lleva a Registro.
+Entre Portada y Crear cuenta/Iniciar sesión hay un carrusel de 5 pasos (`TutorialScreen`, handoff `FutFinder Inicio.dc.html`) que solo se ve una vez por visita: no guarda estado de "ya lo vi", así que quien vuelve a Portada sin sesión lo recorre de nuevo. Se navega con botones y puntos, sin gesto de arrastre (el propio handoff lo deja para después). El botón «Saltar» lleva a Login desde cualquier paso. En el último paso conviven los tres: «Comenzar ahora» (Registro), «Ya tengo cuenta» (Login) y «Atrás» (retrocede un paso) — a diferencia del handoff original, donde «Atrás» desaparecía y «Ya tengo cuenta» lo reemplazaba; se dejaron los tres a pedido explícito, para no perder la vuelta al tutorial.
 
 `authPolicy.js` concentra la decisión de acceso y es lógica pura, sin dependencias de React Native, para poder probarla con `node:test`: el cliente de auth se inyecta.
 

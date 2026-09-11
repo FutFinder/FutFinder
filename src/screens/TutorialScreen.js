@@ -183,12 +183,15 @@ export default function TutorialScreen({ navigation }) {
     if (last) navigation.navigate('Register');
     else goStep(step + 1);
   };
+  // En el último paso "Atrás" ya no reemplaza a "Ya tengo cuenta": ambas
+  // conviven (Comenzar ahora / Ya tengo cuenta / Atrás), así que acá siempre
+  // es retroceder un paso — nunca ir al login.
   const handleBack = () => {
-    if (last) navigation.navigate('Login');
-    else if (step === 0) navigation.goBack();
+    if (step === 0) navigation.goBack();
     else goStep(step - 1);
   };
-  const skip = () => navigation.navigate('Login');
+  const goLogin = () => navigation.navigate('Login');
+  const skip = goLogin;
 
   return (
     <View style={styles.root}>
@@ -233,7 +236,16 @@ export default function TutorialScreen({ navigation }) {
           </View>
           <Button label={last ? 'Comenzar ahora' : 'Siguiente'} onPress={handleNext} />
           <View style={{ height: 10 }} />
-          <Button label={last ? 'Ya tengo cuenta' : 'Atrás'} variant="secondary" onPress={handleBack} />
+          {last ? (
+            <Button label="Ya tengo cuenta" variant="secondary" onPress={goLogin} />
+          ) : (
+            <Button label="Atrás" variant="secondary" onPress={handleBack} />
+          )}
+          {last ? (
+            <Pressable onPress={handleBack} hitSlop={8} style={{ alignSelf: 'center', marginTop: 12 }}>
+              <Text style={styles.backLinkText}>Atrás</Text>
+            </Pressable>
+          ) : null}
         </View>
       </SafeAreaView>
     </View>
@@ -249,6 +261,7 @@ const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   brandText: { fontFamily: F.extraBold, fontSize: 17, color: C.textPrimary, letterSpacing: -0.4 },
   skipText: { fontFamily: F.semiBold, fontSize: 14, color: C.textSecondary },
+  backLinkText: { fontFamily: F.bold, fontSize: 13, color: C.textSecondary },
 
   track: { flex: 1, flexDirection: 'row' },
   slide: { paddingHorizontal: 20, gap: 24 },
