@@ -152,7 +152,7 @@ export default function WelcomeScreen({ navigation }) {
   if (checking) {
     return (
       <View style={[styles.root, styles.splashCenter]}>
-        <FutfinderMark size={40} color={C.green} glow />
+        <FutfinderMark size={44} color={C.green} />
         <View style={{ height: 20 }} />
         <ActivityIndicator color={C.green} />
       </View>
@@ -172,7 +172,7 @@ export default function WelcomeScreen({ navigation }) {
           />
           <SafeAreaView edges={['top']} style={styles.heroContent}>
             <View style={styles.brandRow}>
-              <FutfinderMark size={30} color={C.green} glow />
+              <FutfinderMark size={34} color={C.green} bgColor="#070A07" />
               <Text style={styles.brandText}>
                 fut<Text style={{ color: C.green }}>finder</Text>
               </Text>
@@ -248,9 +248,9 @@ const styles = StyleSheet.create({
 
   hero: { height: HERO_HEIGHT, overflow: 'hidden', backgroundColor: '#070A07' },
   heroContent: { flex: 1, paddingHorizontal: 22, justifyContent: 'space-between' },
-  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 30 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 30 },
   brandText: {
-    fontFamily: F.extraBold, fontSize: 26, color: C.textPrimary, letterSpacing: -0.8,
+    fontFamily: F.extraBold, fontSize: 32, color: C.textPrimary, letterSpacing: -1.3,
   },
   heroBottom: { paddingBottom: 4 },
   headline: {
