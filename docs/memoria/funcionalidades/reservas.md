@@ -99,6 +99,16 @@ La segunda: **en 16:9 igual sobra, y nadie elegía qué se iba.** `resizeAndComp
 
 **Un detalle que estaba mal desde la 75:** la url de la portada terminaba con `?t=1?v=2`, porque `uploadToBucket` ya agrega un parámetro de caché y `uploadComplejoFoto` le sumaba otro con `?` en vez de `&`. No rompía nada visible, pero era una query string malformada; ahora se usa solo la que agrega `uploadToBucket`.
 
+## Quién puede tener un recinto
+
+**El dueño crea su propio recinto, pero solo si FutFinder lo habilitó** (2026-09-11, migración 82). Hasta acá los recintos los cargaba el equipo a mano. Ahora hay una autorización **de un solo uso** que entrega FutFinder al aprobar una solicitud; con ella la persona crea su recinto desde `CrearRecintoScreen` y queda de dueño en el mismo movimiento. Sin autorización no pasa nada: `complejos` sigue sin policy de escritura y la pantalla ni se ofrece.
+
+**Publicar es un permiso aparte y lo da el equipo.** El dueño prepara todo y aprieta «Mandar a revisión»; publicar exige `aprobado_futfinder`. El panel muestra **cinco estados** —falta cancha, falta horario, listo para revisión, en revisión, aprobado— y la decisión de cuál mostrar vive en `estadoDePublicacion` (`src/utils/crearRecinto.js`, 12 pruebas), no en banderas sueltas: con banderas se terminan mostrando dos mensajes que se contradicen, como «lo estamos revisando» sobre algo ya aprobado.
+
+**La dirección se elige del buscador, no se escribe.** De ahí salen comuna, región y coordenadas, que son obligatorias porque son las que ponen el recinto en el mapa. Se reusa `LocationAutocomplete` y el estado de `utils/ubicacionPropuesta`, el mismo de crear un partido, con su regla más importante ya resuelta: editar el texto después de elegir invalida el punto, porque ya describe otro lugar.
+
+El procedimiento para aprobar, en [Aprobar recintos](../operacion/aprobar-recintos.md).
+
 ## La pasarela de pago
 
 **El proveedor es Flow** y la base no lo sabe. La migración 78 creó `pagos` y cuatro RPC (`iniciar_pago_reserva` para quien tiene sesión; `anotar_referencia_pago`, `confirmar_pago` y `rechazar_pago` solo para `service_role`) que hablan de órdenes, montos y estados sin nombrar a ningún proveedor. Todo lo que sabe de Flow vive en `supabase/functions/_shared/flowLogic.ts`, así que cambiar de proveedor es reescribir un archivo.

@@ -7,14 +7,16 @@ import { ArrowLeft, MapPin, ChevronRight, Building2, AlertTriangle } from 'lucid
 import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import { Card, IconButton, Button, Badge, NoticeCard } from '../components/reservas/ui';
 import { Skeleton, Pasos } from '../components/reservas/recintoUi';
-import { misRecintos } from '../services/recinto';
+import { misRecintos, miAutorizacionRecinto } from '../services/recinto';
 
 /**
  * «Mis recintos» (artboards 1c, 1d y 1e del handoff del recinto).
  *
- * NO TIENE BOTÓN DE CREAR, y no es un olvido: los recintos los da de alta el
- * equipo de FutFinder. El vacío tiene que explicar esa fricción de frente en
- * vez de dejar a alguien buscando un botón que no existe.
+ * EL BOTÓN DE CREAR APARECE SOLO CON AUTORIZACIÓN (migración 82). Los
+ * recintos no los crea cualquiera: FutFinder aprueba la solicitud y entrega
+ * una autorización de un solo uso. Quien no la tiene ve el mismo vacío de
+ * siempre, que explica la fricción de frente en vez de dejarlo buscando un
+ * botón que no existe; quien la tiene ve el botón y nada más.
  *
  * Con un solo recinto esta pantalla se salta —el acceso de Reservas entra
  * directo al panel— así que en la práctica solo la ve quien administra dos o
@@ -22,13 +24,20 @@ import { misRecintos } from '../services/recinto';
  */
 export default function MisRecintosScreen({ navigation }) {
   const [recintos, setRecintos] = useState([]);
+  const [autorizacion, setAutorizacion] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
   const cargar = useCallback(async () => {
-    const { data, error: err } = await misRecintos();
+    const [{ data, error: err }, { data: auth }] = await Promise.all([
+      misRecintos(),
+      miAutorizacionRecinto(),
+    ]);
     setError(err?.message || null);
     setRecintos(data || []);
+    // No tener autorización es lo normal y no es un error: simplemente no se
+    // ofrece crear.
+    setAutorizacion(auth || null);
     setCargando(false);
   }, []);
 
@@ -63,7 +72,7 @@ export default function MisRecintosScreen({ navigation }) {
         ) : error ? (
           <NoticeCard tone="warning" icon={AlertTriangle}>{error}</NoticeCard>
         ) : recintos.length === 0 ? (
-          <Vacio navigation={navigation} />
+          <Vacio navigation={navigation} autorizacion={autorizacion} />
         ) : (
           <View style={{ gap: S.cardGap }}>
             {recintos.map((r) => (
@@ -86,9 +95,17 @@ export default function MisRecintosScreen({ navigation }) {
                 </View>
               </Card>
             ))}
-            <Text style={styles.pie}>
-              ¿Te falta un recinto acá? Los da de alta el equipo de FutFinder.
-            </Text>
+            {autorizacion ? (
+              <Button
+                label="Crear otro recinto"
+                variant="secondary"
+                onPress={() => navigation.navigate('CrearRecinto')}
+              />
+            ) : (
+              <Text style={styles.pie}>
+                ¿Te falta un recinto acá? Los da de alta el equipo de FutFinder.
+              </Text>
+            )}
           </View>
         )}
       </ScrollView>
@@ -96,8 +113,42 @@ export default function MisRecintosScreen({ navigation }) {
   );
 }
 
-/** Artboard 1d: sin recintos, sin botón de crear, con la fricción explicada. */
-function Vacio({ navigation }) {
+/**
+ * Sin recintos. Dos vacíos distintos, y la diferencia importa: con
+ * autorización en mano lo único que falta es crear, y contarle a esa persona
+ * cómo se solicita un recinto sería mandarla a hacer algo que ya hizo.
+ */
+function Vacio({ navigation, autorizacion }) {
+  if (autorizacion) {
+    return (
+      <View style={{ gap: 16 }}>
+        <Card>
+          <View style={styles.vacioIcono}>
+            <Building2 color={C.green} size={22} strokeWidth={2} />
+          </View>
+          <Text style={styles.vacioTitulo}>Ya puedes crear tu recinto</Text>
+          <Text style={styles.vacioTexto}>
+            Aprobamos tu solicitud. Carga el nombre y la dirección y quedas como dueño; después
+            agregas canchas, horarios y precios desde el panel.
+          </Text>
+        </Card>
+
+        <Card>
+          <Text style={styles.vacioSubtitulo}>Lo que viene después</Text>
+          <Pasos
+            pasos={[
+              'Creas el recinto con su nombre y dirección',
+              'Cargas tus canchas con horarios y precios',
+              'Nos lo mandas a revisión y lo publicamos',
+            ]}
+          />
+        </Card>
+
+        <Button label="Crear mi recinto" onPress={() => navigation.navigate('CrearRecinto')} />
+      </View>
+    );
+  }
+
   return (
     <View style={{ gap: 16 }}>
       <Card>
@@ -106,8 +157,8 @@ function Vacio({ navigation }) {
         </View>
         <Text style={styles.vacioTitulo}>Todavía no administras ningún recinto</Text>
         <Text style={styles.vacioTexto}>
-          Los recintos los da de alta el equipo de FutFinder. Cuéntanos de tu complejo y te dejamos
-          como dueño para que lo administres desde acá.
+          Para tener un recinto en FutFinder primero lo aprobamos nosotros. Cuéntanos de tu complejo
+          y, si todo cuadra, te habilitamos para crearlo y quedas como dueño.
         </Text>
       </Card>
 
@@ -117,7 +168,7 @@ function Vacio({ navigation }) {
           pasos={[
             'Nos escribes con el nombre y la dirección del complejo',
             'Verificamos los datos (1 a 2 días hábiles)',
-            'Te contactamos para agregar tu recinto a FutFinder',
+            'Te habilitamos para crear tu recinto desde la app',
           ]}
         />
       </Card>

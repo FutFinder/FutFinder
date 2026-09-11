@@ -327,6 +327,70 @@ export async function quitarFotoGaleria(fotoId) {
   return comoResultadoRecinto(data, error, 'quitarFotoGaleria');
 }
 
+/**
+ * ¿Me autorizaron a crear un recinto? (migración 82)
+ *
+ * Lectura directa: `autorizaciones_recinto_select` deja ver solo las propias,
+ * y la tabla no tiene policies de escritura — las crea el equipo. Devuelve la
+ * más antigua sin usar, que es la que va a consumir `crearMiRecinto`.
+ *
+ * `null` significa que no hay, y eso NO es un error: la enorme mayoría de las
+ * cuentas no tiene autorización y la pantalla simplemente no ofrece crear.
+ */
+export async function miAutorizacionRecinto() {
+  if (!isSupabaseConfigured) return { data: null, error: null };
+  const { data, error } = await supabase
+    .from('autorizaciones_recinto')
+    .select('id, nota, created_at')
+    .is('usada_at', null)
+    .order('created_at')
+    .limit(1);
+  if (error) {
+    console.error('[FutFinder] miAutorizacionRecinto:', error);
+    return { data: null, error: { message: error.message } };
+  }
+  return { data: data?.[0] || null, error: null };
+}
+
+/**
+ * Crea el recinto y deja a quien llama como dueño, gastando la autorización.
+ *
+ * Las tres cosas pasan en una sola transacción del lado del servidor: un
+ * recinto sin dueño no lo puede administrar nadie, y una autorización gastada
+ * sin recinto sería una cuenta que perdió su turno sin nada a cambio.
+ */
+export async function crearMiRecinto({
+  nombre, direccion, comuna, region, latitud, longitud, descripcion,
+} = {}) {
+  if (!isSupabaseConfigured) return DEMO;
+  const { data, error } = await supabase.rpc('crear_mi_recinto', {
+    p_nombre: nombre ?? null,
+    p_direccion: direccion ?? null,
+    p_comuna: comuna ?? null,
+    p_region: region ?? null,
+    p_latitud: latitud ?? null,
+    p_longitud: longitud ?? null,
+    p_descripcion: descripcion ?? null,
+  });
+  return comoResultadoRecinto(data, error, 'crearMiRecinto');
+}
+
+/**
+ * Manda el recinto a revisión de FutFinder.
+ *
+ * Publicar pasa por el equipo (migración 82), así que esto es lo único que el
+ * dueño puede hacer por su cuenta. Exige lo mismo que publicar —una cancha
+ * activa con horario— para que nadie mande a revisar un recinto vacío.
+ */
+export async function solicitarRevisionRecinto(complejoId) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
+  const { data, error } = await supabase.rpc('admin_solicitar_revision_complejo', {
+    p_complejo_id: complejoId,
+  });
+  return comoResultadoRecinto(data, error, 'solicitarRevisionRecinto');
+}
+
 /* ── Canchas ───────────────────────────────────────────────────── */
 
 /** Crea una cancha. `tipo` es `futbol_5`, `futbol_7` o `futbol_11`. */

@@ -37,6 +37,7 @@ Esta bóveda documenta la configuración, el código y las migraciones versionad
 | Despliegue, entornos o secretos | [Despliegue y entornos](arquitectura/despliegue-y-entornos.md) | [Stack y estructura](arquitectura/stack-y-estructura.md) |
 | Sistema visual o componentes compartidos | [Sistema visual](diseno/sistema-visual.md) | Ninguna |
 | Arquitectura general | [Stack y estructura](arquitectura/stack-y-estructura.md) | [Navegación](arquitectura/navegacion.md), [Base de datos](arquitectura/base-de-datos.md), [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) |
+| Aprobar un recinto nuevo | [Aprobar recintos](operacion/aprobar-recintos.md) | [Reservas](funcionalidades/reservas.md), [Base de datos](arquitectura/base-de-datos.md) |
 | Estado, pendientes o pruebas | [Estado actual](operacion/estado-actual.md) | [Pendientes](operacion/pendientes.md), [Pruebas](operacion/pruebas.md) |
 | Lint, calidad o errores de render | [Calidad y lint](operacion/calidad-y-lint.md) | [Pruebas](operacion/pruebas.md) |
 

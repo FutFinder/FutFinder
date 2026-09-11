@@ -14,7 +14,9 @@ import { Skeleton, StatTrio, StatusBanner } from '../components/reservas/recinto
 import NotificationBell from '../components/NotificationBell';
 import {
   misRecintos, agendaDelDia, reservasProximas, canchasDelRecinto, publicarRecinto,
+  solicitarRevisionRecinto,
 } from '../services/recinto';
+import { estadoDePublicacion, textoDeEstado } from '../utils/crearRecinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO, fechaRelativa, pluraliza } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
@@ -72,10 +74,13 @@ export default function PanelRecintoScreen({ navigation, route }) {
   const publicado = recinto?.publicado;
   const esDueno = recinto?.rol === 'dueño';
 
-  // La misma condición que exige `admin_publicar_complejo`. Se comprueba acá
-  // para poder decir QUÉ falta antes de que el servidor rechace; el mensaje
-  // que se muestra si igual se envía es el del servidor.
-  const listaParaPublicar = canchas.some((k) => k.activa && k.tiene_horario);
+  // El camino a publicar tiene cinco estados desde la 82 —falta cancha,
+  // falta horario, listo para revisión, en revisión, aprobado— y la pantalla
+  // dice algo distinto en cada uno. Con banderas sueltas se terminan
+  // mostrando dos mensajes que se contradicen, así que la decisión vive en
+  // una función pura con pruebas.
+  const estadoPub = estadoDePublicacion(recinto, canchas);
+  const textoPub = textoDeEstado(estadoPub);
   // El servidor PERMITE estar publicado con todas las canchas apagadas, así
   // que la app tiene que empujar a salir de ahí: el jugador te encuentra y ve
   // el recinto vacío, que se lee peor que no aparecer.
@@ -88,6 +93,18 @@ export default function PanelRecintoScreen({ navigation, route }) {
     setPublicando(false);
     if (err) { setErrorPublicar(err.message); return; }
     setHoja(false);
+    cargar();
+  };
+
+  const pedirRevision = async () => {
+    setPublicando(true);
+    setErrorPublicar(null);
+    const { data, error: err } = await solicitarRevisionRecinto(complejoId);
+    setPublicando(false);
+    if (err || !data?.ok) {
+      setErrorPublicar(err?.message || data?.reason || 'No pudimos mandar el recinto a revisión.');
+      return;
+    }
     cargar();
   };
 
@@ -243,57 +260,64 @@ export default function PanelRecintoScreen({ navigation, route }) {
             </View>
 
             <Card>
-              {publicado ? (
-                <>
-                  <Text style={styles.publicarTitulo}>Estás recibiendo reservas</Text>
-                  <Text style={styles.publicarTexto}>
-                    Apareces en el buscador y cualquiera puede reservar tus canchas disponibles.
+              <Text style={styles.publicarTitulo}>{textoPub.titulo}</Text>
+              <Text style={styles.publicarTexto}>{textoPub.cuerpo}</Text>
+
+              {/* Falta cancha o falta horario: el atajo lleva a donde se
+                  arregla, en vez de dejar a alguien buscando. */}
+              {(estadoPub === 'sin_canchas' || estadoPub === 'sin_horario') ? (
+                <View style={styles.faltaCaja}>
+                  <Text style={styles.faltaTexto}>
+                    {canchas.length === 0
+                      ? 'Todavía no tienes canchas.'
+                      : `${canchas.filter((k) => k.activa).length} de ${canchas.length} canchas activas, y ninguna con horario cargado.`}
                   </Text>
                   <Button
-                    label="Dejar de recibir reservas"
+                    label={canchas.length === 0 ? 'Crear la primera cancha' : 'Cargar horarios'}
                     variant="secondary"
-                    icon={EyeOff}
-                    style={{ marginTop: 13 }}
-                    onPress={() => { setErrorPublicar(null); setHoja(true); }}
+                    onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
                   />
-                </>
-              ) : (
-                <>
-                  <Text style={styles.publicarTitulo}>Todavía no apareces en la app</Text>
-                  <Text style={styles.publicarTexto}>
-                    {listaParaPublicar
-                      ? 'Ya tienes al menos una cancha activa con horario cargado: puedes publicar cuando quieras.'
-                      : 'Para publicar necesitas al menos una cancha activa con horario cargado.'}
-                  </Text>
-                  {!listaParaPublicar ? (
-                    <View style={styles.faltaCaja}>
-                      <Text style={styles.faltaTexto}>
-                        {canchas.length === 0
-                          ? 'Todavía no tienes canchas.'
-                          : `${canchas.filter((k) => k.activa).length} de ${canchas.length} canchas activas, y ninguna con horario cargado.`}
-                      </Text>
-                      <Button
-                        label={canchas.length === 0 ? 'Crear la primera cancha' : 'Cargar horarios'}
-                        variant="secondary"
-                        onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
-                      />
-                    </View>
-                  ) : (
-                    <Button
-                      label="Publicar recinto"
-                      icon={Globe}
-                      style={{ marginTop: 13 }}
-                      loading={publicando}
-                      onPress={() => cambiarPublicado(true)}
-                    />
-                  )}
-                  {errorPublicar ? (
-                    <View style={{ marginTop: 12 }}>
-                      <NoticeCard tone="warning" icon={AlertTriangle}>{errorPublicar}</NoticeCard>
-                    </View>
-                  ) : null}
-                </>
-              )}
+                </View>
+              ) : null}
+
+              {estadoPub === 'listo_para_revision' ? (
+                <Button
+                  label="Mandar a revisión"
+                  icon={ShieldCheck}
+                  style={{ marginTop: 13 }}
+                  loading={publicando}
+                  onPress={pedirRevision}
+                />
+              ) : null}
+
+              {/* En revisión no hay botón: la pelota la tenemos nosotros, y
+                  un botón que no hace nada solo invita a tocarlo. */}
+
+              {estadoPub === 'listo_para_publicar' ? (
+                <Button
+                  label="Publicar recinto"
+                  icon={Globe}
+                  style={{ marginTop: 13 }}
+                  loading={publicando}
+                  onPress={() => cambiarPublicado(true)}
+                />
+              ) : null}
+
+              {estadoPub === 'publicado' ? (
+                <Button
+                  label="Dejar de recibir reservas"
+                  variant="secondary"
+                  icon={EyeOff}
+                  style={{ marginTop: 13 }}
+                  onPress={() => { setErrorPublicar(null); setHoja(true); }}
+                />
+              ) : null}
+
+              {errorPublicar ? (
+                <View style={{ marginTop: 12 }}>
+                  <NoticeCard tone="warning" icon={AlertTriangle}>{errorPublicar}</NoticeCard>
+                </View>
+              ) : null}
             </Card>
 
             {resumen?.bruto ? (

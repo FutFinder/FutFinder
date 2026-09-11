@@ -68,6 +68,7 @@ import ResumenReservaScreen from '../screens/ResumenReservaScreen';
 import PagoReservaScreen from '../screens/PagoReservaScreen';
 import ReportarProblemaScreen from '../screens/ReportarProblemaScreen';
 import MisRecintosScreen from '../screens/MisRecintosScreen';
+import CrearRecintoScreen from '../screens/CrearRecintoScreen';
 import PanelRecintoScreen from '../screens/PanelRecintoScreen';
 import AgendaRecintoScreen from '../screens/AgendaRecintoScreen';
 import ReservaRecintoScreen from '../screens/ReservaRecintoScreen';
@@ -151,6 +152,7 @@ const GuardedReportarProblemaScreen = withAuthGuard(ReportarProblemaScreen, 'Rep
 // Administración del recinto: todas detrás del guard porque muestran datos de
 // reservas de terceros (nombre y teléfono de contacto incluidos).
 const GuardedMisRecintosScreen = withAuthGuard(MisRecintosScreen, 'MisRecintos');
+const GuardedCrearRecintoScreen = withAuthGuard(CrearRecintoScreen, 'CrearRecinto');
 const GuardedPanelRecintoScreen = withAuthGuard(PanelRecintoScreen, 'PanelRecinto');
 const GuardedAgendaRecintoScreen = withAuthGuard(AgendaRecintoScreen, 'AgendaRecinto');
 const GuardedReservaRecintoScreen = withAuthGuard(ReservaRecintoScreen, 'ReservaRecinto');
@@ -476,6 +478,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="MisRecintos"
           component={GuardedMisRecintosScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="CrearRecinto"
+          component={GuardedCrearRecintoScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

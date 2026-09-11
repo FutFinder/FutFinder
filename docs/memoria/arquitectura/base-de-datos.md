@@ -118,6 +118,18 @@ La **81** está **aplicada el 2026-09-11**, arnés 15/15. Agrega las fotos que f
 
 **Ojo con el número**: en `supabase_migrations.schema_migrations` esta migración se aplicó primero como `80` y se renombró a `81` a mano, porque la otra Mac ya había usado el 80 para `80_solicitud_de_recinto`. El orden real lo fija el `version` (timestamp), que ya era el correcto; lo que se corrigió fue el nombre, para que el repositorio y el registro digan lo mismo.
 
+La **82** está **aplicada el 2026-09-11**, arnés 21/21, y abre la puerta que la 54 y la 60 habían dejado cerrada: **el dueño crea su propio recinto**. `complejos` y `complejo_admins` siguen sin policies de escritura — lo que se agrega es una llave, no una apertura. `autorizaciones_recinto` es un permiso que **solo fabrica el equipo con `service_role`** (la tabla tiene RLS de select propio y ninguna policy de escritura) y que `crear_mi_recinto` consume.
+
+**De un solo uso**, decisión de Vicente: un permiso permanente convierte a quien fue aprobado una vez en alguien que puede crear veinte recintos, que es justo lo que se quería evitar. El uso se marca en la MISMA transacción que crea el recinto e inserta al dueño, y el `select ... for update` sobre la autorización impide que dos toques del botón la gasten dos veces. Un índice único por `solicitud_id` impide que aprobar dos veces la misma solicitud entregue dos recintos.
+
+**«Dueño» pasó a ser dos cosas.** El rol de `complejo_admins` sigue siendo por recinto y existe solo cuando el recinto ya existe; la autorización es lo de ANTES. Por eso no se pudo resolver con el rol que ya había.
+
+**Publicar pasa por FutFinder**, también decisión de Vicente. `complejos.aprobado_futfinder` y `revision_pedida_at`; el dueño llama `admin_solicitar_revision_complejo` (que exige lo mismo que publicar, para que nadie mande a revisar un recinto vacío) y `admin_publicar_complejo` gana la comprobación. **Los recintos que ya existían quedaron aprobados**: no se le quita a nadie algo que ya tenía por una migración. **Despublicar no exige nada** — si un recinto tiene que salir del buscador, sale.
+
+Las coordenadas las fija el dueño al crear, con el mismo buscador de direcciones de los partidos, y la RPC comprueba que caigan en Chile (-56..-17, -110..-66, que incluye Rapa Nui): no es una validación fina, es para que un error de signo no ponga el recinto en otro continente. Después de creado, comuna y coordenadas las corrige solo el equipo, como decía la ficha.
+
+`admin_mis_complejos` se tuvo que **soltar y recrear** para sumar `aprobado_futfinder` y `revision_pedida_at`. El procedimiento de aprobación, en [Aprobar recintos](../operacion/aprobar-recintos.md).
+
 La 79 corrige el mensaje de `confirmar_reserva`, que decía «El pago con tarjeta todavía no está disponible» y desde la 78 es falso. Va aparte a propósito: la 78 es por donde va a pasar plata y conviene revisarla sin un cambio de texto en el medio.
 
 **Una lección que ya costó tres veces: agregar parámetros con `default` a una función NO la reemplaza, crea una SOBRECARGA.** Y entonces una llamada con los argumentos viejos calza con las dos y Postgres la rechaza por ambigua. Pasó con `crear_reserva` en la 67 y la 68, y con `admin_crear_bloqueo` y `admin_actualizar_bloqueo` en la 69. Siempre hay que hacer `drop function` de la firma vieja antes, y verificar después que quede una sola versión en `pg_proc`.
