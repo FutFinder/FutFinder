@@ -46,11 +46,11 @@ const SCROLL_RANGE = 296;
 const HERO_SPACER_HEIGHT = COLLAPSED_HERO_HEIGHT + SCROLL_RANGE;
 
 // Nombres de recintos ilustrativos para el ticker de la portada — copia de
-// marketing, igual que "9.400 jugadores ya organizan acá" más abajo: no
-// hay una consulta en vivo detrás (services/reservas.js todavía sirve
-// datos de ejemplo, ver docs/memoria/funcionalidades/reservas.md), así que
-// mostrar nombres reales de un complejo puntual sería fabricar un dato,
-// no ilustrarlo. Son comunas/nombres genéricos, no afirmaciones puntuales.
+// marketing: no hay una consulta en vivo detrás (services/reservas.js
+// todavía sirve datos de ejemplo, ver docs/memoria/funcionalidades/
+// reservas.md), así que mostrar nombres reales de un complejo puntual
+// sería fabricar un dato, no ilustrarlo. Son comunas/nombres genéricos,
+// no afirmaciones puntuales.
 const TICKER_ITEMS = [
   'Cancha Los Álamos · Ñuñoa',
   'Complejo Norte · Quilicura',
@@ -280,18 +280,6 @@ export default function WelcomeScreen({ navigation }) {
           onLayout={(e) => setRestHeight(e.nativeEvent.layout.height)}
           style={{ opacity: restOpacity, transform: [{ translateY: restTranslateY }] }}
         >
-          <View style={styles.restTop}>
-            <View style={styles.avatarRow}>
-              <View style={styles.avatarStack}>
-                <View style={[styles.avatar, { marginLeft: 0 }]}><Text style={styles.avatarLetter}>V</Text></View>
-                <View style={styles.avatar}><Text style={styles.avatarLetter}>J</Text></View>
-                <View style={styles.avatar}><Text style={styles.avatarLetter}>M</Text></View>
-                <View style={[styles.avatar, styles.avatarPlus]}><Text style={styles.avatarPlusLabel}>+9k</Text></View>
-              </View>
-              <Text style={styles.avatarCaption}>9.400 jugadores ya organizan acá</Text>
-            </View>
-          </View>
-
           <Ticker />
 
           {/* ── Por qué FutFinder ── */}
@@ -385,18 +373,6 @@ const styles = StyleSheet.create({
   },
   hintWrap: { alignItems: 'center', gap: 9, paddingBottom: 26 },
   hintText: { fontFamily: F.bold, fontSize: 12.5, letterSpacing: 2, color: 'rgba(255,255,255,0.5)' },
-
-  restTop: { paddingHorizontal: 22 },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  avatarStack: { flexDirection: 'row' },
-  avatar: {
-    width: 32, height: 32, borderRadius: 999, backgroundColor: C.surfaceAlt,
-    borderWidth: 2, borderColor: '#0A0C0A', alignItems: 'center', justifyContent: 'center', marginLeft: -10,
-  },
-  avatarLetter: { fontFamily: F.extraBold, fontSize: 11, color: C.textSecondary },
-  avatarPlus: { backgroundColor: C.shieldBg },
-  avatarPlusLabel: { fontFamily: F.extraBold, fontSize: 10, color: C.green },
-  avatarCaption: { flex: 1, fontFamily: F.semiBold, fontSize: 12, lineHeight: 17, color: C.textSecondary },
 
   tickerWrap: {
     height: 38, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#1A1E1B',
