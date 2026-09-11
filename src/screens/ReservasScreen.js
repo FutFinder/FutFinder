@@ -15,6 +15,7 @@ import {
   Handshake,
 } from 'lucide-react-native';
 
+import BrandMark from '../components/BrandMark';
 import NotificationBell from '../components/NotificationBell';
 import FiltrosSheet from '../components/reservas/FiltrosSheet';
 import { Card, Button, Chip, Badge, NoticeCard } from '../components/reservas/ui';
@@ -146,7 +147,7 @@ export default function ReservasScreen({ navigation }) {
     <SafeAreaView edges={['top']} style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Reservas</Text>
+          <BrandMark />
           <NotificationBell />
         </View>
 
@@ -506,7 +507,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
   },
-  headerTitle: { fontFamily: F.extraBold, fontSize: 19, color: C.textPrimary },
   h1: { fontFamily: F.extraBold, fontSize: 25, color: C.textPrimary, marginTop: 4, letterSpacing: -0.4 },
 
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
