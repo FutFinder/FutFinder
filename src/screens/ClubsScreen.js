@@ -122,16 +122,19 @@ export default function ClubsScreen({ navigation, route }) {
           'ExploreClubs',
           { modoRival: true, retadorClubId: can?.responderDesafios ? activeClubId : null },
         ],
-        partido: nextMatch
-          ? ['ClubMatchRoster', { matchId: nextMatch.id }]
-          : ['ClubChallenges', { clubId: activeClubId }],
+        // Antes saltaba directo a la nómina del próximo partido (o a la
+        // bandeja de desafíos si no había uno) — pedido explícito: ahora
+        // abre el calendario de partidos del club, pasados y por venir.
+        // La bandeja de desafíos sigue alcanzable por su propio acceso
+        // rápido («desafios»), así que no se pierde ningún destino.
+        partido: ['ClubMatchCalendar', { clubId: activeClubId, clubNombre: club?.nombre }],
         integrantes: ['ClubMembers', { clubId: activeClubId }],
         ajustes: ['EditClub', { club }],
       };
       const destino = destinos[clave];
       if (destino) irA(destino[0], destino[1]);
     },
-    [activeClubId, can, club, nextMatch, irA]
+    [activeClubId, can, club, irA]
   );
 
   /**
