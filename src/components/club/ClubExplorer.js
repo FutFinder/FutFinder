@@ -27,6 +27,7 @@ import {
 
 import { clubsExplorer as CE, clubsExplorerRadius as CER } from '../../theme/colors';
 import Banner from '../Banner';
+import BrandMark from '../BrandMark';
 import ClubExplorerCard from './ClubExplorerCard';
 import NotificationBell from '../NotificationBell';
 import {
@@ -212,8 +213,9 @@ export default function ClubExplorer({
                     <ArrowLeft color={CE.textPrimary} size={20} strokeWidth={2.2} />
                   </Pressable>
                 ) : (
-                  <View style={styles.topRowSpacer} />
+                  <BrandMark />
                 )}
+                <View style={styles.topRowSpacer} />
                 {!showBackButton && <NotificationBell />}
               </View>
 

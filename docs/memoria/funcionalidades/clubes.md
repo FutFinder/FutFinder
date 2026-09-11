@@ -79,6 +79,12 @@ El **tope de 3 clubes no se comprueba en el cliente**: lo aplica el trigger `che
 
 El badge se cuenta y se ROTULA en un solo sitio. `contarConAccion()` da el número y `etiquetaBadge()` el texto —«9+» por encima de nueve—, y los usan tanto la barra inferior como «Pendiente para ti»; antes cada una escribía el rótulo por su cuenta y con diez o más pendientes decían cosas distintas. El tope es del rótulo, no del conteo: el número exacto sigue viajando en `badgeCount` y es el que oye un lector de pantalla.
 
+## Calendario de partidos del club
+
+`ClubMatchCalendarScreen` (ruta `ClubMatchCalendar`) muestra en una grilla mensual los partidos del club, pasados y por venir, a los que se accede desde el icono de calendario en `NextMatchCard` (portada de Clubes, sólo visible si hay un próximo partido). NO es una consulta nueva: combina `listPartidosDeClub()` (lo programado, ya con los dos clubes resueltos) y `getClubMatchHistory()` (lo jugado con resultado confirmado) en `calendarioDePartidos()` (`src/utils/calendarioClub.js`, puro y probado). Un partido `finalizado` sin resultado confirmado —nadie cargó el marcador, o está en disputa— no aparece en ninguna de las dos listas de origen, y por eso tampoco en el calendario: mostrarlo sería inventar que se jugó o que todavía no pasó.
+
+La fecha de un partido programado se deriva de `hora` (timestamptz) en la hora LOCAL del dispositivo, nunca con `toISOString()`: Chile cambia de huso horario en el año y una conversión a UTC corre el día. La grilla del mes (`diasDelMes()`) tiene el mismo cuidado por un motivo distinto: recorrer los días con aritmética de milisegundos puede perder o duplicar una hora justo el día del cambio de horario, así que el recorrido usa `setDate()` anclado al mediodía (nunca medianoche, que es donde cae el cambio) para no arrastrar el corrimiento. Las 16 pruebas de `calendarioClub.test.js` recorren los doce meses del año exigiendo semanas completas de lunes a domingo, precisamente para que un cambio de horario no vuelva a correr la grilla en silencio.
+
 ## Tema de color del club
 
 Cada club elige uno de cuatro temas —`green`, `blue`, `red`, `yellow`— y ese color reemplaza los acentos verdes que son su identidad: banner del héroe, escudo provisional, «Crear desafío», el icono de la fila «Desafíos», los enlaces «Ver todos», la celda «Añadir foto» y los botones secundarios atados al club. **No cambian** el fondo, los textos, la navegación, el botón flotante global, el dorado de Premium ni los colores de victoria / empate / derrota, que son semánticos y valen lo mismo para todos: un club rojo no puede hacer que una victoria parezca una derrota. Las tarjetas del carrusel «Buscar rivales» usan el tema **del rival**, no el de quien mira, y por eso `tema` viaja en `RIVAL_CLUB_COLUMNS`.
@@ -91,8 +97,8 @@ La migración **53 está aplicada en producción el 2026-08-21**, con `53_tema_d
 
 ## Pantallas y dependencias
 
-- Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen` y `ClubHistoryScreen`.
-- Código: `src/services/clubs.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/components/club/` y `src/components/clubes/`.
+- Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
+- Código: `src/services/clubs.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
 - Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`.
 
 ## Estados, errores y problemas conocidos

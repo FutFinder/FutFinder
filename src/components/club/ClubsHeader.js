@@ -4,9 +4,16 @@ import { Search, Bell } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
 import { clubSuperficies } from '../../theme/colors';
+import BrandMark from '../BrandMark';
 
 /**
  * Cabecera fija de la portada de Clubes.
+ *
+ * Clubes es una pestaña raíz igual que Home/Partidos/Chat, así que la fila
+ * de arriba lleva el logo `BrandMark` con la lupa y la campana a la derecha
+ * —misma convención que esas pestañas—. El título/subtítulo van en una
+ * segunda fila: no compiten por el mismo lugar que el logo, y "Clubes" no
+ * queda dicho dos veces.
  *
  * El subtítulo es el que dice en qué situación está el usuario —un club, el
  * activo de varios, una solicitud esperando, o ninguno— y lo redacta el
@@ -35,7 +42,24 @@ export default function ClubsHeader({
   const escala = tema || temaClub('green');
 
   return (
-    <View style={styles.barra}>
+    <View style={styles.contenedor}>
+      <View style={styles.marcaFila}>
+        <BrandMark />
+        <View style={styles.acciones}>
+          <BotonIcono
+            Icono={Search}
+            etiqueta="Buscar clubes"
+            onPress={onBuscar}
+          />
+          <BotonIcono
+            Icono={Bell}
+            etiqueta={hayPendientes ? 'Avisos, tienes pendientes' : 'Avisos'}
+            onPress={onAvisos}
+            punto={hayPendientes ? escala.main : null}
+          />
+        </View>
+      </View>
+
       <View style={styles.textos}>
         <Text style={styles.titulo} numberOfLines={1}>
           {titulo}
@@ -45,20 +69,6 @@ export default function ClubsHeader({
             {subtitulo}
           </Text>
         ) : null}
-      </View>
-
-      <View style={styles.acciones}>
-        <BotonIcono
-          Icono={Search}
-          etiqueta="Buscar clubes"
-          onPress={onBuscar}
-        />
-        <BotonIcono
-          Icono={Bell}
-          etiqueta={hayPendientes ? 'Avisos, tienes pendientes' : 'Avisos'}
-          onPress={onAvisos}
-          punto={hayPendientes ? escala.main : null}
-        />
       </View>
     </View>
   );
@@ -82,16 +92,18 @@ function BotonIcono({ Icono, etiqueta, onPress, punto }) {
 const FONDO_BOTON = '#141416';
 
 const styles = StyleSheet.create({
-  barra: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  contenedor: {
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 12,
     backgroundColor: clubSuperficies.header,
   },
-  textos: { flex: 1, minWidth: 0 },
+  marcaFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  textos: { minWidth: 0, marginTop: 12 },
   titulo: {
     fontSize: 27,
     fontWeight: '800',

@@ -442,6 +442,7 @@ function Portada({
             lugar={lugarLabel(nextMatch, [activeClubId])}
             onVerPartido={() => irA('MatchDetail', { matchId: nextMatch.id })}
             onNomina={() => irA('ClubMatchRoster', { matchId: nextMatch.id })}
+            onVerCalendario={() => irA('ClubMatchCalendar', { clubId: activeClubId, clubNombre: club?.nombre })}
           />
         </View>
       ) : null}

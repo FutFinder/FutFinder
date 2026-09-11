@@ -1,10 +1,13 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { listPartidosDeClub } from './matches';
 import {
   cargarHistorial,
   cargarEstadisticas,
   ESTADISTICAS_VACIAS,
   HISTORIAL_LIMITE,
+  HISTORIAL_LIMITE_MAX,
 } from '../utils/historialClub';
+import { calendarioDePartidos } from '../utils/calendarioClub';
 
 /**
  * Historial de partidos entre clubes y estadísticas del club.
@@ -42,6 +45,32 @@ export { ESTADISTICAS_VACIAS };
 export async function getClubMatchHistory(clubId, { limit = HISTORIAL_LIMITE } = {}) {
   if (!isSupabaseConfigured || !clubId) return { data: [], error: null };
   return cargarHistorial(supabase, clubId, { limit });
+}
+
+/**
+ * El calendario de partidos del club: los ya jugados y confirmados, y los
+ * programados desde un desafío que la otra parte ya aceptó — combinados y
+ * ordenados por fecha. Ver `calendarioDePartidos()` en
+ * `utils/calendarioClub.js` para qué entra y qué queda afuera a propósito
+ * (un finalizado sin resultado confirmado no aparece en ninguna de las dos
+ * listas de origen).
+ */
+export async function getClubMatchCalendar(clubId) {
+  if (!isSupabaseConfigured || !clubId) return { data: [], error: null };
+
+  const [proximosRes, historialRes] = await Promise.all([
+    listPartidosDeClub(clubId, { limit: 100 }),
+    cargarHistorial(supabase, clubId, { limit: HISTORIAL_LIMITE_MAX }),
+  ]);
+
+  if (proximosRes.error || historialRes.error) {
+    return { data: [], error: proximosRes.error || historialRes.error };
+  }
+
+  return {
+    data: calendarioDePartidos({ proximos: proximosRes.data, historial: historialRes.data }, clubId),
+    error: null,
+  };
 }
 
 /**

@@ -251,6 +251,10 @@ export function normalizarPartido(row, clubId) {
     suMarcador,
     resultado,
     resultadoNombre: resultadoNombre(resultado),
+    // Fecha cruda ('YYYY-MM-DD', ya en hora de Chile por la RPC — ver el
+    // comentario de `formatFechaCorta`), para agrupar por día en el
+    // calendario de partidos del club sin tener que reparsear `fechaLabel`.
+    fecha: row.fecha ? String(row.fecha).slice(0, 10) : null,
     fechaLabel: formatFechaCorta(row.fecha),
     horaLabel: formatHora(row.hora),
     localLabel: esLocal ? 'Local' : 'Visita',

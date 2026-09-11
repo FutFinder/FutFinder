@@ -29,6 +29,8 @@ import ClubLogo from './ClubLogo';
  * @param {string} [miClubId]   Para saber cuál de los dos es el propio.
  * @param {Function} [onVerPartido]
  * @param {Function} [onNomina]
+ * @param {Function} [onVerCalendario] Abre el calendario de partidos del club
+ *   (pasados y por venir). Sin esto no se dibuja el botón.
  */
 export default function NextMatchCard({
   partido,
@@ -40,6 +42,7 @@ export default function NextMatchCard({
   miClubId,
   onVerPartido,
   onNomina,
+  onVerCalendario,
 }) {
   const escala = tema || temaClub('green');
   if (!partido) return null;
@@ -57,9 +60,22 @@ export default function NextMatchCard({
         ) : (
           <View />
         )}
-        {partido.modalidad ? (
-          <Text style={styles.modalidad}>{etiquetaModalidad(partido.modalidad)}</Text>
-        ) : null}
+        <View style={styles.cabeceraDerecha}>
+          {partido.modalidad ? (
+            <Text style={styles.modalidad}>{etiquetaModalidad(partido.modalidad)}</Text>
+          ) : null}
+          {onVerCalendario ? (
+            <Pressable
+              onPress={onVerCalendario}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Ver calendario de partidos"
+              style={({ pressed }) => [styles.calendarioBtn, pressed && { opacity: 0.7 }]}
+            >
+              <CalendarDays size={15} color="rgba(255, 255, 255, 0.55)" strokeWidth={2.2} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.enfrentamiento}>
@@ -184,6 +200,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.4,
     color: 'rgba(255, 255, 255, 0.35)',
+  },
+  cabeceraDerecha: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  calendarioBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   enfrentamiento: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   lado: { flex: 1, alignItems: 'center', gap: 8 },
