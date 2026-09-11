@@ -33,8 +33,28 @@ export default function ComplejoDetailScreen({ navigation, route }) {
     setTimeout(() => setToast(null), 2400);
   };
 
-  const goHorarios = (canchaId) => {
-    navigation.navigate('ElegirCancha', { complejoId, canchaId });
+  /**
+   * Tocar «Horarios» EN UNA CANCHA va derecho a los horarios de ESA cancha.
+   * Antes pasaba por el selector, o sea que la persona elegía la cancha dos y
+   * la pantalla siguiente le pedía elegir cancha otra vez. La pantalla de
+   * horarios muestra el nombre en el encabezado, así que no hay duda de en
+   * cuál quedó.
+   */
+  const goHorariosDeCancha = (canchaId) =>
+    navigation.navigate('FechaHora', { complejoId, canchaId });
+
+  /**
+   * El botón de abajo es el general: ahí sí corresponde el selector, porque
+   * no se dijo ninguna cancha. Con una sola cancha se salta igual — elegir
+   * entre una opción no es elegir.
+   */
+  const goHorarios = () => {
+    const canchas = complejo?.canchas || [];
+    if (canchas.length === 1) {
+      goHorariosDeCancha(canchas[0].id);
+      return;
+    }
+    navigation.navigate('ElegirCancha', { complejoId });
   };
 
   if (loading) {
@@ -136,7 +156,7 @@ export default function ComplejoDetailScreen({ navigation, route }) {
                     </Text>
                   </View>
                   <Pressable
-                    onPress={() => goHorarios(k.id)}
+                    onPress={() => goHorariosDeCancha(k.id)}
                     accessibilityRole="button"
                     accessibilityLabel={`Ver horarios de ${k.nombre}`}
                     style={({ pressed }) => [styles.horariosBtn, pressed && { opacity: 0.85 }]}
@@ -185,7 +205,7 @@ export default function ComplejoDetailScreen({ navigation, route }) {
               </Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Button label="Ver horarios" onPress={() => goHorarios(complejo.canchas[0].id)} />
+              <Button label="Ver horarios" onPress={goHorarios} />
             </View>
           </View>
         </StickyFooter>

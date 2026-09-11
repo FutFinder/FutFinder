@@ -63,6 +63,8 @@ Construido hasta ahora (pantallas 1 a 8 del handoff):
 
 **`verify_jwt: true` no garantiza sesión.** Apareció probando esta función sin cuenta: la clave anónima es un JWT válido, la función corre igual y choca con el `grant ... to authenticated` de la RPC. Se traduce ese 42501 a «Inicia sesión para mandarnos tu recinto» en vez de reportarlo como error del servidor.
 
+**«Horarios» en una cancha ya no vuelve a preguntar cuál** (2026-09-11). En `ComplejoDetailScreen` los dos botones llevaban al mismo lado: tocar «Horarios» en la cancha dos abría el selector de canchas, o sea que la persona elegía la cancha y la pantalla siguiente le pedía elegirla de nuevo. Ahora el botón de la fila va derecho a `FechaHora` con ESA cancha —su encabezado muestra el nombre, así que no hay duda de en cuál quedó— y el CTA de abajo, que es el general, es el único que abre el selector. **Con una sola cancha el CTA también salta directo**: elegir entre una opción no es elegir. El selector ya no llega con una cancha preseleccionada, así que su botón aparece recién cuando se toca una.
+
 ## Las fotos
 
 **La foto que el recinto subía no la veía nadie** (corregido 2026-09-11). El dato estaba bien de punta a punta —`buscar_complejos` devolvía `foto_url`, `comoComplejoDeLista` lo mapeaba— pero **ninguna pantalla del jugador dibujaba un `<Image>`**: las cinco mostraban un ícono gris de marcador de posición. No era un problema de datos ni de caché: la imagen no estaba puesta. Se resolvió con una primitiva, `Foto` en `components/reservas/ui.js`, que muestra la imagen si la hay y el hueco gris si no, para que la próxima pantalla no nazca con el mismo agujero. Está en la galería de QA (`/ui-reservas`), que es donde se puede comprobar sin sesión.
