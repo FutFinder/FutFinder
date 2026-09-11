@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -45,6 +45,7 @@ export default function LoginScreen({ navigation }) {
   const [banner, setBanner] = useState(null);
   const [remembered, setRemembered] = useState(null);
   const { consumePendingDestination } = useAuth();
+  const passwordRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,7 +159,13 @@ export default function LoginScreen({ navigation }) {
 
           {remembered && (
             <Pressable
-              onPress={() => setIdentifier(remembered.email)}
+              onPress={() => {
+                setIdentifier(remembered.email);
+                // No guardamos la contraseña (ver rememberedAccount.js), así
+                // que un toque no puede entrar solo: deja el correo listo y
+                // el foco en la contraseña para que sea un solo campo más.
+                passwordRef.current?.focus();
+              }}
               style={styles.rememberedRow}
               accessibilityRole="button"
               accessibilityLabel={`Usar la cuenta guardada ${remembered.email}`}
@@ -202,6 +209,7 @@ export default function LoginScreen({ navigation }) {
             </View>
             <View style={styles.passwordRow}>
               <TextInput
+                ref={passwordRef}
                 style={styles.passwordInput}
                 placeholder="Tu contraseña"
                 placeholderTextColor={C.textMuted}
