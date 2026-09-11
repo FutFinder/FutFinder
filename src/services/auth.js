@@ -128,7 +128,7 @@ export async function resendOtp({ email }) {
 export async function requestPasswordResetForEmail(email) {
   if (!isSupabaseConfigured) return { error: null };
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
-  return { error };
+  return { error: error ? { message: describeAuthError(error) } : null };
 }
 
 export async function signOut() {

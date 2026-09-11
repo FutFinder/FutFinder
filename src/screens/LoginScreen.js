@@ -17,7 +17,7 @@ import Banner from '../components/Banner';
 import { Card, IconButton, Button } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { loginWithEmail, requestPasswordResetForEmail, getCurrentProfile } from '../services/auth';
-import { decideAuthDestination, MENSAJES } from '../services/authPolicy';
+import { decideAuthDestination, isValidEmail, MENSAJES } from '../services/authPolicy';
 import { getOnboardingState } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -121,8 +121,12 @@ export default function LoginScreen({ navigation }) {
 
   const handleForgotPassword = async () => {
     const email = identifier.trim();
-    if (!email.includes('@')) {
+    if (!email) {
       showBanner('error', 'Falta tu correo', 'Escribe tu correo arriba para enviarte el enlace de recuperación.');
+      return;
+    }
+    if (!isValidEmail(email)) {
+      showBanner('error', 'Correo inválido', MENSAJES.correoInvalido);
       return;
     }
     setResetting(true);
