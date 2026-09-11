@@ -55,6 +55,65 @@ export function Foto({ uri, style, icon: Icon = ImageIcon, iconSize = 22, alt, c
   );
 }
 
+// ------------------------------------------------------------------ SlotHora
+
+/**
+ * Un bloque de hora de la grilla del jugador: disponible, elegido o no
+ * disponible.
+ *
+ * Vive acá y no dentro de la pantalla porque la galería de QA lo usa para
+ * poder mirar los tres estados juntos sin iniciar sesión, y dos copias del
+ * mismo diseño se separan a la primera corrección.
+ *
+ * LO NO DISPONIBLE SE DICE CON PALABRAS, no solo con un color. Antes la
+ * diferencia entre libre y ocupado eran cinco puntos de gris en el fondo
+ * (#131613 contra #0E110E): en el teléfono, de noche, eso no se ve. Ahora el
+ * bloque ocupado no tiene fondo —queda del color de la página, como un hueco—,
+ * el borde es punteado (la misma señal que el resto de la app usa para «acá no
+ * hay nada»), la hora va tachada y donde iría el precio dice «No disponible».
+ *
+ * NO SE DICE POR QUÉ ESTÁ OCUPADO, y es una decisión del backend que la
+ * interfaz respeta: `get_disponibilidad_cancha` nunca cuenta si hay una
+ * reserva de otra persona o si el recinto cerró esa hora. Por eso la etiqueta
+ * es «No disponible» y no «Reservado».
+ */
+export function SlotHora({ hora, precioTexto, disponible = true, seleccionado = false, onPress, style }) {
+  const libre = disponible && !seleccionado;
+  return (
+    <Pressable
+      onPress={disponible ? onPress : undefined}
+      disabled={!disponible}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !disponible, selected: seleccionado }}
+      accessibilityLabel={`${hora}${disponible ? '' : ', no disponible'}`}
+      style={[
+        styles.slot,
+        libre && styles.slotLibre,
+        !disponible && styles.slotOcupado,
+        seleccionado && styles.slotElegido,
+        style,
+      ]}
+    >
+      <Text style={[
+        styles.slotHora,
+        !disponible && styles.slotTextoOcupado,
+        seleccionado && styles.slotTextoElegido,
+      ]}>
+        {hora}
+      </Text>
+      {/* El precio es POR BLOQUE: con tarifas por franja la misma cancha vale
+          distinto según la hora, y elegir sin ver el valor no se sostiene. */}
+      {!disponible ? (
+        <Text style={styles.slotOcupadoTexto}>No disponible</Text>
+      ) : precioTexto ? (
+        <Text style={[styles.slotPrecio, seleccionado && styles.slotTextoElegido]}>
+          {precioTexto}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
 // ------------------------------------------------------------------ Card
 
 /** Contenedor base de tarjeta. `selected` aplica el fondo/borde verde de selección. */
@@ -393,6 +452,30 @@ export function StickyFooter({ children }) {
 }
 
 const styles = StyleSheet.create({
+  slot: {
+    width: '31%', minHeight: 50, paddingVertical: 6,
+    borderRadius: 15, alignItems: 'center', justifyContent: 'center',
+  },
+  slotLibre: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
+  // Sin fondo propio: queda del color de la página, que es lo que lo hace
+  // leerse como un hueco y no como otra tarjeta más.
+  slotOcupado: {
+    backgroundColor: C.bg,
+    borderWidth: 1, borderColor: C.dashedBorder, borderStyle: 'dashed',
+  },
+  slotElegido: {
+    backgroundColor: C.green, borderWidth: 1, borderColor: C.green,
+    shadowColor: C.green, shadowOpacity: 0.28, shadowRadius: 10, elevation: 3,
+  },
+  slotHora: { fontFamily: F.bold, fontSize: 15, color: C.textPrimary },
+  slotPrecio: { fontFamily: F.medium, fontSize: 10, color: C.textSecondary, marginTop: 2 },
+  slotTextoOcupado: { color: C.textMuted, textDecorationLine: 'line-through' },
+  slotTextoElegido: { fontFamily: F.extraBold, color: C.textOnGreen },
+  slotOcupadoTexto: {
+    fontFamily: F.semiBold, fontSize: 9, color: C.textMuted, marginTop: 3,
+    letterSpacing: 0.2,
+  },
+
   card: {
     backgroundColor: C.surface,
     borderWidth: 1,

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
 
 import { reservas as C, reservasFonts as F } from '../theme/colors';
-import { IconButton, StickyFooter } from '../components/reservas/ui';
+import { IconButton, StickyFooter, SlotHora } from '../components/reservas/ui';
 import { getComplejoById, getDisponibilidad } from '../services/reservas';
 import { formatCLP, buildFechaOptions, fechaLabel, addMinutesToHora } from '../services/reservasRules';
 
@@ -90,48 +90,22 @@ export default function FechaHoraScreen({ navigation, route }) {
         </View>
 
         <View style={styles.slotsGrid}>
-          {horas.map((h, i) => {
-            const on = i === horaIdx;
-            return (
-              <Pressable
-                key={h.hora}
-                onPress={h.disponible ? () => setHoraIdx(i) : undefined}
-                disabled={!h.disponible}
-                style={[
-                  styles.slot,
-                  !h.disponible && styles.slotOcupado,
-                  h.disponible && !on && styles.slotDisponible,
-                  on && styles.slotOn,
-                ]}
-              >
-                <Text style={[
-                  styles.slotText,
-                  !h.disponible && styles.slotTextOcupado,
-                  on && styles.slotTextOn,
-                ]}>
-                  {h.hora}
-                </Text>
-                {/* El precio por bloque: con tarifas por franja la misma
-                    cancha vale distinto según la hora, y elegir sin ver el
-                    valor no se sostiene. */}
-                {h.precio ? (
-                  <Text style={[
-                    styles.slotPrecio,
-                    !h.disponible && styles.slotTextOcupado,
-                    on && styles.slotTextOn,
-                  ]}>
-                    {formatCLP(h.precio)}
-                  </Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
+          {horas.map((h, i) => (
+            <SlotHora
+              key={h.hora}
+              hora={h.hora}
+              precioTexto={h.precio ? formatCLP(h.precio) : null}
+              disponible={h.disponible}
+              seleccionado={i === horaIdx}
+              onPress={() => setHoraIdx(i)}
+            />
+          ))}
         </View>
 
         <View style={styles.legendRow}>
           <Legend color={C.surface} border={C.border} label="Disponible" />
           <Legend color={C.green} label="Seleccionado" />
-          <Legend color="#0E110E" border="#1C201D" label="No disponible" />
+          <Legend color={C.bg} border={C.dashedBorder} punteado label="No disponible" />
         </View>
       </ScrollView>
 
@@ -165,10 +139,16 @@ export default function FechaHoraScreen({ navigation, route }) {
   );
 }
 
-function Legend({ color, border, label }) {
+function Legend({ color, border, punteado, label }) {
   return (
     <View style={styles.legendItem}>
-      <View style={[styles.legendSwatch, { backgroundColor: color, borderColor: border || color }]} />
+      <View style={[
+        styles.legendSwatch,
+        { backgroundColor: color, borderColor: border || color },
+        // El punteado es la señal que distingue lo no disponible, así que la
+        // leyenda tiene que mostrarlo también o explica otra cosa.
+        punteado && { borderStyle: 'dashed' },
+      ]} />
       <Text style={styles.legendText}>{label}</Text>
     </View>
   );
@@ -198,19 +178,6 @@ const styles = StyleSheet.create({
 
 
   slotsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
-  slot: {
-    width: '31%', height: 50, borderRadius: 15, alignItems: 'center', justifyContent: 'center',
-  },
-  slotDisponible: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
-  slotOcupado: { backgroundColor: '#0E110E', borderWidth: 1, borderColor: '#1C201D' },
-  slotOn: {
-    backgroundColor: C.green, borderWidth: 1, borderColor: C.green,
-    shadowColor: C.green, shadowOpacity: 0.28, shadowRadius: 10, elevation: 3,
-  },
-  slotPrecio: { fontFamily: F.medium, fontSize: 10, color: C.textSecondary, marginTop: 2 },
-  slotText: { fontFamily: F.bold, fontSize: 15, color: C.textPrimary },
-  slotTextOcupado: { color: '#454A46', textDecorationLine: 'line-through' },
-  slotTextOn: { fontFamily: F.extraBold, color: C.textOnGreen },
 
   legendRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 18 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },

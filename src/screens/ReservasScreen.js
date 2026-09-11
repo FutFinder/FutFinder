@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Search,
@@ -48,6 +48,12 @@ const normalizar = (s) =>
  * por defecto) hasta que exista una razón real para apagarlas.
  */
 export default function ReservasScreen({ navigation }) {
+  // La barra de pestañas mide 88 más el área segura del teléfono y FLOTA por
+  // encima del contenido. Sin este hueco al final, la última tarjeta —la
+  // invitación al recinto— queda cortada y su botón no se alcanza a tocar.
+  // Un número fijo no sirve: en un teléfono con muesca el área segura son 34
+  // puntos más y volvería a taparse.
+  const insets = useSafeAreaInsets();
   const [vista, setVista] = useState('lista');
   const [query, setQuery] = useState('');
   const [soloHoy, setSoloHoy] = useState(false);
@@ -145,7 +151,10 @@ export default function ReservasScreen({ navigation }) {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: 112 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <BrandMark />
           <NotificationBell />

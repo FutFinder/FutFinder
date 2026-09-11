@@ -16,6 +16,7 @@ import {
   Sheet,
   Stepper,
   Foto,
+  SlotHora,
   NoticeCard,
   StickyFooter,
 } from '../components/reservas/ui';
@@ -103,6 +104,15 @@ export default function ReservasUiGalleryScreen({ navigation }) {
           <Foto style={styles.fotoDemo} />
         </View>
 
+        <SectionLabel>Horarios del jugador</SectionLabel>
+        {/* Los tres estados juntos, que es la única forma de saber si se
+            distinguen: mirados de a uno todos parecen claros. */}
+        <View style={styles.slotsDemo}>
+          <SlotHora hora="15:00" precioTexto="$14.000" />
+          <SlotHora hora="16:00" precioTexto="$14.000" disponible={false} />
+          <SlotHora hora="17:00" precioTexto="$14.000" seleccionado />
+        </View>
+
         <SectionLabel>Encuadre</SectionLabel>
         <Button label="Elegir qué parte se ve" variant="secondary" onPress={() => setEncuadre(true)} />
 
@@ -171,6 +181,7 @@ export default function ReservasUiGalleryScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  slotsDemo: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   fotoDemo: {
     flex: 1, height: 92, borderRadius: 14, overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center', backgroundColor: '#171A17',
