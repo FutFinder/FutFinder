@@ -115,6 +115,9 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
 
   const entradasDelDia = fechaSeleccionada ? agrupadas.get(fechaSeleccionada) || [] : [];
   const diaSinPartidos = fechaSeleccionada != null && entradasDelDia.length === 0;
+  // Un día pasado sin partido ya no admite «Buscar rival» ni «Publicar un
+  // desafío»: los dos programan algo a futuro, y ese día ya pasó.
+  const diaSinPartidosEsPasado = diaSinPartidos && fechaSeleccionada < hoyISO;
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -252,6 +255,10 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                   }
                 />
               ))}
+            </View>
+          ) : diaSinPartidosEsPasado ? (
+            <View style={styles.sinPartidos}>
+              <Text style={styles.sinPartidosTitulo}>No hubo ningún encuentro en esta fecha</Text>
             </View>
           ) : diaSinPartidos ? (
             <View style={styles.sinPartidos}>
