@@ -9,7 +9,7 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarCheck, Shield, UserPlus, Star } from 'lucide-react-native';
+import { CalendarCheck, Swords, UserPlus, Star } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import FutfinderMark from '../components/FutfinderMark';
@@ -28,12 +28,9 @@ const PRIVACY_URL = 'https://futfinder.cl/privacidad';
 // mostrar nombres reales de un complejo puntual sería fabricar un dato,
 // no ilustrarlo. Son comunas/nombres genéricos, no afirmaciones puntuales.
 const TICKER_ITEMS = [
-  'FutCenter · Maipú',
-  'Arena Sur · Ñuñoa',
+  'Cancha Los Álamos · Ñuñoa',
   'Complejo Norte · Quilicura',
   'Estadio Central · Santiago',
-  'Club Andes · La Florida',
-  'Cancha 7 · Providencia',
 ];
 
 const FEATURES = [
@@ -43,7 +40,7 @@ const FEATURES = [
     subtitle: 'Horarios reales, pago dividido y confirmación al instante',
   },
   {
-    icon: Shield,
+    icon: Swords,
     title: 'Desafíos entre clubes',
     subtitle: 'Arma tu club y enfréntate a los mejores de tu zona',
   },
