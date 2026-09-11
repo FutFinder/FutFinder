@@ -17,7 +17,8 @@
  * tuviera, o como si todavía fuera a jugarse.
  */
 
-import { esPartidoDeClubes, miLadoEnPartido, clubesDelPartido } from '../services/clubMatchRules.js';
+import { esPartidoDeClubes, miLadoEnPartido, clubesDelPartido, lugarLabel } from '../services/clubMatchRules.js';
+import { formatHora } from './historialClub.js';
 
 /**
  * 'YYYY-MM-DD' de una fecha, en la hora LOCAL del dispositivo.
@@ -59,6 +60,11 @@ function entradaDesdeProximo(match, clubId) {
     resultadoNombre: null,
     miMarcador: null,
     suMarcador: null,
+    horaLabel: formatHora(match.hora),
+    lugar: lugarLabel(match, [clubId]) || null,
+    // Un partido programado siempre lo puede abrir cualquiera de los dos
+    // clubes: `listPartidosDeClub()` ya viene filtrada por RLS a integrantes.
+    soyIntegrante: true,
   };
 }
 
@@ -76,6 +82,8 @@ function entradaDesdeHistorial(partido) {
     resultadoNombre: partido.resultadoNombre,
     miMarcador: partido.miMarcador,
     suMarcador: partido.suMarcador,
+    horaLabel: partido.horaLabel,
+    lugar: partido.canchaNombre || null,
     // Sólo un integrante puede abrir el detalle — ver `clubMatchRules.js`.
     soyIntegrante: partido.soyIntegrante === true,
   };
@@ -151,4 +159,26 @@ export function diasDelMes(anio, mes) {
 export function nombreMes(anio, mes) {
   const texto = new Date(anio, mes - 1, 1).toLocaleDateString('es-CL', { month: 'long' });
   return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/**
+ * El mes en el que se fundó el club (`clubs.created_at`), como `{ anio, mes }`
+ * (mes en base 1). El calendario no tiene sentido antes de eso — un club no
+ * pudo jugar un partido antes de existir—, así que es el límite de cuánto
+ * se puede retroceder con «mes anterior». `null` si `creadoEn` no es una
+ * fecha válida (club recién creado y todavía sin cargar, por ejemplo).
+ */
+export function mesDeFundacion(creadoEn) {
+  // `new Date(null)` no es inválida: `null` se coacciona a 0 (época Unix), y
+  // `new Date(undefined)` sí da NaN pero por las dudas se corta antes.
+  if (!creadoEn) return null;
+  const d = creadoEn instanceof Date ? creadoEn : new Date(creadoEn);
+  if (Number.isNaN(d.getTime())) return null;
+  return { anio: d.getFullYear(), mes: d.getMonth() + 1 };
+}
+
+/** `true` si el mes (anio, mes) es anterior al mes de fundación — no se puede navegar ahí. */
+export function esMesAnteriorAFundacion(anio, mes, fundacion) {
+  if (!fundacion) return false;
+  return anio * 12 + mes < fundacion.anio * 12 + fundacion.mes;
 }

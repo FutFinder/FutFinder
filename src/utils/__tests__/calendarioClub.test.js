@@ -6,6 +6,8 @@ const {
   agruparPorFecha,
   diasDelMes,
   nombreMes,
+  mesDeFundacion,
+  esMesAnteriorAFundacion,
 } = require('../calendarioClub.js');
 
 const CLUB_A = 'club-a';
@@ -17,6 +19,8 @@ function proximo({ id, local = CLUB_A, visitante = CLUB_B, hora, estado = 'publi
     id,
     hora,
     estado,
+    cancha_nombre: 'Cancha Test',
+    comuna: 'Ñuñoa',
     club_local_id: local,
     club_visitante_id: visitante,
     club_local: { id: local, nombre: local === CLUB_A ? 'Club A' : 'Club B', foto_url: 'a.png' },
@@ -32,6 +36,8 @@ function historial({
   resultado = 'V',
   resultadoNombre = 'Victoria',
   soyIntegrante = true,
+  horaLabel = '21:00',
+  canchaNombre = 'Cancha Test',
 }) {
   return {
     id,
@@ -43,6 +49,8 @@ function historial({
     resultadoNombre,
     miMarcador: 2,
     suMarcador: 1,
+    horaLabel,
+    canchaNombre,
     soyIntegrante,
   };
 }
@@ -70,6 +78,34 @@ test('un próximo partido como visitante trae al local como rival', () => {
   );
   assert.equal(e.esLocal, false);
   assert.equal(e.rivalNombre, 'Club B');
+});
+
+test('un próximo partido trae hora y lugar, y siempre se puede abrir', () => {
+  const [e] = calendarioDePartidos(
+    { proximos: [proximo({ id: 'p6', hora: '2026-09-15T20:00:00-03:00' })] },
+    CLUB_A
+  );
+  assert.equal(e.horaLabel, '20:00');
+  assert.equal(e.lugar, 'Cancha Test · Ñuñoa');
+  assert.equal(e.soyIntegrante, true);
+});
+
+test('un partido del historial trae hora y cancha del normalizado, no inventadas', () => {
+  const [e] = calendarioDePartidos(
+    { historial: [historial({ id: 'h3', fecha: '2026-08-01', horaLabel: '18:30', canchaNombre: 'Cancha Roble' })] },
+    CLUB_A
+  );
+  assert.equal(e.horaLabel, '18:30');
+  assert.equal(e.lugar, 'Cancha Roble');
+});
+
+test('un partido del historial sin cancha (no integrante) no inventa un lugar', () => {
+  const [e] = calendarioDePartidos(
+    { historial: [historial({ id: 'h4', fecha: '2026-08-01', canchaNombre: null, soyIntegrante: false })] },
+    CLUB_A
+  );
+  assert.equal(e.lugar, null);
+  assert.equal(e.soyIntegrante, false);
 });
 
 test('un partido de un club ajeno no entra al calendario', () => {
@@ -236,4 +272,31 @@ test('nombreMes devuelve el nombre en español con mayúscula inicial', () => {
   assert.equal(nombreMes(2026, 9), 'Septiembre');
   assert.equal(nombreMes(2026, 1), 'Enero');
   assert.equal(nombreMes(2026, 12), 'Diciembre');
+});
+
+// --------------------------------------------------------------------------
+// mesDeFundacion / esMesAnteriorAFundacion
+// --------------------------------------------------------------------------
+
+test('mesDeFundacion lee el año y mes de created_at', () => {
+  assert.deepEqual(mesDeFundacion('2026-03-15T12:00:00-03:00'), { anio: 2026, mes: 3 });
+  assert.deepEqual(mesDeFundacion(new Date(2025, 0, 1)), { anio: 2025, mes: 1 });
+});
+
+test('mesDeFundacion sin fecha válida no revienta: devuelve null', () => {
+  assert.equal(mesDeFundacion(null), null);
+  assert.equal(mesDeFundacion('no es una fecha'), null);
+  assert.equal(mesDeFundacion(undefined), null);
+});
+
+test('esMesAnteriorAFundacion sólo bloquea meses estrictamente anteriores', () => {
+  const fundacion = { anio: 2026, mes: 3 };
+  assert.equal(esMesAnteriorAFundacion(2026, 2, fundacion), true);
+  assert.equal(esMesAnteriorAFundacion(2025, 12, fundacion), true);
+  assert.equal(esMesAnteriorAFundacion(2026, 3, fundacion), false); // el mismo mes SÍ se puede ver
+  assert.equal(esMesAnteriorAFundacion(2026, 4, fundacion), false);
+});
+
+test('esMesAnteriorAFundacion sin fecha de fundación no bloquea nada', () => {
+  assert.equal(esMesAnteriorAFundacion(2000, 1, null), false);
 });
