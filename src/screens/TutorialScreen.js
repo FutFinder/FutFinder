@@ -6,7 +6,6 @@ import { Check } from 'lucide-react-native';
 import FutfinderMark from '../components/FutfinderMark';
 import { Button } from '../components/reservas/ui';
 import { reservas as C, reservasFonts as F } from '../theme/colors';
-import { phoneColumn } from '../theme/layout';
 
 
 /**
@@ -168,11 +167,10 @@ export default function TutorialScreen({ navigation }) {
   const [step, setStep] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
   // El ancho de una lámina es el del carrusel medido, no el de la ventana:
-  // en web la pantalla está topada a `phoneColumn`, así que
-  // `Dimensions.get('window').width` devuelve bastante más que el hueco real
-  // y las láminas se salen por la derecha, cortadas. De paso deja de ser un
-  // valor leído una sola vez al importar el módulo, que además ignoraba
-  // rotaciones y redimensionados.
+  // `Dimensions.get('window').width` se lee una sola vez al importar el
+  // módulo, así que ignora rotaciones y redimensionados, y devuelve el ancho
+  // de la ventana aunque el carrusel ocupe menos — las láminas terminaban
+  // cortadas por la derecha. Medirlo con `onLayout` acierta siempre.
   const [slideWidth, setSlideWidth] = useState(0);
   const stepRef = useRef(0);
 
@@ -277,7 +275,7 @@ export default function TutorialScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, ...phoneColumn },
+  root: { flex: 1, backgroundColor: C.bg },
 
   header: {
     height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20,

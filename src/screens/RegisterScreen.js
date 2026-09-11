@@ -18,7 +18,6 @@ import FutfinderMark from '../components/FutfinderMark';
 import Banner from '../components/Banner';
 import { Card, IconButton, Button } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
-import { phoneColumn } from '../theme/layout';
 import { registerWithEmail } from '../services/auth';
 import { validarFechaNacimiento, usernameDesdeNombre } from '../utils/fechaNacimiento';
 import { passwordStrength } from '../utils/passwordStrength';
@@ -311,7 +310,7 @@ export default function RegisterScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, ...phoneColumn },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 24, flexGrow: 1 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },

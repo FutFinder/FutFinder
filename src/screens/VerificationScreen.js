@@ -15,7 +15,6 @@ import { ArrowLeft, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { colors, radius } from '../theme/colors';
-import { phoneColumn } from '../theme/layout';
 import { APP_VERSION } from '../utils/appVersion';
 import {
   verifyEmailOtp,
@@ -258,7 +257,7 @@ export default function VerificationScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background, ...phoneColumn },
+  root: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 },
   header: {
     flexDirection: 'row',
