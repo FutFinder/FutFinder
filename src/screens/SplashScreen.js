@@ -13,6 +13,7 @@ import { MapPin } from 'lucide-react-native';
 import { clubsExplorer, tactical } from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
 import { getInitialRouteName } from '../utils/routing';
+import { conTecho } from '../utils/conTecho';
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -124,7 +125,13 @@ export default function SplashScreen({ navigation }) {
     // Espera tanto la animación como la sesión: si la sesión tarda más, el
     // logo queda quieto en su estado final (nada se repite) hasta que
     // resuelva — recién ahí se desvanece la pantalla y se navega.
-    Promise.all([animationPromise, sessionPromise]).then(() => {
+    // El techo va SOLO en la animación. `requestAnimationFrame` se suspende
+    // cuando la página no se dibuja (pestaña en segundo plano), y ahí la
+    // secuencia no termina nunca: sin techo, una animación decorativa sería el
+    // único motivo por el que alguien no puede entrar. La sesión se espera sin
+    // techo a propósito — soltarla antes mandaría a la portada a alguien que
+    // sí tiene cuenta.
+    Promise.all([conTecho(animationPromise), sessionPromise]).then(() => {
       if (!isMounted) return;
 
       Animated.timing(screenOpacity, {
