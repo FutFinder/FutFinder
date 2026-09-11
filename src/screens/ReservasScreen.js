@@ -7,7 +7,6 @@ import {
   MapPin,
   Star,
   SlidersHorizontal,
-  Image as ImageIcon,
   Calendar,
   ShieldCheck,
   Building2,
@@ -17,7 +16,7 @@ import {
 
 import NotificationBell from '../components/NotificationBell';
 import FiltrosSheet from '../components/reservas/FiltrosSheet';
-import { Card, Button, Chip, Badge, NoticeCard } from '../components/reservas/ui';
+import { Card, Button, Chip, Badge, NoticeCard, Foto } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { listComplejosCerca, listHorasLibresHoy } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
@@ -269,14 +268,18 @@ export default function ReservasScreen({ navigation }) {
 
             {mapCard ? (
               <View style={styles.mapPreview}>
-                <View style={styles.mapPreviewPhoto}>
-                  <ImageIcon color={C.textMuted} size={20} strokeWidth={1.6} />
+                <Foto
+                  uri={mapCard.fotoUrl}
+                  style={styles.mapPreviewPhoto}
+                  iconSize={20}
+                  alt={`Foto de ${mapCard.nombre}`}
+                >
                   <View style={styles.mapPreviewRating}>
                     <Text style={styles.mapPreviewRatingText}>
                       {mapCard.reseñas > 0 ? `★ ${Number(mapCard.rating).toFixed(1)}` : 'nuevo'}
                     </Text>
                   </View>
-                </View>
+                </Foto>
                 <View style={styles.mapPreviewBody}>
                   <Pressable onPress={() => goComplejo(mapCard.id)} style={styles.mapPreviewTitleRow}>
                     <Text style={styles.mapPreviewNombre} numberOfLines={1}>{mapCard.nombre}</Text>
@@ -449,12 +452,19 @@ function InvitacionRecinto({ solicitud, navigation }) {
 function ComplejoCard({ complejo, onPress }) {
   return (
     <Card padded={false} onPress={onPress} radius={R.hero}>
-      <View style={styles.photoPlaceholder}>
-        <ImageIcon color={C.textMuted} size={22} strokeWidth={1.6} />
+      <Foto
+        uri={complejo.fotoUrl}
+        style={styles.photoPlaceholder}
+        alt={`Foto de ${complejo.nombre}`}
+      >
         {complejo.desde != null ? (
-          <Badge label={`Desde ${formatCLP(complejo.desde)}`} tone="neutral" />
+          // Abajo a la izquierda y no centrada: con foto, una insignia en el
+          // medio parece un error de maquetación; sin foto, acompaña al ícono.
+          <View style={styles.photoBadge}>
+            <Badge label={`Desde ${formatCLP(complejo.desde)}`} tone="neutral" />
+          </View>
         ) : null}
-      </View>
+      </Foto>
       <View style={styles.complejoBody}>
         <View style={styles.complejoTopRow}>
           {/* Un recinto recién publicado no tiene calificaciones, y sin
@@ -591,7 +601,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden',
   },
   mapPreviewPhoto: {
-    height: 110, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center',
+    height: 110, backgroundColor: C.surfaceAlt, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
   },
   mapPreviewRating: {
     position: 'absolute', left: 12, top: 12, height: 24, paddingHorizontal: 9, borderRadius: 999,
@@ -647,10 +658,13 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfaceAlt,
     borderTopLeftRadius: R.hero,
     borderTopRightRadius: R.hero,
+    // Sin esto la foto se sale por las esquinas redondeadas.
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
+  photoBadge: { position: 'absolute', left: 12, bottom: 12 },
   complejoBody: { padding: 16 },
   complejoTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },

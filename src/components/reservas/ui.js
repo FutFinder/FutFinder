@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, Modal } from 'react-native';
-import { Minus, Plus, Info, AlertTriangle, X as XIcon } from 'lucide-react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Modal, Image } from 'react-native';
+import { Minus, Plus, Info, AlertTriangle, X as XIcon, Image as ImageIcon } from 'lucide-react-native';
 
 import {
   reservas as C,
@@ -18,6 +18,42 @@ import {
  * Fuente Manrope cargada en App.js (ver `reservasFonts`) — el resto de la
  * app sigue en `System`, esto no la toca.
  */
+
+// ------------------------------------------------------------------ Foto
+
+/**
+ * Una foto, o el hueco donde va cuando todavía no hay.
+ *
+ * Existe porque el mismo par «imagen si hay, ícono gris si no» aparecía en
+ * cinco pantallas del vertical, y en las cinco estaba puesto solo el ícono:
+ * la foto que el recinto sube se guardaba bien y no la veía nadie. Un
+ * componente evita que la próxima pantalla nazca con el mismo hueco.
+ *
+ * La imagen va en `absoluteFill` y no como fondo del contenedor para que lo
+ * que se le pase como hijo —una insignia de precio, un botón de volver— quede
+ * ENCIMA sin tener que saber si hay foto o no.
+ *
+ * El contenedor necesita `overflow: 'hidden'` si tiene esquinas redondeadas;
+ * se pasa en `style` porque el radio lo decide cada pantalla.
+ */
+export function Foto({ uri, style, icon: Icon = ImageIcon, iconSize = 22, alt, children }) {
+  return (
+    <View style={style}>
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          accessible={!!alt}
+          accessibilityLabel={alt}
+        />
+      ) : (
+        <Icon color={C.textMuted} size={iconSize} strokeWidth={1.6} />
+      )}
+      {children}
+    </View>
+  );
+}
 
 // ------------------------------------------------------------------ Card
 

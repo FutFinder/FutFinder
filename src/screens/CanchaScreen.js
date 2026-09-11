@@ -1,12 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Platform, Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, AlertTriangle, Clock, CalendarClock, Tag, Lock } from 'lucide-react-native';
+import {
+  ArrowLeft, AlertTriangle, Clock, CalendarClock, Tag, Lock, ImagePlus, Trash2, Check,
+} from 'lucide-react-native';
 
 import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import { Card, IconButton, Button, ListRow, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { Skeleton, FieldLabel, TextField, Switch } from '../components/reservas/recintoUi';
-import { canchasDelRecinto, crearCancha, actualizarCancha } from '../services/recinto';
+import {
+  canchasDelRecinto, crearCancha, actualizarCancha, actualizarFotoCancha,
+} from '../services/recinto';
+import { pickImage, uploadFotoCancha } from '../services/storage';
 import { formatCLP } from '../services/reservasRules';
 
 const TIPOS = [
@@ -30,6 +37,12 @@ const DURACIONES = [30, 60, 90, 120];
  * hacia atrás lo que dicen las reservas ya jugadas. Si la cancha cambió de
  * verdad, se crea otra y se desactiva esta.
  *
+ * LA FOTO ES DE ESTA CANCHA Y NO DEL RECINTO. Es la que el jugador ve en la
+ * lista de canchas y en el resumen antes de pagar: si no la hay, se muestra
+ * la portada del recinto. Solo se puede poner al EDITAR, porque hasta que la
+ * cancha no existe no hay a qué colgarle el archivo. Y se guarda sola, igual
+ * que la portada — el botón de abajo es para el nombre, el precio y lo demás.
+ *
  * DESACTIVAR NO CANCELA NADA. Es lo que un dueño va a temer al apretar el
  * interruptor, así que se dice ahí mismo: deja de recibir reservas nuevas,
  * las confirmadas se respetan. Es la misma distinción que despublicar el
@@ -49,6 +62,9 @@ export default function CanchaScreen({ navigation, route }) {
   const [precio, setPrecio] = useState('');
   const [duracion, setDuracion] = useState(60);
   const [activa, setActiva] = useState(true);
+  const [foto, setFoto] = useState(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [aviso, setAviso] = useState(null);
 
   const cargar = useCallback(async () => {
     if (esNueva) return;
@@ -62,6 +78,7 @@ export default function CanchaScreen({ navigation, route }) {
       setPrecio(String(mia.precio_hora ?? ''));
       setDuracion(mia.duracion_slot_min || 60);
       setActiva(!!mia.activa);
+      setFoto(mia.foto_url || null);
     }
     setCargando(false);
   }, [complejoId, canchaId, esNueva]);
@@ -72,6 +89,38 @@ export default function CanchaScreen({ navigation, route }) {
   const nombreOk = nombre.trim().length > 0;
   const precioOk = Number.isFinite(precioNumero) && precioNumero >= 0 && String(precio).trim() !== '';
   const puedeGuardar = nombreOk && precioOk && !enviando;
+
+  const avisar = (texto) => {
+    setAviso(texto);
+    setTimeout(() => setAviso(null), 3500);
+  };
+
+  const cambiarFoto = async () => {
+    const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.8, base64: false });
+    if (!ok) { if (reason) setError(reason); return; }
+    setSubiendo(true);
+    setError(null);
+
+    const { url, error: errSubida } = await uploadFotoCancha(complejoId, canchaId, asset);
+    if (errSubida) { setSubiendo(false); setError(errSubida.message); return; }
+
+    const { error: err } = await actualizarFotoCancha(canchaId, url);
+    setSubiendo(false);
+    if (err) { setError(err.message); return; }
+    setFoto(url);
+    avisar('Foto de la cancha actualizada. Ya quedó guardada.');
+  };
+
+  const quitarFoto = async () => {
+    setSubiendo(true);
+    // El archivo queda en el bucket a propósito: la ruta lleva el id de la
+    // cancha, así que la próxima foto lo reemplaza. No se acumula nada.
+    const { error: err } = await actualizarFotoCancha(canchaId, null);
+    setSubiendo(false);
+    if (err) { setError(err.message); return; }
+    setFoto(null);
+    avisar('Quitamos la foto de la cancha.');
+  };
 
   const guardar = async () => {
     setEnviando(true);
@@ -140,6 +189,42 @@ export default function CanchaScreen({ navigation, route }) {
                 maxLength={60}
               />
             </Card>
+
+            {!esNueva ? (
+              <Card>
+                <FieldLabel>Foto de la cancha</FieldLabel>
+                <Text style={styles.ayuda}>
+                  Horizontal, de esta cancha en particular. Es la que ve el jugador al elegir; si no
+                  la pones, se muestra la portada del recinto. Se guarda sola apenas la eliges.
+                </Text>
+                {foto ? (
+                  <Image
+                    source={{ uri: foto }}
+                    style={styles.foto}
+                    resizeMode="cover"
+                    accessibilityLabel={`Foto de ${nombre || 'la cancha'}`}
+                  />
+                ) : (
+                  <View style={[styles.foto, styles.fotoVacia]}>
+                    <ImagePlus color={C.textMuted} size={24} strokeWidth={1.7} />
+                    <Text style={styles.fotoVaciaTexto}>Sin foto todavía</Text>
+                  </View>
+                )}
+                <View style={styles.fotoBotones}>
+                  <Button
+                    label={foto ? 'Cambiar foto' : 'Subir foto'}
+                    variant="secondary"
+                    icon={ImagePlus}
+                    loading={subiendo}
+                    onPress={cambiarFoto}
+                    style={{ flex: 1 }}
+                  />
+                  {foto ? (
+                    <IconButton icon={Trash2} onPress={quitarFoto} accessibilityLabel="Quitar la foto" />
+                  ) : null}
+                </View>
+              </Card>
+            ) : null}
 
             <Card>
               <FieldLabel marca={esNueva ? undefined : 'no se puede cambiar'}>Tipo</FieldLabel>
@@ -257,6 +342,7 @@ export default function CanchaScreen({ navigation, route }) {
               </Card>
             ) : null}
 
+            {aviso ? <NoticeCard tone="info" icon={Check}>{aviso}</NoticeCard> : null}
             {error ? <NoticeCard tone="warning" icon={AlertTriangle}>{error}</NoticeCard> : null}
           </View>
         </ScrollView>
@@ -288,6 +374,13 @@ function Cabecera({ navigation, titulo, subtitulo }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
+  foto: { width: '100%', aspectRatio: 16 / 9, borderRadius: R.cardSm, marginTop: 13 },
+  fotoVacia: {
+    alignItems: 'center', justifyContent: 'center', gap: 7,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.dashedBorder, borderStyle: 'dashed',
+  },
+  fotoVaciaTexto: { fontFamily: F.medium, fontSize: 12, color: C.textMuted },
+  fotoBotones: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

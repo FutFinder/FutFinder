@@ -100,6 +100,7 @@ export function comoCancha(fila) {
     nota: notaDeCancha(fila),
     duracionSlotMin: Number(fila.duracion_slot_min) || 60,
     jugadoresHabitual: jugadoresDeTipo(fila.tipo),
+    fotoUrl: fila.foto_url || null,
     base,
     total: base,
   };

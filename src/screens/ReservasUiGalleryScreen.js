@@ -13,6 +13,7 @@ import {
   SectionLabel,
   Sheet,
   Stepper,
+  Foto,
   NoticeCard,
   StickyFooter,
 } from '../components/reservas/ui';
@@ -26,6 +27,10 @@ import { reservas as C, reservasFonts as F } from '../theme/colors';
  * pantallas reales sobre ellas. Sin guard de sesión a propósito: no
  * muestra ni depende de ningún dato de usuario.
  */
+// Un cuadrado verde de 1 px, incrustado. Alcanza para ver que `Foto` pinta la
+// imagen y no el ícono, sin salir a buscar nada a internet.
+const FOTO_DE_EJEMPLO = 'data:image/gif;base64,R0lGODlhAQABAIAAACHFewAAACwAAAAAAQABAAACAkQBADs=';
+
 export default function ReservasUiGalleryScreen({ navigation }) {
   const [chip, setChip] = useState('hoy');
   const [count, setCount] = useState(1);
@@ -74,6 +79,15 @@ export default function ReservasUiGalleryScreen({ navigation }) {
           <Badge label="Requiere Balance" tone="neutral" />
           <Badge label="Pendiente" tone="amber" />
           <Badge label="Rechazado" tone="red" />
+        </View>
+
+        <SectionLabel>Foto</SectionLabel>
+        {/* Las dos formas: con imagen y sin ella. La de la izquierda usa una
+            imagen incrustada para que esta galería no dependa de la red ni de
+            los datos de ningún recinto. */}
+        <View style={[styles.row, styles.gapSm]}>
+          <Foto uri={FOTO_DE_EJEMPLO} style={styles.fotoDemo} alt="Foto de ejemplo" />
+          <Foto style={styles.fotoDemo} />
         </View>
 
         <SectionLabel>Fila de lista</SectionLabel>
@@ -134,6 +148,10 @@ export default function ReservasUiGalleryScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  fotoDemo: {
+    flex: 1, height: 92, borderRadius: 14, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#171A17',
+  },
   root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 20, paddingBottom: 24, gap: 22 },
   header: {

@@ -5,7 +5,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Plus, ChevronRight, AlertTriangle } from 'lucide-react-native';
 
 import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
-import { Card, IconButton, Button, Chip, Badge, NoticeCard, StickyFooter } from '../components/reservas/ui';
+import {
+  Card, IconButton, Button, Chip, Badge, NoticeCard, StickyFooter, Foto,
+} from '../components/reservas/ui';
 import { Skeleton } from '../components/reservas/recintoUi';
 import { canchasDelRecinto } from '../services/recinto';
 import { pluraliza } from '../utils/recintoPantallas';
@@ -108,6 +110,12 @@ export default function CanchasScreen({ navigation, route }) {
             {visibles.map((k) => (
               <Card key={k.id} onPress={() => abrir(k.id)} style={!k.activa && styles.apagada}>
                 <View style={styles.fila}>
+                  <Foto
+                    uri={k.foto_url}
+                    style={styles.miniatura}
+                    iconSize={16}
+                    alt={`Foto de ${k.nombre}`}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.nombre} numberOfLines={1}>{k.nombre}</Text>
                     <Text style={styles.detalle} numberOfLines={1}>
@@ -180,6 +188,11 @@ const styles = StyleSheet.create({
 
   apagada: { opacity: 0.72 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  miniatura: {
+    width: 46, height: 46, borderRadius: 12, flexShrink: 0, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
   nombre: { fontFamily: F.extraBold, fontSize: 16, color: C.textPrimary },
   detalle: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 3 },
   precio: { fontFamily: F.extraBold, fontSize: 15, color: C.textPrimary },

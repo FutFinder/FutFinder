@@ -1,15 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, AlertTriangle, MapPin, ImagePlus, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle, MapPin, ImagePlus, Trash2, X, Check } from 'lucide-react-native';
 
 import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import { Card, IconButton, Button, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { Skeleton, FieldLabel, TextField } from '../components/reservas/recintoUi';
 import {
   misRecintos, actualizarFicha, serviciosDelRecinto, guardarServicios, quitarFotoRecinto,
+  fotosDelRecinto, agregarFotoRecinto, quitarFotoGaleria,
 } from '../services/recinto';
-import { pickImage, uploadComplejoFoto } from '../services/storage';
+import {
+  pickImage, uploadComplejoFoto, uploadFotoGaleria, removeComplejoFotoFile, pathFromPublicUrl,
+} from '../services/storage';
 import { SERVICIOS } from '../utils/serviciosRecinto';
 
 /**
@@ -28,6 +31,18 @@ import { SERVICIOS } from '../utils/serviciosRecinto';
  * que mueve su pin dos comunas para salir en más búsquedas rompe el buscador
  * para todos, así que los cambia el equipo de FutFinder. La RPC ni siquiera
  * los recibe.
+ *
+ * LAS FOTOS SE GUARDAN SOLAS, y por eso el botón «Guardar cambios» no se
+ * enciende al cambiarlas. No es un descuido: subir una foto ya la deja
+ * guardada en el servidor, así que no hay nada que guardar después. Pero un
+ * botón apagado después de hacer algo se lee como «no se guardó», así que
+ * ahora la pantalla lo DICE en vez de dejar que alguien lo deduzca — era
+ * exactamente lo que pasaba cuando se probó.
+ *
+ * LA PORTADA Y LA GALERÍA SON COSAS DISTINTAS (migración 80). La portada es
+ * la única que representa al recinto en el buscador: es UNA y la elige el
+ * recinto. La galería es contexto —camarines, luz de noche, estacionamiento—
+ * y va hasta ocho.
  *
  * LOS SERVICIOS SON UN CATÁLOGO CERRADO, no texto libre (migración 75): con
  * texto libre un recinto escribe «Estacionamiento» y otro «parking», y
@@ -49,11 +64,17 @@ export default function FichaRecintoScreen({ navigation, route }) {
   const [servicios, setServicios] = useState([]);
   const [serviciosGuardados, setServiciosGuardados] = useState([]);
   const [subiendo, setSubiendo] = useState(false);
+  const [galeria, setGaleria] = useState([]);
+  const [subiendoGaleria, setSubiendoGaleria] = useState(false);
+  // Lo que acaba de pasar con las fotos. Se muestra y se va: es un acuse, no
+  // un estado.
+  const [aviso, setAviso] = useState(null);
 
   const cargar = useCallback(async () => {
-    const [{ data, error: err }, { data: servs }] = await Promise.all([
+    const [{ data, error: err }, { data: servs }, { data: fotos }] = await Promise.all([
       misRecintos(),
       serviciosDelRecinto(complejoId),
+      fotosDelRecinto(complejoId),
     ]);
     const mio = (data || []).find((r) => r.id === complejoId) || null;
     setRecinto(mio);
@@ -65,6 +86,7 @@ export default function FichaRecintoScreen({ navigation, route }) {
     }
     setServicios(servs || []);
     setServiciosGuardados(servs || []);
+    setGaleria(fotos || []);
     setCargando(false);
   }, [complejoId]);
 
@@ -83,6 +105,11 @@ export default function FichaRecintoScreen({ navigation, route }) {
   const alternarServicio = (clave) =>
     setServicios((prev) => (prev.includes(clave) ? prev.filter((x) => x !== clave) : [...prev, clave]));
 
+  const avisar = (texto) => {
+    setAviso(texto);
+    setTimeout(() => setAviso(null), 3500);
+  };
+
   const cambiarFoto = async () => {
     const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.8, base64: false });
     if (!ok) { if (reason) setError(reason); return; }
@@ -91,7 +118,8 @@ export default function FichaRecintoScreen({ navigation, route }) {
     const { error: err } = await uploadComplejoFoto(complejoId, asset);
     setSubiendo(false);
     if (err) { setError(err.message); return; }
-    cargar();
+    await cargar();
+    avisar('Portada actualizada. Las fotos se guardan solas, no hace falta guardar nada más.');
   };
 
   const borrarFoto = async () => {
@@ -99,7 +127,41 @@ export default function FichaRecintoScreen({ navigation, route }) {
     const { error: err } = await quitarFotoRecinto(complejoId);
     setSubiendo(false);
     if (err) { setError(err.message); return; }
-    cargar();
+    await cargar();
+    avisar('Quitamos la portada.');
+  };
+
+  const agregarAGaleria = async () => {
+    const { ok, asset, reason } = await pickImage({ aspect: [4, 3], quality: 0.8, base64: false });
+    if (!ok) { if (reason) setError(reason); return; }
+    setSubiendoGaleria(true);
+    setError(null);
+
+    const { url, error: errSubida } = await uploadFotoGaleria(complejoId, asset);
+    if (errSubida) { setSubiendoGaleria(false); setError(errSubida.message); return; }
+
+    const { data, error: err } = await agregarFotoRecinto(complejoId, url);
+    setSubiendoGaleria(false);
+    if (err) { setError(err.message); return; }
+    // El tope de ocho lo aplica el servidor, así que esto puede volver con un
+    // «no» aunque la subida haya salido bien. Se dice, no se ignora.
+    if (data && data.ok === false) { setError(data.reason); return; }
+    await cargar();
+    avisar('Foto agregada. Ya está guardada.');
+  };
+
+  const quitarDeGaleria = async (foto) => {
+    setSubiendoGaleria(true);
+    const { data, error: err } = await quitarFotoGaleria(foto.id);
+    setSubiendoGaleria(false);
+    if (err) { setError(err.message); return; }
+    // El archivo del bucket se borra DESPUÉS y sin bloquear: si esto falla,
+    // la foto ya no se muestra en ninguna parte y lo único que queda es un
+    // archivo suelto. Es mejor que dejar la fila colgada por un error de red.
+    const path = pathFromPublicUrl(data?.url || foto.url, 'complejo-fotos');
+    if (path) removeComplejoFotoFile(path);
+    await cargar();
+    avisar('Foto quitada.');
   };
   const puedeGuardar = nombreOk && cambio && !enviando;
 
@@ -229,8 +291,8 @@ export default function FichaRecintoScreen({ navigation, route }) {
             <Card>
               <FieldLabel>Foto de portada</FieldLabel>
               <Text style={styles.ayuda}>
-                Horizontal, con la cancha completa. Es la primera impresión del recinto en el
-                buscador.
+                Horizontal, con la cancha completa. Es la única que representa al recinto en el
+                buscador. Se guarda sola apenas la eliges: no hace falta tocar «Guardar cambios».
               </Text>
               {recinto.foto_url ? (
                 <Image
@@ -260,6 +322,55 @@ export default function FichaRecintoScreen({ navigation, route }) {
               </View>
             </Card>
 
+            <Card>
+              <FieldLabel>Más fotos del recinto</FieldLabel>
+              <Text style={styles.ayuda}>
+                Hasta ocho. Son las que le muestran al jugador cómo es el lugar: los camarines, la
+                iluminación de noche, el estacionamiento. También se guardan solas.
+              </Text>
+
+              {galeria.length ? (
+                <View style={styles.galeriaGrid}>
+                  {galeria.map((f, i) => (
+                    <View key={f.id} style={styles.galeriaItem}>
+                      <Image
+                        source={{ uri: f.url }}
+                        style={styles.galeriaFoto}
+                        resizeMode="cover"
+                        accessibilityLabel={`Foto ${i + 1} de ${recinto.nombre}`}
+                      />
+                      <Pressable
+                        onPress={() => quitarDeGaleria(f)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Quitar la foto ${i + 1}`}
+                        hitSlop={8}
+                        style={({ pressed }) => [styles.galeriaQuitar, pressed && { opacity: 0.8 }]}
+                      >
+                        <X color={C.textPrimary} size={13} strokeWidth={2.6} />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.galeriaVacia}>
+                  <Text style={styles.fotoVaciaTexto}>Todavía no hay más fotos</Text>
+                </View>
+              )}
+
+              <Button
+                label={galeria.length >= 8 ? 'Ya tienes ocho fotos' : 'Agregar una foto'}
+                variant="secondary"
+                icon={ImagePlus}
+                loading={subiendoGaleria}
+                disabled={galeria.length >= 8}
+                onPress={agregarAGaleria}
+                style={{ marginTop: 12 }}
+              />
+            </Card>
+
+            {aviso ? (
+              <NoticeCard tone="info" icon={Check}>{aviso}</NoticeCard>
+            ) : null}
             {error ? <NoticeCard tone="warning" icon={AlertTriangle}>{error}</NoticeCard> : null}
           </View>
         </ScrollView>
@@ -316,4 +427,23 @@ const styles = StyleSheet.create({
   },
   fotoVaciaTexto: { fontFamily: F.medium, fontSize: 12, color: C.textMuted },
   fotoBotones: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12 },
+
+  galeriaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 13 },
+  // Tres por fila con 8 de separación: 31% deja el margen justo sin tener que
+  // medir el ancho de la pantalla.
+  galeriaItem: { width: '31%', aspectRatio: 4 / 3 },
+  galeriaFoto: {
+    width: '100%', height: '100%', borderRadius: R.cardSm,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
+  galeriaQuitar: {
+    position: 'absolute', top: 5, right: 5,
+    width: 22, height: 22, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(8,10,8,0.86)', borderWidth: 1, borderColor: C.border,
+  },
+  galeriaVacia: {
+    marginTop: 13, paddingVertical: 22, alignItems: 'center', borderRadius: R.cardSm,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.dashedBorder, borderStyle: 'dashed',
+  },
 });

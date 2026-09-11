@@ -63,6 +63,22 @@ Construido hasta ahora (pantallas 1 a 8 del handoff):
 
 **`verify_jwt: true` no garantiza sesión.** Apareció probando esta función sin cuenta: la clave anónima es un JWT válido, la función corre igual y choca con el `grant ... to authenticated` de la RPC. Se traduce ese 42501 a «Inicia sesión para mandarnos tu recinto» en vez de reportarlo como error del servidor.
 
+## Las fotos
+
+**La foto que el recinto subía no la veía nadie** (corregido 2026-09-11). El dato estaba bien de punta a punta —`buscar_complejos` devolvía `foto_url`, `comoComplejoDeLista` lo mapeaba— pero **ninguna pantalla del jugador dibujaba un `<Image>`**: las cinco mostraban un ícono gris de marcador de posición. No era un problema de datos ni de caché: la imagen no estaba puesta. Se resolvió con una primitiva, `Foto` en `components/reservas/ui.js`, que muestra la imagen si la hay y el hueco gris si no, para que la próxima pantalla no nazca con el mismo agujero. Está en la galería de QA (`/ui-reservas`), que es donde se puede comprobar sin sesión.
+
+**«No me deja guardar si solo cambio la foto» no era un bug de guardado: la foto YA estaba guardada.** Subirla llama a `admin_actualizar_complejo` en el momento, así que cuando termina no queda nada pendiente y el botón «Guardar cambios» —que mira nombre, descripción, dirección y servicios— sigue apagado con razón. El problema era que un botón apagado después de hacer algo se lee como «no se guardó». Ahora la pantalla lo dice: la ayuda del campo avisa que se guarda sola y aparece un acuse al terminar. Misma regla para la galería y para la foto de la cancha.
+
+**Tres clases de foto, y son distintas a propósito:**
+
+- **Portada del recinto** (`complejos.foto_url`): una. Es la única que sale en el listado del buscador.
+- **Galería del recinto** (`complejo_fotos`, migración 81): hasta ocho, para que el jugador vea cómo es el lugar. Se muestran deslizables en `ComplejoDetailScreen`, con la portada primero.
+- **Foto de cada cancha** (`canchas_reservables.foto_url`, migración 81): una por cancha. Es la que se ve al elegir cancha y en el resumen; si no está, se cae a la portada del recinto.
+
+**El archivo del bucket se borra después de la fila y sin bloquear.** Si falla, la foto ya no se muestra en ninguna parte y lo único que queda es un archivo suelto — mejor que dejar la fila colgada por un error de red. La foto de la cancha ni siquiera se borra: su ruta lleva el id de la cancha, así que la siguiente la reemplaza.
+
+**Un detalle que estaba mal desde la 75:** la url de la portada terminaba con `?t=1?v=2`, porque `uploadToBucket` ya agrega un parámetro de caché y `uploadComplejoFoto` le sumaba otro con `?` en vez de `&`. No rompía nada visible, pero era una query string malformada; ahora se usa solo la que agrega `uploadToBucket`.
+
 ## La pasarela de pago
 
 **El proveedor es Flow** y la base no lo sabe. La migración 78 creó `pagos` y cuatro RPC (`iniciar_pago_reserva` para quien tiene sesión; `anotar_referencia_pago`, `confirmar_pago` y `rechazar_pago` solo para `service_role`) que hablan de órdenes, montos y estados sin nombrar a ningún proveedor. Todo lo que sabe de Flow vive en `supabase/functions/_shared/flowLogic.ts`, así que cambiar de proveedor es reescribir un archivo.

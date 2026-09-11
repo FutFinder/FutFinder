@@ -280,6 +280,53 @@ export async function quitarFotoRecinto(complejoId) {
   return comoResultadoRecinto(data, error, 'quitarFotoRecinto');
 }
 
+/**
+ * La galería del recinto: las fotos que NO son la portada (migración 80).
+ *
+ * Lectura directa y no RPC: `complejo_fotos_select_publico` deja ver las de un
+ * recinto publicado y `complejo_fotos_select_admin` las del recinto que
+ * administras aunque esté sin publicar, así que la RLS ya hace el filtro. Las
+ * dos policies están partidas a propósito — ver la 76.
+ */
+export async function fotosDelRecinto(complejoId) {
+  if (!isSupabaseConfigured) return { data: [], error: null };
+  if (!complejoId) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('complejo_fotos')
+    .select('id, url, orden')
+    .eq('complejo_id', complejoId)
+    .order('orden')
+    .order('created_at');
+  return comoListaRecinto(data, error, 'fotosDelRecinto');
+}
+
+/** Agrega una foto ya subida a la galería. El tope de ocho lo aplica el servidor. */
+export async function agregarFotoRecinto(complejoId, url) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!complejoId || !url) return { data: null, error: { message: 'Faltan datos' } };
+  const { data, error } = await supabase.rpc('admin_agregar_foto_complejo', {
+    p_complejo_id: complejoId,
+    p_url: url,
+  });
+  return comoResultadoRecinto(data, error, 'agregarFotoRecinto');
+}
+
+/**
+ * Quita una foto de la galería.
+ *
+ * La RPC devuelve la `url` de la foto borrada para que quien llama pueda
+ * borrar también el archivo del bucket; sin eso cada foto quitada dejaría un
+ * archivo huérfano que nadie sabe a quién pertenecía.
+ */
+export async function quitarFotoGaleria(fotoId) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!fotoId) return { data: null, error: { message: 'Falta la foto' } };
+  const { data, error } = await supabase.rpc('admin_quitar_foto_galeria', {
+    p_foto_id: fotoId,
+  });
+  return comoResultadoRecinto(data, error, 'quitarFotoGaleria');
+}
+
 /* ── Canchas ───────────────────────────────────────────────────── */
 
 /** Crea una cancha. `tipo` es `futbol_5`, `futbol_7` o `futbol_11`. */
@@ -715,4 +762,21 @@ export async function quitarAdministrador(complejoId, userId) {
     p_user_id: userId,
   });
   return comoResultadoRecinto(data, error, 'quitarAdministrador');
+}
+
+/**
+ * Pone o quita la foto de una cancha (migración 80).
+ *
+ * `null` la QUITA. Es al revés que en la ficha del recinto, donde un `null`
+ * significa «no cambiar»: acá la función hace una sola cosa, así que llamarla
+ * ya es decir que quieres cambiar la foto.
+ */
+export async function actualizarFotoCancha(canchaId, url) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!canchaId) return { data: null, error: { message: 'Falta la cancha' } };
+  const { data, error } = await supabase.rpc('admin_actualizar_foto_cancha', {
+    p_cancha_id: canchaId,
+    p_foto_url: url ?? null,
+  });
+  return comoResultadoRecinto(data, error, 'actualizarFotoCancha');
 }

@@ -391,8 +391,10 @@ export const removeAvatarBucketFile = (path) => removeFromBucket('avatars', path
  * también castiga a quien la mira desde el celular.
  *
  * `upsert` en el mismo path: cambiar la foto reemplaza la anterior en vez de
- * ir dejando archivos huérfanos. La URL no cambia, así que se le agrega un
- * parámetro con la hora para que el caché no siga mostrando la vieja.
+ * ir dejando archivos huérfanos. Como la ruta no cambia, el caché seguiría
+ * mostrando la vieja; el parámetro con la hora que ya agrega `uploadToBucket`
+ * es el que lo evita — antes se le sumaba OTRO con `?`, lo que dejaba una
+ * query string malformada (`?t=1?v=2`).
  */
 export async function uploadComplejoFoto(complejoId, asset) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
@@ -410,18 +412,80 @@ export async function uploadComplejoFoto(complejoId, asset) {
     return { error };
   }
 
-  const conVersion = `${url}?v=${Date.now()}`;
   const { error: errorFicha } = await supabase.rpc('admin_actualizar_complejo', {
     p_complejo_id: complejoId,
     p_nombre: null,
     p_descripcion: null,
     p_direccion: null,
-    p_foto_url: conVersion,
+    p_foto_url: url,
   });
   if (errorFicha) {
     console.error('[FutFinder] uploadComplejoFoto (ficha):', errorFicha);
     return { error: { message: errorFicha.message || 'La foto se subió pero no se pudo guardar.' } };
   }
 
-  return { url: conVersion };
+  return { url };
 }
+
+/**
+ * Sube una foto a la GALERÍA del recinto (migración 80).
+ *
+ * Ruta `<complejoId>/galeria/<marca>.<ext>`, y esa primera carpeta es lo
+ * único que mira la política de storage de la 75: por eso la galería no
+ * necesitó políticas nuevas.
+ *
+ * A diferencia de la portada, acá el nombre del archivo es único: son varias
+ * fotos y `upsert` en un path fijo las pisaría entre sí. Como el nombre
+ * cambia en cada subida, tampoco hace falta el `?v=` de cache-bust.
+ *
+ * Devuelve también el `path` para poder borrar el archivo cuando la foto se
+ * quite de la galería; si no, cada foto quitada dejaría un archivo huérfano.
+ */
+export async function uploadFotoGaleria(complejoId, asset) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!asset || !complejoId) return { error: { message: 'Faltan datos' } };
+
+  const processed = await resizeAndCompress(asset, { maxDimension: 1600 });
+  const ext = extFromAsset(processed);
+  const marca = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const path = `${complejoId}/galeria/${marca}.${ext}`;
+  const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const body = await getUploadBody(processed);
+  const { error, url } = await uploadToBucket('complejo-fotos', path, body, contentType);
+  if (error) {
+    console.error('[FutFinder] uploadFotoGaleria:', error);
+    return { error };
+  }
+  return { url, path };
+}
+
+/**
+ * Sube la foto de UNA cancha (migración 80).
+ *
+ * Ruta `<complejoId>/canchas/<canchaId>.<ext>`: cuelga del complejo para que
+ * la política de storage la cubra, y lleva el id de la cancha para que
+ * cambiarla reemplace la anterior en vez de ir dejando archivos sueltos. El
+ * `?t=` que ya agrega `uploadToBucket` es el que evita que el caché siga
+ * mostrando la foto anterior.
+ */
+export async function uploadFotoCancha(complejoId, canchaId, asset) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!asset || !complejoId || !canchaId) return { error: { message: 'Faltan datos' } };
+
+  const processed = await resizeAndCompress(asset, { maxDimension: 1600 });
+  const ext = extFromAsset(processed);
+  const path = `${complejoId}/canchas/${canchaId}.${ext}`;
+  const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const body = await getUploadBody(processed);
+  const { error, url } = await uploadToBucket('complejo-fotos', path, body, contentType);
+  if (error) {
+    console.error('[FutFinder] uploadFotoCancha:', error);
+    return { error };
+  }
+  return { url, path };
+}
+
+/** Borra un archivo del bucket `complejo-fotos` por su path. */
+export const removeComplejoFotoFile = (path) => removeFromBucket('complejo-fotos', path);

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Info, Check, Lock } from 'lucide-react-native';
 
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
-import { IconButton, Card, NoticeCard, StickyFooter, Button } from '../components/reservas/ui';
+import { IconButton, Card, NoticeCard, StickyFooter, Button, Foto } from '../components/reservas/ui';
 import { FieldLabel, TextField } from '../components/reservas/recintoUi';
 import { getComplejoById, cobrosDelComplejo, crearReserva } from '../services/reservas';
 import { estadoPasarela } from '../services/pagos';
@@ -144,7 +144,12 @@ export default function ResumenReservaScreen({ navigation, route }) {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.complejoRow}>
-          <View style={styles.thumb} />
+          <Foto
+            uri={cancha?.fotoUrl || complejo?.fotoUrl}
+            style={styles.thumb}
+            iconSize={18}
+            alt={`Foto de ${complejo?.nombre || 'el recinto'}`}
+          />
           <View style={{ flex: 1 }}>
             <Text style={styles.complejoNombre}>{complejo?.nombre}</Text>
             <Text style={styles.complejoDireccion} numberOfLines={1}>{complejo?.direccion}</Text>
@@ -305,7 +310,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 13,
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 22, padding: 14,
   },
-  thumb: { width: 64, height: 64, borderRadius: 16, flexShrink: 0, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border },
+  thumb: {
+    width: 64, height: 64, borderRadius: 16, flexShrink: 0, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
   complejoNombre: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 16 },
   complejoDireccion: { fontFamily: F.medium, color: C.textSecondary, fontSize: 12, marginTop: 4 },
 

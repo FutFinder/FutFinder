@@ -104,6 +104,7 @@ export async function getComplejoById(id) {
     { data: complejo, error: e1 },
     { data: canchas, error: e2 },
     { data: servicios, error: e3 },
+    { data: fotos, error: e4 },
   ] = await Promise.all([
     supabase
       .from('complejos')
@@ -112,7 +113,7 @@ export async function getComplejoById(id) {
       .maybeSingle(),
     supabase
       .from('canchas_reservables')
-      .select('id, nombre, tipo, precio_hora, duracion_slot_min')
+      .select('id, nombre, tipo, precio_hora, duracion_slot_min, foto_url')
       .eq('complejo_id', id)
       .eq('activa', true)
       .order('nombre'),
@@ -120,11 +121,20 @@ export async function getComplejoById(id) {
       .from('complejo_servicios')
       .select('servicio')
       .eq('complejo_id', id),
+    // La galería (migración 80). La portada sigue viniendo en `foto_url` del
+    // complejo: son cosas distintas y la del listado tiene que ser la que el
+    // recinto eligió, no la primera que subió.
+    supabase
+      .from('complejo_fotos')
+      .select('id, url')
+      .eq('complejo_id', id)
+      .order('orden')
+      .order('created_at'),
   ]);
 
-  if (e1 || e2 || e3) {
-    console.error('[FutFinder] getComplejoById:', e1 || e2 || e3);
-    return { data: null, error: { message: (e1 || e2 || e3).message || 'No se pudo cargar el complejo.' } };
+  if (e1 || e2 || e3 || e4) {
+    console.error('[FutFinder] getComplejoById:', e1 || e2 || e3 || e4);
+    return { data: null, error: { message: (e1 || e2 || e3 || e4).message || 'No se pudo cargar el complejo.' } };
   }
   if (!complejo) return { data: null, error: null };
 
@@ -142,6 +152,10 @@ export async function getComplejoById(id) {
       latitud: complejo.latitud,
       longitud: complejo.longitud,
       fotoUrl: complejo.foto_url,
+      // La portada primero y después la galería: es el orden en que se
+      // muestran, y así la primera que ve el jugador es la que el recinto
+      // eligió para representarlo.
+      fotos: [complejo.foto_url, ...(fotos || []).map((f) => f.url)].filter(Boolean),
       // Traducidos y en el orden del catálogo, para que dos recintos con los
       // mismos servicios los muestren igual (migración 75).
       servicios: nombresDeServicios((servicios || []).map((f) => f.servicio)),

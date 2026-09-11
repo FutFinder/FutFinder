@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Image as ImageIcon, MapPin, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, MapPin, AlertTriangle } from 'lucide-react-native';
 
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
-import { Badge, IconButton, NoticeCard, StickyFooter, Button } from '../components/reservas/ui';
+import { Badge, IconButton, NoticeCard, StickyFooter, Button, Foto } from '../components/reservas/ui';
 import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
@@ -63,8 +65,7 @@ export default function ComplejoDetailScreen({ navigation, route }) {
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.photo}>
-          <ImageIcon color={C.textMuted} size={26} strokeWidth={1.6} />
+        <Galeria fotos={complejo.fotos} nombre={complejo.nombre}>
           <IconButton
             icon={ArrowLeft}
             onPress={() => navigation.goBack()}
@@ -74,7 +75,7 @@ export default function ComplejoDetailScreen({ navigation, route }) {
           <View style={styles.photoBell}>
             <NotificationBell />
           </View>
-        </View>
+        </Galeria>
 
         <View style={styles.body}>
           <Text style={styles.nombre}>{complejo.nombre}</Text>
@@ -192,6 +193,52 @@ export default function ComplejoDetailScreen({ navigation, route }) {
   );
 }
 
+/**
+ * Las fotos del recinto, deslizables (migración 80).
+ *
+ * Con una sola foto —o ninguna— se ve exactamente igual que antes: una
+ * imagen a lo ancho, o el hueco gris. El contador solo aparece cuando hay
+ * más de una, porque «1/1» no le dice nada a nadie.
+ *
+ * El ancho sale de `useWindowDimensions` y no de un `flex`, porque
+ * `pagingEnabled` necesita que cada página mida exactamente lo mismo que el
+ * visor; con flex, la foto queda a medio camino entre dos páginas.
+ */
+function Galeria({ fotos = [], nombre, children }) {
+  const { width } = useWindowDimensions();
+  const [indice, setIndice] = useState(0);
+  const lista = fotos.length ? fotos : [null];
+
+  return (
+    <View style={styles.photo}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEnabled={lista.length > 1}
+        onMomentumScrollEnd={(e) =>
+          setIndice(Math.round(e.nativeEvent.contentOffset.x / Math.max(width, 1)))}
+      >
+        {lista.map((uri, i) => (
+          <Foto
+            key={uri || `hueco-${i}`}
+            uri={uri}
+            style={[styles.photoPagina, { width }]}
+            iconSize={26}
+            alt={`Foto ${i + 1} de ${nombre}`}
+          />
+        ))}
+      </ScrollView>
+      {lista.length > 1 ? (
+        <View style={styles.photoContador}>
+          <Text style={styles.photoContadorTexto}>{indice + 1}/{lista.length}</Text>
+        </View>
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: 24 },
@@ -199,9 +246,14 @@ const styles = StyleSheet.create({
   errorText: { fontFamily: F.medium, color: C.textSecondary, fontSize: 13 },
   header: { paddingHorizontal: 16, paddingTop: 10 },
 
-  photo: {
-    height: 250, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center',
+  photo: { height: 250, backgroundColor: C.surfaceAlt },
+  photoPagina: { height: 250, alignItems: 'center', justifyContent: 'center' },
+  photoContador: {
+    position: 'absolute', right: 16, bottom: 12,
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,
+    backgroundColor: 'rgba(8,10,8,0.82)', borderWidth: 1, borderColor: C.border,
   },
+  photoContadorTexto: { fontFamily: F.bold, fontSize: 11, color: C.textPrimary },
   photoBack: { position: 'absolute', top: 12, left: 16 },
   photoBell: { position: 'absolute', top: 12, right: 16 },
 

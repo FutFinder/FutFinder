@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, AlertTriangle } from 'lucide-react-native';
 
 import { reservas as C, reservasFonts as F } from '../theme/colors';
-import { Card, IconButton, Button, StickyFooter, NoticeCard } from '../components/reservas/ui';
+import { Card, IconButton, Button, StickyFooter, NoticeCard, Foto } from '../components/reservas/ui';
 import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
@@ -66,7 +66,12 @@ export default function ElegirCanchaScreen({ navigation, route }) {
               return (
                 <Card key={k.id} selected={on} onPress={() => setSelectedId(k.id)} style={styles.canchaCard}>
                   <View style={styles.canchaRow}>
-                    <View style={styles.thumb} />
+                    <Foto
+                      uri={k.fotoUrl}
+                      style={styles.thumb}
+                      iconSize={20}
+                      alt={`Foto de ${k.nombre}`}
+                    />
                     <View style={{ flex: 1 }}>
                       <View style={styles.nombreRow}>
                         <Text style={styles.nombre}>{k.nombre}</Text>
@@ -116,7 +121,11 @@ const styles = StyleSheet.create({
 
   canchaCard: { padding: 14 },
   canchaRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  thumb: { width: 84, height: 84, borderRadius: 18, flexShrink: 0, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border },
+  thumb: {
+    width: 84, height: 84, borderRadius: 18, flexShrink: 0, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
   nombreRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nombre: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 17, flexShrink: 1 },
   tipoBadge: { height: 24, paddingHorizontal: 9, borderRadius: 999, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
