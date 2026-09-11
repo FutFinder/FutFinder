@@ -14,6 +14,8 @@ El registro **no usa `signUp`**: usa `signInWithOtp` con `shouldCreateUser: true
 
 Una sesión con onboarding completo abre `Main`; una incompleta continúa en ubicación. `AuthProvider` resuelve la sesión antes de montar la navegación y escucha cambios. Una ruta guardada por `withAuthGuard` se consume después del login terminado.
 
+Entre Portada y Crear cuenta/Iniciar sesión hay un carrusel de 5 pasos (`TutorialScreen`, handoff `FutFinder Inicio.dc.html`) que solo se ve una vez por visita: no guarda estado de "ya lo vi", así que quien vuelve a Portada sin sesión lo recorre de nuevo. Se navega con botones y puntos, sin gesto de arrastre (el propio handoff lo deja para después). El botón «Saltar» y, en el último paso, «Ya tengo cuenta» llevan a Login; «Comenzar ahora» en el último paso lleva a Registro.
+
 `authPolicy.js` concentra la decisión de acceso y es lógica pura, sin dependencias de React Native, para poder probarla con `node:test`: el cliente de auth se inyecta.
 
 ## Reglas y permisos
@@ -24,7 +26,7 @@ La creación del perfil depende del trigger `handle_new_user`. La migración 59 
 
 ## Pantallas y dependencias
 
-- Pantallas: `SplashScreen`, `WelcomeScreen`, `LoginScreen`, `RegisterScreen`, `VerificationScreen`, `LocationPermissionScreen`, `TermsScreen` y `SuccessScreen`.
+- Pantallas: `SplashScreen`, `WelcomeScreen`, `TutorialScreen`, `LoginScreen`, `RegisterScreen`, `VerificationScreen`, `LocationPermissionScreen`, `TermsScreen` y `SuccessScreen`.
 - Código: `src/services/authPolicy.js` (política pura), `src/services/auth.js`, `src/services/profile.js`, `src/contexts/AuthContext.js`, `src/navigation/withAuthGuard.js` y `src/utils/routing.js`.
 - Backend: Supabase Auth, `profiles` y el trigger del esquema.
 

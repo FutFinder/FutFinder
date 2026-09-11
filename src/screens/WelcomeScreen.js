@@ -230,9 +230,7 @@ export default function WelcomeScreen({ navigation }) {
             style={{ flex: 1 }}
           />
         </View>
-        <Button label="Comenzar ahora" onPress={() => navigation.navigate('Register')} />
-        <View style={{ height: 10 }} />
-        <Button label="Ya tengo cuenta" variant="secondary" onPress={() => navigation.navigate('Login')} />
+        <Button label="Siguiente" onPress={() => navigation.navigate('Tutorial')} />
         <Text style={styles.legal}>
           Al continuar aceptas nuestros{' '}
           <Text style={styles.legalLink} onPress={() => openURL(TERMS_URL)}>Términos</Text>

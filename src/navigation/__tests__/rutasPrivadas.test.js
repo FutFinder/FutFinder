@@ -32,6 +32,7 @@ const FUENTE = fs.readFileSync(
 const PUBLICAS = new Set([
   'Splash',
   'Welcome',
+  'Tutorial',
   'Login',
   'Register',
   'Verification',
