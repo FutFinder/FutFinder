@@ -130,19 +130,19 @@ export default function FichaRecintoScreen({ navigation, route }) {
     if (!ok) { if (reason) setError(reason); return; }
     setError(null);
     if (!queSobra(asset.width, asset.height, PROPORCION_PORTADA)) {
-      subirFoto(destino, asset, 'centro');
+      subirFoto(destino, asset, 0.5);
       return;
     }
     setPendiente({ asset, destino });
   };
 
-  const subirFoto = async (destino, asset, anclaje) => {
+  const subirFoto = async (destino, asset, posicion) => {
     const enGaleria = destino === 'galeria';
     const marcar = enGaleria ? setSubiendoGaleria : setSubiendo;
     marcar(true);
 
     if (enGaleria) {
-      const { url, error: errSubida } = await uploadFotoGaleria(complejoId, asset, { anclaje });
+      const { url, error: errSubida } = await uploadFotoGaleria(complejoId, asset, { posicion });
       if (errSubida) { marcar(false); setPendiente(null); setError(errSubida.message); return; }
       const { data, error: err } = await agregarFotoRecinto(complejoId, url);
       marcar(false);
@@ -156,7 +156,7 @@ export default function FichaRecintoScreen({ navigation, route }) {
       return;
     }
 
-    const { error: err } = await uploadComplejoFoto(complejoId, asset, { anclaje });
+    const { error: err } = await uploadComplejoFoto(complejoId, asset, { posicion });
     marcar(false);
     setPendiente(null);
     if (err) { setError(err.message); return; }
@@ -413,7 +413,7 @@ export default function FichaRecintoScreen({ navigation, route }) {
         asset={pendiente?.asset}
         guardando={subiendo || subiendoGaleria}
         onCancelar={() => setPendiente(null)}
-        onConfirmar={(anclaje) => subirFoto(pendiente.destino, pendiente.asset, anclaje)}
+        onConfirmar={(posicion) => subirFoto(pendiente.destino, pendiente.asset, posicion)}
       />
     </SafeAreaView>
   );

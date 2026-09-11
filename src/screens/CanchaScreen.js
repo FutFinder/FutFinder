@@ -110,15 +110,15 @@ export default function CanchaScreen({ navigation, route }) {
     if (!ok) { if (reason) setError(reason); return; }
     setError(null);
     if (!queSobra(asset.width, asset.height, PROPORCION_PORTADA)) {
-      subirFoto(asset, 'centro');
+      subirFoto(asset, 0.5);
       return;
     }
     setPendiente(asset);
   };
 
-  const subirFoto = async (asset, anclaje) => {
+  const subirFoto = async (asset, posicion) => {
     setSubiendo(true);
-    const { url, error: errSubida } = await uploadFotoCancha(complejoId, canchaId, asset, { anclaje });
+    const { url, error: errSubida } = await uploadFotoCancha(complejoId, canchaId, asset, { posicion });
     if (errSubida) { setSubiendo(false); setPendiente(null); setError(errSubida.message); return; }
 
     const { error: err } = await actualizarFotoCancha(canchaId, url);
@@ -371,7 +371,7 @@ export default function CanchaScreen({ navigation, route }) {
         asset={pendiente}
         guardando={subiendo}
         onCancelar={() => setPendiente(null)}
-        onConfirmar={(anclaje) => subirFoto(pendiente, anclaje)}
+        onConfirmar={(posicion) => subirFoto(pendiente, posicion)}
       />
 
       <StickyFooter>

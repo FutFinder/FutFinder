@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, Pressable } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, Text, Image, StyleSheet, Pressable, PanResponder } from 'react-native';
 
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../../theme/colors';
 import { Sheet, Button } from './ui';
 import {
-  ANCLAJES, PROPORCION_PORTADA, encuadreEnCaja, nombreDeAnclaje, queSobra,
+  POSICIONES, PROPORCION_PORTADA, encuadreEnCaja, nombreDePosicion,
+  posicionTrasArrastre, queSobra, recorridoDeArrastre,
 } from '../../utils/encuadre';
 
 /**
@@ -12,50 +13,87 @@ import {
  *
  * POR QUÉ EXISTE. Las fotos del recinto se muestran en cajas horizontales y
  * nadie saca fotos horizontales: una cámara de teléfono da 4:3 acostada o 3:4
- * parada. En 16:9, una foto parada conserva el 42 % de su alto — y hasta acá
- * ese 42 % lo elegía el programa por el medio, así que una cancha fotografiada
- * desde la galería terminaba siendo una franja de gradas.
+ * parada. En 16:9, una foto parada conserva el 42 % de su alto — y ese 42 % lo
+ * elegía el programa por el medio, así que una cancha fotografiada de pie
+ * terminaba siendo una franja de gradas.
  *
- * TRES OPCIONES Y NO UN RECORTE LIBRE, a propósito. Lo único que hay que
- * decidir es con qué tercio quedarse; un recorte con gestos obliga a resolver
- * arrastres en web y en teléfono, y para esta decisión no agrega nada.
+ * SE ARRASTRA LA FOTO, Y LOS TRES BOTONES SON ATAJOS. Primero esto ofrecía
+ * solo arriba/centro/abajo; sirve para salir del paso pero no para dejar algo
+ * bien encuadrado, y encuadrar es justamente lo que se está haciendo acá. El
+ * recorte tiene un único grado de libertad —el rectángulo siempre ocupa todo
+ * el ancho y tiene la proporción de destino— así que «personalizar» es mover
+ * un número entre 0 y 1, y el arrastre y los botones escriben en el mismo.
  *
  * LA VISTA PREVIA NO ES UNA APROXIMACIÓN. Sale de `encuadreEnCaja`, que hace
  * la misma cuenta que el recorte real pero en porcentajes, y hay una prueba
- * que compara las dos: si se separan, la persona elegiría una cosa y se
- * guardaría otra.
+ * que compara las dos sobre posiciones sueltas, no solo sobre los atajos: si
+ * se separan, la persona encuadra una cosa y se guarda otra.
  *
- * NADA SE MIDE. La primera versión medía la caja con `onLayout` para calcular
- * desplazamientos en píxeles, y adentro de un modal esa medición a veces no
- * llegaba nunca: la vista previa quedaba vacía sin decir por qué. En
- * porcentajes la caja ya tiene su proporción fijada y no hay qué esperar.
+ * LO ÚNICO QUE SE MIDE ES PARA EL ARRASTRE. El dibujo va en porcentajes y no
+ * necesita medición —medirlo dentro de un modal a veces no llegaba nunca y la
+ * hoja quedaba vacía— pero el gesto viene en píxeles y hay que traducirlo. Si
+ * la medición todavía no llegó, el recorrido es 0, el arrastre no hace nada y
+ * los atajos siguen funcionando.
  */
 export default function EncuadreSheet({ visible, asset, onCancelar, onConfirmar, guardando }) {
-  const [anclaje, setAnclaje] = useState('centro');
+  const [posicion, setPosicion] = useState(0.5);
+  const [caja, setCaja] = useState({ ancho: 0, alto: 0 });
 
-  // Lo que sobra decide los nombres: en una foto parada se elige entre arriba
-  // y abajo; en una panorámica, entre izquierda y derecha.
-  const orientacion = queSobra(asset?.width, asset?.height, PROPORCION_PORTADA) || 'vertical';
-  const enc = encuadreEnCaja(asset?.width, asset?.height, PROPORCION_PORTADA, anclaje);
+  // El PanResponder se arma una sola vez, así que no puede leer el estado
+  // directamente: leería el de la primera vuelta. Estas referencias son lo que
+  // mira durante el gesto.
+  const posRef = useRef(0.5);
+  const inicioRef = useRef(0.5);
+  const datosRef = useRef({ asset: null, caja: { ancho: 0, alto: 0 } });
+  datosRef.current = { asset, caja };
+
+  const sobra = queSobra(asset?.width, asset?.height, PROPORCION_PORTADA);
+  const orientacion = sobra || 'vertical';
+
+  const mover = (posicionNueva) => {
+    posRef.current = posicionNueva;
+    setPosicion(posicionNueva);
+  };
+
+  const arrastre = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => { inicioRef.current = posRef.current; },
+    onPanResponderMove: (_evt, gesto) => {
+      const { asset: a, caja: k } = datosRef.current;
+      const eje = queSobra(a?.width, a?.height, PROPORCION_PORTADA);
+      if (!eje) return;
+      const ladoCaja = eje === 'vertical' ? k.alto : k.ancho;
+      const recorrido = recorridoDeArrastre(a?.width, a?.height, PROPORCION_PORTADA, ladoCaja);
+      const desplazamiento = eje === 'vertical' ? gesto.dy : gesto.dx;
+      const nueva = posicionTrasArrastre(inicioRef.current, desplazamiento, recorrido);
+      posRef.current = nueva;
+      setPosicion(nueva);
+    },
+  }), []);
+
+  const enc = encuadreEnCaja(asset?.width, asset?.height, PROPORCION_PORTADA, posicion);
 
   return (
     <Sheet visible={visible} onClose={onCancelar} title="¿Qué parte se ve?">
       <Text style={styles.ayuda}>
-        La foto se muestra horizontal, así que hay que sacarle un poco. Elige con qué parte te
-        quedas: esto es exactamente lo que va a ver el jugador.
+        {sobra === 'horizontal'
+          ? 'La foto es más ancha que el espacio. Arrástrala de lado para acomodarla: esto es exactamente lo que va a ver el jugador.'
+          : 'La foto es más alta que el espacio. Arrástrala para acomodarla: esto es exactamente lo que va a ver el jugador.'}
       </Text>
 
-      <View style={styles.caja}>
+      <View
+        style={styles.caja}
+        onLayout={(e) => setCaja({
+          ancho: e.nativeEvent.layout.width,
+          alto: e.nativeEvent.layout.height,
+        })}
+        {...arrastre.panHandlers}
+      >
         {asset?.uri ? (
           <Image
             source={{ uri: asset.uri }}
-            style={{
-              position: 'absolute',
-              left: enc.x,
-              top: enc.y,
-              width: enc.ancho,
-              height: enc.alto,
-            }}
+            style={{ position: 'absolute', left: enc.x, top: enc.y, width: enc.ancho, height: enc.alto }}
             resizeMode="cover"
             accessibilityLabel="Vista previa del encuadre"
           />
@@ -63,18 +101,20 @@ export default function EncuadreSheet({ visible, asset, onCancelar, onConfirmar,
       </View>
 
       <View style={styles.opciones}>
-        {ANCLAJES.map((a) => {
-          const on = a === anclaje;
+        {POSICIONES.map((op) => {
+          // Se marca solo si la posición cae justo en el atajo. Después de
+          // arrastrar no queda ninguno encendido, que es la verdad.
+          const on = Math.abs(posicion - op.valor) < 0.001;
           return (
             <Pressable
-              key={a}
-              onPress={() => setAnclaje(a)}
-              accessibilityRole="radio"
+              key={op.clave}
+              onPress={() => mover(op.valor)}
+              accessibilityRole="button"
               accessibilityState={{ selected: on }}
               style={({ pressed }) => [styles.opcion, on && styles.opcionOn, pressed && { opacity: 0.9 }]}
             >
               <Text style={[styles.opcionTexto, on && styles.opcionTextoOn]}>
-                {nombreDeAnclaje(a, orientacion)}
+                {nombreDePosicion(op.clave, orientacion)}
               </Text>
             </Pressable>
           );
@@ -84,7 +124,7 @@ export default function EncuadreSheet({ visible, asset, onCancelar, onConfirmar,
       <Button
         label="Usar esta foto"
         loading={guardando}
-        onPress={() => onConfirmar(anclaje)}
+        onPress={() => onConfirmar(posicion)}
         style={{ marginTop: 14 }}
       />
       <Button

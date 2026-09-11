@@ -403,13 +403,13 @@ export const removeAvatarBucketFile = (path) => removeFromBucket('avatars', path
  * es el que lo evita — antes se le sumaba OTRO con `?`, lo que dejaba una
  * query string malformada (`?t=1?v=2`).
  */
-export async function uploadComplejoFoto(complejoId, asset, { anclaje = 'centro' } = {}) {
+export async function uploadComplejoFoto(complejoId, asset, { posicion = 0.5 } = {}) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   if (!asset || !complejoId) return { error: { message: 'Faltan datos' } };
 
   const processed = await resizeAndCompress(asset, {
     maxDimension: 1600,
-    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, anclaje),
+    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, posicion),
   });
   const ext = extFromAsset(processed);
   const path = `${complejoId}/portada.${ext}`;
@@ -451,13 +451,13 @@ export async function uploadComplejoFoto(complejoId, asset, { anclaje = 'centro'
  * Devuelve también el `path` para poder borrar el archivo cuando la foto se
  * quite de la galería; si no, cada foto quitada dejaría un archivo huérfano.
  */
-export async function uploadFotoGaleria(complejoId, asset, { anclaje = 'centro' } = {}) {
+export async function uploadFotoGaleria(complejoId, asset, { posicion = 0.5 } = {}) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   if (!asset || !complejoId) return { error: { message: 'Faltan datos' } };
 
   const processed = await resizeAndCompress(asset, {
     maxDimension: 1600,
-    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, anclaje),
+    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, posicion),
   });
   const ext = extFromAsset(processed);
   const marca = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -482,13 +482,13 @@ export async function uploadFotoGaleria(complejoId, asset, { anclaje = 'centro' 
  * `?t=` que ya agrega `uploadToBucket` es el que evita que el caché siga
  * mostrando la foto anterior.
  */
-export async function uploadFotoCancha(complejoId, canchaId, asset, { anclaje = 'centro' } = {}) {
+export async function uploadFotoCancha(complejoId, canchaId, asset, { posicion = 0.5 } = {}) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   if (!asset || !complejoId || !canchaId) return { error: { message: 'Faltan datos' } };
 
   const processed = await resizeAndCompress(asset, {
     maxDimension: 1600,
-    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, anclaje),
+    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, posicion),
   });
   const ext = extFromAsset(processed);
   const path = `${complejoId}/canchas/${canchaId}.${ext}`;
