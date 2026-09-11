@@ -33,6 +33,7 @@ const PUBLICAS = new Set([
   'Splash',
   'Welcome',
   'Login',
+  'Register',
   'Verification',
   'LocationPermission',
   'Terms',

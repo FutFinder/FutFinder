@@ -1,6 +1,6 @@
 # Autenticación
 
-Última revisión: 2026-08-27
+Última revisión: 2026-09-10
 
 ## Propósito
 
@@ -8,7 +8,7 @@ Crear o iniciar una sesión por correo, confirmar cuentas y encaminar al usuario
 
 ## Flujos actuales
 
-Iniciar sesión y registrarse son acciones separadas del mismo formulario, elegidas con el enlace inferior (`mode` en `LoginScreen`). El login solo llama a `signInWithPassword`: nunca cae a registro.
+Iniciar sesión y registrarse son pantallas separadas (`LoginScreen` y `RegisterScreen`, handoff `Bienvenida.dc.html`), no un mismo formulario con modo. El login solo llama a `signInWithPassword`: nunca cae a registro.
 
 El registro **no usa `signUp`**: usa `signInWithOtp` con `shouldCreateUser: true`, así que crea la cuenta sin contraseña usable y manda un código de 6 dígitos. La contraseña escrita queda en memoria (`pendingSignUp.js`, de un solo uso, nunca en disco ni en parámetros de navegación) y se fija con `updateUser` recién después de verificar el código (`completeSignUpPassword`). Sin acceso al buzón no hay código, no hay sesión y no hay contraseña: la cuenta no sirve ni para registrarse ni para iniciar sesión después.
 
@@ -24,13 +24,13 @@ La creación del perfil depende del trigger `handle_new_user`. La migración 59 
 
 ## Pantallas y dependencias
 
-- Pantallas: `SplashScreen`, `WelcomeScreen`, `LoginScreen`, `VerificationScreen`, `LocationPermissionScreen`, `TermsScreen` y `SuccessScreen`.
+- Pantallas: `SplashScreen`, `WelcomeScreen`, `LoginScreen`, `RegisterScreen`, `VerificationScreen`, `LocationPermissionScreen`, `TermsScreen` y `SuccessScreen`.
 - Código: `src/services/authPolicy.js` (política pura), `src/services/auth.js`, `src/services/profile.js`, `src/contexts/AuthContext.js`, `src/navigation/withAuthGuard.js` y `src/utils/routing.js`.
 - Backend: Supabase Auth, `profiles` y el trigger del esquema.
 
 ## Estados, errores y problemas conocidos
 
-Login valida correo/contraseña, traduce los errores de Auth a mensajes propios y ofrece reenvío de OTP. Un correo inexistente y una contraseña incorrecta reciben el mismo mensaje, para no permitir averiguar qué correos están registrados. La guarda cubre `Main` y las pantallas operativas del stack; `LocationPermission`, `Terms` y `Success` quedan públicas a propósito (son el onboarding posterior al registro, no exponen datos y no están en la config de deep links), igual que la galería de QA `ReservasUiGallery`. Las opciones visuales de Google y Apple, y el enlace de contraseña olvidada, no tienen acción implementada.
+Login valida correo/contraseña, traduce los errores de Auth a mensajes propios y ofrece reenvío de OTP. Un correo inexistente y una contraseña incorrecta reciben el mismo mensaje, para no permitir averiguar qué correos están registrados. La guarda cubre `Main` y las pantallas operativas del stack; `LocationPermission`, `Terms` y `Success` quedan públicas a propósito (son el onboarding posterior al registro, no exponen datos y no están en la config de deep links), igual que la galería de QA `ReservasUiGallery`. El enlace «¿La olvidaste?» de `LoginScreen` sí llama a `requestPasswordResetForEmail` (real). Las opciones visuales de Google y Apple, en `RegisterScreen`, muestran un aviso «muy pronto» y no tienen acción implementada.
 
 La confirmación de correo está **desactivada** en el proyecto de Supabase: `signUp` autoconfirma y emite sesión al instante, y una cuenta creada así queda confirmada para siempre, así que después sirve para iniciar sesión con su contraseña. Por eso el registro dejó de usar `signUp`: ninguna validación en el cliente puede tapar eso. El camino OTP no depende de ese ajuste.
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,65 +10,71 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, Eye, EyeOff, Check } from 'lucide-react-native';
 
-import Logo from '../components/Logo';
-import Button from '../components/Button';
-import { colors, radius } from '../theme/colors';
-import { loginWithEmail, registerWithEmail } from '../services/auth';
-import {
-  validateCredentials,
-  decideAuthDestination,
-  MENSAJES,
-  MIN_PASSWORD_SIGNUP,
-} from '../services/authPolicy';
+import FutfinderMark from '../components/FutfinderMark';
+import Banner from '../components/Banner';
+import { Card, IconButton, Button } from '../components/reservas/ui';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { loginWithEmail, requestPasswordResetForEmail, getCurrentProfile } from '../services/auth';
+import { decideAuthDestination, MENSAJES } from '../services/authPolicy';
 import { getOnboardingState } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { APP_VERSION } from '../utils/appVersion';
+import { getRememberedAccount, saveRememberedAccount } from '../utils/rememberedAccount';
+
+function inicialDe(texto) {
+  const t = (texto || '').trim();
+  return t ? t[0].toUpperCase() : '?';
+}
 
 /**
- * Iniciar sesión y registrarse son dos acciones distintas en la misma
- * pantalla, elegidas con el enlace de abajo (`mode`). Antes eran una sola:
- * un login que fallaba caía a `signUp`, y como Supabase autoconfirma cuando
- * la confirmación de correo está desactivada, cualquier correo inventado
- * entraba a la app creando una cuenta real de paso. Ahora el login solo
- * inicia sesión, y solo se navega a una ruta privada si Supabase devolvió
- * una sesión usable.
+ * Iniciar sesión y registrarse son pantallas separadas (esta y `Register`).
+ * Antes eran una sola: un login que fallaba caía a `signUp`, y como Supabase
+ * autoconfirma cuando la confirmación de correo está desactivada, cualquier
+ * correo inventado entraba a la app creando una cuenta real de paso. Ahora el
+ * login solo inicia sesión, y solo se navega a una ruta privada si Supabase
+ * devolvió una sesión usable.
  */
 export default function LoginScreen({ navigation }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(null);
+  const [resetting, setResetting] = useState(false);
+  const [banner, setBanner] = useState(null);
+  const [remembered, setRemembered] = useState(null);
   const { consumePendingDestination } = useAuth();
 
-  const isSignUp = mode === 'signup';
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const acc = await getRememberedAccount();
+      if (!cancelled && acc) {
+        setRemembered(acc);
+        setIdentifier(acc.email);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-  const toggleMode = () => {
-    setMode(isSignUp ? 'login' : 'signup');
-    setErrorMsg(null);
-  };
+  const showBanner = (type, title, message = '') => setBanner({ type, title, message });
 
-  const handleSubmit = async () => {
-    setErrorMsg(null);
+  const handleLogin = async () => {
+    setBanner(null);
 
-    // Los campos vacíos o mal escritos no se envían al proveedor.
-    const check = validateCredentials({ email, password, mode });
-    if (!check.valid) {
-      setErrorMsg(check.message);
+    const email = identifier.trim();
+    if (!email.includes('@') || !password) {
+      showBanner('error', 'Datos incompletos', 'Ingresa tu correo y tu contraseña.');
       return;
     }
 
     setLoading(true);
-    const result = isSignUp
-      ? await registerWithEmail({ email, password })
-      : await loginWithEmail({ email, password });
+    const result = await loginWithEmail({ email, password });
     setLoading(false);
 
     if (result.error) {
-      setErrorMsg(result.error.message || MENSAJES.inesperado);
+      showBanner('error', 'No pudimos iniciar sesión', result.error.message || MENSAJES.inesperado);
       return;
     }
 
@@ -88,9 +94,12 @@ export default function LoginScreen({ navigation }) {
 
     // Sin sesión usable no se entra, pase lo que pase.
     if (destino === 'login') {
-      setErrorMsg(MENSAJES.credencialesInvalidas);
+      showBanner('error', 'No pudimos iniciar sesión', MENSAJES.credencialesInvalidas);
       return;
     }
+
+    const profile = await getCurrentProfile();
+    await saveRememberedAccount({ email, username: profile?.username || remembered?.username });
 
     if (destino === 'onboarding') {
       navigation.navigate('LocationPermission');
@@ -110,131 +119,133 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    const email = identifier.trim();
+    if (!email.includes('@')) {
+      showBanner('error', 'Falta tu correo', 'Escribe tu correo arriba para enviarte el enlace de recuperación.');
+      return;
+    }
+    setResetting(true);
+    const { error } = await requestPasswordResetForEmail(email);
+    setResetting(false);
+    if (error) {
+      showBanner('error', 'No se pudo enviar el correo', error.message || '');
+      return;
+    }
+    showBanner('success', 'Revisa tu bandeja', `Te enviamos un enlace para recuperar tu contraseña a ${email}.`);
+  };
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.root}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.root}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <Pressable
-              onPress={() => navigation.goBack()}
-              hitSlop={12}
-              style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-            >
-              <ArrowLeft color={colors.textPrimary} size={22} />
-            </Pressable>
-            <View style={styles.logoCenter}>
-              <Logo size={32} />
+            <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+            <View style={styles.brandRow}>
+              <FutfinderMark size={22} color={C.green} />
+              <Text style={styles.brandText}>fut<Text style={{ color: C.green }}>finder</Text></Text>
             </View>
             <View style={{ width: 40 }} />
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.title}>
-              {isSignUp ? 'Crear tu cuenta' : 'Iniciar sesión'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isSignUp
-                ? 'Te enviaremos un código a tu correo para confirmarlo'
-                : 'Accede a partidos cerca de ti en minutos'}
-            </Text>
+          {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-            <Text style={styles.label}>Correo electrónico</Text>
+          <Text style={styles.title}>Qué bueno verte{'\n'}de vuelta</Text>
+
+          {remembered && (
+            <Pressable
+              onPress={() => setIdentifier(remembered.email)}
+              style={styles.rememberedRow}
+              accessibilityRole="button"
+              accessibilityLabel={`Usar la cuenta guardada ${remembered.email}`}
+            >
+              <View style={styles.rememberedAvatar}>
+                <Text style={styles.rememberedAvatarText}>{inicialDe(remembered.username || remembered.email)}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rememberedName} numberOfLines={1}>
+                  {remembered.username ? `@${remembered.username}` : remembered.email}
+                </Text>
+                <Text style={styles.rememberedEmail} numberOfLines={1}>{remembered.email}</Text>
+              </View>
+              <View style={styles.rememberedBadge}>
+                <Text style={styles.rememberedBadgeText}>GUARDADA</Text>
+              </View>
+            </Pressable>
+          )}
+
+          <Card style={{ marginTop: remembered ? 11 : 20 }}>
+            <Text style={styles.fieldLabel}>Correo electrónico</Text>
             <TextInput
               style={styles.input}
-              placeholder="tu@email.com"
-              placeholderTextColor={colors.textMuted}
-              value={email}
-              onChangeText={setEmail}
+              placeholder="tu@correo.cl"
+              placeholderTextColor={C.textMuted}
+              value={identifier}
+              onChangeText={setIdentifier}
               keyboardType="email-address"
               autoCapitalize="none"
-              autoComplete="email"
+              autoCorrect={false}
             />
 
-            <Text style={[styles.label, { marginTop: 16 }]}>Contraseña</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="••••••••"
-              placeholderTextColor={colors.textMuted}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete={isSignUp ? 'new-password' : 'password'}
-            />
-
-            {isSignUp && (
-              <Text style={styles.hintPassword}>
-                Usa al menos {MIN_PASSWORD_SIGNUP} caracteres.
+            <View style={styles.passwordLabelRow}>
+              <Text style={styles.fieldLabel}>Contraseña</Text>
+              <Text
+                style={[styles.forgotLink, resetting && { opacity: 0.5 }]}
+                onPress={resetting ? undefined : handleForgotPassword}
+              >
+                {resetting ? 'Enviando…' : '¿La olvidaste?'}
               </Text>
-            )}
+            </View>
+            <View style={styles.passwordRow}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Tu contraseña"
+                placeholderTextColor={C.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+              <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
+                {showPassword ? (
+                  <EyeOff color={C.textMuted} size={18} strokeWidth={1.8} />
+                ) : (
+                  <Eye color={C.textMuted} size={18} strokeWidth={1.8} />
+                )}
+              </Pressable>
+            </View>
 
-            {errorMsg && (
-              <View style={styles.errorBox}>
-                <AlertCircle color={colors.error} size={16} />
-                <Text style={styles.errorText}>{errorMsg}</Text>
+            {/* Esta app siempre mantiene la sesión abierta entre usos
+                (`persistSession: true` en services/supabase.js) — no hay
+                una vía para cerrarla "salvo esta vez", así que el control
+                se muestra fijo en vez de fingir que se puede desactivar. */}
+            <View style={styles.keepSessionRow}>
+              <View style={[styles.checkbox, styles.checkboxOn]}>
+                <Check color={C.textOnGreen} size={13} strokeWidth={3} />
               </View>
-            )}
+              <Text style={styles.keepSessionText}>Mantener mi sesión abierta</Text>
+            </View>
+          </Card>
 
-            <View style={{ height: 18 }} />
-
+          <View style={{ marginTop: 22, gap: 10 }}>
             <Button
-              label={loading ? 'Conectando…' : isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}
-              variant="primary"
+              label={loading ? 'Ingresando…' : 'Iniciar sesión'}
+              onPress={handleLogin}
               loading={loading}
-              onPress={handleSubmit}
             />
-
-            <View style={styles.linksRow}>
-              {!isSignUp && (
-                <Pressable hitSlop={8}>
-                  <Text style={styles.linkSmall}>¿Olvidaste tu contraseña?</Text>
-                </Pressable>
-              )}
-              <Pressable hitSlop={8} onPress={toggleMode}>
-                <Text style={styles.linkSmallMuted}>
-                  {isSignUp ? '¿Ya tienes cuenta? ' : '¿No tienes cuenta? '}
-                  <Text style={styles.linkSmall}>
-                    {isSignUp ? 'Inicia sesión' : 'Regístrate'}
-                  </Text>
-                </Text>
-              </Pressable>
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>¿Aún no tienes cuenta?</Text>
+              <Text style={styles.footerLink} onPress={() => navigation.navigate('Register')}> Regístrate</Text>
             </View>
-
-            <View style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>o continúa con</Text>
-              <View style={styles.divider} />
-            </View>
-
-            <View style={styles.socialRow}>
-              <Pressable
-                style={({ pressed }) => [styles.socialBtn, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.socialLabel}>Google</Text>
-              </Pressable>
-              <View style={{ width: 12 }} />
-              <Pressable
-                style={({ pressed }) => [styles.socialBtn, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.socialLabel}>Apple</Text>
-              </Pressable>
-            </View>
-
-            {!isSupabaseConfigured && (
-              <Text style={styles.demoBanner}>
-                ⚠️ Faltan las variables de entorno de Supabase, así que no se
-                puede iniciar sesión. Revisa el archivo .env.
-              </Text>
-            )}
           </View>
 
-          <Text style={styles.footer}>FUTFINDER{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
+          {!isSupabaseConfigured && (
+            <Text style={styles.demoHint}>
+              ⚠️ Faltan las variables de entorno de Supabase, así que no se
+              puede iniciar sesión. Revisa el archivo .env.
+            </Text>
+          )}
+
+          <View style={{ height: 24 }} />
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -242,141 +253,60 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+  root: { flex: 1, backgroundColor: C.bg },
+  scroll: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 24, flexGrow: 1 },
+
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  brandText: { fontFamily: F.extraBold, fontSize: 17, color: C.textPrimary, letterSpacing: -0.4 },
+
+  title: { fontFamily: F.extraBold, fontSize: 27, lineHeight: 32, color: C.textPrimary, letterSpacing: -0.6, marginTop: 18 },
+
+  rememberedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: R.row,
+    paddingHorizontal: 14, paddingVertical: 13, marginTop: 20,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+  rememberedAvatar: {
+    width: 42, height: 42, borderRadius: 14, flexShrink: 0,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  logoCenter: { flex: 1, alignItems: 'center' },
-  card: {
-    marginTop: 12,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.xl,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
+  rememberedAvatarText: { fontFamily: F.extraBold, fontSize: 15, color: C.textSecondary },
+  rememberedName: { fontFamily: F.extraBold, fontSize: 14, color: C.textPrimary },
+  rememberedEmail: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary, marginTop: 3 },
+  rememberedBadge: {
+    height: 24, paddingHorizontal: 9, borderRadius: 999, flexShrink: 0,
+    backgroundColor: C.shieldBg, borderWidth: 1, borderColor: C.greenDeepBorder,
+    alignItems: 'center', justifyContent: 'center',
   },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  subtitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 4,
-    marginBottom: 22,
-  },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginBottom: 6,
-    fontWeight: '500',
-  },
+  rememberedBadgeText: { fontFamily: F.extraBold, fontSize: 9.5, letterSpacing: 0.6, color: C.green },
+
+  fieldLabel: { fontFamily: F.bold, color: C.textSecondary, fontSize: 12 },
   input: {
-    height: 50,
-    borderRadius: radius.md,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    color: colors.textPrimary,
-    fontSize: 15,
+    height: 48, marginTop: 9, paddingHorizontal: 14, borderRadius: R.iconBtn,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+    color: C.textPrimary, fontFamily: F.bold, fontSize: 14.5,
   },
-  hintPassword: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 6,
+  passwordLabelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 15 },
+  forgotLink: { fontFamily: F.bold, fontSize: 11.5, color: C.green },
+  passwordRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, marginTop: 9,
+    paddingHorizontal: 14, borderRadius: R.iconBtn, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
   },
-  errorBox: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.errorSoft,
-    borderRadius: radius.md,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.error,
+  passwordInput: { flex: 1, minWidth: 0, height: '100%', color: C.textPrimary, fontFamily: F.bold, fontSize: 14.5 },
+
+  keepSessionRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 16 },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+    borderWidth: 1.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center',
   },
-  errorText: {
-    color: colors.error,
-    fontSize: 13,
-    fontWeight: '500',
-    flex: 1,
-  },
-  linksRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  linkSmall: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  linkSmallMuted: {
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 18,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginHorizontal: 12,
-  },
-  socialRow: { flexDirection: 'row' },
-  socialBtn: {
-    flex: 1,
-    height: 50,
-    borderRadius: radius.md,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialLabel: {
-    color: colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  demoBanner: {
-    color: colors.textMuted,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 18,
-    lineHeight: 16,
-  },
-  footer: {
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 24,
-    letterSpacing: 0.5,
-  },
+  checkboxOn: { backgroundColor: C.green, borderColor: C.green },
+  keepSessionText: { fontFamily: F.semiBold, fontSize: 12.5, color: C.textSecondary },
+
+  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  footerText: { fontFamily: F.semiBold, fontSize: 13, color: C.textSecondary },
+  footerLink: { fontFamily: F.extraBold, fontSize: 13, color: C.textPrimary },
+
+  demoHint: { fontFamily: F.medium, fontSize: 11, lineHeight: 16, color: C.textMuted, textAlign: 'center', marginTop: 18 },
 });

@@ -21,6 +21,7 @@ export const navigationReadyPromise = new Promise((resolve) => {
 
 import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
+import RegisterScreen from '../screens/RegisterScreen';
 import LoginScreen from '../screens/LoginScreen';
 import VerificationScreen from '../screens/VerificationScreen';
 import LocationPermissionScreen from '../screens/LocationPermissionScreen';
@@ -93,6 +94,7 @@ const Stack = createNativeStackNavigator();
 // siquiera de poder iniciar sesión.
 const SafeSplashScreen = withErrorBoundary(SplashScreen, 'Splash');
 const SafeWelcomeScreen = withErrorBoundary(WelcomeScreen, 'Welcome');
+const SafeRegisterScreen = withErrorBoundary(RegisterScreen, 'Register');
 const SafeLoginScreen = withErrorBoundary(LoginScreen, 'Login');
 const SafeVerificationScreen = withErrorBoundary(VerificationScreen, 'Verification');
 const SafeLocationPermissionScreen = withErrorBoundary(LocationPermissionScreen, 'LocationPermission');
@@ -253,6 +255,7 @@ export default function AppNavigator() {
       >
         <Stack.Screen name="Splash" component={SafeSplashScreen} options={{ animation: 'none' }} />
         <Stack.Screen name="Welcome" component={SafeWelcomeScreen} options={{ animation: 'fade' }} />
+        <Stack.Screen name="Register" component={SafeRegisterScreen} />
         <Stack.Screen name="Login" component={SafeLoginScreen} />
         <Stack.Screen name="Verification" component={SafeVerificationScreen} />
         <Stack.Screen name="LocationPermission" component={SafeLocationPermissionScreen} />

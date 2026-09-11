@@ -118,6 +118,19 @@ export async function resendOtp({ email }) {
   return { error: error ? { message: describeAuthError(error) } : null };
 }
 
+/**
+ * Envía el correo de recuperación de contraseña a un email arbitrario, SIN
+ * requerir sesión — a diferencia de `requestPasswordReset()` en
+ * `settings.js`, que lee el email de la sesión activa (sirve para "olvidé
+ * mi contraseña" desde Ajustes, ya logueado). Esta es la variante para el
+ * link "¿La olvidaste?" de IniciarSesión, antes de tener sesión.
+ */
+export async function requestPasswordResetForEmail(email) {
+  if (!isSupabaseConfigured) return { error: null };
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+  return { error };
+}
+
 export async function signOut() {
   if (!isSupabaseConfigured) return { error: null };
   const { error } = await supabase.auth.signOut();

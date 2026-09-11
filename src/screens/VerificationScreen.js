@@ -23,12 +23,19 @@ import {
   abandonSignUp,
 } from '../services/auth';
 import { isSessionUsable } from '../services/authPolicy';
+import { updateMyProfile } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 
 const CODE_LENGTH = 6;
 
 export default function VerificationScreen({ navigation, route }) {
   const email = route?.params?.email || '';
+  // La fecha de nacimiento que se pidió al crear la cuenta (pantalla
+  // "Crear cuenta") no se pudo guardar todavía porque, hasta este punto,
+  // no había sesión: `profiles.edad` recién se puede escribir con RLS una
+  // vez que la verificación entrega una sesión real. Viaja como parámetro
+  // desde RegisterScreen y se aplica acá, justo después de verificar.
+  const edad = route?.params?.edad;
 
   const [digits, setDigits] = useState(Array(CODE_LENGTH).fill(''));
   const [channel, setChannel] = useState('Correo'); // Correo | SMS
@@ -65,6 +72,17 @@ export default function VerificationScreen({ navigation, route }) {
       return;
     }
 
+    // Modo demo: si Supabase no está configurado, aceptamos 472000
+    if (!isSupabaseConfigured) {
+      if (code !== '472000') {
+        setError('Código incorrecto. Intente de nuevo');
+        return;
+      }
+      if (edad != null) await updateMyProfile({ edad });
+      navigation.navigate('LocationPermission');
+      return;
+    }
+
     setLoading(true);
     const { error: err, session } = await verifyEmailOtp({ email, token: code });
 
@@ -83,6 +101,7 @@ export default function VerificationScreen({ navigation, route }) {
 
     // Recién ahora, con el correo demostrado, la cuenta recibe su contraseña.
     const { error: errPassword } = await completeSignUpPassword({ email });
+    if (edad != null) await updateMyProfile({ edad });
     setLoading(false);
 
     if (errPassword) {

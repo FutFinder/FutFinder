@@ -96,13 +96,25 @@ test('el login ya no existe como "inicia sesión o registra" (signInOrUp)', () =
 test('la pantalla de login no registra usuarios al iniciar sesión', () => {
   const fuente = leer('screens/LoginScreen.js');
   assert.match(fuente, /loginWithEmail/, 'debe usar loginWithEmail');
-  // El registro solo se llama en el modo explícito de registro.
-  const llamadasARegistro = fuente.match(/registerWithEmail\(/g) || [];
-  assert.equal(llamadasARegistro.length, 1, 'registerWithEmail se llama una sola vez, en el modo registro');
-  assert.match(
+  // Login y Registro son pantallas separadas (LoginScreen / RegisterScreen):
+  // ya no hay un modo isSignUp que decida entre ambas llamadas, así que
+  // registrar solo puede pasar navegando a otra pantalla, nunca desde acá.
+  assert.doesNotMatch(
     fuente,
-    /isSignUp\s*\n?\s*\?\s*await registerWithEmail/,
-    'el registro debe estar detrás del modo explícito isSignUp'
+    /registerWithEmail/,
+    'Login no debe registrar a nadie: eso es responsabilidad exclusiva de RegisterScreen'
+  );
+});
+
+test('el registro solo se alcanza navegando explícitamente a la pantalla de Registro', () => {
+  const registro = leer('screens/RegisterScreen.js');
+  assert.match(registro, /registerWithEmail/, 'RegisterScreen debe usar registerWithEmail');
+
+  const login = leer('screens/LoginScreen.js');
+  assert.match(
+    login,
+    /navigation\.navigate\('Register'\)/,
+    "desde Login se llega a Register con una navegación explícita, nunca registrando de forma implícita"
   );
 });
 
