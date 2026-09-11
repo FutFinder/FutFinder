@@ -1,0 +1,28 @@
+# Configuración de las Edge Functions.
+#
+# `verify_jwt` decide si Supabase exige un token de sesión ANTES de que la
+# función corra. El valor por omisión es `true`, que es lo correcto para
+# todo lo que llama la app; acá solo aparecen las excepciones y por qué lo
+# son. Si una función que recibe avisos de afuera queda con la verificación
+# puesta, el proveedor recibe 401 y el pago se pierde en silencio.
+
+[functions.pagar-reserva]
+# La llama la app con la sesión del jugador. La función usa ese mismo token
+# para iniciar el pago, así que sin sesión no tiene nada que hacer.
+verify_jwt = true
+
+[functions.flow-confirmacion]
+# El aviso de servidor a servidor de Flow. Flow no tiene ni puede tener una
+# sesión de Supabase. Lo que protege esta URL no es un token de entrada: es
+# que la función no le cree al POST y vaya a preguntarle a Flow con una
+# consulta firmada con la Secret Key.
+verify_jwt = false
+
+[functions.flow-retorno]
+# El navegador del jugador volviendo de Flow, con un POST y sin token. No
+# lee ni escribe nada: solo muestra una página que rebota a la app.
+verify_jwt = false
+
+[functions.send-push]
+# La dispara un Database Webhook de Supabase, que sí manda la service key.
+verify_jwt = true

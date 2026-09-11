@@ -6,7 +6,8 @@ import { ArrowLeft, Info, Check, Lock } from 'lucide-react-native';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { IconButton, Card, NoticeCard, StickyFooter, Button } from '../components/reservas/ui';
 import { FieldLabel, TextField } from '../components/reservas/recintoUi';
-import { getComplejoById, cobrosDelComplejo } from '../services/reservas';
+import { getComplejoById, cobrosDelComplejo, crearReserva } from '../services/reservas';
+import { estadoPasarela } from '../services/pagos';
 import { totalDeReserva, reservaLista } from '../utils/reservasJugador';
 import { telefonoAceptable } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
@@ -27,10 +28,17 @@ import { formatCLP } from '../services/reservasRules';
  * completa, o ninguno. Y son siempre opcionales — saltarlos tiene que ser
  * evidente.
  *
- * HASTA ACÁ LLEGA EL FLUJO. Pagar necesita saldo en el Balance FutFinder, y
- * `cargar_balance` está revocada desde la migración 73 justo porque acredita
- * plata sin cobrarla. No es un «próximamente» de relleno: es una decisión de
- * pasarela pendiente, y la pantalla lo dice con esas palabras.
+ * DE ACÁ SE SALE CREANDO LA RESERVA, NO PAGANDO. `crear_reserva` la deja en
+ * `armando`, que es un estado real: existe, es suya y NO ocupa el horario.
+ * Recién el pago confirmado lo toma. Esa diferencia es el corazón del
+ * vertical y por eso está escrita en la pantalla y no solo en el backend.
+ *
+ * SE PREGUNTA POR LA PASARELA ANTES DE DEJAR APRETAR. Mientras no haya cuenta
+ * de comercio conectada, el botón queda apagado y se dice por qué. La
+ * alternativa —crear la reserva y descubrir después que no se puede pagar—
+ * dejaría reservas muertas dando vueltas por una cuenta que todavía no
+ * existe. El día que las credenciales estén cargadas esto se enciende solo,
+ * sin tocar una línea.
  */
 export default function ResumenReservaScreen({ navigation, route }) {
   const { complejoId, canchaId, fechaLabel, horaInicio, horaFin, precioBloque, fecha } = route.params || {};
@@ -40,16 +48,22 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [loading, setLoading] = useState(true);
+  const [pasarela, setPasarela] = useState(null);
+  const [creando, setCreando] = useState(false);
   const [toast, setToast] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data }, { data: cs }] = await Promise.all([
+    const [{ data }, { data: cs }, { data: ps }] = await Promise.all([
       getComplejoById(complejoId),
       cobrosDelComplejo(complejoId),
+      estadoPasarela(),
     ]);
     setComplejo(data);
     setCobros(cs || []);
+    // `null` si no se pudo comprobar: no es lo mismo que «no hay». Con `null`
+    // el botón queda disponible y el error, si llega, aparece al tocarlo.
+    setPasarela(ps ? !!ps.configurada : null);
     setLoading(false);
   }, [complejoId]);
 
@@ -58,10 +72,41 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const alternar = (id) =>
     setElegidos((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  const proximamente = () => {
-    setToast('Todavía no hay pasarela de pago conectada, así que esta reserva no se puede completar. '
-      + 'Es lo único que falta.');
-    setTimeout(() => setToast(null), 4000);
+  /**
+   * Crea la reserva y manda a pagarla.
+   *
+   * El orden importa: primero existe la reserva, después el cobro. Cobrar
+   * antes de tener la reserva dejaría plata sin a qué asociarla.
+   */
+  const continuar = async () => {
+    setCreando(true);
+    setToast(null);
+    const { data, error } = await crearReserva({
+      canchaId,
+      fecha,
+      horaInicio,
+      modalidad: 'completa',
+      medioPago: 'tarjeta',
+      nJugadores: cancha?.jugadoresHabitual ?? null,
+      contactoNombre: nombre.trim(),
+      contactoTelefono: telefono,
+      cobros: elegidos,
+    });
+    setCreando(false);
+
+    if (error || !data?.ok) {
+      setToast(error?.message || data?.reason || 'No pudimos crear la reserva.');
+      return;
+    }
+    navigation.navigate('PagoReserva', {
+      reservaId: data.reserva_id,
+      monto: dinero.total,
+      resumen: {
+        recinto: complejo?.nombre,
+        cancha: cancha ? `${cancha.nombre} · ${cancha.tipo}` : null,
+        cuando: `${fechaLabel} · ${horaInicio}–${horaFin}`,
+      },
+    });
   };
 
   if (loading) {
@@ -207,14 +252,22 @@ export default function ResumenReservaScreen({ navigation, route }) {
           horas antes del partido.
         </NoticeCard>
 
+        {pasarela === false ? (
+          <NoticeCard tone="warning">
+            Todavía no hay medio de pago conectado, así que esta reserva no se puede completar.
+            Es lo único que falta.
+          </NoticeCard>
+        ) : null}
+
         {toast ? <NoticeCard tone="warning">{toast}</NoticeCard> : null}
       </ScrollView>
 
       <StickyFooter>
         <Button
           label={listo ? `Continuar al pago · ${formatCLP(dinero.total)}` : 'Continuar al pago'}
-          disabled={!listo}
-          onPress={proximamente}
+          disabled={!listo || pasarela === false}
+          loading={creando}
+          onPress={continuar}
         />
       </StickyFooter>
     </SafeAreaView>

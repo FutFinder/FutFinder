@@ -42,6 +42,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@babel/core@^7.25.2",
+        "npm:@expo-google-fonts/manrope@~0.4.2",
         "npm:@expo/metro-runtime@~6.1.2",
         "npm:@expo/react-native-action-sheet@^4.1.1",
         "npm:@react-native-async-storage/async-storage@2.2.0",
@@ -55,6 +56,7 @@
         "npm:eslint@^9.39.5",
         "npm:expo-constants@~18.0.13",
         "npm:expo-device@~8.0.10",
+        "npm:expo-font@~14.0.12",
         "npm:expo-image-manipulator@~14.0.8",
         "npm:expo-image-picker@~17.0.11",
         "npm:expo-linear-gradient@~15.0.8",

@@ -57,3 +57,25 @@ Sin el archivo de servicios válido, un prebuild o build Android que evalúe `go
 - [Stack y estructura](stack-y-estructura.md)
 - [Visión y alcance](../producto/vision-y-alcance.md)
 - [Inicio de la memoria](../00-inicio.md)
+
+## Edge Functions y sus secretos
+
+`supabase/config.toml` (desde 2026-09-10) declara el `verify_jwt` de cada función y por qué. Es la parte que no se ve en el código y la que se rompe en silencio: una función que recibe avisos de afuera con la verificación puesta devuelve 401 al proveedor y el aviso se pierde sin dejar rastro en nuestros logs.
+
+| Función | `verify_jwt` | Quién la llama |
+|---|---|---|
+| `send-push` | sí | Database Webhook de Supabase |
+| `pagar-reserva` | sí | la app, con la sesión del jugador |
+| `flow-confirmacion` | **no** | Flow, de servidor a servidor |
+| `flow-retorno` | **no** | el navegador del jugador volviendo de Flow |
+
+Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cree al POST que recibe —solo toma el `token` y va a preguntarle a Flow con una consulta firmada con la Secret Key— y `flow-retorno` no lee ni escribe nada, solo muestra una página que rebota a la app.
+
+**Secretos de la pasarela** (Supabase → Edge Functions → Secrets; ninguno va en el repo ni en esta memoria):
+
+- `FLOW_API_KEY` y `FLOW_SECRET_KEY` — de la cuenta de comercio de Flow.
+- `FLOW_AMBIENTE` — `sandbox` por omisión; `produccion` hay que escribirlo a propósito, para que nadie cobre plata de verdad por olvidarse de una variable.
+- `FUNCTIONS_BASE_URL` — opcional, solo si hay un dominio propio delante. Sin ella las URL de retorno se deducen de `SUPABASE_URL`, que Supabase inyecta sola.
+- `APP_RETORNO_URL` — opcional; adónde rebota `flow-retorno`. Por omisión `futfinder://`.
+
+**Sin `FLOW_API_KEY`/`FLOW_SECRET_KEY` nada explota**: `pagar-reserva` contesta `configurada: false` y la app deja el botón de pago apagado diciendo que el medio de pago todavía no está conectado. Comprobado contra producción el 2026-09-10, con las tres funciones desplegadas y sin credenciales cargadas.

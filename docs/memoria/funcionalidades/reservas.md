@@ -32,7 +32,11 @@ Dos decisiones de esas dos pantallas que conviene no volver a discutir. **La com
 
 Tres cosas que cambiaron en las pantallas y no son cosméticas. **`FechaHoraScreen` recargaba la disponibilidad solo del primer día**: con datos de ejemplo daba igual porque la grilla era siempre la misma, contra la base era un bug. **Se eliminó el selector de duración 60/90 min**: la duración la define la cancha (`duracion_slot_min`), no el jugador, y ese selector no cambiaba nada real. Y **el total sale del precio del BLOQUE, no del precio base de la cancha** — con tarifas por franja no son lo mismo, y cobrar el base sería cobrar de más en las horas baratas.
 
-**Hasta ahí llega.** El resumen pide teléfono de contacto (obligatorio) y ofrece los adicionales, pero el CTA de pago está bloqueado: pagar necesita saldo en el Balance y `cargar_balance` quedó revocada en la 73 porque acreditaba plata sin cobrarla. `crearReserva()` está escrita y lista; no se llama desde ninguna pantalla todavía, para no dejar reservas en `armando` que nadie pueda completar.
+**El flujo del jugador llega hasta el pago** (2026-09-10). `ResumenReservaScreen` llama a `crearReserva()` de verdad y navega a `PagoReservaScreen`, que arma el cobro y manda al proveedor. El medio es **cobro directo con tarjeta por reserva**; el Balance se dejó para después y en su propio paso.
+
+**La pantalla de pago no sabe si se pagó: lo pregunta.** El estado lo escribe el aviso firmado del proveedor contra la base, y la app solo consulta cómo quedó la fila (`faseDePago` en `src/utils/pagosCliente.js`, 12 pruebas). Ningún estado intermedio se muestra como fracaso: un pago `pagado` con la reserva todavía sin confirmar es el instante entre las dos escrituras de `confirmar_pago`, no un error, y decir «no se pudo» ahí sería mentirle a alguien a quien acaban de cobrarle. Se vuelve a preguntar con una espera que arranca en 2 s y se suelta hasta 10 s, y a los cinco minutos se deja de mirar **diciendo que se dejó de mirar**, no que el pago falló.
+
+**Se pregunta por la pasarela ANTES de dejar apretar el botón.** Mientras no haya credenciales cargadas, `pagar-reserva` contesta `configurada: false`, el CTA del resumen queda apagado y se dice por qué. La alternativa —crear la reserva y descubrir después que no se puede pagar— dejaría reservas en `armando` dando vueltas por una cuenta que todavía no existe.
 
 Dos huecos del backend aparecieron recién al construir: el calendario no traía el `tipo` del bloqueo (migración 71) y no había forma de listar las canchas de un recinto no publicado (migración 72). Los dos se ven solo cuando alguien intenta usar la RPC para armar una pantalla de verdad. **Lo único que falta del backend del recinto son los datos bancarios y las liquidaciones**, bloqueados por los plazos de abono de la pasarela — una decisión que no es de software.
 
@@ -49,7 +53,25 @@ Construido hasta ahora (pantallas 1 a 8 del handoff):
 - Shell de navegación: Avisos dejó de ser pestaña, su lugar lo toma `ReservasTab` (ícono calendario); la campana de notificaciones (`NotificationBell`) pasa arriba a la derecha en cada pantalla principal.
 - Descubrimiento completo: `ReservasScreen` (lista + "Juega hoy" + filtros vía `FiltrosSheet`, y la vista de mapa esquemático con dos pines destacados y su vista previa — el mapa NO es un `MapView` real, es una ilustración de Views, igual que el propio prototipo, así que no hereda el pendiente de mapa real en web), `ComplejoDetailScreen`, `ElegirCanchaScreen`, `FechaHoraScreen` y `ResumenReservaScreen`.
 
-**Todavía no construido:** Balance/monedero (pantallas 11, 26), las tres modalidades de pago con su transacción atómica (9, 10, 12–18, 19–22), post-reserva (23–25) y bordes/calificación (27–33). El CTA "Continuar al pago" de `ResumenReservaScreen` muestra un aviso de "todavía no disponible" en vez de navegar a una pantalla inexistente.
+**Todavía no construido:** Balance/monedero (pantallas 11, 26), el pago dividido entre capitanes o entre todos (9, 10, 12–18, 19–22), post-reserva (23–25) y bordes/calificación (27–33). **No hay pantalla donde el jugador vea sus reservas**, así que después de pagar el botón dice «Volver al inicio» y no «Ver mi reserva»: prometer un destino que no existe es peor que no ofrecerlo.
+
+## La pasarela de pago
+
+**El proveedor es Flow** y la base no lo sabe. La migración 78 creó `pagos` y cuatro RPC (`iniciar_pago_reserva` para quien tiene sesión; `anotar_referencia_pago`, `confirmar_pago` y `rechazar_pago` solo para `service_role`) que hablan de órdenes, montos y estados sin nombrar a ningún proveedor. Todo lo que sabe de Flow vive en `supabase/functions/_shared/flowLogic.ts`, así que cambiar de proveedor es reescribir un archivo.
+
+**Lo difícil no era cobrar, era qué pasa si el horario se lo lleva otro mientras el jugador paga.** Una reserva sin confirmar no ocupa el bloque —es la regla central del vertical— así que entre que alguien entra a pagar y Flow avisa pueden pasar minutos, y en el medio otro grupo puede confirmar ese mismo horario. Para entonces la plata ya se movió. `confirmar_pago` toma el **mismo candado** que `confirmar_reserva`, así que los dos caminos se serializan; si el bloque se fue, deja el pago en `reversar`, la reserva en `rechazada` y le avisa a quien pagó, todo en la transacción que descubre el choque.
+
+**`estado = 'reversar'` es plata de alguien que no recibió nada.** Tiene índice propio (`idx_pagos_reversar`). Hasta que la reversa sea automática, esa consulta hay que mirarla todos los días.
+
+**No se le cree al aviso de Flow.** `flow-confirmacion` recibe un POST que cualquiera puede falsificar —la URL es pública por definición— y lo único que hace con él es sacar el `token` e ir a preguntarle a Flow con `payment/getStatus`, firmado con la Secret Key. Lo que protege esa URL no es un token de entrada: es que sin la Secret Key nadie puede hacer que `getStatus` conteste «pagada».
+
+**Idempotencia en tres capas**, porque un webhook llega dos veces: `orden_comercio` única, `(proveedor, referencia_externa)` única, y `confirmar_pago` sobre un pago ya pagado devuelve ok sin repetir nada. Más un índice parcial que impide dos pagos vivos por reserva, así que volver atrás en el navegador y darle pagar de nuevo reusa el pendiente.
+
+**La firma de Flow está probada contra un vector calculado con `openssl`** (`supabase/functions/_shared/flowLogic.test.ts`, 10 casos, `deno test`), justo porque es lo que falla en silencio: con el orden de parámetros mal, Flow contesta «firma inválida» y no dice cuál de los quince campos lo rompió.
+
+**El monto se compara en la Edge Function, no en la base.** `confirmar_pago` no recibe el monto, así que `flow-confirmacion` lee `pagos.monto` y lo compara con lo que dice Flow antes de confirmar. Si no coinciden no se confirma nada: queda un `[flow][ALERTA]` en el log y el pago pendiente, para que lo mire una persona. Mover esa comprobación adentro de `confirmar_pago` es candidato para cuando el Balance toque esa función igual.
+
+**Lo que falta de la pasarela:** las credenciales (no hay cuenta de comercio todavía: se abre a nombre de la empresa, no personal), el pago dividido con tarjeta —`iniciar_pago_reserva` lo rechaza explícito en vez de cobrarle todo al organizador por descuido—, la reversa automática de los `reversar`, y la pantalla de Ingresos del recinto, que sigue bloqueada por los plazos de abono.
 
 ## Reglas y permisos
 
@@ -59,15 +81,16 @@ Dos adaptaciones deliberadas del prototipo a datos reales, no fabricados: el map
 
 ## Pantallas y dependencias
 
-- Pantallas: `ReservasScreen`, `ComplejoDetailScreen`, `ElegirCanchaScreen`, `FechaHoraScreen`, `ResumenReservaScreen`, `ReservasUiGalleryScreen` (QA interna).
-- Código: `src/services/reservas.js`, `reservasRules.js`, `src/components/reservas/ui.js`, `FiltrosSheet.js`.
-- Navegación: `MainTabs.js` (`ReservasTab`), `AppNavigator.js` (`ComplejoDetail`, `ElegirCancha`, `FechaHora`, `Resumen`, todas con `withAuthGuard`).
+- Pantallas: `ReservasScreen`, `ComplejoDetailScreen`, `ElegirCanchaScreen`, `FechaHoraScreen`, `ResumenReservaScreen`, `PagoReservaScreen`, `ReservasUiGalleryScreen` (QA interna).
+- Código: `src/services/reservas.js`, `reservasRules.js`, `src/services/pagos.js`, `src/utils/pagosCliente.js`, `src/components/reservas/ui.js`, `FiltrosSheet.js`.
+- Edge Functions: `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, con `_shared/flowLogic.ts`. Sus secretos y su `verify_jwt`, en [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md).
+- Navegación: `MainTabs.js` (`ReservasTab`), `AppNavigator.js` (`ComplejoDetail`, `ElegirCancha`, `FechaHora`, `Resumen`, `PagoReserva`, todas con `withAuthGuard`).
 
 ## Estados, errores y problemas conocidos
 
 **El cargo de servicio al jugador ya no existe.** `reservasRules.js` tenía `SERVICE_FEE_CLP = 1500` sumado ARRIBA del precio de la cancha —un recargo al jugador—, y `ResumenReservaScreen` lo mostraba como una fila propia. El modelo es el inverso: la comisión la paga el recinto (migración 62) y el jugador paga el precio de la cancha, así que `SERVICE_FEE_CLP` y `computeTotal()` se eliminaron junto con esa fila. Hay una prueba de regresión que falla si alguno de los dos vuelve.
 
-**Pendiente conocido y es un bug:** `computeCuota()` redondea al múltiplo de $50 más cercano y `crear_reserva` en Postgres usa `ceil()` sin redondear. No coinciden, y redondear al más cercano puede dejar la suma de las cuotas POR DEBAJO del total: $20.000 entre 3 da $6.650 cada uno, o sea $19.950, y faltan $50. Hay que unificarlo redondeando hacia arriba en los dos lados; es una regla que el jugador ve, así que se decide aparte. Era la verificación que el propio `reservasRules.js` pedía hacer «cuando exista backend real» — la parte del cargo de servicio ya se hizo en la 62, esta queda.
+**Ya corregido** (2026-09-09): `computeCuota()` redondeaba al múltiplo de $50 más cercano y Postgres usa `ceil()`, así que la pantalla mostraba una cuota que el servidor rechaza. Se unificó al peso hacia arriba y `roundToNearest50()` se eliminó. Ver arriba el porqué de no redondear a $50.
 
 La disponibilidad horaria (`getDisponibilidad()`) es la misma grilla fija de 12 bloques con 5 ocupados siempre, sin variar por cancha ni por fecha — limitación de datos de ejemplo, no un bug. Un complejo sin canchas cargadas (dos de los tres complejos de ejemplo) muestra un aviso en vez de un botón roto, y `ComplejoDetailScreen` esconde el CTA sticky en ese caso.
 
