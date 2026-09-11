@@ -16,6 +16,7 @@ import FutfinderMark from '../components/FutfinderMark';
 import Banner from '../components/Banner';
 import { Card, IconButton, Button } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { phoneColumn } from '../theme/layout';
 import { loginWithEmail, requestPasswordResetForEmail, getCurrentProfile } from '../services/auth';
 import { decideAuthDestination, isValidEmail, MENSAJES } from '../services/authPolicy';
 import { getOnboardingState } from '../services/profile';
@@ -265,7 +266,7 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1, backgroundColor: C.bg, ...phoneColumn },
   scroll: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 24, flexGrow: 1 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },

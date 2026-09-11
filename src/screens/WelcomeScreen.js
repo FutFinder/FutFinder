@@ -16,6 +16,7 @@ import FutfinderMark from '../components/FutfinderMark';
 import BannerBackdrop from '../components/ds/BannerBackdrop';
 import { Card, SectionLabel, Button } from '../components/reservas/ui';
 import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { phoneColumn } from '../theme/layout';
 import { getOnboardingState } from '../services/profile';
 
 const TERMS_URL = 'https://futfinder.cl/terminos';
@@ -365,7 +366,7 @@ export default function WelcomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1, backgroundColor: C.bg, ...phoneColumn },
   splashCenter: { alignItems: 'center', justifyContent: 'center' },
   scroll: { flexGrow: 1 },
 

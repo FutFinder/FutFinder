@@ -1,13 +1,13 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Dimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check } from 'lucide-react-native';
 
 import FutfinderMark from '../components/FutfinderMark';
 import { Button } from '../components/reservas/ui';
 import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { phoneColumn } from '../theme/layout';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 /**
  * Carrusel de 5 pasos entre la Portada y Crear cuenta / Iniciar sesión
@@ -167,15 +167,31 @@ const STEPS = [
 export default function TutorialScreen({ navigation }) {
   const [step, setStep] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
+  // El ancho de una lámina es el del carrusel medido, no el de la ventana:
+  // en web la pantalla está topada a `phoneColumn`, así que
+  // `Dimensions.get('window').width` devuelve bastante más que el hueco real
+  // y las láminas se salen por la derecha, cortadas. De paso deja de ser un
+  // valor leído una sola vez al importar el módulo, que además ignoraba
+  // rotaciones y redimensionados.
+  const [slideWidth, setSlideWidth] = useState(0);
+  const stepRef = useRef(0);
 
   const goStep = (next) => {
     setStep(next);
+    stepRef.current = next;
     Animated.timing(translateX, {
-      toValue: -next * SCREEN_WIDTH,
+      toValue: -next * slideWidth,
       duration: 320,
       useNativeDriver: true,
     }).start();
   };
+
+  // Si el ancho cambia (rotar el teléfono, redimensionar la ventana, o la
+  // primera medición real), el desplazamiento acumulado apunta a un píxel
+  // que ya no corresponde: se recoloca de golpe, sin animar.
+  useEffect(() => {
+    translateX.setValue(-stepRef.current * slideWidth);
+  }, [slideWidth, translateX]);
 
   const last = step === STEPS.length - 1;
 
@@ -206,10 +222,18 @@ export default function TutorialScreen({ navigation }) {
           </Pressable>
         </View>
 
-        <View style={{ flex: 1, overflow: 'hidden' }}>
-          <Animated.View style={[styles.track, { transform: [{ translateX }] }]}>
+        <View
+          style={{ flex: 1, overflow: 'hidden' }}
+          onLayout={(e) => setSlideWidth(e.nativeEvent.layout.width)}
+        >
+          {/* Sin ancho medido las láminas no tienen dónde acomodarse; se
+              esperan esa primera pasada de layout en vez de pintarlas con un
+              ancho supuesto y corregirlas al fotograma siguiente. */}
+          <Animated.View
+            style={[styles.track, { transform: [{ translateX }] }, slideWidth ? null : styles.trackHidden]}
+          >
             {STEPS.map(({ Preview, label, title, subtitle }, i) => (
-              <View key={i} style={[styles.slide, { width: SCREEN_WIDTH }]}>
+              <View key={i} style={[styles.slide, { width: slideWidth }]}>
                 <Preview />
                 <View style={styles.slideText}>
                   <StepLabel>{label}</StepLabel>
@@ -253,7 +277,7 @@ export default function TutorialScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1, backgroundColor: C.bg, ...phoneColumn },
 
   header: {
     height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20,
@@ -264,6 +288,7 @@ const styles = StyleSheet.create({
   backLinkText: { fontFamily: F.bold, fontSize: 13, color: C.textSecondary },
 
   track: { flex: 1, flexDirection: 'row' },
+  trackHidden: { opacity: 0 },
   slide: { paddingHorizontal: 20, gap: 24 },
 
   previewCard: {
