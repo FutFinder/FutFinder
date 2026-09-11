@@ -1,6 +1,6 @@
 # Reservas
 
-Última revisión: 2026-09-09
+Última revisión: 2026-09-10
 
 ## Propósito
 
@@ -55,6 +55,14 @@ Construido hasta ahora (pantallas 1 a 8 del handoff):
 
 **Todavía no construido:** Balance/monedero (pantallas 11, 26), el pago dividido entre capitanes o entre todos (9, 10, 12–18, 19–22), post-reserva (23–25) y bordes/calificación (27–33). **No hay pantalla donde el jugador vea sus reservas**, así que después de pagar el botón dice «Volver al inicio» y no «Ver mi reserva»: prometer un destino que no existe es peor que no ofrecerlo.
 
+**El final de la lista de Reservas ya lleva a alguna parte** (2026-09-10). Donde había un aviso muerto —«¿Administras un complejo? Recibe reservas en FutFinder», sin botón— ahora va una tarjeta con lo que gana el recinto y un botón que abre `SolicitudRecintoScreen`: nombre del recinto, dirección exacta, comuna, nombre del dueño, teléfono, correo y un campo libre opcional. **Todo lo demás es obligatorio** porque una solicitud existe para poder llamar; el formulario más corto llegaría más lleno y serviría menos. La validación pura vive en `src/utils/solicitudRecinto.js` (10 pruebas) y el botón queda ENCENDIDO aunque falte algo, para que al apretarlo pueda decir qué falta — un botón apagado sin explicación es peor.
+
+**La tarjeta no se le muestra a quien ya administra un recinto** (arriba tiene su panel), y si ya mandó una solicitud sin atender cambia de texto y saca el botón: volver a invitar a alguien que espera respuesta se lee como que su solicitud se perdió. Esa consulta (`miSolicitudPendiente`) se hace **solo cuando `misRecintos()` vino vacío**, así que a quien administra no le cuesta un viaje de más.
+
+**La solicitud se guarda siempre y el correo es aparte.** La migración 80 crea `solicitudes_recinto` y `crear_solicitud_recinto`; la Edge Function `solicitud-recinto` la llama con el token de quien manda el formulario y después avisa al equipo por correo. **Sin proveedor de correo configurado —que es el estado de hoy— la función contesta `ok: true` con `avisada: false`** y la fila igual quedó escrita: el equipo la lee en Supabase. Y `src/services/solicitudRecinto.js` cae a la RPC directo si la función no responde, porque los dos caminos son el mismo y ninguno puede perder una solicitud. Decirle «no se pudo» a alguien cuya solicitud SÍ se guardó lo haría mandarla de nuevo para nada.
+
+**`verify_jwt: true` no garantiza sesión.** Apareció probando esta función sin cuenta: la clave anónima es un JWT válido, la función corre igual y choca con el `grant ... to authenticated` de la RPC. Se traduce ese 42501 a «Inicia sesión para mandarnos tu recinto» en vez de reportarlo como error del servidor.
+
 ## La pasarela de pago
 
 **El proveedor es Flow** y la base no lo sabe. La migración 78 creó `pagos` y cuatro RPC (`iniciar_pago_reserva` para quien tiene sesión; `anotar_referencia_pago`, `confirmar_pago` y `rechazar_pago` solo para `service_role`) que hablan de órdenes, montos y estados sin nombrar a ningún proveedor. Todo lo que sabe de Flow vive en `supabase/functions/_shared/flowLogic.ts`, así que cambiar de proveedor es reescribir un archivo.
@@ -81,10 +89,10 @@ Dos adaptaciones deliberadas del prototipo a datos reales, no fabricados: el map
 
 ## Pantallas y dependencias
 
-- Pantallas: `ReservasScreen`, `ComplejoDetailScreen`, `ElegirCanchaScreen`, `FechaHoraScreen`, `ResumenReservaScreen`, `PagoReservaScreen`, `ReservasUiGalleryScreen` (QA interna).
-- Código: `src/services/reservas.js`, `reservasRules.js`, `src/services/pagos.js`, `src/utils/pagosCliente.js`, `src/components/reservas/ui.js`, `FiltrosSheet.js`.
-- Edge Functions: `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, con `_shared/flowLogic.ts`. Sus secretos y su `verify_jwt`, en [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md).
-- Navegación: `MainTabs.js` (`ReservasTab`), `AppNavigator.js` (`ComplejoDetail`, `ElegirCancha`, `FechaHora`, `Resumen`, `PagoReserva`, todas con `withAuthGuard`).
+- Pantallas: `ReservasScreen`, `ComplejoDetailScreen`, `ElegirCanchaScreen`, `FechaHoraScreen`, `ResumenReservaScreen`, `PagoReservaScreen`, `SolicitudRecintoScreen`, `ReservasUiGalleryScreen` (QA interna).
+- Código: `src/services/reservas.js`, `reservasRules.js`, `src/services/pagos.js`, `src/services/solicitudRecinto.js`, `src/utils/pagosCliente.js`, `src/utils/solicitudRecinto.js`, `src/components/reservas/ui.js`, `FiltrosSheet.js`.
+- Edge Functions: `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, con `_shared/flowLogic.ts`; `solicitud-recinto`, con `_shared/correoSolicitud.ts`. Sus secretos y su `verify_jwt`, en [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md).
+- Navegación: `MainTabs.js` (`ReservasTab`), `AppNavigator.js` (`ComplejoDetail`, `ElegirCancha`, `FechaHora`, `Resumen`, `PagoReserva`, `SolicitudRecinto`, todas con `withAuthGuard`).
 
 ## Estados, errores y problemas conocidos
 

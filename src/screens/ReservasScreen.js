@@ -12,15 +12,17 @@ import {
   ShieldCheck,
   Building2,
   ChevronRight,
+  Handshake,
 } from 'lucide-react-native';
 
 import NotificationBell from '../components/NotificationBell';
 import FiltrosSheet from '../components/reservas/FiltrosSheet';
-import { Card, Chip, Badge, NoticeCard } from '../components/reservas/ui';
+import { Card, Button, Chip, Badge, NoticeCard } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { listComplejosCerca, listHorasLibresHoy } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { misRecintos, agendaDelDia } from '../services/recinto';
+import { miSolicitudPendiente } from '../services/solicitudRecinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO } from '../utils/recintoPantallas';
 
@@ -78,6 +80,9 @@ export default function ReservasScreen({ navigation }) {
   // más, a la lista. Es una llamada de más solo para quien administra.
   const [recintos, setRecintos] = useState([]);
   const [reservasHoy, setReservasHoy] = useState(null);
+  // La solicitud sin atender de quien mira, si tiene una: la invitación de
+  // abajo cambia de texto en vez de invitar de nuevo a alguien que ya escribió.
+  const [solicitud, setSolicitud] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -91,6 +96,12 @@ export default function ReservasScreen({ navigation }) {
           if (vivo) setReservasHoy(resumenDelPanel(agenda?.resumen)?.reservasConfirmadas ?? null);
         } else {
           setReservasHoy(null);
+        }
+        // Solo para quien no administra ninguno: al resto no se le muestra la
+        // invitación, así que preguntarlo sería una consulta para nada.
+        if ((data || []).length === 0) {
+          const { data: pendiente } = await miSolicitudPendiente();
+          if (vivo) setSolicitud(pendiente);
         }
       })();
       return () => { vivo = false; };
@@ -364,9 +375,7 @@ export default function ReservasScreen({ navigation }) {
               <Text style={styles.misReservasText}>3 próximas · 1 desafío de club</Text>
             </Pressable>
 
-            <NoticeCard tone="info" icon={ImageIcon}>
-              ¿Administras un complejo? Recibe reservas en FutFinder.
-            </NoticeCard>
+            {recintos.length === 0 ? <InvitacionRecinto solicitud={solicitud} navigation={navigation} /> : null}
           </>
         )}
 
@@ -390,6 +399,50 @@ export default function ReservasScreen({ navigation }) {
         resultCount={complejosFiltrados.length}
       />
     </SafeAreaView>
+  );
+}
+
+/**
+ * La invitación del final de la lista (reemplaza el aviso muerto que estaba
+ * acá antes: decía «¿Administras un complejo?» y no llevaba a ninguna parte).
+ *
+ * SOLO PARA QUIEN NO ADMINISTRA NINGUNO. A quien ya tiene su recinto se le
+ * muestra arriba el acceso a su panel; invitarlo a sumarlo otra vez sería
+ * ofrecerle algo que ya hizo.
+ *
+ * Y SI YA NOS ESCRIBIÓ, LO DICE. Una solicitud sin atender cambia el texto y
+ * saca el botón: volver a invitar a alguien que está esperando respuesta se
+ * lee como que su solicitud se perdió.
+ */
+function InvitacionRecinto({ solicitud, navigation }) {
+  const pendiente = !!solicitud;
+  return (
+    <Card style={styles.invitacionCard}>
+      <View style={styles.invitacionFila}>
+        <View style={styles.invitacionIcono}>
+          <Handshake color={C.green} size={19} strokeWidth={2.1} />
+        </View>
+        <Text style={styles.invitacionTitulo}>
+          {pendiente ? 'Tu solicitud está con nosotros' : '¿Tienes un recinto?'}
+        </Text>
+      </View>
+      <Text style={styles.invitacionTexto}>
+        {pendiente
+          ? `Recibimos ${solicitud.nombre_recinto} y la estamos revisando. Te vamos a llamar al número que `
+            + 'dejaste para ver horarios, precios y canchas.'
+          : 'Súmalo a FutFinder y aparece en este buscador. Recibes las reservas pagadas por la app, con '
+            + 'tu agenda, tus horarios y tus precios en un panel propio. La comisión la pagamos desde cada '
+            + 'reserva: publicar tu recinto no te cuesta nada.'}
+      </Text>
+      {pendiente ? null : (
+        <Button
+          label="Quiero sumar mi recinto"
+          variant="secondary"
+          style={{ marginTop: 14 }}
+          onPress={() => navigation.navigate('SolicitudRecinto')}
+        />
+      )}
+    </Card>
   );
 }
 
@@ -616,4 +669,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   misReservasText: { fontFamily: F.bold, fontSize: 13.5, color: C.textPrimary },
+
+  invitacionCard: { marginTop: 18 },
+  invitacionFila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  invitacionIcono: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
+  invitacionTitulo: { flex: 1, fontFamily: F.extraBold, fontSize: 15.5, color: C.textPrimary },
+  invitacionTexto: {
+    fontFamily: F.medium, fontSize: 12.5, color: C.textSecondary,
+    lineHeight: 18.5, marginTop: 11,
+  },
 });

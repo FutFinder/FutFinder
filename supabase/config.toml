@@ -26,3 +26,9 @@ verify_jwt = false
 [functions.send-push]
 # La dispara un Database Webhook de Supabase, que sí manda la service key.
 verify_jwt = true
+
+[functions.solicitud-recinto]
+# La llama la app con la sesión de quien manda el formulario, y la función
+# usa ese mismo token para crear la solicitud: sin sesión no tiene nada que
+# hacer. El correo al equipo lo manda después, con sus propios secretos.
+verify_jwt = true

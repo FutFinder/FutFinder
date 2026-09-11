@@ -78,6 +78,7 @@ import HorariosScreen from '../screens/HorariosScreen';
 import TarifasScreen from '../screens/TarifasScreen';
 import CobrosScreen from '../screens/CobrosScreen';
 import FichaRecintoScreen from '../screens/FichaRecintoScreen';
+import SolicitudRecintoScreen from '../screens/SolicitudRecintoScreen';
 import AdministradoresScreen from '../screens/AdministradoresScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
@@ -159,6 +160,7 @@ const GuardedHorariosScreen = withAuthGuard(HorariosScreen, 'Horarios');
 const GuardedTarifasScreen = withAuthGuard(TarifasScreen, 'Tarifas');
 const GuardedCobrosScreen = withAuthGuard(CobrosScreen, 'Cobros');
 const GuardedFichaRecintoScreen = withAuthGuard(FichaRecintoScreen, 'FichaRecinto');
+const GuardedSolicitudRecintoScreen = withAuthGuard(SolicitudRecintoScreen, 'SolicitudRecinto');
 const GuardedAdministradoresScreen = withAuthGuard(AdministradoresScreen, 'Administradores');
 
 // Extendemos DarkTheme (que ya trae fonts + colors completos)
@@ -522,6 +524,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="FichaRecinto"
           component={GuardedFichaRecintoScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="SolicitudRecinto"
+          component={GuardedSolicitudRecintoScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

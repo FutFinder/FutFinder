@@ -68,6 +68,7 @@ Sin el archivo de servicios válido, un prebuild o build Android que evalúe `go
 | `pagar-reserva` | sí | la app, con la sesión del jugador |
 | `flow-confirmacion` | **no** | Flow, de servidor a servidor |
 | `flow-retorno` | **no** | el navegador del jugador volviendo de Flow |
+| `solicitud-recinto` | sí | la app, con la sesión de quien manda el formulario |
 
 Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cree al POST que recibe —solo toma el `token` y va a preguntarle a Flow con una consulta firmada con la Secret Key— y `flow-retorno` no lee ni escribe nada, solo muestra una página que rebota a la app.
 
@@ -77,5 +78,15 @@ Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cre
 - `FLOW_AMBIENTE` — `sandbox` por omisión; `produccion` hay que escribirlo a propósito, para que nadie cobre plata de verdad por olvidarse de una variable.
 - `FUNCTIONS_BASE_URL` — opcional, solo si hay un dominio propio delante. Sin ella las URL de retorno se deducen de `SUPABASE_URL`, que Supabase inyecta sola.
 - `APP_RETORNO_URL` — opcional; adónde rebota `flow-retorno`. Por omisión `futfinder://`.
+
+**Secretos del aviso de solicitudes de recinto** (los lee `_shared/correoSolicitud.ts`; tampoco van en el repo):
+
+- `RESEND_API_KEY` — del proveedor de correo. **No hay cuenta todavía**, igual que con Flow.
+- `SOLICITUDES_EMAIL_TO` — a dónde llegan las solicitudes. Admite varias direcciones separadas por coma.
+- `SOLICITUDES_EMAIL_FROM` — opcional; el remitente verificado. Por omisión el de prueba del proveedor.
+
+**Sin esos dos primeros nada explota**: la solicitud igual queda escrita en `solicitudes_recinto` y la función contesta `ok: true` con `avisada: false`. El correo es el aviso, no el registro, así que encender los secretos después no pierde ninguna solicitud anterior — se leen de la tabla.
+
+**`verify_jwt: true` NO garantiza que haya sesión**, y esto se descubrió probando `solicitud-recinto` en el navegador sin cuenta: la clave anónima es un JWT válido, así que la función corre igual y choca con el `grant ... to authenticated` de la RPC que llama. Vale para cualquier función futura: si necesita una sesión de verdad, tiene que comprobarla ella —o traducir el 42501 a un mensaje honesto, que es lo que hace esta— en vez de confiar en `verify_jwt`.
 
 **Sin `FLOW_API_KEY`/`FLOW_SECRET_KEY` nada explota**: `pagar-reserva` contesta `configurada: false` y la app deja el botón de pago apagado diciendo que el medio de pago todavía no está conectado. Comprobado contra producción el 2026-09-10, con las tres funciones desplegadas y sin credenciales cargadas.
