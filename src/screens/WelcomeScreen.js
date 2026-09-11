@@ -6,7 +6,7 @@ import {
   Animated,
   ActivityIndicator,
   Linking,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CalendarCheck, Swords, UserPlus, Star, ChevronDown } from 'lucide-react-native';
@@ -21,14 +21,19 @@ import { getOnboardingState } from '../services/profile';
 const TERMS_URL = 'https://futfinder.cl/terminos';
 const PRIVACY_URL = 'https://futfinder.cl/privacidad';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 // El héroe arranca ocupando toda la pantalla (logo, titular, hint de scroll)
 // y se contrae a medida que se scrollea, revelando el resto — igual que el
 // handoff `FutFinder Inicio.dc.html`. `SCROLL_RANGE` es la distancia de
 // scroll en la que se completa la contracción (no depende del alto real del
 // héroe: el handoff la fija en 296px y acá se respeta el mismo número).
-const EXPANDED_HERO_HEIGHT = SCREEN_HEIGHT;
+//
+// El alto expandido sale de `useWindowDimensions()`, no de un
+// `Dimensions.get('window')` de módulo: ese se lee una sola vez al importar
+// el archivo, y de él depende el relleno final que garantiza el recorrido
+// completo. En web la ventana termina de acomodarse después de ese primer
+// render (y el usuario además puede redimensionarla), así que con el valor
+// congelado el recorrido queda corto, el héroe nunca termina de contraerse
+// y el contenido se queda a media opacidad, sin forma de destaparlo.
 const COLLAPSED_HERO_HEIGHT = 148;
 const SCROLL_RANGE = 296;
 // El espaciador que empuja el resto del contenido no puede medir
@@ -171,6 +176,8 @@ function FeatureRow({ icon: Icon, title, subtitle }) {
 
 export default function WelcomeScreen({ navigation }) {
   const [checking, setChecking] = useState(true);
+  const { height: windowHeight } = useWindowDimensions();
+  const expandedHeroHeight = windowHeight;
   const scrollY = useRef(new Animated.Value(0)).current;
   // Cuánto mide en verdad el bloque que se revela al scrollear (avatares,
   // ticker, features, CTA). Sin este dato, el padding final es una
@@ -215,7 +222,7 @@ export default function WelcomeScreen({ navigation }) {
   }
 
   const clampedInput = { inputRange: [0, SCROLL_RANGE], extrapolate: 'clamp' };
-  const heroHeight = scrollY.interpolate({ ...clampedInput, outputRange: [EXPANDED_HERO_HEIGHT, COLLAPSED_HERO_HEIGHT] });
+  const heroHeight = scrollY.interpolate({ ...clampedInput, outputRange: [expandedHeroHeight, COLLAPSED_HERO_HEIGHT] });
   const heroPadTop = scrollY.interpolate({ ...clampedInput, outputRange: [120, 4] });
   const heroPadBottom = scrollY.interpolate({ ...clampedInput, outputRange: [26, 14] });
   const logoScale = scrollY.interpolate({ ...clampedInput, outputRange: [1.5, 1] });
@@ -253,7 +260,7 @@ export default function WelcomeScreen({ navigation }) {
   // contraer, tapando el contenido en vez de dejarlo justo debajo.
   const bottomPad = Math.max(
     24,
-    EXPANDED_HERO_HEIGHT + SCROLL_RANGE - HERO_SPACER_HEIGHT - restHeight
+    expandedHeroHeight + SCROLL_RANGE - HERO_SPACER_HEIGHT - restHeight
   );
 
   return (
@@ -312,7 +319,14 @@ export default function WelcomeScreen({ navigation }) {
       </Animated.ScrollView>
 
       {/* ── Héroe: se superpone al scroll y se contrae con él ── */}
-      <Animated.View style={[styles.hero, { height: heroHeight }]} pointerEvents="box-none">
+      {/* `pointerEvents="none"` (no "box-none"): el héroe está superpuesto y es
+          HERMANO del ScrollView, no su ancestro, así que la rueda del mouse y el
+          arrastre que caen sobre él no encadenan hacia abajo — mueren acá, y como
+          el héroe tiene `overflow:hidden` tampoco lo scrollean a él. Resultado:
+          no se puede deslizar desde ninguna parte que el héroe tape, que al
+          entrar es la pantalla entera. Nada acá adentro es tocable, así que
+          apagarle los eventos por completo deja pasar el gesto al scroll. */}
+      <Animated.View style={[styles.hero, { height: heroHeight }]} pointerEvents="none">
         <BannerBackdrop variant="filled" />
         <LinearGradient
           colors={['rgba(7,10,7,0.15)', 'rgba(7,10,7,0.55)', C.bg]}
