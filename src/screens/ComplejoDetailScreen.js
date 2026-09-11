@@ -10,6 +10,7 @@ import { Badge, IconButton, NoticeCard, StickyFooter, Button, Foto } from '../co
 import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
+import { PROPORCION_PORTADA } from '../utils/encuadre';
 
 /** Pantalla 5 del handoff `Reservas.dc.html`: perfil de un complejo. */
 export default function ComplejoDetailScreen({ navigation, route }) {
@@ -208,9 +209,13 @@ function Galeria({ fotos = [], nombre, children }) {
   const { width } = useWindowDimensions();
   const [indice, setIndice] = useState(0);
   const lista = fotos.length ? fotos : [null];
+  // El alto sale del ancho y no es un número fijo: 250 sobre una pantalla de
+  // 390 daba 1,56:1, que no es la proporción en la que se recorta la foto al
+  // subirla, así que igual se le comía un pedazo.
+  const alto = Math.round(width / PROPORCION_PORTADA);
 
   return (
-    <View style={styles.photo}>
+    <View style={[styles.photo, { height: alto }]}>
       <ScrollView
         horizontal
         pagingEnabled
@@ -223,7 +228,7 @@ function Galeria({ fotos = [], nombre, children }) {
           <Foto
             key={uri || `hueco-${i}`}
             uri={uri}
-            style={[styles.photoPagina, { width }]}
+            style={[styles.photoPagina, { width, height: alto }]}
             iconSize={26}
             alt={`Foto ${i + 1} de ${nombre}`}
           />
@@ -246,8 +251,8 @@ const styles = StyleSheet.create({
   errorText: { fontFamily: F.medium, color: C.textSecondary, fontSize: 13 },
   header: { paddingHorizontal: 16, paddingTop: 10 },
 
-  photo: { height: 250, backgroundColor: C.surfaceAlt },
-  photoPagina: { height: 250, alignItems: 'center', justifyContent: 'center' },
+  photo: { backgroundColor: C.surfaceAlt },
+  photoPagina: { alignItems: 'center', justifyContent: 'center' },
   photoContador: {
     position: 'absolute', right: 16, bottom: 12,
     paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,

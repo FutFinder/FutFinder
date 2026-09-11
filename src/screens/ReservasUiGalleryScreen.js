@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import EncuadreSheet from '../components/reservas/EncuadreSheet';
 import { ArrowLeft, ChevronRight, MapPin, Star } from 'lucide-react-native';
 
 import {
@@ -31,10 +33,21 @@ import { reservas as C, reservasFonts as F } from '../theme/colors';
 // imagen y no el ícono, sin salir a buscar nada a internet.
 const FOTO_DE_EJEMPLO = 'data:image/gif;base64,R0lGODlhAQABAIAAACHFewAAACwAAAAAAQABAAACAkQBADs=';
 
+// Una foto PARADA de 60x180 con tres franjas: roja arriba, verde al medio,
+// azul abajo. Es el caso que rompía las portadas —una foto de teléfono sacada
+// de pie— y con las franjas se ve de un vistazo si el encuadre elegido es el
+// que se está mostrando: «Arriba» tiene que dar rojo y «Abajo», azul.
+const FOTO_PARADA = {
+  uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAC0CAIAAABHfdiQAAAAqUlEQVR42u3OAQkAIAwAsFcxzM0kpjPF89jicBgswKIyxwlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlp6Zb0enccaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaeme9D41jrS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLR0iw8Z3pp1caezbgAAAABJRU5ErkJggg==',
+  width: 60,
+  height: 180,
+};
+
 export default function ReservasUiGalleryScreen({ navigation }) {
   const [chip, setChip] = useState('hoy');
   const [count, setCount] = useState(1);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [encuadre, setEncuadre] = useState(false);
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -90,6 +103,9 @@ export default function ReservasUiGalleryScreen({ navigation }) {
           <Foto style={styles.fotoDemo} />
         </View>
 
+        <SectionLabel>Encuadre</SectionLabel>
+        <Button label="Elegir qué parte se ve" variant="secondary" onPress={() => setEncuadre(true)} />
+
         <SectionLabel>Fila de lista</SectionLabel>
         <Card padded={false}>
           <ListRow
@@ -137,6 +153,13 @@ export default function ReservasUiGalleryScreen({ navigation }) {
       <StickyFooter>
         <Button label="CTA sticky de fondo" onPress={() => {}} />
       </StickyFooter>
+
+      <EncuadreSheet
+        visible={encuadre}
+        asset={FOTO_PARADA}
+        onCancelar={() => setEncuadre(false)}
+        onConfirmar={() => setEncuadre(false)}
+      />
 
       <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)} title="Filtros">
         <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.textSecondary }}>

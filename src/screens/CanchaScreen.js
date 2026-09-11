@@ -14,6 +14,8 @@ import {
   canchasDelRecinto, crearCancha, actualizarCancha, actualizarFotoCancha,
 } from '../services/recinto';
 import { pickImage, uploadFotoCancha } from '../services/storage';
+import EncuadreSheet from '../components/reservas/EncuadreSheet';
+import { queSobra, PROPORCION_PORTADA } from '../utils/encuadre';
 import { formatCLP } from '../services/reservasRules';
 
 const TIPOS = [
@@ -65,6 +67,7 @@ export default function CanchaScreen({ navigation, route }) {
   const [foto, setFoto] = useState(null);
   const [subiendo, setSubiendo] = useState(false);
   const [aviso, setAviso] = useState(null);
+  const [pendiente, setPendiente] = useState(null);
 
   const cargar = useCallback(async () => {
     if (esNueva) return;
@@ -95,17 +98,32 @@ export default function CanchaScreen({ navigation, route }) {
     setTimeout(() => setAviso(null), 3500);
   };
 
-  const cambiarFoto = async () => {
+  /**
+   * Si la foto ya viene con la proporción en que se va a mostrar —el selector
+   * del teléfono recorta solo— se sube directo. Si no, se pregunta con qué
+   * parte quedarse antes de subir nada: en 16:9 una foto sacada de pie pierde
+   * más de la mitad del alto, y elegirlo por la persona es cómo terminaba
+   * viéndose solo la reja del fondo.
+   */
+  const elegirFoto = async () => {
     const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.8, base64: false });
     if (!ok) { if (reason) setError(reason); return; }
-    setSubiendo(true);
     setError(null);
+    if (!queSobra(asset.width, asset.height, PROPORCION_PORTADA)) {
+      subirFoto(asset, 'centro');
+      return;
+    }
+    setPendiente(asset);
+  };
 
-    const { url, error: errSubida } = await uploadFotoCancha(complejoId, canchaId, asset);
-    if (errSubida) { setSubiendo(false); setError(errSubida.message); return; }
+  const subirFoto = async (asset, anclaje) => {
+    setSubiendo(true);
+    const { url, error: errSubida } = await uploadFotoCancha(complejoId, canchaId, asset, { anclaje });
+    if (errSubida) { setSubiendo(false); setPendiente(null); setError(errSubida.message); return; }
 
     const { error: err } = await actualizarFotoCancha(canchaId, url);
     setSubiendo(false);
+    setPendiente(null);
     if (err) { setError(err.message); return; }
     setFoto(url);
     avisar('Foto de la cancha actualizada. Ya quedó guardada.');
@@ -216,7 +234,7 @@ export default function CanchaScreen({ navigation, route }) {
                     variant="secondary"
                     icon={ImagePlus}
                     loading={subiendo}
-                    onPress={cambiarFoto}
+                    onPress={elegirFoto}
                     style={{ flex: 1 }}
                   />
                   {foto ? (
@@ -347,6 +365,14 @@ export default function CanchaScreen({ navigation, route }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <EncuadreSheet
+        visible={!!pendiente}
+        asset={pendiente}
+        guardando={subiendo}
+        onCancelar={() => setPendiente(null)}
+        onConfirmar={(anclaje) => subirFoto(pendiente, anclaje)}
+      />
 
       <StickyFooter>
         <Button

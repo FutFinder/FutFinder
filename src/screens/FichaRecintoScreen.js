@@ -14,6 +14,8 @@ import {
   pickImage, uploadComplejoFoto, uploadFotoGaleria, removeComplejoFotoFile, pathFromPublicUrl,
 } from '../services/storage';
 import { SERVICIOS } from '../utils/serviciosRecinto';
+import EncuadreSheet from '../components/reservas/EncuadreSheet';
+import { queSobra, PROPORCION_PORTADA } from '../utils/encuadre';
 
 /**
  * Ficha del recinto (artboards 1i y 1j).
@@ -38,6 +40,12 @@ import { SERVICIOS } from '../utils/serviciosRecinto';
  * botón apagado después de hacer algo se lee como «no se guardó», así que
  * ahora la pantalla lo DICE en vez de dejar que alguien lo deduzca — era
  * exactamente lo que pasaba cuando se probó.
+ *
+ * LA FOTO SE RECORTA AL SUBIRLA, Y LO ELIGE QUIEN LA SUBE. Se muestra en
+ * cajas horizontales y nadie saca fotos horizontales, así que siempre sobra
+ * algo. En el teléfono el selector ya deja recortar; en el navegador no, y ahí
+ * se abre `EncuadreSheet` para elegir con qué parte quedarse. Sin eso, una
+ * foto sacada de pie terminaba siendo una franja.
  *
  * LA PORTADA Y LA GALERÍA SON COSAS DISTINTAS (migración 80). La portada es
  * la única que representa al recinto en el buscador: es UNA y la elige el
@@ -69,6 +77,8 @@ export default function FichaRecintoScreen({ navigation, route }) {
   // Lo que acaba de pasar con las fotos. Se muestra y se va: es un acuse, no
   // un estado.
   const [aviso, setAviso] = useState(null);
+  // La foto elegida que todavía no se sube porque falta decidir el encuadre.
+  const [pendiente, setPendiente] = useState(null);
 
   const cargar = useCallback(async () => {
     const [{ data, error: err }, { data: servs }, { data: fotos }] = await Promise.all([
@@ -110,13 +120,45 @@ export default function FichaRecintoScreen({ navigation, route }) {
     setTimeout(() => setAviso(null), 3500);
   };
 
-  const cambiarFoto = async () => {
+  /**
+   * Elegir una foto. Si ya viene con la proporción en que se va a mostrar
+   —el selector del teléfono recorta solo— se sube directo; si no, se
+   * pregunta con qué parte quedarse antes de tocar nada.
+   */
+  const elegirFoto = async (destino) => {
     const { ok, asset, reason } = await pickImage({ aspect: [16, 9], quality: 0.8, base64: false });
     if (!ok) { if (reason) setError(reason); return; }
-    setSubiendo(true);
     setError(null);
-    const { error: err } = await uploadComplejoFoto(complejoId, asset);
-    setSubiendo(false);
+    if (!queSobra(asset.width, asset.height, PROPORCION_PORTADA)) {
+      subirFoto(destino, asset, 'centro');
+      return;
+    }
+    setPendiente({ asset, destino });
+  };
+
+  const subirFoto = async (destino, asset, anclaje) => {
+    const enGaleria = destino === 'galeria';
+    const marcar = enGaleria ? setSubiendoGaleria : setSubiendo;
+    marcar(true);
+
+    if (enGaleria) {
+      const { url, error: errSubida } = await uploadFotoGaleria(complejoId, asset, { anclaje });
+      if (errSubida) { marcar(false); setPendiente(null); setError(errSubida.message); return; }
+      const { data, error: err } = await agregarFotoRecinto(complejoId, url);
+      marcar(false);
+      setPendiente(null);
+      if (err) { setError(err.message); return; }
+      // El tope de ocho lo aplica el servidor, así que esto puede volver con
+      // un «no» aunque la subida haya salido bien. Se dice, no se ignora.
+      if (data && data.ok === false) { setError(data.reason); return; }
+      await cargar();
+      avisar('Foto agregada. Ya está guardada.');
+      return;
+    }
+
+    const { error: err } = await uploadComplejoFoto(complejoId, asset, { anclaje });
+    marcar(false);
+    setPendiente(null);
     if (err) { setError(err.message); return; }
     await cargar();
     avisar('Portada actualizada. Las fotos se guardan solas, no hace falta guardar nada más.');
@@ -129,25 +171,6 @@ export default function FichaRecintoScreen({ navigation, route }) {
     if (err) { setError(err.message); return; }
     await cargar();
     avisar('Quitamos la portada.');
-  };
-
-  const agregarAGaleria = async () => {
-    const { ok, asset, reason } = await pickImage({ aspect: [4, 3], quality: 0.8, base64: false });
-    if (!ok) { if (reason) setError(reason); return; }
-    setSubiendoGaleria(true);
-    setError(null);
-
-    const { url, error: errSubida } = await uploadFotoGaleria(complejoId, asset);
-    if (errSubida) { setSubiendoGaleria(false); setError(errSubida.message); return; }
-
-    const { data, error: err } = await agregarFotoRecinto(complejoId, url);
-    setSubiendoGaleria(false);
-    if (err) { setError(err.message); return; }
-    // El tope de ocho lo aplica el servidor, así que esto puede volver con un
-    // «no» aunque la subida haya salido bien. Se dice, no se ignora.
-    if (data && data.ok === false) { setError(data.reason); return; }
-    await cargar();
-    avisar('Foto agregada. Ya está guardada.');
   };
 
   const quitarDeGaleria = async (foto) => {
@@ -313,7 +336,7 @@ export default function FichaRecintoScreen({ navigation, route }) {
                   variant="secondary"
                   icon={ImagePlus}
                   loading={subiendo}
-                  onPress={cambiarFoto}
+                  onPress={() => elegirFoto('portada')}
                   style={{ flex: 1 }}
                 />
                 {recinto.foto_url ? (
@@ -363,7 +386,7 @@ export default function FichaRecintoScreen({ navigation, route }) {
                 icon={ImagePlus}
                 loading={subiendoGaleria}
                 disabled={galeria.length >= 8}
-                onPress={agregarAGaleria}
+                onPress={() => elegirFoto('galeria')}
                 style={{ marginTop: 12 }}
               />
             </Card>
@@ -384,6 +407,14 @@ export default function FichaRecintoScreen({ navigation, route }) {
           onPress={guardar}
         />
       </StickyFooter>
+
+      <EncuadreSheet
+        visible={!!pendiente}
+        asset={pendiente?.asset}
+        guardando={subiendo || subiendoGaleria}
+        onCancelar={() => setPendiente(null)}
+        onConfirmar={(anclaje) => subirFoto(pendiente.destino, pendiente.asset, anclaje)}
+      />
     </SafeAreaView>
   );
 }
@@ -431,7 +462,7 @@ const styles = StyleSheet.create({
   galeriaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 13 },
   // Tres por fila con 8 de separación: 31% deja el margen justo sin tener que
   // medir el ancho de la pantalla.
-  galeriaItem: { width: '31%', aspectRatio: 4 / 3 },
+  galeriaItem: { width: '31%', aspectRatio: PROPORCION_PORTADA },
   galeriaFoto: {
     width: '100%', height: '100%', borderRadius: R.cardSm,
     backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,

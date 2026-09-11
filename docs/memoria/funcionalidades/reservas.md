@@ -75,6 +75,16 @@ Construido hasta ahora (pantallas 1 a 8 del handoff):
 - **Galería del recinto** (`complejo_fotos`, migración 81): hasta ocho, para que el jugador vea cómo es el lugar. Se muestran deslizables en `ComplejoDetailScreen`, con la portada primero.
 - **Foto de cada cancha** (`canchas_reservables.foto_url`, migración 81): una por cancha. Es la que se ve al elegir cancha y en el resumen; si no está, se cae a la portada del recinto.
 
+**Las fotos se veían cortadas, y eran dos causas** (corregido 2026-09-11).
+
+La primera: **las cajas tenían proporciones que ninguna foto tiene.** La tarjeta del listado era `height: 130` sobre 350 de ancho — **2,69:1** — y la vista previa del mapa, **3,18:1**. Una cámara de teléfono da 4:3 acostada o 3:4 parada, así que de una foto acostada se veía la mitad del alto y de una parada, un 28 %: una franja. Ahora todas las cajas grandes usan `PROPORCION_PORTADA` (16:9), que es la misma en la que se recorta al subir, así que la foto se ve completa.
+
+La segunda: **en 16:9 igual sobra, y nadie elegía qué se iba.** `resizeAndCompress` nunca recortó —guardaba la foto entera— y todo el recorte ocurría al mostrarla, con `cover`, por el centro. En el teléfono el selector de imágenes ya deja recortar; **en el navegador `allowsEditing` no hace nada**, así que ahí no había ningún paso de encuadre. `EncuadreSheet` lo agrega: tres opciones (arriba/centro/abajo, o izquierda/derecha en una panorámica) y se recorta **antes** de subir, con `expo-image-manipulator`. Si la foto ya viene en 16:9 la hoja ni se abre.
+
+**La cuenta de la vista previa y la del recorte son la misma, y hay una prueba que lo exige** (`LO QUE SE VE ES LO QUE SE GUARDA`, en `src/utils/__tests__/encuadre.test.js`). Si se separan, alguien elige «arriba» y se guarda el medio, y eso no se nota hasta que un recinto reclama.
+
+**La vista previa no mide nada.** La primera versión usaba `onLayout` para calcular desplazamientos en píxeles; dentro de un modal esa medición a veces no llegaba nunca y la hoja quedaba vacía, sin error. Se reescribió en porcentajes: la caja ya tiene su proporción fijada y no hay qué esperar. Se comprobó en `/ui-reservas`, con una foto de prueba de tres franjas de color — arriba da rojo, abajo da azul.
+
 **El archivo del bucket se borra después de la fila y sin bloquear.** Si falla, la foto ya no se muestra en ninguna parte y lo único que queda es un archivo suelto — mejor que dejar la fila colgada por un error de red. La foto de la cancha ni siquiera se borra: su ruta lleva el id de la cancha, así que la siguiente la reemplaza.
 
 **Un detalle que estaba mal desde la 75:** la url de la portada terminaba con `?t=1?v=2`, porque `uploadToBucket` ya agrega un parámetro de caché y `uploadComplejoFoto` le sumaba otro con `?` en vez de `&`. No rompía nada visible, pero era una query string malformada; ahora se usa solo la que agrega `uploadToBucket`.

@@ -25,6 +25,7 @@ import { misRecintos, agendaDelDia } from '../services/recinto';
 import { miSolicitudPendiente } from '../services/solicitudRecinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO } from '../utils/recintoPantallas';
+import { PROPORCION_PORTADA } from '../utils/encuadre';
 
 // Búsqueda sin distinguir tilde/mayúscula ("maipu" debe encontrar "Maipú") —
 // mismo patrón que ya usa PickerSheet en el módulo Partidos.
@@ -601,7 +602,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden',
   },
   mapPreviewPhoto: {
-    height: 110, backgroundColor: C.surfaceAlt, overflow: 'hidden',
+    // Igual que la del listado: 110 de alto daba 3,18:1, todavía peor.
+    aspectRatio: PROPORCION_PORTADA, backgroundColor: C.surfaceAlt, overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
   },
   mapPreviewRating: {
@@ -654,7 +656,12 @@ const styles = StyleSheet.create({
   horaReservarText: { fontFamily: F.extraBold, fontSize: 12.5, color: C.green },
 
   photoPlaceholder: {
-    height: 130,
+    // 16:9 y no una altura fija. Con `height: 130` la caja quedaba en 2,69:1
+    // sobre una tarjeta de 350 de ancho, y ninguna cámara de teléfono da algo
+    // parecido: de una foto 4:3 se veía la mitad del alto, y de una sacada de
+    // pie, un 28 %. Es la misma proporción en la que se recorta al subir, así
+    // que ahora se ve la foto completa.
+    aspectRatio: PROPORCION_PORTADA,
     backgroundColor: C.surfaceAlt,
     borderTopLeftRadius: R.hero,
     borderTopRightRadius: R.hero,

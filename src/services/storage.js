@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { recorteParaProporcion, PROPORCION_PORTADA } from '../utils/encuadre';
 import { computeTargetDimensions } from '../utils/profileEdit';
 
 /**
@@ -178,10 +179,16 @@ export function pathFromPublicUrl(url, bucket) {
  * Si `expo-image-manipulator` falla en alguna plataforma, no bloqueamos la
  * subida: se sigue con la imagen original sin redimensionar.
  */
-async function resizeAndCompress(asset, { maxDimension, compress = 0.7 } = {}) {
+async function resizeAndCompress(asset, { maxDimension, compress = 0.7, recorte = null } = {}) {
   try {
-    const target = computeTargetDimensions(asset.width, asset.height, maxDimension);
-    const actions = target ? [{ resize: target }] : [];
+    // El recorte va PRIMERO y en píxeles de la foto original: si se
+    // redimensionara antes, el rectángulo que calculó `recorteParaProporcion`
+    // ya no correspondería a esta imagen y se recortaría cualquier cosa.
+    const acciones = recorte ? [{ crop: recorte }] : [];
+    const anchoTrasRecorte = recorte ? recorte.width : asset.width;
+    const altoTrasRecorte = recorte ? recorte.height : asset.height;
+    const target = computeTargetDimensions(anchoTrasRecorte, altoTrasRecorte, maxDimension);
+    const actions = target ? [...acciones, { resize: target }] : acciones;
     const result = await ImageManipulator.manipulateAsync(asset.uri, actions, {
       compress,
       format: ImageManipulator.SaveFormat.JPEG,
@@ -396,11 +403,14 @@ export const removeAvatarBucketFile = (path) => removeFromBucket('avatars', path
  * es el que lo evita — antes se le sumaba OTRO con `?`, lo que dejaba una
  * query string malformada (`?t=1?v=2`).
  */
-export async function uploadComplejoFoto(complejoId, asset) {
+export async function uploadComplejoFoto(complejoId, asset, { anclaje = 'centro' } = {}) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   if (!asset || !complejoId) return { error: { message: 'Faltan datos' } };
 
-  const processed = await resizeAndCompress(asset, { maxDimension: 1600 });
+  const processed = await resizeAndCompress(asset, {
+    maxDimension: 1600,
+    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, anclaje),
+  });
   const ext = extFromAsset(processed);
   const path = `${complejoId}/portada.${ext}`;
   const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
@@ -441,11 +451,14 @@ export async function uploadComplejoFoto(complejoId, asset) {
  * Devuelve también el `path` para poder borrar el archivo cuando la foto se
  * quite de la galería; si no, cada foto quitada dejaría un archivo huérfano.
  */
-export async function uploadFotoGaleria(complejoId, asset) {
+export async function uploadFotoGaleria(complejoId, asset, { anclaje = 'centro' } = {}) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   if (!asset || !complejoId) return { error: { message: 'Faltan datos' } };
 
-  const processed = await resizeAndCompress(asset, { maxDimension: 1600 });
+  const processed = await resizeAndCompress(asset, {
+    maxDimension: 1600,
+    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, anclaje),
+  });
   const ext = extFromAsset(processed);
   const marca = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const path = `${complejoId}/galeria/${marca}.${ext}`;
@@ -469,11 +482,14 @@ export async function uploadFotoGaleria(complejoId, asset) {
  * `?t=` que ya agrega `uploadToBucket` es el que evita que el caché siga
  * mostrando la foto anterior.
  */
-export async function uploadFotoCancha(complejoId, canchaId, asset) {
+export async function uploadFotoCancha(complejoId, canchaId, asset, { anclaje = 'centro' } = {}) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   if (!asset || !complejoId || !canchaId) return { error: { message: 'Faltan datos' } };
 
-  const processed = await resizeAndCompress(asset, { maxDimension: 1600 });
+  const processed = await resizeAndCompress(asset, {
+    maxDimension: 1600,
+    recorte: recorteParaProporcion(asset.width, asset.height, PROPORCION_PORTADA, anclaje),
+  });
   const ext = extFromAsset(processed);
   const path = `${complejoId}/canchas/${canchaId}.${ext}`;
   const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
