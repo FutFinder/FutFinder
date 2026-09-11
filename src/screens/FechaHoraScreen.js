@@ -105,7 +105,7 @@ export default function FechaHoraScreen({ navigation, route }) {
         <View style={styles.legendRow}>
           <Legend color={C.surface} border={C.border} label="Disponible" />
           <Legend color={C.green} label="Seleccionado" />
-          <Legend color={C.bg} border={C.dashedBorder} punteado label="No disponible" />
+          <Legend color={C.bg} border={C.dashedBorder} punteado label="Reservada" />
         </View>
       </ScrollView>
 

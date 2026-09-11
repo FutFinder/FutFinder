@@ -72,10 +72,13 @@ export function Foto({ uri, style, icon: Icon = ImageIcon, iconSize = 22, alt, c
  * el borde es punteado (la misma señal que el resto de la app usa para «acá no
  * hay nada»), la hora va tachada y donde iría el precio dice «No disponible».
  *
- * NO SE DICE POR QUÉ ESTÁ OCUPADO, y es una decisión del backend que la
- * interfaz respeta: `get_disponibilidad_cancha` nunca cuenta si hay una
- * reserva de otra persona o si el recinto cerró esa hora. Por eso la etiqueta
- * es «No disponible» y no «Reservado».
+ * LA ETIQUETA DICE «RESERVADA» PARA TODO LO OCUPADO. El backend no cuenta
+ * por qué —`get_disponibilidad_cancha` nunca distingue entre una reserva de
+ * otra persona y una hora que el recinto cerró— así que una hora bloqueada
+ * por mantención también va a decir «Reservada». Se eligió a propósito: al
+ * jugador no le sirve el matiz y «Reservada» es más claro que «No
+ * disponible». Si algún día importa distinguirlas, el cambio no es de texto:
+ * hay que decidir primero qué se le puede contar al jugador.
  */
 export function SlotHora({ hora, precioTexto, disponible = true, seleccionado = false, onPress, style }) {
   const libre = disponible && !seleccionado;
@@ -104,7 +107,7 @@ export function SlotHora({ hora, precioTexto, disponible = true, seleccionado = 
       {/* El precio es POR BLOQUE: con tarifas por franja la misma cancha vale
           distinto según la hora, y elegir sin ver el valor no se sostiene. */}
       {!disponible ? (
-        <Text style={styles.slotOcupadoTexto}>No disponible</Text>
+        <Text style={styles.slotOcupadoTexto}>Reservada</Text>
       ) : precioTexto ? (
         <Text style={[styles.slotPrecio, seleccionado && styles.slotTextoElegido]}>
           {precioTexto}
