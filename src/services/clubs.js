@@ -377,7 +377,7 @@ export async function listMembers(clubId) {
   const ids = members.map((m) => m.user_id);
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username, foto_url, trust_score, posicion_preferida, comuna')
+    .select('id, username, foto_url, trust_score, posicion_preferida, comuna, flanco')
     .in('id', ids);
   const byId = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -403,6 +403,7 @@ export async function listMembers(clubId) {
       trust_score: byId.get(m.user_id)?.trust_score ?? 100,
       posicion_preferida: byId.get(m.user_id)?.posicion_preferida || [],
       comuna: byId.get(m.user_id)?.comuna || null,
+      flanco: byId.get(m.user_id)?.flanco || null,
       apodo: apodoPorMiembro.get(m.id) || null,
     })),
     error: null,

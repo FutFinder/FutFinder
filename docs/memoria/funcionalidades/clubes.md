@@ -109,11 +109,51 @@ Ambas migraciones tienen su arnés (`90_el_capitan_del_equipo_test.sql`, `91_el_
 
 `ClubMembersScreen` se rediseñó sobre esta base, y de paso adoptó `clubColors`/`dsColors` en vez de los tokens de `colors.js`, para verse igual que `ClubDetailScreen`: resumen del plantel con el tope real del plan, buscador por nombre/apodo/posición, pestaña «Solicitudes» sólo para administradores (las solicitudes reales de `club_join_requests`, no invitaciones inventadas), insignias Admin/Capitán, y un menú ⋮ por integrante con ver perfil, editar apodo, enviar mensaje directo (`dm:<userId>`, el mismo canal que ya usa `ProfileScreen`), nombrar/quitar capitán, hacer administrador y quitar del club. El botón de copiar/compartir enlace de invitación del mockup de referencia se descartó a propósito: no existe ningún mecanismo de invitación por link en el backend, y el único real sigue siendo `ClubInviteScreen` (buscar por nombre dentro de la app).
 
+## Alineación del club
+
+La migración **92** agrega `club_lineups`: UNA fila por club, no por partido —
+formación, modo (7 u 11) y qué integrante va en cada puesto—, que se
+SOBRESCRIBE al guardar (`club_id` es primary key; guardar de nuevo reemplaza,
+no archiva). Nace ya con la calificación explícita `club_lineups.club_id` en
+sus políticas de RLS, aprendiendo de memoria del bug real que la 90 encontró
+y corrigió en `club_members_update`: la misma auto-referencia sin calificar,
+pero acá corregida desde el primer día en vez de heredada. Sólo admin o
+capitán arman y guardan (`club_lineups_insert`/`_update` exigen
+`rol in ('admin','capitan')` y `updated_by = auth.uid()`); cualquier
+integrante del club la lee. `asignaciones` es un jsonb `{puesto: member_id}`
+sin FK adentro a propósito: un integrante expulsado después de guardar
+simplemente deja de resolver a nadie al leer, en vez de romper la pantalla.
+
+Los PUESTOS de la cancha (`src/utils/formacionClub.js`, puro y probado) son
+más finos que las 7 posiciones reales de `profiles.posicion_preferida`:
+distinguen lado (LI/LD, MI/MD, EI/ED) y profundidad (MC/MCD, DC/MP), que la
+posición declarada no tiene. `fitsForMember()` traduce lo real a la lista de
+puestos que le calzan —juntando TODAS las posiciones de un jugador cuando
+declaró más de una, sin repetir— y usa `profiles.flanco` sólo para anteponer
+el lado ya declarado, nunca para descartar el otro. Es una decisión
+deliberada: inventar una posición más precisa de la que el jugador nunca
+declaró habría sido fabricar un dato, así que el tablero resalta el mejor
+calce con lo real en vez de simular una granularidad que no existe.
+
+A diferencia del mockup de referencia, la pantalla **no permite arrastrar un
+puesto por la cancha para reposicionarlo a mano** («alineación
+personalizada»): las claves de puesto son posicionales por línea (`l0p0`,
+`l1p2`…) y sólo tienen sentido para la formación con la que se calcularon,
+así que cambiar de formación siempre limpia las asignaciones en vez de
+arrastrar un dato que podría quedar mal ubicado en silencio — el mismo mockup
+tenía ahí una inconsistencia latente (conservaba asignaciones entre
+formaciones distintas sin remapear los índices de línea).
+
+Se llega desde el acceso rápido «Alineación» de la portada de Clubes
+(`QuickActionGrid`), en el lugar donde antes estaba «Mi club» — ese acceso a
+`ClubDetailScreen` no se perdió: sigue disponible desde «Ver club» en
+`ClubSummaryCard`, más abajo en la misma portada.
+
 ## Pantallas y dependencias
 
-- Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
-- Código: `src/services/clubs.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
-- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`) y 91 (`club_member_apodos`) están escritas y probadas, **pendientes de aplicar**.
+- Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, alineación, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
+- Código: `src/services/clubs.js`, `clubLineup.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/utils/formacionClub.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
+- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`) y 92 (`club_lineups`) están escritas y probadas, **pendientes de aplicar**.
 
 ## Estados, errores y problemas conocidos
 

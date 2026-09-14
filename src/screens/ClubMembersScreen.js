@@ -37,6 +37,7 @@ import {
 } from 'lucide-react-native';
 
 import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import { etiquetaPosiciones } from '../utils/playerMeta';
 import Banner from '../components/Banner';
 import { getCurrentUser } from '../services/auth';
 import {
@@ -62,22 +63,6 @@ import {
   setApodo,
   CLUB_LIMITS,
 } from '../services/clubs';
-
-const POSICION_LABEL = {
-  arquero: 'Arquero',
-  defensa: 'Defensa',
-  lateral: 'Lateral',
-  medio: 'Medio',
-  volante: 'Volante',
-  delantero: 'Delantero',
-};
-
-function formatPosiciones(lista) {
-  return (lista || [])
-    .filter((p) => p !== 'sin_definir')
-    .map((p) => POSICION_LABEL[p] || p)
-    .join(' · ');
-}
 
 /** Confirmación multiplataforma (web usa confirm, native usa Alert). */
 function confirmAction(title, message, onConfirm) {
@@ -679,7 +664,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                 </View>
               )
             : ({ item }) => {
-                const posiciones = formatPosiciones(item.posicion_preferida);
+                const posiciones = etiquetaPosiciones(item.posicion_preferida);
                 return (
                   <Pressable
                     onPress={() => navigation.navigate('UserProfile', { userId: item.user_id })}
