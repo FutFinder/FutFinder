@@ -65,6 +65,7 @@ import ComplejoDetailScreen from '../screens/ComplejoDetailScreen';
 import ElegirCanchaScreen from '../screens/ElegirCanchaScreen';
 import FechaHoraScreen from '../screens/FechaHoraScreen';
 import ResumenReservaScreen from '../screens/ResumenReservaScreen';
+import MisReservasScreen from '../screens/MisReservasScreen';
 import PagoReservaScreen from '../screens/PagoReservaScreen';
 import ReportarProblemaScreen from '../screens/ReportarProblemaScreen';
 import MisRecintosScreen from '../screens/MisRecintosScreen';
@@ -148,6 +149,7 @@ const GuardedElegirCanchaScreen = withAuthGuard(ElegirCanchaScreen, 'ElegirCanch
 const GuardedFechaHoraScreen = withAuthGuard(FechaHoraScreen, 'FechaHora');
 const GuardedResumenReservaScreen = withAuthGuard(ResumenReservaScreen, 'Resumen');
 const GuardedPagoReservaScreen = withAuthGuard(PagoReservaScreen, 'PagoReserva');
+const GuardedMisReservasScreen = withAuthGuard(MisReservasScreen, 'MisReservas');
 const GuardedReportarProblemaScreen = withAuthGuard(ReportarProblemaScreen, 'ReportarProblema');
 // Administración del recinto: todas detrás del guard porque muestran datos de
 // reservas de terceros (nombre y teléfono de contacto incluidos).
@@ -458,6 +460,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Resumen"
           component={GuardedResumenReservaScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="MisReservas"
+          component={GuardedMisReservasScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

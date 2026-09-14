@@ -72,7 +72,7 @@ test('toda fase tiene texto, y el texto nunca queda vacío', () => {
 test('mientras se espera no se ofrece ningún botón', () => {
   assert.equal(accionDeFase('pagando'), null);
   assert.equal(accionDeFase('esperando'), null);
-  assert.equal(accionDeFase('confirmada').accion, 'inicio');
+  assert.equal(accionDeFase('confirmada').accion, 'reserva');
   assert.equal(accionDeFase('rechazada').accion, 'reintentar');
   assert.equal(accionDeFase('expirada').accion, 'reintentar');
   // Ojo: después de «te devolvemos» NO se ofrece reintentar el mismo

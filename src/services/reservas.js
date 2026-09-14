@@ -4,6 +4,7 @@ import {
   nombreDeTipo, jugadoresDeTipo, notaDeCancha, comoComplejoDeLista, comoCancha,
 } from '../utils/reservasJugador';
 import { nombresDeServicios } from '../utils/serviciosRecinto';
+import { comoReserva } from '../utils/misReservas';
 
 /**
  * Servicio del vertical Reservas, LADO DEL JUGADOR.
@@ -249,6 +250,44 @@ export async function crearReserva({
     p_cobros: cobros && cobros.length ? cobros : null,
   });
   return comoResultadoRecinto(data, error, 'crearReserva');
+}
+
+/* ── Mis reservas ──────────────────────────────────────────────── */
+
+/**
+ * Las reservas del jugador: las que organizó y en las que lo invitaron.
+ *
+ * RPC y no consulta directa: la pantalla necesita el nombre del recinto y de
+ * la cancha, y la RLS de esas tablas solo muestra lo PUBLICADO. Un recinto
+ * que se despublica haría desaparecer de la lista una reserva que la persona
+ * pagó (migración 86).
+ *
+ * `puede_cancelar` viene calculado del servidor y NO se recalcula acá: la
+ * ventana de 12 horas es una regla de plata y tener dos copias es garantizar
+ * que un día digan cosas distintas.
+ */
+export async function misReservas(limite = 60) {
+  if (!isSupabaseConfigured) return SIN_CONFIG;
+  const { data, error } = await supabase.rpc('mis_reservas', { p_limite: limite });
+  const res = comoListaRecinto(data, error, 'misReservas');
+  if (res.error) return res;
+  return { data: (res.data || []).map(comoReserva), error: null };
+}
+
+/**
+ * Cancela una reserva. La ventana de 12 horas la comprueba el servidor.
+ *
+ * Devuelve `ok:false` con el motivo cuando ya no se puede, en vez de un
+ * error: es una respuesta del negocio y la pantalla la muestra tal cual.
+ */
+export async function cancelarMiReserva(reservaId, motivo) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  if (!reservaId) return { data: null, error: { message: 'Falta la reserva' } };
+  const { data, error } = await supabase.rpc('cancelar_reserva', {
+    p_reserva_id: reservaId,
+    p_motivo: motivo || null,
+  });
+  return comoResultadoRecinto(data, error, 'cancelarMiReserva');
 }
 
 export { nombreDeTipo, jugadoresDeTipo, notaDeCancha };

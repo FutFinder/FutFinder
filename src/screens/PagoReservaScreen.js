@@ -119,7 +119,7 @@ export default function PagoReservaScreen({ navigation, route }) {
   const total = detalle?.precio_total ?? monto ?? null;
 
   const ejecutar = () => {
-    if (accion?.accion === 'inicio') navigation.navigate('Main');
+    if (accion?.accion === 'reserva') navigation.navigate('MisReservas');
     else if (accion?.accion === 'reintentar') navigation.goBack();
     else if (accion?.accion === 'buscar') navigation.navigate('Main');
     else navigation.goBack();

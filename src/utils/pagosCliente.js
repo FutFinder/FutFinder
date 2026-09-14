@@ -154,10 +154,9 @@ export function textoDeFase(fase) {
  * sería «apurar», y no existe.
  */
 export function accionDeFase(fase) {
-  // Ojo: dice «volver al inicio» y no «ver mi reserva» porque TODAVÍA NO HAY
-  // pantalla donde el jugador vea sus reservas. Prometer un destino que no
-  // existe es peor que no ofrecerlo; el día que exista, esto cambia acá.
-  if (fase === 'confirmada') return { label: 'Volver al inicio', accion: 'inicio' };
+  // Ya existe la pantalla de «Mis reservas» (migración 86), así que el botón
+  // lleva a lo que la persona acaba de comprar en vez de al inicio.
+  if (fase === 'confirmada') return { label: 'Ver mi reserva', accion: 'reserva' };
   if (fase === 'rechazada' || fase === 'expirada') return { label: 'Intentar de nuevo', accion: 'reintentar' };
   if (fase === 'devolver' || fase === 'error') return { label: 'Volver a buscar cancha', accion: 'buscar' };
   if (fase === 'nodisponible') return { label: 'Volver', accion: 'atras' };

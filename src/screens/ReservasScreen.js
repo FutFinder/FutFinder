@@ -8,6 +8,7 @@ import {
   Star,
   SlidersHorizontal,
   Calendar,
+  CalendarDays,
   ShieldCheck,
   Building2,
   ChevronRight,
@@ -22,6 +23,8 @@ import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme
 import { listComplejosCerca, listHorasLibresHoy } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { misRecintos, agendaDelDia } from '../services/recinto';
+import { misReservas } from '../services/reservas';
+import { separaReservas } from '../utils/misReservas';
 import { miSolicitudPendiente } from '../services/solicitudRecinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO } from '../utils/recintoPantallas';
@@ -86,6 +89,7 @@ export default function ReservasScreen({ navigation }) {
   // administras algún recinto. Con uno se entra directo al panel; con dos o
   // más, a la lista. Es una llamada de más solo para quien administra.
   const [recintos, setRecintos] = useState([]);
+  const [misProximas, setMisProximas] = useState(0);
   const [reservasHoy, setReservasHoy] = useState(null);
   // La solicitud sin atender de quien mira, si tiene una: la invitación de
   // abajo cambia de texto en vez de invitar de nuevo a alguien que ya escribió.
@@ -95,6 +99,8 @@ export default function ReservasScreen({ navigation }) {
     useCallback(() => {
       let vivo = true;
       (async () => {
+        const { data: reservasMias } = await misReservas(60);
+        if (vivo) setMisProximas(separaReservas(reservasMias || []).proximas.length);
         const { data } = await misRecintos();
         if (!vivo) return;
         setRecintos(data || []);
@@ -185,6 +191,26 @@ export default function ReservasScreen({ navigation }) {
             </View>
           </Card>
         ) : null}
+
+        {/* La forma de volver a lo que uno ya reservó. Va arriba del
+            buscador porque quien entra con una reserva hecha viene a mirarla,
+            no a buscar otra. */}
+        <Card onPress={() => navigation.navigate('MisReservas')} style={styles.recintoCard}>
+          <View style={styles.recintoFila}>
+            <View style={styles.recintoIcono}>
+              <CalendarDays color={C.green} size={18} strokeWidth={2.2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.recintoNombre}>Mis reservas</Text>
+              <Text style={styles.recintoSub} numberOfLines={1}>
+                {misProximas > 0
+                  ? `${misProximas} por jugar`
+                  : 'Lo que reservaste, con la hora y cómo llegar'}
+              </Text>
+            </View>
+            <ChevronRight color={C.textSecondary} size={18} strokeWidth={2.2} />
+          </View>
+        </Card>
 
         <Text style={styles.h1}>Reserva una cancha</Text>
 
