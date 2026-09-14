@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, Plus, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, Plus, AlertTriangle, Trash2 } from 'lucide-react-native';
 
 import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import { Card, IconButton, Button, Badge, Sheet, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { Skeleton, FieldLabel, TextField, Switch } from '../components/reservas/recintoUi';
 import {
-  cobrosDelRecinto, crearCobro, actualizarCobro, canchasDelRecinto, comisionDe,
+  cobrosDelRecinto, crearCobro, actualizarCobro, canchasDelRecinto, comisionDe, eliminarCobro,
 } from '../services/recinto';
 import { formatCLP } from '../services/reservasRules';
 
@@ -55,6 +55,10 @@ export default function CobrosScreen({ navigation, route }) {
   const [nombreCobro, setNombreCobro] = useState('');
   const [precio, setPrecio] = useState('');
   const [activo, setActivo] = useState(true);
+  // El cobro que se está por sacar, y el resultado de haberlo sacado.
+  const [porEliminar, setPorEliminar] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
+  const [avisoBorrado, setAvisoBorrado] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [errorHoja, setErrorHoja] = useState(null);
 
@@ -113,6 +117,32 @@ export default function CobrosScreen({ navigation, route }) {
     cargar();
   };
 
+  /**
+   * Sacar un cobro de la lista.
+   *
+   * El servidor decide si se borra o se apaga —uno ya cobrado no se puede
+   * borrar sin romper la línea de una reserva pagada— y devuelve cuál de los
+   * dos pasó. La pantalla dice ESO y no un «listo» que a veces mentiría: si
+   * quedó apagado y la persona no lo sabe, va a abrir la lista, verlo ahí, y
+   * pensar que la app no funciona.
+   */
+  const confirmarEliminar = async () => {
+    setEliminando(true);
+    const { data, error: err } = await eliminarCobro(porEliminar.id);
+    setEliminando(false);
+    if (err) { setError(err.message); return; }
+
+    setAvisoBorrado(
+      data?.resultado === 'apagado'
+        ? `«${porEliminar.nombre}» ya se cobró en ${data.usos === 1 ? 'una reserva' : `${data.usos} reservas`}, `
+          + 'así que no se puede borrar del todo: lo apagamos. Deja de ofrecerse y las reservas que lo '
+          + 'incluyen lo siguen mostrando.'
+        : `Listo, «${porEliminar.nombre}» ya no está en tu lista.`,
+    );
+    setPorEliminar(null);
+    cargar();
+  };
+
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
@@ -155,6 +185,11 @@ export default function CobrosScreen({ navigation, route }) {
                       <Text style={styles.detalle}>{formatCLP(c.precio)} · por reserva</Text>
                     </View>
                     {c.activo ? null : <Badge label="Apagado" tone="neutral" />}
+                    <IconButton
+                      icon={Trash2}
+                      onPress={() => setPorEliminar(c)}
+                      accessibilityLabel={`Eliminar ${c.nombre}`}
+                    />
                   </View>
                 </Card>
               ))}
@@ -162,8 +197,11 @@ export default function CobrosScreen({ navigation, route }) {
 
             <Text style={styles.pie}>
               Apagar uno no lo borra: deja de ofrecerse en reservas nuevas y las reservas que ya lo
-              incluyen lo siguen mostrando, con el precio que tenía ese día.
+              incluyen lo siguen mostrando, con el precio que tenía ese día. Eliminarlo sí lo saca de
+              la lista, salvo que ya se haya cobrado alguna vez.
             </Text>
+
+            {avisoBorrado ? <NoticeCard tone="info">{avisoBorrado}</NoticeCard> : null}
 
             {lleno ? (
               <NoticeCard tone="warning" icon={AlertTriangle}>
@@ -185,6 +223,32 @@ export default function CobrosScreen({ navigation, route }) {
           />
         </StickyFooter>
       ) : null}
+
+      <Sheet
+        visible={!!porEliminar}
+        onClose={() => setPorEliminar(null)}
+        title={porEliminar ? `¿Eliminar ${porEliminar.nombre}?` : 'Eliminar'}
+      >
+        <Text style={styles.eliminarTexto}>
+          Deja de ofrecerse a los jugadores de inmediato. Si nunca se cobró, desaparece de tu lista;
+          si ya se cobró alguna vez, queda apagado — no se puede borrar de una reserva que alguien
+          ya pagó.
+        </Text>
+        <Button
+          label="Eliminar"
+          variant="destructive"
+          style={{ marginTop: 16 }}
+          loading={eliminando}
+          onPress={confirmarEliminar}
+        />
+        <Button
+          label="Mejor no"
+          variant="secondary"
+          style={{ marginTop: 9 }}
+          disabled={eliminando}
+          onPress={() => setPorEliminar(null)}
+        />
+      </Sheet>
 
       <Sheet visible={hoja} onClose={() => setHoja(false)} title={editando ? editando.nombre : 'Nuevo cobro'}>
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 470 }}>
@@ -332,6 +396,8 @@ function Vacio() {
 }
 
 const styles = StyleSheet.create({
+  eliminarTexto: { fontFamily: F.medium, fontSize: 13, lineHeight: 19.5, color: C.textSecondary },
+
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

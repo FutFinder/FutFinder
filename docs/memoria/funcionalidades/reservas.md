@@ -81,6 +81,8 @@ La regla quedó en los tres lugares: **un bloque que ya empezó no se ofrece, no
 
 El pago se cierra con un disparador sobre `pagos` y no reescribiendo la RPC, así queda cubierta cualquier función de pago que se agregue después. **Solo en INSERT**: un pago que ya existe tiene que poder confirmarse aunque el bloque haya empezado mientras la persona pagaba — para eso está el estado `reversar`.
 
+**Un cobro adicional ahora se puede eliminar** (2026-09-14, migración 85). Antes solo se podía apagar, y uno creado por error —un nombre mal escrito, un precio de prueba— se quedaba para siempre estorbando en la lista. **No siempre se puede borrar del todo**: `reserva_cobros.cobro_id` es una clave foránea sin cascada, así que borrar uno ya cobrado reventaría la línea de una reserva pagada. La RPC hace lo que se puede en un solo paso —borra si nunca se usó, apaga si sí— y **devuelve cuál de los dos pasó**, porque decir «eliminado» cuando quedó apagado se descubre al abrir la lista y verlo ahí. El permiso no se comprueba en la función: el disparador `tg_permiso_cobros` de la 83 ya cubre el DELETE.
+
 ## Las fotos
 
 **La foto que el recinto subía no la veía nadie** (corregido 2026-09-11). El dato estaba bien de punta a punta —`buscar_complejos` devolvía `foto_url`, `comoComplejoDeLista` lo mapeaba— pero **ninguna pantalla del jugador dibujaba un `<Image>`**: las cinco mostraban un ícono gris de marcador de posición. No era un problema de datos ni de caché: la imagen no estaba puesta. Se resolvió con una primitiva, `Foto` en `components/reservas/ui.js`, que muestra la imagen si la hay y el hueco gris si no, para que la próxima pantalla no nazca con el mismo agujero. Está en la galería de QA (`/ui-reservas`), que es donde se puede comprobar sin sesión.

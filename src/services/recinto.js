@@ -391,6 +391,25 @@ export async function solicitarRevisionRecinto(complejoId) {
   return comoResultadoRecinto(data, error, 'solicitarRevisionRecinto');
 }
 
+/**
+ * Saca un cobro adicional de la lista (migración 85).
+ *
+ * UN COBRO YA USADO NO SE PUEDE BORRAR: `reserva_cobros` apunta a él con
+ * una clave foránea, y borrarlo reventaría la línea de una reserva que
+ * alguien pagó. El servidor decide en un solo paso —lo borra si nunca se
+ * usó, lo apaga si sí— y devuelve `resultado` con cuál de los dos pasó.
+ *
+ * Quien llama TIENE que mirar `resultado`: decir «eliminado» cuando en
+ * realidad quedó apagado es la clase de mentira que se descubre al abrir
+ * la lista y verlo ahí.
+ */
+export async function eliminarCobro(cobroId) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!cobroId) return { data: null, error: { message: 'Falta el cobro' } };
+  const { data, error } = await supabase.rpc('admin_eliminar_cobro', { p_cobro_id: cobroId });
+  return comoResultadoRecinto(data, error, 'eliminarCobro');
+}
+
 /* ── Canchas ───────────────────────────────────────────────────── */
 
 /** Crea una cancha. `tipo` es `futbol_5`, `futbol_7` o `futbol_11`. */

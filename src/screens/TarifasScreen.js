@@ -154,7 +154,7 @@ export default function TarifasScreen({ navigation, route }) {
       <View style={styles.header}>
         <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Tarifas</Text>
+          <Text style={styles.headerTitle}>Tarifas por horario</Text>
           {cancha ? (
             <Text style={styles.headerSub} numberOfLines={1}>
               {cancha.nombre} · bloques de {cancha.duracion_slot_min} min
