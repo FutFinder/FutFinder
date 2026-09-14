@@ -510,6 +510,36 @@ export function telefonoAceptable(telefono) {
   return normalizaTelefonoCl(t) !== null;
 }
 
+/* ── Resúmenes de la lista de canchas ───────────────────────────────────── */
+
+/**
+ * «Todos los días» / «3 días con horario» / «Sin horario».
+ *
+ * Sale de `admin_canchas_complejo`, que trae la CANTIDAD de días con regla
+ * pero no las horas. Decir «abre 09:00–23:00» obligaría a pedir los horarios
+ * de cada cancha para pintar una lista, y sería falso en cuanto un día tenga
+ * otro horario.
+ */
+export function resumenDeHorario(cancha) {
+  const dias = Number(cancha?.dias_con_horario) || 0;
+  if (!cancha?.tiene_horario || dias === 0) return 'Sin horario';
+  if (dias === 7) return 'Abre todos los días';
+  return `${dias} ${dias === 1 ? 'día' : 'días'} con horario`;
+}
+
+/**
+ * «Precio único» o «Con tarifas por franja», más el precio base.
+ *
+ * El precio base no desaparece cuando hay tarifas: es el que se cobra en las
+ * horas que ninguna tarifa cubre. Por eso se muestra siempre, y por eso el
+ * texto dice «base» y no «precio».
+ */
+export function resumenDePrecio(cancha, formatea = (n) => String(n)) {
+  const base = Number(cancha?.precio_hora);
+  const precio = Number.isFinite(base) && base > 0 ? `${formatea(base)} base` : 'Sin precio';
+  return cancha?.tiene_tarifas ? `${precio} · con tarifas por franja` : `${precio} · precio único`;
+}
+
 /* ── Horas sueltas ──────────────────────────────────────────────────────── */
 
 /**

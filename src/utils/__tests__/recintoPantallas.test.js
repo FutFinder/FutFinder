@@ -513,3 +513,33 @@ test('hoyISO es la fecha local de ahora', () => {
   const ahora = new Date();
   assert.equal(hoyISO(ahora), fechaISO(ahora));
 });
+
+const { resumenDeHorario, resumenDePrecio } = require('../recintoPantallas.js');
+
+test('el resumen de horario no inventa horas que la lista no tiene', () => {
+  // `admin_canchas_complejo` trae la CANTIDAD de días con regla, no las horas.
+  // Decir «abre 09:00–23:00» obligaría a pedir los horarios de cada cancha
+  // para pintar una lista, y sería falso apenas un día tenga otro horario.
+  assert.strictEqual(resumenDeHorario({ tiene_horario: true, dias_con_horario: 7 }), 'Abre todos los días');
+  assert.strictEqual(resumenDeHorario({ tiene_horario: true, dias_con_horario: 3 }), '3 días con horario');
+  assert.strictEqual(resumenDeHorario({ tiene_horario: true, dias_con_horario: 1 }), '1 día con horario');
+  assert.strictEqual(resumenDeHorario({ tiene_horario: false, dias_con_horario: 0 }), 'Sin horario');
+  // Incoherencia del servidor: dice que tiene horario y cuenta cero días.
+  assert.strictEqual(resumenDeHorario({ tiene_horario: true, dias_con_horario: 0 }), 'Sin horario');
+  assert.strictEqual(resumenDeHorario(null), 'Sin horario');
+});
+
+test('el precio base se muestra aunque haya tarifas, porque se sigue cobrando', () => {
+  const plata = (n) => `$${n}`;
+  assert.strictEqual(
+    resumenDePrecio({ precio_hora: 20000, tiene_tarifas: false }, plata),
+    '$20000 base · precio único',
+  );
+  assert.strictEqual(
+    resumenDePrecio({ precio_hora: 20000, tiene_tarifas: true }, plata),
+    '$20000 base · con tarifas por franja',
+  );
+  // Sin precio no se muestra «$0», que se leería como gratis.
+  assert.strictEqual(resumenDePrecio({ precio_hora: 0 }, plata), 'Sin precio · precio único');
+  assert.strictEqual(resumenDePrecio(null, plata), 'Sin precio · precio único');
+});

@@ -2,7 +2,9 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, Plus, ChevronRight, AlertTriangle } from 'lucide-react-native';
+import {
+  ArrowLeft, Plus, ChevronRight, AlertTriangle, Clock, Tag,
+} from 'lucide-react-native';
 
 import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import {
@@ -10,7 +12,7 @@ import {
 } from '../components/reservas/ui';
 import { Skeleton } from '../components/reservas/recintoUi';
 import { canchasDelRecinto } from '../services/recinto';
-import { pluraliza } from '../utils/recintoPantallas';
+import { pluraliza, resumenDeHorario, resumenDePrecio } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
 
 const TIPOS = {
@@ -31,9 +33,27 @@ const TIPOS = {
  * detalle: una cancha activa sin horario cargado no tiene ni un bloque
  * reservable, y además es lo que impide publicar el recinto entero. Vale más
  * decirlo en la lista que hacer que alguien lo descubra al intentar publicar.
+ *
+ * DOS MODOS, PORQUE ANTES ERAN DOS ENTRADAS AL MISMO LUGAR. El panel tenía
+ * «Canchas» y «Horarios y tarifas» y las dos navegaban acá con los mismos
+ * parámetros: el mismo encabezado, la misma lista, el mismo destino al tocar.
+ * Dos puertas al mismo cuarto no es una elección, es una duda.
+ *
+ *   · `modo: 'canchas'` — administrar las canchas EN SÍ. Tocar una abre su
+ *     edición: nombre, tipo, precio base, duración del bloque, foto,
+ *     encendida o apagada. Se pueden crear.
+ *   · `modo: 'horarios'` — cuándo abre y cuánto cobra cada una. Cada fila
+ *     lleva DIRECTO al horario o a las tarifas de esa cancha, sin pasar por
+ *     la pantalla de edición. Es el atajo del día a día: cambiar un precio o
+ *     correr una hora no debería obligar a entrar a editar la cancha.
+ *
+ * El modo cambia el encabezado, lo que dice cada fila, lo que hace tocarla y
+ * si aparece el botón de crear. Si solo cambiara el título, seguirían siendo
+ * la misma pantalla con dos nombres.
  */
 export default function CanchasScreen({ navigation, route }) {
-  const { complejoId, nombre } = route.params || {};
+  const { complejoId, nombre, modo = 'canchas' } = route.params || {};
+  const esHorarios = modo === 'horarios';
   const [canchas, setCanchas] = useState([]);
   const [filtro, setFiltro] = useState('todas');
   const [cargando, setCargando] = useState(true);
@@ -60,12 +80,21 @@ export default function CanchasScreen({ navigation, route }) {
   const abrir = (canchaId) =>
     navigation.navigate('Cancha', { complejoId, canchaId, complejoNombre: nombre });
 
+  const irAHorario = (k) =>
+    navigation.navigate('Horarios', {
+      canchaId: k.id,
+      canchaNombre: k.nombre,
+      duracionSlotMin: k.duracion_slot_min,
+    });
+
+  const irATarifas = (k) => navigation.navigate('Tarifas', { complejoId, canchaId: k.id });
+
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
         <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Canchas</Text>
+          <Text style={styles.headerTitle}>{esHorarios ? 'Horarios y tarifas' : 'Canchas'}</Text>
           {nombre ? <Text style={styles.headerSub} numberOfLines={1}>{nombre}</Text> : null}
         </View>
       </View>
@@ -108,7 +137,11 @@ export default function CanchasScreen({ navigation, route }) {
         ) : (
           <View style={{ gap: S.cardGap }}>
             {visibles.map((k) => (
-              <Card key={k.id} onPress={() => abrir(k.id)} style={!k.activa && styles.apagada}>
+              <Card
+                key={k.id}
+                onPress={esHorarios ? undefined : () => abrir(k.id)}
+                style={!k.activa && styles.apagada}
+              >
                 <View style={styles.fila}>
                   <Foto
                     uri={k.foto_url}
@@ -119,14 +152,21 @@ export default function CanchasScreen({ navigation, route }) {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.nombre} numberOfLines={1}>{k.nombre}</Text>
                     <Text style={styles.detalle} numberOfLines={1}>
-                      {TIPOS[k.tipo] || k.tipo} · bloques de {k.duracion_slot_min} min
+                      {esHorarios
+                        ? resumenDeHorario(k)
+                        : `${TIPOS[k.tipo] || k.tipo} · bloques de ${k.duracion_slot_min} min`}
                     </Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.precio}>{formatCLP(k.precio_hora)}</Text>
                     <Text style={styles.precioSub}>/hora</Text>
                   </View>
-                  <ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />
+                  {/* La flecha promete «tocá y te llevo». En el modo de
+                      horarios el destino no es uno solo, así que la fila no
+                      se toca: se tocan los dos botones de abajo. */}
+                  {!esHorarios ? (
+                    <ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />
+                  ) : null}
                 </View>
 
                 <View style={styles.badges}>
@@ -152,13 +192,37 @@ export default function CanchasScreen({ navigation, route }) {
                     puedes publicar el recinto.
                   </Text>
                 ) : null}
+
+                {esHorarios ? (
+                  <>
+                    <Text style={styles.precioResumen}>
+                      {resumenDePrecio(k, formatCLP)}
+                    </Text>
+                    <View style={styles.accionesHorario}>
+                      <Button
+                        label="Horario"
+                        variant="secondary"
+                        icon={Clock}
+                        style={{ flex: 1 }}
+                        onPress={() => irAHorario(k)}
+                      />
+                      <Button
+                        label="Tarifas"
+                        variant="secondary"
+                        icon={Tag}
+                        style={{ flex: 1 }}
+                        onPress={() => irATarifas(k)}
+                      />
+                    </View>
+                  </>
+                ) : null}
               </Card>
             ))}
           </View>
         )}
       </ScrollView>
 
-      {!cargando && !error ? (
+      {!cargando && !error && !esHorarios ? (
         <StickyFooter>
           <Button
             label={canchas.length === 0 ? 'Crear cancha' : 'Agregar cancha'}
@@ -172,6 +236,9 @@ export default function CanchasScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  precioResumen: { fontFamily: F.semiBold, fontSize: 12, color: C.textSecondary, marginTop: 11 },
+  accionesHorario: { flexDirection: 'row', gap: 9, marginTop: 11 },
+
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',

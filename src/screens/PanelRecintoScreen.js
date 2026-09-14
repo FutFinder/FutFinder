@@ -240,21 +240,24 @@ export default function PanelRecintoScreen({ navigation, route }) {
                   title="Canchas"
                   subtitle={
                     resumen
-                      ? pluraliza(resumen.canchasTotal, 'cancha', 'canchas')
-                        + (resumen.canchasTotal - resumen.canchasActivas > 0
-                          ? ` · ${pluraliza(resumen.canchasTotal - resumen.canchasActivas, 'inactiva', 'inactivas')}`
-                          : '')
-                      : 'Crear, editar y activar canchas'
+                      ? `${pluraliza(resumen.canchasTotal, 'cancha', 'canchas')} · nombre, tipo, precio y foto`
+                      : 'Crear, editar y apagar canchas'
                   }
                   right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
                   onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
                 />
+                {/* Misma lista que «Canchas» pero en otro modo: de acá se
+                    entra DIRECTO al horario o a las tarifas de una cancha,
+                    sin pasar por su edición. Antes estas dos filas navegaban
+                    exactamente a lo mismo, con los mismos parámetros. */}
                 <ListRow
                   icon={Clock}
                   title="Horarios y tarifas"
-                  subtitle="Por cancha: cuándo abre y cuánto cobra"
+                  subtitle="Cuándo abre cada cancha y cuánto cobra"
                   right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
-                  onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
+                  onPress={() => navigation.navigate('Canchas', {
+                    complejoId, nombre: recinto.nombre, modo: 'horarios',
+                  })}
                 />
                 <ListRow
                   icon={ShoppingBag}
