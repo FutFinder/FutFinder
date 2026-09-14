@@ -75,6 +75,12 @@ Construido hasta ahora (pantallas 1 a 8 del handoff):
 
 **«Tarifas» dejaba la app en blanco** (corregido 2026-09-14). `TarifasScreen` importaba `bloquesDeTarifa` de `recintoPantallas` y la función vive en `recintoAgenda`: el nombre llegaba como `undefined` y la pantalla reventaba al dibujarse, sin decir qué archivo estaba mal — no lo veía el lint ni el empaquetado. `recintoPantallas` ya reexportaba dos funciones vecinas del mismo archivo; faltaba esta en esa línea. Lo cubre ahora `src/utils/__tests__/importaciones.test.js`, que comprueba que cada nombre importado de `src/utils` exista de verdad.
 
+**Se podían reservar y PAGAR horas que ya habían pasado** (corregido 2026-09-14, migración 84). Encontrado recorriendo el vertical como jugador, a las 14:23 de Chile: la grilla de hoy ofrecía **7 de 16 bloques ya empezados** como disponibles y se podían tocar; `crear_reserva` aceptaba las 08:00 de hoy y también ayer; `iniciar_pago_reserva` aceptaba cobrar esa reserva de ayer. Ninguna de las tres miraba la hora.
+
+La regla quedó en los tres lugares: **un bloque que ya empezó no se ofrece, no se reserva y no se cobra.** Se compara con `inicio_de_reserva()`, que resuelve el huso de Chile — con `current_date` habría vuelto el error que arregló la 70. **No se pide margen**: reservar las 15:00 a las 14:59 se permite, porque elegir un margen es una decisión de producto que nadie tomó.
+
+El pago se cierra con un disparador sobre `pagos` y no reescribiendo la RPC, así queda cubierta cualquier función de pago que se agregue después. **Solo en INSERT**: un pago que ya existe tiene que poder confirmarse aunque el bloque haya empezado mientras la persona pagaba — para eso está el estado `reversar`.
+
 ## Las fotos
 
 **La foto que el recinto subía no la veía nadie** (corregido 2026-09-11). El dato estaba bien de punta a punta —`buscar_complejos` devolvía `foto_url`, `comoComplejoDeLista` lo mapeaba— pero **ninguna pantalla del jugador dibujaba un `<Image>`**: las cinco mostraban un ícono gris de marcador de posición. No era un problema de datos ni de caché: la imagen no estaba puesta. Se resolvió con una primitiva, `Foto` en `components/reservas/ui.js`, que muestra la imagen si la hay y el hueco gris si no, para que la próxima pantalla no nazca con el mismo agujero. Está en la galería de QA (`/ui-reservas`), que es donde se puede comprobar sin sesión.
