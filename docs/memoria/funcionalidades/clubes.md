@@ -135,14 +135,42 @@ deliberada: inventar una posición más precisa de la que el jugador nunca
 declaró habría sido fabricar un dato, así que el tablero resalta el mejor
 calce con lo real en vez de simular una granularidad que no existe.
 
-A diferencia del mockup de referencia, la pantalla **no permite arrastrar un
-puesto por la cancha para reposicionarlo a mano** («alineación
-personalizada»): las claves de puesto son posicionales por línea (`l0p0`,
-`l1p2`…) y sólo tienen sentido para la formación con la que se calcularon,
-así que cambiar de formación siempre limpia las asignaciones en vez de
-arrastrar un dato que podría quedar mal ubicado en silencio — el mismo mockup
-tenía ahí una inconsistencia latente (conservaba asignaciones entre
-formaciones distintas sin remapear los índices de línea).
+SÍ SE PUEDE ARRASTRAR un puesto por la cancha para reposicionarlo a mano
+(«alineación personalizada»), igual que en el mockup de referencia. Al
+soltarlo, `zoneLabel(left, top)` (`formacionClub.js`, puro y probado)
+recalcula la etiqueta del puesto según DÓNDE quedó, no de dónde salió: un
+mediocampista arrastrado al fondo pasa a ser DFC de verdad, nunca un MC mal
+puesto. Ese recálculo alimenta lo mismo que usa `fitsForMember()` para
+resaltar puestos, así que un puesto reubicado participa del resaltado con su
+posición NUEVA. La formación pasa a mostrarse como «Personalizado · base
+X» y el aviso «Alineación personalizada» sale UNA sola vez — al momento en
+que una formación establecida deja de serlo, no en cada arrastre
+siguiente—, controlado comparando el estado `personalizado` de ANTES de
+soltar contra el de después. Cambiar de formación o de modo sigue limpiando
+las asignaciones y los puestos personalizados: las claves de puesto son
+posicionales por línea (`l0p0`, `l1p2`…) y sólo tienen sentido para la
+formación con la que se calcularon.
+
+El resaltado al elegir a alguien de la banca es de UN SOLO nivel: un puesto
+calza o no calza con `fitsForMember()`, sin una distinción visual entre
+«el mejor» y «un aceptable» — simplifica lo que el mockup de referencia
+mostraba en dos tonos de verde. El capitán se diferencia con dorado
+(`clubColors.gold`), no verde: anillo del avatar, insignia «C» y etiqueta
+del nombre, tanto en la banca como ya puesto en la cancha — el mismo color
+que ya usa `ClubMembersScreen` para el chip «Capitán», para no inventar un
+segundo código de color para el mismo rol.
+
+La migración **93** agrega `club_lineups.puestos_personalizados` (jsonb
+`{puesto: {left, top, label}}`) en vez de tocar la 92, porque la 92 ya pudo
+haberse aplicado sin forma de saberlo. Vacío si nadie arrastró nada.
+
+**Nota de implementación (react-native-web):** el `PanResponder` de cada
+puesto necesita `onPanResponderTerminationRequest: () => false`. Sin eso, el
+navegador entrega el primer `mousemove` y después abandona el gesto a medio
+camino —se veía como si el arrastre sólo avanzara unos pocos píxeles y se
+detuviera—, porque algo más en el árbol acepta la solicitud de terminación
+por defecto. Cualquier otro `PanResponder` de arrastre libre en esta app
+debería llevar la misma línea.
 
 Se llega desde el acceso rápido «Alineación» de la portada de Clubes
 (`QuickActionGrid`), en el lugar donde antes estaba «Mi club» — ese acceso a
@@ -153,7 +181,7 @@ Se llega desde el acceso rápido «Alineación» de la portada de Clubes
 
 - Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, alineación, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
 - Código: `src/services/clubs.js`, `clubLineup.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/utils/formacionClub.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
-- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`) y 92 (`club_lineups`) están escritas y probadas, **pendientes de aplicar**.
+- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`), 92 (`club_lineups`) y 93 (`club_lineups.puestos_personalizados`) están escritas y probadas, **pendientes de aplicar**.
 
 ## Estados, errores y problemas conocidos
 

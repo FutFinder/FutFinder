@@ -10,6 +10,8 @@
  *     antepone el lado sin descartar el otro.
  *   · `autocompletarAsignaciones` no deja puestos libres si hay banca
  *     suficiente, y prioriza el calce exacto sobre cualquiera.
+ *   · `zoneLabel` recalcula el puesto según dónde se soltó, para que mover
+ *     un mediocampista al fondo lo vuelva DFC de verdad, no un MC mal puesto.
  *
  * Se ejecutan con: npm test
  */
@@ -17,7 +19,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { F7, F11, layoutSlots, fitsForMember, autocompletarAsignaciones } = require('../formacionClub.js');
+const {
+  F7,
+  F11,
+  layoutSlots,
+  fitsForMember,
+  autocompletarAsignaciones,
+  zoneLabel,
+} = require('../formacionClub.js');
 
 test('layoutSlots: "4-3-3" tiene arquero + 4 + 3 + 3 = 11 puestos', () => {
   const slots = layoutSlots('4-3-3');
@@ -130,4 +139,37 @@ test('autocompletarAsignaciones: sin banca suficiente deja el resto de los puest
 test('autocompletarAsignaciones: sin banca no asigna nada y no revienta', () => {
   const slots = layoutSlots('2-3-1');
   assert.deepEqual(autocompletarAsignaciones(slots, []), {});
+});
+
+test('zoneLabel: el fondo de la cancha siempre es POR', () => {
+  assert.equal(zoneLabel(50, 90), 'POR');
+  assert.equal(zoneLabel(10, 95), 'POR');
+});
+
+test('zoneLabel: centro de la defensa es DFC, no un lateral', () => {
+  assert.equal(zoneLabel(50, 70), 'DFC');
+});
+
+test('zoneLabel: el extremo izquierdo de la línea defensiva es LI', () => {
+  assert.equal(zoneLabel(15, 70), 'LI');
+});
+
+test('zoneLabel: el extremo derecho de la línea defensiva es LD', () => {
+  assert.equal(zoneLabel(85, 70), 'LD');
+});
+
+test('zoneLabel: el extremo del último tercio es un puesto de ataque (EI/ED), no un lateral', () => {
+  assert.equal(zoneLabel(15, 10), 'EI');
+  assert.equal(zoneLabel(85, 10), 'ED');
+});
+
+test('zoneLabel: mover un mediocampista (MC) hacia el fondo lo vuelve DFC', () => {
+  // Simula arrastrar un puesto que empezó en MC (top ~45) hasta top 70.
+  assert.equal(zoneLabel(50, 45), 'MC');
+  assert.equal(zoneLabel(50, 70), 'DFC');
+});
+
+test('zoneLabel: el centro de la cancha (ni izquierda ni derecha) no lleva lado', () => {
+  assert.equal(zoneLabel(50, 55), 'MCD');
+  assert.equal(zoneLabel(50, 25), 'MP');
 });

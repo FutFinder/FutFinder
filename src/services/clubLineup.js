@@ -8,12 +8,15 @@ import { supabase, isSupabaseConfigured } from './supabase';
  * resolver a nadie en el cliente, en vez de romper la lectura.
  */
 
+const COLUMNAS =
+  'club_id, modo, formacion, personalizado, asignaciones, puestos_personalizados, updated_by, updated_at';
+
 /** La alineación vigente del club, o `null` si nunca se ha guardado una. */
 export async function getClubLineup(clubId) {
   if (!isSupabaseConfigured) return { data: null, error: null };
   const { data, error } = await supabase
     .from('club_lineups')
-    .select('club_id, modo, formacion, personalizado, asignaciones, updated_by, updated_at')
+    .select(COLUMNAS)
     .eq('club_id', clubId)
     .maybeSingle();
   if (error) {
@@ -28,7 +31,10 @@ export async function getClubLineup(clubId) {
  * quien de verdad decide si puede: sólo admin/capitán del club, y sólo con
  * `updated_by` igual a quien llama.
  */
-export async function saveClubLineup(clubId, { modo, formacion, personalizado, asignaciones }) {
+export async function saveClubLineup(
+  clubId,
+  { modo, formacion, personalizado, asignaciones, puestosPersonalizados }
+) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth?.user?.id;
@@ -43,12 +49,13 @@ export async function saveClubLineup(clubId, { modo, formacion, personalizado, a
         formacion,
         personalizado: !!personalizado,
         asignaciones: asignaciones || {},
+        puestos_personalizados: puestosPersonalizados || {},
         updated_by: uid,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'club_id' }
     )
-    .select('club_id, modo, formacion, personalizado, asignaciones, updated_by, updated_at')
+    .select(COLUMNAS)
     .single();
 
   if (error) {

@@ -7,6 +7,7 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,23 +17,35 @@ import { ArrowLeft, Shield } from 'lucide-react-native';
 import { clubColors, clubRadius, clubSizes } from '../theme/colors';
 import { etiquetaPosiciones } from '../utils/playerMeta';
 import { haceCuanto } from '../utils/tiempoRelativo.js';
-import { F7, F11, layoutSlots, fitsForMember, autocompletarAsignaciones } from '../utils/formacionClub';
+import {
+  F7,
+  F11,
+  layoutSlots,
+  fitsForMember,
+  autocompletarAsignaciones,
+  zoneLabel,
+} from '../utils/formacionClub';
 import { getCurrentUser } from '../services/auth';
 import { getClubById, listMembers } from '../services/clubs';
 import { getClubLineup, saveClubLineup } from '../services/clubLineup';
 
+function clamp(v, min, max) {
+  return Math.min(max, Math.max(min, v));
+}
+
 /**
- * Alineación del club (migración 92): un tablero por club, no por partido.
- * Admin y capitán arman la formación tocando un integrante de la banca y
- * después el puesto (o tocando un puesto ocupado para devolverlo a la
- * banca); el resto del club sólo la ve.
+ * Alineación del club (migraciones 92/93): un tablero por club, no por
+ * partido. Admin y capitán arman la formación tocando un integrante de la
+ * banca y después el puesto (o tocando un puesto ocupado para devolverlo a
+ * la banca), y además pueden ARRASTRAR un puesto por la cancha para
+ * reubicarlo a mano — eso vuelve la alineación «personalizada» y recalcula
+ * la etiqueta del puesto según la zona donde queda (un mediocampista
+ * arrastrado al fondo pasa a ser DFC de verdad, no un MC mal puesto). El
+ * resto del club sólo la ve.
  *
- * A diferencia del mockup de referencia, acá NO se arrastra el puesto por la
- * cancha para reposicionarlo a mano («alineación personalizada»): las
- * claves de puesto son posicionales por línea (`l0p0`, `l1p2`…) y sólo
- * tienen sentido para LA formación con la que se calcularon, así que
- * cambiar de formación siempre limpia las asignaciones en vez de arrastrar
- * un dato que podría quedar mal ubicado en silencio.
+ * «Personalizada» se avisa una sola vez, al momento en que deja de ser una
+ * formación establecida — no en cada arrastre siguiente — porque lo que
+ * importa comunicar es el cambio de estado, no cada micro-ajuste.
  */
 export default function ClubLineupScreen({ navigation, route }) {
   const { clubId } = route.params || {};
@@ -51,6 +64,8 @@ export default function ClubLineupScreen({ navigation, route }) {
   const [formacion, setFormacion] = useState(F7[0]);
   const [asignaciones, setAsignaciones] = useState({});
   const [picked, setPicked] = useState(null);
+  const [custom, setCustom] = useState({}); // puesto → {left, top, label} arrastrado a mano
+  const [personalizado, setPersonalizado] = useState(false);
 
   const flash = useCallback((msg) => {
     clearTimeout(toastTimer.current);
@@ -77,11 +92,15 @@ export default function ClubLineupScreen({ navigation, route }) {
       setModo(lu.modo);
       setFormacion(lu.formacion);
       setAsignaciones(lu.asignaciones || {});
+      setCustom(lu.puestos_personalizados || {});
+      setPersonalizado(!!lu.personalizado);
     } else {
       const modoInicial = c?.modalidad === 'futbol11' ? 11 : 7;
       setModo(modoInicial);
       setFormacion(modoInicial === 11 ? F11[0] : F7[0]);
       setAsignaciones({});
+      setCustom({});
+      setPersonalizado(false);
     }
     setPicked(null);
     setLoading(false);
@@ -97,7 +116,11 @@ export default function ClubLineupScreen({ navigation, route }) {
   const canEdit = miMembresia?.rol === 'admin' || miMembresia?.rol === 'capitan';
 
   const membersById = useMemo(() => new Map(members.map((m) => [m.member_id, m])), [members]);
-  const slots = useMemo(() => layoutSlots(formacion), [formacion]);
+  const baseSlots = useMemo(() => layoutSlots(formacion), [formacion]);
+  const slots = useMemo(
+    () => baseSlots.map((s) => (custom[s.key] ? { ...s, ...custom[s.key] } : s)),
+    [baseSlots, custom]
+  );
   const assignedIds = useMemo(() => new Set(Object.values(asignaciones)), [asignaciones]);
   const bench = useMemo(
     () => members.filter((m) => !assignedIds.has(m.member_id)),
@@ -106,6 +129,19 @@ export default function ClubLineupScreen({ navigation, route }) {
   const placedCount = Object.keys(asignaciones).length;
   const pickedMember = picked ? membersById.get(picked) : null;
   const fits = pickedMember ? fitsForMember(pickedMember) : [];
+
+  // Refs "instantánea" para que los gestos de arrastre (creados una sola
+  // vez por puesto) lean siempre el valor más reciente sin quedar pegados
+  // al closure del render en que nacieron.
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
+  const customizadoRef = useRef(personalizado);
+  customizadoRef.current = personalizado;
+  const pitchSizeRef = useRef({ width: 0, height: 0 });
+  const slotPosRef = useRef({});
+  slotPosRef.current = Object.fromEntries(slots.map((s) => [s.key, { left: s.left, top: s.top }]));
+  const tapActionRef = useRef(() => {});
+  const respondersRef = useRef(new Map());
 
   const place = (slotKey, memberId) => {
     setAsignaciones((prev) => {
@@ -133,6 +169,58 @@ export default function ClubLineupScreen({ navigation, route }) {
     if (picked) place(slot.key, picked);
   };
 
+  tapActionRef.current = (slotKey) => {
+    const slot = slots.find((s) => s.key === slotKey);
+    if (!slot) return;
+    const occupant = asignaciones[slotKey] ? membersById.get(asignaciones[slotKey]) || null : null;
+    onSlotPress(slot, occupant);
+  };
+
+  /** Un `PanResponder` por puesto, creado una sola vez y cacheado por clave. */
+  const getResponder = (slotKey) => {
+    if (respondersRef.current.has(slotKey)) return respondersRef.current.get(slotKey);
+    let drag = null;
+    const responder = PanResponder.create({
+      onStartShouldSetPanResponder: () => canEditRef.current,
+      onMoveShouldSetPanResponder: (evt, g) =>
+        canEditRef.current && (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        const cur = slotPosRef.current[slotKey] || { left: 50, top: 50 };
+        drag = { startLeft: cur.left, startTop: cur.top, wasCustomized: customizadoRef.current, moved: false };
+      },
+      onPanResponderMove: (evt, g) => {
+        if (!drag) return;
+        const { width, height } = pitchSizeRef.current;
+        if (!width || !height) return;
+        if (!drag.moved && (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4)) drag.moved = true;
+        if (!drag.moved) return;
+        const left = clamp(drag.startLeft + (g.dx / width) * 100, 6, 94);
+        const top = clamp(drag.startTop + (g.dy / height) * 100, 5, 95);
+        const label = zoneLabel(left, top);
+        setCustom((prev) => ({ ...prev, [slotKey]: { left, top, label } }));
+        setPersonalizado(true);
+      },
+      onPanResponderRelease: () => {
+        if (!drag) return;
+        const { moved, wasCustomized } = drag;
+        drag = null;
+        if (!moved) {
+          tapActionRef.current(slotKey);
+          return;
+        }
+        // Sólo se avisa la PRIMERA vez que una formación establecida pasa a
+        // ser personalizada — no en cada arrastre siguiente.
+        if (!wasCustomized) flash('Alineación personalizada');
+      },
+      onPanResponderTerminate: () => {
+        drag = null;
+      },
+    });
+    respondersRef.current.set(slotKey, responder);
+    return responder;
+  };
+
   const onBenchPress = (member) => {
     if (!canEdit) return;
     setPicked((prev) => (prev === member.member_id ? null : member.member_id));
@@ -144,14 +232,26 @@ export default function ClubLineupScreen({ navigation, route }) {
     setModo(nuevoModo);
     setFormacion(f);
     setAsignaciones({});
+    setCustom({});
+    setPersonalizado(false);
     setPicked(null);
+    respondersRef.current.clear();
   };
 
   const cambiarFormacion = (f) => {
-    if (!canEdit || f === formacion) return;
+    if (!canEdit || (f === formacion && !personalizado)) return;
     setFormacion(f);
     setAsignaciones({});
+    setCustom({});
+    setPersonalizado(false);
     setPicked(null);
+    respondersRef.current.clear();
+  };
+
+  const quitarPersonalizacion = () => {
+    setCustom({});
+    setPersonalizado(false);
+    respondersRef.current.clear();
   };
 
   const onAutocompletar = () => {
@@ -176,8 +276,9 @@ export default function ClubLineupScreen({ navigation, route }) {
     const { data, error } = await saveClubLineup(clubId, {
       modo,
       formacion,
-      personalizado: false,
+      personalizado,
       asignaciones,
+      puestosPersonalizados: custom,
     });
     setSaving(false);
     if (error) {
@@ -185,7 +286,7 @@ export default function ClubLineupScreen({ navigation, route }) {
       return;
     }
     setLineup(data);
-    flash(`Alineación ${formacion} guardada`);
+    flash(`Alineación ${personalizado ? 'personalizada' : formacion} guardada`);
   };
 
   if (loading || !club) {
@@ -208,6 +309,8 @@ export default function ClubLineupScreen({ navigation, route }) {
   }
 
   const soyIntegrante = Boolean(miMembresia);
+  const formacionMostrada = (esPersonalizado, base) =>
+    esPersonalizado ? `Personalizado · base ${base}` : base;
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -225,9 +328,9 @@ export default function ClubLineupScreen({ navigation, route }) {
           </Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {canEdit
-              ? `${formacion} · ${placedCount}/${slots.length} puestos`
+              ? `${formacionMostrada(personalizado, formacion)} · ${placedCount}/${slots.length} puestos`
               : lineup
-                ? `${lineup.formacion} · Fútbol ${lineup.modo}`
+                ? `${formacionMostrada(lineup.personalizado, lineup.formacion)} · Fútbol ${lineup.modo}`
                 : club.nombre}
           </Text>
         </View>
@@ -279,22 +382,30 @@ export default function ClubLineupScreen({ navigation, route }) {
                 style={styles.formationRow}
                 contentContainerStyle={styles.formationRowContent}
               >
-                {(modo === 7 ? F7 : F11).map((f) => (
+                {personalizado && (
                   <Pressable
-                    key={f}
-                    onPress={() => cambiarFormacion(f)}
-                    style={[styles.formationChip, f === formacion && styles.formationChipActive]}
+                    onPress={quitarPersonalizacion}
+                    style={[styles.formationChip, styles.formationChipActive]}
                   >
-                    <Text
-                      style={[
-                        styles.formationChipText,
-                        f === formacion && styles.formationChipTextActive,
-                      ]}
-                    >
-                      {f}
+                    <Text style={[styles.formationChipText, styles.formationChipTextActive]}>
+                      Personalizado
                     </Text>
                   </Pressable>
-                ))}
+                )}
+                {(modo === 7 ? F7 : F11).map((f) => {
+                  const activa = !personalizado && f === formacion;
+                  return (
+                    <Pressable
+                      key={f}
+                      onPress={() => cambiarFormacion(f)}
+                      style={[styles.formationChip, activa && styles.formationChipActive]}
+                    >
+                      <Text style={[styles.formationChipText, activa && styles.formationChipTextActive]}>
+                        {f}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             </>
           )}
@@ -309,7 +420,16 @@ export default function ClubLineupScreen({ navigation, route }) {
                 </Text>
               </View>
             ) : (
-              <LinearGradient colors={['#0C1A0E', '#08130A']} style={styles.pitch}>
+              <LinearGradient
+                colors={['#0C1A0E', '#08130A']}
+                style={styles.pitch}
+                onLayout={(e) => {
+                  pitchSizeRef.current = {
+                    width: e.nativeEvent.layout.width,
+                    height: e.nativeEvent.layout.height,
+                  };
+                }}
+              >
                 <View style={styles.pitchBorder} pointerEvents="none" />
                 <View style={styles.pitchHalfway} pointerEvents="none" />
                 <View style={styles.pitchCircle} pointerEvents="none" />
@@ -320,39 +440,30 @@ export default function ClubLineupScreen({ navigation, route }) {
                   const occupant = asignaciones[slot.key]
                     ? membersById.get(asignaciones[slot.key]) || null
                     : null;
-                  const fitRank = pickedMember && !occupant ? fits.indexOf(slot.label) : -1;
-                  const isBest = fitRank === 0;
-                  const isTarget = fitRank > 0;
+                  const isFit = Boolean(pickedMember) && !occupant && fits.includes(slot.label);
                   const isCaptain = occupant?.rol === 'capitan';
+                  const responder = canEdit ? getResponder(slot.key) : null;
 
                   return (
-                    <Pressable
+                    <View
                       key={slot.key}
-                      onPress={() => onSlotPress(slot, occupant)}
-                      disabled={!canEdit}
+                      {...(responder ? responder.panHandlers : {})}
                       style={[styles.slot, { left: `${slot.left}%`, top: `${slot.top}%` }]}
                     >
                       <View
                         style={[
                           styles.slotCircle,
                           occupant
-                            ? styles.slotCircleFilled
-                            : isBest
-                              ? styles.slotCircleBest
-                              : isTarget
-                                ? styles.slotCircleTarget
-                                : styles.slotCircleEmpty,
+                            ? [styles.slotCircleFilled, isCaptain && styles.slotCircleCaptain]
+                            : isFit
+                              ? styles.slotCircleFit
+                              : styles.slotCircleEmpty,
                         ]}
                       >
                         {occupant?.foto_url ? (
                           <Image source={{ uri: occupant.foto_url }} style={styles.slotAvatar} />
                         ) : (
-                          <Text
-                            style={[
-                              styles.slotFace,
-                              !occupant && (isBest || isTarget) && { color: clubColors.green },
-                            ]}
-                          >
+                          <Text style={[styles.slotFace, !occupant && isFit && { color: clubColors.green }]}>
                             {occupant ? (occupant.username || '?')[0]?.toUpperCase() : slot.label[0]}
                           </Text>
                         )}
@@ -368,12 +479,17 @@ export default function ClubLineupScreen({ navigation, route }) {
                       >
                         {occupant ? occupant.username : slot.label}
                       </Text>
-                    </Pressable>
+                    </View>
                   );
                 })}
               </LinearGradient>
             )}
           </View>
+          {canEdit && (
+            <Text style={styles.dragHint}>
+              Arrastra un puesto por la cancha para reubicarlo a mano.
+            </Text>
+          )}
 
           {canEdit && (
             <View style={styles.benchWrap}>
@@ -400,6 +516,7 @@ export default function ClubLineupScreen({ navigation, route }) {
                 ) : (
                   bench.map((m) => {
                     const seleccionado = picked === m.member_id;
+                    const esCapitan = m.rol === 'capitan';
                     return (
                       <Pressable
                         key={m.member_id}
@@ -408,15 +525,24 @@ export default function ClubLineupScreen({ navigation, route }) {
                       >
                         <View style={styles.benchAvatarWrap}>
                           {m.foto_url ? (
-                            <Image source={{ uri: m.foto_url }} style={styles.benchAvatar} />
+                            <Image
+                              source={{ uri: m.foto_url }}
+                              style={[styles.benchAvatar, esCapitan && styles.benchAvatarCaptain]}
+                            />
                           ) : (
-                            <View style={[styles.benchAvatar, styles.benchAvatarFallback]}>
+                            <View
+                              style={[
+                                styles.benchAvatar,
+                                styles.benchAvatarFallback,
+                                esCapitan && styles.benchAvatarCaptain,
+                              ]}
+                            >
                               <Text style={styles.benchAvatarInitial}>
                                 {(m.username || '?')[0]?.toUpperCase()}
                               </Text>
                             </View>
                           )}
-                          {m.rol === 'capitan' && (
+                          {esCapitan && (
                             <View style={styles.captainBadgeSmall}>
                               <Text style={styles.captainBadgeText}>C</Text>
                             </View>
@@ -585,6 +711,13 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
   },
 
+  dragHint: {
+    color: clubColors.textFaint,
+    fontSize: 11,
+    textAlign: 'center',
+    paddingTop: 8,
+  },
+
   slot: {
     position: 'absolute',
     width: 62,
@@ -601,9 +734,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   slotCircleFilled: { backgroundColor: '#1E231E', borderWidth: 2, borderColor: clubColors.green },
-  slotCircleEmpty: { backgroundColor: 'rgba(5,6,5,.55)', borderWidth: 2, borderColor: 'rgba(255,255,255,.2)', borderStyle: 'dashed' },
-  slotCircleBest: { backgroundColor: 'rgba(90,224,106,.3)', borderWidth: 2.5, borderColor: clubColors.green },
-  slotCircleTarget: { backgroundColor: 'rgba(90,224,106,.12)', borderWidth: 2, borderColor: 'rgba(90,224,106,.45)' },
+  slotCircleCaptain: { borderColor: clubColors.gold },
+  slotCircleEmpty: {
+    backgroundColor: 'rgba(5,6,5,.55)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,.2)',
+    borderStyle: 'dashed',
+  },
+  slotCircleFit: { backgroundColor: 'rgba(90,224,106,.3)', borderWidth: 2.5, borderColor: clubColors.green },
   slotAvatar: { width: 44, height: 44, borderRadius: 22 },
   slotFace: { color: 'rgba(255,255,255,.4)', fontSize: 14, fontWeight: '800' },
   slotLabel: {
@@ -616,7 +754,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     maxWidth: 62,
   },
-  slotLabelCaptain: { color: clubColors.green, backgroundColor: 'rgba(90,224,106,.16)' },
+  slotLabelCaptain: { color: clubColors.gold, backgroundColor: 'rgba(240,200,90,.16)' },
   captainBadge: {
     position: 'absolute',
     top: -3,
@@ -624,7 +762,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: clubColors.green,
+    backgroundColor: clubColors.gold,
     borderWidth: 2,
     borderColor: '#0A140B',
     alignItems: 'center',
@@ -637,13 +775,13 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: clubColors.green,
+    backgroundColor: clubColors.gold,
     borderWidth: 2,
     borderColor: clubColors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  captainBadgeText: { color: clubColors.greenInk, fontSize: 9, fontWeight: '800' },
+  captainBadgeText: { color: clubColors.background, fontSize: 9, fontWeight: '800' },
 
   benchWrap: { paddingHorizontal: clubSizes.gutter, paddingVertical: 12 },
   benchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -697,6 +835,7 @@ const styles = StyleSheet.create({
   benchCardSelected: { borderColor: clubColors.green, backgroundColor: clubColors.greenSoft },
   benchAvatarWrap: { position: 'relative' },
   benchAvatar: { width: 36, height: 36, borderRadius: 18 },
+  benchAvatarCaptain: { borderWidth: 2, borderColor: clubColors.gold },
   benchAvatarFallback: { backgroundColor: clubColors.chip, alignItems: 'center', justifyContent: 'center' },
   benchAvatarInitial: { color: clubColors.textPrimary, fontSize: 13, fontWeight: '800' },
   benchName: { color: clubColors.textPrimary, fontSize: 11, fontWeight: '700', maxWidth: 64 },

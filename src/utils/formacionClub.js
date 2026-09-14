@@ -64,6 +64,23 @@ export function layoutSlots(formation) {
   return slots;
 }
 
+/**
+ * A qué puesto corresponde una coordenada de la cancha, cuando se arrastra
+ * un puesto a mano («alineación personalizada»). Así, mover al mediocampista
+ * hacia el fondo lo vuelve DFC de verdad — deja de mostrarse como MC en una
+ * zona que ya no es de mediocampo — en vez de conservar una etiqueta que ya
+ * no describe dónde está parado.
+ */
+export function zoneLabel(left, top) {
+  if (top >= 86) return 'POR';
+  const lado = left < 26 ? 'I' : left > 74 ? 'D' : null;
+  if (top >= 66) return lado ? `L${lado}` : 'DFC';
+  if (top >= 48) return lado ? `M${lado}` : 'MCD';
+  if (top >= 32) return lado ? `M${lado}` : 'MC';
+  if (top >= 20) return lado ? `E${lado}` : 'MP';
+  return lado ? `E${lado}` : 'DC';
+}
+
 /** A qué puestos de cancha calza cada posición real declarada. */
 const REAL_POS_TO_SLOTS = {
   arquero: ['POR'],
