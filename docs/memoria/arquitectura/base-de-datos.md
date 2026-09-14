@@ -144,6 +144,16 @@ La **83** está **aplicada el 2026-09-14**, arnés 23/23: **«administrador» de
 
 La **87** está **aplicada el 2026-09-14**, arnés 6/6, y cierra el ciclo que la 78 había dejado abierto: **cómo se sale de `reversar`**. Ese estado es plata de alguien que pagó y no recibió nada, y hasta ahora no había forma de anotar que ya se devolvió — la lista de pendientes iba a crecer para siempre. Agrega `reversado_at`, `reversa_nota` y `reversado_por`, más `marcar_pago_reversado`, solo para `service_role`: la devolución la hace el equipo, es plata de FutFinder saliendo. **No se puede marcar como devuelto un pago bien cobrado** —dejarlo pasar descuadraría la caja con una sola consulta— y marcarlo dos veces no pisa la fecha ni la nota de la primera. **La migración no devuelve plata**: eso es una llamada a Flow que necesita credenciales. Lo que hace es dejar el ciclo cerrado para el día que existan. El procedimiento diario, en [Revisión diaria](../operacion/revision-diaria.md).
 
+La **89** está **aplicada el 2026-09-14**, arnés 15/15: **el núcleo del pago dividido con tarjeta**. No es «la 78 pero con varios pagos». Con Balance —como se diseñó el pago dividido en la 55— nadie pone plata hasta el final: cada uno autoriza y el cobro ocurre entero cuando están todos, así que si falta uno **no hay nada que devolver**. Con tarjeta la plata se mueve en cada pago, y una reserva que no se completa deja dinero de **varias** personas en la mano. Todo lo delicado de la migración sale de ahí.
+
+**La regla para confirmar es la plata, no la gente**: se confirma cuando la suma de lo pagado alcanza el precio total. Contar personas obligaría a decidir qué pasa si alguien se va o si el grupo cambia de tamaño; el dinero no tiene ese problema.
+
+**Si el bloque se pierde, se devuelve a TODOS** —el caso que no existía con un solo pagador— y todos reciben aviso. Lo mismo si la reserva se vence a medio pagar: `vencer_reservas_pasadas` pasa a marcar esos pagos, porque si no la plata de los que sí pagaron se quedaría acá sin que nadie se entere. Los dos caminos usan `reversar_pagos_de_reserva`, en un solo lugar: repetirlo en dos es garantizar que un día uno se olvide de avisarle a alguien.
+
+El índice de la 78 permitía **un solo pago vivo por reserva**, justo lo contrario de lo necesario; ahora es uno por **(reserva, persona)**.
+
+**`crear_reserva` sigue rechazando el pago dividido con tarjeta, a propósito.** Sin las pantallas del flujo —invitar, ver quién pagó, recordarle al que falta— abrir esa puerta sería dejar crear reservas que nadie puede terminar de pagar. Esto es el motor; la llave se gira con la pantalla y la pasarela.
+
 La 79 corrige el mensaje de `confirmar_reserva`, que decía «El pago con tarjeta todavía no está disponible» y desde la 78 es falso. Va aparte a propósito: la 78 es por donde va a pasar plata y conviene revisarla sin un cambio de texto en el medio.
 
 **Una lección que ya costó tres veces: agregar parámetros con `default` a una función NO la reemplaza, crea una SOBRECARGA.** Y entonces una llamada con los argumentos viejos calza con las dos y Postgres la rechaza por ambigua. Pasó con `crear_reserva` en la 67 y la 68, y con `admin_crear_bloqueo` y `admin_actualizar_bloqueo` en la 69. Siempre hay que hacer `drop function` de la firma vieja antes, y verificar después que quede una sola versión en `pg_proc`.
