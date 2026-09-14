@@ -33,7 +33,7 @@
  *    `recintoAgenda.js`).
  */
 
-import { horaAMinutos, minutosAHora } from './recintoAgenda.js';
+import { horaAMinutos, minutosAHora, bloquesDeTarifa } from './recintoAgenda.js';
 
 const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -512,5 +512,12 @@ export function telefonoAceptable(telefono) {
 
 /* ── Horas sueltas ──────────────────────────────────────────────────────── */
 
-/** Reexportadas para que una pantalla no tenga que importar de dos archivos. */
-export { horaAMinutos, minutosAHora };
+/**
+ * Reexportadas para que una pantalla no tenga que importar de dos archivos.
+ *
+ * `bloquesDeTarifa` faltaba en esta línea y `TarifasScreen` la importaba de
+ * acá igual: llegaba como `undefined` y la pantalla reventaba al dibujarse,
+ * en blanco y sin decir qué archivo estaba mal. No lo veía el lint ni el
+ * empaquetado. Lo cubre ahora `__tests__/importaciones.test.js`.
+ */
+export { horaAMinutos, minutosAHora, bloquesDeTarifa };
