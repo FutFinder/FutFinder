@@ -308,7 +308,12 @@ export default function PanelRecintoScreen({ navigation, route }) {
                 </View>
               ) : null}
 
-              {estadoPub === 'listo_para_revision' ? (
+              {/* Desde la migración 83 mandar a revisión, publicar y
+                  despublicar son del dueño. Mostrarle el botón a un
+                  administrador sería ofrecerle algo que el servidor le va a
+                  rechazar — y ese rechazo llega como un error, que se lee
+                  como que la app está rota. */}
+              {estadoPub === 'listo_para_revision' && esDueno ? (
                 <Button
                   label="Mandar a revisión"
                   icon={ShieldCheck}
@@ -321,7 +326,7 @@ export default function PanelRecintoScreen({ navigation, route }) {
               {/* En revisión no hay botón: la pelota la tenemos nosotros, y
                   un botón que no hace nada solo invita a tocarlo. */}
 
-              {estadoPub === 'listo_para_publicar' ? (
+              {estadoPub === 'listo_para_publicar' && esDueno ? (
                 <Button
                   label="Publicar recinto"
                   icon={Globe}
@@ -331,7 +336,7 @@ export default function PanelRecintoScreen({ navigation, route }) {
                 />
               ) : null}
 
-              {estadoPub === 'publicado' ? (
+              {estadoPub === 'publicado' && esDueno ? (
                 <Button
                   label="Dejar de recibir reservas"
                   variant="secondary"
@@ -339,6 +344,14 @@ export default function PanelRecintoScreen({ navigation, route }) {
                   style={{ marginTop: 13 }}
                   onPress={() => { setErrorPublicar(null); setHoja(true); }}
                 />
+              ) : null}
+
+              {/* Y se dice de quién es la decisión, en vez de dejar un hueco
+                  donde el dueño ve un botón. */}
+              {!esDueno && estadoPub !== 'sin_canchas' && estadoPub !== 'sin_horario' ? (
+                <Text style={styles.soloDueno}>
+                  Publicar y mandar a revisión los decide quien es dueño del recinto.
+                </Text>
               ) : null}
 
               {errorPublicar ? (
@@ -499,6 +512,8 @@ function Cabecera({ recinto }) {
 }
 
 const styles = StyleSheet.create({
+  soloDueno: { fontFamily: F.medium, fontSize: 12, color: C.textMuted, marginTop: 13, lineHeight: 17 },
+
 
   root: { flex: 1, backgroundColor: C.bg },
   header: {
