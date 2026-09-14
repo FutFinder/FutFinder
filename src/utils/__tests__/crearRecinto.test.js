@@ -110,3 +110,55 @@ test('todo estado tiene texto y ninguno queda vacío', () => {
 test('el texto de «listo para revisión» dice que publicar pasa por FutFinder', () => {
   assert.match(textoDeEstado('listo_para_revision').cuerpo, /pasa por nosotros/i);
 });
+
+const { debeMostrarBienvenida, pasosParaPublicar } = require('../crearRecinto.js');
+
+test('los pasos dicen qué falta, y el recién creado tiene casi todo pendiente', () => {
+  const pasos = pasosParaPublicar({ publicado: false }, []);
+  assert.deepEqual(pasos.map((p) => p.clave),
+    ['crear', 'canchas', 'horario', 'ficha', 'revision', 'publicar']);
+  // Crear está hecho —se está mirando el panel del recinto— y nada más.
+  assert.deepEqual(pasos.map((p) => p.hecho), [true, false, false, false, false, false]);
+});
+
+test('una cancha sin horario marca el paso de la cancha pero no el del horario', () => {
+  const pasos = pasosParaPublicar({ publicado: false }, [{ activa: true, tiene_horario: false }]);
+  const hecho = Object.fromEntries(pasos.map((p) => [p.clave, p.hecho]));
+  assert.equal(hecho.canchas, true);
+  assert.equal(hecho.horario, false);
+});
+
+test('la ficha necesita foto Y descripción, no una de las dos', () => {
+  const canchas = [{ activa: true, tiene_horario: true }];
+  const soloFoto = pasosParaPublicar({ publicado: false, foto_url: 'x' }, canchas);
+  const soloTexto = pasosParaPublicar({ publicado: false, descripcion: 'x' }, canchas);
+  const ambas = pasosParaPublicar({ publicado: false, foto_url: 'x', descripcion: 'x' }, canchas);
+  const ficha = (ps) => ps.find((p) => p.clave === 'ficha').hecho;
+  assert.equal(ficha(soloFoto), false);
+  assert.equal(ficha(soloTexto), false);
+  assert.equal(ficha(ambas), true);
+});
+
+test('un recinto ya aprobado cuenta la revisión como hecha aunque no quede la fecha', () => {
+  // Se puede aprobar sin que el dueño llegue a pedirlo —pasa con los que
+  // cargó el equipo— y ahí `revision_pedida_at` queda en null. Marcar ese
+  // paso como pendiente sería pedirle algo que ya no corresponde.
+  const pasos = pasosParaPublicar(
+    { publicado: false, aprobado_futfinder: true }, [{ activa: true, tiene_horario: true }],
+  );
+  assert.equal(pasos.find((p) => p.clave === 'revision').hecho, true);
+});
+
+test('el aviso aparece solo mientras el recinto está en preparación', () => {
+  assert.equal(debeMostrarBienvenida('sin_canchas', false), true);
+  assert.equal(debeMostrarBienvenida('sin_horario', false), true);
+  // Con cancha y horario, la tarjeta del panel ya dice qué sigue: el aviso
+  // pasaría a ser un obstáculo entre la persona y su trabajo.
+  assert.equal(debeMostrarBienvenida('listo_para_revision', false), false);
+  assert.equal(debeMostrarBienvenida('en_revision', false), false);
+  assert.equal(debeMostrarBienvenida('publicado', false), false);
+});
+
+test('una vez cerrado no vuelve, aunque el recinto siga sin canchas', () => {
+  assert.equal(debeMostrarBienvenida('sin_canchas', true), false);
+});

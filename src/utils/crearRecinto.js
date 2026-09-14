@@ -104,3 +104,52 @@ const TEXTOS = {
 export function textoDeEstado(estado) {
   return TEXTOS[estado] || TEXTOS.sin_canchas;
 }
+
+/**
+ * Los pasos para llegar a estar publicado, con lo que ya está hecho.
+ *
+ * Es lo que se le muestra a alguien que acaba de crear su recinto y ve un
+ * panel lleno de secciones sin saber por dónde empezar. Una lista con ticks
+ * responde la pregunta de verdad —qué me falta— que un texto corrido no
+ * responde.
+ *
+ * LA FICHA NO ES UN REQUISITO DEL SERVIDOR: `admin_publicar_complejo` solo
+ * exige una cancha activa con horario, y la aprobación. Va en la lista igual
+ * porque publicar pasa por la revisión de FutFinder, y un recinto sin foto ni
+ * descripción no se aprueba. Decirlo antes es más honesto que rechazarlo
+ * después.
+ */
+export function pasosParaPublicar(recinto, canchas = []) {
+  const lista = canchas || [];
+  const conHorario = lista.some((k) => k.activa && k.tiene_horario);
+  const estado = estadoDePublicacion(recinto, lista);
+
+  return [
+    { clave: 'crear', texto: 'Crear el recinto', hecho: !!recinto },
+    { clave: 'canchas', texto: 'Cargar al menos una cancha', hecho: lista.length > 0 },
+    { clave: 'horario', texto: 'Ponerle su horario de atención', hecho: conHorario },
+    {
+      clave: 'ficha',
+      texto: 'Completar la ficha: foto y descripción',
+      hecho: !!recinto?.foto_url && !!recinto?.descripcion,
+    },
+    {
+      clave: 'revision',
+      texto: 'Mandarlo a revisión de FutFinder',
+      hecho: !!recinto?.revision_pedida_at || !!recinto?.aprobado_futfinder,
+    },
+    { clave: 'publicar', texto: 'Publicar y empezar a recibir reservas', hecho: estado === 'publicado' },
+  ];
+}
+
+/**
+ * Si conviene abrir el aviso de bienvenida del panel.
+ *
+ * Solo mientras el recinto está en preparación: una vez que tiene cancha con
+ * horario, la tarjeta del propio panel ya dice qué sigue y el aviso pasaría a
+ * ser un obstáculo entre la persona y su trabajo.
+ */
+export function debeMostrarBienvenida(estado, yaVista) {
+  if (yaVista) return false;
+  return estado === 'sin_canchas' || estado === 'sin_horario';
+}

@@ -107,6 +107,8 @@ La segunda: **en 16:9 igual sobra, y nadie elegía qué se iba.** `resizeAndComp
 
 **La dirección se elige del buscador, no se escribe.** De ahí salen comuna, región y coordenadas, que son obligatorias porque son las que ponen el recinto en el mapa. Se reusa `LocationAutocomplete` y el estado de `utils/ubicacionPropuesta`, el mismo de crear un partido, con su regla más importante ya resuelta: editar el texto después de elegir invalida el punto, porque ya describe otro lugar.
 
+**Al entrar al panel de un recinto recién creado se abre un aviso con los pasos que faltan** (2026-09-14). Sin él, crear el recinto deja a alguien en un panel de ocho secciones cuya pregunta obvia —«¿y ahora qué hago para que aparezca?»— no la contesta ninguna pantalla: la respuesta estaba repartida en tres. Es una lista con ticks y no un párrafo, porque lo que se pregunta es **qué me falta** y eso un texto corrido obliga a releerlo entero cada vez; se recalcula sola con `pasosParaPublicar`. Aparece **una vez por recinto** (marca en AsyncStorage, no en la base: es comodidad de interfaz, no dato del negocio) y **solo mientras está en preparación** — con cancha y horario la tarjeta del panel ya dice qué sigue, y repetirlo sería ponerse entre la persona y su trabajo. La ficha figura como paso aunque el servidor no la exija: publicar pasa por la revisión y un recinto sin foto ni descripción no se aprueba, así que decirlo antes es más honesto que rechazarlo después.
+
 El procedimiento para aprobar, en [Aprobar recintos](../operacion/aprobar-recintos.md).
 
 ## La pasarela de pago

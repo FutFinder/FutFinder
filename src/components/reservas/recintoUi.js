@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, Linking, StyleSheet } from 'react-native';
-import { Phone, MessageCircle, Lock } from 'lucide-react-native';
+import { Phone, MessageCircle, Lock, Check, Circle } from 'lucide-react-native';
 
 import {
   reservas as C,
@@ -8,7 +8,7 @@ import {
   reservasSizes as S,
   reservasFonts as F,
 } from '../../theme/colors';
-import { Card, Sheet } from './ui';
+import { Card, Sheet, Button } from './ui';
 import { formatCLP } from '../../services/reservasRules';
 import { diaCorto, numeroDeDia } from '../../utils/recintoPantallas';
 
@@ -454,6 +454,21 @@ export function Bloque({ titulo, children, style }) {
 }
 
 const styles = StyleSheet.create({
+  bienvenidaTexto: { fontFamily: F.medium, fontSize: 13, lineHeight: 19.5, color: C.textSecondary },
+  bvLista: { gap: 11, marginTop: 16 },
+  bvFila: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  bvMarca: {
+    width: 21, height: 21, borderRadius: 11, flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
+  },
+  bvMarcaHecha: { backgroundColor: C.green, borderColor: C.green },
+  bvTexto: { flex: 1, fontFamily: F.semiBold, fontSize: 13, color: C.textPrimary },
+  bvTextoHecho: { color: C.textSecondary },
+  bienvenidaPie: {
+    fontFamily: F.medium, fontSize: 11.5, lineHeight: 16.5, color: C.textMuted, marginTop: 16,
+  },
+
   banner: {
     paddingHorizontal: S.screenPadding,
     paddingVertical: 10,
@@ -639,3 +654,54 @@ const styles = StyleSheet.create({
 
   bloqueSeccionTitulo: { fontFamily: F.extraBold, fontSize: 15, color: C.textPrimary, marginBottom: 11 },
 });
+
+/**
+ * Lo primero que ve alguien que acaba de crear su recinto.
+ *
+ * POR QUÉ HACE FALTA. Al crear el recinto se entra a un panel con ocho
+ * secciones y el recinto no se ve en ninguna parte de la app. Sin esto, la
+ * pregunta obvia —«¿y ahora qué hago para que aparezca?»— no la contesta
+ * nadie, y la respuesta está repartida en tres pantallas distintas.
+ *
+ * UNA LISTA CON TICKS Y NO UN PÁRRAFO. La pregunta de verdad es «qué me
+ * falta», y eso un texto corrido no lo contesta: hay que volver a leerlo
+ * entero cada vez. La lista se recalcula sola, así que el día que vuelva a
+ * abrirse ya va a tener marcado lo que se hizo.
+ *
+ * SE MUESTRA UNA VEZ POR RECINTO y solo mientras está en preparación. Después
+ * la tarjeta del panel dice qué sigue, y repetir el aviso sería ponerse entre
+ * la persona y su trabajo.
+ */
+export function HojaBienvenida({ visible, nombre, pasos = [], onCerrar, onCargarCanchas }) {
+  return (
+    <Sheet visible={visible} onClose={onCerrar} title="Tu recinto está creado">
+      <Text style={styles.bienvenidaTexto}>
+        {nombre ? `«${nombre}» ya es tuyo` : 'Ya es tuyo'}, pero todavía no aparece en FutFinder y
+        nadie puede reservarte. Estás en la parte de preparación: carga tus canchas y completa la
+        ficha, y cuando esté listo nos lo mandas a revisión.
+      </Text>
+
+      <View style={styles.bvLista}>
+        {pasos.map((paso) => (
+          <View key={paso.clave} style={styles.bvFila}>
+            <View style={[styles.bvMarca, paso.hecho && styles.bvMarcaHecha]}>
+              {paso.hecho
+                ? <Check color={C.textOnGreen} size={12} strokeWidth={3} />
+                : <Circle color={C.textMuted} size={8} strokeWidth={2.5} />}
+            </View>
+            <Text style={[styles.bvTexto, paso.hecho && styles.bvTextoHecho]}>
+              {paso.texto}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <Text style={styles.bienvenidaPie}>
+        Publicar pasa por nosotros: miramos los datos antes de que tu recinto salga en el buscador.
+      </Text>
+
+      <Button label="Cargar mi primera cancha" style={{ marginTop: 16 }} onPress={onCargarCanchas} />
+      <Button label="Después" variant="secondary" style={{ marginTop: 9 }} onPress={onCerrar} />
+    </Sheet>
+  );
+}

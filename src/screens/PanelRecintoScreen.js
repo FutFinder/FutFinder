@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,13 +10,16 @@ import {
 
 import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import { Card, IconButton, Button, Badge, ListRow, SectionLabel, Sheet, NoticeCard } from '../components/reservas/ui';
-import { Skeleton, StatTrio, StatusBanner } from '../components/reservas/recintoUi';
+import { Skeleton, StatTrio, StatusBanner, HojaBienvenida } from '../components/reservas/recintoUi';
 import NotificationBell from '../components/NotificationBell';
 import {
   misRecintos, agendaDelDia, reservasProximas, canchasDelRecinto, publicarRecinto,
   solicitarRevisionRecinto,
 } from '../services/recinto';
-import { estadoDePublicacion, textoDeEstado } from '../utils/crearRecinto';
+import {
+  estadoDePublicacion, textoDeEstado, pasosParaPublicar, debeMostrarBienvenida,
+} from '../utils/crearRecinto';
+import { bienvenidaVista, marcarBienvenidaVista } from '../utils/avisoPanelRecinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO, fechaRelativa, pluraliza } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
@@ -48,6 +51,10 @@ export default function PanelRecintoScreen({ navigation, route }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [hoja, setHoja] = useState(false);
+  // El aviso de bienvenida. Arranca cerrado y se abre recién cuando se sabe
+  // que el recinto está en preparación Y que no se vio antes: abrirlo por
+  // omisión lo haría parpadear en un panel que ya estaba andando.
+  const [bienvenida, setBienvenida] = useState(false);
   const [publicando, setPublicando] = useState(false);
   const [errorPublicar, setErrorPublicar] = useState(null);
 
@@ -81,10 +88,28 @@ export default function PanelRecintoScreen({ navigation, route }) {
   // una función pura con pruebas.
   const estadoPub = estadoDePublicacion(recinto, canchas);
   const textoPub = textoDeEstado(estadoPub);
+  const pasos = pasosParaPublicar(recinto, canchas);
   // El servidor PERMITE estar publicado con todas las canchas apagadas, así
   // que la app tiene que empujar a salir de ahí: el jugador te encuentra y ve
   // el recinto vacío, que se lee peor que no aparecer.
   const publicadoSinCanchas = publicado && canchas.length > 0 && !canchas.some((k) => k.activa);
+
+  useEffect(() => {
+    if (cargando || !recinto) return;
+    let vivo = true;
+    (async () => {
+      const vista = await bienvenidaVista(complejoId);
+      if (vivo && debeMostrarBienvenida(estadoPub, vista)) setBienvenida(true);
+    })();
+    return () => { vivo = false; };
+  }, [cargando, recinto, estadoPub, complejoId]);
+
+  const cerrarBienvenida = () => {
+    setBienvenida(false);
+    // Se marca al cerrar y no al abrir: si la app se cae entremedio, el aviso
+    // vuelve, que es el lado correcto del error.
+    marcarBienvenidaVista(complejoId);
+  };
 
   const cambiarPublicado = async (aPublicar) => {
     setPublicando(true);
@@ -333,6 +358,17 @@ export default function PanelRecintoScreen({ navigation, route }) {
         )}
       </ScrollView>
 
+      <HojaBienvenida
+        visible={bienvenida}
+        nombre={recinto?.nombre}
+        pasos={pasos}
+        onCerrar={cerrarBienvenida}
+        onCargarCanchas={() => {
+          cerrarBienvenida();
+          navigation.navigate('Canchas', { complejoId, nombre: recinto?.nombre });
+        }}
+      />
+
       <HojaDespublicar
         visible={hoja}
         nombre={recinto?.nombre}
@@ -460,6 +496,7 @@ function Cabecera({ recinto }) {
 }
 
 const styles = StyleSheet.create({
+
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',

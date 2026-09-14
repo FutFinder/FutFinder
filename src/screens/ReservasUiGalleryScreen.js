@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import EncuadreSheet from '../components/reservas/EncuadreSheet';
+import { HojaBienvenida } from '../components/reservas/recintoUi';
 import { ArrowLeft, ChevronRight, MapPin, Star } from 'lucide-react-native';
 
 import {
@@ -49,6 +50,7 @@ export default function ReservasUiGalleryScreen({ navigation }) {
   const [count, setCount] = useState(1);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [encuadre, setEncuadre] = useState(false);
+  const [bienvenida, setBienvenida] = useState(false);
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -113,6 +115,13 @@ export default function ReservasUiGalleryScreen({ navigation }) {
           <SlotHora hora="17:00" precioTexto="$14.000" seleccionado />
         </View>
 
+        <SectionLabel>Bienvenida del panel</SectionLabel>
+        <Button
+          label="Ver el aviso del recinto nuevo"
+          variant="secondary"
+          onPress={() => setBienvenida(true)}
+        />
+
         <SectionLabel>Encuadre</SectionLabel>
         <Button label="Elegir qué parte se ve" variant="secondary" onPress={() => setEncuadre(true)} />
 
@@ -163,6 +172,21 @@ export default function ReservasUiGalleryScreen({ navigation }) {
       <StickyFooter>
         <Button label="CTA sticky de fondo" onPress={() => {}} />
       </StickyFooter>
+
+      <HojaBienvenida
+        visible={bienvenida}
+        nombre="Complejo Deportivo Ñuñoa"
+        pasos={[
+          { clave: 'crear', texto: 'Crear el recinto', hecho: true },
+          { clave: 'canchas', texto: 'Cargar al menos una cancha', hecho: false },
+          { clave: 'horario', texto: 'Ponerle su horario de atención', hecho: false },
+          { clave: 'ficha', texto: 'Completar la ficha: foto y descripción', hecho: false },
+          { clave: 'revision', texto: 'Mandarlo a revisión de FutFinder', hecho: false },
+          { clave: 'publicar', texto: 'Publicar y empezar a recibir reservas', hecho: false },
+        ]}
+        onCerrar={() => setBienvenida(false)}
+        onCargarCanchas={() => setBienvenida(false)}
+      />
 
       <EncuadreSheet
         visible={encuadre}
