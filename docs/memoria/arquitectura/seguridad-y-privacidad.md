@@ -54,3 +54,17 @@ PostgreSQL concede `EXECUTE` a `PUBLIC` en toda función nueva, y `anon` lo here
 - [Autenticación](../funcionalidades/autenticacion.md)
 - [Chat](../funcionalidades/chat.md)
 - [Configuración](../funcionalidades/configuracion.md)
+
+## search_path de las funciones
+
+Desde la **migración 88** (2026-09-14) **todas** las funciones de `public` tienen `search_path` fijo: la consulta `select count(*) from pg_proc ... where proconfig is null` devuelve **0**.
+
+Las diecinueve que faltaban las levantó el linter de Supabase, y conviene tener escrito qué tan grave era, porque la primera lectura fue peor que la realidad: **ninguna era `security definer`**, así que no había escalada de privilegios. Corrían con los permisos de quien las llamaba.
+
+Se arreglaron igual por una razón concreta: varias las llaman funciones que **sí** son `security definer` —`crear_reserva` llama a `precio_de_bloque`, `calcular_comision` y `normaliza_telefono_cl`— y dentro de esa llamada manda el `search_path` de la que define. Estaban cubiertas **por dónde se las llamaba, no por lo que eran**: una garantía prestada que deja de valer el día que alguna se llame desde otro lado.
+
+Se hizo con `alter function ... set search_path`, que **no toca el cuerpo**. Copiar diecinueve cuerpos para cambiarles el entorno habría sido diecinueve oportunidades de introducir un error donde no había ninguno.
+
+**Antes se comprobó que ninguna usara algo fuera de `public`** (unaccent, pgcrypto, earthdistance). Fijar el camino en una función que dependiera de una extensión la habría roto: es la única forma en que este cambio podía hacer daño.
+
+**Pendiente y es tuyo:** la protección de contraseñas filtradas de Supabase Auth está **desactivada**. Se enciende en Authentication → Policies del panel; no se puede hacer por SQL ni por migración.
