@@ -744,7 +744,8 @@ export async function administradoresDelRecinto(complejoId) {
   if (!complejoId) return { data: null, error: { message: 'Falta el recinto' } };
   const { data, error } = await supabase
     .from('complejo_admins')
-    .select('id, user_id, rol, created_at, profiles!inner(username, foto_url, created_at)')
+    .select('id, user_id, rol, puede_canchas, puede_cobros, puede_ficha, created_at,'
+      + ' profiles!inner(username, foto_url, created_at)')
     .eq('complejo_id', complejoId)
     .order('created_at');
   if (error) {
@@ -755,6 +756,9 @@ export async function administradoresDelRecinto(complejoId) {
     id: f.id,
     userId: f.user_id,
     rol: f.rol,
+    puedeCanchas: !!f.puede_canchas,
+    puedeCobros: !!f.puede_cobros,
+    puedeFicha: !!f.puede_ficha,
     username: f.profiles?.username || null,
     fotoUrl: f.profiles?.foto_url || null,
     enFutfinderDesde: f.profiles?.created_at || null,
@@ -764,6 +768,27 @@ export async function administradoresDelRecinto(complejoId) {
   // 'admin' antes que 'dueño'.
   filas.sort((a, b) => (a.rol === b.rol ? 0 : a.rol === 'dueño' ? -1 : 1));
   return { data: filas, error: null };
+}
+
+/**
+ * El dueño enciende o apaga los permisos de un administrador (migración 83).
+ *
+ * Se manda el estado ENTERO de las tres casillas y no lo que cambió: son
+ * interruptores, y mandar el estado final evita que dos toques seguidos dejen
+ * el servidor en algo que la pantalla no muestra. Es el mismo criterio que
+ * usan los servicios del recinto.
+ */
+export async function guardarPermisosAdmin(complejoId, userId, permisos = {}) {
+  if (!isSupabaseConfigured) return DEMO;
+  if (!complejoId || !userId) return { data: null, error: { message: 'Faltan datos' } };
+  const { data, error } = await supabase.rpc('admin_permisos_admin', {
+    p_complejo_id: complejoId,
+    p_user_id: userId,
+    p_canchas: !!permisos.canchas,
+    p_cobros: !!permisos.cobros,
+    p_ficha: !!permisos.ficha,
+  });
+  return comoResultadoRecinto(data, error, 'guardarPermisosAdmin');
 }
 
 /**

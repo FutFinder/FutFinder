@@ -130,6 +130,18 @@ Las coordenadas las fija el dueño al crear, con el mismo buscador de direccione
 
 `admin_mis_complejos` se tuvo que **soltar y recrear** para sumar `aprobado_futfinder` y `revision_pedida_at`. El procedimiento de aprobación, en [Aprobar recintos](../operacion/aprobar-recintos.md).
 
+La **83** está **aplicada el 2026-09-14**, arnés 23/23: **«administrador» dejó de ser todo o nada**. Tres permisos en `complejo_admins` —`puede_canchas`, `puede_cobros`, `puede_ficha`— que reparte el dueño con `admin_permisos_admin`. **El día a día NO es un permiso**: agenda, calendario, ocupar una hora y cancelar una reserva los puede cualquier administrador, siempre; es para lo que se suma a alguien.
+
+**Se aplica en las TABLAS, no en cada RPC.** Son doce funciones las que escriben y tocarlas una por una es doce oportunidades de olvidar una — y la que se olvide no falla, deja pasar. Siete disparadores (`tg_permiso_por_complejo` / `tg_permiso_por_cancha`, con el permiso en `TG_ARGV[0]`) cubren `canchas_reservables`, `cancha_horario_reglas`, `cancha_tarifas`, `complejo_cobros`, `complejo_servicios`, `complejo_fotos` y `complejos`, así que **cualquier RPC que se agregue mañana queda protegida sola**.
+
+**El disparador de `complejos` va con `update of <columnas>`, y eso no es un detalle:** `recalc_complejo_rating` escribe `rating_avg` cada vez que un jugador califica, y ese jugador no administra nada. Con un disparador sobre toda la tabla, calificar un recinto reventaría. Hay un caso del arnés que comprueba que `rating_avg` no esté entre las columnas vigiladas.
+
+**`puede_en_complejo` devuelve `true` sin sesión**, a propósito: es el equipo por SQL y las funciones de sistema. No abre nada porque todas las RPC empiezan comprobando `auth.uid() is null` — pero si alguna deja de comprobarlo, el agujero está ahí, y por eso está dicho en el código.
+
+**Publicar y pedir revisión pasaron a ser del dueño.** No están entre los permisos porque no son una tarea que se delegue. Antes cualquier administrador podía publicar.
+
+**Una lección del arnés, no del código:** la primera corrida daba verde en el caso del horario porque la llamada reventaba… por un choque de horarios, no por el permiso. Desde entonces **cada caso de denegación comprueba el MENSAJE**, y la prueba crea su propia cancha para que ningún choque tape lo que se quiere medir.
+
 La 79 corrige el mensaje de `confirmar_reserva`, que decía «El pago con tarjeta todavía no está disponible» y desde la 78 es falso. Va aparte a propósito: la 78 es por donde va a pasar plata y conviene revisarla sin un cambio de texto en el medio.
 
 **Una lección que ya costó tres veces: agregar parámetros con `default` a una función NO la reemplaza, crea una SOBRECARGA.** Y entonces una llamada con los argumentos viejos calza con las dos y Postgres la rechaza por ambigua. Pasó con `crear_reserva` en la 67 y la 68, y con `admin_crear_bloqueo` y `admin_actualizar_bloqueo` en la 69. Siempre hay que hacer `drop function` de la firma vieja antes, y verificar después que quede una sola versión en `pg_proc`.

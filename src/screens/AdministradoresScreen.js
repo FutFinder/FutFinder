@@ -2,15 +2,21 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, Plus, AlertTriangle, UserX, Search } from 'lucide-react-native';
+import {
+  ArrowLeft, Plus, AlertTriangle, UserX, Search, SlidersHorizontal, Check,
+} from 'lucide-react-native';
 
 import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import { Card, IconButton, Button, Badge, Sheet, NoticeCard, StickyFooter } from '../components/reservas/ui';
+import { Switch } from '../components/reservas/recintoUi';
+import {
+  PERMISOS, SIEMPRE_PUEDE, permisosCambiaron, permisosDe, resumenDePermisos,
+} from '../utils/permisosAdmin';
 import { Skeleton, FieldLabel, TextField } from '../components/reservas/recintoUi';
 import { useAuth } from '../contexts/AuthContext';
 import {
   administradoresDelRecinto, buscarUsuarioPorUsername,
-  agregarAdministrador, quitarAdministrador,
+  agregarAdministrador, quitarAdministrador, guardarPermisosAdmin,
 } from '../services/recinto';
 
 const MESES = [
@@ -29,12 +35,14 @@ function desdeCuando(iso) {
 /**
  * Administradores del recinto (artboard 1s). Solo el dueño llega acá.
  *
- * NO HAY PERMISOS PARCIALES, y la pantalla lo dice de frente: un admin puede
- * todo lo del recinto —ficha, canchas, horarios, tarifas, bloqueos, cobros,
- * cancelar reservas— menos tocar esta lista. Las funciones del servidor
- * validan que quien llama administre el complejo, sin mirar el rol; solo
- * `admin_agregar_admin` y `admin_quitar_admin` exigen ser dueño. Ofrecer
- * casillas de permisos sería prometer algo que el backend no hace.
+ * LOS PERMISOS SON TRES Y LOS REPARTE EL DUEÑO (migración 83): canchas,
+ * cobros y ficha. Un administrador nuevo nace SIN NINGUNO y aun así sirve:
+ * el día a día —agenda, calendario, ocupar una hora, cancelar una reserva—
+ * no es un permiso y no se puede apagar. Es para lo que se suma a alguien.
+ *
+ * LAS CASILLAS NO SON UN ADORNO: quien manda es el servidor. Cada permiso se
+ * aplica en disparadores sobre las tablas, así que apagarlo acá lo apaga de
+ * verdad, incluso para una RPC que se agregue mañana.
  *
  * SE AGREGA A ALGUIEN QUE YA TIENE CUENTA, buscándolo por su `@usuario`. No
  * se crean cuentas ni se piden contraseñas: crear una cuenta a nombre de otra
@@ -55,6 +63,10 @@ export default function AdministradoresScreen({ navigation, route }) {
   const [error, setError] = useState(null);
 
   const [hoja, setHoja] = useState(false);
+  // A quién se le están editando los permisos, y cómo quedaron las casillas.
+  const [permisosDe_, setPermisosDe] = useState(null);
+  const [casillas, setCasillas] = useState({});
+  const [guardandoPermisos, setGuardandoPermisos] = useState(false);
   const [texto, setTexto] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [encontrado, setEncontrado] = useState(null);
@@ -92,6 +104,25 @@ export default function AdministradoresScreen({ navigation, route }) {
   }, [texto]);
 
   const yaEsta = encontrado && admins.some((a) => a.userId === encontrado.id);
+
+  const abrirPermisos = (a) => {
+    setPermisosDe(a);
+    setCasillas(permisosDe(a));
+  };
+
+  const guardarPermisos = async () => {
+    setGuardandoPermisos(true);
+    const { data, error: err } = await guardarPermisosAdmin(
+      complejoId, permisosDe_.userId, casillas,
+    );
+    setGuardandoPermisos(false);
+    if (err || !data?.ok) {
+      setError(err?.message || data?.reason || 'No pudimos guardar los permisos.');
+      return;
+    }
+    setPermisosDe(null);
+    cargar();
+  };
 
   const agregar = async () => {
     if (!encontrado) return;
@@ -174,6 +205,21 @@ export default function AdministradoresScreen({ navigation, route }) {
                         />
                       ) : null}
                     </View>
+
+                    <Text style={styles.resumenPermisos}>{resumenDePermisos(a)}</Text>
+
+                    {/* El dueño no tiene permisos que editar: los tiene por
+                        ser dueño, y ofrecer casillas que no hacen nada sería
+                        peor que no ofrecerlas. */}
+                    {!esDueno ? (
+                      <Button
+                        label="Editar permisos"
+                        variant="secondary"
+                        icon={SlidersHorizontal}
+                        style={{ marginTop: 11 }}
+                        onPress={() => abrirPermisos(a)}
+                      />
+                    ) : null}
                   </Card>
                 );
               })}
@@ -194,6 +240,51 @@ export default function AdministradoresScreen({ navigation, route }) {
       ) : null}
 
       {/* Agregar */}
+      <Sheet
+        visible={!!permisosDe_}
+        onClose={() => setPermisosDe(null)}
+        title={permisosDe_ ? `Permisos de @${permisosDe_.username}` : 'Permisos'}
+      >
+        <Text style={styles.permisoAyuda}>
+          Enciende solo lo que quieras que pueda cambiar. Lo demás lo va a ver, pero no lo va a
+          poder tocar.
+        </Text>
+
+        <View style={{ gap: 14, marginTop: 16 }}>
+          {PERMISOS.map((permiso) => (
+            <Switch
+              key={permiso.clave}
+              valor={!!casillas[permiso.clave]}
+              onChange={(v) => setCasillas((prev) => ({ ...prev, [permiso.clave]: v }))}
+              etiqueta={permiso.nombre}
+              descripcion={permiso.descripcion}
+              deshabilitado={guardandoPermisos}
+            />
+          ))}
+        </View>
+
+        {/* Lo que no se puede apagar, dicho acá mismo: si no, la pregunta
+            «¿y entonces para qué sirve un admin sin permisos?» queda sin
+            respuesta justo donde se está decidiendo. */}
+        <View style={styles.siemprePuede}>
+          <Text style={styles.siempreTitulo}>Sin encender nada, igual puede</Text>
+          {SIEMPRE_PUEDE.map((linea) => (
+            <View key={linea} style={styles.siempreFila}>
+              <Check color={C.green} size={13} strokeWidth={2.6} />
+              <Text style={styles.siempreTexto}>{linea}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Button
+          label="Guardar permisos"
+          style={{ marginTop: 16 }}
+          loading={guardandoPermisos}
+          disabled={!permisosCambiaron(permisosDe_, casillas)}
+          onPress={guardarPermisos}
+        />
+      </Sheet>
+
       <Sheet visible={hoja} onClose={() => setHoja(false)} title="Agregar administrador">
         <View style={{ gap: 15 }}>
           <View>
@@ -287,6 +378,16 @@ export default function AdministradoresScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  resumenPermisos: { fontFamily: F.semiBold, fontSize: 12, color: C.textSecondary, marginTop: 11 },
+  permisoAyuda: { fontFamily: F.medium, fontSize: 12.5, color: C.textSecondary, lineHeight: 18 },
+  siemprePuede: {
+    marginTop: 18, padding: 14, borderRadius: 16,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
+  siempreTitulo: { fontFamily: F.extraBold, fontSize: 12.5, color: C.textPrimary, marginBottom: 9 },
+  siempreFila: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
+  siempreTexto: { flex: 1, fontFamily: F.medium, fontSize: 12, color: C.textSecondary },
+
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
