@@ -45,6 +45,13 @@ import { DateSheet, TimeSheet, formatFechaLarga, startOfDay } from '../component
 import { LoadingList, ErrorState } from '../components/partidos/StateViews';
 import LocationAutocomplete, { reverseGeocode } from '../components/LocationAutocomplete';
 import {
+  escribirDireccion,
+  formularioConUbicacion,
+  seleccionarLugar,
+  ubicacionDelFormulario,
+  ubicacionFijada,
+} from '../utils/ubicacionPropuesta';
+import {
   getMatchAttendees,
   getMatchRequests,
   translateSchemaError,
@@ -146,6 +153,21 @@ export default function EditMatchScreen({ route, navigation }) {
     });
   };
 
+  /**
+   * Teclear la dirección y elegir una sugerencia pasan por la misma transición
+   * pura: el buscador hace eco del texto justo después de entregar el punto, y
+   * solo la forma funcional lee el estado que quedó y no el rancio.
+   */
+  const setUbicacion = (transicion) => {
+    setForm((f) => formularioConUbicacion(f, transicion(ubicacionDelFormulario(f))));
+    setErrors((prev) => {
+      if (!Object.keys(prev).length) return prev;
+      const next = { ...prev };
+      ['direccion', 'cancha', 'comuna', 'region'].forEach((k) => delete next[k]);
+      return next;
+    });
+  };
+
   const comunas = useMemo(() => (form?.region ? getComunasOfRegion(form.region) : []), [form?.region]);
 
   // Cupos totales mínimos: los que ya están tomados por otros jugadores.
@@ -176,6 +198,10 @@ export default function EditMatchScreen({ route, navigation }) {
     if (!form.titulo.trim()) e.titulo = 'El título no puede quedar vacío';
     if (!MODALIDADES.some((m) => m.value === form.modalidad)) e.modalidad = 'Elige la modalidad';
     if (!form.cancha.trim()) e.cancha = 'Falta el nombre de la cancha';
+    if (!ubicacionFijada(ubicacionDelFormulario(form))) {
+      e.direccion =
+        'Cambiaste la dirección: elige una sugerencia del buscador o toca «Usar mi ubicación» para fijar la ubicación de la cancha.';
+    }
     if (!form.region) e.region = 'Elige una región';
     if (!form.comuna) e.comuna = 'Elige una comuna';
 
@@ -244,24 +270,23 @@ export default function EditMatchScreen({ route, navigation }) {
     const dt = combineDateTime(form.fecha, form.hora);
     const edad = resolveEdad(form);
     const nuevosTotales = Number(form.cupos);
-    // `cupos_disponibles` solo se recalcula si el total cambió, y siempre
-    // descontando a los jugadores que realmente ocupan un cupo (sin contar al
-    // organizador). Si el total no cambió no se toca: recalcularlo a ciegas
-    // hacía desaparecer un cupo cada vez que se guardaba.
-    const totalCambio = nuevosTotales !== (original.cupos_totales ?? nuevosTotales);
+    // `cupos_disponibles` ya no se manda: lo recalcula el servidor con la
+    // nómina vigente al momento de guardar. Esta pantalla se abrió hace rato y
+    // su conteo puede estar viejo (migración 104).
 
     const { error } = await updateMatch(matchId, {
       titulo: form.titulo.trim(),
       modalidad: form.modalidad,
       cancha_nombre: form.cancha.trim(),
       direccion: form.direccion.trim() || null,
-      latitud: form.coords?.lat ?? original.latitud,
-      longitud: form.coords?.lng ?? original.longitud,
+      // `validate` no deja llegar acá sin un punto que corresponda a la
+      // dirección escrita; si alguna vez llegara, no se guarda uno viejo.
+      latitud: ubicacionFijada(ubicacionDelFormulario(form)) ? form.coords.lat : original.latitud,
+      longitud: ubicacionFijada(ubicacionDelFormulario(form)) ? form.coords.lng : original.longitud,
       region: form.region,
       comuna: form.comuna,
       hora: dt.toISOString(),
       cupos_totales: nuevosTotales,
-      ...(totalCambio ? { cupos_disponibles: Math.max(0, nuevosTotales - ocupadas) } : {}),
       precio_cuota: form.cuota === '' ? 0 : Number(form.cuota),
       nivel: form.nivel,
       duracion_min: Number(form.duracion),
@@ -334,9 +359,12 @@ export default function EditMatchScreen({ route, navigation }) {
   const useMyLocation = async () => {
     const loc = await getCurrentLocation();
     if (!loc?.ok) return;
-    const patch = { coords: { lat: loc.latitude, lng: loc.longitude } };
     const rev = await reverseGeocode({ lat: loc.latitude, lng: loc.longitude });
-    if (rev?.address) patch.direccion = rev.address;
+    const direccion = rev?.address || form.direccion;
+    const patch = {
+      direccion,
+      coords: { lat: loc.latitude, lng: loc.longitude, direccion },
+    };
     const m = matchComuna(rev?.comunaRaw) || matchComuna(rev?.regionRaw);
     if (m) {
       patch.region = m.region;
@@ -578,17 +606,8 @@ export default function EditMatchScreen({ route, navigation }) {
               <LocationAutocomplete
                 value={form.direccion}
                 placeholder="Busca por dirección o sector"
-                onChangeText={(v) => set({ direccion: v })}
-                onSelect={({ lat, lng, address, comunaRaw, regionRaw }) => {
-                  const patch = { direccion: address || form.direccion };
-                  if (lat != null && lng != null) patch.coords = { lat, lng };
-                  const m = matchComuna(comunaRaw) || matchComuna(regionRaw);
-                  if (m) {
-                    patch.region = m.region;
-                    patch.comuna = m.comuna;
-                  }
-                  set(patch);
-                }}
+                onChangeText={(v) => setUbicacion((u) => escribirDireccion(u, v))}
+                onSelect={(seleccion) => setUbicacion((u) => seleccionarLugar(u, seleccion))}
                 inputRowStyle={styles.autoRow}
                 inputStyle={styles.autoInput}
                 dropdownStyle={styles.autoDropdown}
@@ -605,6 +624,7 @@ export default function EditMatchScreen({ route, navigation }) {
                 <Locate color={P.green} size={15} strokeWidth={2} />
                 <Text style={styles.locBtnText}>Usar mi ubicación</Text>
               </Pressable>
+              <ErrorHint>{errors.direccion}</ErrorHint>
             </Field>
 
             <Field label="Región">
@@ -890,7 +910,12 @@ function toForm(m) {
     cuota: String(m.precio_cuota ?? 0),
     cancha: m.cancha_nombre || '',
     direccion: m.direccion || '',
-    coords: m.latitud != null ? { lat: Number(m.latitud), lng: Number(m.longitud) } : null,
+    // El punto guardado es el de la dirección guardada: se atan, y si el texto
+    // cambia sin confirmar una ubicación nueva el punto deja de valer.
+    coords:
+      m.latitud != null
+        ? { lat: Number(m.latitud), lng: Number(m.longitud), direccion: m.direccion || '' }
+        : null,
     region: m.region || '',
     comuna: m.comuna || '',
     fecha: startOfDay(dt),

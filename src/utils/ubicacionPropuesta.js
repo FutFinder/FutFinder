@@ -94,6 +94,36 @@ export function ubicacionFijada(estado) {
 }
 
 /**
+ * El mismo estado visto como los campos que usan el formulario de publicar y
+ * el de editar un partido, donde la cancha se llama `cancha` y no
+ * `canchaNombre`. Vive acá y no en cada pantalla porque la regla de las
+ * coordenadas es una sola: duplicar el adaptador es duplicar la ocasión de
+ * equivocarse.
+ */
+export function ubicacionDelFormulario(f = {}) {
+  return {
+    direccion: f.direccion || '',
+    canchaNombre: f.cancha || '',
+    comuna: f.comuna || '',
+    region: f.region || '',
+    coords: f.coords || null,
+  };
+}
+
+/** La vuelta: el formulario anterior con la ubicación ya aplicada. */
+export function formularioConUbicacion(f = {}, u = UBICACION_VACIA) {
+  const base = u || UBICACION_VACIA;
+  return {
+    ...f,
+    direccion: base.direccion,
+    cancha: base.canchaNombre,
+    comuna: base.comuna,
+    region: base.region,
+    coords: base.coords,
+  };
+}
+
+/**
  * Los campos de ubicación tal como los espera `validarPropuestaOficial` y,
  * detrás, `propuestaOficialPayload`. Traducir a mano en la pantalla es donde
  * un nombre mal puesto se convierte en un campo que llega vacío al servidor.

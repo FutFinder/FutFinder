@@ -61,6 +61,13 @@ import { isNetworkError, useOnline } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
 import { REGIONES, getComunasOfRegion, matchComuna } from '../data/regiones-chile';
 import {
+  escribirDireccion,
+  formularioConUbicacion,
+  seleccionarLugar,
+  ubicacionDelFormulario,
+  ubicacionFijada,
+} from '../utils/ubicacionPropuesta';
+import {
   CUPOS,
   DESC_MAX,
   DURACIONES,
@@ -100,6 +107,8 @@ function initialDraft() {
     modalidad: 'futbol7',
     cancha: '',
     direccion: '',
+    // `{ lat, lng, direccion }` o `null`: el punto viaja con la dirección de
+    // la que salió (ver `utils/ubicacionPropuesta`).
     coords: null,
     region: REGION_DEFAULT,
     comuna: '',
@@ -141,6 +150,9 @@ export default function PublishMatchScreen({ navigation, route }) {
   const [submitError, setSubmitError] = useState(null);
   const [sheet, setSheet] = useState(null); // 'region' | 'comuna' | 'fecha' | 'hora' | 'share'
   const [locBusy, setLocBusy] = useState(false);
+  // Ubicación del teléfono. Sirve SOLO para ordenar las sugerencias del
+  // buscador: nunca se publica como ubicación de la cancha.
+  const [proximidad, setProximidad] = useState(null);
 
   // Token de idempotencia: se crea una vez por borrador, así que dos toques
   // seguidos en «Publicar» no pueden crear dos partidos.
@@ -199,14 +211,12 @@ export default function PublishMatchScreen({ navigation, route }) {
   }, [clubChallengeId]);
 
   // Ubicación aproximada al abrir: solo para sugerir la cancha más cercana.
+  // Antes se guardaba en el borrador y terminaba publicada como la ubicación
+  // de la cancha aunque el organizador escribiera otra dirección.
   useEffect(() => {
     (async () => {
       const loc = await getCurrentLocation();
-      if (loc?.ok) {
-        setDraft((d) =>
-          d.coords ? d : { ...d, coords: { lat: loc.latitude, lng: loc.longitude } }
-        );
-      }
+      if (loc?.ok) setProximidad({ lat: loc.latitude, lng: loc.longitude });
     })();
   }, []);
 
@@ -223,6 +233,23 @@ export default function PublishMatchScreen({ navigation, route }) {
         const field = k === 'edadMin' || k === 'edadMax' || k === 'edadPreset' ? 'edad' : k;
         delete next[field];
       });
+      return next;
+    });
+  }, []);
+
+  /**
+   * Los dos caminos que tocan la ubicación (teclear y elegir una sugerencia)
+   * pasan por acá: la transición es pura y se aplica en forma funcional, que
+   * es lo único que hace correcta la secuencia `onSelect` → `onChangeText`
+   * con la que el buscador hace eco del texto elegido.
+   */
+  const setUbicacion = useCallback((transicion) => {
+    setDraft((d) => formularioConUbicacion(d, transicion(ubicacionDelFormulario(d))));
+    setSubmitError(null);
+    setErrors((prev) => {
+      if (!Object.keys(prev).length) return prev;
+      const next = { ...prev };
+      ['direccion', 'cancha', 'comuna', 'region'].forEach((k) => delete next[k]);
       return next;
     });
   }, []);
@@ -283,9 +310,12 @@ export default function PublishMatchScreen({ navigation, route }) {
         setSubmitError('No pudimos leer tu ubicación. Revisa el permiso o escribe la dirección.');
         return;
       }
-      const patch = { coords: { lat: loc.latitude, lng: loc.longitude } };
       const rev = await reverseGeocode({ lat: loc.latitude, lng: loc.longitude });
-      if (rev?.address) patch.direccion = rev.address;
+      const direccion = rev?.address || draft.direccion;
+      const patch = {
+        direccion,
+        coords: { lat: loc.latitude, lng: loc.longitude, direccion },
+      };
       const m = matchComuna(rev?.comunaRaw) || matchComuna(rev?.regionRaw);
       if (m) {
         patch.region = m.region;
@@ -333,10 +363,11 @@ export default function PublishMatchScreen({ navigation, route }) {
       comuna: draft.comuna,
       cancha_nombre: draft.cancha.trim(),
       direccion: draft.direccion.trim() || null,
-      // Sin coordenadas del buscador caemos al centro aproximado que ya
-      // tenemos; nunca publicamos con lat/lng inventadas.
-      latitud: draft.coords?.lat ?? null,
-      longitud: draft.coords?.lng ?? null,
+      // Solo se publica el punto que corresponde a la dirección escrita: el
+      // GPS del teléfono sirve para ordenar sugerencias, no para decir dónde
+      // está la cancha.
+      latitud: ubicacionFijada(ubicacionDelFormulario(draft)) ? draft.coords.lat : null,
+      longitud: ubicacionFijada(ubicacionDelFormulario(draft)) ? draft.coords.lng : null,
       hora: dt.toISOString(),
       cupos_totales: Number(draft.cupos),
       precio_cuota: draft.cuota === '' ? 0 : Number(draft.cuota),
@@ -696,19 +727,9 @@ export default function PublishMatchScreen({ navigation, route }) {
                 <LocationAutocomplete
                   value={draft.direccion}
                   placeholder="Busca por dirección o sector"
-                  proximity={draft.coords ? { lat: draft.coords.lat, lng: draft.coords.lng } : null}
-                  onChangeText={(v) => set({ direccion: v })}
-                  onSelect={({ lat, lng, address, comunaRaw, regionRaw, canchaName }) => {
-                    const patch = { direccion: address || draft.direccion };
-                    if (lat != null && lng != null) patch.coords = { lat, lng };
-                    const m = matchComuna(comunaRaw) || matchComuna(regionRaw);
-                    if (m) {
-                      patch.region = m.region;
-                      patch.comuna = m.comuna;
-                    }
-                    if (canchaName && !draft.cancha.trim()) patch.cancha = canchaName;
-                    set(patch);
-                  }}
+                  proximity={draft.coords || proximidad}
+                  onChangeText={(v) => setUbicacion((u) => escribirDireccion(u, v))}
+                  onSelect={(seleccion) => setUbicacion((u) => seleccionarLugar(u, seleccion))}
                   inputRowStyle={styles.autoRow}
                   inputStyle={styles.autoInput}
                   dropdownStyle={styles.autoDropdown}

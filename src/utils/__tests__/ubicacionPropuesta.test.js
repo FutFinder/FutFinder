@@ -222,3 +222,88 @@ test('no revienta con entradas ausentes', () => {
   const e = U.seleccionarLugar(U.UBICACION_VACIA, {});
   assert.equal(U.ubicacionFijada(e), false);
 });
+
+// ── el formulario de publicar y el de editar ──────────────────
+//
+// Auditoría del 15 de septiembre de 2026, hallazgo 3: publicar guardaba las
+// coordenadas del TELÉFONO como las de la cancha. La pantalla precargaba el
+// GPS en el borrador «para sugerir la cancha más cercana» y escribir una
+// dirección distinta no las invalidaba. Estas pruebas recorren el formulario
+// con los nombres que usa (`cancha`, no `canchaNombre`).
+
+/** Lo que hace la pantalla en cada callback del buscador. */
+function enElFormulario(form, transicion) {
+  return U.formularioConUbicacion(form, transicion(U.ubicacionDelFormulario(form)));
+}
+
+const FORM_VACIO = {
+  titulo: 'Pichanga del viernes',
+  cancha: '',
+  direccion: '',
+  comuna: '',
+  region: '',
+  coords: null,
+  cupos: 10,
+};
+
+test('el formulario sobrevive la ida y vuelta sin perder sus otros campos', () => {
+  const form = enElFormulario(FORM_VACIO, (u) => U.seleccionarLugar(u, SUGERENCIA));
+  assert.equal(form.titulo, 'Pichanga del viernes', 'no puede tocar lo que no es ubicación');
+  assert.equal(form.cupos, 10);
+  assert.equal(form.cancha, 'Complejo Deportivo Ñuñoa', 'la cancha se llama `cancha` acá');
+  assert.equal(form.direccion, SUGERENCIA.address);
+  assert.equal(U.ubicacionFijada(U.ubicacionDelFormulario(form)), true);
+});
+
+test('escribir una dirección a mano nunca deja el partido con un punto', () => {
+  let form = FORM_VACIO;
+  form = teclearEnFormulario(form, 'Cancha del barrio, por la plaza');
+  assert.equal(form.coords, null);
+  assert.equal(
+    U.ubicacionFijada(U.ubicacionDelFormulario(form)),
+    false,
+    'sin elegir sugerencia el partido se publica sin ubicación, no con la del teléfono'
+  );
+});
+
+test('HALLAZGO 3: elegir una cancha y luego escribir otra dirección suelta el punto', () => {
+  let form = enElFormulario(FORM_VACIO, (u) => U.escribirDireccion(u, SUGERENCIA.address));
+  form = enElFormulario(form, (u) => U.seleccionarLugar(u, SUGERENCIA));
+  form = enElFormulario(form, (u) => U.escribirDireccion(u, SUGERENCIA.address)); // el eco
+  assert.equal(U.ubicacionFijada(U.ubicacionDelFormulario(form)), true);
+
+  form = teclearEnFormulario(form, 'Estadio Nacional, Ñuñoa');
+  assert.equal(
+    U.ubicacionFijada(U.ubicacionDelFormulario(form)),
+    false,
+    'el punto era de la dirección anterior: no puede viajar a la nueva'
+  );
+});
+
+test('editar un partido arranca con el punto atado a la dirección guardada', () => {
+  // Como lo arma `toForm` a partir de la fila de la base.
+  const form = {
+    ...FORM_VACIO,
+    direccion: 'Av. Grecia 3401, Ñuñoa',
+    cancha: 'Complejo Deportivo Ñuñoa',
+    coords: { lat: -33.4569, lng: -70.6019, direccion: 'Av. Grecia 3401, Ñuñoa' },
+  };
+  assert.equal(U.ubicacionFijada(U.ubicacionDelFormulario(form)), true, 'lo guardado vale');
+
+  const editado = teclearEnFormulario(form, 'Av. Grecia 3401, Ñuñoa (cancha 2)');
+  assert.equal(
+    U.ubicacionFijada(U.ubicacionDelFormulario(editado)),
+    false,
+    'cambiar el texto no puede guardar las coordenadas viejas como las nuevas'
+  );
+});
+
+/** Teclear sobre el formulario, letra a letra, reemplazando lo que hubiera. */
+function teclearEnFormulario(form, texto) {
+  return texto
+    .split('')
+    .reduce(
+      (acc, _c, i) => enElFormulario(acc, (u) => U.escribirDireccion(u, texto.slice(0, i + 1))),
+      form
+    );
+}

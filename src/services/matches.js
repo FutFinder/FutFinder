@@ -616,6 +616,9 @@ function translateJoinError(msg = '') {
   if (msg.includes('CHOQUE_HORARIO')) {
     return 'Ya tienes un partido a esta hora.';
   }
+  if (msg.includes('EDAD_FUERA_DE_RANGO')) {
+    return 'Tu edad está fuera del rango que pide este partido.';
+  }
   const m = msg.match(/TRUST_BAJO:(\d+):(\d+)/);
   if (m) {
     return `Trust Score insuficiente: este partido pide ${m[2]} y tú tienes ${m[1]}.`;
