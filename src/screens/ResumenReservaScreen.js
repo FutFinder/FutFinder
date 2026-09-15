@@ -15,6 +15,7 @@ import { estadoPasarela } from '../services/pagos';
 import { totalDeReserva, reservaLista } from '../utils/reservasJugador';
 import { telefonoAceptable } from '../utils/recintoPantallas';
 import { MAX_JUGADORES, MIN_JUGADORES, repartoDeCuotas } from '../utils/pagoDividido';
+import { alcanzaPara } from '../utils/saldo';
 import { formatCLP } from '../services/reservasRules';
 
 /**
@@ -85,7 +86,7 @@ export default function ResumenReservaScreen({ navigation, route }) {
       getMiBalance(),
     ]);
     setComplejo(data);
-    setSaldo(sal);
+    setSaldo(sal?.saldo ?? null);
     setCobros(cs || []);
     // `null` si no se pudo comprobar: no es lo mismo que «no hay». Con `null`
     // el botón queda disponible y el error, si llega, aparece al tocarlo.
@@ -174,7 +175,7 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const cuantos = nJugadores ?? tope;
   const reparto = repartoDeCuotas(dinero.total, cuantos) || repartoDeCuotas(dinero.total, MIN_JUGADORES);
   const divide = modalidad === 'jugadores';
-  const saldoCorto = divide && saldo !== null && reparto && saldo < reparto.cuota;
+  const saldoCorto = divide && !!reparto && alcanzaPara(saldo, reparto.cuota) === false;
   const listo = baseLista && !saldoCorto;
 
   return (

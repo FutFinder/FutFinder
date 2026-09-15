@@ -14,6 +14,7 @@ import {
 import {
   avanceDeGrupo, etiquetaDeParticipante, miAccion, motivoLegible, puedeQuitar, puedeRecordar,
 } from '../utils/pagoDividido';
+import { alcanzaPara } from '../utils/saldo';
 import { formatCLP } from '../services/reservasRules';
 
 /**
@@ -55,7 +56,7 @@ export default function ArmarReservaScreen({ navigation, route }) {
     ]);
     if (e) setError(e.message);
     else { setDetalle(data); setError(null); }
-    setSaldo(s);
+    setSaldo(s?.saldo ?? null);
     setLoading(false);
   }, [reservaId]);
 
@@ -156,8 +157,10 @@ export default function ArmarReservaScreen({ navigation, route }) {
   const accion = miAccion(detalle);
   const armando = detalle.estado === 'armando';
   // El saldo propio sí se puede mirar, y es la única forma de avisarle a
-  // alguien ANTES de que apriete que no le va a alcanzar.
-  const saldoCorto = accion?.clave === 'autorizar' && saldo !== null && saldo < detalle.cuota;
+  // alguien ANTES de que apriete que no le va a alcanzar. `alcanzaPara`
+  // devuelve null cuando no se sabe, y eso NO bloquea: un error de red no
+  // tiene por qué apagar el botón de pagar.
+  const saldoCorto = accion?.clave === 'autorizar' && alcanzaPara(saldo, detalle.cuota) === false;
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>

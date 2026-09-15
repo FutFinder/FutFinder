@@ -69,6 +69,7 @@ import ResumenReservaScreen from '../screens/ResumenReservaScreen';
 import MisReservasScreen from '../screens/MisReservasScreen';
 import PagoReservaScreen from '../screens/PagoReservaScreen';
 import ArmarReservaScreen from '../screens/ArmarReservaScreen';
+import SaldoScreen from '../screens/SaldoScreen';
 import InvitarJugadoresScreen from '../screens/InvitarJugadoresScreen';
 import ReportarProblemaScreen from '../screens/ReportarProblemaScreen';
 import MisRecintosScreen from '../screens/MisRecintosScreen';
@@ -155,6 +156,7 @@ const GuardedResumenReservaScreen = withAuthGuard(ResumenReservaScreen, 'Resumen
 const GuardedPagoReservaScreen = withAuthGuard(PagoReservaScreen, 'PagoReserva');
 const GuardedMisReservasScreen = withAuthGuard(MisReservasScreen, 'MisReservas');
 const GuardedArmarReservaScreen = withAuthGuard(ArmarReservaScreen, 'ArmarReserva');
+const GuardedSaldoScreen = withAuthGuard(SaldoScreen, 'Saldo');
 const GuardedInvitarJugadoresScreen = withAuthGuard(InvitarJugadoresScreen, 'InvitarJugadores');
 const GuardedReportarProblemaScreen = withAuthGuard(ReportarProblemaScreen, 'ReportarProblema');
 // Administración del recinto: todas detrás del guard porque muestran datos de
@@ -486,6 +488,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="ArmarReserva"
           component={GuardedArmarReservaScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Saldo"
+          component={GuardedSaldoScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

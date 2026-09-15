@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
   Calendar,
   CalendarDays,
+  Wallet,
   ShieldCheck,
   Building2,
   ChevronRight,
@@ -20,7 +21,7 @@ import NotificationBell from '../components/NotificationBell';
 import FiltrosSheet from '../components/reservas/FiltrosSheet';
 import { Card, Button, Chip, Badge, NoticeCard, Foto } from '../components/reservas/ui';
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
-import { listComplejosCerca, listHorasLibresHoy } from '../services/reservas';
+import { listComplejosCerca, listHorasLibresHoy, getMiBalance } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { misRecintos, agendaDelDia } from '../services/recinto';
 import { misReservas } from '../services/reservas';
@@ -90,6 +91,9 @@ export default function ReservasScreen({ navigation }) {
   // más, a la lista. Es una llamada de más solo para quien administra.
   const [recintos, setRecintos] = useState([]);
   const [misProximas, setMisProximas] = useState(0);
+  // `null` es «todavía no sé», no «cero pesos»: la fila dice para qué sirve
+  // el saldo en vez de afirmar que no hay plata.
+  const [saldo, setSaldo] = useState(null);
   const [reservasHoy, setReservasHoy] = useState(null);
   // La solicitud sin atender de quien mira, si tiene una: la invitación de
   // abajo cambia de texto en vez de invitar de nuevo a alguien que ya escribió.
@@ -101,6 +105,10 @@ export default function ReservasScreen({ navigation }) {
       (async () => {
         const { data: reservasMias } = await misReservas(60);
         if (vivo) setMisProximas(separaReservas(reservasMias || []).proximas.length);
+        // Solo el número: la lista de movimientos es cosa de la pantalla de
+        // saldo, y pedirla acá serían filas que nadie va a mirar.
+        const { data: bal } = await getMiBalance(1);
+        if (vivo) setSaldo(bal?.saldo ?? null);
         const { data } = await misRecintos();
         if (!vivo) return;
         setRecintos(data || []);
@@ -206,6 +214,26 @@ export default function ReservasScreen({ navigation }) {
                 {misProximas > 0
                   ? `${misProximas} por jugar`
                   : 'Lo que reservaste, con la hora y cómo llegar'}
+              </Text>
+            </View>
+            <ChevronRight color={C.textSecondary} size={18} strokeWidth={2.2} />
+          </View>
+        </Card>
+
+        {/* El saldo vive en Perfil —es de la persona, no de este vertical,
+            y el pago entre capitanes lo va a necesitar desde Clubes— pero
+            acá hay un acceso porque es el único lugar donde hoy se gasta. */}
+        <Card onPress={() => navigation.navigate('Saldo')} style={styles.recintoCard}>
+          <View style={styles.recintoFila}>
+            <View style={styles.recintoIcono}>
+              <Wallet color={C.green} size={18} strokeWidth={2.2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.recintoNombre}>Mi saldo</Text>
+              <Text style={styles.recintoSub} numberOfLines={1}>
+                {saldo === null
+                  ? 'Para pagar tu parte cuando dividen la cuenta'
+                  : `${formatCLP(saldo)} disponible`}
               </Text>
             </View>
             <ChevronRight color={C.textSecondary} size={18} strokeWidth={2.2} />

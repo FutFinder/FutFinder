@@ -6,6 +6,7 @@ import {
 import { nombresDeServicios } from '../utils/serviciosRecinto';
 import { comoReserva } from '../utils/misReservas';
 import { comoDetalle } from '../utils/pagoDividido';
+import { comoBalance } from '../utils/saldo';
 
 /**
  * Servicio del vertical Reservas, LADO DEL JUGADOR.
@@ -410,22 +411,18 @@ export async function recalcularCuota(reservaId, nJugadores) {
  * el de alguien del mismo grupo. Por eso la nómina dice «falta que confirme» y
  * nunca «no le alcanza».
  */
-export async function getMiBalance() {
+export async function getMiBalance(limite = 50) {
   if (!isSupabaseConfigured) return { data: null, error: null };
-  const { data, error } = await supabase.rpc('get_mi_balance');
+  const { data, error } = await supabase.rpc('get_mi_balance', { p_limite: limite });
 
   // `get_mi_balance` devuelve un OBJETO {ok, saldo, movimientos}, no un
-  // número. `Number({...})` es NaN, y `NaN || 0` es 0: el saldo se leía
-  // SIEMPRE como cero, la pantalla decía «tu saldo es $0, no te alcanza» y
-  // APAGABA el botón de poner la parte. Nadie podía pagar nunca. Salió de
-  // abrir la pantalla con una cuenta que sí tenía saldo.
+  // número. Hacer `Number(data) || 0` daba NaN → 0: el saldo se leía SIEMPRE
+  // como cero, la pantalla del grupo decía «no te alcanza» y apagaba el
+  // botón de poner la parte. Nadie podía pagar. Salió de abrir la pantalla
+  // con una cuenta que sí tenía saldo, no de ningún arnés.
   if (error || !data?.ok) return { data: null, error: error || null };
-
-  // `null` es «no pude preguntar», y NO es cero: las pantallas solo bloquean
-  // cuando saben que el saldo no alcanza. Devolver 0 ante un fallo de red
-  // volvería a apagar el botón por una razón inventada.
-  const saldo = Number(data.saldo);
-  return { data: Number.isFinite(saldo) ? saldo : null, error: null };
+  return { data: comoBalance(data), error: null };
 }
+
 
 export { nombreDeTipo, jugadoresDeTipo, notaDeCancha };
