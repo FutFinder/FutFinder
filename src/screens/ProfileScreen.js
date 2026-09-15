@@ -13,7 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Pencil,
-  Wallet,
   LogOut,
   Clock,
   AlertCircle,
@@ -613,23 +612,15 @@ export default function ProfileScreen({ navigation, route }) {
           <>
             <AuditSupportCard reportesRecibidos={reportesRecibidos} />
 
-            {/* EL SALDO VIVE ACÁ, no en Reservas: es de la persona, no de un
-                flujo. Hoy solo se gasta reservando canchas, pero el pago
-                entre capitanes también exige Balance, así que en cuanto un
-                desafío de clubes ofrezca reservar, el saldo va a importar
-                fuera de ese vertical. Reservas tiene un acceso directo a
-                esta misma pantalla. */}
-            <ProfileActionRow
-              icon={<Wallet color={dsColors.green} size={17} strokeWidth={2} />}
-              label="Mi saldo"
-              onPress={() => navigation.navigate('Saldo')}
-              style={styles.actionSpaced}
-            />
-
+            {/* El saldo NO tiene fila acá: se entra por la billetera del
+                header, que está en Inicio, Partidos y Reservas. Una sola
+                puerta, y en el lugar que no depende de en qué pestaña
+                estés. */}
             <ProfileActionRow
               icon={<Pencil color={dsColors.green} size={17} strokeWidth={2} />}
               label="Editar mi perfil"
               onPress={goEdit}
+              style={styles.actionSpaced}
             />
 
             <Pressable
