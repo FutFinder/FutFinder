@@ -47,6 +47,12 @@ export function comoReserva(fila) {
     cupos: fila.cupos ?? 1,
     listos: fila.listos ?? 0,
     miEstado: fila.mi_estado || null,
+    // La cancha de un desafío no la cancela un club solo: se le pide al
+    // otro (migración 55). `puedoResponder` lo calcula el servidor, porque
+    // el cliente no puede leer los miembros del club ajeno.
+    esDesafioClub: !!fila.es_desafio_club,
+    cancelacionEstado: fila.cancelacion_estado || 'ninguna',
+    puedoResponderCancelacion: !!fila.puedo_responder_cancelacion,
   };
 }
 
@@ -137,6 +143,29 @@ export function accionesDeReserva(reserva) {
 }
 
 /**
+ * La solicitud de cancelación de un desafío, si la hay y me toca a mí.
+ *
+ * ERA UN CALLEJÓN SIN SALIDA: `cancelar_reserva` le PIDE al otro club en vez
+ * de cancelar, mandaba el aviso… y no existía ninguna pantalla para aceptar
+ * o rechazar. Una reserva confirmada quedaba cobrada y sin forma de
+ * cancelarse. La función del servidor estaba desde la migración 55 y nadie
+ * la llamaba.
+ *
+ * Solo aparece para el club que NO la pidió: el que pidió ya dijo lo suyo.
+ */
+export function solicitudDeCancelacion(reserva) {
+  if (!reserva || !reserva.puedoResponderCancelacion) return null;
+  return {
+    titulo: 'El otro club quiere cancelar',
+    texto: reserva.estado === 'confirmada'
+      ? 'Si aceptas, la cancha se libera y se les devuelve a los dos capitanes lo que pusieron.'
+      : 'Si aceptas, la reserva se cancela. Todavía no se le cobró nada a nadie.',
+    aceptar: 'Aceptar y cancelar',
+    rechazar: 'No cancelar',
+  };
+}
+
+/**
  * Qué decirle sobre la cancelación.
  *
  * Tres situaciones y tres textos distintos: todavía no paga, ya pagó y le
@@ -145,6 +174,16 @@ export function accionesDeReserva(reserva) {
  */
 export function textoDeCancelacion(reserva) {
   if (!reserva) return null;
+  // En un desafío pedido y sin responder, lo que hay que contar es que se
+  // está esperando al otro club — no la regla de las 12 horas.
+  if (reserva.cancelacionEstado === 'solicitada') {
+    return reserva.puedoResponderCancelacion
+      ? null
+      : 'Pediste cancelar: falta que el otro club responda.';
+  }
+  if (reserva.cancelacionEstado === 'rechazada') {
+    return 'El otro club no quiso cancelar, así que la cancha sigue reservada.';
+  }
   if (reserva.estado !== 'confirmada') {
     return reserva.puedeCancelar
       ? 'Todavía no pagas, así que puedes cancelarla cuando quieras. La hora tampoco es tuya hasta que pagues.'

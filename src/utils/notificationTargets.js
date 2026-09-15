@@ -121,6 +121,7 @@ export function resolveNotificationTarget(n) {
     case 'reserva_invitacion_rechazada':
     case 'reserva_participante_quitado':
     case 'reserva_cancelacion_solicitada':
+    case 'reserva_cancelacion_rechazada':
       return { screen: 'MisReservas' };
 
     case 'club_match_published':

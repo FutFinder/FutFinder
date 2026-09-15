@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   accionesDeReserva, comoReserva, enlaceDeMapa, etiquetaDeEstado, lineaDePrecio,
-  separaReservas, textoDeCancelacion,
+  separaReservas, solicitudDeCancelacion, textoDeCancelacion,
 } = require('../misReservas.js');
 
 const AHORA = new Date('2026-09-14T18:00:00Z');
@@ -200,4 +200,59 @@ test('una reserva normal muestra el total, como siempre', () => {
 
 test('una reserva normal no cambió: el invitado sigue sin acciones', () => {
   assert.deepEqual(accionesDeReserva(r({ soyOrganizador: false })), []);
+});
+
+/* ── La cancelación de un desafío (migración 101) ───────────────── */
+
+const desafio = (extra) => ({
+  id: 'd', estado: 'confirmada', soyOrganizador: false, medioPago: 'balance',
+  puedeCancelar: true, cupos: 2, listos: 2, esDesafioClub: true,
+  cancelacionEstado: 'ninguna', puedoResponderCancelacion: false, ...extra,
+});
+
+test('LA SOLICITUD SOLO LE APARECE AL CLUB QUE NO LA PIDIÓ', () => {
+  // Era un callejón sin salida: se pedía, llegaba el aviso, y no había
+  // ninguna pantalla para aceptar o rechazar. Una reserva confirmada quedaba
+  // cobrada y sin forma de cancelarse.
+  assert.equal(solicitudDeCancelacion(desafio()), null);
+  assert.equal(solicitudDeCancelacion(desafio({ cancelacionEstado: 'solicitada' })), null);
+
+  const mia = solicitudDeCancelacion(desafio({
+    cancelacionEstado: 'solicitada', puedoResponderCancelacion: true,
+  }));
+  assert.equal(mia.titulo, 'El otro club quiere cancelar');
+  assert.match(mia.texto, /se les devuelve a los dos capitanes/);
+});
+
+test('el texto cambia si todavía no se cobró nada', () => {
+  // Hablar de devoluciones cuando nadie puso plata asusta sin motivo.
+  const armando = solicitudDeCancelacion(desafio({
+    estado: 'armando', cancelacionEstado: 'solicitada', puedoResponderCancelacion: true,
+  }));
+  assert.match(armando.texto, /Todavía no se le cobró nada/);
+});
+
+test('a quien pidió se le dice que espere, no la regla de las 12 horas', () => {
+  assert.equal(
+    textoDeCancelacion(desafio({ cancelacionEstado: 'solicitada' })),
+    'Pediste cancelar: falta que el otro club responda.',
+  );
+  // Y al que le toca responder no se le repite: ya tiene la tarjeta arriba.
+  assert.equal(
+    textoDeCancelacion(desafio({ cancelacionEstado: 'solicitada', puedoResponderCancelacion: true })),
+    null,
+  );
+});
+
+test('un rechazo se cuenta, no se traga', () => {
+  // Sin esto, quien pidió cancelar no se entera nunca de que le dijeron que no.
+  assert.match(
+    textoDeCancelacion(desafio({ cancelacionEstado: 'rechazada' })),
+    /no quiso cancelar/,
+  );
+});
+
+test('una reserva normal sigue con el texto de siempre', () => {
+  assert.match(textoDeCancelacion(r({ estado: 'confirmada', puedeCancelar: true })),
+    /hasta 12 horas antes/);
 });

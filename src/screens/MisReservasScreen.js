@@ -4,13 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, AlertTriangle, MapPin, CalendarDays } from 'lucide-react-native';
 
-import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import {
+  reservas as C, reservasSizes as S, reservasFonts as F, reservasRadius as R,
+} from '../theme/colors';
 import { Card, IconButton, Button, Badge, NoticeCard, Sheet, Foto } from '../components/reservas/ui';
 import { Skeleton } from '../components/reservas/recintoUi';
-import { misReservas, cancelarMiReserva } from '../services/reservas';
+import { misReservas, cancelarMiReserva, responderCancelacionDesafio } from '../services/reservas';
 import {
   accionesDeReserva, enlaceDeMapa, etiquetaDeEstado, lineaDePrecio, separaReservas,
-  textoDeCancelacion,
+  solicitudDeCancelacion, textoDeCancelacion,
 } from '../utils/misReservas';
 import { formatCLP } from '../services/reservasRules';
 import { fechaLarga } from '../utils/recintoPantallas';
@@ -67,6 +69,20 @@ export default function MisReservasScreen({ navigation }) {
     cargar();
   };
 
+  const responderCancelacion = async (reserva, acepta) => {
+    setCancelando(true);
+    const { data, error: err } = await responderCancelacionDesafio(reserva.id, acepta);
+    setCancelando(false);
+    if (err || !data?.ok) {
+      setAviso(data?.reason || err?.message || 'No pudimos responder.');
+      return;
+    }
+    setAviso(acepta
+      ? 'Cancha liberada. Si habían puesto su parte, se la devolvimos a los dos.'
+      : 'Le avisamos al otro club que la cancha sigue en pie.');
+    cargar();
+  };
+
   const ejecutar = (reserva, clave) => {
     if (clave === 'cancelar') { setPorCancelar(reserva); return; }
     // La única acción que también es del invitado: sin esto, a quien lo
@@ -114,7 +130,7 @@ export default function MisReservasScreen({ navigation }) {
               <View style={{ gap: 12 }}>
                 <Text style={styles.seccion}>PRÓXIMAS · {proximas.length}</Text>
                 {proximas.map((r) => (
-                  <Tarjeta key={r.id} reserva={r} onAccion={ejecutar} />
+                  <Tarjeta key={r.id} reserva={r} onAccion={ejecutar} onResponder={responderCancelacion} />
                 ))}
               </View>
             ) : (
@@ -127,7 +143,7 @@ export default function MisReservasScreen({ navigation }) {
               <View style={{ gap: 12 }}>
                 <Text style={styles.seccion}>ANTES · {historial.length}</Text>
                 {historial.map((r) => (
-                  <Tarjeta key={r.id} reserva={r} onAccion={ejecutar} />
+                  <Tarjeta key={r.id} reserva={r} onAccion={ejecutar} onResponder={responderCancelacion} />
                 ))}
               </View>
             ) : null}
@@ -165,12 +181,13 @@ export default function MisReservasScreen({ navigation }) {
 }
 
 /** Una reserva. Todo lo que hace falta saber sin abrir otra pantalla. */
-function Tarjeta({ reserva, onAccion }) {
+function Tarjeta({ reserva, onAccion, onResponder }) {
   const etiqueta = etiquetaDeEstado(reserva);
   const acciones = accionesDeReserva(reserva);
   const nota = textoDeCancelacion(reserva);
   const mapa = enlaceDeMapa(reserva);
   const precio = lineaDePrecio(reserva);
+  const solicitud = solicitudDeCancelacion(reserva);
 
   return (
     <Card padded={false}>
@@ -206,10 +223,34 @@ function Tarjeta({ reserva, onAccion }) {
           </Text>
         ) : null}
 
-        {!reserva.soyOrganizador ? (
+        {!reserva.soyOrganizador && !reserva.esDesafioClub ? (
           <Text style={styles.nota}>Te invitaron a este partido: lo organiza otra persona.</Text>
         ) : nota ? (
           <Text style={styles.nota}>{nota}</Text>
+        ) : null}
+
+        {/* LA SALIDA QUE NO EXISTÍA. La cancha de un desafío no la cancela un
+            club solo: se le pide al otro. El aviso llegaba y no había dónde
+            responder, así que una reserva confirmada quedaba cobrada y sin
+            forma de cancelarse. */}
+        {solicitud ? (
+          <View style={styles.solicitud}>
+            <Text style={styles.solicitudTitulo}>{solicitud.titulo}</Text>
+            <Text style={styles.solicitudTexto}>{solicitud.texto}</Text>
+            <View style={styles.solicitudBotones}>
+              <Button
+                label={solicitud.rechazar}
+                variant="secondary"
+                style={{ flex: 1 }}
+                onPress={() => onResponder(reserva, false)}
+              />
+              <Button
+                label={solicitud.aceptar}
+                style={{ flex: 1 }}
+                onPress={() => onResponder(reserva, true)}
+              />
+            </View>
+          </View>
         ) : null}
 
         {mapa || acciones.length ? (
@@ -283,6 +324,19 @@ const styles = StyleSheet.create({
   totalK: { fontFamily: F.medium, fontSize: 13, color: C.textSecondary },
   totalV: { fontFamily: F.extraBold, fontSize: 17, color: C.textPrimary },
   reparto: { fontFamily: F.medium, fontSize: 11.5, color: C.textMuted, marginTop: 4 },
+
+  solicitud: {
+    marginTop: 14,
+    padding: 13,
+    borderRadius: R.row,
+    borderWidth: 1,
+    borderColor: C.amberBorder,
+    backgroundColor: C.amberSoft,
+    gap: 4,
+  },
+  solicitudTitulo: { fontFamily: F.extraBold, fontSize: 14, color: C.textAmber },
+  solicitudTexto: { fontFamily: F.medium, fontSize: 12.5, lineHeight: 18, color: C.textAmber },
+  solicitudBotones: { flexDirection: 'row', gap: 9, marginTop: 10 },
 
   nota: { fontFamily: F.medium, fontSize: 11.5, lineHeight: 16.5, color: C.textMuted, marginTop: 11 },
   acciones: { flexDirection: 'row', gap: 9, marginTop: 13 },

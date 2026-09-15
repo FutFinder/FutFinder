@@ -226,3 +226,13 @@ El segundo: la pantalla de Administradores seguía diciendo que **«un administr
 Se resuelve con un **trigger** y no con un paso en cada RPC: un partido se cancela desde varios lados y mañana desde alguno más. `after update of estado` a propósito, para que las escrituras sobre otras columnas ni lo despierten — la misma decisión que la 83 tomó con los permisos.
 
 **Se cancela, no se pregunta.** `cancelar_reserva` tiene una rama que en un desafío le PIDE al otro club en vez de cancelar, porque cancelarle la cancha al rival por tu cuenta no corresponde. Acá esa negociación no aplica: el partido ya no existe, y dejar la reserva esperando una respuesta sería justo el agujero que se está tapando. Para no tener dos versiones de la devolución, la cola de `cancelar_reserva` —devolver, marcar cancelada, avisar— se mudó a `cancelar_reserva_interna` y las dos vías la comparten. Arnés 6/6, incluida la prueba que de verdad cierra el caso: **sumando todo lo que la reserva movió, el neto queda en cero**.
+
+**La reserva de un desafío no se podía cancelar NUNCA** (2026-09-15, migración 101). `cancelar_reserva` no cancela una reserva entre clubes: le **pide** al otro club que acepte, porque cancelarle la cancha al rival por tu cuenta no corresponde. Mandaba el aviso, dejaba `cancelacion_estado = 'solicitada'`… y ahí moría: `responder_cancelacion_desafio` existía desde la migración 55 y **ninguna pantalla la llamaba**. Una reserva confirmada quedaba cobrada y sin forma de cancelarse; el único camino era entrar a la base.
+
+**Cómo apareció**: buscando al revés. De las 146 funciones concedidas a `authenticated`, solo dos no tenían ningún llamador en el cliente — y esta tenía dinero detrás. (La otra es `actualizar_contacto_reserva`: no se puede corregir el teléfono de una reserva, que es al que te llama el recinto.)
+
+**El hueco estaba a medio tapar y casi lo dejo así**: quien tiene que RESPONDER es un `admin` del club, y quien está DENTRO de la reserva es el `capitan` — pueden ser dos personas distintas, así que el admin nunca veía la reserva. Por eso `mis_reservas` ahora incluye las canchas de desafío de los clubes que administras aunque no juegues, lo que además resuelve que hoy, si reservaba el capitán, el admin no veía nada.
+
+**Rechazar también avisa** (nuevo en la 101). La función aceptaba y rechazaba bien, pero al rechazar no le decía nada a quien lo había pedido: se quedaba esperando una respuesta que ya había llegado. El mismo silencio, una capa más adentro.
+
+Arnés 8/8, y comprobado tocándolo: pedir desde un club, ver la tarjeta en el otro, rechazar, y que el aviso llegue.

@@ -436,6 +436,21 @@ export async function getMiBalance(limite = 50) {
 }
 
 
+/**
+ * Responder la solicitud de cancelación de la cancha de un desafío.
+ *
+ * Solo el club que NO la pidió, y solo su admin — lo comprueba el servidor.
+ * Aceptar cancela de verdad y devuelve a los dos capitanes lo que pusieron;
+ * rechazar deja la cancha reservada y avisa a quien lo pidió.
+ */
+export async function responderCancelacionDesafio(reservaId, acepta) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('responder_cancelacion_desafio', {
+    p_reserva_id: reservaId, p_acepta: !!acepta,
+  });
+  return comoResultadoRecinto(data, error, 'responderCancelacionDesafio');
+}
+
 /* ── El puente desde Clubes ────────────────────────────────────── */
 
 /**
