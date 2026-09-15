@@ -28,7 +28,6 @@ import {
   UserPlus,
   UserCheck,
   Clock,
-  Trash2,
   Search,
   MoreVertical,
   User,
@@ -58,7 +57,6 @@ import {
   getMyClubs,
   promoteToAdmin,
   transferAdmin,
-  deleteClub,
   setCaptain,
   setApodo,
   CLUB_LIMITS,
@@ -222,12 +220,9 @@ export default function ClubMembersScreen({ navigation, route }) {
   };
 
   const handleLeave = () => {
-    const ultimoMiembro = members.length === 1;
     confirmAction(
-      ultimoMiembro ? '¿Eliminar el club?' : '¿Salir del club?',
-      ultimoMiembro
-        ? 'Eres el último integrante: al salir, el club y su chat se eliminan para siempre.'
-        : 'Dejarás de ver el chat y los datos internos del club.',
+      '¿Salir del club?',
+      'Dejarás de ver el chat y los datos internos del club.',
       async () => {
         setWorking(true);
         const { error, clubDeleted } = await leaveClub(clubId);
@@ -390,30 +385,6 @@ export default function ClubMembersScreen({ navigation, route }) {
           return;
         }
         await load();
-      }
-    );
-  };
-
-  const handleDeleteClub = () => {
-    confirmAction(
-      '¿Eliminar este club?',
-      'Esta acción no se puede deshacer. Se eliminarán todos los miembros, mensajes e historial del club.',
-      async () => {
-        setWorking(true);
-        const { error } = await deleteClub(clubId);
-        setWorking(false);
-        if (error) {
-          console.error('[FutFinder] handleDeleteClub:', error);
-          setBanner({ type: 'error', title: 'No se pudo eliminar', message: error.message });
-          return;
-        }
-        navigation.navigate('Main', {
-          screen: 'ClubsTab',
-          params: {
-            successTitle: 'Club eliminado',
-            successMessage: 'El club fue eliminado permanentemente.',
-          },
-        });
       }
     );
   };
@@ -720,27 +691,13 @@ export default function ClubMembersScreen({ navigation, route }) {
         }
         ListFooterComponent={
           soyMiembro ? (
-            <View>
-              <Pressable
-                onPress={handleLeave}
-                style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
-              >
-                <LogOut color={clubColors.loss} size={16} />
-                <Text style={styles.leaveText}>
-                  {members.length === 1 ? 'Eliminar club' : 'Salir del club'}
-                </Text>
-              </Pressable>
-              {soyAdmin && (
-                <Pressable
-                  onPress={handleDeleteClub}
-                  disabled={working}
-                  style={({ pressed }) => [styles.deleteClubBtn, pressed && { opacity: 0.7 }]}
-                >
-                  <Trash2 color={clubColors.loss} size={16} />
-                  <Text style={styles.leaveText}>Eliminar club permanentemente</Text>
-                </Pressable>
-              )}
-            </View>
+            <Pressable
+              onPress={handleLeave}
+              style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
+            >
+              <LogOut color={clubColors.loss} size={16} />
+              <Text style={styles.leaveText}>Salir del club</Text>
+            </Pressable>
           ) : null
         }
       />
@@ -1282,18 +1239,6 @@ const styles = StyleSheet.create({
     color: clubColors.loss,
     fontSize: 14,
     fontWeight: '700',
-  },
-  deleteClubBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 10,
-    paddingVertical: 14,
-    borderRadius: clubRadius.lg,
-    borderWidth: 1,
-    borderColor: clubColors.loss,
-    backgroundColor: 'rgba(232, 115, 123, 0.1)',
   },
 
   sheetBackdrop: {
