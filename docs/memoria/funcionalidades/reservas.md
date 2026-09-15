@@ -204,3 +204,19 @@ La disponibilidad horaria (`getDisponibilidad()`) es la misma grilla fija de 12 
 El segundo: la pantalla de Administradores seguía diciendo que **«un administrador puede todo lo del recinto»**, que dejó de ser cierto con los permisos granulares de la migración 83. Ahora dice lo que de verdad pasa: entra al día a día, y lo que puede *cambiar* se enciende uno por uno.
 
 **Un tercero, anotado y sin arreglar**: un recinto creado con autorización **no se puede borrar**. El `on delete set null` de `autorizaciones_recinto.complejo_id` choca con el CHECK que exige coherencia entre `usada_at` y `complejo_id`. No estorba —los recintos se despublican, no se borran— pero deja sin salida a quien cree uno por error.
+
+## El puente desde Clubes
+
+**Dos clubes acuerdan un partido y, si el recinto trabaja con FutFinder, la cancha se reserva desde ahí** (2026-09-15, migración 99). Antes había que salirse, buscar el recinto a mano y armar una reserva suelta que no sabía nada del desafío — y es justo el caso donde el pago **entre 2 capitanes** tiene más sentido: cada club paga la mitad de su partido.
+
+**`matches.reserva_id`, no al revés.** La pregunta que hace la pantalla es «¿este partido ya tiene cancha?», y responderla desde `reservas` obligaría a buscar por dos clubes y una fecha. Un índice único parcial impide dos reservas vivas para el mismo partido.
+
+**Una sola puerta, no tres llamadas.** `reservar_cancha_del_partido` crea la reserva, invita al capitán rival y enlaza el partido en la misma transacción: los tres pasos no pueden quedar a medias porque **una reserva de capitanes sin el segundo capitán no se confirma nunca**. Adentro se REUSAN `crear_reserva` e `invitar_participante_reserva`, así que el bloqueo del bloque, el precio por franja, el contacto obligatorio y el cupo de un solo capitán siguen viviendo en un solo lugar.
+
+**Quién es «el capitán del otro club»:** el que tiene rol `capitan`; si el club no nombró uno, el admin más antiguo — alguien tiene que poder comprometer la mitad de la plata. Si no hay ninguno se dice con todas sus letras, en vez de crear una reserva que nadie podría completar. Y reservar es del **club local**: es el anfitrión, y quien reserva queda como organizador y paga su mitad.
+
+**La intención viaja aparte, no por parámetros.** Entre tocar «Reservar la cancha» y llegar al resumen hay cinco pantallas y ninguna tiene por qué saber de clubes; arrastrar el partido por todas significa que la que lo olvide rompe el flujo en silencio. `intencionDeReserva` la guarda una vez y la lee solo el resumen — que **la muestra siempre**, con el nombre del partido y un enlace para soltarla, y **caduca a la media hora**: si alguien empieza desde el desafío, se distrae y después reserva una cancha cualquiera, esa reserva no tiene por qué ser del partido.
+
+**No se toca la hora del partido.** La reserva se hace con el bloque que la persona elige, que es el único que sabe qué está libre; si no calza con la hora del desafío, se avisa sin bloquear. Forzarla sería inventar disponibilidad.
+
+**Un error que se vio tocándolo:** el botón parecía no hacer nada. `navigate('Main', { screen })` cambia la pestaña, pero el detalle del partido seguía apilado encima — la pestaña cambiaba **debajo** de lo que se veía. De ahí sale `irAPestana`, que vacía la pila antes.

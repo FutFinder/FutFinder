@@ -17,3 +17,21 @@ export function goBackOrPartidos(navigation) {
   }
   navigation.navigate('Main', { screen: 'SearchTab' });
 }
+
+/**
+ * Manda a una pestaña dejando la pila vacía.
+ *
+ * `navigate('Main', { screen })` cambia la pestaña, pero si hay pantallas
+ * apiladas encima —el detalle de un partido, por ejemplo— siguen ahí y el
+ * botón parece no hacer nada: la pestaña cambió DEBAJO de lo que se ve. Hay
+ * que sacar la pila primero.
+ */
+export function irAPestana(navigation, pestana) {
+  if (navigation.canGoBack()) {
+    const padre = navigation.getParent?.();
+    if (typeof navigation.popToTop === 'function') navigation.popToTop();
+    else if (padre && typeof padre.popToTop === 'function') padre.popToTop();
+    else navigation.goBack();
+  }
+  navigation.navigate('Main', { screen: pestana });
+}

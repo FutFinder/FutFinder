@@ -436,4 +436,55 @@ export async function getMiBalance(limite = 50) {
 }
 
 
+/* ── El puente desde Clubes ────────────────────────────────────── */
+
+/**
+ * Qué puede hacer este partido de clubes con su cancha.
+ *
+ * Una llamada y no tres: la pantalla no puede leer `club_members` del club
+ * rival ni una reserva ajena por su cuenta, así que el servidor le dice de
+ * una si puede reservar, si ya reservó y a quién le toca la otra mitad.
+ */
+export async function canchaDelPartido(matchId) {
+  if (!isSupabaseConfigured || !matchId) return { data: null, error: null };
+  const { data, error } = await supabase.rpc('cancha_del_partido', { p_match_id: matchId });
+  if (error || !data?.ok) return { data: null, error: error || null };
+  if (!data.aplica) return { data: null, error: null };
+  return {
+    data: {
+      puedoReservar: !!data.puedo_reservar,
+      reservaId: data.reserva_id || null,
+      reservaEstado: data.reserva_estado || null,
+      capitanRival: data.capitan_rival || null,
+      capitanRivalNombre: data.capitan_rival_username || null,
+      clubRival: data.club_rival || null,
+      horaPartido: data.hora_partido || null,
+    },
+    error: null,
+  };
+}
+
+/**
+ * Reserva la cancha de un desafío, en modalidad capitanes.
+ *
+ * UNA SOLA LLAMADA para crear, invitar al capitán rival y enlazar con el
+ * partido: los tres pasos no pueden quedar a medias, porque una reserva de
+ * capitanes sin el segundo capitán no se puede confirmar nunca.
+ */
+export async function reservarCanchaDelPartido({
+  matchId, canchaId, fecha, horaInicio, contactoNombre, contactoTelefono, cobros,
+} = {}) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('reservar_cancha_del_partido', {
+    p_match_id: matchId,
+    p_cancha_id: canchaId,
+    p_fecha: fecha,
+    p_hora_inicio: horaInicio,
+    p_contacto_nombre: contactoNombre ?? null,
+    p_contacto_telefono: contactoTelefono ?? null,
+    p_cobros: cobros && cobros.length ? cobros : null,
+  });
+  return comoResultadoRecinto(data, error, 'reservarCanchaDelPartido');
+}
+
 export { nombreDeTipo, jugadoresDeTipo, notaDeCancha };

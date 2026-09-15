@@ -16,6 +16,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Calendar,
+  CalendarDays,
   CalendarX,
   Check,
   CheckCircle2,
@@ -105,6 +106,8 @@ import {
   trustLabel,
 } from '../services/matchRules';
 import { getMyClubIds } from '../services/clubs';
+import { canchaDelPartido } from '../services/reservas';
+import { guardarIntencion } from '../utils/intencionDeReserva';
 import {
   esPartidoDeClubes,
   esUbicacionProtegida,
@@ -119,7 +122,7 @@ import {
 import { getNominaPartido, suscribirseANomina } from '../services/clubRoster';
 import { haversineKm, getClubMatchLocation } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
-import { goBackOrPartidos } from '../utils/navigation';
+import { goBackOrPartidos, irAPestana } from '../utils/navigation';
 
 /**
  * Detalle del partido (sección 2 del handoff).
@@ -159,6 +162,9 @@ export default function MatchDetailScreen({ route, navigation }) {
   const [ubicacionProtegida, setUbicacionProtegida] = useState('cargando');
   // `null` mientras no se sepa: la etiqueta se queda entonces sin numerador.
   const [inscritosDeMiClub, setInscritosDeMiClub] = useState(null);
+  // Si este desafío puede reservar cancha en FutFinder, si ya la reservó y
+  // quién es el capitán del otro club (migración 99). `null` = no aplica.
+  const [cancha, setCancha] = useState(null);
 
   const cacheKey = `partidos/detail/${matchId}`;
 
@@ -173,6 +179,10 @@ export default function MatchDetailScreen({ route, navigation }) {
       getCurrentLocation(),
       getMyClubIds().catch(() => ({ data: [] })),
     ]);
+
+    // Aparte del Promise.all: solo tiene sentido en un partido de clubes y
+    // el servidor responde `aplica: false` en cualquier otro.
+    canchaDelPartido(matchId).then(({ data }) => setCancha(data || null)).catch(() => setCancha(null));
 
     setMyId(user?.id || null);
     // `getMyProfile()` devuelve el perfil plano; le sumamos el estado de cuenta
@@ -882,6 +892,51 @@ export default function MatchDetailScreen({ route, navigation }) {
                     />
                   </>
                 )}
+
+                {/* LA CANCHA DEL DESAFÍO. Si el recinto trabaja con FutFinder,
+                    acá se reserva y se paga entre los dos capitanes: cada club
+                    pone la mitad de su partido. Solo se le ofrece a quien
+                    dirige el club LOCAL —es el anfitrión, y quien reserve paga
+                    su mitad— y el capitán del otro club queda invitado solo.
+                    El botón desaparece en cuanto hay una reserva viva. */}
+                {cancha?.puedoReservar ? (
+                  <>
+                    <View style={{ height: 12 }} />
+                    <SurfaceButton
+                      label="Reservar la cancha en FutFinder"
+                      icon={CalendarDays}
+                      height={44}
+                      onPress={() => {
+                        guardarIntencion({
+                          matchId: match.id,
+                          titulo: match.titulo,
+                          clubRival: cancha.clubRival,
+                          capitanRival: cancha.capitanRivalNombre,
+                          horaPartido: cancha.horaPartido,
+                        });
+                        // La pestaña vive dentro de `Main`, y además hay que
+                        // sacar el detalle de la pila: cambiarla dejando esta
+                        // pantalla encima hace que el botón parezca no hacer
+                        // nada, porque la pestaña cambia DEBAJO de lo que se ve.
+                        irAPestana(navigation, 'ReservasTab');
+                      }}
+                    />
+                    <Text style={styles.canchaAyuda}>
+                      Se divide entre los dos capitanes
+                      {cancha.capitanRivalNombre ? ` · @${cancha.capitanRivalNombre} pone la otra mitad` : ''}
+                    </Text>
+                  </>
+                ) : cancha?.reservaId ? (
+                  <>
+                    <View style={{ height: 12 }} />
+                    <SurfaceButton
+                      label="Ver la cancha reservada"
+                      icon={CalendarDays}
+                      height={44}
+                      onPress={() => navigation.navigate('ArmarReserva', { reservaId: cancha.reservaId })}
+                    />
+                  </>
+                ) : null}
               </Card>
             </Section>
           ) : null}
@@ -1698,6 +1753,10 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: 7, marginTop: 4 },
 
   cardTitle: { fontSize: 14, fontWeight: '700', color: P.text },
+  canchaAyuda: {
+    fontFamily: 'Manrope_500Medium', fontSize: 11.5, color: P.textMuted,
+    lineHeight: 16, marginTop: 8, paddingHorizontal: 2,
+  },
   cardSub: { fontSize: 12, color: P.textMuted, marginTop: 2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   metaText: { fontSize: 11.5, fontWeight: '600', color: P.textFaint },

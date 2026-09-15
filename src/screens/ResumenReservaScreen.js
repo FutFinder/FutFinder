@@ -10,12 +10,14 @@ import {
 import { FieldLabel, TextField, ChoiceCard } from '../components/reservas/recintoUi';
 import {
   getComplejoById, cobrosDelComplejo, crearReserva, getMiBalance,
+  reservarCanchaDelPartido,
 } from '../services/reservas';
 import { estadoPasarela } from '../services/pagos';
 import { totalDeReserva, reservaLista } from '../utils/reservasJugador';
 import { telefonoAceptable } from '../utils/recintoPantallas';
 import { MAX_JUGADORES, MIN_JUGADORES, repartoDeCuotas } from '../utils/pagoDividido';
 import { alcanzaPara } from '../utils/saldo';
+import { calzaConElPartido, leerIntencion, olvidarIntencion } from '../utils/intencionDeReserva';
 import { formatCLP } from '../services/reservasRules';
 
 /**
@@ -73,7 +75,10 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const [pasarela, setPasarela] = useState(null);
   const [creando, setCreando] = useState(false);
   const [toast, setToast] = useState(null);
-  const [modalidad, setModalidad] = useState('completa');
+  // Si se viene desde un desafío de clubes, la reserva es de ese partido y
+  // entre capitanes. Se lee una sola vez para que soltarla no la reviva.
+  const [desafio, setDesafio] = useState(() => leerIntencion());
+  const [modalidad, setModalidad] = useState(() => (leerIntencion() ? 'capitanes' : 'completa'));
   const [nJugadores, setNJugadores] = useState(null);
   const [saldo, setSaldo] = useState(null);
 
@@ -114,6 +119,28 @@ export default function ResumenReservaScreen({ navigation, route }) {
     // la pasarela. Dos definiciones de lo mismo en el mismo archivo: la de
     // arriba se corrigió y esta se quedó atrás.
     const divide = modalidad !== 'completa';
+
+    // Desde un desafío se usa la puerta que además invita al capitán rival y
+    // enlaza el partido. Hacerlo con `crear_reserva` dejaría una reserva de
+    // capitanes sin segundo capitán, que no se puede confirmar nunca.
+    if (desafio) {
+      const r = await reservarCanchaDelPartido({
+        matchId: desafio.matchId,
+        canchaId, fecha, horaInicio,
+        contactoNombre: nombre.trim(),
+        contactoTelefono: telefono,
+        cobros: elegidos,
+      });
+      setCreando(false);
+      if (r.error || !r.data?.ok) {
+        setToast(r.error?.message || r.data?.reason || 'No pudimos reservar la cancha del partido.');
+        return;
+      }
+      olvidarIntencion();
+      navigation.navigate('ArmarReserva', { reservaId: r.data.reserva_id });
+      return;
+    }
+
     const { data, error } = await crearReserva({
       canchaId,
       fecha,
@@ -188,6 +215,7 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const reparto = repartoDeCuotas(dinero.total, cuantos) || repartoDeCuotas(dinero.total, MIN_JUGADORES);
   const divide = modalidad !== 'completa';
   const saldoCorto = divide && !!reparto && alcanzaPara(saldo, reparto.cuota) === false;
+  const calza = desafio ? calzaConElPartido(desafio.horaPartido, fecha, horaInicio) : null;
   const listo = baseLista && !saldoCorto;
 
   return (
@@ -223,6 +251,24 @@ export default function ResumenReservaScreen({ navigation, route }) {
             <Text style={styles.detalleV}>Hasta {cancha?.jugadoresHabitual ?? '—'}</Text>
           </View>
         </Card>
+
+        {desafio ? (
+          <NoticeCard tone="info" icon={Info}>
+            Esta reserva es para <Text style={{ fontFamily: F.extraBold }}>{desafio.titulo || 'tu partido de clubes'}</Text>.
+            Se divide entre los dos capitanes y {desafio.capitanRival ? `@${desafio.capitanRival}` : 'el capitán del otro club'} queda
+            invitado solo. <Text
+              style={styles.soltar}
+              onPress={() => { olvidarIntencion(); setDesafio(null); setModalidad('completa'); }}
+            >Reservar sin el partido</Text>
+          </NoticeCard>
+        ) : null}
+
+        {desafio && calza === false ? (
+          <NoticeCard tone="warning">
+            El partido es a otra hora. Puedes reservar igual, pero después tendrás que mover el
+            partido o la cancha para que coincidan.
+          </NoticeCard>
+        ) : null}
 
         <Card>
           <Text style={styles.seccion}>¿Cómo se paga?</Text>
@@ -417,6 +463,7 @@ const styles = StyleSheet.create({
   cobroNombre: { flex: 1, fontFamily: F.bold, fontSize: 13.5, color: C.textSecondary },
   cobroPrecio: { fontFamily: F.semiBold, fontSize: 13.5, color: C.textAmber },
   errorCampo: { fontFamily: F.semiBold, fontSize: 11.5, color: C.red, marginTop: 6 },
+  soltar: { fontFamily: F.bold, color: C.green, textDecorationLine: 'underline' },
   cuotaCaja: {
     borderRadius: R.row, borderWidth: 1, borderColor: C.greenDeepBorder,
     backgroundColor: C.shieldBg, paddingHorizontal: 14, paddingVertical: 13,
