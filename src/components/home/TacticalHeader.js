@@ -5,6 +5,7 @@ import { MapPin, ShieldCheck } from 'lucide-react-native';
 import StatusPill from './StatusPill';
 import BrandMark from '../BrandMark';
 import NotificationBell from '../NotificationBell';
+import WalletButton from '../WalletButton';
 import { tactical as t } from '../../theme/colors';
 
 export default function TacticalHeader({
@@ -21,7 +22,10 @@ export default function TacticalHeader({
       <View className="mt-2 flex-row items-center">
         <BrandMark />
         <View className="flex-1" />
-        <NotificationBell />
+        <View className="flex-row items-center gap-2">
+          <WalletButton />
+          <NotificationBell />
+        </View>
       </View>
 
       <View className="mt-5">
