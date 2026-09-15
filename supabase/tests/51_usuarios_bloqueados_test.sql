@@ -83,14 +83,28 @@ begin
   end if;
   raise notice 'OK (caso 2a): B no ve el bloqueo';
 
+  -- Ojo con cómo se mide esto: actuando como B, `blocked_users_select_own`
+  -- deja el count en 0 pase lo que pase, así que un `select count(*)` acá no
+  -- distingue «no pudo borrar» de «sí borró» — y además contradice el caso 2a,
+  -- que acaba de exigir 0. Hay que mirar el alcance del DELETE y después
+  -- volver a comprobar como A, que es quien sí puede ver la fila.
   delete from public.blocked_users where blocker_id = v_a_id and blocked_id = v_b_id;
+  get diagnostics v_count = row_count;
+  if v_count <> 0 then
+    raise exception 'FALLÓ (caso 2b-i): el DELETE de B no debería alcanzar ninguna fila, alcanzó %', v_count;
+  end if;
+
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_a_id, 'role', 'authenticated')::text);
   select count(*) into v_count
   from public.blocked_users
   where blocker_id = v_a_id and blocked_id = v_b_id;
   if v_count <> 1 then
-    raise exception 'FALLÓ (caso 2b): B no debería poder borrar el bloqueo de A hacia B';
+    raise exception 'FALLÓ (caso 2b-ii): el bloqueo de A hacia B debería seguir vivo tras el intento de B, hay % fila(s)', v_count;
   end if;
-  raise notice 'OK (caso 2b): B no puede borrar el bloqueo';
+
+  -- Volver a ser B para el caso 3.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_b_id, 'role', 'authenticated')::text);
+  raise notice 'OK (caso 2b): B no puede borrar el bloqueo y la fila sigue viva para A';
 
   -- ── Caso 3: con el bloqueo activo, B no puede pedir amistad a A ──
   begin
