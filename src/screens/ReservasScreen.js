@@ -23,7 +23,7 @@ import { Card, Button, Chip, Badge, NoticeCard, Foto } from '../components/reser
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { listComplejosCerca, listHorasLibresHoy } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
-import { misRecintos, agendaDelDia } from '../services/recinto';
+import { misRecintos, agendaDelDia, miAutorizacionRecinto } from '../services/recinto';
 import { misReservas } from '../services/reservas';
 import { separaReservas } from '../utils/misReservas';
 import { miSolicitudPendiente } from '../services/solicitudRecinto';
@@ -95,6 +95,8 @@ export default function ReservasScreen({ navigation }) {
   // La solicitud sin atender de quien mira, si tiene una: la invitación de
   // abajo cambia de texto en vez de invitar de nuevo a alguien que ya escribió.
   const [solicitud, setSolicitud] = useState(null);
+  // La autorización de un solo uso para abrir un recinto (migración 82).
+  const [autorizacion, setAutorizacion] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -111,9 +113,16 @@ export default function ReservasScreen({ navigation }) {
         } else {
           setReservasHoy(null);
         }
-        // Solo para quien no administra ninguno: al resto no se le muestra la
-        // invitación, así que preguntarlo sería una consulta para nada.
-        if ((data || []).length === 0) {
+        // La autorización manda sobre la invitación: quien ya la tiene no
+        // necesita que le expliquen cómo pedir una.
+        const { data: permiso } = await miAutorizacionRecinto();
+        if (!vivo) return;
+        setAutorizacion(permiso || null);
+
+        // Solo para quien no administra ninguno NI tiene autorización: al
+        // resto no se le muestra la invitación, así que preguntarlo sería
+        // una consulta para nada.
+        if ((data || []).length === 0 && !permiso) {
           const { data: pendiente } = await miSolicitudPendiente();
           if (vivo) setSolicitud(pendiente);
         }
@@ -123,12 +132,18 @@ export default function ReservasScreen({ navigation }) {
   );
 
   const irAlRecinto = useCallback(() => {
-    if (recintos.length === 1) {
+    // CON UNA AUTORIZACIÓN SIN USAR SIEMPRE SE VA A LA LISTA, aunque haya un
+    // solo recinto: «Crear mi recinto» vive ahí y en ningún otro lado. Sin
+    // esto, el permiso para abrir un recinto —que es de un solo uso y se
+    // entrega a mano— era INALCANZABLE justo para quien más lo necesita: el
+    // dueño recién aprobado, que tiene cero recintos y ninguna tarjeta que
+    // tocar. Funcionaba de casualidad solo para quien ya administraba dos.
+    if (recintos.length === 1 && !autorizacion) {
       navigation.navigate('PanelRecinto', { complejoId: recintos[0].id, nombre: recintos[0].nombre });
     } else {
       navigation.navigate('MisRecintos');
     }
-  }, [navigation, recintos]);
+  }, [navigation, recintos, autorizacion]);
 
   const proximamente = useCallback((mensaje) => {
     setBanner(mensaje);
@@ -170,7 +185,7 @@ export default function ReservasScreen({ navigation }) {
           </View>
         </View>
 
-        {recintos.length > 0 ? (
+        {recintos.length > 0 || autorizacion ? (
           <Card onPress={irAlRecinto} style={styles.recintoCard}>
             <View style={styles.recintoFila}>
               <View style={styles.recintoIcono}>
@@ -178,10 +193,14 @@ export default function ReservasScreen({ navigation }) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.recintoNombre} numberOfLines={1}>
-                  {recintos.length === 1 ? recintos[0].nombre : `${recintos.length} recintos`}
+                  {recintos.length === 0
+                    ? 'Crear mi recinto'
+                    : recintos.length === 1 ? recintos[0].nombre : `${recintos.length} recintos`}
                 </Text>
                 <Text style={styles.recintoSub} numberOfLines={1}>
-                  {recintos.length === 1
+                  {recintos.length === 0
+                    ? 'Tu autorización está lista'
+                    : recintos.length === 1
                     ? [
                         reservasHoy === null
                           ? null

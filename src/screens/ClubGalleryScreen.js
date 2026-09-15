@@ -39,7 +39,6 @@ const SCREEN_W = Dimensions.get('window').width;
 const GRID_GAP = 4;
 const THUMB = Math.floor((SCREEN_W - 32 - GRID_GAP * 2) / 3);
 
-/** Confirmación multiplataforma (web usa confirm, native usa Alert). */
 /**
  * Galería completa de fotos de un club. Cualquiera la ve; solo los admins
  * pueden agregar o borrar (la RLS lo garantiza de todos modos).

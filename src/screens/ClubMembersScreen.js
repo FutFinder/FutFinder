@@ -61,7 +61,6 @@ import {
 } from '../services/clubs';
 import useConfirmacion from '../components/useConfirmacion';
 
-/** Confirmación multiplataforma (web usa confirm, native usa Alert). */
 /**
  * Integrantes de un club: lista de miembros con reputación, apodo y rol, y
  * acciones según quién mire:

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Plus, AlertTriangle, Trash2 } from 'lucide-react-native';
@@ -177,13 +177,24 @@ export default function CobrosScreen({ navigation, route }) {
             </NoticeCard>
 
             <View style={{ gap: S.cardGap }}>
+              {/* La tarjeta NO es pulsable entera: el tarrito de basura vive
+                  adentro, y un botón dentro de otro botón es HTML inválido —
+                  en web React avisa que «causará un error de hidratación», y
+                  el clic en el de adentro puede disparar el de afuera. Se hace
+                  pulsable solo el bloque de texto, que igual ocupa casi toda
+                  la fila. */}
               {cobros.map((c) => (
-                <Card key={c.id} onPress={() => abrirEdicion(c)} style={!c.activo && styles.apagado}>
+                <Card key={c.id} style={!c.activo && styles.apagado}>
                   <View style={styles.fila}>
-                    <View style={{ flex: 1 }}>
+                    <Pressable
+                      onPress={() => abrirEdicion(c)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Editar ${c.nombre}`}
+                      style={({ pressed }) => [{ flex: 1 }, pressed && { opacity: 0.7 }]}
+                    >
                       <Text style={styles.nombre} numberOfLines={1}>{c.nombre}</Text>
                       <Text style={styles.detalle}>{formatCLP(c.precio)} · por reserva</Text>
-                    </View>
+                    </Pressable>
                     {c.activo ? null : <Badge label="Apagado" tone="neutral" />}
                     <IconButton
                       icon={Trash2}

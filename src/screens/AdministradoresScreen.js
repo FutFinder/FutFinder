@@ -172,8 +172,9 @@ export default function AdministradoresScreen({ navigation, route }) {
         ) : (
           <View style={{ gap: 14 }}>
             <NoticeCard tone="info">
-              Un administrador puede todo lo del recinto —la ficha, las canchas, los horarios, las
-              tarifas, los bloqueos y los cobros— menos tocar esta lista. Eso es solo tuyo.
+              Un administrador entra al día a día —la agenda, el calendario y los bloqueos— y
+              nada más. Lo que puede CAMBIAR —las canchas, los horarios y tarifas, los cobros y la
+              ficha— se lo enciendes tú, uno por uno. Esta lista es solo tuya.
             </NoticeCard>
 
             <View style={{ gap: S.cardGap }}>
@@ -318,8 +319,8 @@ export default function AdministradoresScreen({ navigation, route }) {
                 <Text style={styles.yaEsta}>Ya administra este recinto.</Text>
               ) : (
                 <Text style={styles.ayuda}>
-                  Va a quedar como <Text style={styles.fuerte}>admin</Text>: puede todo lo del recinto
-                  menos esta lista.
+                  Va a quedar como <Text style={styles.fuerte}>admin</Text>: entra a la agenda y al
+                  calendario. Lo que puede cambiar se lo enciendes después, en «Editar permisos».
                 </Text>
               )}
             </Card>

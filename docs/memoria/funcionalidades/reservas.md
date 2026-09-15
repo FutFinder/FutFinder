@@ -190,3 +190,9 @@ La disponibilidad horaria (`getDisponibilidad()`) es la misma grilla fija de 12 
 
 - [Sistema visual](../diseno/sistema-visual.md)
 - [Navegación](../arquitectura/navegacion.md)
+
+**Dos huecos que aparecieron probando las pantallas del recinto** (2026-09-15). El primero es grave: **la autorización para crear un recinto era inalcanzable**. `CrearRecinto` solo se llega desde «Mis recintos», y a esa lista solo se entra con DOS o más recintos — con uno se va directo al panel, y con cero no hay ni tarjeta que tocar. O sea que el permiso de un solo uso que se entrega a mano, pensado justo para el dueño recién aprobado, no se podía usar salvo que ya administraras dos recintos. Funcionaba de casualidad. Ahora, con una autorización sin usar, la tarjeta de Reservas siempre lleva a la lista, y con cero recintos dice «Crear mi recinto · Tu autorización está lista».
+
+El segundo: la pantalla de Administradores seguía diciendo que **«un administrador puede todo lo del recinto»**, que dejó de ser cierto con los permisos granulares de la migración 83. Ahora dice lo que de verdad pasa: entra al día a día, y lo que puede *cambiar* se enciende uno por uno.
+
+**Un tercero, anotado y sin arreglar**: un recinto creado con autorización **no se puede borrar**. El `on delete set null` de `autorizaciones_recinto.complejo_id` choca con el CHECK que exige coherencia entre `usada_at` y `complejo_id`. No estorba —los recintos se despublican, no se borran— pero deja sin salida a quien cree uno por error.
