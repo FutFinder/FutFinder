@@ -1,6 +1,6 @@
 # Reglas de negocio
 
-Última revisión: 2026-08-17
+Última revisión: 2026-09-15
 
 ## Propósito
 
@@ -9,6 +9,10 @@ Reunir las reglas de producto que cambian el resultado para jugadores, organizad
 ## Estado verificado
 
 Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espejo versionado es la función `partido_reglas()` de la migración 33. Las reglas de clubes y asistencia también tienen validación en servicios y/o PostgreSQL.
+
+## Ubicación de un partido
+
+- La ubicación de un partido es la de la dirección escrita, nunca la del teléfono: el GPS del dispositivo solo ordena las sugerencias del buscador. Las coordenadas viajan junto a la dirección de la que salieron (`src/utils/ubicacionPropuesta.js`) y dejan de valer en cuanto el texto cambia sin confirmar una ubicación nueva.
 
 ## Clubes y planes
 
@@ -36,6 +40,7 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 ## Trust Score
 
 - El puntaje se almacena entre 0 y 100 y puede condicionar el ingreso cuando un partido define `min_trust_score`.
+- **Nadie edita su propio puntaje.** Desde la migración 102, `profiles` no tiene UPDATE abierto: los permisos son por columna y dejan fuera `trust_score`, `partidos_jugados`, `asistencias_confirmadas`, `mvps`, los promedios de rating, `estado` y `suspended_until`. Esas columnas solo cambian desde las operaciones del servidor.
 - Confirmar presencia por GPS suma 1 punto, con tope de 100, y registra una asistencia confirmada.
 - Al registrar asistencia, el organizador puede marcar presente o ausente: una presencia no confirmada previamente por GPS suma 2 puntos; una ausencia resta 15. La operación evita repetir ese efecto si el estado no cambia.
 - Las salidas y cancelaciones usan una ventana sin penalización de 2 horas; las penalizaciones vigentes se consultan en la fuente central de reglas antes de modificar esta política.
@@ -44,12 +49,17 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 
 - Los estados de partido son `abierto`, `lleno`, `en_curso`, `finalizado` y `cancelado`.
 - Los estados de asistencia son `pendiente` (solicitud con aprobación manual, sin reservar cupo), `inscrito`, `confirmado_gps`, `no_asistio` y `cancelado`.
+- **Las reglas de ingreso se exigen en el servidor, no en la pantalla** (migración 103). `join_match` rechaza los partidos con `aprobacion = 'manual'` —ese camino es `request_join`— y el rango de edad se comprueba al inscribir, al solicitar, al aprobar y en el trigger `tg_enforce_join_rules`. Política explícita de la edad: **un perfil sin edad no queda fuera**, porque no se puede demostrar que incumple; el día que la edad sea obligatoria, la regla se endurece en `edad_fuera_de_rango()`.
+- `approve_join` comprueba el estado y la hora del partido dentro del bloqueo de fila: no se acepta a nadie en un partido cancelado ni después de su hora de inicio.
+- **Los cupos son las plazas para OTROS jugadores: el organizador está en `attendees` pero no ocupa una.** La guarda `matches_guard_cupos` lo excluye (salvo en partidos entre clubes, donde el organizador es un administrador del club rival y sí puede jugar) y, desde la migración 104, **deduce** `cupos_disponibles` de la nómina vigente en lugar de aceptar el conteo que manda el cliente.
+- Un partido que ocupa la hora del jugador es el que está `abierto`, `lleno` o `en_curso`: ese conjunto vive en `estados_que_ocupan_horario()` y lo usan por igual la consulta (`get_schedule_conflict`) y la escritura (el trigger de elegibilidad).
 - El organizador solo puede guardar asistencia después de que termine el partido y hasta 72 horas después de su hora de término; al guardarla, el partido queda `finalizado`, salvo si ya estaba cancelado o finalizado. **Esto vale sólo para los partidos normales:** desde la migración 50, un partido nacido de una propuesta entre clubes rechaza `save_match_attendance()` y `cancel_match()`, porque su asistencia viaja con el resultado y su cierre lo firma el club contrario.
 
 ## Confirmación GPS
 
 - El radio máximo es de 200 metros respecto de las coordenadas de la cancha.
 - La fuente temporal para la validación es `now()` de PostgreSQL, comparada con la hora y duración del partido: abre 30 minutos antes y cierra 30 minutos después del término calculado. No se valida con la hora del dispositivo.
+- **Estar en la cancha a la hora no convierte a nadie en jugador del partido.** Confirmar exige una inscripción válida (`inscrito`) y un partido en pie: una solicitud `pendiente` ya no se confirma sola, y un partido cancelado no reparte asistencias ni Trust Score.
 
 ## Lista de espera
 
@@ -63,6 +73,7 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 - `src/services/clubs.js`
 - `supabase/migrations/11_clubes.sql`, `supabase/migrations/24_multi_club_membership.sql` y `supabase/migrations/33_partidos_flujo_completo.sql`
 - `supabase/migrations/22_settings_radius_trust_history.sql`
+- `supabase/migrations/102_el_trust_score_no_se_edita_solo.sql`, `supabase/migrations/103_las_reglas_del_partido_en_el_servidor.sql` y `supabase/migrations/104_los_cupos_los_cuenta_la_nomina.sql`
 
 ## Limitaciones conocidas
 
