@@ -50,3 +50,9 @@ docs/memoria/.obsidian/
 # Build
 build/
 out/
+
+# Prompts de diseño y borradores de rediseño: material de trabajo para
+# Claude Design, no del producto. Se quedan en la máquina a propósito —
+# cambian a cada iteración y no describen lo que la app hace hoy.
+docs/Prompt-Claude-Design-*.md
+docs/Rediseno-*.md
