@@ -9,7 +9,8 @@ import { Card, IconButton, Button, Badge, NoticeCard, Sheet, Foto } from '../com
 import { Skeleton } from '../components/reservas/recintoUi';
 import { misReservas, cancelarMiReserva } from '../services/reservas';
 import {
-  accionesDeReserva, enlaceDeMapa, etiquetaDeEstado, separaReservas, textoDeCancelacion,
+  accionesDeReserva, enlaceDeMapa, etiquetaDeEstado, lineaDePrecio, separaReservas,
+  textoDeCancelacion,
 } from '../utils/misReservas';
 import { formatCLP } from '../services/reservasRules';
 import { fechaLarga } from '../utils/recintoPantallas';
@@ -169,6 +170,7 @@ function Tarjeta({ reserva, onAccion }) {
   const acciones = accionesDeReserva(reserva);
   const nota = textoDeCancelacion(reserva);
   const mapa = enlaceDeMapa(reserva);
+  const precio = lineaDePrecio(reserva);
 
   return (
     <Card padded={false}>
@@ -195,11 +197,14 @@ function Tarjeta({ reserva, onAccion }) {
         ) : null}
 
         <View style={styles.totalFila}>
-          <Text style={styles.totalK}>
-            {reserva.soyOrganizador ? 'Total' : 'Total del partido'}
-          </Text>
-          <Text style={styles.totalV}>{formatCLP(reserva.precioTotal)}</Text>
+          <Text style={styles.totalK}>{precio.etiqueta}</Text>
+          <Text style={styles.totalV}>{formatCLP(precio.monto)}</Text>
         </View>
+        {precio.total ? (
+          <Text style={styles.reparto}>
+            {formatCLP(precio.total)} el partido, entre {precio.cupos}
+          </Text>
+        ) : null}
 
         {!reserva.soyOrganizador ? (
           <Text style={styles.nota}>Te invitaron a este partido: lo organiza otra persona.</Text>
@@ -277,6 +282,7 @@ const styles = StyleSheet.create({
   },
   totalK: { fontFamily: F.medium, fontSize: 13, color: C.textSecondary },
   totalV: { fontFamily: F.extraBold, fontSize: 17, color: C.textPrimary },
+  reparto: { fontFamily: F.medium, fontSize: 11.5, color: C.textMuted, marginTop: 4 },
 
   nota: { fontFamily: F.medium, fontSize: 11.5, lineHeight: 16.5, color: C.textMuted, marginTop: 11 },
   acciones: { flexDirection: 'row', gap: 9, marginTop: 13 },
