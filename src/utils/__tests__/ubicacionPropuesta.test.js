@@ -216,6 +216,29 @@ test('sin ubicación fijada, el borrador manda latitud y longitud nulas, nunca 0
   assert.equal(draft.longitud, null);
 });
 
+test('HALLAZGO 3: un GPS sin selección de dirección no se exporta como cancha', () => {
+  // Forma que tenía el GPS precargado del teléfono antes de la corrección.
+  const estado = {
+    ...U.UBICACION_VACIA,
+    direccion: 'Cancha elegida por escrito',
+    coords: { lat: -33.45, lng: -70.65 },
+  };
+  assert.equal(U.ubicacionFijada(estado), false);
+  const payload = U.ubicacionDraft(estado);
+  assert.equal(payload.latitud, null);
+  assert.equal(payload.longitud, null);
+});
+
+test('HALLAZGO 3: cambiar la dirección elimina ambas coordenadas del payload', () => {
+  const elegida = elegirSugerencia(U.UBICACION_VACIA, SUGERENCIA);
+  assert.equal(U.ubicacionDraft(elegida).latitud, SUGERENCIA.lat);
+  const editada = U.escribirDireccion(elegida, 'Otra cancha, otra dirección');
+  const payload = U.ubicacionDraft(editada);
+  assert.equal(payload.direccion, 'Otra cancha, otra dirección');
+  assert.equal(payload.latitud, null);
+  assert.equal(payload.longitud, null);
+});
+
 test('no revienta con entradas ausentes', () => {
   assert.equal(U.ubicacionFijada(null), false);
   assert.equal(U.ubicacionFijada(undefined), false);
