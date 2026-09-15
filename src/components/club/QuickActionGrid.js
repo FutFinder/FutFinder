@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Shield, Swords, Search, CalendarDays, Users, Settings } from 'lucide-react-native';
+import { Rows3, Swords, Search, CalendarDays, Users, Settings } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
 import { clubSuperficies } from '../../theme/colors';
@@ -73,7 +73,7 @@ export default function QuickActionGrid({ tema, can, badges, onPress }) {
 }
 
 const ACCIONES = [
-  { clave: 'club', etiqueta: 'Mi club', Icono: Shield },
+  { clave: 'alineacion', etiqueta: 'Alineación', Icono: Rows3 },
   { clave: 'desafios', etiqueta: 'Desafíos', Icono: Swords },
   { clave: 'rivales', etiqueta: 'Buscar rivales', Icono: Search },
   { clave: 'partido', etiqueta: 'Próximo partido', Icono: CalendarDays },

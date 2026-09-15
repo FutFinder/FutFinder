@@ -99,11 +99,89 @@ La migración **53 está aplicada en producción el 2026-08-21**, con `53_tema_d
 
 «Editar club» adoptó la estética de «Mi club» (fondo `clubColors.background`, tarjetas oscuras de borde tenue, radios de `clubRadius`) y comprueba el permiso por su cuenta con `getMisClubesAdmin()`: cargando, sin permiso, no se pudo comprobar y formulario son cuatro vistas distintas, porque un formulario abierto sin permiso invita a escribir cambios que el servidor va a rechazar. El tema se PREVISUALIZA —chips, opciones elegidas, escudo y botón de guardar toman el color en el acto— pero el club no cambia hasta que la base de datos confirma: si el guardado falla, no queda ningún color aplicado sólo en el teléfono.
 
+## Capitán y apodo del integrante
+
+La migración **90** agrega el rol `capitan` a `club_members.rol` (antes sólo `admin`/`jugador`) y de paso corrige un bug de RLS real encontrado al escribirla: `club_members_update` (migración 11) tenía la misma auto-referencia sin calificar que ya se había corregido en `club_members_insert` (18) y `club_members_delete` (20), pero nunca se arregló para `update` — dentro del `exists`, el `club_id` sin calificar resolvía contra el alias de la subconsulta y no contra la fila que se actualiza, así que CUALQUIER administrador de CUALQUIER club podía cambiar el rol de un integrante de OTRO club. Se corrige calificando explícitamente `m.club_id = club_members.club_id`, igual que ya hacía la 20. `capitan` no cuenta contra el tope de administradores del plan —`check_club_limits()` sólo mira `rol = 'admin'`— y puede haber más de uno a la vez; nombrarlo o quitarlo es un simple `update` de `rol`, el mismo mecanismo que ya usaba `promoteToAdmin()`, expuesto en el cliente como `setCaptain()`.
+
+La migración **91** agrega el apodo dentro del club: uno por integrante y por club, no por persona, así que el mismo jugador puede tener apodos distintos en dos clubes. Vive en `club_member_apodos`, una tabla aparte y no una columna en `club_members`, porque `club_members_read` es `using (true)` a propósito (la membresía es pública) y el apodo es explícitamente lo contrario —sólo lo ven compañeros del mismo club—, el mismo patrón que ya usa `club_match_locations` (44b). Toda escritura pasa por `set_apodo_club()` (`security definer`): decide si quien llama es la propia persona o un administrador del club, y vaciar el apodo BORRA la fila en vez de guardar una en blanco. Expuesto en el cliente como `setApodo()`.
+
+Ambas migraciones tienen su arnés (`90_el_capitan_del_equipo_test.sql`, `91_el_apodo_dentro_del_club_test.sql`) en verde contra el esquema ya aplicado, pero **no están aplicadas en producción todavía**: quedan pendientes de que alguien las corra en Supabase.
+
+`ClubMembersScreen` se rediseñó sobre esta base, y de paso adoptó `clubColors`/`dsColors` en vez de los tokens de `colors.js`, para verse igual que `ClubDetailScreen`: resumen del plantel con el tope real del plan, buscador por nombre/apodo/posición, pestaña «Solicitudes» sólo para administradores (las solicitudes reales de `club_join_requests`, no invitaciones inventadas), insignias Admin/Capitán, y un menú ⋮ por integrante con ver perfil, editar apodo, enviar mensaje directo (`dm:<userId>`, el mismo canal que ya usa `ProfileScreen`), nombrar/quitar capitán, hacer administrador y quitar del club. El botón de copiar/compartir enlace de invitación del mockup de referencia se descartó a propósito: no existe ningún mecanismo de invitación por link en el backend, y el único real sigue siendo `ClubInviteScreen` (buscar por nombre dentro de la app).
+
+## Alineación del club
+
+La migración **92** agrega `club_lineups`: UNA fila por club, no por partido —
+formación, modo (7 u 11) y qué integrante va en cada puesto—, que se
+SOBRESCRIBE al guardar (`club_id` es primary key; guardar de nuevo reemplaza,
+no archiva). Nace ya con la calificación explícita `club_lineups.club_id` en
+sus políticas de RLS, aprendiendo de memoria del bug real que la 90 encontró
+y corrigió en `club_members_update`: la misma auto-referencia sin calificar,
+pero acá corregida desde el primer día en vez de heredada. Sólo admin o
+capitán arman y guardan (`club_lineups_insert`/`_update` exigen
+`rol in ('admin','capitan')` y `updated_by = auth.uid()`); cualquier
+integrante del club la lee. `asignaciones` es un jsonb `{puesto: member_id}`
+sin FK adentro a propósito: un integrante expulsado después de guardar
+simplemente deja de resolver a nadie al leer, en vez de romper la pantalla.
+
+Los PUESTOS de la cancha (`src/utils/formacionClub.js`, puro y probado) son
+más finos que las 7 posiciones reales de `profiles.posicion_preferida`:
+distinguen lado (LI/LD, MI/MD, EI/ED) y profundidad (MC/MCD, DC/MP), que la
+posición declarada no tiene. `fitsForMember()` traduce lo real a la lista de
+puestos que le calzan —juntando TODAS las posiciones de un jugador cuando
+declaró más de una, sin repetir— y usa `profiles.flanco` sólo para anteponer
+el lado ya declarado, nunca para descartar el otro. Es una decisión
+deliberada: inventar una posición más precisa de la que el jugador nunca
+declaró habría sido fabricar un dato, así que el tablero resalta el mejor
+calce con lo real en vez de simular una granularidad que no existe.
+
+SÍ SE PUEDE ARRASTRAR un puesto por la cancha para reposicionarlo a mano
+(«alineación personalizada»), igual que en el mockup de referencia. Al
+soltarlo, `zoneLabel(left, top)` (`formacionClub.js`, puro y probado)
+recalcula la etiqueta del puesto según DÓNDE quedó, no de dónde salió: un
+mediocampista arrastrado al fondo pasa a ser DFC de verdad, nunca un MC mal
+puesto. Ese recálculo alimenta lo mismo que usa `fitsForMember()` para
+resaltar puestos, así que un puesto reubicado participa del resaltado con su
+posición NUEVA. La formación pasa a mostrarse como «Personalizado · base
+X» y el aviso «Alineación personalizada» sale UNA sola vez — al momento en
+que una formación establecida deja de serlo, no en cada arrastre
+siguiente—, controlado comparando el estado `personalizado` de ANTES de
+soltar contra el de después. Cambiar de formación o de modo sigue limpiando
+las asignaciones y los puestos personalizados: las claves de puesto son
+posicionales por línea (`l0p0`, `l1p2`…) y sólo tienen sentido para la
+formación con la que se calcularon.
+
+El resaltado al elegir a alguien de la banca es de UN SOLO nivel: un puesto
+calza o no calza con `fitsForMember()`, sin una distinción visual entre
+«el mejor» y «un aceptable» — simplifica lo que el mockup de referencia
+mostraba en dos tonos de verde. El capitán se diferencia con dorado
+(`clubColors.gold`), no verde: anillo del avatar, insignia «C» y etiqueta
+del nombre, tanto en la banca como ya puesto en la cancha — el mismo color
+que ya usa `ClubMembersScreen` para el chip «Capitán», para no inventar un
+segundo código de color para el mismo rol.
+
+La migración **93** agrega `club_lineups.puestos_personalizados` (jsonb
+`{puesto: {left, top, label}}`) en vez de tocar la 92, porque la 92 ya pudo
+haberse aplicado sin forma de saberlo. Vacío si nadie arrastró nada.
+
+**Nota de implementación (react-native-web):** el `PanResponder` de cada
+puesto necesita `onPanResponderTerminationRequest: () => false`. Sin eso, el
+navegador entrega el primer `mousemove` y después abandona el gesto a medio
+camino —se veía como si el arrastre sólo avanzara unos pocos píxeles y se
+detuviera—, porque algo más en el árbol acepta la solicitud de terminación
+por defecto. Cualquier otro `PanResponder` de arrastre libre en esta app
+debería llevar la misma línea.
+
+Se llega desde el acceso rápido «Alineación» de la portada de Clubes
+(`QuickActionGrid`), en el lugar donde antes estaba «Mi club» — ese acceso a
+`ClubDetailScreen` no se perdió: sigue disponible desde «Ver club» en
+`ClubSummaryCard`, más abajo en la misma portada.
+
 ## Pantallas y dependencias
 
-- Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
-- Código: `src/services/clubs.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
-- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`.
+- Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, alineación, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
+- Código: `src/services/clubs.js`, `clubLineup.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/utils/formacionClub.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
+- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`), 92 (`club_lineups`) y 93 (`club_lineups.puestos_personalizados`) están escritas y probadas, **pendientes de aplicar**.
 
 ## Estados, errores y problemas conocidos
 

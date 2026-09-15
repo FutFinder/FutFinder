@@ -42,6 +42,13 @@ export const POSICION_LABEL = {
   sin_definir: 'Sin definir',
 };
 
+/** 'Medio · Volante' — nombres en español, sin 'sin_definir'. */
+export function etiquetaPosiciones(pref) {
+  return posicionesReales(pref)
+    .map((p) => POSICION_LABEL[p] || p)
+    .join(' · ');
+}
+
 export function esModalidadValida(v) {
   return Object.values(MODALIDADES).includes(v);
 }

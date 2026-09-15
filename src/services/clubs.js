@@ -377,9 +377,20 @@ export async function listMembers(clubId) {
   const ids = members.map((m) => m.user_id);
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username, foto_url, trust_score, posicion_preferida, comuna')
+    .select('id, username, foto_url, trust_score, posicion_preferida, comuna, flanco')
     .in('id', ids);
   const byId = new Map((profiles || []).map((p) => [p.id, p]));
+
+  // El apodo vive en su propia tabla, con su propia RLS (migración 91):
+  // sólo lo ve un compañero de este mismo club, nunca alguien de afuera.
+  // Una consulta sin filas no es un error — la mayoría de los integrantes
+  // no tiene apodo puesto — así que ni siquiera se mira `error` acá.
+  const memberIds = members.map((m) => m.id);
+  const { data: apodos } = await supabase
+    .from('club_member_apodos')
+    .select('member_id, apodo')
+    .in('member_id', memberIds);
+  const apodoPorMiembro = new Map((apodos || []).map((a) => [a.member_id, a.apodo]));
 
   return {
     data: members.map((m) => ({
@@ -392,6 +403,8 @@ export async function listMembers(clubId) {
       trust_score: byId.get(m.user_id)?.trust_score ?? 100,
       posicion_preferida: byId.get(m.user_id)?.posicion_preferida || [],
       comuna: byId.get(m.user_id)?.comuna || null,
+      flanco: byId.get(m.user_id)?.flanco || null,
+      apodo: apodoPorMiembro.get(m.id) || null,
     })),
     error: null,
   };
@@ -807,6 +820,66 @@ export async function promoteToAdmin(memberId) {
   }
 
   return { data: data[0], error: null };
+}
+
+/**
+ * Nombra o quita el capitán de un integrante. `on=true` lo nombra
+ * capitán; `on=false` lo vuelve a jugador.
+ *
+ * NO CUENTA CONTRA EL TOPE DE ADMINISTRADORES DEL PLAN: `check_club_limits`
+ * sólo mira `rol = 'admin'` (migración 90), así que nombrar capitán nunca
+ * choca con el límite. Puede haber más de un capitán a la vez — no hay
+ * exclusividad, es un rol más, no una banda que se le saca a alguien más
+ * para dársela a otro.
+ *
+ * `.neq('rol', 'admin')` es una guarda de más, no de la RLS: esta función
+ * es sólo para alternar entre capitán y jugador, nunca para tocar a un
+ * administrador por accidente si algún día se llama mal desde la interfaz.
+ */
+export async function setCaptain(memberId, on) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!memberId) return { error: { message: 'memberId requerido' } };
+
+  const { data, error } = await supabase
+    .from('club_members')
+    .update({ rol: on ? 'capitan' : 'jugador' })
+    .eq('id', memberId)
+    .neq('rol', 'admin')
+    .select('id, rol');
+
+  if (error) {
+    console.error('[FutFinder] setCaptain:', error);
+    return { data: null, error };
+  }
+  if (!data || data.length === 0) {
+    return {
+      error: { message: 'No se pudo actualizar. Solo un administrador del club puede hacerlo.' },
+    };
+  }
+  return { data: data[0], error: null };
+}
+
+/**
+ * Pone o quita el apodo de un integrante DENTRO de este club — sólo lo ven
+ * sus compañeros de club (migración 91: RLS propia de `club_member_apodos`,
+ * distinta de la de `club_members`, que es pública). Un apodo vacío lo
+ * quita en vez de guardar una fila en blanco. Lo puede cambiar la propia
+ * persona o un administrador del club — lo valida `set_apodo_club()` en
+ * el servidor, no esta función.
+ */
+export async function setApodo(memberId, apodo) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!memberId) return { error: { message: 'memberId requerido' } };
+
+  const { data, error } = await supabase.rpc('set_apodo_club', {
+    p_member_id: memberId,
+    p_apodo: apodo,
+  });
+  if (error) {
+    console.error('[FutFinder] setApodo:', error);
+    return { data: null, error: { message: error.message || 'No se pudo guardar el apodo' } };
+  }
+  return { data, error: null };
 }
 
 /**

@@ -40,7 +40,7 @@ import Banner from '../components/Banner';
  * `ClubDetailScreen` o `ClubExplorer`, así que entrar a Clubes era entrar al
  * detalle de un club: para responder un desafío o revisar la nómina había que
  * bajar por toda la ficha. Ahora la pestaña abre un centro de control y el
- * detalle queda a un toque explícito, desde «Mi club» o «Ver club».
+ * detalle queda a un toque explícito, desde «Ver club» en el resumen.
  *
  * NO SE AGREGA FUNCIONALIDAD. Todo lo que se ve acá ya existía en otra
  * pantalla; lo que cambia es el orden en que aparece y cuánto hay que
@@ -113,7 +113,7 @@ export default function ClubsScreen({ navigation, route }) {
   const onAccionRapida = useCallback(
     (clave) => {
       const destinos = {
-        club: ['ClubDetail', { clubId: activeClubId }],
+        alineacion: ['ClubLineup', { clubId: activeClubId }],
         desafios: ['ClubChallenges', { clubId: activeClubId }],
         // `modoRival: true` es lo que hace que ExploreClubs deje de ser el
         // catálogo completo y liste sólo clubes desafiables; sin él,

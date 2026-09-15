@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,6 +19,7 @@ import {
   ArrowLeft,
   Shield,
   Crown,
+  Star,
   Check,
   X,
   UserMinus,
@@ -25,12 +28,16 @@ import {
   UserPlus,
   UserCheck,
   Clock,
-  Trash2,
+  Search,
+  MoreVertical,
+  User,
+  Pencil,
+  Send,
 } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import { etiquetaPosiciones } from '../utils/playerMeta';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
 import { getCurrentUser } from '../services/auth';
 import {
   getFriendshipStatuses,
@@ -50,7 +57,8 @@ import {
   getMyClubs,
   promoteToAdmin,
   transferAdmin,
-  deleteClub,
+  setCaptain,
+  setApodo,
   CLUB_LIMITS,
 } from '../services/clubs';
 
@@ -69,11 +77,11 @@ function confirmAction(title, message, onConfirm) {
 }
 
 /**
- * Integrantes de un club: lista de miembros con reputación, y acciones según
- * quién mire:
+ * Integrantes de un club: lista de miembros con reputación, apodo y rol, y
+ * acciones según quién mire:
  *  - visitante sin club  → "Solicitar unirme" / "Cancelar solicitud"
- *  - miembro             → chat + salir del club
- *  - admin               → además: solicitudes pendientes, expulsar, promover
+ *  - miembro             → chat, buscar, ver ficha de cada compañero
+ *  - admin               → además: solicitudes, capitán, admin, expulsar
  *
  * Se llega aquí desde el contador de integrantes del dashboard (ClubDetail).
  */
@@ -91,6 +99,10 @@ export default function ClubMembersScreen({ navigation, route }) {
   const [friendStatus, setFriendStatus] = useState(new Map()); // user_id -> { status, friendshipId }
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
+  const [query, setQuery] = useState('');
+  const [tab, setTab] = useState('miembros'); // 'miembros' | 'solicitudes'
+  const [actionSheet, setActionSheet] = useState(null); // miembro seleccionado en el menú ⋮
+  const [apodoEdit, setApodoEdit] = useState(null); // { member, value }
 
   const miMembresia = members.find((m) => m.user_id === me);
   const soyMiembro = Boolean(miMembresia);
@@ -129,6 +141,7 @@ export default function ClubMembersScreen({ navigation, route }) {
       setRequests(reqs || []);
     } else {
       setRequests([]);
+      setTab('miembros');
     }
     if (!amMember && myId) {
       const { data: mr } = await getMyRequestTo(clubId);
@@ -150,6 +163,17 @@ export default function ClubMembersScreen({ navigation, route }) {
     await load();
     setRefreshing(false);
   };
+
+  const filteredMembers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter((m) => {
+      if (m.username?.toLowerCase().includes(q)) return true;
+      if (m.apodo?.toLowerCase().includes(q)) return true;
+      if ((m.posicion_preferida || []).some((p) => p.replace('_', ' ').includes(q))) return true;
+      return false;
+    });
+  }, [members, query]);
 
   const handleJoin = async () => {
     setWorking(true);
@@ -196,12 +220,9 @@ export default function ClubMembersScreen({ navigation, route }) {
   };
 
   const handleLeave = () => {
-    const ultimoMiembro = members.length === 1;
     confirmAction(
-      ultimoMiembro ? '¿Eliminar el club?' : '¿Salir del club?',
-      ultimoMiembro
-        ? 'Eres el último integrante: al salir, el club y su chat se eliminan para siempre.'
-        : 'Dejarás de ver el chat y los datos internos del club.',
+      '¿Salir del club?',
+      'Dejarás de ver el chat y los datos internos del club.',
       async () => {
         setWorking(true);
         const { error, clubDeleted } = await leaveClub(clubId);
@@ -267,6 +288,36 @@ export default function ClubMembersScreen({ navigation, route }) {
         }
       );
     }
+  };
+
+  const handleSetCaptain = async (member, on) => {
+    setWorking(true);
+    const { error } = await setCaptain(member.member_id, on);
+    setWorking(false);
+    if (error) {
+      setBanner({ type: 'error', title: 'No se pudo actualizar', message: error.message });
+      return;
+    }
+    setBanner({
+      type: 'success',
+      title: on ? 'Nuevo capitán' : 'Capitán actualizado',
+      message: on
+        ? `${member.username} ahora es capitán del club.`
+        : `${member.username} ya no es capitán.`,
+    });
+    await load();
+  };
+
+  const handleSaveApodo = async (member, value) => {
+    setWorking(true);
+    const { error } = await setApodo(member.member_id, value);
+    setWorking(false);
+    setApodoEdit(null);
+    if (error) {
+      setBanner({ type: 'error', title: 'No se pudo guardar', message: error.message });
+      return;
+    }
+    await load();
   };
 
   const handleAddFriend = async (member) => {
@@ -338,28 +389,14 @@ export default function ClubMembersScreen({ navigation, route }) {
     );
   };
 
-  const handleDeleteClub = () => {
-    confirmAction(
-      '¿Eliminar este club?',
-      'Esta acción no se puede deshacer. Se eliminarán todos los miembros, mensajes e historial del club.',
-      async () => {
-        setWorking(true);
-        const { error } = await deleteClub(clubId);
-        setWorking(false);
-        if (error) {
-          console.error('[FutFinder] handleDeleteClub:', error);
-          setBanner({ type: 'error', title: 'No se pudo eliminar', message: error.message });
-          return;
-        }
-        navigation.navigate('Main', {
-          screen: 'ClubsTab',
-          params: {
-            successTitle: 'Club eliminado',
-            successMessage: 'El club fue eliminado permanentemente.',
-          },
-        });
-      }
-    );
+  const openMessage = (member) => {
+    setActionSheet(null);
+    (navigation.getParent() || navigation).navigate('ChatThread', {
+      threadKey: `dm:${member.user_id}`,
+      title: `@${member.username}`,
+      subtitle: 'Mensaje directo',
+      fotoUrl: member.foto_url || null,
+    });
   };
 
   if (loading || !club) {
@@ -369,33 +406,44 @@ export default function ClubMembersScreen({ navigation, route }) {
           <Pressable
             onPress={() => navigation.goBack()}
             hitSlop={12}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           >
-            <ArrowLeft color={colors.textPrimary} size={22} />
+            <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
           </Pressable>
         </View>
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={clubColors.green} />
         </View>
       </SafeAreaView>
     );
   }
 
   const limites = CLUB_LIMITS[club.plan] || CLUB_LIMITS.estandar;
+  const cuposRestantes = Math.max(0, limites.miembros - members.length);
+  const isSolicitudesTab = soyAdmin && tab === 'solicitudes';
+  const listData = isSolicitudesTab ? requests : filteredMembers;
+  const listKeyExtractor = isSolicitudesTab
+    ? (item) => item.request_id
+    : (item) => item.member_id;
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
         >
-          <ArrowLeft color={colors.textPrimary} size={22} />
+          <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
         </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          Integrantes
-        </Text>
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Integrantes
+          </Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            {club.nombre}
+          </Text>
+        </View>
         {soyMiembro && (
           <Pressable
             onPress={() =>
@@ -407,48 +455,72 @@ export default function ClubMembersScreen({ navigation, route }) {
               })
             }
             hitSlop={8}
-            style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           >
-            <MessageCircle color={colors.primary} size={18} />
+            <MessageCircle color={clubColors.green} size={18} strokeWidth={2.2} />
           </Pressable>
         )}
       </View>
 
       <FlatList
-        data={members}
-        keyExtractor={(item) => item.member_id}
+        data={listData}
+        keyExtractor={listKeyExtractor}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+            tintColor={clubColors.green}
+            colors={[clubColors.green]}
           />
         }
         ListHeaderComponent={
           <View>
             {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryHeaderRow}>
+                <Text style={styles.summaryTitle}>
+                  Plantel {members.length}/{limites.miembros}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.min(100, (members.length / limites.miembros) * 100)}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.summaryHint}>
+                {cuposRestantes > 0
+                  ? `Quedan ${cuposRestantes} cupo${cuposRestantes === 1 ? '' : 's'} en el plantel`
+                  : 'Plantel completo'}
+              </Text>
+            </View>
+
             {/* Acción principal para visitantes */}
             {!soyMiembro && !tengoMaxClubs && (
-              myRequest ? (
-                <Button
-                  label="Cancelar solicitud"
-                  variant="secondary"
-                  loading={working}
-                  onPress={handleCancelRequest}
-                  style={styles.joinBtn}
-                />
-              ) : (
-                <Button
-                  label="Solicitar unirme"
-                  icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
-                  loading={working}
-                  onPress={handleJoin}
-                  style={styles.joinBtn}
-                />
-              )
+              <Pressable
+                onPress={myRequest ? handleCancelRequest : handleJoin}
+                disabled={working}
+                style={({ pressed }) => [
+                  myRequest ? styles.secondaryBtn : styles.primaryBtn,
+                  pressed && !working && { opacity: 0.85 },
+                  working && { opacity: 0.6 },
+                ]}
+              >
+                {working ? (
+                  <ActivityIndicator color={myRequest ? clubColors.textPrimary : clubColors.greenInk} />
+                ) : (
+                  <>
+                    {!myRequest && <UserPlus color={clubColors.greenInk} size={18} strokeWidth={2.4} />}
+                    <Text style={myRequest ? styles.secondaryBtnText : styles.primaryBtnText}>
+                      {myRequest ? 'Cancelar solicitud' : 'Solicitar unirme'}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
             )}
             {!soyMiembro && tengoMaxClubs && (
               <Banner
@@ -460,143 +532,318 @@ export default function ClubMembersScreen({ navigation, route }) {
 
             {/* Invitar jugadores (solo admin) */}
             {soyAdmin && (
-              <Button
-                label="Invitar jugadores"
-                icon={<UserPlus color="#0E0E0D" size={18} strokeWidth={2.4} />}
+              <Pressable
                 onPress={() =>
                   navigation.navigate('ClubInvite', {
                     clubId: club.id,
                     clubNombre: club.nombre,
                   })
                 }
-                style={styles.inviteBtn}
-              />
+                style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
+              >
+                <UserPlus color={clubColors.greenInk} size={18} strokeWidth={2.4} />
+                <Text style={styles.primaryBtnText}>Invitar jugadores</Text>
+              </Pressable>
             )}
 
-            {/* Solicitudes pendientes (solo admin) */}
-            {soyAdmin && requests.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                  Solicitudes pendientes ({requests.length})
-                </Text>
-                {requests.map((req) => (
-                  <View key={req.request_id} style={styles.requestRow}>
-                    <MemberAvatar foto={req.foto_url} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.memberName}>{req.username}</Text>
-                      <Text style={styles.memberMeta}>
-                        Reputación {req.trust_score}
-                        {req.comuna ? ` · ${req.comuna}` : ''}
-                      </Text>
+            {soyAdmin && (
+              <View style={styles.tabRow}>
+                <Pressable
+                  onPress={() => setTab('miembros')}
+                  style={[styles.tabBtn, tab === 'miembros' && styles.tabBtnActive]}
+                >
+                  <Text style={[styles.tabLabel, tab === 'miembros' && styles.tabLabelActive]}>
+                    Integrantes
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setTab('solicitudes')}
+                  style={[styles.tabBtn, tab === 'solicitudes' && styles.tabBtnActive]}
+                >
+                  <Text style={[styles.tabLabel, tab === 'solicitudes' && styles.tabLabelActive]}>
+                    Solicitudes
+                  </Text>
+                  {requests.length > 0 && (
+                    <View style={styles.tabBadge}>
+                      <Text style={styles.tabBadgeText}>{requests.length}</Text>
                     </View>
-                    <Pressable
-                      onPress={() => handleRespond(req, true)}
-                      hitSlop={6}
-                      style={({ pressed }) => [
-                        styles.reqBtn,
-                        styles.reqAccept,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <Check color="#0E0E0D" size={16} strokeWidth={2.6} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleRespond(req, false)}
-                      hitSlop={6}
-                      style={({ pressed }) => [
-                        styles.reqBtn,
-                        styles.reqReject,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <X color={colors.error} size={16} strokeWidth={2.6} />
-                    </Pressable>
-                  </View>
-                ))}
+                  )}
+                </Pressable>
               </View>
             )}
 
-            <Text style={styles.sectionTitle}>
-              Integrantes ({members.length}/{limites.miembros})
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => navigation.navigate('UserProfile', { userId: item.user_id })}
-            style={({ pressed }) => [styles.memberRow, pressed && { opacity: 0.85 }]}
-          >
-            <MemberAvatar foto={item.foto_url} />
-            <View style={{ flex: 1 }}>
-              <View style={styles.memberNameRow}>
-                <Text style={styles.memberName}>{item.username}</Text>
-                {item.rol === 'admin' && (
-                  <View style={styles.adminChip}>
-                    <Crown color={colors.primary} size={10} strokeWidth={2.4} />
-                    <Text style={styles.adminChipText}>Admin</Text>
-                  </View>
+            {!isSolicitudesTab && (
+              <View style={styles.searchBox}>
+                <Search color={clubColors.textSecondary} size={18} strokeWidth={2} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Buscar por nombre, apodo o posición"
+                  placeholderTextColor={clubColors.textSecondary}
+                  style={styles.searchInput}
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={() => setQuery('')} hitSlop={8} style={styles.searchClear}>
+                    <X color={clubColors.textSecondary} size={14} strokeWidth={2.4} />
+                  </Pressable>
                 )}
               </View>
-              <Text style={styles.memberMeta}>
-                Reputación {item.trust_score}
-                {item.comuna ? ` · ${item.comuna}` : ''}
-              </Text>
-            </View>
-            {item.user_id !== me && (
-              <FriendControl
-                status={friendStatus.get(item.user_id)?.status || 'none'}
-                onAdd={() => handleAddFriend(item)}
-                onAccept={() =>
-                  handleAcceptFriend(item, friendStatus.get(item.user_id)?.friendshipId)
-                }
-              />
             )}
-            {soyAdmin && item.user_id !== me && item.rol !== 'admin' && (
-              <Pressable
-                onPress={() => handlePromote(item)}
-                hitSlop={8}
-                style={({ pressed }) => [styles.promoteBtn, pressed && { opacity: 0.5 }]}
-              >
-                <Crown color={colors.primary} size={16} />
-              </Pressable>
+
+            {isSolicitudesTab && requests.length === 0 && (
+              <Text style={styles.emptyHint}>No hay solicitudes pendientes.</Text>
             )}
-            {soyAdmin && item.user_id !== me && (
-              <Pressable
-                onPress={() => handleExpel(item)}
-                hitSlop={8}
-                style={({ pressed }) => [styles.expelBtn, pressed && { opacity: 0.5 }]}
-              >
-                <UserMinus color={colors.error} size={16} />
-              </Pressable>
+            {!isSolicitudesTab && filteredMembers.length === 0 && query.length > 0 && (
+              <Text style={styles.emptyHint}>Nadie coincide con «{query}».</Text>
             )}
-          </Pressable>
-        )}
+          </View>
+        }
+        renderItem={
+          isSolicitudesTab
+            ? ({ item }) => (
+                <View style={styles.requestRow}>
+                  <MemberAvatar foto={item.foto_url} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.memberName}>{item.username}</Text>
+                    <Text style={styles.memberMeta}>
+                      Reputación {item.trust_score}
+                      {item.comuna ? ` · ${item.comuna}` : ''}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => handleRespond(item, true)}
+                    hitSlop={6}
+                    style={({ pressed }) => [
+                      styles.reqBtn,
+                      styles.reqAccept,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Check color={clubColors.greenInk} size={16} strokeWidth={2.6} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleRespond(item, false)}
+                    hitSlop={6}
+                    style={({ pressed }) => [
+                      styles.reqBtn,
+                      styles.reqReject,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <X color={clubColors.loss} size={16} strokeWidth={2.6} />
+                  </Pressable>
+                </View>
+              )
+            : ({ item }) => {
+                const posiciones = etiquetaPosiciones(item.posicion_preferida);
+                return (
+                  <Pressable
+                    onPress={() => navigation.navigate('UserProfile', { userId: item.user_id })}
+                    style={({ pressed }) => [styles.memberRow, pressed && { opacity: 0.9 }]}
+                  >
+                    <MemberAvatar foto={item.foto_url} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.memberName} numberOfLines={1}>
+                        {item.username}
+                        {item.apodo ? <Text style={styles.memberApodo}> "{item.apodo}"</Text> : null}
+                      </Text>
+                      {(item.rol === 'admin' || item.rol === 'capitan') && (
+                        <View style={styles.badgeRow}>
+                          {item.rol === 'admin' && (
+                            <View style={styles.adminChip}>
+                              <Crown color={clubColors.green} size={10} strokeWidth={2.4} />
+                              <Text style={styles.adminChipText}>Admin</Text>
+                            </View>
+                          )}
+                          {item.rol === 'capitan' && (
+                            <View style={styles.capitanChip}>
+                              <Star color={clubColors.gold} size={10} strokeWidth={2.4} />
+                              <Text style={styles.capitanChipText}>Capitán</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                      <Text style={styles.memberMeta} numberOfLines={1}>
+                        Reputación {item.trust_score}
+                        {posiciones ? ` · ${posiciones}` : ''}
+                        {item.comuna ? ` · ${item.comuna}` : ''}
+                      </Text>
+                    </View>
+                    {item.user_id !== me && (
+                      <FriendControl
+                        status={friendStatus.get(item.user_id)?.status || 'none'}
+                        onAdd={() => handleAddFriend(item)}
+                        onAccept={() =>
+                          handleAcceptFriend(item, friendStatus.get(item.user_id)?.friendshipId)
+                        }
+                      />
+                    )}
+                    <Pressable
+                      onPress={() => setActionSheet(item)}
+                      hitSlop={8}
+                      style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.6 }]}
+                    >
+                      <MoreVertical color={clubColors.textMuted} size={18} />
+                    </Pressable>
+                  </Pressable>
+                );
+              }
+        }
         ListFooterComponent={
           soyMiembro ? (
-            <View>
-              <Pressable
-                onPress={handleLeave}
-                style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
-              >
-                <LogOut color={colors.error} size={16} />
-                <Text style={styles.leaveText}>
-                  {members.length === 1 ? 'Eliminar club' : 'Salir del club'}
-                </Text>
-              </Pressable>
-              {soyAdmin && (
-                <Pressable
-                  onPress={handleDeleteClub}
-                  disabled={working}
-                  style={({ pressed }) => [styles.deleteClubBtn, pressed && { opacity: 0.7 }]}
-                >
-                  <Trash2 color={colors.error} size={16} />
-                  <Text style={styles.leaveText}>Eliminar club permanentemente</Text>
-                </Pressable>
-              )}
-            </View>
+            <Pressable
+              onPress={handleLeave}
+              style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
+            >
+              <LogOut color={clubColors.loss} size={16} />
+              <Text style={styles.leaveText}>Salir del club</Text>
+            </Pressable>
           ) : null
         }
       />
+
+      {/* Hoja: acciones sobre un integrante */}
+      <Modal
+        visible={!!actionSheet}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setActionSheet(null)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setActionSheet(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.sheetHandle} />
+            {actionSheet && (
+              <>
+                <Text style={styles.sheetTitle} numberOfLines={1}>
+                  {actionSheet.username}
+                  {actionSheet.apodo ? ` "${actionSheet.apodo}"` : ''}
+                </Text>
+
+                <SheetAction
+                  icon={<User color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                  label="Ver perfil"
+                  onPress={() => {
+                    setActionSheet(null);
+                    navigation.navigate('UserProfile', { userId: actionSheet.user_id });
+                  }}
+                />
+
+                {(actionSheet.user_id === me || soyAdmin) && (
+                  <SheetAction
+                    icon={<Pencil color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                    label="Editar apodo"
+                    onPress={() => {
+                      const member = actionSheet;
+                      setApodoEdit({ member, value: member.apodo || '' });
+                      setActionSheet(null);
+                    }}
+                  />
+                )}
+
+                {actionSheet.user_id !== me && (
+                  <SheetAction
+                    icon={<Send color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                    label="Enviar mensaje"
+                    onPress={() => openMessage(actionSheet)}
+                  />
+                )}
+
+                {soyAdmin && actionSheet.user_id !== me && actionSheet.rol !== 'admin' && (
+                  <>
+                    <SheetAction
+                      icon={<Crown color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                      label="Hacer administrador"
+                      onPress={() => {
+                        const member = actionSheet;
+                        setActionSheet(null);
+                        handlePromote(member);
+                      }}
+                    />
+                    {actionSheet.rol === 'capitan' ? (
+                      <SheetAction
+                        icon={<Star color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                        label="Quitar como capitán"
+                        onPress={() => {
+                          const member = actionSheet;
+                          setActionSheet(null);
+                          handleSetCaptain(member, false);
+                        }}
+                      />
+                    ) : (
+                      <SheetAction
+                        icon={<Star color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                        label="Nombrar capitán"
+                        onPress={() => {
+                          const member = actionSheet;
+                          setActionSheet(null);
+                          handleSetCaptain(member, true);
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+
+                {soyAdmin && actionSheet.user_id !== me && (
+                  <SheetAction
+                    icon={<UserMinus color={clubColors.loss} size={18} strokeWidth={2} />}
+                    label="Quitar del club"
+                    destructive
+                    onPress={() => {
+                      const member = actionSheet;
+                      setActionSheet(null);
+                      handleExpel(member);
+                    }}
+                  />
+                )}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Hoja: editar apodo */}
+      <Modal
+        visible={!!apodoEdit}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setApodoEdit(null)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setApodoEdit(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Apodo en el club</Text>
+            <Text style={styles.sheetSubtitle}>
+              Solo lo ven los integrantes de {club.nombre}. Déjalo vacío para quitarlo.
+            </Text>
+            <TextInput
+              value={apodoEdit?.value || ''}
+              onChangeText={(v) => setApodoEdit((prev) => (prev ? { ...prev, value: v } : prev))}
+              placeholder="Ej: El Muro"
+              placeholderTextColor={clubColors.textMuted}
+              maxLength={18}
+              autoFocus
+              style={styles.apodoInput}
+            />
+            <Pressable
+              onPress={() => apodoEdit && handleSaveApodo(apodoEdit.member, apodoEdit.value)}
+              disabled={working}
+              style={({ pressed }) => [
+                styles.sheetPrimary,
+                pressed && !working && { opacity: 0.85 },
+                working && { opacity: 0.6 },
+              ]}
+            >
+              {working ? (
+                <ActivityIndicator color={clubColors.greenInk} />
+              ) : (
+                <Text style={styles.sheetPrimaryText}>Guardar</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -607,7 +854,7 @@ function MemberAvatar({ foto }) {
   }
   return (
     <View style={[styles.avatar, styles.avatarFallback]}>
-      <Shield color={colors.textMuted} size={18} strokeWidth={1.8} />
+      <Shield color={clubColors.textMuted} size={18} strokeWidth={1.8} />
     </View>
   );
 }
@@ -623,15 +870,14 @@ function FriendControl({ status, onAdd, onAccept }) {
   if (status === 'friends') {
     return (
       <View style={styles.friendIconBox} accessibilityLabel="Ya son amigos">
-        <UserCheck color={colors.primary} size={16} strokeWidth={2.2} />
+        <UserCheck color={clubColors.green} size={16} strokeWidth={2.2} />
       </View>
     );
   }
   if (status === 'sent') {
     return (
-      <View style={styles.friendPillMuted} accessibilityLabel="Solicitud enviada">
-        <Clock color={colors.textMuted} size={12} strokeWidth={2.2} />
-        <Text style={styles.friendPillMutedText}>Solicitud enviada</Text>
+      <View style={styles.friendIconBoxMuted} accessibilityLabel="Solicitud enviada">
+        <Clock color={clubColors.textMuted} size={14} strokeWidth={2.2} />
       </View>
     );
   }
@@ -640,10 +886,10 @@ function FriendControl({ status, onAdd, onAccept }) {
       <Pressable
         onPress={onAccept}
         hitSlop={6}
-        style={({ pressed }) => [styles.friendPill, pressed && { opacity: 0.7 }]}
+        style={({ pressed }) => [styles.friendIconBox, pressed && { opacity: 0.7 }]}
+        accessibilityLabel="Aceptar solicitud de amistad"
       >
-        <Check color={colors.primary} size={12} strokeWidth={2.6} />
-        <Text style={styles.friendPillText}>Aceptar</Text>
+        <Check color={clubColors.green} size={16} strokeWidth={2.6} />
       </Pressable>
     );
   }
@@ -651,70 +897,218 @@ function FriendControl({ status, onAdd, onAccept }) {
     <Pressable
       onPress={onAdd}
       hitSlop={6}
-      style={({ pressed }) => [styles.friendPill, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.friendIconBoxMuted, pressed && { opacity: 0.7 }]}
+      accessibilityLabel="Agregar amigo"
     >
-      <UserPlus color={colors.primary} size={12} strokeWidth={2.4} />
-      <Text style={styles.friendPillText}>Agregar amigo</Text>
+      <UserPlus color={clubColors.textSecondary} size={14} strokeWidth={2.4} />
+    </Pressable>
+  );
+}
+
+function SheetAction({ icon, label, onPress, destructive, disabled }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.sheetAction,
+        pressed && !disabled && styles.sheetActionPressed,
+        disabled && { opacity: 0.4 },
+      ]}
+    >
+      <View style={styles.sheetActionIcon}>{icon}</View>
+      <Text style={[styles.sheetActionLabel, destructive && styles.sheetActionLabelDanger]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: clubColors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 12,
+    paddingHorizontal: clubSizes.gutter,
+    paddingTop: 4,
+    paddingBottom: 12,
+    gap: 8,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+  iconBtn: {
+    width: clubSizes.iconBtn,
+    height: clubSizes.iconBtn,
+    borderRadius: clubRadius.md,
+    borderWidth: 1,
+    borderColor: clubColors.border,
+    backgroundColor: clubColors.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chatBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  iconBtnPressed: { backgroundColor: clubColors.chipStrong },
+  headerTitles: { flex: 1, minWidth: 0 },
   headerTitle: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    color: clubColors.textPrimary,
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  headerSubtitle: {
+    color: clubColors.textSecondary,
+    fontSize: 12.5,
+    marginTop: 1,
   },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { paddingHorizontal: 16, paddingBottom: 40 },
+  listContent: { paddingHorizontal: clubSizes.gutter, paddingBottom: 40 },
 
-  joinBtn: { marginBottom: 16 },
-  inviteBtn: { marginBottom: 16 },
-
-  section: { marginBottom: 8 },
-  sectionTitle: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 10,
+  summaryCard: {
+    backgroundColor: clubColors.surface,
+    borderRadius: clubRadius.lg,
+    borderWidth: 1,
+    borderColor: clubColors.borderSoft,
+    padding: 14,
+    marginBottom: 14,
+  },
+  summaryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  summaryTitle: {
+    color: clubColors.textPrimary,
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: clubColors.chip,
+    marginTop: 10,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: clubColors.green,
+  },
+  summaryHint: {
+    color: clubColors.textMuted,
+    fontSize: 12,
     marginTop: 8,
   },
+
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    borderRadius: clubRadius.md,
+    backgroundColor: clubColors.green,
+    marginBottom: 12,
+  },
+  primaryBtnText: {
+    color: clubColors.greenInk,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    borderRadius: clubRadius.md,
+    borderWidth: 1,
+    borderColor: clubColors.border,
+    backgroundColor: clubColors.chip,
+    marginBottom: 12,
+  },
+  secondaryBtnText: {
+    color: clubColors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  tabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tabBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    flex: 1,
+    height: 40,
+    borderRadius: clubRadius.md,
+    borderWidth: 1,
+    borderColor: clubColors.border,
+    backgroundColor: clubColors.chip,
+  },
+  tabBtnActive: {
+    backgroundColor: clubColors.greenSoft,
+    borderColor: clubColors.greenBorder,
+  },
+  tabLabel: {
+    color: clubColors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  tabLabelActive: { color: clubColors.green },
+  tabBadge: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: clubColors.loss,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBadgeText: { color: '#2A0C0F', fontSize: 10, fontWeight: '800' },
+
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 46,
+    backgroundColor: clubColors.surface,
+    borderWidth: 1,
+    borderColor: clubColors.border,
+    borderRadius: clubRadius.md,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    color: clubColors.textPrimary,
+    fontSize: 14,
+  },
+  searchClear: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: clubColors.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyHint: {
+    color: clubColors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+
   requestRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    backgroundColor: clubColors.surface,
+    borderRadius: clubRadius.lg,
     borderWidth: 1,
-    borderColor: colors.primary + '55',
+    borderColor: clubColors.greenBorder,
     padding: 12,
     marginBottom: 8,
   },
@@ -722,10 +1116,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
+    backgroundColor: clubColors.surface,
+    borderRadius: clubRadius.lg,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: clubColors.borderSoft,
     padding: 12,
     marginBottom: 8,
   },
@@ -735,38 +1129,58 @@ const styles = StyleSheet.create({
     borderRadius: 21,
   },
   avatarFallback: {
-    backgroundColor: colors.surface,
+    backgroundColor: clubColors.chip,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-  },
-  memberNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    borderColor: clubColors.borderSoft,
   },
   memberName: {
-    color: colors.textPrimary,
+    color: clubColors.textPrimary,
     fontSize: 14,
     fontWeight: '700',
   },
+  memberApodo: {
+    color: clubColors.textSecondary,
+    fontWeight: '500',
+    fontSize: 13,
+  },
   memberMeta: {
-    color: colors.textMuted,
+    color: clubColors.textMuted,
     fontSize: 12,
     marginTop: 2,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
   },
   adminChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.pill,
+    backgroundColor: clubColors.greenSoft,
+    borderRadius: 999,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   adminChipText: {
-    color: colors.primary,
+    color: clubColors.green,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  capitanChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: clubColors.goldSoft,
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  capitanChipText: {
+    color: clubColors.gold,
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -778,63 +1192,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  reqAccept: { backgroundColor: colors.primary },
+  reqAccept: { backgroundColor: clubColors.green },
   reqReject: {
-    backgroundColor: colors.errorSoft,
+    backgroundColor: clubColors.chip,
     borderWidth: 1,
-    borderColor: colors.error,
+    borderColor: clubColors.loss,
   },
   friendIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primarySoft,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: clubColors.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  friendPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  friendPillText: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  friendPillMuted: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.surface,
+  friendIconBoxMuted: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: clubColors.chip,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  friendPillMutedText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  promoteBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primarySoft,
+    borderColor: clubColors.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  expelBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.errorSoft,
+  menuBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -845,26 +1230,90 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 16,
     paddingVertical: 14,
-    borderRadius: radius.lg,
+    borderRadius: clubRadius.lg,
     borderWidth: 1,
-    borderColor: colors.error,
-    backgroundColor: colors.errorSoft,
+    borderColor: clubColors.loss,
+    backgroundColor: 'rgba(232, 115, 123, 0.1)',
   },
   leaveText: {
-    color: colors.error,
+    color: clubColors.loss,
     fontSize: 14,
     fontWeight: '700',
   },
-  deleteClubBtn: {
+
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: clubColors.surface,
+    borderTopLeftRadius: clubRadius.sheet,
+    borderTopRightRadius: clubRadius.sheet,
+    borderTopWidth: 1,
+    borderColor: clubColors.border,
+    paddingHorizontal: clubSizes.gutter,
+    paddingTop: 14,
+    paddingBottom: 30,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    color: clubColors.textPrimary,
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  sheetSubtitle: {
+    color: clubColors.textSecondary,
+    fontSize: 12.5,
+    marginBottom: 14,
+  },
+  sheetAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 10,
-    paddingVertical: 14,
-    borderRadius: radius.lg,
+    gap: 12,
+    paddingVertical: 13,
+  },
+  sheetActionPressed: { opacity: 0.6 },
+  sheetActionIcon: {
+    width: 24,
+    alignItems: 'center',
+  },
+  sheetActionLabel: {
+    color: clubColors.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  sheetActionLabelDanger: { color: clubColors.loss },
+  apodoInput: {
+    height: 48,
+    borderRadius: clubRadius.md,
     borderWidth: 1,
-    borderColor: colors.error,
-    backgroundColor: colors.errorSoft,
+    borderColor: clubColors.border,
+    backgroundColor: clubColors.chip,
+    paddingHorizontal: 14,
+    color: clubColors.textPrimary,
+    fontSize: 15,
+    marginBottom: 14,
+  },
+  sheetPrimary: {
+    height: 50,
+    borderRadius: clubRadius.md,
+    backgroundColor: clubColors.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetPrimaryText: {
+    color: clubColors.greenInk,
+    fontSize: 15,
+    fontWeight: '800',
   },
 });
