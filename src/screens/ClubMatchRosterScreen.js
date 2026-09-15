@@ -4,16 +4,17 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Check, UserX, Shield, Clock } from 'lucide-react-native';
+import { ArrowLeft, Check, UserX, Shield, Clock } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { partidos as P } from '../theme/colors';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
+import {
+  Avatar, Card, GhostButton, IconButton, PrimaryButton, SectionLabel,
+} from '../components/partidos/ui';
 import { supabase } from '../services/supabase';
 import { getMatchById, withClubs } from '../services/matches';
 import { getMyClubs } from '../services/clubs';
@@ -31,7 +32,6 @@ import {
   ACCION_LABEL,
   puedoConfirmarNomina,
   clubesDelPartido,
-  iniciales,
 } from '../services/clubMatchRules';
 
 /**
@@ -188,25 +188,22 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
+      {/* Misma cabecera que el detalle del partido: flecha a la izquierda,
+          título y subtítulo. Antes era una X a la derecha, que es de hoja
+          modal — y esta pantalla no lo es: se llega navegando. */}
       <View style={styles.header}>
+        <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Nómina del partido</Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {match ? `${clubes.local.nombre} vs ${clubes.visitante.nombre}` : 'Cargando…'}
           </Text>
         </View>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
-        >
-          <X color={colors.textPrimary} size={20} />
-        </Pressable>
       </View>
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={P.green} />
         </View>
       ) : !match ? (
         <View style={styles.content}>
@@ -237,12 +234,7 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
                 title="No se pudo cargar la nómina"
                 message={`${errorNomina.message} No se muestran los cupos ni las listas para no darte un dato equivocado.`}
               />
-              <Button
-                label="Reintentar"
-                variant="secondary"
-                onPress={cargar}
-                style={styles.accionBtn}
-              />
+              <GhostButton label="Reintentar" onPress={cargar} style={styles.accionBtn} />
             </>
           ) : (
             <>
@@ -276,15 +268,22 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
               {accion === 'ninguna' ? (
                 <Text style={styles.motivo}>{motivo}</Text>
               ) : (
-                <Button
-                  label={ACCION_LABEL[accion]}
-                  variant={
-                    accion === 'salir' || accion === 'cancelar_postulacion' ? 'secondary' : 'primary'
-                  }
-                  onPress={handleAccion}
-                  loading={enviando}
-                  style={styles.accionBtn}
-                />
+                accion === 'salir' || accion === 'cancelar_postulacion' ? (
+                  <GhostButton
+                    label={ACCION_LABEL[accion]}
+                    onPress={handleAccion}
+                    disabled={enviando}
+                    tone="danger"
+                    style={styles.accionBtn}
+                  />
+                ) : (
+                  <PrimaryButton
+                    label={ACCION_LABEL[accion]}
+                    onPress={handleAccion}
+                    loading={enviando}
+                    style={styles.accionBtn}
+                  />
+                )
               )}
             </>
           )}
@@ -319,11 +318,9 @@ function NominaClub({
   const pendientes = filas.filter((a) => a.estado === 'pendiente');
 
   return (
-    <View style={[styles.columna, ancho && { flex: 1 }, esMiClub && styles.columnaMia]}>
+    <Card style={[ancho && { flex: 1 }, styles.columna, esMiClub && styles.columnaMia]}>
       <View style={styles.columnaHead}>
-        <View style={styles.escudo}>
-          <Text style={styles.escudoTxt}>{club.iniciales}</Text>
-        </View>
+        <Avatar name={club.nombre} size={38} ring={esMiClub} />
         <View style={{ flex: 1 }}>
           <Text style={styles.clubNombre} numberOfLines={1}>
             {club.nombre}
@@ -345,9 +342,11 @@ function NominaClub({
 
       {pendientes.length > 0 && (
         <>
-          <Text style={styles.subtitulo}>
-            {pendientes.length === 1 ? '1 postulación' : `${pendientes.length} postulaciones`}
-          </Text>
+          <View style={{ marginTop: 10, marginBottom: 2 }}>
+            <SectionLabel>
+              {pendientes.length === 1 ? '1 postulación' : `${pendientes.length} postulaciones`}
+            </SectionLabel>
+          </View>
           {pendientes.map((a) => (
             <Jugador
               key={a.id}
@@ -358,24 +357,19 @@ function NominaClub({
               acciones={
                 puedoConfirmar && a.id_jugador !== me ? (
                   <View style={styles.accionesFila}>
-                    <Pressable
-                      disabled={enviando}
-                      onPress={() => onConfirmar(a.id_jugador, true)}
-                      hitSlop={8}
-                      style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+                    <IconButton
+                      icon={Check}
+                      tone="green"
+                      size={38}
+                      onPress={enviando ? undefined : () => onConfirmar(a.id_jugador, true)}
                       accessibilityLabel={`Confirmar a ${nombreDe(a)}`}
-                    >
-                      <Check color={colors.primary} size={18} strokeWidth={2.6} />
-                    </Pressable>
-                    <Pressable
-                      disabled={enviando}
-                      onPress={() => onConfirmar(a.id_jugador, false)}
-                      hitSlop={8}
-                      style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+                    />
+                    <IconButton
+                      icon={UserX}
+                      size={38}
+                      onPress={enviando ? undefined : () => onConfirmar(a.id_jugador, false)}
                       accessibilityLabel={`Rechazar a ${nombreDe(a)}`}
-                    >
-                      <UserX color={colors.textMuted} size={18} strokeWidth={2.4} />
-                    </Pressable>
+                    />
                   </View>
                 ) : null
               }
@@ -383,7 +377,7 @@ function NominaClub({
           ))}
         </>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -403,9 +397,7 @@ function Jugador({ fila, esYo, acciones }) {
   const etiqueta = ETIQUETA_ORIGEN[fila.origen];
   return (
     <View style={styles.jugador}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarTxt}>{iniciales(nombreDe(fila))}</Text>
-      </View>
+      <Avatar name={nombreDe(fila)} size={32} tone={esYo ? 'green' : 'neutral'} />
       <View style={{ flex: 1 }}>
         <Text style={styles.jugadorNombre} numberOfLines={1}>
           {nombreDe(fila)}
@@ -414,9 +406,9 @@ function Jugador({ fila, esYo, acciones }) {
         {!!etiqueta && (
           <View style={styles.etiquetaFila}>
             {fila.estado === 'pendiente' ? (
-              <Clock color={colors.textMuted} size={11} />
+              <Clock color={P.textMuted} size={11} />
             ) : (
-              <Shield color={colors.textMuted} size={11} />
+              <Shield color={P.textMuted} size={11} />
             )}
             <Text style={styles.etiqueta}>{etiqueta}</Text>
           </View>
@@ -436,11 +428,13 @@ const ETIQUETA_ORIGEN = {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: P.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     width: '100%',
@@ -448,16 +442,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   headerCenter: { flex: 1 },
-  headerTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  headerSubtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-  },
+  headerTitle: { color: P.text, fontSize: 19, fontWeight: '800', letterSpacing: -0.4 },
+  headerSubtitle: { color: P.textMuted, fontSize: 12, marginTop: 2 },
+
   content: {
     padding: 16,
     paddingBottom: 40,
@@ -466,7 +453,7 @@ const styles = StyleSheet.create({
     maxWidth: 932,
     alignSelf: 'center',
   },
-  aviso: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
+  aviso: { color: P.textMuted, fontSize: 12, lineHeight: 17 },
 
   // Apiladas en teléfono, lado a lado desde 720 px. El `maxWidth` es lo que
   // evita que en un monitor ancho las dos columnas se estiren hasta dejar los
@@ -474,63 +461,23 @@ const styles = StyleSheet.create({
   columnas: { gap: 12 },
   columnasAncho: { flexDirection: 'row', maxWidth: 900, alignSelf: 'center', width: '100%' },
 
-  columna: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    padding: 14,
-    gap: 8,
-  },
-  columnaMia: { borderColor: colors.primary },
-  columnaHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
-  escudo: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  escudoTxt: { color: colors.textPrimary, fontSize: 13, fontWeight: '800' },
-  clubNombre: { color: colors.textPrimary, fontSize: 15, fontWeight: '800' },
-  conteo: { color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 1 },
+  columna: { gap: 8 },
+  // El club propio se marca con el verde de la app, no con un borde de otro
+  // tono: es la misma señal que usan las tarjetas de partidos.
+  columnaMia: { borderColor: P.greenBorder },
+  columnaHead: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 4 },
+  clubNombre: { color: P.text, fontSize: 15.5, fontWeight: '800', letterSpacing: -0.2 },
+  conteo: { color: P.green, fontSize: 12, fontWeight: '700', marginTop: 2 },
 
-  subtitulo: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  vacio: { color: colors.textMuted, fontSize: 13 },
+  vacio: { color: P.textFaint, fontSize: 13, paddingVertical: 2 },
 
-  jugador: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarTxt: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' },
-  jugadorNombre: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
-  etiquetaFila: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
-  etiqueta: { color: colors.textMuted, fontSize: 11, flexShrink: 1 },
+  jugador: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 6 },
+  jugadorNombre: { color: P.textStrong, fontSize: 14, fontWeight: '600' },
+  etiquetaFila: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  etiqueta: { color: P.textMuted, fontSize: 11, flexShrink: 1 },
 
-  accionesFila: { flexDirection: 'row', gap: 4 },
-  // 40 px: el mínimo cómodo para tocar sin apuntar.
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
-  },
+  accionesFila: { flexDirection: 'row', gap: 6 },
 
   accionBtn: { marginTop: 8 },
-  motivo: { color: colors.textMuted, fontSize: 13, textAlign: 'center', marginTop: 12 },
+  motivo: { color: P.textMuted, fontSize: 13, textAlign: 'center', marginTop: 12, lineHeight: 18 },
 });
