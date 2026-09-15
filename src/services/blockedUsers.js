@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { buildBlockedUsersSelect } from '../utils/blockedUsersQuery';
 
 /**
  * Bloqueo de usuarios (tabla blocked_users, migración 51).
@@ -92,12 +93,13 @@ export async function isBlockedByMe(userId) {
 export async function listBlockedUsers() {
   if (!isSupabaseConfigured) return { data: [], error: null };
 
+  // El `select` se arma en `utils/blockedUsersQuery.js`, que es puro y está
+  // probado contra el esquema versionado: pedir acá una columna inventada
+  // —`profiles.nombre`, la piedra con la que este repo ya tropezó tres veces—
+  // no deja la lista sin ese dato, la tumba entera con 400 y 42703.
   const { data, error } = await supabase
     .from('blocked_users')
-    .select(
-      'id, blocked_id, created_at, ' +
-        'profile:profiles!blocked_users_blocked_id_fkey(id, username, nombre, foto_url)'
-    )
+    .select(buildBlockedUsersSelect())
     .order('created_at', { ascending: false });
 
   if (error) {
