@@ -18,6 +18,11 @@ import { comoSolicitud } from '../utils/solicitudRecinto';
  *
  * NO HAY MODO DEMO. Sin Supabase configurado esto no finge que se mandó: una
  * solicitud que nadie recibió es peor que un error.
+ *
+ * LAS FOTOS NO PASAN POR ACÁ. Se suben al elegirlas (`uploadFotoSolicitud`) y
+ * lo que viaja en el formulario son sus RUTAS. Así el envío no queda esperando
+ * seis subidas, y una foto que falla se reintenta sola sin volver a llenar
+ * nada — ver la migración 110 para por qué se guarda la ruta y no una URL.
  */
 
 const SIN_CONFIG = { data: null, error: { message: 'Sin conexión a la base' } };
@@ -59,6 +64,9 @@ export async function enviarSolicitudRecinto(form) {
     p_telefono: payload.telefono,
     p_correo: payload.correo,
     p_mensaje: payload.mensaje,
+    p_n_canchas: payload.nCanchas,
+    p_fotos: payload.fotos,
+    p_servicios: payload.servicios,
   });
 
   if (error) {

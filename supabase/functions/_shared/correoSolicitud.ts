@@ -22,7 +22,14 @@ export type ConfigCorreo = {
   desde: string;
 };
 
-/** La solicitud tal como la devuelve `solicitudes_recinto`. */
+/**
+ * La solicitud tal como la devuelve `solicitudes_recinto`.
+ *
+ * Los tres campos de la migración 110 son OPCIONALES en el tipo, no por
+ * comodidad: las solicitudes anteriores a esa migración no los tienen, y una
+ * app vieja tampoco los manda. El cuerpo del correo lo dice en vez de dejar un
+ * hueco que se lea como «no tiene canchas».
+ */
 export type Solicitud = {
   id: string;
   nombre_recinto: string;
@@ -32,6 +39,9 @@ export type Solicitud = {
   telefono: string;
   correo: string;
   mensaje: string | null;
+  n_canchas?: number | null;
+  servicios?: string[] | null;
+  fotos?: string[] | null;
   created_at?: string | null;
 };
 
@@ -64,17 +74,39 @@ export function asuntoDeSolicitud(s: Solicitud): string {
   return `Nuevo recinto: ${s.nombre_recinto} (${s.comuna})`;
 }
 
-// Un correo que va a una bandeja del equipo no necesita HTML: lo que importa
-// es poder copiar el teléfono y la dirección de un tirón.
-export function cuerpoDeSolicitud(s: Solicitud): string {
+// Los servicios se escriben con la clave del catálogo y solo se le sacan los
+// guiones bajos. Traducirlos a «Arriendo de balón» obligaría a mantener el
+// catálogo de la 75 en un TERCER lugar —el CHECK de Postgres, `serviciosRecinto.js`
+// y acá— y lo que se gana es que un correo interno se lea un poco más lindo.
+const legible = (clave: string) => clave.replace(/_/g, " ");
+
+/**
+ * El cuerpo del correo al equipo.
+ *
+ * `enlaces` son las URL FIRMADAS de las fotos, que arma quien llama: el bucket
+ * es privado (migración 110) y la fila solo guarda la ruta, así que acá no hay
+ * forma de construirlas — y tampoco debería haberla, porque firmar necesita la
+ * clave de servicio y esta función es pura a propósito.
+ *
+ * Un correo que va a una bandeja del equipo no necesita HTML: lo que importa
+ * es poder copiar el teléfono y la dirección de un tirón.
+ */
+export function cuerpoDeSolicitud(s: Solicitud, enlaces: string[] = []): string {
+  const servicios = (s.servicios ?? []).map(legible);
   return [
     `Recinto:   ${s.nombre_recinto}`,
     `Dirección: ${s.direccion}, ${s.comuna}`,
+    `Canchas:   ${s.n_canchas ?? "no lo dijo"}`,
     `Dueño:     ${s.nombre_dueno}`,
     `Teléfono:  ${s.telefono}`,
     `Correo:    ${s.correo}`,
+    `Servicios: ${servicios.length ? servicios.join(", ") : "no marcó ninguno"}`,
     "",
     s.mensaje ? `Nos cuenta:\n${s.mensaje}` : "No dejó un mensaje.",
+    "",
+    enlaces.length
+      ? `Fotos (${enlaces.length}, los enlaces vencen en 7 días):\n${enlaces.join("\n")}`
+      : "No adjuntó fotos.",
     "",
     `Solicitud ${s.id}`,
   ].join("\n");
@@ -86,7 +118,11 @@ export function cuerpoDeSolicitud(s: Solicitud): string {
  * Un fallo del proveedor no puede voltear la solicitud: ya está guardada, y
  * lo único que se pierde es el aviso inmediato.
  */
-export async function enviarCorreo(config: ConfigCorreo, s: Solicitud): Promise<boolean> {
+export async function enviarCorreo(
+  config: ConfigCorreo,
+  s: Solicitud,
+  enlaces: string[] = [],
+): Promise<boolean> {
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -99,7 +135,7 @@ export async function enviarCorreo(config: ConfigCorreo, s: Solicitud): Promise<
         to: config.para,
         reply_to: s.correo,
         subject: asuntoDeSolicitud(s),
-        text: cuerpoDeSolicitud(s),
+        text: cuerpoDeSolicitud(s, enlaces),
       }),
     });
     if (!res.ok) {

@@ -61,6 +61,47 @@ Deno.test("el cuerpo trae todo lo que hace falta para llamar", () => {
   assertEquals(cuerpo.includes("11111111-1111-1111-1111-111111111111"), true);
 });
 
+Deno.test("el cuerpo trae las canchas y los servicios (migración 110)", () => {
+  const cuerpo = cuerpoDeSolicitud({
+    ...SOLICITUD,
+    n_canchas: 6,
+    servicios: ["estacionamiento", "arriendo_balon"],
+  });
+  assertEquals(cuerpo.includes("Canchas:   6"), true);
+  // Solo se le sacan los guiones bajos: traducir obligaría a mantener el
+  // catálogo de la 75 en un tercer lugar.
+  assertEquals(cuerpo.includes("estacionamiento, arriendo balon"), true);
+});
+
+Deno.test("una solicitud vieja no deja huecos que se lean como un cero", () => {
+  // Las anteriores a la 110 no tienen ninguno de los tres campos, y una app
+  // vieja tampoco los manda: el correo lo dice con palabras.
+  const cuerpo = cuerpoDeSolicitud(SOLICITUD);
+  assertEquals(cuerpo.includes("Canchas:   no lo dijo"), true);
+  assertEquals(cuerpo.includes("Servicios: no marcó ninguno"), true);
+  assertEquals(cuerpo.includes("No adjuntó fotos."), true);
+});
+
+Deno.test("las fotos van como enlace firmado, no adjuntas", () => {
+  // Adjuntarlas engordaría el correo hasta los 30 MB y un recinto con seis
+  // fotos no llegaría a la bandeja.
+  const cuerpo = cuerpoDeSolicitud(
+    { ...SOLICITUD, fotos: ["uid/a.jpg", "uid/b.jpg"] },
+    ["https://firmada/a", "https://firmada/b"],
+  );
+  assertEquals(cuerpo.includes("Fotos (2, los enlaces vencen en 7 días):"), true);
+  assertEquals(cuerpo.includes("https://firmada/a"), true);
+  assertEquals(cuerpo.includes("https://firmada/b"), true);
+});
+
+Deno.test("si no se pudo firmar ningún enlace, el correo sale igual", () => {
+  // Un enlace que no se pudo firmar no puede voltear el aviso: el equipo ve
+  // las fotos desde Supabase, que es donde están.
+  const cuerpo = cuerpoDeSolicitud({ ...SOLICITUD, fotos: ["uid/a.jpg"] }, []);
+  assertEquals(cuerpo.includes("No adjuntó fotos."), true);
+  assertEquals(cuerpo.includes("11111111-1111-1111-1111-111111111111"), true);
+});
+
 Deno.test("sin mensaje lo dice, en vez de dejar un hueco", () => {
   assertEquals(cuerpoDeSolicitud(SOLICITUD).includes("No dejó un mensaje."), true);
   assertEquals(

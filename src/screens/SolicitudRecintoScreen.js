@@ -1,13 +1,17 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image, Pressable,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, AlertTriangle, CheckCircle2, Lock } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle, CheckCircle2, Lock, ImagePlus, X } from 'lucide-react-native';
 
-import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
-import { Card, IconButton, Button, NoticeCard, StickyFooter } from '../components/reservas/ui';
+import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { Card, IconButton, Button, NoticeCard, StickyFooter, Chip } from '../components/reservas/ui';
 import { FieldLabel, TextField } from '../components/reservas/recintoUi';
-import { camposFaltantes } from '../utils/solicitudRecinto';
+import { camposFaltantes, MAX_FOTOS, MAX_CANCHAS } from '../utils/solicitudRecinto';
+import { SERVICIOS } from '../utils/serviciosRecinto';
 import { enviarSolicitudRecinto } from '../services/solicitudRecinto';
+import { pickImages, uploadFotoSolicitud, removeFotoSolicitudFile } from '../services/storage';
 
 /**
  * «Suma tu recinto»: el formulario con que el dueño de un complejo pide
@@ -22,25 +26,102 @@ import { enviarSolicitudRecinto } from '../services/solicitudRecinto';
  * correo a medio escribir es regañar a alguien que todavía no termina. Y el
  * botón queda ENCENDIDO aunque falte algo, para que al apretarlo pueda decir
  * qué falta: un botón apagado sin explicación es la peor de las dos.
+ *
+ * LAS FOTOS SE SUBEN AL ELEGIRLAS y no al mandar el formulario (migración
+ * 110). Así se ven de inmediato, quitarlas borra el archivo de verdad, y
+ * apretar «Mandar mi solicitud» no queda esperando seis subidas. Lo que viaja
+ * en el envío son las RUTAS, no las imágenes.
+ *
+ * Y POR ESO SE LIMPIAN AL SALIR: si alguien sube fotos y se arrepiente, los
+ * archivos no pueden quedar en el bucket sin ninguna solicitud que los
+ * mencione. Se borran al desmontar la pantalla, salvo que la solicitud se haya
+ * mandado — ahí son justamente lo que el equipo va a mirar.
  */
 export default function SolicitudRecintoScreen({ navigation }) {
   const [form, setForm] = useState({
     nombreRecinto: '',
     direccion: '',
     comuna: '',
+    nCanchas: '',
     nombreDueno: '',
     telefono: '',
     correo: '',
     mensaje: '',
+    fotos: [],      // { path, uri }: la ruta viaja, la uri es la copia local
+    servicios: [],  // claves del catálogo de la 75
   });
   const [intentado, setIntentado] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState(null);
   const [enviada, setEnviada] = useState(null);
 
   const campo = (clave) => (valor) => {
     setForm((f) => ({ ...f, [clave]: valor }));
     setError(null);
+  };
+
+  // Las refs son para poder limpiar al desmontar sin volver a montar el efecto
+  // en cada tecla: el efecto de limpieza corre una sola vez, al salir, y ahí
+  // necesita el ÚLTIMO estado, no el que había cuando se montó.
+  const fotosRef = useRef([]);
+  const enviadaRef = useRef(false);
+  useEffect(() => { fotosRef.current = form.fotos; }, [form.fotos]);
+  useEffect(() => { enviadaRef.current = !!enviada; }, [enviada]);
+  useEffect(() => () => {
+    if (enviadaRef.current) return;
+    fotosRef.current.forEach((f) => removeFotoSolicitudFile(f.path));
+  }, []);
+
+  const alternarServicio = (clave) => {
+    setForm((f) => ({
+      ...f,
+      servicios: f.servicios.includes(clave)
+        ? f.servicios.filter((c) => c !== clave)
+        : [...f.servicios, clave],
+    }));
+  };
+
+  /**
+   * Varias fotos de una vez, y nunca más de las que faltan para el tope: el
+   * servidor rechaza la solicitud ENTERA si llegan siete, y esa negativa
+   * después de llenar todo el formulario sería la peor forma de enterarse.
+   */
+  const agregarFotos = async () => {
+    const restantes = MAX_FOTOS - form.fotos.length;
+    if (restantes <= 0) return;
+
+    const { ok, assets, reason } = await pickImages({
+      quality: 0.8,
+      selectionLimit: restantes,
+      base64: false,
+    });
+    if (!ok) {
+      // Cancelar no es un error que mostrar: es alguien que se arrepintió.
+      if (reason && reason !== 'Cancelado') setError(reason);
+      return;
+    }
+
+    setSubiendo(true);
+    setError(null);
+    // De a una y en orden: una falla corta el resto en vez de dejar huecos, y
+    // las que ya subieron se conservan — no hay que volver a elegirlas.
+    const subidas = [];
+    let falla = null;
+    for (const asset of assets.slice(0, restantes)) {
+      const { path, uri, error: err } = await uploadFotoSolicitud(asset);
+      if (err) { falla = err.message; break; }
+      subidas.push({ path, uri });
+    }
+    if (subidas.length) setForm((f) => ({ ...f, fotos: [...f.fotos, ...subidas] }));
+    if (falla) setError(falla);
+    setSubiendo(false);
+  };
+
+  /** Quitarla la borra del bucket: si no, quedaría un archivo que nadie mira. */
+  const quitarFoto = (foto) => {
+    setForm((f) => ({ ...f, fotos: f.fotos.filter((x) => x.path !== foto.path) }));
+    removeFotoSolicitudFile(foto.path);
   };
 
   const faltantes = useMemo(() => camposFaltantes(form), [form]);
@@ -142,6 +223,23 @@ export default function SolicitudRecintoScreen({ navigation }) {
                   />
                   {falla('comuna') ? <Text style={styles.errorCampo}>Falta la comuna.</Text> : null}
                 </View>
+                <View>
+                  <FieldLabel>Cuántas canchas</FieldLabel>
+                  <TextField
+                    value={form.nCanchas}
+                    onChangeText={campo('nCanchas')}
+                    placeholder="6"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Text style={styles.ayuda}>
+                    Las que se pueden arrendar a la vez. Es lo primero que miramos para saber si
+                    alcanzamos a cargarte ahora.
+                  </Text>
+                  {falla('nCanchas') ? (
+                    <Text style={styles.errorCampo}>Un número entre 1 y {MAX_CANCHAS}.</Text>
+                  ) : null}
+                </View>
               </View>
             </Card>
 
@@ -190,18 +288,82 @@ export default function SolicitudRecintoScreen({ navigation }) {
             </Card>
 
             <Card>
+              <FieldLabel marca="opcional">Qué más ofrece tu recinto</FieldLabel>
+              <Text style={styles.ayuda}>
+                Toca lo que tengas. Es la misma lista que después se ve en tu ficha, así que lo
+                que marques acá no hay que volver a marcarlo cuando carguemos el recinto.
+              </Text>
+              <View style={styles.serviciosGrid}>
+                {SERVICIOS.map((sv) => (
+                  <Chip
+                    key={sv.clave}
+                    label={sv.nombre}
+                    active={form.servicios.includes(sv.clave)}
+                    onPress={() => alternarServicio(sv.clave)}
+                  />
+                ))}
+              </View>
+            </Card>
+
+            <Card>
+              <FieldLabel marca="opcional">Fotos del recinto</FieldLabel>
+              <Text style={styles.ayuda}>
+                Hasta {MAX_FOTOS}. Las canchas, los camarines, cómo se ve de noche: con verlas nos
+                ahorramos media primera llamada. Las vemos solo nosotros y no se publican.
+              </Text>
+
+              {form.fotos.length ? (
+                <View style={styles.fotosGrid}>
+                  {form.fotos.map((f, i) => (
+                    <View key={f.path} style={styles.fotoItem}>
+                      <Image
+                        source={{ uri: f.uri }}
+                        style={styles.foto}
+                        resizeMode="cover"
+                        accessibilityLabel={`Foto ${i + 1} de tu recinto`}
+                      />
+                      <Pressable
+                        onPress={() => quitarFoto(f)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Quitar la foto ${i + 1}`}
+                        hitSlop={8}
+                        style={({ pressed }) => [styles.fotoQuitar, pressed && { opacity: 0.8 }]}
+                      >
+                        <X color={C.textPrimary} size={13} strokeWidth={2.6} />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              <Button
+                label={
+                  form.fotos.length >= MAX_FOTOS
+                    ? `Ya tienes ${MAX_FOTOS} fotos`
+                    : (form.fotos.length ? 'Agregar otra foto' : 'Agregar fotos')
+                }
+                variant="secondary"
+                icon={ImagePlus}
+                loading={subiendo}
+                disabled={form.fotos.length >= MAX_FOTOS}
+                onPress={agregarFotos}
+                style={{ marginTop: 13 }}
+              />
+            </Card>
+
+            <Card>
               <FieldLabel marca="opcional">Cuéntanos de tu recinto</FieldLabel>
               <TextField
                 value={form.mensaje}
                 onChangeText={campo('mensaje')}
-                placeholder="Seis canchas de fútbol 7, abrimos de 11:00 a 22:00 todos los días, tenemos estacionamiento y camarines."
+                placeholder="Son de fútbol 7 con pasto sintético, abrimos de 11:00 a 22:00 todos los días y tenemos dos canchas techadas."
                 multiline
                 maxLength={1000}
                 contador
               />
               <Text style={styles.ayuda}>
-                Cuántas canchas tienes, de qué tipo, en qué horario atiendes. Nos ahorra la mitad de la
-                primera llamada, pero puedes dejarlo en blanco.
+                De qué tipo son las canchas, en qué horario atiendes, lo que no cabe en lo de arriba.
+                Puedes dejarlo en blanco.
               </Text>
             </Card>
 
@@ -240,6 +402,24 @@ const styles = StyleSheet.create({
   seccion: { fontFamily: F.extraBold, fontSize: 15, color: C.textPrimary },
   ayuda: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary, lineHeight: 16.5, marginTop: 7 },
   errorCampo: { fontFamily: F.semiBold, fontSize: 11.5, color: C.red, marginTop: 6 },
+
+  serviciosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 13 },
+
+  fotosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 13 },
+  // Tres por fila con 8 de separación: 31% deja el margen justo sin tener que
+  // medir el ancho de la pantalla. Cuadradas y no apaisadas como la galería de
+  // la ficha: acá no se recorta nada, el equipo mira la foto completa.
+  fotoItem: { width: '31%', aspectRatio: 1 },
+  foto: {
+    width: '100%', height: '100%', borderRadius: R.cardSm,
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
+  fotoQuitar: {
+    position: 'absolute', top: 5, right: 5,
+    width: 22, height: 22, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(8,10,8,0.86)', borderWidth: 1, borderColor: C.border,
+  },
 
   privacidad: { flexDirection: 'row', gap: 6, marginTop: 14 },
   privacidadTexto: { flex: 1, fontFamily: F.medium, fontSize: 11, color: C.textSecondary, lineHeight: 15.5 },

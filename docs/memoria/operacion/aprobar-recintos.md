@@ -6,9 +6,27 @@ Cómo se pasa de «alguien quiere sumar su complejo» a «su recinto está en el
 
 ## 1. Habilitar a alguien para crear su recinto
 
-Llega una fila a `solicitudes_recinto` (la manda la persona desde la app, pestaña Reservas → «Quiero sumar mi recinto»). Trae nombre del recinto, dirección, comuna, nombre del dueño, teléfono y correo.
+Llega una fila a `solicitudes_recinto` (la manda la persona desde la app, pestaña Reservas → «Quiero sumar mi recinto»). Trae nombre del recinto, dirección, comuna, nombre del dueño, teléfono, correo y —desde la migración 110— **cuántas canchas tiene, hasta seis fotos y los servicios que ofrece**.
 
-Lo que hay que mirar antes de aprobar es lo que no está en la tabla: que el complejo exista, que quien escribe tenga que ver con él, y que vaya a trabajar en serio. Eso es una llamada, no una consulta.
+**Las fotos están en el bucket privado `solicitud-fotos`** y la columna `fotos` guarda su RUTA, no una URL: se miran desde Supabase → Storage, o por el enlace firmado que trae el correo del aviso (vence a los 7 días). No son públicas porque el recinto todavía no entró.
+
+**Los servicios usan el mismo catálogo cerrado que `complejo_servicios`**, así que al cargar el recinto se copian tal cual:
+
+```sql
+-- Con el complejo ya creado, copia lo que marcó el dueño en su solicitud.
+-- Va directo a la tabla y no por `admin_actualizar_servicios`: esa RPC exige
+-- `auth.uid()` y ser administrador del complejo, y en el editor de SQL no hay
+-- sesión. Desde ahí se escribe como postgres, que no pasa por la RLS.
+insert into public.complejo_servicios (complejo_id, servicio)
+select '<complejo_id>', s
+  from public.solicitudes_recinto sr, unnest(sr.servicios) as s
+ where sr.id = '<solicitud_id>'
+    on conflict (complejo_id, servicio) do nothing;
+```
+
+Los tres campos **pueden venir vacíos**: las solicitudes anteriores a la 110 no los tienen, y una app vieja tampoco los manda. `n_canchas` en `null` significa «no lo dijo», no «cero».
+
+Lo que hay que mirar antes de aprobar sigue siendo lo que no está en la tabla: que el complejo exista, que quien escribe tenga que ver con él, y que vaya a trabajar en serio. Eso es una llamada, no una consulta.
 
 ```sql
 -- Reemplaza el id por el de la solicitud.

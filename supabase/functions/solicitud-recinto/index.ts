@@ -65,6 +65,9 @@ Deno.serve(async (req) => {
     p_telefono: cuerpo?.telefono ?? null,
     p_correo: cuerpo?.correo ?? null,
     p_mensaje: cuerpo?.mensaje ?? null,
+    p_n_canchas: cuerpo?.nCanchas ?? null,
+    p_fotos: cuerpo?.fotos ?? null,
+    p_servicios: cuerpo?.servicios ?? null,
   });
 
   if (error) {
@@ -95,7 +98,10 @@ Deno.serve(async (req) => {
   const admin = createClient(url, servicio);
   const { data: fila, error: eFila } = await admin
     .from("solicitudes_recinto")
-    .select("id, nombre_recinto, direccion, comuna, nombre_dueno, telefono, correo, mensaje, created_at, avisada_at")
+    .select(
+      "id, nombre_recinto, direccion, comuna, nombre_dueno, telefono, correo, mensaje, " +
+        "n_canchas, fotos, servicios, created_at, avisada_at",
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -108,7 +114,22 @@ Deno.serve(async (req) => {
   // de nuevo no puede llenar la bandeja del equipo.
   if (fila.avisada_at) return json({ ok: true, id, reusada, avisada: true });
 
-  const salio = await enviarCorreo(config, fila as Solicitud);
+  // Un enlace que no se pudo firmar no puede voltear el aviso: se manda el
+  // correo con las fotos que sí se pudieron firmar —o con ninguna— y el equipo
+  // las ve igual desde Supabase, que es donde están.
+  const rutas: string[] = (fila as { fotos?: string[] | null }).fotos ?? [];
+  let enlaces: string[] = [];
+  if (rutas.length > 0) {
+    const { data: firmadas, error: eFirma } = await admin.storage
+      .from("solicitud-fotos")
+      .createSignedUrls(rutas, 60 * 60 * 24 * 7);
+    if (eFirma) console.error("[solicitud-recinto] no se pudieron firmar las fotos:", eFirma);
+    enlaces = (firmadas ?? [])
+      .map((f) => f.signedUrl)
+      .filter((u): u is string => typeof u === "string" && u.length > 0);
+  }
+
+  const salio = await enviarCorreo(config, fila as Solicitud, enlaces);
   if (salio) {
     const { error: eSello } = await admin
       .from("solicitudes_recinto")

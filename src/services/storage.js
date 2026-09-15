@@ -505,3 +505,52 @@ export async function uploadFotoCancha(complejoId, canchaId, asset, { posicion =
 
 /** Borra un archivo del bucket `complejo-fotos` por su path. */
 export const removeComplejoFotoFile = (path) => removeFromBucket('complejo-fotos', path);
+
+/**
+ * Sube una foto de una SOLICITUD de recinto al bucket `solicitud-fotos`
+ * (migración 110), en `<userId>/<marca>.<ext>`.
+ *
+ * DEVUELVE LA RUTA Y NO UNA URL, y es la diferencia de fondo con
+ * `uploadFotoGaleria`. Ese bucket es público porque su foto es lo primero que
+ * se ve en el buscador; este es PRIVADO, porque son fotos de un recinto que
+ * todavía no acepta nada y que quizá nunca entre: son para que el equipo
+ * decida, no para publicarlas. Con la ruta guardada, el enlace para mirarlas
+ * se firma cuando hace falta y vence solo.
+ *
+ * LA PRIMERA CARPETA ES EL uid, que es justo lo que miran las tres políticas
+ * del bucket y lo que vuelve a comprobar `crear_solicitud_recinto`: no hay
+ * forma de que una solicitud termine llevando la foto de otra persona.
+ *
+ * NO SE REDIMENSIONA A UNA PROPORCIÓN FIJA, al revés que la portada: al equipo
+ * le sirve ver el recinto entero, no un recorte apaisado. Solo se achica lo
+ * que no cabe en el límite de 5 MB del bucket.
+ */
+export async function uploadFotoSolicitud(asset) {
+  if (!isSupabaseConfigured) return { error: { message: 'Sin conexión a la base' } };
+  if (!asset) return { error: { message: 'Falta la imagen' } };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: 'Inicia sesión para adjuntar fotos.' } };
+
+  const processed = await resizeAndCompress(asset, { maxDimension: 1600 });
+  const ext = extFromAsset(processed);
+  const marca = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const path = `${user.id}/${marca}.${ext}`;
+  const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const body = await getUploadBody(processed);
+  const { error } = await supabase.storage
+    .from('solicitud-fotos')
+    .upload(path, body, { contentType, cacheControl: '3600' });
+  if (error) {
+    console.error('[FutFinder] uploadFotoSolicitud:', error);
+    return { error: { message: 'No pudimos subir la foto. Inténtalo de nuevo.' } };
+  }
+
+  // La copia local es la que se muestra mientras se llena el formulario: el
+  // bucket es privado, así que no hay URL pública que mirar.
+  return { path, uri: processed.uri || asset.uri };
+}
+
+/** Borra una foto de una solicitud por su ruta. */
+export const removeFotoSolicitudFile = (path) => removeFromBucket('solicitud-fotos', path);
