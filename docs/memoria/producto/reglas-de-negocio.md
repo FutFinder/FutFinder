@@ -43,7 +43,8 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 - **Nadie edita su propio puntaje.** Desde la migración 102, `profiles` no tiene UPDATE abierto: los permisos son por columna y dejan fuera `trust_score`, `partidos_jugados`, `asistencias_confirmadas`, `mvps`, los promedios de rating, `estado` y `suspended_until`. Esas columnas solo cambian desde las operaciones del servidor.
 - Confirmar presencia por GPS suma 1 punto, con tope de 100, y registra una asistencia confirmada.
 - Al registrar asistencia, el organizador puede marcar presente o ausente: una presencia no confirmada previamente por GPS suma 2 puntos; una ausencia resta 15. La operación evita repetir ese efecto si el estado no cambia.
-- Las salidas y cancelaciones usan una ventana sin penalización de 2 horas; las penalizaciones vigentes se consultan en la fuente central de reglas antes de modificar esta política.
+- Salirse de un partido **siempre cuesta**: 3 puntos con más de 2 horas de anticipación y 20 después (`leave_match_penalized`). Las 2 horas separan la sanción leve de la grave; no son una ventana gratis, y los textos de la app dicen los puntos que se cobran. Cancelar como organizador cuesta 15 y 25 con el mismo corte.
+- El chat de un partido es para el organizador y los inscritos: una solicitud pendiente todavía no lo abre y un partido cancelado lo deja en solo lectura (`accesoAlChatDelPartido`).
 
 ## Estados de partidos y asistencia
 
@@ -52,6 +53,7 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 - **Las reglas de ingreso se exigen en el servidor, no en la pantalla** (migración 103). `join_match` rechaza los partidos con `aprobacion = 'manual'` —ese camino es `request_join`— y el rango de edad se comprueba al inscribir, al solicitar, al aprobar y en el trigger `tg_enforce_join_rules`. Política explícita de la edad: **un perfil sin edad no queda fuera**, porque no se puede demostrar que incumple; el día que la edad sea obligatoria, la regla se endurece en `edad_fuera_de_rango()`.
 - `approve_join` comprueba el estado y la hora del partido dentro del bloqueo de fila: no se acepta a nadie en un partido cancelado ni después de su hora de inicio.
 - **Los cupos son las plazas para OTROS jugadores: el organizador está en `attendees` pero no ocupa una.** La guarda `matches_guard_cupos` lo excluye (salvo en partidos entre clubes, donde el organizador es un administrador del club rival y sí puede jugar) y, desde la migración 104, **deduce** `cupos_disponibles` de la nómina vigente en lugar de aceptar el conteo que manda el cliente.
+- `abierto` y `lleno` se deducen juntos con la disponibilidad: ampliar los cupos de un partido lleno vuelve a abrirlo, sin que nadie tenga que acordarse de cambiar el estado.
 - Un partido que ocupa la hora del jugador es el que está `abierto`, `lleno` o `en_curso`: ese conjunto vive en `estados_que_ocupan_horario()` y lo usan por igual la consulta (`get_schedule_conflict`) y la escritura (el trigger de elegibilidad).
 - El organizador solo puede guardar asistencia después de que termine el partido y hasta 72 horas después de su hora de término; al guardarla, el partido queda `finalizado`, salvo si ya estaba cancelado o finalizado. **Esto vale sólo para los partidos normales:** desde la migración 50, un partido nacido de una propuesta entre clubes rechaza `save_match_attendance()` y `cancel_match()`, porque su asistencia viaja con el resultado y su cierre lo firma el club contrario.
 
@@ -59,12 +61,15 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 
 - El radio máximo es de 200 metros respecto de las coordenadas de la cancha.
 - La fuente temporal para la validación es `now()` de PostgreSQL, comparada con la hora y duración del partido: abre 30 minutos antes y cierra 30 minutos después del término calculado. No se valida con la hora del dispositivo.
+- La ventana se ofrece completa en la app: el botón aparece desde 30 minutos antes y no solo «durante el partido» (`ventanaGps`/`enVentanaGps` en `matchRules`).
 - **Estar en la cancha a la hora no convierte a nadie en jugador del partido.** Confirmar exige una inscripción válida (`inscrito`) y un partido en pie: una solicitud `pendiente` ya no se confirma sola, y un partido cancelado no reparte asistencias ni Trust Score.
 
 ## Lista de espera
 
 - Solo se permite entrar a la cola de un partido abierto o lleno que aún no comienza y para el que el jugador cumple los mismos requisitos de elegibilidad.
-- El orden es de llegada (`created_at`). Cuando se pasa de cero cupos disponibles a uno o más, un trigger avisa al primer integrante aún no avisado y le asigna 30 minutos para confirmar.
+- El orden es de llegada (`created_at`). Al liberarse cupos se avisa a **tantos de la cola como cupos haya** —antes siempre a uno— y cada avisado tiene 30 minutos (`confirmar_antes_de`).
+- **El turno reserva el cupo de verdad** (migración 105): mientras el plazo corra, `join_match` y el trigger de elegibilidad rechazan a cualquier otro con `CUPO_RESERVADO`. La aprobación del organizador (`approve_join`) es la excepción: es su nómina.
+- El plazo vence solo. `barrer_lista_de_espera()` corre cada 5 minutos: al vencido se le avisa, pierde su lugar en la cola —puede volver a entrar— y el turno pasa al siguiente. Salir de la cola con el turno en la mano también despierta al siguiente.
 - Salir de la lista no modifica el Trust Score. Al unirse al partido, el jugador sale automáticamente de su entrada en la cola.
 
 ## Rutas de código relacionadas
