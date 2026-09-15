@@ -12,6 +12,7 @@ Auth de Supabase define la identidad; `AuthProvider` y `withAuthGuard` evitan mo
 
 ## Reglas aplicadas en backend
 
+- **Reputación del perfil (migración 102, verificada el 2026-09-15):** `authenticated` solo puede actualizar los 25 campos editables que usa `updateMyProfile`, incluido `updated_at`; `anon` no tiene permisos de actualización. Trust Score, estadísticas, sanciones, identidad y fecha de creación quedan fuera. `profiles_update_self` limita además las filas al perfil propio. Las RPC `security definer` conservan la escritura necesaria para aplicar reputación; no se debe volver a conceder `UPDATE` sobre toda la tabla. La regresión `supabase/tests/profiles_reputacion_protegida_test.sql` verifica ambas restricciones y que una salida legítima siga descontando puntos.
 - Perfiles, partidos, asistentes, clubes, membresías, solicitudes, galerías, reportes, lectura/silencio de chat y tickets de push tienen políticas versionadas. Los tickets no exponen políticas al cliente.
 - Las solicitudes de amistad se rechazan en RLS si el destinatario eligió no recibirlas; la visibilidad en búsqueda se filtra desde la consulta de perfiles.
 - Chat: los DM requieren amistad aceptada o la excepción de administradores de clubes con desafío aceptado; grupos de partido requieren asistencia inscrita o GPS confirmada y chats de club requieren membresía. Las funciones auxiliares son `SECURITY INVOKER`, con lo que no revelan relaciones a terceros.
