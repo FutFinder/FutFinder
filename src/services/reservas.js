@@ -192,6 +192,10 @@ export async function getDisponibilidad(canchaId, fechaIso) {
     horaFin: s.hora_fin,
     precio: s.precio,
     disponible: !!s.disponible,
+    // «Ya pasó» y «alguien la tomó» llegaban iguales (`disponible: false`),
+    // así que a las 23:30 la grilla mostraba la jornada entera como
+    // «Reservada» sin que nadie hubiera reservado nada (migración 96).
+    pasada: !!s.pasada,
   }));
   return { data: { horas }, error: null };
 }

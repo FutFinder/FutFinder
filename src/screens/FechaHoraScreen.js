@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Clock } from 'lucide-react-native';
 
 import { reservas as C, reservasFonts as F } from '../theme/colors';
-import { IconButton, StickyFooter, SlotHora } from '../components/reservas/ui';
+import { IconButton, StickyFooter, SlotHora, NoticeCard } from '../components/reservas/ui';
 import { getComplejoById, getDisponibilidad } from '../services/reservas';
 import { formatCLP, buildFechaOptions, fechaLabel, addMinutesToHora } from '../services/reservasRules';
 
@@ -14,6 +14,9 @@ export default function FechaHoraScreen({ navigation, route }) {
   const { complejoId, canchaId } = route.params || {};
   const [complejo, setComplejo] = useState(null);
   const [horas, setHoras] = useState([]);
+  // Distingue «este día no tiene horario» de «hoy ya se acabó»: son dos
+  // pantallas vacías por motivos muy distintos.
+  const [todasPasaron, setTodasPasaron] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fechas = useMemo(() => buildFechaOptions(), []);
@@ -30,8 +33,14 @@ export default function FechaHoraScreen({ navigation, route }) {
       getDisponibilidad(canchaId, fechas[fechaIdx].iso),
     ]);
     setComplejo(c);
-    setHoras(disp?.horas || []);
-    const primeraDisponible = (disp?.horas || []).findIndex((h) => h.disponible);
+    // LAS HORAS QUE YA PASARON NO SE MUESTRAN. Mostrarlas tachadas sería
+    // media pantalla de ruido sobre algo que nadie puede elegir, y con la
+    // etiqueta de no-disponible parecería que el recinto está copado
+    // cuando en realidad el día se acabó (migración 96).
+    const delDia = (disp?.horas || []).filter((h) => !h.pasada);
+    setHoras(delDia);
+    setTodasPasaron((disp?.horas || []).length > 0 && delDia.length === 0);
+    const primeraDisponible = delDia.findIndex((h) => h.disponible);
     setHoraIdx(primeraDisponible >= 0 ? primeraDisponible : null);
     setLoading(false);
   }, [complejoId, canchaId, fechas, fechaIdx]);
@@ -86,8 +95,18 @@ export default function FechaHoraScreen({ navigation, route }) {
 
         <View style={styles.rowBetween}>
           <Text style={styles.sectionLabel}>HORARIOS DISPONIBLES</Text>
-          <Text style={styles.dispCount}>{dispCount} de {horas.length} libres</Text>
+          {horas.length > 0 ? (
+            <Text style={styles.dispCount}>{dispCount} de {horas.length} libres</Text>
+          ) : null}
         </View>
+
+        {todasPasaron ? (
+          <View style={{ marginTop: 6 }}>
+            <NoticeCard tone="info" icon={Clock}>
+              Por hoy ya no quedan horas. Elige otro día arriba.
+            </NoticeCard>
+          </View>
+        ) : null}
 
         <View style={styles.slotsGrid}>
           {horas.map((h, i) => (
