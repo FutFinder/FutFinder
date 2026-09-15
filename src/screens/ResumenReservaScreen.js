@@ -108,16 +108,24 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const continuar = async () => {
     setCreando(true);
     setToast(null);
-    const divide = modalidad === 'jugadores';
+    // OJO: `modalidad` es la elegida, y 'completa' NO divide. Acá había una
+    // segunda copia de esta cuenta que solo miraba 'jugadores', así que
+    // elegir capitanes creaba una reserva COMPLETA con tarjeta y mandaba a
+    // la pasarela. Dos definiciones de lo mismo en el mismo archivo: la de
+    // arriba se corrigió y esta se quedó atrás.
+    const divide = modalidad !== 'completa';
     const { data, error } = await crearReserva({
       canchaId,
       fecha,
       horaInicio,
       // Dividir exige Balance y pagar solo va por tarjeta: son dos caminos
       // completos, no una casilla que se marca sobre el mismo.
-      modalidad: divide ? 'jugadores' : 'completa',
+      modalidad: divide ? modalidad : 'completa',
       medioPago: divide ? 'balance' : 'tarjeta',
-      nJugadores: divide ? reparto.n : null,
+      // `n_jugadores` es solo de la modalidad 'jugadores': en capitanes el
+      // servidor calcula la mitad solo, y mandarlo choca con el CHECK de la
+      // tabla (`reservas_jugadores_datos`).
+      nJugadores: modalidad === 'jugadores' ? reparto.n : null,
       contactoNombre: nombre.trim(),
       contactoTelefono: telefono,
       cobros: elegidos,
@@ -172,9 +180,13 @@ export default function ResumenReservaScreen({ navigation, route }) {
   // Los adicionales entran en la división: son del partido, no de quien los
   // marcó. Dividir solo la cancha dejaría al organizador pagando el asado.
   const tope = Math.max(MIN_JUGADORES, cancha?.jugadoresHabitual || MIN_JUGADORES);
-  const cuantos = nJugadores ?? tope;
+  // Capitanes son SIEMPRE dos: con tres la mitad deja de ser una mitad y el
+  // reparto se complica sin que nadie gane nada. Para más gente está
+  // «dividir entre todos», que reparte entre los que sean.
+  const entreCapitanes = modalidad === 'capitanes';
+  const cuantos = entreCapitanes ? 2 : (nJugadores ?? tope);
   const reparto = repartoDeCuotas(dinero.total, cuantos) || repartoDeCuotas(dinero.total, MIN_JUGADORES);
-  const divide = modalidad === 'jugadores';
+  const divide = modalidad !== 'completa';
   const saldoCorto = divide && !!reparto && alcanzaPara(saldo, reparto.cuota) === false;
   const listo = baseLista && !saldoCorto;
 
@@ -222,37 +234,46 @@ export default function ResumenReservaScreen({ navigation, route }) {
               onPress={() => setModalidad('completa')}
             />
             <ChoiceCard
-              titulo="Lo dividimos"
+              titulo="Lo dividimos entre todos"
               descripcion="Cada uno pone su parte con su saldo FutFinder. No se cobra a nadie hasta que estén todos."
-              seleccionado={divide}
+              seleccionado={modalidad === 'jugadores'}
               onPress={() => setModalidad('jugadores')}
+            />
+            <ChoiceCard
+              titulo="Entre 2 capitanes"
+              descripcion="Cada equipo paga el 50%. Eliges a un capitán y él pone la otra mitad."
+              seleccionado={entreCapitanes}
+              onPress={() => setModalidad('capitanes')}
             />
           </View>
 
           {divide ? (
             <View style={{ marginTop: 14, gap: 12 }}>
-              <View>
-                <FieldLabel>¿Entre cuántos?</FieldLabel>
-                <Stepper
-                  value={cuantos}
-                  onChange={setNJugadores}
-                  min={MIN_JUGADORES}
-                  max={MAX_JUGADORES}
-                  unitLabel="jugadores"
-                />
-              </View>
+              {entreCapitanes ? null : (
+                <View>
+                  <FieldLabel>¿Entre cuántos?</FieldLabel>
+                  <Stepper
+                    value={cuantos}
+                    onChange={setNJugadores}
+                    min={MIN_JUGADORES}
+                    max={MAX_JUGADORES}
+                    unitLabel="jugadores"
+                  />
+                </View>
+              )}
               <View style={styles.cuotaCaja}>
                 <Text style={styles.cuotaMonto}>{formatCLP(reparto.cuota)}</Text>
                 <Text style={styles.cuotaSub}>
-                  a cada uno, incluidos los adicionales
+                  {entreCapitanes ? 'cada capitán, incluidos los adicionales' : 'a cada uno, incluidos los adicionales'}
                   {reparto.excedente > 0
                     ? ` (la división no es exacta: entre todos suman ${formatCLP(reparto.suma)})`
                     : ''}
                 </Text>
               </View>
               <Text style={styles.seccionAyuda}>
-                Creas la reserva, invitas a los demás y cada uno pone su parte. Puedes cambiar entre
-                cuántos se divide después, mientras nadie haya puesto lo suyo.
+                {entreCapitanes
+                  ? 'Creas la reserva y eliges al otro capitán. Cuando los dos pongan su mitad, la cancha queda tomada. Son dos capitanes y no más: para repartir entre más gente está la opción de arriba.'
+                  : 'Creas la reserva, invitas a los demás y cada uno pone su parte. Puedes cambiar entre cuántos se divide después, mientras nadie haya puesto lo suyo.'}
               </Text>
             </View>
           ) : null}
@@ -366,7 +387,7 @@ export default function ResumenReservaScreen({ navigation, route }) {
       <StickyFooter>
         <Button
           label={divide
-            ? `Armar el grupo · ${formatCLP(reparto.cuota)} c/u`
+            ? `${entreCapitanes ? 'Armar la reserva' : 'Armar el grupo'} · ${formatCLP(reparto.cuota)} c/u`
             : (listo ? `Continuar al pago · ${formatCLP(dinero.total)}` : 'Continuar al pago')}
           disabled={!listo || (!divide && pasarela === false)}
           loading={creando}

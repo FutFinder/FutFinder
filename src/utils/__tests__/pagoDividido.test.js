@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const {
   MAX_JUGADORES, MIN_JUGADORES, avanceDeGrupo, comoDetalle, comoParticipante,
   cuotaPara, etiquetaDeParticipante, miAccion, motivoLegible, opcionesDeReparto,
-  puedeQuitar, puedeRecordar, repartoDeCuotas,
+  puedeQuitar, puedeRecordar, repartoDeCuotas, textosDeModalidad,
 } = require('../pagoDividido.js');
 const { computeCuota } = require('../../services/reservasRules.js');
 
@@ -118,13 +118,18 @@ test('el que rechazó no vuelve a ver el botón de pagar', () => {
   assert.equal(miAccion(DET({ soy_organizador: false, mi_listo: false, mi_estado: 'rechazado' })).clave, 'esperar');
 });
 
-test('las etiquetas distinguen «no contestó» de «su monto ya no sirve»', () => {
-  // Los dos están sin autorización vigente, pero uno no hizo nada y el otro
-  // aceptó y quedó desactualizado por un recálculo de cuota. Decirles lo
-  // mismo haría que el segundo no entienda por qué lo apuran.
+test('«RECONFIRMAR» SOLO SI HUBO UNA CONFIRMACIÓN ANTES', () => {
+  // El organizador entra como 'aceptado' desde que crea la reserva, sin haber
+  // puesto un peso. Decirle «falta reconfirmar» ahí lo manda a buscar algo
+  // que nunca hizo — se vio en pantalla en una reserva recién creada.
+  // `monto_autorizado` es lo que separa «nunca puso» de «puso un monto que
+  // ya no sirve» (pasa tras un recálculo de cuota).
   const p = (x) => comoParticipante({ user_id: 'u', username: 'a', rol: 'jugador', ...x });
-  assert.equal(etiquetaDeParticipante(p({ estado: 'pendiente', listo: false })).texto, 'Falta que confirme');
-  assert.equal(etiquetaDeParticipante(p({ estado: 'aceptado', listo: false })).texto, 'Falta reconfirmar');
+  assert.equal(etiquetaDeParticipante(p({ estado: 'aceptado', listo: false, monto_autorizado: null })).texto,
+    'Falta su parte');
+  assert.equal(etiquetaDeParticipante(p({ estado: 'aceptado', listo: false, monto_autorizado: 6000 })).texto,
+    'Falta reconfirmar');
+  assert.equal(etiquetaDeParticipante(p({ estado: 'pendiente', listo: false })).texto, 'Falta su parte');
   assert.equal(etiquetaDeParticipante(p({ estado: 'aceptado', listo: true })).texto, 'Puso su parte');
   assert.equal(etiquetaDeParticipante(p({ estado: 'rechazado', listo: false })).texto, 'No va');
 });
@@ -152,4 +157,62 @@ test('«ocupado» dice primero lo único que tranquiliza', () => {
   // Un motivo que no está en la tabla se muestra tal cual, no se traga.
   assert.equal(motivoLegible('algo_nuevo_del_servidor'), 'algo_nuevo_del_servidor');
   assert.equal(motivoLegible(null), null);
+});
+
+/* ── Dividir entre 2 capitanes ──────────────────────────────────── */
+
+const CAP = (extra = {}) => comoDetalle({
+  ok: true,
+  reserva: {
+    id: 'r2', estado: 'armando', modalidad: 'capitanes', medio_pago: 'balance',
+    precio_total: 18000, n_jugadores: null, cuota: 9000, organizador_id: 'u1',
+  },
+  cancha: {}, soy_organizador: true, mi_estado: 'aceptado', mi_listo: true,
+  participantes: [], cupos: 2, listos: 1, en_reserva: 1,
+  faltan_invitar: 1, faltan_autorizar: 1,
+  ...extra,
+});
+
+test('CAPITANES SON DOS, NUNCA TRES', () => {
+  // Con tres, la mitad deja de ser una mitad y el reparto se complica sin que
+  // nadie gane nada: para eso está «dividir entre todos». El servidor ya lo
+  // sostiene («Ya hay un segundo capitán invitado») y acá el cupo es 1 para
+  // que no se pueda ni marcar a un tercero.
+  assert.equal(textosDeModalidad('capitanes').cupos, 2);
+  assert.equal(CAP().cupos, 2);
+  assert.equal(CAP().faltanInvitar, 1);
+});
+
+test('en capitanes no se «invita a un grupo», se elige a UNA persona', () => {
+  // Decirle «Invitar jugadores» haría pensar que después vienen más.
+  assert.equal(textosDeModalidad('capitanes').invitar, 'Elegir al otro capitán');
+  assert.equal(miAccion(CAP()).label, 'Elegir al otro capitán');
+  // Y en jugadores sigue diciendo lo de siempre.
+  assert.equal(miAccion(DET({ faltan_invitar: 1 })).label, 'Invitar jugadores');
+});
+
+test('la invitación del capitán va con rol «capitan», no «jugador»', () => {
+  // Mandar 'jugador' en una reserva de capitanes lo rechaza el servidor:
+  // «Esta reserva no es de modalidad jugadores».
+  assert.equal(textosDeModalidad('capitanes').rol, 'capitan');
+  assert.equal(textosDeModalidad('jugadores').rol, 'jugador');
+  // Una modalidad desconocida no revienta ni inventa un rol raro.
+  assert.equal(textosDeModalidad('completa').rol, 'jugador');
+  assert.equal(textosDeModalidad(undefined).rol, 'jugador');
+});
+
+test('el avance de capitanes se dice en persona, no en cantidad', () => {
+  // «Invita a 1 jugador más» para el segundo capitán se lee mal.
+  assert.equal(avanceDeGrupo(CAP({ listos: 0 })).texto, 'Falta el otro capitán');
+  assert.equal(avanceDeGrupo(CAP({ listos: 1, faltan_invitar: 0, en_reserva: 2 })).texto,
+    '1 de 2 pusieron su parte');
+  assert.equal(avanceDeGrupo(CAP({ listos: 2, faltan_invitar: 0, faltan_autorizar: 0, en_reserva: 2 })).completo, true);
+});
+
+test('la mitad de capitanes es la MISMA cuenta que hace el servidor', () => {
+  // `ceil(precio_total / 2)`, igual que `autorizar_cobro_reserva`. Con un
+  // total impar los dos pagan un peso de más entre ambos, nunca de menos.
+  assert.equal(repartoDeCuotas(18000, 2).cuota, 9000);
+  assert.equal(repartoDeCuotas(18001, 2).cuota, 9001);
+  assert.equal(repartoDeCuotas(18001, 2).excedente, 1);
 });

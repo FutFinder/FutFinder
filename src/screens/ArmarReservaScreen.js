@@ -13,6 +13,7 @@ import {
 } from '../services/reservas';
 import {
   avanceDeGrupo, etiquetaDeParticipante, miAccion, motivoLegible, puedeQuitar, puedeRecordar,
+  textosDeModalidad,
 } from '../utils/pagoDividido';
 import { alcanzaPara } from '../utils/saldo';
 import { formatCLP } from '../services/reservasRules';
@@ -155,6 +156,13 @@ export default function ArmarReservaScreen({ navigation, route }) {
 
   const avance = avanceDeGrupo(detalle);
   const accion = miAccion(detalle);
+  const textos = textosDeModalidad(detalle.modalidad);
+  const aInvitar = {
+    reservaId,
+    faltan: detalle.faltanInvitar,
+    yaEstan: detalle.participantes.map((p) => p.userId),
+    modalidad: detalle.modalidad,
+  };
   const armando = detalle.estado === 'armando';
   // El saldo propio sí se puede mirar, y es la única forma de avisarle a
   // alguien ANTES de que apriete que no le va a alcanzar. `alcanzaPara`
@@ -212,7 +220,7 @@ export default function ArmarReservaScreen({ navigation, route }) {
           </NoticeCard>
         ) : null}
 
-        <SectionLabel>Quiénes van</SectionLabel>
+        <SectionLabel>{textos.quienes}</SectionLabel>
         <Card padded={false} style={{ paddingVertical: 4 }}>
           {detalle.participantes.map((p) => {
             const et = etiquetaDeParticipante(p);
@@ -224,7 +232,7 @@ export default function ArmarReservaScreen({ navigation, route }) {
                     {p.nombre}{p.soyYo ? ' · tú' : ''}
                   </Text>
                   <Text style={styles.rol}>
-                    {p.rol === 'organizador' ? 'Organiza' : 'Jugador'}
+                    {p.rol === 'organizador' ? 'Organiza' : p.rol === 'capitan' ? 'Capitán' : 'Jugador'}
                   </Text>
                 </View>
                 <Badge label={et.texto} tone={et.tono} />
@@ -247,12 +255,10 @@ export default function ArmarReservaScreen({ navigation, route }) {
               <Button
                 variant="secondary"
                 icon={UserPlus}
-                label={`Invitar ${detalle.faltanInvitar} ${detalle.faltanInvitar === 1 ? 'jugador' : 'jugadores'}`}
-                onPress={() => navigation.navigate('InvitarJugadores', {
-                  reservaId,
-                  faltan: detalle.faltanInvitar,
-                  yaEstan: detalle.participantes.map((p) => p.userId),
-                })}
+                label={detalle.modalidad === 'capitanes'
+                  ? textos.invitar
+                  : `Invitar ${detalle.faltanInvitar} ${detalle.faltanInvitar === 1 ? 'jugador' : 'jugadores'}`}
+                onPress={() => navigation.navigate('InvitarJugadores', aInvitar)}
               />
             ) : null}
             {puedeRecordar(detalle) ? (
@@ -275,11 +281,7 @@ export default function ArmarReservaScreen({ navigation, route }) {
             loading={ocupado}
             onPress={accion.clave === 'autorizar'
               ? poneMiParte
-              : () => navigation.navigate('InvitarJugadores', {
-                reservaId,
-                faltan: detalle.faltanInvitar,
-                yaEstan: detalle.participantes.map((p) => p.userId),
-              })}
+              : () => navigation.navigate('InvitarJugadores', aInvitar)}
           />
         </StickyFooter>
       ) : null}

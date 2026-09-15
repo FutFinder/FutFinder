@@ -73,6 +73,46 @@ export function opcionesDeReparto(precioTotal, maximo = MAX_JUGADORES) {
   return out;
 }
 
+/**
+ * Las palabras de cada modalidad.
+ *
+ * SON DOS FLUJOS CON LA MISMA MÁQUINA. El servidor los trata casi igual
+ * —cada uno autoriza su cuota y el último confirma— pero para la persona no
+ * son lo mismo: en 'capitanes' no invitas a un grupo, eliges a UNA persona, y
+ * esa persona representa al otro equipo. Llamarle «invitar jugadores» a eso
+ * haría pensar que después vienen más.
+ *
+ * CAPITANES SON DOS, NUNCA TRES. Con tres, la mitad deja de ser una mitad y
+ * el reparto se complica sin que nadie gane nada: para eso está «lo
+ * dividimos entre todos», que ya reparte entre los que sean. El servidor lo
+ * sostiene desde la migración 55 («Ya hay un segundo capitán invitado») y acá
+ * el cupo es 1 para que ni siquiera se pueda marcar a un tercero.
+ */
+const TEXTOS = {
+  capitanes: {
+    rol: 'capitan',
+    cupos: 2,
+    invitar: 'Elegir al otro capitán',
+    tituloInvitar: 'El otro capitán',
+    ayudaInvitar: 'Va a pagar la mitad de la cancha. Son dos capitanes y no más.',
+    quienes: 'Los dos capitanes',
+    faltaUno: 'Falta el otro capitán',
+  },
+  jugadores: {
+    rol: 'jugador',
+    cupos: null,
+    invitar: 'Invitar jugadores',
+    tituloInvitar: 'Invitar jugadores',
+    ayudaInvitar: 'Cada uno pone su parte. La cancha se cierra cuando estén todos.',
+    quienes: 'Quiénes van',
+    faltaUno: 'Falta 1 jugador',
+  },
+};
+
+export function textosDeModalidad(modalidad) {
+  return TEXTOS[modalidad] || TEXTOS.jugadores;
+}
+
 /** Una fila de `detalle_reserva().participantes` con nombres de pantalla. */
 export function comoParticipante(p) {
   if (!p) return null;
@@ -137,9 +177,12 @@ export function avanceDeGrupo(detalle) {
   const { listos = 0, cupos = 0, faltanInvitar = 0, faltanAutorizar = 0 } = detalle;
   const completo = cupos > 0 && listos >= cupos;
   let texto;
+  const t = textosDeModalidad(detalle.modalidad);
   if (completo) texto = 'Todos pusieron su parte';
   else if (faltanInvitar > 0 && listos === 0) {
-    texto = `Invita a ${faltanInvitar} ${faltanInvitar === 1 ? 'jugador' : 'jugadores'} más`;
+    texto = detalle.modalidad === 'capitanes'
+      ? t.faltaUno
+      : `Invita a ${faltanInvitar} ${faltanInvitar === 1 ? 'jugador' : 'jugadores'} más`;
   } else texto = `${listos} de ${cupos} pusieron su parte`;
   return { listos, cupos, completo, faltanInvitar, faltanAutorizar, texto };
 }
@@ -159,7 +202,7 @@ export function miAccion(detalle) {
     return { clave: 'autorizar', label: `Poner mi parte · ${formatCLP(detalle.cuota)}` };
   }
   if (detalle.soyOrganizador && detalle.faltanInvitar > 0) {
-    return { clave: 'invitar', label: 'Invitar jugadores' };
+    return { clave: 'invitar', label: textosDeModalidad(detalle.modalidad).invitar };
   }
   return { clave: 'esperar', label: 'Esperando a los demás' };
 }
@@ -169,8 +212,15 @@ export function etiquetaDeParticipante(p) {
   if (!p) return null;
   if (p.estado === 'rechazado') return { texto: 'No va', tono: 'neutral' };
   if (p.listo) return { texto: 'Puso su parte', tono: 'green' };
-  if (p.estado === 'aceptado') return { texto: 'Falta reconfirmar', tono: 'amber' };
-  return { texto: 'Falta que confirme', tono: 'amber' };
+  // «Reconfirmar» solo si de verdad HUBO una confirmación antes. El
+  // organizador entra como 'aceptado' desde que crea la reserva, sin haber
+  // puesto nada: decirle «falta reconfirmar» en una reserva recién creada lo
+  // manda a buscar algo que nunca hizo. `montoAutorizado` es lo que
+  // distingue «nunca puso» de «puso un monto que ya no sirve».
+  if (p.estado === 'aceptado' && p.montoAutorizado != null) {
+    return { texto: 'Falta reconfirmar', tono: 'amber' };
+  }
+  return { texto: 'Falta su parte', tono: 'amber' };
 }
 
 /** El organizador solo puede empujar si de verdad falta alguien. */

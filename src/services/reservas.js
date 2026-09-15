@@ -327,13 +327,20 @@ export async function detalleReserva(reservaId) {
   return { data: comoDetalle(data), error: null };
 }
 
-/** Sumar a alguien al grupo. El servidor corta si ya no quedan cupos. */
-export async function invitarJugador(reservaId, userId) {
+/**
+ * Sumar a alguien a la reserva. El servidor corta si ya no quedan cupos.
+ *
+ * EL ROL TIENE QUE CALZAR CON LA MODALIDAD: mandar 'jugador' en una reserva
+ * de capitanes se rechaza con «Esta reserva no es de modalidad jugadores», y
+ * al revés igual. Sale de `textosDeModalidad`, que es la misma fuente que
+ * decide las palabras de la pantalla, para que no puedan separarse.
+ */
+export async function invitarParticipante(reservaId, userId, rol = 'jugador') {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
   const { data, error } = await supabase.rpc('invitar_participante_reserva', {
-    p_reserva_id: reservaId, p_user_id: userId, p_rol: 'jugador',
+    p_reserva_id: reservaId, p_user_id: userId, p_rol: rol,
   });
-  return comoResultadoRecinto(data, error, 'invitarJugador');
+  return comoResultadoRecinto(data, error, 'invitarParticipante');
 }
 
 /** Sacar del grupo al que no va a poner su parte. Solo el organizador. */

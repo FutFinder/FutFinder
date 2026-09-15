@@ -8,8 +8,8 @@ import { IconButton, Card, NoticeCard, StickyFooter, Button, Foto, Chip } from '
 import { TextField } from '../components/reservas/recintoUi';
 import { listMyFriends } from '../services/friends';
 import { searchPlayers } from '../services/profile';
-import { invitarJugador } from '../services/reservas';
-import { motivoLegible } from '../utils/pagoDividido';
+import { invitarParticipante } from '../services/reservas';
+import { motivoLegible, textosDeModalidad } from '../utils/pagoDividido';
 
 /**
  * A quién sumar a la reserva.
@@ -36,7 +36,8 @@ import { motivoLegible } from '../utils/pagoDividido';
  * clase de detalle que obliga a empezar de nuevo sin entender por qué.
  */
 export default function InvitarJugadoresScreen({ navigation, route }) {
-  const { reservaId, faltan = 1, yaEstan = [] } = route.params || {};
+  const { reservaId, faltan = 1, yaEstan = [], modalidad = 'jugadores' } = route.params || {};
+  const textos = textosDeModalidad(modalidad);
   const [pestana, setPestana] = useState('amigos');
   const [amigos, setAmigos] = useState([]);
   const [busca, setBusca] = useState('');
@@ -95,7 +96,7 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
     let ok = 0;
     let fallo = null;
     for (const p of elegidos) {
-      const { data, error } = await invitarJugador(reservaId, p.userId);
+      const { data, error } = await invitarParticipante(reservaId, p.userId, textos.rol);
       if (data?.ok) ok += 1;
       else fallo = motivoLegible(data?.reason) || error?.message;
     }
@@ -162,9 +163,11 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
       <View style={styles.header}>
         <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Invitar jugadores</Text>
-          <Text style={styles.headerSub}>
-            {elegidos.length > 0
+          <Text style={styles.headerTitle}>{textos.tituloInvitar}</Text>
+          <Text style={styles.headerSub} numberOfLines={1}>
+            {modalidad === 'capitanes'
+              ? textos.ayudaInvitar
+              : elegidos.length > 0
               ? `${elegidos.length} de ${faltan} ${faltan === 1 ? 'cupo' : 'cupos'}`
               : `Quedan ${faltan} ${faltan === 1 ? 'cupo' : 'cupos'}`}
           </Text>
@@ -189,8 +192,8 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
 
         {!enAmigos && busca.trim().length < 2 ? (
           <NoticeCard tone="info" icon={Search}>
-            Escribe el nombre de usuario de quien quieres invitar. No hace falta que sea tu amigo:
-            le llega la invitación igual, con tu nombre.
+            Escribe el nombre de usuario de quien quieres {modalidad === 'capitanes' ? 'elegir' : 'invitar'}.
+            No hace falta que sea tu amigo: le llega la invitación igual, con tu nombre.
           </NoticeCard>
         ) : null}
 
@@ -227,7 +230,7 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
         <StickyFooter>
           <Button
             label={elegidos.length === 1
-              ? `Invitar a ${elegidos[0].nombre}`
+              ? `${modalidad === 'capitanes' ? 'Elegir a' : 'Invitar a'} ${elegidos[0].nombre}`
               : `Invitar a ${elegidos.length}`}
             loading={enviando}
             onPress={invitar}
