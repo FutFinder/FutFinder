@@ -52,6 +52,7 @@ import {
   saveMatchAttendance,
 } from '../services/matches';
 import { getCurrentUser } from '../services/auth';
+import { suscribirseANomina } from '../services/clubRoster';
 import { useOnline } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
 import {
@@ -136,6 +137,15 @@ export default function ManageMatchScreen({ route, navigation }) {
     load();
     return navigation.addListener('focus', load);
   }, [load, navigation]);
+  // La inscripción puede cambiar desde otra sesión: el organizador aprueba o
+  // rechaza, alguien se sale, se libera un cupo. `suscribirseANomina` escucha
+  // `attendees` de este partido y mantiene un sondeo corto de respaldo, así
+  // que la pantalla se entera sola en vez de quedarse pendiente hasta que el
+  // usuario la recargue a mano.
+  useEffect(() => {
+    if (!matchId) return undefined;
+    return suscribirseANomina(matchId, load);
+  }, [matchId, load]);
 
   const confirmed = useMemo(
     () => attendees.filter((a) => a.estado !== 'pendiente' && a.estado !== 'cancelado'),

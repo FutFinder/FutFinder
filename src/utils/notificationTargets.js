@@ -33,6 +33,7 @@ export function resolveNotificationTarget(n) {
     case 'match_updated':
     case 'match_slot_free':
     case 'waitlist_turn':
+    case 'waitlist_turno_vencido':
     case 'match_left':
     case 'match_attendance':
     case 'join_approved':

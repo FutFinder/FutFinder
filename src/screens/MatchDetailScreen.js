@@ -236,6 +236,15 @@ export default function MatchDetailScreen({ route, navigation }) {
     load();
     return navigation.addListener('focus', load);
   }, [load, navigation]);
+  // La inscripción puede cambiar desde otra sesión: el organizador aprueba o
+  // rechaza, alguien se sale, se libera un cupo. `suscribirseANomina` escucha
+  // `attendees` de este partido y mantiene un sondeo corto de respaldo, así
+  // que la pantalla se entera sola en vez de quedarse pendiente hasta que el
+  // usuario la recargue a mano.
+  useEffect(() => {
+    if (!matchId) return undefined;
+    return suscribirseANomina(matchId, load);
+  }, [matchId, load]);
 
   /**
    * La ubicación exacta de un partido de clubes, si me corresponde verla.

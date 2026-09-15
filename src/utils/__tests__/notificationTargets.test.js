@@ -491,3 +491,11 @@ test('los avisos que solo informan van a la lista, no al grupo', () => {
     );
   }
 });
+
+test('resolveNotificationTarget: el turno de la lista que se venció abre el partido', () => {
+  const t = resolveNotificationTarget({
+    type: 'waitlist_turno_vencido',
+    data: { matchId: 'm-9' },
+  });
+  assert.deepEqual(t, { screen: 'MatchDetail', params: { matchId: 'm-9' } });
+});

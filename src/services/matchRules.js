@@ -426,6 +426,49 @@ export function getBlockReason(ctx) {
 }
 
 /**
+ * Quién puede leer y escribir en el chat de un partido.
+ *
+ * EL FALLO: la pantalla solo miraba si existía una fila en `attendees`, así
+ * que un solicitante PENDIENTE —cuyo cupo no está confirmado— encontraba el
+ * compositor habilitado, y en un partido cancelado, que el flujo promete en
+ * solo lectura, también. La RLS protege el servidor; esto evita ofrecer lo
+ * que la base va a rechazar y explica por qué.
+ *
+ * `inscripcion` es la fila de `attendees` de esta persona (o `null`).
+ * Devuelve `{ canRead, canWrite, reason, title, message }`.
+ */
+export function accesoAlChatDelPartido(inscripcion, partido) {
+  if (!inscripcion || inscripcion.estado === 'cancelado') {
+    return {
+      canRead: false,
+      canWrite: false,
+      reason: 'not_attendee',
+      title: 'No estás inscrito en este partido',
+      message: 'El chat es solo para el organizador y los jugadores inscritos.',
+    };
+  }
+  if (inscripcion.estado === 'pendiente') {
+    return {
+      canRead: false,
+      canWrite: false,
+      reason: 'solicitud_pendiente',
+      title: 'Tu solicitud todavía está pendiente',
+      message: 'El chat del partido se abre cuando el organizador confirme tu cupo.',
+    };
+  }
+  if (partido?.estado === 'cancelado') {
+    return {
+      canRead: true,
+      canWrite: false,
+      reason: 'partido_cancelado',
+      title: 'El partido se canceló',
+      message: 'La conversación queda en solo lectura.',
+    };
+  }
+  return { canRead: true, canWrite: true, reason: null, title: null, message: null };
+}
+
+/**
  * Qué mostrar en «Mi cupo» (`MatchSpotScreen`), derivado del estado real.
  *
  * EL FALLO: la pantalla se abría por URL y saludaba con «Cupo confirmado»,

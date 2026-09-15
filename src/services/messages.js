@@ -57,6 +57,7 @@ export {
 } from '../utils/chatMeta';
 import { canUseMentionAll, mapThreadRow, createSharedChannel, isGroupType } from '../utils/chatMeta';
 import { esEstadoActivo, estadoLabel } from './clubChallengeRules';
+import { accesoAlChatDelPartido } from './matchRules';
 
 // ============================================================
 // TOLERANCIA A MIGRACIONES SIN APLICAR
@@ -444,24 +445,27 @@ export async function getThreadAccess(threadKeyStr, { challengeId = null } = {})
   }
 
   if (t.type === 'match') {
-    const { data, error } = await supabase
-      .from('attendees')
-      .select('id, estado')
-      .eq('id_partido', t.id)
-      .eq('id_jugador', me)
-      .maybeSingle();
+    // El estado del PARTIDO importa tanto como el del jugador: el flujo
+    // promete que una solicitud pendiente todavía no abre el chat y que un
+    // partido cancelado lo deja en solo lectura, y el compositor aparecía
+    // habilitado en los dos casos.
+    const [{ data, error }, { data: partido, error: errorPartido }] = await Promise.all([
+      supabase
+        .from('attendees')
+        .select('id, estado')
+        .eq('id_partido', t.id)
+        .eq('id_jugador', me)
+        .maybeSingle(),
+      supabase
+        .from('matches')
+        .select('id, estado')
+        .eq('id', t.id)
+        .maybeSingle(),
+    ]);
     if (error) console.error('[FutFinder] getThreadAccess(match):', error);
-    if (!data || data.estado === 'cancelado') {
-      return {
-        ...ok,
-        canRead: false,
-        canWrite: false,
-        reason: 'not_attendee',
-        title: 'No estás inscrito en este partido',
-        message: 'El chat es solo para el organizador y los jugadores inscritos.',
-      };
-    }
-    return ok;
+    if (errorPartido) console.error('[FutFinder] getThreadAccess(match/partido):', errorPartido);
+
+    return { ...ok, ...accesoAlChatDelPartido(data, partido) };
   }
 
   if (t.type === 'challenge') {

@@ -320,3 +320,35 @@ test('después de jugar todavía se alcanza a confirmar, media hora más', () =>
   assert.equal(e.puedeConfirmarGps, true);
   assert.equal(e.puedeSalir, false);
 });
+
+// ── el chat del partido (hallazgo 17) ─────────────────────────
+
+test('HALLAZGO 17: una solicitud pendiente no abre el chat', () => {
+  const a = R.accesoAlChatDelPartido({ estado: 'pendiente' }, { estado: 'abierto' });
+  assert.equal(a.canRead, false);
+  assert.equal(a.canWrite, false, 'el compositor aparecía habilitado');
+  assert.match(a.message, /cuando el organizador confirme tu cupo/);
+});
+
+test('HALLAZGO 17: en un partido cancelado el chat queda en solo lectura', () => {
+  const a = R.accesoAlChatDelPartido({ estado: 'inscrito' }, { estado: 'cancelado' });
+  assert.equal(a.canRead, true, 'lo conversado se puede seguir leyendo');
+  assert.equal(a.canWrite, false);
+  assert.match(a.title, /cancel/i);
+});
+
+test('quien no está inscrito no entra al chat', () => {
+  assert.equal(R.accesoAlChatDelPartido(null, { estado: 'abierto' }).canRead, false);
+  assert.equal(R.accesoAlChatDelPartido({ estado: 'cancelado' }, { estado: 'abierto' }).canRead, false);
+});
+
+test('un inscrito en un partido vivo escribe con normalidad', () => {
+  const a = R.accesoAlChatDelPartido({ estado: 'inscrito' }, { estado: 'abierto' });
+  assert.equal(a.canWrite, true);
+  assert.equal(a.reason, null);
+  assert.equal(R.accesoAlChatDelPartido({ estado: 'confirmado_gps' }, { estado: 'lleno' }).canWrite, true);
+});
+
+test('sin datos del partido no se bloquea a quien sí está inscrito', () => {
+  assert.equal(R.accesoAlChatDelPartido({ estado: 'inscrito' }, null).canWrite, true);
+});
