@@ -51,6 +51,8 @@ export const EMPTY_FILTERS = {
   edadMax: '',
   cuota: null,
   disponibilidad: 'todos',
+  /** Solo partidos que aceptan a cualquiera (`min_trust_score = 0`). */
+  sinMinimoTrust: false,
 };
 
 export function countActiveFilters(f) {
@@ -64,6 +66,7 @@ export function countActiveFilters(f) {
   if (f.edadPreset !== 0) n++;
   if (f.cuota) n++;
   if (f.disponibilidad !== 'todos') n++;
+  if (f.sinMinimoTrust) n++;
   return n;
 }
 
@@ -269,6 +272,24 @@ export default function FiltersSheet({ visible, onClose, filters, onApply, previ
                 onPress={() => set({ disponibilidad: o.value })}
               />
             ))}
+          </View>
+        </Group>
+
+        {/* Trust Score mínimo del partido */}
+        <Group label="Trust Score">
+          <View style={styles.row}>
+            <OptionChip
+              label="Cualquiera"
+              flex
+              active={!temp.sinMinimoTrust}
+              onPress={() => set({ sinMinimoTrust: false })}
+            />
+            <OptionChip
+              label="Sin mínimo"
+              flex
+              active={!!temp.sinMinimoTrust}
+              onPress={() => set({ sinMinimoTrust: true })}
+            />
           </View>
         </Group>
       </Sheet>

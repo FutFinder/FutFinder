@@ -16,9 +16,17 @@
  * completa queda alineada.
  */
 
-/** Ventana sin penalización y castigos de Trust Score. */
+/**
+ * Umbral de anticipación y castigos de Trust Score.
+ *
+ * `freeHours` NO significa que salirse sea gratis: es la frontera entre la
+ * sanción leve y la grave, y así lo cobra `leave_match_penalized` en Postgres
+ * (3 puntos con más de 2 h de anticipación, 20 después). El texto del CTA
+ * prometía «sin sanción» y después se descontaban 3: prometer de menos y
+ * cobrar es peor que advertir de más.
+ */
 export const PENALTY = {
-  /** Horas antes del partido en que salir/cancelar todavía es gratis. */
+  /** Horas antes del partido que separan la sanción leve de la grave. */
   freeHours: 2,
   /** Puntos que pierde un jugador al salirse. */
   leaveEarly: 3,
@@ -78,6 +86,15 @@ export const WAITLIST_CONFIRM_MINUTES = 30;
 /** Radio en metros que valida `confirm_attendance_gps`. */
 export const GPS_RADIUS_METERS = 200;
 
+/**
+ * La ventana en que el servidor acepta confirmar por GPS: desde 30 minutos
+ * antes de la hora hasta 30 minutos después del término calculado
+ * (`confirm_attendance_gps`). Las pantallas ofrecían el botón solo DURANTE el
+ * partido, así que a 15 minutos del inicio —cuando la gente va llegando a la
+ * cancha, que es el momento de confirmar— no había nada que tocar.
+ */
+export const GPS_WINDOW_MIN = { antes: 30, despues: 30 };
+
 /** Horas después del partido en que el organizador aún puede guardar asistencia. */
 export const ATTENDANCE_WINDOW_HOURS = 72;
 
@@ -105,6 +122,33 @@ export function cancelPenaltyFor(hora) {
   return isPenaltyFree(hora) ? PENALTY.cancelEarly : PENALTY.cancelLate;
 }
 
+/**
+ * La ventana del filtro «Fin de semana», desde un reloj que se puede fijar.
+ *
+ * EL FALLO: el cálculo buscaba siempre el PRÓXIMO sábado. Un domingo a
+ * mediodía eso apuntaba al sábado de la semana siguiente, así que el partido
+ * de esa misma tarde —el fin de semana en el que está parado el usuario—
+ * quedaba fuera y aparecían los de dentro de seis días.
+ *
+ * Si hoy es sábado o domingo, el fin de semana es este: empieza AHORA (no a
+ * medianoche, para no ofrecer partidos que ya empezaron) y termina el lunes a
+ * las 00:00. El resto de la semana apunta al sábado que viene.
+ */
+export function ventanaDeFinDeSemana(ahora = new Date()) {
+  const dia = ahora.getDay(); // 0 = domingo, 6 = sábado
+  const medianoche = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const enCurso = dia === 6 || dia === 0;
+
+  const desde = enCurso ? new Date(ahora) : new Date(medianoche);
+  if (!enCurso) desde.setDate(desde.getDate() + ((6 - dia + 7) % 7));
+
+  // El lunes a las 00:00 cierra siempre: dos días si arrancamos el sábado.
+  const hasta = new Date(medianoche);
+  hasta.setDate(hasta.getDate() + (dia === 0 ? 1 : (6 - dia + 7) % 7 + 2));
+
+  return { desde, hasta };
+}
+
 /** Texto humano de cuánto falta: «1 h 20», «3 días», «ya empezó». */
 export function timeUntilLabel(hora) {
   if (!hora) return '';
@@ -123,22 +167,75 @@ export function timeUntilLabel(hora) {
 export function leaveRuleText(hora) {
   const free = isPenaltyFree(hora);
   return free
-    ? `Puedes salir sin sanción hasta ${PENALTY.freeHours} h antes del partido. Después, salirse resta ${PENALTY.leaveLate} puntos de Trust Score.`
+    ? `Salir ahora resta ${PENALTY.leaveEarly} puntos de Trust Score. Desde ${PENALTY.freeHours} h antes del partido son ${PENALTY.leaveLate}.`
     : `Falta menos de ${PENALTY.freeHours} h: salir ahora resta ${PENALTY.leaveLate} puntos de Trust Score.`;
 }
 
-/** ¿El partido ya terminó (hora + duración)? */
-export function hasFinished(match) {
+/**
+ * El turno vigente de quien espera en la cola, o `null`.
+ *
+ * El servidor avisa al primero de la lista y le guarda el cupo por unos
+ * minutos (`match_waitlist.confirmar_antes_de`, migración 105). La pantalla
+ * solo mostraba «En lista de espera · N° 1» y «Salir de la lista»: el jugador
+ * recibía el aviso y no tenía dónde tomar el cupo que ya era suyo.
+ */
+export function turnoDeLaLista(entrada, ahora = new Date()) {
+  const hasta = entrada?.confirmar_antes_de;
+  if (!hasta) return null;
+  const restanMs = new Date(hasta).getTime() - ahora.getTime();
+  if (!(restanMs > 0)) return null;
+  return { hasta: new Date(hasta), minutos: Math.max(1, Math.ceil(restanMs / 60000)) };
+}
+
+/**
+ * ¿Este partido acepta a cualquiera? (no pide Trust Score mínimo)
+ *
+ * Es la regla del filtro «Sin mínimo» del buscador y la del contador que
+ * ofrece el detalle cuando a alguien lo deja fuera el mínimo del organizador.
+ */
+export function aceptaACualquiera(match) {
+  return Number(match?.min_trust_score || 0) === 0;
+}
+
+/**
+ * Ventana de confirmación por GPS de un partido: `{ desde, hasta }`.
+ * Devuelve `null` si el partido no tiene hora.
+ */
+export function ventanaGps(match) {
+  if (!match?.hora) return null;
+  const inicio = new Date(match.hora).getTime();
+  const fin = inicio + (match.duracion_min ?? 90) * 60 * 1000;
+  return {
+    desde: new Date(inicio - GPS_WINDOW_MIN.antes * 60 * 1000),
+    hasta: new Date(fin + GPS_WINDOW_MIN.despues * 60 * 1000),
+  };
+}
+
+/** ¿Estamos dentro de la ventana en que el servidor acepta el GPS? */
+export function enVentanaGps(match, ahora = new Date()) {
+  const v = ventanaGps(match);
+  if (!v) return false;
+  const t = ahora.getTime();
+  return t >= v.desde.getTime() && t <= v.hasta.getTime();
+}
+
+/**
+ * ¿El partido ya terminó (hora + duración)?
+ *
+ * `ahora` se puede fijar: las pantallas que se quedan abiertas mueven su
+ * propio reloj, y así la regla se puede probar sin esperar.
+ */
+export function hasFinished(match, ahora = new Date()) {
   if (!match?.hora) return false;
   const end =
     new Date(match.hora).getTime() + (match.duracion_min ?? 90) * 60 * 1000;
-  return Date.now() >= end;
+  return ahora.getTime() >= end;
 }
 
 /** ¿El partido ya empezó? */
-export function hasStarted(match) {
+export function hasStarted(match, ahora = new Date()) {
   if (!match?.hora) return false;
-  return Date.now() >= new Date(match.hora).getTime();
+  return ahora.getTime() >= new Date(match.hora).getTime();
 }
 
 /** ¿El organizador todavía puede registrar asistencia? */
@@ -216,8 +313,9 @@ export function estadoLabel(match) {
  *   match, myId, myProfile, myAttendee, myWaitlist, conflict, online
  */
 export function getBlockReason(ctx) {
-  const { match, myId, myProfile, myAttendee, conflict, online } = ctx || {};
+  const { match, myId, myProfile, myAttendee, conflict, online, ahora } = ctx || {};
   if (!match) return null;
+  const reloj = ahora || new Date();
 
   if (online === false) {
     return {
@@ -237,14 +335,14 @@ export function getBlockReason(ctx) {
         : 'El organizador lo canceló y ya no acepta jugadores.',
     };
   }
-  if (match.estado === 'finalizado' || hasFinished(match)) {
+  if (match.estado === 'finalizado' || hasFinished(match, reloj)) {
     return {
       code: 'finalizado',
       title: 'Este partido ya terminó',
       detail: 'Busca otro partido abierto cerca de ti.',
     };
   }
-  if (match.estado === 'en_curso' || hasStarted(match)) {
+  if (match.estado === 'en_curso' || hasStarted(match, reloj)) {
     return {
       code: 'en_curso',
       title: 'Este partido ya comenzó',
@@ -328,14 +426,109 @@ export function getBlockReason(ctx) {
 }
 
 /**
+ * Qué mostrar en «Mi cupo» (`MatchSpotScreen`), derivado del estado real.
+ *
+ * EL FALLO: la pantalla se abría por URL y saludaba con «Cupo confirmado»,
+ * «Estás en la lista» y «Salir del partido» a cualquiera, tuviera cupo o no;
+ * y en un partido cancelado mostraba el aviso de cancelación y el «Cupo
+ * confirmado» al mismo tiempo. Acá el estado del partido manda sobre el del
+ * jugador, y no tener cupo es un estado con nombre propio.
+ *
+ * Devuelve `{ code, titulo, texto, puedeSalir, puedeConfirmarGps, puedeChat }`
+ * con `code`: 'sin_cupo' | 'pendiente' | 'cancelado' | 'finalizado' | 'confirmado'.
+ */
+export function estadoDeMiCupo({ match, mine, ahora = new Date() } = {}) {
+  if (!match) return null;
+
+  const cancelado = match.estado === 'cancelado';
+  const terminado = match.estado === 'finalizado' || hasFinished(match, ahora);
+
+  if (!mine || mine.estado === 'cancelado') {
+    return {
+      code: 'sin_cupo',
+      titulo: 'No tienes cupo en este partido',
+      texto: cancelado
+        ? 'Además, el organizador lo canceló.'
+        : 'Puede que hayas salido o que nunca te inscribieras. Entra al partido para pedir tu cupo.',
+      puedeSalir: false,
+      puedeConfirmarGps: false,
+      puedeChat: false,
+    };
+  }
+
+  if (mine.estado === 'pendiente') {
+    return {
+      code: 'pendiente',
+      titulo: 'Tu solicitud está pendiente',
+      texto: 'El organizador todavía no responde. Tu cupo no está reservado.',
+      puedeSalir: false,
+      puedeConfirmarGps: false,
+      puedeChat: false,
+    };
+  }
+
+  if (cancelado) {
+    return {
+      code: 'cancelado',
+      titulo: 'El partido se canceló',
+      texto: match.motivo_cancelacion
+        ? `Motivo del organizador: ${match.motivo_cancelacion}`
+        : 'Ya no se juega. El chat quedó en solo lectura.',
+      puedeSalir: false,
+      puedeConfirmarGps: false,
+      puedeChat: true,
+    };
+  }
+
+  if (mine.estado === 'no_asistio') {
+    return {
+      code: 'finalizado',
+      titulo: 'Quedaste como ausente',
+      texto: 'El organizador registró que no llegaste a este partido.',
+      puedeSalir: false,
+      puedeConfirmarGps: false,
+      puedeChat: true,
+    };
+  }
+
+  if (terminado) {
+    return {
+      code: 'finalizado',
+      titulo: 'Partido jugado',
+      texto: 'Este partido ya terminó. El organizador registrará la asistencia.',
+      puedeSalir: false,
+      // La ventana sigue abierta media hora después del término: quien llegó y
+      // jugó todavía alcanza a confirmar.
+      puedeConfirmarGps: mine.estado === 'inscrito' && enVentanaGps(match, ahora),
+      puedeChat: true,
+    };
+  }
+
+  return {
+    code: 'confirmado',
+    titulo: 'Cupo confirmado',
+    texto:
+      match.recordatorio_1h !== false
+        ? 'Estás en la lista. Te recordamos el partido una hora antes.'
+        : 'Estás en la lista. Anota la hora: este partido no envía recordatorio.',
+    puedeSalir: true,
+    puedeConfirmarGps: mine.estado === 'inscrito' && enVentanaGps(match, ahora),
+    puedeChat: true,
+  };
+}
+
+/**
  * Estado del CTA sticky del detalle, derivado del estado real.
  *
  * Devuelve `{ kind, label, hint, tone }` donde `kind` es:
  *   'gestionar' | 'unirme' | 'solicitar' | 'espera' | 'en_espera'
- *   | 'pendiente' | 'confirmado' | 'bloqueado'
+ *   | 'tomar_cupo' | 'pendiente' | 'confirmado' | 'bloqueado'
+ *
+ * `ctx.ahora` permite fijar el reloj: la pantalla lo va moviendo para que el
+ * turno de la lista de espera se apague solo, sin recargar.
  */
 export function getCtaState(ctx) {
-  const { match, myId, myAttendee, myWaitlist, online } = ctx || {};
+  const { match, myId, myAttendee, myWaitlist, online, ahora } = ctx || {};
   if (!match) return { kind: 'bloqueado', label: 'Partido no disponible', tone: 'muted' };
 
   const isOrganizer = myId && match.id_organizador === myId;
@@ -349,6 +542,19 @@ export function getCtaState(ctx) {
   }
 
   const block = getBlockReason(ctx);
+
+  // Un partido caído o terminado manda sobre cualquier otra cosa: se mostraba
+  // «Cupo confirmado» junto al aviso de cancelación, y el jugador se quedaba
+  // sin saber cuál de las dos era la verdad.
+  if (block && (block.code === 'cancelado' || block.code === 'finalizado')) {
+    return {
+      kind: 'bloqueado',
+      label: block.title,
+      hint: block.detail,
+      tone: 'muted',
+      block,
+    };
+  }
 
   if (myAttendee?.estado === 'pendiente') {
     return {
@@ -367,6 +573,23 @@ export function getCtaState(ctx) {
     };
   }
   if (myWaitlist) {
+    const turno = turnoDeLaLista(myWaitlist, ahora || new Date());
+    if (turno) {
+      const manual = match.aprobacion === 'manual';
+      return {
+        kind: 'tomar_cupo',
+        label: manual ? 'Pedir el cupo que se liberó' : 'Tomar mi cupo',
+        hint: manual
+          ? `El cupo es tuyo por ${turno.minutos} ${turno.minutos === 1 ? 'minuto' : 'minutos'} más, pero este partido lo revisa el organizador: manda tu solicitud ahora.`
+          : `Se liberó un cupo y es tuyo por ${turno.minutos} ${turno.minutos === 1 ? 'minuto' : 'minutos'} más. Nadie puede tomarlo hasta entonces.`,
+        tone: 'primary',
+        turno,
+        // Qué acción dispara la pantalla: en un partido de aprobación manual
+        // `join_match` rechaza a propósito (migración 103).
+        via: manual ? 'solicitar' : 'unirme',
+        disabled: online === false,
+      };
+    }
     return {
       kind: 'en_espera',
       label: `En lista de espera · N° ${myWaitlist.posicion}`,

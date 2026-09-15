@@ -145,12 +145,28 @@ export default function PartidosScreen({ navigation, route }) {
     }
   }, [route.params?.initialMode]);
 
+  // Quien llega desde «Ver partidos sin mínimo» tiene que aterrizar con ese
+  // filtro puesto, no en el buscador general con los mismos partidos que
+  // acaban de rechazarlo.
+  useEffect(() => {
+    if (route.params?.initialFilters) {
+      setFilters((prev) => ({ ...prev, ...route.params.initialFilters }));
+      navigation.setParams({ initialFilters: undefined });
+    }
+  }, [route.params?.initialFilters]);
+
   // ------------------------------------------------------------- carga
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoadError(null);
     const [res, loc, user, status, misClubes] = await Promise.all([
-      listOpenMatches({ limit: 100 }).catch((e) => ({ data: [], error: e })),
+      // `lleno` también: el filtro «Todos» los promete y es donde se descubre
+      // la lista de espera. El tope alto es a propósito: los filtros se
+      // aplican en el cliente para poder sugerir «qué pasa si sueltas uno».
+      listOpenMatches({ limit: 300, estados: ['abierto', 'lleno'] }).catch((e) => ({
+        data: [],
+        error: e,
+      })),
       getCurrentLocation(),
       getCurrentUser(),
       getMyAccountStatus().catch(() => null),
@@ -239,6 +255,7 @@ export default function PartidosScreen({ navigation, route }) {
       minLng: r.longitude - r.longitudeDelta / 2,
       maxLng: r.longitude + r.longitudeDelta / 2,
       limit: 200,
+      estados: ['abierto', 'lleno'],
     });
     if (!error) {
       setMatches(data || []);
@@ -288,6 +305,10 @@ export default function PartidosScreen({ navigation, route }) {
     if (filters.comuna) {
       const n = applyFilterSet({ ...filters, comuna: null }).length;
       if (n > 0) out.push({ label: `Buscar en toda ${shorten(filters.region || '')}`.trim(), count: n });
+    }
+    if (filters.sinMinimoTrust) {
+      const n = applyFilterSet({ ...filters, sinMinimoTrust: false }).length;
+      if (n > 0) out.push({ label: 'Incluir partidos con Trust Score mínimo', count: n });
     }
     return out.slice(0, 3);
   }, [filtered.length, filters, applyFilterSet]);

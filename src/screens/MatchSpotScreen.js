@@ -37,8 +37,8 @@ import { goBackOrPartidos } from '../utils/navigation';
 import {
   GPS_RADIUS_METERS,
   cuotaLabel,
+  estadoDeMiCupo,
   hasFinished,
-  hasStarted,
   isPenaltyFree,
   leavePenaltyFor,
   leaveRuleText,
@@ -89,8 +89,19 @@ export default function MatchSpotScreen({ route, navigation }) {
     [attendees]
   );
   const libres = match?.cupos_disponibles ?? 0;
-  const gpsPending =
-    mine?.estado === 'inscrito' && hasStarted(match) && !hasFinished(match);
+
+  // Un reloj propio: la ventana del GPS se abre media hora antes de empezar y
+  // la pantalla puede llevar rato abierta.
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Quién es en este partido: sin esto la pantalla saludaba con «Cupo
+  // confirmado» a cualquiera que abriera la dirección.
+  const miCupo = useMemo(() => estadoDeMiCupo({ match, mine, ahora }), [match, mine, ahora]);
+  const gpsPending = !!miCupo?.puedeConfirmarGps;
 
   const leave = async () => {
     if (busy || !online) return;
@@ -155,6 +166,7 @@ export default function MatchSpotScreen({ route, navigation }) {
 
   const canceled = match.estado === 'cancelado';
   const finished = hasFinished(match);
+  const sinCupo = miCupo?.code === 'sin_cupo' || miCupo?.code === 'pendiente';
 
   return (
     <View style={styles.root}>
@@ -176,7 +188,7 @@ export default function MatchSpotScreen({ route, navigation }) {
             />
           ) : null}
 
-          {canceled ? (
+          {canceled && !sinCupo ? (
             <Callout
               tone="danger"
               icon={AlertCircle}
@@ -191,17 +203,22 @@ export default function MatchSpotScreen({ route, navigation }) {
           ) : null}
 
           <View style={{ alignItems: 'center', gap: 12, paddingVertical: 14 }}>
-            <View style={styles.bigIcon}>
-              <CheckCircle2 color={P.green} size={28} strokeWidth={2} />
+            <View style={[styles.bigIcon, sinCupo && styles.bigIconMuted]}>
+              {sinCupo ? (
+                <AlertCircle color={P.textMuted} size={28} strokeWidth={2} />
+              ) : (
+                <CheckCircle2 color={P.green} size={28} strokeWidth={2} />
+              )}
             </View>
-            <Text style={styles.bigTitle}>{finished ? 'Partido jugado' : 'Cupo confirmado'}</Text>
-            <Text style={styles.bigText}>
-              {finished
-                ? 'Este partido ya terminó. El organizador registrará la asistencia.'
-                : match.recordatorio_1h !== false
-                ? 'Estás en la lista. Te recordamos el partido una hora antes.'
-                : 'Estás en la lista. Anota la hora: este partido no envía recordatorio.'}
-            </Text>
+            <Text style={styles.bigTitle}>{miCupo?.titulo}</Text>
+            <Text style={styles.bigText}>{miCupo?.texto}</Text>
+            {sinCupo ? (
+              <SurfaceButton
+                label="Ver el partido"
+                onPress={() => navigation.navigate('MatchDetail', { matchId })}
+                height={46}
+              />
+            ) : null}
           </View>
 
           {/* Datos del partido */}
@@ -210,10 +227,12 @@ export default function MatchSpotScreen({ route, navigation }) {
               <Text style={[styles.matchTitle, { flex: 1 }]} numberOfLines={2}>
                 {match.titulo}
               </Text>
-              <Tag
-                label={mine?.estado === 'confirmado_gps' ? 'Asistencia OK' : 'Confirmado'}
-                tone="green"
-              />
+              {sinCupo ? null : (
+                <Tag
+                  label={mine?.estado === 'confirmado_gps' ? 'Asistencia OK' : 'Confirmado'}
+                  tone="green"
+                />
+              )}
             </View>
             <Row icon={Calendar} strong>
               {capitalize(formatFechaLarga(match.hora))} · {timeOf(match.hora)}
@@ -285,13 +304,15 @@ export default function MatchSpotScreen({ route, navigation }) {
         </ScrollView>
 
         <View style={[styles.footer, { paddingBottom: 14 + Math.max(insets.bottom, 8) }]}>
-          <PrimaryButton
-            label="Abrir chat del partido"
-            icon={MessageSquare}
-            onPress={openChat}
-            height={52}
-          />
-          {!finished && !canceled ? (
+          {miCupo?.puedeChat ? (
+            <PrimaryButton
+              label="Abrir chat del partido"
+              icon={MessageSquare}
+              onPress={openChat}
+              height={52}
+            />
+          ) : null}
+          {miCupo?.puedeSalir ? (
             <>
               <View style={{ flexDirection: 'row', gap: 9 }}>
                 <SurfaceButton
@@ -432,6 +453,10 @@ const styles = StyleSheet.create({
     borderColor: P.greenBorder,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bigIconMuted: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   bigTitle: { fontSize: 22, fontWeight: '800', color: P.text, letterSpacing: -0.4 },
   bigText: { fontSize: 13, lineHeight: 20, color: P.textMuted, textAlign: 'center' },

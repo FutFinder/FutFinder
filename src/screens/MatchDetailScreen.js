@@ -92,11 +92,11 @@ import {
   WAITLIST_CONFIRM_MINUTES,
   cuotaLabel,
   edadLabel,
+  enVentanaGps,
   estadoLabel,
   getBlockReason,
   getCtaState,
   hasFinished,
-  hasStarted,
   isPenaltyFree,
   leavePenaltyFor,
   leaveRuleText,
@@ -360,11 +360,19 @@ export default function MatchDetailScreen({ route, navigation }) {
   );
 
   const esDeClubes = esPartidoDeClubes(match);
+  // Un reloj propio: el turno de la lista de espera y la ventana del GPS se
+  // abren y se cierran con el tiempo, y la pantalla puede quedarse abierta.
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
   const usaNominaClub = usaNominaPorClub(match);
   // En el flujo formal `id_organizador` es quien aprobó porque la columna es
   // NOT NULL; no lo convierte en organizador ni le abre la gestión normal.
   const isOrganizer = !!(match && myId && match.id_organizador === myId && !usaNominaClub);
-  const ctx = { match, myId, myProfile, myAttendee, myWaitlist, conflict, online };
+  const ctx = { match, myId, myProfile, myAttendee, myWaitlist, conflict, online, ahora };
   const ctaNormal = match ? getCtaState(ctx) : null;
   const cta = usaNominaClub
     ? {
@@ -424,11 +432,14 @@ export default function MatchDetailScreen({ route, navigation }) {
   const tomados = Math.max(0, total - libres);
   const iAmConfirmedGps = myAttendee?.estado === 'confirmado_gps';
   const canRate = iAmConfirmedGps && hasFinished(match);
+  // La ventana es la que acepta `confirm_attendance_gps`: media hora antes y
+  // hasta media hora después del término. Ofrecerla solo «durante el partido»
+  // dejaba sin botón a quien ya estaba en la cancha 15 minutos antes.
   const canConfirmGps =
     !!myAttendee &&
     myAttendee.estado === 'inscrito' &&
-    hasStarted(match) &&
-    !hasFinished(match);
+    match?.estado !== 'cancelado' &&
+    enVentanaGps(match, ahora);
   const chatOpen = isOrganizer || (!!myAttendee && myAttendee.estado !== 'pendiente');
 
   // ----------------------------------------------------------- acciones
@@ -620,6 +631,10 @@ export default function MatchDetailScreen({ route, navigation }) {
         break;
       case 'espera':
         setSheet('waitlist');
+        break;
+      case 'tomar_cupo':
+        if (cta.via === 'solicitar') doRequest();
+        else doJoin();
         break;
       case 'en_espera':
         doLeaveWaitlist();
@@ -1238,7 +1253,12 @@ export default function MatchDetailScreen({ route, navigation }) {
                         ? 'Buscamos partidos que acepten a cualquiera'
                         : `${openWithoutTrust} ${openWithoutTrust === 1 ? 'partido acepta' : 'partidos aceptan'} a cualquiera`
                     }
-                    onPress={() => navigation.navigate('Main', { screen: 'SearchTab' })}
+                    onPress={() =>
+                      navigation.navigate('Main', {
+                        screen: 'SearchTab',
+                        params: { initialFilters: { sinMinimoTrust: true } },
+                      })
+                    }
                   />
                   <AltRow
                     icon={Trophy}
@@ -1380,6 +1400,23 @@ export default function MatchDetailScreen({ route, navigation }) {
               />
             </View>
             <Note>El chat se abre solo cuando tu cupo esté confirmado.</Note>
+          </View>
+        ) : cta?.kind === 'tomar_cupo' ? (
+          <View style={{ gap: 9 }}>
+            <PrimaryButton
+              label={cta.label}
+              height={50}
+              onPress={onCta}
+              loading={busy}
+              disabled={cta.disabled || busy}
+            />
+            <GhostButton
+              label="Salir de la lista de espera"
+              onPress={doLeaveWaitlist}
+              height={46}
+              disabled={busy || !online}
+            />
+            <Note>{cta.hint}</Note>
           </View>
         ) : cta?.kind === 'en_espera' ? (
           <View style={{ gap: 9 }}>

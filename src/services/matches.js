@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
 import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
+import { aceptaACualquiera, ventanaDeFinDeSemana } from './matchRules';
 
 /**
  * `tema` → migración 53. Sin ella, pedirla en el `select` explícito de
@@ -34,7 +35,7 @@ export function haversineKm(a, b) {
  * Lista partidos abiertos cerca del usuario, ordenados por hora.
  * Si pasas comuna filtra por comuna.
  */
-export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
+export async function listOpenMatches({ comuna = null, limit = 50, estados = ['abierto'] } = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), error: null };
 
   // Mostramos solo partidos cuya hora oficial todavía NO haya pasado.
@@ -43,10 +44,13 @@ export async function listOpenMatches({ comuna = null, limit = 50 } = {}) {
   // estado post-partido).
   const ahora = new Date().toISOString();
 
+  // `estados` lo decide quien llama: la portada ofrece un botón de unirse, así
+  // que pide solo `abierto`; el buscador pide también `lleno`, porque su filtro
+  // «Todos» los promete y es donde se descubre la lista de espera.
   let q = supabase
     .from('matches')
     .select('*')
-    .eq('estado', 'abierto')
+    .in('estado', estados)
     .gt('hora', ahora)
     .order('hora', { ascending: true })
     .limit(limit);
@@ -197,6 +201,7 @@ export async function listMatchesInBounds({
   minLng,
   maxLng,
   limit = 100,
+  estados = ['abierto'],
 } = {}) {
   if (!isSupabaseConfigured) return { data: [], error: null };
   if ([minLat, maxLat, minLng, maxLng].some((v) => v == null)) {
@@ -207,7 +212,7 @@ export async function listMatchesInBounds({
   const { data, error } = await supabase
     .from('matches')
     .select('*')
-    .eq('estado', 'abierto')
+    .in('estado', estados)
     .gt('hora', ahora)
     .gte('latitud', minLat)
     .lte('latitud', maxLat)
@@ -266,19 +271,15 @@ export function applyFilters(matches, filters, userCoords) {
   startTomorrow.setDate(startTomorrow.getDate() + 1);
   const endTomorrow = new Date(startTomorrow);
   endTomorrow.setDate(endTomorrow.getDate() + 1);
-  const dayOfWeek = now.getDay(); // 0=dom 6=sáb
-  const daysToSat = (6 - dayOfWeek + 7) % 7;
-  const startSat = new Date(startOfDay);
-  startSat.setDate(startSat.getDate() + daysToSat);
-  const endSun = new Date(startSat);
-  endSun.setDate(endSun.getDate() + 2);
+  // Si hoy es sábado o domingo, el fin de semana es este, no el que viene.
+  const finde = ventanaDeFinDeSemana(now);
 
   function inWindow(matchHora) {
     const h = new Date(matchHora);
     if (timeWindow === 'todos') return true;
     if (timeWindow === 'hoy') return h >= now && h < startTomorrow;
     if (timeWindow === 'manana') return h >= startTomorrow && h < endTomorrow;
-    if (timeWindow === 'finde') return h >= startSat && h < endSun;
+    if (timeWindow === 'finde') return h >= finde.desde && h < finde.hasta;
     return true;
   }
 
@@ -334,11 +335,7 @@ export function filterMatches(matches, f = {}, userCoords = null) {
   startTomorrow.setDate(startTomorrow.getDate() + 1);
   const endTomorrow = new Date(startTomorrow);
   endTomorrow.setDate(endTomorrow.getDate() + 1);
-  const daysToSat = (6 - now.getDay() + 7) % 7;
-  const startSat = new Date(startOfDay);
-  startSat.setDate(startSat.getDate() + daysToSat);
-  const endSun = new Date(startSat);
-  endSun.setDate(endSun.getDate() + 2);
+  const finde = ventanaDeFinDeSemana(now);
 
   const inWindow = (hora) => {
     const h = new Date(hora);
@@ -348,7 +345,7 @@ export function filterMatches(matches, f = {}, userCoords = null) {
       case 'manana':
         return h >= startTomorrow && h < endTomorrow;
       case 'finde':
-        return h >= startSat && h < endSun;
+        return h >= finde.desde && h < finde.hasta;
       default:
         return true;
     }
@@ -370,6 +367,10 @@ export function filterMatches(matches, f = {}, userCoords = null) {
     if (f.modalidad && m.modalidad !== f.modalidad) return false;
     if (f.nivel && m.nivel !== f.nivel) return false;
     if (f.disponibilidad === 'con_cupos' && (m.cupos_disponibles ?? 0) <= 0) return false;
+    // «Ver partidos sin mínimo» llega hasta acá con el filtro puesto, en vez
+    // de mandar al buscador general y dejar al jugador con los mismos
+    // partidos que acaban de rechazarlo.
+    if (f.sinMinimoTrust && !aceptaACualquiera(m)) return false;
     if (f.cuota) {
       const p = Number(m.precio_cuota || 0);
       if (p < f.cuota.min || p > f.cuota.max) return false;
