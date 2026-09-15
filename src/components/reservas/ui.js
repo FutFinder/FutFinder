@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Modal, Image } from 'react-native';
-import { Minus, Plus, Info, AlertTriangle, X as XIcon, Image as ImageIcon } from 'lucide-react-native';
+import {
+  Minus, Plus, Info, AlertTriangle, Check, X as XIcon, Image as ImageIcon,
+} from 'lucide-react-native';
 
 import {
   reservas as C,
@@ -425,6 +427,20 @@ export function NoticeCard({ children, tone = 'info', icon }) {
       </View>
     );
   }
+  if (tone === 'success') {
+    // Verde propio y no el `info` gris: cuando algo de plata SALIÓ BIEN, la
+    // confirmación tiene que verse distinta del resto de los avisos, o se lee
+    // como una nota al pie más.
+    const Icon = icon || Check;
+    return (
+      <View style={styles.noticeSuccess}>
+        <Icon color={C.green} size={17} strokeWidth={2.2} style={{ marginTop: 1 }} />
+        <Text style={{ flex: 1, fontFamily: F.medium, fontSize: 13, lineHeight: 20.8, color: C.green }}>
+          {children}
+        </Text>
+      </View>
+    );
+  }
   if (tone === 'warning') {
     const Icon = icon || AlertTriangle;
     return (
@@ -630,6 +646,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.amberBorder,
     backgroundColor: C.amberSoft,
+  },
+  noticeSuccess: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 14,
+    borderRadius: R.row,
+    borderWidth: 1,
+    borderColor: C.greenDeepBorder,
+    backgroundColor: C.shieldBg,
   },
 
   stickyFooter: {

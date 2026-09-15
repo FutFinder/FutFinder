@@ -100,6 +100,29 @@ export function resolveNotificationTarget(n) {
           }
         : null;
 
+    // ── Reservas ──
+    // NINGÚN AVISO DE RESERVA TENÍA DESTINO. La invitación a poner tu parte
+    // llegaba y, al tocarla, no pasaba nada: el flujo del pago dividido se
+    // cortaba justo ahí, en el único paso que la otra persona no puede
+    // adivinar sola.
+    //
+    // Los que tienen algo que HACER van al grupo, que es donde se pone la
+    // parte, se ve quién falta y se invita. Los que solo informan van a la
+    // lista, porque abrir el grupo de una reserva ya cerrada no ofrece nada.
+    case 'reserva_invitacion_jugador':
+    case 'reserva_invitacion_capitan':
+    case 'reserva_recordatorio_pago':
+    case 'reserva_saldo_insuficiente':
+    case 'reserva_cuota_recalculada':
+      return data.reservaId ? { screen: 'ArmarReserva', params: { reservaId: data.reservaId } } : null;
+
+    case 'reserva_confirmada':
+    case 'reserva_cancelada':
+    case 'reserva_invitacion_rechazada':
+    case 'reserva_participante_quitado':
+    case 'reserva_cancelacion_solicitada':
+      return { screen: 'MisReservas' };
+
     case 'club_match_published':
       return data.matchId
         ? {

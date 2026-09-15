@@ -4,12 +4,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Info, Check, Lock } from 'lucide-react-native';
 
 import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
-import { IconButton, Card, NoticeCard, StickyFooter, Button, Foto } from '../components/reservas/ui';
-import { FieldLabel, TextField } from '../components/reservas/recintoUi';
-import { getComplejoById, cobrosDelComplejo, crearReserva } from '../services/reservas';
+import {
+  IconButton, Card, NoticeCard, StickyFooter, Button, Foto, Stepper,
+} from '../components/reservas/ui';
+import { FieldLabel, TextField, ChoiceCard } from '../components/reservas/recintoUi';
+import {
+  getComplejoById, cobrosDelComplejo, crearReserva, getMiBalance,
+} from '../services/reservas';
 import { estadoPasarela } from '../services/pagos';
 import { totalDeReserva, reservaLista } from '../utils/reservasJugador';
 import { telefonoAceptable } from '../utils/recintoPantallas';
+import { MAX_JUGADORES, MIN_JUGADORES, repartoDeCuotas } from '../utils/pagoDividido';
 import { formatCLP } from '../services/reservasRules';
 
 /**
@@ -33,6 +38,22 @@ import { formatCLP } from '../services/reservasRules';
  * Recién el pago confirmado lo toma. Esa diferencia es el corazón del
  * vertical y por eso está escrita en la pantalla y no solo en el backend.
  *
+ * PAGAR SOLO O DIVIDIR SON DOS CAMINOS DISTINTOS, Y SE ELIGE ACÁ.
+ *
+ * Dividir es SOLO con Balance, y no por una limitación técnica. Con Balance
+ * nadie pone plata hasta que están todos: el cobro ocurre entero, a todos a
+ * la vez, o no ocurre. Eso hace que un grupo que no se completa no deje NADA
+ * que devolver, y que la hora no tenga que retenerse mientras se arma.
+ * Dividir con tarjeta sería lo contrario: cada uno paga de verdad al entrar,
+ * y el grupo que se cae deja cinco reembolsos que alguien tiene que hacer a
+ * mano. Por eso el servidor lo rechaza desde la migración 55 y acá ni se
+ * ofrece.
+ *
+ * La contracara honesta: cargar saldo todavía no existe (`cargar_balance`
+ * quedó revocada en la migración 73 justo porque acreditaba plata sin
+ * cobrarla). Así que el camino dividido se puede recorrer entero, pero quien
+ * no tenga saldo lo ve apagado y con el motivo escrito.
+ *
  * SE PREGUNTA POR LA PASARELA ANTES DE DEJAR APRETAR. Mientras no haya cuenta
  * de comercio conectada, el botón queda apagado y se dice por qué. La
  * alternativa —crear la reserva y descubrir después que no se puede pagar—
@@ -51,15 +72,20 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const [pasarela, setPasarela] = useState(null);
   const [creando, setCreando] = useState(false);
   const [toast, setToast] = useState(null);
+  const [modalidad, setModalidad] = useState('completa');
+  const [nJugadores, setNJugadores] = useState(null);
+  const [saldo, setSaldo] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data }, { data: cs }, { data: ps }] = await Promise.all([
+    const [{ data }, { data: cs }, { data: ps }, { data: sal }] = await Promise.all([
       getComplejoById(complejoId),
       cobrosDelComplejo(complejoId),
       estadoPasarela(),
+      getMiBalance(),
     ]);
     setComplejo(data);
+    setSaldo(sal);
     setCobros(cs || []);
     // `null` si no se pudo comprobar: no es lo mismo que «no hay». Con `null`
     // el botón queda disponible y el error, si llega, aparece al tocarlo.
@@ -81,13 +107,16 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const continuar = async () => {
     setCreando(true);
     setToast(null);
+    const divide = modalidad === 'jugadores';
     const { data, error } = await crearReserva({
       canchaId,
       fecha,
       horaInicio,
-      modalidad: 'completa',
-      medioPago: 'tarjeta',
-      nJugadores: cancha?.jugadoresHabitual ?? null,
+      // Dividir exige Balance y pagar solo va por tarjeta: son dos caminos
+      // completos, no una casilla que se marca sobre el mismo.
+      modalidad: divide ? 'jugadores' : 'completa',
+      medioPago: divide ? 'balance' : 'tarjeta',
+      nJugadores: divide ? reparto.n : null,
       contactoNombre: nombre.trim(),
       contactoTelefono: telefono,
       cobros: elegidos,
@@ -96,6 +125,10 @@ export default function ResumenReservaScreen({ navigation, route }) {
 
     if (error || !data?.ok) {
       setToast(error?.message || data?.reason || 'No pudimos crear la reserva.');
+      return;
+    }
+    if (divide) {
+      navigation.navigate('ArmarReserva', { reservaId: data.reserva_id });
       return;
     }
     navigation.navigate('PagoReserva', {
@@ -131,9 +164,18 @@ export default function ResumenReservaScreen({ navigation, route }) {
   // son lo mismo.
   const dinero = totalDeReserva({ precioBloque: precioBloque ?? cancha?.base, cobros: elegidosDetalle });
   const telefonoOk = telefonoAceptable(telefono);
-  const listo = telefonoOk && reservaLista({
+  const baseLista = telefonoOk && reservaLista({
     canchaId, fecha, hora: horaInicio, contactoNombre: nombre, contactoTelefono: telefono,
   });
+
+  // Los adicionales entran en la división: son del partido, no de quien los
+  // marcó. Dividir solo la cancha dejaría al organizador pagando el asado.
+  const tope = Math.max(MIN_JUGADORES, cancha?.jugadoresHabitual || MIN_JUGADORES);
+  const cuantos = nJugadores ?? tope;
+  const reparto = repartoDeCuotas(dinero.total, cuantos) || repartoDeCuotas(dinero.total, MIN_JUGADORES);
+  const divide = modalidad === 'jugadores';
+  const saldoCorto = divide && saldo !== null && reparto && saldo < reparto.cuota;
+  const listo = baseLista && !saldoCorto;
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -167,6 +209,52 @@ export default function ResumenReservaScreen({ navigation, route }) {
             <Text style={styles.detalleK}>Jugadores</Text>
             <Text style={styles.detalleV}>Hasta {cancha?.jugadoresHabitual ?? '—'}</Text>
           </View>
+        </Card>
+
+        <Card>
+          <Text style={styles.seccion}>¿Cómo se paga?</Text>
+          <View style={{ gap: 9, marginTop: 12 }}>
+            <ChoiceCard
+              titulo="Pago yo todo"
+              descripcion={`${formatCLP(dinero.total)} con tarjeta. La hora queda tuya apenas se completa el pago.`}
+              seleccionado={!divide}
+              onPress={() => setModalidad('completa')}
+            />
+            <ChoiceCard
+              titulo="Lo dividimos"
+              descripcion="Cada uno pone su parte con su saldo FutFinder. No se cobra a nadie hasta que estén todos."
+              seleccionado={divide}
+              onPress={() => setModalidad('jugadores')}
+            />
+          </View>
+
+          {divide ? (
+            <View style={{ marginTop: 14, gap: 12 }}>
+              <View>
+                <FieldLabel>¿Entre cuántos?</FieldLabel>
+                <Stepper
+                  value={cuantos}
+                  onChange={setNJugadores}
+                  min={MIN_JUGADORES}
+                  max={MAX_JUGADORES}
+                  unitLabel="jugadores"
+                />
+              </View>
+              <View style={styles.cuotaCaja}>
+                <Text style={styles.cuotaMonto}>{formatCLP(reparto.cuota)}</Text>
+                <Text style={styles.cuotaSub}>
+                  a cada uno, incluidos los adicionales
+                  {reparto.excedente > 0
+                    ? ` (la división no es exacta: entre todos suman ${formatCLP(reparto.suma)})`
+                    : ''}
+                </Text>
+              </View>
+              <Text style={styles.seccionAyuda}>
+                Creas la reserva, invitas a los demás y cada uno pone su parte. Puedes cambiar entre
+                cuántos se divide después, mientras nadie haya puesto lo suyo.
+              </Text>
+            </View>
+          ) : null}
         </Card>
 
         {cobros.length > 0 ? (
@@ -252,15 +340,22 @@ export default function ResumenReservaScreen({ navigation, route }) {
         </Card>
 
         <NoticeCard tone="info" icon={Info}>
-          Reservar no toma la hora todavía: sigue disponible para otros grupos hasta que el pago
-          quede completo. El primero que paga se la lleva. Y puedes cancelar con devolución hasta 12
-          horas antes del partido.
+          {divide
+            ? 'Reservar no toma la hora todavía: sigue disponible para otros grupos hasta que TODOS pongan su parte. Si el grupo no se completa, no se le cobra nada a nadie. Y puedes cancelar con devolución hasta 12 horas antes del partido.'
+            : 'Reservar no toma la hora todavía: sigue disponible para otros grupos hasta que el pago quede completo. El primero que paga se la lleva. Y puedes cancelar con devolución hasta 12 horas antes del partido.'}
         </NoticeCard>
 
-        {pasarela === false ? (
+        {!divide && pasarela === false ? (
           <NoticeCard tone="warning">
             Todavía no hay medio de pago conectado, así que esta reserva no se puede completar.
             Es lo único que falta.
+          </NoticeCard>
+        ) : null}
+
+        {saldoCorto ? (
+          <NoticeCard tone="warning">
+            Tu parte son {formatCLP(reparto.cuota)} y tu saldo es {formatCLP(saldo)}. Cargar saldo
+            todavía no está disponible — es lo único que falta para que dividir funcione de verdad.
           </NoticeCard>
         ) : null}
 
@@ -269,8 +364,10 @@ export default function ResumenReservaScreen({ navigation, route }) {
 
       <StickyFooter>
         <Button
-          label={listo ? `Continuar al pago · ${formatCLP(dinero.total)}` : 'Continuar al pago'}
-          disabled={!listo || pasarela === false}
+          label={divide
+            ? `Armar el grupo · ${formatCLP(reparto.cuota)} c/u`
+            : (listo ? `Continuar al pago · ${formatCLP(dinero.total)}` : 'Continuar al pago')}
+          disabled={!listo || (!divide && pasarela === false)}
           loading={creando}
           onPress={continuar}
         />
@@ -298,6 +395,12 @@ const styles = StyleSheet.create({
   cobroNombre: { flex: 1, fontFamily: F.bold, fontSize: 13.5, color: C.textSecondary },
   cobroPrecio: { fontFamily: F.semiBold, fontSize: 13.5, color: C.textAmber },
   errorCampo: { fontFamily: F.semiBold, fontSize: 11.5, color: C.red, marginTop: 6 },
+  cuotaCaja: {
+    borderRadius: R.row, borderWidth: 1, borderColor: C.greenDeepBorder,
+    backgroundColor: C.shieldBg, paddingHorizontal: 14, paddingVertical: 13,
+  },
+  cuotaMonto: { fontFamily: F.extraBold, fontSize: 24, color: C.green, letterSpacing: -0.5 },
+  cuotaSub: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, lineHeight: 17, marginTop: 4 },
   privacidad: { flexDirection: 'row', gap: 6, marginTop: 13 },
   privacidadTexto: { flex: 1, fontFamily: F.medium, fontSize: 11, color: C.textSecondary, lineHeight: 15.5 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },

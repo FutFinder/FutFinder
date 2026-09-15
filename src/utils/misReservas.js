@@ -40,6 +40,13 @@ export function comoReserva(fila) {
     cobros: fila.cobros || [],
     puedeCancelar: !!fila.puede_cancelar,
     cancelacionHasta: fila.cancelacion_hasta || null,
+    // El avance del grupo, para la tarjeta de una reserva dividida
+    // (migración 90). `cupos` vale 1 en una reserva normal, así que la
+    // tarjeta puede preguntar `cupos > 1` sin mirar la modalidad.
+    nJugadores: fila.n_jugadores ?? null,
+    cupos: fila.cupos ?? 1,
+    listos: fila.listos ?? 0,
+    miEstado: fila.mi_estado || null,
   };
 }
 
@@ -89,6 +96,12 @@ const ETIQUETAS = {
  * hora NO es suya hasta que pague.
  */
 export function etiquetaDeEstado(reserva) {
+  // En una reserva dividida que se está armando, el número dice más que la
+  // palabra: «1 de 3» se entiende de una, «Armando el grupo» no dice si falta
+  // mucho o si ya está.
+  if (reserva?.estado === 'armando' && reserva?.cupos > 1) {
+    return { texto: `${reserva.listos || 0} de ${reserva.cupos}`, tono: 'amber' };
+  }
   return ETIQUETAS[reserva?.estado] || { texto: reserva?.estado || '—', tono: 'neutral' };
 }
 
@@ -99,8 +112,18 @@ export function etiquetaDeEstado(reserva) {
  * ofrecerle cancelarle el partido a otro.
  */
 export function accionesDeReserva(reserva) {
-  if (!reserva || !reserva.soyOrganizador) return [];
+  if (!reserva) return [];
   const acciones = [];
+
+  // Una reserva dividida es del grupo, no solo de quien la organizó: al
+  // invitado también hay que dejarlo entrar, o no tiene por dónde poner su
+  // parte. Es la única acción que no es exclusiva del organizador.
+  if (reserva.cupos > 1 && (reserva.estado === 'armando' || reserva.estado === 'procesando')) {
+    acciones.push({ clave: 'grupo', label: reserva.miEstado === 'aceptado' ? 'Ver el grupo' : 'Poner mi parte' });
+  }
+
+  if (!reserva.soyOrganizador) return acciones;
+
   if (reserva.estado === 'procesando' || reserva.estado === 'armando') {
     if (reserva.medioPago === 'tarjeta') acciones.push({ clave: 'pagar', label: 'Continuar al pago' });
   }

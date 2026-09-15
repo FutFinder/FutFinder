@@ -117,3 +117,47 @@ test('la fila del servidor se traduce sin perder nada importante', () => {
   // Sin cobros, una lista vacía y no `undefined`: la pantalla la recorre.
   assert.deepEqual(comoReserva({ id: 'b' }).cobros, []);
 });
+
+/* ── Reservas divididas (migración 90) ─────────────────────────── */
+
+const dividida = (extra) => ({
+  id: 'd1', estado: 'armando', soyOrganizador: true, medioPago: 'balance',
+  puedeCancelar: true, cupos: 3, listos: 1, miEstado: 'aceptado', ...extra,
+});
+
+test('en una dividida la insignia muestra el avance, no la palabra', () => {
+  // «Armando el grupo» no dice si falta uno o faltan cinco. «1 de 3» sí, y es
+  // lo único que la persona quiere saber de un vistazo en la lista.
+  assert.equal(etiquetaDeEstado(dividida()).texto, '1 de 3');
+  assert.equal(etiquetaDeEstado(dividida({ listos: 3 })).texto, '3 de 3');
+  // Una reserva normal en 'armando' no tiene avance que mostrar.
+  assert.equal(etiquetaDeEstado(dividida({ cupos: 1 })).texto, 'Armando el grupo');
+  // Y una ya confirmada muestra su estado, no el conteo.
+  assert.equal(etiquetaDeEstado(dividida({ estado: 'confirmada' })).texto, 'Confirmada');
+});
+
+test('EL INVITADO TAMBIÉN ENTRA AL GRUPO, aunque no organice', () => {
+  // Es la única acción que no es del organizador. Sin ella el invitado ve la
+  // reserva en su lista y no tiene por dónde poner su parte: el flujo entero
+  // se corta ahí.
+  const inv = dividida({ soyOrganizador: false, miEstado: 'pendiente' });
+  const claves = accionesDeReserva(inv).map((a) => a.clave);
+  assert.deepEqual(claves, ['grupo']);
+  assert.equal(accionesDeReserva(inv)[0].label, 'Poner mi parte');
+  // Y al que ya puso lo suyo se le ofrece mirar, no pagar de nuevo.
+  assert.equal(accionesDeReserva(dividida({ soyOrganizador: false }))[0].label, 'Ver el grupo');
+});
+
+test('al organizador de una dividida se le ofrece el grupo y cancelar', () => {
+  const claves = accionesDeReserva(dividida()).map((a) => a.clave);
+  assert.deepEqual(claves, ['grupo', 'cancelar']);
+  // Confirmada ya no se entra a armar nada.
+  assert.deepEqual(
+    accionesDeReserva(dividida({ estado: 'confirmada' })).map((a) => a.clave),
+    ['cancelar'],
+  );
+});
+
+test('una reserva normal no cambió: el invitado sigue sin acciones', () => {
+  assert.deepEqual(accionesDeReserva(r({ soyOrganizador: false })), []);
+});

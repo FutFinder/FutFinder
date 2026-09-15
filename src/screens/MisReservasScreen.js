@@ -68,6 +68,10 @@ export default function MisReservasScreen({ navigation }) {
 
   const ejecutar = (reserva, clave) => {
     if (clave === 'cancelar') { setPorCancelar(reserva); return; }
+    // La única acción que también es del invitado: sin esto, a quien lo
+    // sumaron a una reserva dividida le aparece en la lista y no tiene por
+    // dónde poner su parte.
+    if (clave === 'grupo') { navigation.navigate('ArmarReserva', { reservaId: reserva.id }); return; }
     if (clave === 'pagar') {
       navigation.navigate('PagoReserva', {
         reservaId: reserva.id,

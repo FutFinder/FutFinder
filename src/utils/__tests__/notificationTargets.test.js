@@ -458,3 +458,36 @@ test('club_match_reserva_omitida verifica que el partido siga existiendo', () =>
   });
   assert.deepEqual(t.resource, { kind: 'match', id: 'm1' });
 });
+
+/* ── Reservas (migración 90) ────────────────────────────────────── */
+
+test('LA INVITACIÓN A PONER TU PARTE TIENE QUE LLEVAR A ALGÚN LADO', () => {
+  // Antes ninguna notificación de reserva tenía destino: el aviso llegaba y
+  // al tocarlo no pasaba nada. Es justo el paso que la otra persona no puede
+  // adivinar sola, así que sin esto el pago dividido no se completa nunca.
+  for (const type of ['reserva_invitacion_jugador', 'reserva_invitacion_capitan',
+    'reserva_recordatorio_pago', 'reserva_saldo_insuficiente', 'reserva_cuota_recalculada']) {
+    assert.deepEqual(
+      resolveNotificationTarget({ type, data: { reservaId: 'r1' } }),
+      { screen: 'ArmarReserva', params: { reservaId: 'r1' } },
+      type,
+    );
+  }
+});
+
+test('un aviso viejo sin reservaId no navega a ciegas', () => {
+  assert.equal(resolveNotificationTarget({ type: 'reserva_invitacion_jugador', data: {} }), null);
+});
+
+test('los avisos que solo informan van a la lista, no al grupo', () => {
+  // Abrir el grupo de una reserva ya confirmada o cancelada no ofrece nada
+  // que hacer.
+  for (const type of ['reserva_confirmada', 'reserva_cancelada',
+    'reserva_invitacion_rechazada', 'reserva_participante_quitado']) {
+    assert.deepEqual(
+      resolveNotificationTarget({ type, data: { reservaId: 'r1' } }),
+      { screen: 'MisReservas' },
+      type,
+    );
+  }
+});

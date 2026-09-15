@@ -5,6 +5,7 @@ import {
 } from '../utils/reservasJugador';
 import { nombresDeServicios } from '../utils/serviciosRecinto';
 import { comoReserva } from '../utils/misReservas';
+import { comoDetalle } from '../utils/pagoDividido';
 
 /**
  * Servicio del vertical Reservas, LADO DEL JUGADOR.
@@ -288,6 +289,119 @@ export async function cancelarMiReserva(reservaId, motivo) {
     p_motivo: motivo || null,
   });
   return comoResultadoRecinto(data, error, 'cancelarMiReserva');
+}
+
+/* ── Pago dividido: armar el grupo ─────────────────────────────── */
+
+/**
+ * La nómina de una reserva: quién va, quién ya puso su parte, cuánto falta.
+ *
+ * Una sola llamada para toda la pantalla. `mis_reservas` trae el avance en
+ * números para pintar la lista, pero no los nombres: pedir el detalle de cada
+ * reserva solo para la lista serían N llamadas por pantalla.
+ */
+export async function detalleReserva(reservaId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  if (!reservaId) return { data: null, error: { message: 'Falta la reserva' } };
+  const { data, error } = await supabase.rpc('detalle_reserva', { p_reserva_id: reservaId });
+  if (error) return { data: null, error };
+  if (!data?.ok) return { data: null, error: { message: data?.reason || 'No se pudo leer la reserva' } };
+  return { data: comoDetalle(data), error: null };
+}
+
+/** Sumar a alguien al grupo. El servidor corta si ya no quedan cupos. */
+export async function invitarJugador(reservaId, userId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('invitar_participante_reserva', {
+    p_reserva_id: reservaId, p_user_id: userId, p_rol: 'jugador',
+  });
+  return comoResultadoRecinto(data, error, 'invitarJugador');
+}
+
+/** Sacar del grupo al que no va a poner su parte. Solo el organizador. */
+export async function quitarJugador(reservaId, userId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('quitar_participante_reserva', {
+    p_reserva_id: reservaId, p_user_id: userId,
+  });
+  return comoResultadoRecinto(data, error, 'quitarJugador');
+}
+
+/**
+ * Poner mi parte.
+ *
+ * NO MUEVE PLATA: autoriza que se cobre mi cuota del Balance cuando el grupo
+ * esté completo. Si el grupo nunca se completa, nunca se cobró nada — por eso
+ * el pago dividido es solo con Balance.
+ *
+ * El monto va explícito y tiene que calzar EXACTO con la cuota vigente. Es a
+ * propósito: si alguien cambió entre cuántos se divide mientras yo miraba la
+ * pantalla, prefiero un rechazo a que se me cobre un monto que no vi.
+ *
+ * Cuando entro yo último, el servidor confirma la reserva en la misma
+ * llamada y lo dice en `confirmada`.
+ */
+export async function autorizarMiParte(reservaId, monto) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('autorizar_cobro_reserva', {
+    p_reserva_id: reservaId, p_monto: monto,
+  });
+  return comoResultadoRecinto(data, error, 'autorizarMiParte');
+}
+
+/** Rechazar la invitación a una reserva. */
+export async function rechazarInvitacion(reservaId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('rechazar_invitacion_reserva', { p_reserva_id: reservaId });
+  return comoResultadoRecinto(data, error, 'rechazarInvitacion');
+}
+
+/**
+ * Cerrar la reserva: cobra a todos y toma la hora.
+ *
+ * Normalmente no hace falta llamarla —la última autorización confirma sola—
+ * pero queda para el caso en que la autoconfirmación falló por algo temporal
+ * (a alguien no le alcanzaba y ya cargó saldo) y el organizador reintenta.
+ */
+export async function confirmarReserva(reservaId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('confirmar_reserva', { p_reserva_id: reservaId });
+  return comoResultadoRecinto(data, error, 'confirmarReserva');
+}
+
+/** Empujar a los que faltan. El servidor deja uno por hora. */
+export async function recordarPago(reservaId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('recordar_pago_reserva', { p_reserva_id: reservaId });
+  return comoResultadoRecinto(data, error, 'recordarPago');
+}
+
+/**
+ * Cambiar entre cuántos se divide.
+ *
+ * INVALIDA TODAS las autorizaciones, incluida la de quien lo cambia: nadie
+ * queda comprometido con un monto que no volvió a ver.
+ */
+export async function recalcularCuota(reservaId, nJugadores) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('recalcular_cuota_reserva', {
+    p_reserva_id: reservaId, p_n_jugadores: nJugadores,
+  });
+  return comoResultadoRecinto(data, error, 'recalcularCuota');
+}
+
+/**
+ * Mi saldo.
+ *
+ * Solo el propio: `balance_movimientos` nunca deja ver el de otro, ni siquiera
+ * el de alguien del mismo grupo. Por eso la nómina dice «falta que confirme» y
+ * nunca «no le alcanza».
+ */
+export async function getMiBalance() {
+  if (!isSupabaseConfigured) return { data: 0, error: null };
+  const { data, error } = await supabase.rpc('get_mi_balance');
+  if (error) return { data: 0, error };
+  return { data: Number(data) || 0, error: null };
 }
 
 export { nombreDeTipo, jugadoresDeTipo, notaDeCancha };
