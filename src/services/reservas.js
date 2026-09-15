@@ -269,6 +269,19 @@ export async function crearReserva({
  */
 export async function misReservas(limite = 60) {
   if (!isSupabaseConfigured) return SIN_CONFIG;
+
+  // SIN SESIÓN, `mis_reservas` DEVUELVE CERO FILAS Y NINGÚN ERROR: la RPC
+  // arranca con `if auth.uid() is null then return`. Sin este chequeo, una
+  // sesión vencida se ve EXACTAMENTE IGUAL que «todavía no reservaste nada»,
+  // y la pantalla afirma algo falso sobre las canchas que alguien pagó en
+  // vez de decirle que vuelva a entrar. Es la misma regla que ya está
+  // escrita en `notificationInbox`: nunca mostrar «todo al día» cuando en
+  // realidad no pudimos ni preguntar.
+  const { data: sesion } = await supabase.auth.getSession();
+  if (!sesion?.session) {
+    return { data: null, error: { message: 'Tu sesión se cerró. Entra de nuevo para ver tus reservas.' } };
+  }
+
   const { data, error } = await supabase.rpc('mis_reservas', { p_limite: limite });
   const res = comoListaRecinto(data, error, 'misReservas');
   if (res.error) return res;
