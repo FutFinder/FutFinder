@@ -9,8 +9,6 @@ import {
   Modal,
   Dimensions,
   ActivityIndicator,
-  Platform,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,30 +33,21 @@ import {
   deleteClubPhoto,
   MAX_PHOTOS,
 } from '../services/clubGallery';
+import useConfirmacion from '../components/useConfirmacion';
 
 const SCREEN_W = Dimensions.get('window').width;
 const GRID_GAP = 4;
 const THUMB = Math.floor((SCREEN_W - 32 - GRID_GAP * 2) / 3);
 
 /** Confirmación multiplataforma (web usa confirm, native usa Alert). */
-function confirmAction(title, message, onConfirm) {
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.confirm(`${title}\n${message}`)) {
-      onConfirm();
-    }
-    return;
-  }
-  Alert.alert(title, message, [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: 'Eliminar', style: 'destructive', onPress: onConfirm },
-  ]);
-}
-
 /**
  * Galería completa de fotos de un club. Cualquiera la ve; solo los admins
  * pueden agregar o borrar (la RLS lo garantiza de todos modos).
  */
 export default function ClubGalleryScreen({ navigation, route }) {
+  // `window.confirm` no abre nada en web: devuelve false al instante y la
+  // acción no se ejecutaba nunca, sin decir por qué. Diálogo propio.
+  const { confirmar, dialogo } = useConfirmacion();
   const { clubId } = route.params || {};
 
   const [loading, setLoading] = useState(true);
@@ -144,7 +133,7 @@ export default function ClubGalleryScreen({ navigation, route }) {
   };
 
   const handleDelete = (photo) => {
-    confirmAction('¿Eliminar esta foto?', 'Se quitará de la galería del club.', async () => {
+    confirmar('¿Eliminar esta foto?', 'Se quitará de la galería del club.', async () => {
       const { error } = await deleteClubPhoto(photo.id, photo.photo_url, clubId);
       if (error) {
         setBanner({ type: 'error', title: 'No se pudo eliminar', message: error.message });
@@ -273,6 +262,8 @@ export default function ClubGalleryScreen({ navigation, route }) {
           )}
         </View>
       </Modal>
+
+      {dialogo}
     </SafeAreaView>
   );
 }

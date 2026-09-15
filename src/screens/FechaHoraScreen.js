@@ -36,7 +36,7 @@ export default function FechaHoraScreen({ navigation, route }) {
     // LAS HORAS QUE YA PASARON NO SE MUESTRAN. Mostrarlas tachadas sería
     // media pantalla de ruido sobre algo que nadie puede elegir, y con la
     // etiqueta de no-disponible parecería que el recinto está copado
-    // cuando en realidad el día se acabó (migración 96).
+    // cuando en realidad el día se acabó (migración 97).
     const delDia = (disp?.horas || []).filter((h) => !h.pasada);
     setHoras(delDia);
     setTodasPasaron((disp?.horas || []).length > 0 && delDia.length === 0);

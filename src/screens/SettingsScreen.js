@@ -6,7 +6,6 @@ import {
   ScrollView,
   Pressable,
   TextInput,
-  Alert,
   Platform,
   Linking,
   ActivityIndicator,
@@ -60,22 +59,10 @@ import {
 import { getProfileLoadStatus } from '../utils/profileEdit';
 import { APP_VERSION } from '../utils/appVersion';
 import { buildMyDataExport } from '../services/dataExport';
+import useConfirmacion from '../components/useConfirmacion';
 
 const TERMS_URL = 'https://futfinder.cl/terminos';
 const PRIVACY_URL = 'https://futfinder.cl/privacidad';
-
-function confirmAction(title, message, onConfirm) {
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.confirm(`${title}\n\n${message}`)) {
-      onConfirm();
-    }
-    return;
-  }
-  Alert.alert(title, message, [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: 'Confirmar', style: 'destructive', onPress: onConfirm },
-  ]);
-}
 
 // ── Custom slider (no deps externos) ─────────────────────────────
 // onValueChange: llama en cada movimiento (UI en tiempo real)
@@ -283,6 +270,9 @@ function OtpBoxes({ digits, onChangeDigits, error }) {
 
 export default function SettingsScreen({ navigation }) {
   const { showActionSheetWithOptions } = useActionSheet();
+  // Diálogo propio: `window.confirm` no abre nada en web y dejaba cerrar
+  // sesión y eliminar cuenta sin hacer absolutamente nada, en silencio.
+  const { confirmar, dialogo } = useConfirmacion();
 
   const [profile, setProfile] = useState(null);
   const [misClub, setMisClub] = useState(null);
@@ -562,10 +552,11 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleLogout = () => {
-    confirmAction(
+    confirmar(
       'Cerrar sesión',
       '¿Seguro que quieres salir de tu cuenta?',
       async () => { await signOut(); navigateToAuth(); },
+      { confirmar: 'Cerrar sesión' },
     );
   };
 
@@ -595,7 +586,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleDeleteAccount = () => {
-    confirmAction(
+    confirmar(
       '¿Eliminar tu cuenta?',
       'Esta acción es permanente e irreversible. Se borrarán todos tus datos, partidos, mensajes y membresías.',
       async () => {
@@ -609,6 +600,7 @@ export default function SettingsScreen({ navigation }) {
         await signOut();
         navigateToAuth();
       },
+      { confirmar: 'Eliminar mi cuenta' },
     );
   };
 
@@ -1048,6 +1040,8 @@ export default function SettingsScreen({ navigation }) {
           style={{ marginTop: 14 }}
         />
       </Sheet>
+
+      {dialogo}
     </SafeAreaView>
   );
 }

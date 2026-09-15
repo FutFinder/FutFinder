@@ -1,5 +1,5 @@
 -- =============================================================
--- FutFinder migration 96: una hora que pasó no está «Reservada»
+-- FutFinder migration 97: una hora que pasó no está «Reservada»
 -- =============================================================
 -- A LAS 23:30 EL RECINTO SE VE COMPLETAMENTE COPADO, Y NO LO ESTÁ.
 -- Abriendo la app de noche, la grilla de hoy mostraba «0 de 14 libres» y
@@ -74,7 +74,7 @@ begin
                'hora_fin', to_char(s.hora_inicio + (v_slot_min || ' minutes')::interval, 'HH24:MI'),
                -- Precio del bloque (migración 64).
                'precio', public.precio_de_bloque(p_cancha_id, p_fecha, s.hora_inicio),
-               -- NUEVO EN LA 96: si la hora ya pasó. No rompe la regla de
+               -- NUEVO EN LA 97: si la hora ya pasó. No rompe la regla de
                -- privacidad —el reloj no es información de nadie— y es lo
                -- único que le permite a la pantalla no llamar «Reservada»
                -- a media jornada que nadie tomó.

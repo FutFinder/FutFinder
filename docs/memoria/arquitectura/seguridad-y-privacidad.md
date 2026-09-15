@@ -68,3 +68,7 @@ Se hizo con `alter function ... set search_path`, que **no toca el cuerpo**. Cop
 **Antes se comprobó que ninguna usara algo fuera de `public`** (unaccent, pgcrypto, earthdistance). Fijar el camino en una función que dependiera de una extensión la habría roto: es la única forma en que este cambio podía hacer daño.
 
 **Pendiente y es tuyo:** la protección de contraseñas filtradas de Supabase Auth está **desactivada**. Se enciende en Authentication → Policies del panel; no se puede hacer por SQL ni por migración.
+
+## Confirmar algo destructivo
+
+`window.confirm` **no abre nada en la app web**: devuelve `false` en un milisegundo sin mostrar ningún cuadro. Tres pantallas tenían su propia copia de un `confirmAction` que lo usaba cuando `Platform.OS === 'web'`, así que **cerrar sesión no hacía nada, en silencio** — y lo mismo eliminar la cuenta, borrar una foto del club y expulsar a un integrante. El botón respondía al toque, no aparecía ningún error, y la única conclusión posible era que la app estaba rota. `Alert.alert` de React Native tampoco funciona en web. La salida es `useConfirmacion`, un Modal propio que anda en los tres lados (2026-09-15). Se descubrió probando cerrar sesión en el navegador, no leyendo código.

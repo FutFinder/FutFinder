@@ -1,5 +1,5 @@
 -- =============================================================
--- FutFinder migration 95: el saldo, con la historia de cada peso
+-- FutFinder migration 96: el saldo, con la historia de cada peso
 -- =============================================================
 -- NO HAY NINGUNA PANTALLA DONDE VER EL SALDO. `get_mi_balance` existe
 -- desde la 56 y hasta hoy no la llamaba nadie más que un aviso de la

@@ -8,8 +8,6 @@ import {
   Image,
   RefreshControl,
   ActivityIndicator,
-  Platform,
-  Alert,
   TextInput,
   Modal,
 } from 'react-native';
@@ -61,21 +59,9 @@ import {
   setApodo,
   CLUB_LIMITS,
 } from '../services/clubs';
+import useConfirmacion from '../components/useConfirmacion';
 
 /** Confirmación multiplataforma (web usa confirm, native usa Alert). */
-function confirmAction(title, message, onConfirm) {
-  if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.confirm(`${title}\n${message}`)) {
-      onConfirm();
-    }
-    return;
-  }
-  Alert.alert(title, message, [
-    { text: 'Cancelar', style: 'cancel' },
-    { text: 'Confirmar', style: 'destructive', onPress: onConfirm },
-  ]);
-}
-
 /**
  * Integrantes de un club: lista de miembros con reputación, apodo y rol, y
  * acciones según quién mire:
@@ -86,6 +72,9 @@ function confirmAction(title, message, onConfirm) {
  * Se llega aquí desde el contador de integrantes del dashboard (ClubDetail).
  */
 export default function ClubMembersScreen({ navigation, route }) {
+  // `window.confirm` no abre nada en web: devuelve false al instante y la
+  // acción no se ejecutaba nunca, sin decir por qué. Diálogo propio.
+  const { confirmar, dialogo } = useConfirmacion();
   const { clubId } = route.params || {};
 
   const [loading, setLoading] = useState(true);
@@ -220,7 +209,7 @@ export default function ClubMembersScreen({ navigation, route }) {
   };
 
   const handleLeave = () => {
-    confirmAction(
+    confirmar(
       '¿Salir del club?',
       'Dejarás de ver el chat y los datos internos del club.',
       async () => {
@@ -251,7 +240,7 @@ export default function ClubMembersScreen({ navigation, route }) {
 
     if (adminCount < limites.admins) {
       // hay cupo: se suma como admin sin que yo deje de serlo
-      confirmAction(
+      confirmar(
         `¿Hacer admin a ${member.username}?`,
         'Podrá aceptar solicitudes, invitar jugadores y expulsar miembros.',
         async () => {
@@ -270,7 +259,7 @@ export default function ClubMembersScreen({ navigation, route }) {
       );
     } else {
       // sin cupo (p.ej. Estándar = 1 admin): ceder mi administración
-      confirmAction(
+      confirmar(
         `¿Ceder la administración a ${member.username}?`,
         `Tu plan permite ${limites.admins} admin${limites.admins > 1 ? 's' : ''}: tú pasarás a ser jugador.`,
         async () => {
@@ -375,7 +364,7 @@ export default function ClubMembersScreen({ navigation, route }) {
   };
 
   const handleExpel = (member) => {
-    confirmAction(
+    confirmar(
       `¿Expulsar a ${member.username}?`,
       'Perderá acceso al chat y dejará de ser parte del club.',
       async () => {
@@ -844,6 +833,8 @@ export default function ClubMembersScreen({ navigation, route }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {dialogo}
     </SafeAreaView>
   );
 }
