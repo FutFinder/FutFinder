@@ -1,6 +1,6 @@
 # Partidos
 
-Última revisión: 2026-08-08
+Última revisión de cupos: 2026-09-15
 
 ## Propósito
 
@@ -13,6 +13,8 @@ Descubrir, publicar, administrar y completar partidos, incluyendo cupos, solicit
 ## Reglas y permisos
 
 `matchRules.js` es la fuente de UI: 2 horas sin penalización, cupos 1–30, 200 m para GPS y 72 horas para asistencia final. PostgreSQL replica las reglas críticas: estado, cupos, elegibilidad, Trust Score, choques de horario, cola y una sola aplicación de asistencia. Sólo organizador actualiza/cancela/gestiona; asistentes autorizados participan en chat de partido.
+
+En partidos normales, los cupos representan jugadores adicionales al organizador: «falta 1 jugador» admite al organizador y a un jugador más. `matches_guard_cupos` calcula la disponibilidad desde la nómina vigente, excluyendo al organizador (migraciones 104 y 105). Los partidos de clubes conservan su conteo propio. La regresión `supabase/tests/partidos_cupo_unico_test.sql` cubre ingreso inmediato, rechazo de un segundo jugador y aprobación manual para ese único cupo.
 
 ## Pantallas y dependencias
 
