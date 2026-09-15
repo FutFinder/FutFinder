@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  accionesDeReserva, comoReserva, enlaceDeMapa, etiquetaDeEstado,
+  accionesDeReserva, comoReserva, enlaceDeMapa, etiquetaDeEstado, lineaDePrecio,
   separaReservas, textoDeCancelacion,
 } = require('../misReservas.js');
 
@@ -151,11 +151,51 @@ test('EL INVITADO TAMBIÉN ENTRA AL GRUPO, aunque no organice', () => {
 test('al organizador de una dividida se le ofrece el grupo y cancelar', () => {
   const claves = accionesDeReserva(dividida()).map((a) => a.clave);
   assert.deepEqual(claves, ['grupo', 'cancelar']);
-  // Confirmada ya no se entra a armar nada.
+});
+
+test('UNA DIVIDIDA CONFIRMADA SIGUE DEJANDO VER EL GRUPO', () => {
+  // La primera versión las dejaba fuera —«ya no hay nada que armar»— y era
+  // mirar el botón en vez de mirar para qué sirve: después de confirmar es
+  // justo cuando uno quiere ver quiénes van, y para un invitado es la única
+  // forma de saber con quién juega. Salió probándolo en el teléfono.
   assert.deepEqual(
     accionesDeReserva(dividida({ estado: 'confirmada' })).map((a) => a.clave),
-    ['cancelar'],
+    ['grupo', 'cancelar'],
   );
+  assert.deepEqual(
+    accionesDeReserva(dividida({ estado: 'confirmada', soyOrganizador: false })).map((a) => a.clave),
+    ['grupo'],
+  );
+  // Una muerta no: ahí ya no hay partido que mirar.
+  for (const estado of ['cancelada', 'vencida', 'rechazada']) {
+    assert.deepEqual(accionesDeReserva(dividida({ estado, puedeCancelar: false })), [], estado);
+  }
+});
+
+test('EN UNA DIVIDIDA EL NÚMERO GRANDE ES LO QUE PAGA QUIEN MIRA', () => {
+  // La tarjeta decía «Total del partido $18.000» a alguien a quien le
+  // cobraron $9.000: el único número que esa persona puede comprobar contra
+  // su saldo aparecía mal.
+  const p = lineaDePrecio(dividida({ cupos: 2, cuota: 9000, precioTotal: 18000 }));
+  assert.equal(p.etiqueta, 'Tu parte');
+  assert.equal(p.monto, 9000);
+  assert.equal(p.total, 18000);
+  assert.equal(p.cupos, 2);
+});
+
+test('sin cuota guardada se calcula igual que el servidor', () => {
+  // 'capitanes' no guarda `cuota`: es la mitad, redondeada hacia arriba.
+  const p = lineaDePrecio(dividida({ cupos: 2, cuota: null, precioTotal: 18001 }));
+  assert.equal(p.monto, 9001);
+});
+
+test('una reserva normal muestra el total, como siempre', () => {
+  const mio = lineaDePrecio(dividida({ cupos: 1, cuota: null, precioTotal: 18000 }));
+  assert.equal(mio.etiqueta, 'Total');
+  assert.equal(mio.monto, 18000);
+  assert.equal(mio.total, null);
+  const ajeno = lineaDePrecio(dividida({ cupos: 1, cuota: null, soyOrganizador: false }));
+  assert.equal(ajeno.etiqueta, 'Total del partido');
 });
 
 test('una reserva normal no cambió: el invitado sigue sin acciones', () => {

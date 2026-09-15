@@ -118,7 +118,12 @@ export function accionesDeReserva(reserva) {
   // Una reserva dividida es del grupo, no solo de quien la organizó: al
   // invitado también hay que dejarlo entrar, o no tiene por dónde poner su
   // parte. Es la única acción que no es exclusiva del organizador.
-  if (reserva.cupos > 1 && (reserva.estado === 'armando' || reserva.estado === 'procesando')) {
+  //
+  // INCLUYE LAS CONFIRMADAS. La primera versión las dejaba fuera —«ya no hay
+  // nada que armar»— y era mirar el botón en vez de mirar para qué sirve:
+  // después de confirmar es JUSTO cuando uno quiere ver quiénes van, y para
+  // un invitado es la única forma de saber con quién juega.
+  if (reserva.cupos > 1 && VIVAS.includes(reserva.estado)) {
     acciones.push({ clave: 'grupo', label: reserva.miEstado === 'aceptado' ? 'Ver el grupo' : 'Poner mi parte' });
   }
 
@@ -149,6 +154,38 @@ export function textoDeCancelacion(reserva) {
     return 'Puedes cancelar con devolución hasta 12 horas antes del partido.';
   }
   return 'Ya no se puede cancelar: quedan menos de 12 horas para el partido.';
+}
+
+/**
+ * Qué número mostrar en la tarjeta.
+ *
+ * EN UNA DIVIDIDA, EL NÚMERO GRANDE ES LO QUE PAGA QUIEN MIRA, no el total.
+ * La tarjeta decía «Total del partido $18.000» a alguien a quien le cobraron
+ * $9.000: el único número que esa persona puede comprobar contra su saldo
+ * aparecía mal. El total queda abajo, como contexto.
+ *
+ * `cuota` solo está en la base para la modalidad 'jugadores'; en 'capitanes'
+ * es la mitad y se calcula igual que en el servidor.
+ *
+ * Devuelve números, no texto con signo peso: el formato es de la pantalla.
+ */
+export function lineaDePrecio(reserva) {
+  if (!reserva) return null;
+  const cupos = reserva.cupos || 1;
+  if (cupos <= 1) {
+    return {
+      etiqueta: reserva.soyOrganizador ? 'Total' : 'Total del partido',
+      monto: reserva.precioTotal,
+      total: null,
+      cupos,
+    };
+  }
+  return {
+    etiqueta: 'Tu parte',
+    monto: reserva.cuota ?? Math.ceil(reserva.precioTotal / cupos),
+    total: reserva.precioTotal,
+    cupos,
+  };
 }
 
 /** Para abrir el mapa del teléfono con el recinto. */

@@ -61,6 +61,8 @@ Construido hasta ahora (pantallas 1 a 8 del handoff):
 
 **Ninguna notificación de reserva tenía destino** hasta la 94: la invitación a poner tu parte llegaba y, al tocarla, no pasaba nada — el flujo se cortaba justo en el paso que la otra persona no puede adivinar sola. Las que tienen algo que hacer van a `ArmarReserva`; las que solo informan, a `MisReservas`.
 
+**Dos cosas salieron de probarlo en el teléfono, no de leer el código.** La primera: «Ver el grupo» no aparecía en una reserva ya **confirmada** —la regla decía «ya no hay nada que armar»— y era mirar el botón en vez de mirar para qué sirve: después de confirmar es justo cuando uno quiere ver quiénes van, y para un invitado es la única forma de saber con quién juega. La segunda, peor: la tarjeta decía «Total del partido $18.000» a alguien a quien le cobraron **$9.000**. En una dividida el número grande es **lo que paga quien mira** (`lineaDePrecio`), y el total queda abajo como contexto — era el único número que esa persona podía comprobar contra su saldo y aparecía mal.
+
 **El saldo ajeno no se muestra nunca.** La nómina dice «falta que confirme», no «no le alcanza», aunque el servidor sepa la diferencia: `balance_movimientos` solo deja ver lo propio y esa promesa no se rompe para pintar una lista. El saldo **propio** sí, y es lo único que permite avisarle a alguien antes de que apriete que no le va a alcanzar.
 
 **La contracara honesta:** cargar saldo no existe (`cargar_balance` revocada en la migración 73 porque acreditaba plata sin cobrarla). El camino dividido se recorre entero, pero quien no tenga saldo ve el botón apagado y el motivo escrito.
