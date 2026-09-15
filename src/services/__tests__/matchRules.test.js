@@ -352,3 +352,33 @@ test('un inscrito en un partido vivo escribe con normalidad', () => {
 test('sin datos del partido no se bloquea a quien sí está inscrito', () => {
   assert.equal(R.accesoAlChatDelPartido({ estado: 'inscrito' }, null).canWrite, true);
 });
+
+/**
+ * `rangoDeFecha` es la definición ÚNICA de cada ventana: la usa la consulta a
+ * la base y el filtro en memoria. Cuando cada uno calculaba lo suyo, «Fin de
+ * semana» significaba una cosa en la base y otra en la pantalla.
+ */
+test('rangoDeFecha: «hoy» va desde ahora hasta la medianoche', () => {
+  const ahora = new Date(2026, 8, 16, 15, 30); // miércoles
+  const { desde, hasta } = R.rangoDeFecha('hoy', ahora);
+  assert.equal(desde.getTime(), ahora.getTime(), 'desde ahora: no ofrece lo que ya empezó');
+  assert.equal(hasta.getDate(), 17);
+  assert.equal(hasta.getHours(), 0);
+});
+
+test('rangoDeFecha: «mañana» es el día completo siguiente', () => {
+  const { desde, hasta } = R.rangoDeFecha('manana', new Date(2026, 8, 16, 15, 30));
+  assert.equal(desde.getDate(), 17);
+  assert.equal(desde.getHours(), 0);
+  assert.equal(hasta.getDate(), 18);
+});
+
+test('rangoDeFecha: «finde» delega en la ventana del fin de semana', () => {
+  const domingo = new Date(2026, 8, 20, 12, 0);
+  assert.deepEqual(R.rangoDeFecha('finde', domingo), R.ventanaDeFinDeSemana(domingo));
+});
+
+test('rangoDeFecha: sin ventana no acota nada', () => {
+  assert.deepEqual(R.rangoDeFecha('todos'), { desde: null, hasta: null });
+  assert.deepEqual(R.rangoDeFecha(undefined), { desde: null, hasta: null });
+});

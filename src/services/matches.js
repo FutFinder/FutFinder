@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
 import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
-import { aceptaACualquiera, ventanaDeFinDeSemana } from './matchRules';
+import { aceptaACualquiera, rangoDeFecha } from './matchRules';
 
 /**
  * `tema` → migración 53. Sin ella, pedirla en el `select` explícito de
@@ -231,6 +231,106 @@ export async function listMatchesInBounds({
 }
 
 /**
+ * Traduce los filtros del buscador a una consulta de Supabase.
+ *
+ * POR QUÉ EXISTE. El buscador traía los N partidos más próximos y filtraba
+ * TODO en el cliente: un partido que calzaba con lo que el usuario pedía, pero
+ * que caía fuera de esos N, era invisible sin que nada lo dijera. Acá los
+ * criterios que la base sabe resolver van en la consulta, así el tope se
+ * aplica sobre los partidos que importan.
+ *
+ * QUÉ SE QUEDA EN EL CLIENTE, a propósito:
+ *   · la distancia, que se calcula con las coordenadas del teléfono y no
+ *     viaja al servidor (ver la nota de privacidad de la pantalla);
+ *   · el rango de edad, que no es una comparación sino un solapamiento de
+ *     rangos —un partido «sin restricción» siempre entra— y se lee mejor en
+ *     `filterMatches`, donde está probado.
+ */
+function consultaDePartidos({ filtros = {}, texto = '', estados = ['abierto', 'lleno'] } = {}) {
+  const ahora = new Date().toISOString();
+  let q = supabase.from('matches').select('*').in('estado', estados).gt('hora', ahora);
+
+  const ventana = rangoDeFecha(filtros.fecha);
+  if (ventana?.desde) q = q.gte('hora', ventana.desde.toISOString());
+  if (ventana?.hasta) q = q.lt('hora', ventana.hasta.toISOString());
+
+  if (filtros.region) q = q.eq('region', filtros.region);
+  if (filtros.comuna) q = q.eq('comuna', filtros.comuna);
+  if (filtros.modalidad) q = q.eq('modalidad', filtros.modalidad);
+  if (filtros.nivel) q = q.eq('nivel', filtros.nivel);
+  if (filtros.disponibilidad === 'con_cupos') q = q.gt('cupos_disponibles', 0);
+  if (filtros.sinMinimoTrust) q = q.eq('min_trust_score', 0);
+  if (filtros.cuota) {
+    q = q.gte('precio_cuota', filtros.cuota.min).lte('precio_cuota', filtros.cuota.max);
+  }
+
+  const t = (texto || '').trim();
+  if (t) {
+    // `,` y `)` rompen la sintaxis del `or` de PostgREST: se sacan del texto
+    // en vez de escapar, que acá no aporta nada al usuario.
+    const limpio = t.replace(/[,()]/g, ' ').trim();
+    if (limpio) {
+      const p = `%${limpio}%`;
+      q = q.or(
+        `titulo.ilike.${p},cancha_nombre.ilike.${p},comuna.ilike.${p},direccion.ilike.${p}`
+      );
+    }
+  }
+  return q;
+}
+
+/**
+ * Una página de partidos que ya calzan con los filtros, ordenados por hora.
+ *
+ * Devuelve `{ data, hayMas, error }`. `hayMas` dice si vale la pena pedir la
+ * página siguiente: se pide un elemento de más y se descarta.
+ */
+export async function buscarPartidos({
+  filtros = {},
+  texto = '',
+  limite = 50,
+  desde = 0,
+  estados = ['abierto', 'lleno'],
+} = {}) {
+  if (!isSupabaseConfigured) return { data: getDemoMatches(), hayMas: false, error: null };
+
+  const { data, error } = await consultaDePartidos({ filtros, texto, estados })
+    .order('hora', { ascending: true })
+    .range(desde, desde + limite);
+
+  if (error) {
+    console.error('[FutFinder] buscarPartidos:', error);
+    return { data: [], hayMas: false, error };
+  }
+  const pagina = (data || []).slice(0, limite);
+  return {
+    data: await withClubs(await withOrganizers(pagina)),
+    hayMas: (data || []).length > limite,
+    error: null,
+  };
+}
+
+/**
+ * Cuántos partidos calzarían con estos filtros, sin traerlos.
+ *
+ * Es lo que sostiene las sugerencias de «qué pasaría si sueltas este filtro»
+ * ahora que la lista no tiene todos los partidos en memoria. Una consulta de
+ * conteo por sugerencia, y solo cuando la búsqueda quedó vacía.
+ */
+export async function contarPartidos({ filtros = {}, texto = '', estados = ['abierto', 'lleno'] } = {}) {
+  if (!isSupabaseConfigured) return 0;
+  const { count, error } = await consultaDePartidos({ filtros, texto, estados }).select('id', {
+    count: 'exact',
+    head: true,
+  });
+  if (error) {
+    console.warn('[FutFinder] contarPartidos:', error);
+    return 0;
+  }
+  return count || 0;
+}
+
+/**
  * Filtra una lista de partidos por criterios del usuario y los enriquece
  * con la distancia calculada desde sus coordenadas (si vienen).
  *
@@ -264,22 +364,14 @@ export function applyFilters(matches, filters, userCoords) {
     return { ...m, _distanciaKm: km };
   });
 
-  // Ventana horaria
+  // Ventana horaria: la misma que usa la consulta (ver `consultaDePartidos`).
   const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startTomorrow = new Date(startOfDay);
-  startTomorrow.setDate(startTomorrow.getDate() + 1);
-  const endTomorrow = new Date(startTomorrow);
-  endTomorrow.setDate(endTomorrow.getDate() + 1);
-  // Si hoy es sábado o domingo, el fin de semana es este, no el que viene.
-  const finde = ventanaDeFinDeSemana(now);
+  const ventana = rangoDeFecha(timeWindow, now);
 
   function inWindow(matchHora) {
     const h = new Date(matchHora);
-    if (timeWindow === 'todos') return true;
-    if (timeWindow === 'hoy') return h >= now && h < startTomorrow;
-    if (timeWindow === 'manana') return h >= startTomorrow && h < endTomorrow;
-    if (timeWindow === 'finde') return h >= finde.desde && h < finde.hasta;
+    if (ventana.desde && h < ventana.desde) return false;
+    if (ventana.hasta && h >= ventana.hasta) return false;
     return true;
   }
 
@@ -330,25 +422,13 @@ export function filterMatches(matches, f = {}, userCoords = null) {
   }));
 
   const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startTomorrow = new Date(startOfDay);
-  startTomorrow.setDate(startTomorrow.getDate() + 1);
-  const endTomorrow = new Date(startTomorrow);
-  endTomorrow.setDate(endTomorrow.getDate() + 1);
-  const finde = ventanaDeFinDeSemana(now);
+  const ventana = rangoDeFecha(f.fecha, now);
 
   const inWindow = (hora) => {
     const h = new Date(hora);
-    switch (f.fecha) {
-      case 'hoy':
-        return h >= now && h < startTomorrow;
-      case 'manana':
-        return h >= startTomorrow && h < endTomorrow;
-      case 'finde':
-        return h >= finde.desde && h < finde.hasta;
-      default:
-        return true;
-    }
+    if (ventana.desde && h < ventana.desde) return false;
+    if (ventana.hasta && h >= ventana.hasta) return false;
+    return true;
   };
 
   const edadRange = resolveEdadFilter(f);

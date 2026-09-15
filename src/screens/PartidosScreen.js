@@ -25,7 +25,7 @@ import {
 } from 'lucide-react-native';
 
 import { partidos as P, partidosRadius as R } from '../theme/colors';
-import { Pill, Tag, Avatar, PrimaryButton } from '../components/partidos/ui';
+import { Pill, Tag, Avatar, PrimaryButton, SurfaceButton } from '../components/partidos/ui';
 import PartidoCard from '../components/partidos/PartidoCard';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { esPartidoDeClubes } from '../services/clubMatchRules';
@@ -48,9 +48,10 @@ import {
 } from '../components/partidos/StateViews';
 import MatchMap from '../components/MatchMap';
 import {
+  buscarPartidos,
+  contarPartidos,
   filterMatches,
   listMatchesInBounds,
-  listOpenMatches,
 } from '../services/matches';
 import { getCurrentLocation, requestLocationPermission } from '../services/location';
 import { getCurrentUser } from '../services/auth';
@@ -69,6 +70,9 @@ import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { DIST_OPTS } from '../services/matchRules';
 
 const CACHE_KEY = 'partidos/open';
+
+/** Partidos por página. La siguiente se pide con «Ver más partidos». */
+const PAGINA = 50;
 
 const POS_OPTS = [
   { label: 'Cualquier posición', value: null },
@@ -119,6 +123,14 @@ export default function PartidosScreen({ navigation, route }) {
 
   const [text, setText] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [hayMas, setHayMas] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  // `load` no depende de los filtros para no reconstruirse en cada tecla: lee
+  // el valor vigente por referencia.
+  const filtrosRef = useRef(filters);
+  const textoRef = useRef(text);
+  filtrosRef.current = filters;
+  textoRef.current = text;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [picker, setPicker] = useState(null); // 'region' | 'comuna'
 
@@ -160,13 +172,14 @@ export default function PartidosScreen({ navigation, route }) {
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoadError(null);
     const [res, loc, user, status, misClubes] = await Promise.all([
-      // `lleno` también: el filtro «Todos» los promete y es donde se descubre
-      // la lista de espera. El tope alto es a propósito: los filtros se
-      // aplican en el cliente para poder sugerir «qué pasa si sueltas uno».
-      listOpenMatches({ limit: 300, estados: ['abierto', 'lleno'] }).catch((e) => ({
-        data: [],
-        error: e,
-      })),
+      // Los filtros que la base sabe resolver van EN la consulta: antes se
+      // traían los N partidos más próximos y se filtraba después, así que uno
+      // que calzaba pero caía fuera de esos N era invisible. `lleno` también
+      // viene, porque el filtro «Todos» los promete y es donde se descubre la
+      // lista de espera.
+      buscarPartidos({ filtros: filtrosRef.current, texto: textoRef.current, limite: PAGINA }).catch(
+        (e) => ({ data: [], hayMas: false, error: e })
+      ),
       getCurrentLocation(),
       getCurrentUser(),
       getMyAccountStatus().catch(() => null),
@@ -217,6 +230,7 @@ export default function PartidosScreen({ navigation, route }) {
     } else {
       markOnline();
       setMatches(res.data || []);
+      setHayMas(!!res.hayMas);
       setFromCache(null);
       setLoadError(null);
       cacheWrite(CACHE_KEY, res.data || []);
@@ -225,6 +239,39 @@ export default function PartidosScreen({ navigation, route }) {
     setLoading(false);
     setRefreshing(false);
   }, []);
+
+  /** La página siguiente, sin perder lo que ya está en pantalla. */
+  const cargarMas = useCallback(async () => {
+    if (cargandoMas || !hayMas) return;
+    setCargandoMas(true);
+    const res = await buscarPartidos({
+      filtros: filtrosRef.current,
+      texto: textoRef.current,
+      limite: PAGINA,
+      desde: matches.length,
+    }).catch(() => ({ data: [], hayMas: false }));
+    // Por id: dos páginas pueden solaparse si alguien publica entremedio.
+    setMatches((prev) => {
+      const vistos = new Set(prev.map((m) => m.id));
+      return [...prev, ...(res.data || []).filter((m) => !vistos.has(m.id))];
+    });
+    setHayMas(!!res.hayMas);
+    setCargandoMas(false);
+  }, [cargandoMas, hayMas, matches.length]);
+
+  // Cambiar un filtro o el texto vuelve a preguntarle a la base. El texto se
+  // deja reposar: si no, cada letra sería una consulta. La primera vuelta se
+  // salta: la carga inicial ya pidió lo mismo, y sin esto entrar al buscador
+  // disparaba dos consultas idénticas.
+  const yaPregunto = useRef(false);
+  useEffect(() => {
+    if (!yaPregunto.current) {
+      yaPregunto.current = true;
+      return undefined;
+    }
+    const t = setTimeout(() => load({ silent: true }), text.trim() ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [filters, text]);
 
   useEffect(() => {
     load();
@@ -276,42 +323,67 @@ export default function PartidosScreen({ navigation, route }) {
   const activeCount = countActiveFilters(filters);
   const hasQuery = text.trim().length > 0;
 
-  // Sugerencias reales: qué pasaría si suelto un filtro.
-  const suggestions = useMemo(() => {
-    if (filtered.length > 0) return [];
-    const out = [];
-    if (filters.maxKm != null) {
-      const wider = DIST_OPTS.filter((d) => d.value == null || d.value > filters.maxKm);
-      for (const d of wider) {
-        const n = applyFilterSet({ ...filters, maxKm: d.value }).length;
-        if (n > 0) {
-          out.push({ label: d.value == null ? 'Quitar el límite de distancia' : `Ampliar a ${d.label}`, count: n });
-          break;
+  /**
+   * Sugerencias reales: qué pasaría si suelto un filtro.
+   *
+   * Antes se contaban sobre la lista en memoria, que traía TODOS los partidos
+   * próximos. Ahora la consulta ya viene filtrada, así que la lista no tiene
+   * los partidos que el filtro dejó fuera: cada sugerencia se cuenta con su
+   * propia consulta de conteo, y solo cuando la búsqueda quedó vacía. La
+   * distancia es la excepción: se calcula en el teléfono, así que esa se
+   * sigue contando acá.
+   */
+  const [suggestions, setSuggestions] = useState([]);
+  useEffect(() => {
+    if (mode !== 'matches' || loading || filtered.length > 0) {
+      setSuggestions([]);
+      return undefined;
+    }
+    let vivo = true;
+    (async () => {
+      const out = [];
+
+      if (filters.maxKm != null) {
+        const wider = DIST_OPTS.filter((d) => d.value == null || d.value > filters.maxKm);
+        for (const d of wider) {
+          const n = applyFilterSet({ ...filters, maxKm: d.value }).length;
+          if (n > 0) {
+            out.push({
+              label: d.value == null ? 'Quitar el límite de distancia' : `Ampliar a ${d.label}`,
+              count: n,
+            });
+            break;
+          }
         }
       }
-    }
-    if (filters.nivel) {
-      const n = applyFilterSet({ ...filters, nivel: null }).length;
-      if (n > 0) out.push({ label: `Quitar «${filters.nivel}»`, count: n });
-    }
-    if (filters.modalidad) {
-      const n = applyFilterSet({ ...filters, modalidad: null }).length;
-      if (n > 0) out.push({ label: 'Aceptar las dos modalidades', count: n });
-    }
-    if (filters.fecha !== 'todos') {
-      const n = applyFilterSet({ ...filters, fecha: 'todos' }).length;
-      if (n > 0) out.push({ label: 'Incluir otros días', count: n });
-    }
-    if (filters.comuna) {
-      const n = applyFilterSet({ ...filters, comuna: null }).length;
-      if (n > 0) out.push({ label: `Buscar en toda ${shorten(filters.region || '')}`.trim(), count: n });
-    }
-    if (filters.sinMinimoTrust) {
-      const n = applyFilterSet({ ...filters, sinMinimoTrust: false }).length;
-      if (n > 0) out.push({ label: 'Incluir partidos con Trust Score mínimo', count: n });
-    }
-    return out.slice(0, 3);
-  }, [filtered.length, filters, applyFilterSet]);
+
+      const candidatos = [
+        filters.nivel && [{ ...filters, nivel: null }, `Quitar «${filters.nivel}»`],
+        filters.modalidad && [{ ...filters, modalidad: null }, 'Aceptar las dos modalidades'],
+        filters.fecha !== 'todos' && [{ ...filters, fecha: 'todos' }, 'Incluir otros días'],
+        filters.comuna && [
+          { ...filters, comuna: null },
+          `Buscar en toda ${shorten(filters.region || '')}`.trim(),
+        ],
+        filters.sinMinimoTrust && [
+          { ...filters, sinMinimoTrust: false },
+          'Incluir partidos con Trust Score mínimo',
+        ],
+      ].filter(Boolean);
+
+      for (const [f, label] of candidatos) {
+        if (out.length >= 3) break;
+        const n = await contarPartidos({ filtros: f, texto: text });
+        if (!vivo) return;
+        if (n > 0) out.push({ label, count: n });
+      }
+
+      if (vivo) setSuggestions(out.slice(0, 3));
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [mode, loading, filtered.length, filters, text, applyFilterSet]);
 
   // ---------------------------------------------------------- jugadores
 
@@ -524,9 +596,9 @@ export default function PartidosScreen({ navigation, route }) {
                   <Text style={styles.count}>
                     {loading
                       ? 'Buscando…'
-                      : activeCount > 0 || hasQuery
-                      ? `${filtered.length} de ${matches.length} partidos`
-                      : `${filtered.length} ${filtered.length === 1 ? 'partido' : 'partidos'}`}
+                      : `${filtered.length}${hayMas ? '+' : ''} ${
+                          filtered.length === 1 ? 'partido' : 'partidos'
+                        }`}
                   </Text>
                   {activeCount > 0 || hasQuery ? (
                     <Pressable
@@ -676,6 +748,15 @@ export default function PartidosScreen({ navigation, route }) {
                       )
                     )}
                   </View>
+                  {hayMas ? (
+                    <SurfaceButton
+                      label={cargandoMas ? 'Buscando más…' : 'Ver más partidos'}
+                      onPress={cargarMas}
+                      height={48}
+                      disabled={cargandoMas}
+                      style={{ marginTop: 12 }}
+                    />
+                  ) : null}
                   <PrimaryButton
                     label="Publicar un partido"
                     onPress={openPublish}

@@ -149,6 +149,30 @@ export function ventanaDeFinDeSemana(ahora = new Date()) {
   return { desde, hasta };
 }
 
+/**
+ * La ventana de tiempo de un filtro de fecha: `{ desde, hasta }`.
+ *
+ * Es la MISMA definición para la consulta y para el filtro en memoria. Cuando
+ * cada uno calculaba lo suyo, «Fin de semana» significaba una cosa en la base
+ * y otra en la pantalla. `hasta` es `null` cuando la ventana no cierra.
+ */
+export function rangoDeFecha(ventana, ahora = new Date()) {
+  const medianoche = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const manana = new Date(medianoche);
+  manana.setDate(manana.getDate() + 1);
+
+  if (ventana === 'hoy') {
+    return { desde: new Date(ahora), hasta: manana };
+  }
+  if (ventana === 'manana') {
+    const pasado = new Date(manana);
+    pasado.setDate(pasado.getDate() + 1);
+    return { desde: manana, hasta: pasado };
+  }
+  if (ventana === 'finde') return ventanaDeFinDeSemana(ahora);
+  return { desde: null, hasta: null };
+}
+
 /** Texto humano de cuánto falta: «1 h 20», «3 días», «ya empezó». */
 export function timeUntilLabel(hora) {
   if (!hora) return '';
