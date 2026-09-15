@@ -27,6 +27,7 @@ import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { getMyClub, getMyClubIds } from '../services/clubs';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { seleccionInicio } from '../services/clubMatchRules';
+import useConfirmacion from '../components/useConfirmacion';
 
 function greetingFor(d = new Date()) {
   const h = d.getHours();
@@ -37,6 +38,8 @@ function greetingFor(d = new Date()) {
 }
 
 export default function HomeScreen({ navigation }) {
+  // `window.confirm` no abre nada en web: diálogo propio de la app.
+  const { confirmar, dialogo } = useConfirmacion();
   const [matches, setMatches] = useState([]);
   const [profile, setProfile] = useState(null);
   const [myUserId, setMyUserId] = useState(null);
@@ -144,12 +147,13 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleDelete = async (matchId) => {
-    const ok =
-      typeof window !== 'undefined' && typeof window.confirm === 'function'
-        ? window.confirm('¿Eliminar este partido?')
-        : true;
-    if (!ok) return;
+  const handleDelete = (matchId) => {
+    // `window.confirm` no abre nada en web: eliminar no hacía nada.
+    confirmar('¿Eliminar este partido?', 'No se puede deshacer.',
+      () => borrarPartido(matchId), { confirmar: 'Eliminar' });
+  };
+
+  const borrarPartido = async (matchId) => {
     setBusyMatchId(matchId);
     const { error } = await deleteMatch(matchId);
     setBusyMatchId(null);
@@ -368,6 +372,8 @@ export default function HomeScreen({ navigation }) {
         onJoin={handleJoin}
         onNavigateToDetail={(id) => navigation.navigate('MatchDetail', { matchId: id })}
       />
+
+      {dialogo}
     </View>
   );
 }

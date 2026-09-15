@@ -69,6 +69,16 @@ Se hizo con `alter function ... set search_path`, que **no toca el cuerpo**. Cop
 
 **Pendiente y es tuyo:** la protección de contraseñas filtradas de Supabase Auth está **desactivada**. Se enciende en Authentication → Policies del panel; no se puede hacer por SQL ni por migración.
 
+## Los diálogos y avisos del navegador no existen
+
+**Ni `window.confirm` ni `window.alert` abren nada en la app web**: los dos devuelven en un par de milisegundos sin mostrar un cuadro. Y `Alert.alert` de React Native tampoco funciona en web. O sea que las tres formas «obvias» de hablarle a la persona fallan, y fallan **en silencio**, que es lo peor: el botón responde al toque, no aparece ningún error, y la única conclusión posible es que la app está rota.
+
+Costó dos hallazgos separados. Primero `confirmAction` (2026-09-15): **cerrar sesión no hacía nada**, ni eliminar la cuenta, ni borrar una foto del club, ni expulsar a un integrante. Después `notify()`: **17 mensajes en 5 pantallas**, casi todos errores («No pudimos cargar más», «No pudimos cambiar el silencio»), que nadie veía nunca.
+
+La salida son dos piezas propias, que andan en los tres lados: `useConfirmacion` (un Modal, para lo que hay que confirmar) y `avisos` + `AvisosHost` (una cola con su anfitrión en la raíz de la app, para lo que solo hay que leer). **Regla para lo que venga: nada que tenga que ver la persona pasa por un diálogo del navegador.**
+
+`AvisosHost` se monta FUERA del navegador de pantallas a propósito: un aviso lanzado por una acción que cambia de pantalla se leería a medias si muriera con la pantalla que lo lanzó. Y es una cola, no un aviso único: dos errores seguidos —pasa cuando algo de red falla— se pisaban.
+
 ## Confirmar algo destructivo
 
 `window.confirm` **no abre nada en la app web**: devuelve `false` en un milisegundo sin mostrar ningún cuadro. Tres pantallas tenían su propia copia de un `confirmAction` que lo usaba cuando `Platform.OS === 'web'`, así que **cerrar sesión no hacía nada, en silencio** — y lo mismo eliminar la cuenta, borrar una foto del club y expulsar a un integrante. El botón respondía al toque, no aparecía ningún error, y la única conclusión posible era que la app estaba rota. `Alert.alert` de React Native tampoco funciona en web. La salida es `useConfirmacion`, un Modal propio que anda en los tres lados (2026-09-15). Se descubrió probando cerrar sesión en el navegador, no leyendo código.

@@ -220,3 +220,9 @@ El segundo: la pantalla de Administradores seguía diciendo que **«un administr
 **No se toca la hora del partido.** La reserva se hace con el bloque que la persona elige, que es el único que sabe qué está libre; si no calza con la hora del desafío, se avisa sin bloquear. Forzarla sería inventar disponibilidad.
 
 **Un error que se vio tocándolo:** el botón parecía no hacer nada. `navigate('Main', { screen })` cambia la pestaña, pero el detalle del partido seguía apilado encima — la pestaña cambiaba **debajo** de lo que se veía. De ahí sale `irAPestana`, que vacía la pila antes.
+
+**Si se cae el partido, se suelta la cancha** (2026-09-15, migración 100). Era el agujero que dejó la 99: los dos capitanes ponían su mitad —la plata se movía de verdad— y si después alguien cancelaba el partido, la reserva se quedaba viva. Cancha arrendada y pagada para un encuentro que ya no existe, y nadie se enteraba hasta el día del partido. Ninguna función ni trigger de `matches` miraba `reserva_id`.
+
+Se resuelve con un **trigger** y no con un paso en cada RPC: un partido se cancela desde varios lados y mañana desde alguno más. `after update of estado` a propósito, para que las escrituras sobre otras columnas ni lo despierten — la misma decisión que la 83 tomó con los permisos.
+
+**Se cancela, no se pregunta.** `cancelar_reserva` tiene una rama que en un desafío le PIDE al otro club en vez de cancelar, porque cancelarle la cancha al rival por tu cuenta no corresponde. Acá esa negociación no aplica: el partido ya no existe, y dejar la reserva esperando una respuesta sería justo el agujero que se está tapando. Para no tener dos versiones de la devolución, la cola de `cancelar_reserva` —devolver, marcar cancelada, avisar— se mudó a `cancelar_reserva_interna` y las dos vías la comparten. Arnés 6/6, incluida la prueba que de verdad cierra el caso: **sumando todo lo que la reserva movió, el neto queda en cero**.

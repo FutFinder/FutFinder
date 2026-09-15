@@ -38,6 +38,7 @@ import {
   withoutId,
   withActionsResolved,
 } from '../utils/notificationInbox';
+import useConfirmacion from '../components/useConfirmacion';
 
 /**
  * Pantalla de inbox de notificaciones — "Avisos".
@@ -141,6 +142,8 @@ function actionsFor(n, clubesAdmin) {
 }
 
 export default function NotificationsScreen({ navigation }) {
+  // `window.confirm` no abre nada en web: diálogo propio de la app.
+  const { confirmar, dialogo } = useConfirmacion();
   const [items, setItems] = useState([]);
   // TODOS los clubes que administro. `null` es «no se pudo averiguar» y no
   // se confunde con «no administro ninguno» ([]).
@@ -278,13 +281,19 @@ export default function NotificationsScreen({ navigation }) {
     }
   };
 
-  const handleClearAll = async () => {
+  const handleClearAll = () => {
     if (items.length === 0) return;
-    const ok =
-      typeof window !== 'undefined' && typeof window.confirm === 'function'
-        ? window.confirm('¿Borrar todas las notificaciones? Esta acción no se puede deshacer.')
-        : true;
-    if (!ok) return;
+    // `window.confirm` no abre nada en web —devuelve false al instante— así
+    // que borrar todo no hacía absolutamente nada, sin decir por qué.
+    confirmar(
+      'Borrar todas las notificaciones',
+      'Esta acción no se puede deshacer.',
+      borrarTodas,
+      { confirmar: 'Borrar todo' },
+    );
+  };
+
+  const borrarTodas = async () => {
     if (!actionGuard.begin(CLEAR_ALL_ID)) return;
     setBusy(CLEAR_ALL_ID, true);
     const { error } = await runOptimistic({
@@ -495,6 +504,8 @@ export default function NotificationsScreen({ navigation }) {
           />
         )}
       </SafeAreaView>
+
+      {dialogo}
     </View>
   );
 }

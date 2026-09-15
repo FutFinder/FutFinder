@@ -25,6 +25,7 @@ import {
 import { navigateToNotification } from './src/utils/notificationTargets';
 import { getMatchById } from './src/services/matches';
 import { getClubById } from './src/services/clubs';
+import AvisosHost from './src/components/AvisosHost';
 
 // Ids de notificación (fila real de `notifications`, no el id efímero del
 // push) ya procesados en esta sesión de la app. `getLastNotificationResponseAsync`
@@ -187,6 +188,10 @@ export default function App() {
           <StatusBar style="light" />
           <AuthProvider>
             <AppNavigator />
+            {/* Fuera del navegador a propósito: un aviso lanzado por una
+                acción que cambia de pantalla se leería a medias si muriera
+                con la pantalla que lo lanzó. */}
+            <AvisosHost />
           </AuthProvider>
         </SafeAreaProvider>
       </ActionSheetProvider>

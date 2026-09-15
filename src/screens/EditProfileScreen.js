@@ -47,6 +47,7 @@ import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD, OPCIONES_NIVEL, inicialDe } from '../utils/playerMeta';
 import { validateImageAsset, commitProfileSave, getProfileLoadStatus } from '../utils/profileEdit';
+import useConfirmacion from '../components/useConfirmacion';
 
 const POSICIONES = [
   { value: 'arquero', label: 'Arquero' },
@@ -117,6 +118,8 @@ function Divider() {
 }
 
 export default function EditProfileScreen({ navigation }) {
+  // `window.confirm` no abre nada en web: diálogo propio de la app.
+  const { confirmar, dialogo } = useConfirmacion();
   const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
   const [loadError, setLoadError] = useState(null);
   const [initialProfile, setInitialProfile] = useState(null);
@@ -267,16 +270,10 @@ export default function EditProfileScreen({ navigation }) {
       setGalleryPhotos((prev) => prev.filter((p) => p.id !== photo.id));
     };
 
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.confirm('¿Eliminar esta foto de tu galería?')) {
-        doDelete();
-      }
-    } else {
-      Alert.alert('Eliminar foto', '¿Seguro que quieres eliminar esta foto de tu galería?', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: doDelete },
-      ]);
-    }
+    // Un solo diálogo para los dos lados: `window.confirm` no abre nada en
+    // web, así que ahí la foto no se borraba nunca y no se decía por qué.
+    confirmar('Eliminar foto', '¿Seguro que quieres eliminar esta foto de tu galería?',
+      doDelete, { confirmar: 'Eliminar' });
   };
 
   const comunasOfRegion = region ? getComunasOfRegion(region) : [];
@@ -773,6 +770,8 @@ export default function EditProfileScreen({ navigation }) {
           </View>
         )}
       </SafeAreaView>
+
+      {dialogo}
     </KeyboardAvoidingView>
   );
 }
