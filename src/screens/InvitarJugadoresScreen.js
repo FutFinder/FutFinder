@@ -4,61 +4,88 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, Search, Users } from 'lucide-react-native';
 
 import { reservas as C, reservasFonts as F } from '../theme/colors';
-import { IconButton, Card, NoticeCard, StickyFooter, Button, Foto } from '../components/reservas/ui';
+import { IconButton, Card, NoticeCard, StickyFooter, Button, Foto, Chip } from '../components/reservas/ui';
 import { TextField } from '../components/reservas/recintoUi';
 import { listMyFriends } from '../services/friends';
+import { searchPlayers } from '../services/profile';
 import { invitarJugador } from '../services/reservas';
 import { motivoLegible } from '../utils/pagoDividido';
 
 /**
  * A quién sumar a la reserva.
  *
- * SE INVITA DESDE LOS AMIGOS, no desde un buscador abierto de usuarios. Una
- * invitación a una reserva le llega a alguien como una notificación con el
- * nombre de quien invita: abrirla a cualquier @usuario sería una vía directa
- * para molestar a desconocidos, y no hay ningún caso real en que uno divida
- * la cuenta de una cancha con alguien que no tiene agregado.
+ * DOS VÍAS, Y LA SEGUNDA NO ES UN EXTRA. Con quién uno juega a la pelota no
+ * es lo mismo que a quién tiene agregado: se juega con el compañero de
+ * trabajo, con el primo de alguien, con el que siempre completa el equipo.
+ * Obligar a que sean amigos para poder invitarlos empujaría a la gente a
+ * agregar a medio mundo solo para jugar junto, y eso ensucia la lista de
+ * amigos mucho más de lo que protege a nadie.
  *
- * SE PUEDE ELEGIR A VARIOS Y SE MANDA UNA POR UNA. El servidor corta cuando
- * se acaban los cupos (`cupos_llenos`), así que si dos invitaciones se pisan
- * la segunda se rechaza sola en vez de dejar la reserva imposible de
- * confirmar.
+ * EL BUSCADOR ABIERTO NO EXPONE NADA NUEVO. `searchPlayers` es el mismo que
+ * ya usa la búsqueda de jugadores, y respeta `privacy_visible_in_search`:
+ * quien apagó «visible en búsquedas» no aparece acá tampoco. La RLS de
+ * `profiles` ya permite leer todos los perfiles, así que esto es comodidad,
+ * no una puerta nueva.
  *
- * LOS QUE YA ESTÁN NO APARECEN. Volver a invitar a alguien que ya está no
- * rompe nada —el insert es `on conflict do nothing`— pero verlo en la lista
- * hace pensar que no se mandó.
+ * SE PUEDE ELEGIR A VARIOS Y SE MANDA UNA POR UNA, EN ORDEN. El servidor
+ * corta cuando se acaban los cupos (`cupos_llenos`); en paralelo dos podrían
+ * pasar el chequeo a la vez y dejar la reserva imposible de confirmar.
+ *
+ * LA SELECCIÓN SOBREVIVE AL CAMBIO DE PESTAÑA. Uno marca a dos amigos, se va
+ * al buscador por el tercero y vuelve: perder los dos primeros ahí sería la
+ * clase de detalle que obliga a empezar de nuevo sin entender por qué.
  */
 export default function InvitarJugadoresScreen({ navigation, route }) {
   const { reservaId, faltan = 1, yaEstan = [] } = route.params || {};
+  const [pestana, setPestana] = useState('amigos');
   const [amigos, setAmigos] = useState([]);
   const [busca, setBusca] = useState('');
+  const [hallados, setHallados] = useState([]);
+  const [buscando, setBuscando] = useState(false);
   const [elegidos, setElegidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState(null);
 
-  const load = useCallback(async () => {
+  const cargarAmigos = useCallback(async () => {
     const lista = await listMyFriends();
     setAmigos((lista || []).filter((a) => !yaEstan.includes(a.user_id)));
     setLoading(false);
   }, [yaEstan]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { cargarAmigos(); }, [cargarAmigos]);
 
-  const visibles = useMemo(() => {
+  // El buscador espera a que la persona deje de escribir: una consulta por
+  // tecla son diez viajes para una palabra de diez letras.
+  useEffect(() => {
+    if (pestana !== 'buscar') return undefined;
+    const q = busca.trim();
+    if (q.length < 2) { setHallados([]); setBuscando(false); return undefined; }
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      const { data } = await searchPlayers(q, { limit: 25 });
+      setHallados((data || []).filter((p) => !yaEstan.includes(p.id)));
+      setBuscando(false);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [busca, pestana, yaEstan]);
+
+  const amigosVisibles = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    if (!q) return amigos;
+    if (pestana !== 'amigos' || !q) return amigos;
     return amigos.filter((a) => (a.username || '').toLowerCase().includes(q));
-  }, [amigos, busca]);
+  }, [amigos, busca, pestana]);
 
-  const alternar = (id) => {
+  const alternar = (persona) => {
     setAviso(null);
     setElegidos((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.some((p) => p.userId === persona.userId)) {
+        return prev.filter((p) => p.userId !== persona.userId);
+      }
       // El tope es el de la reserva: dejar marcar de más sería prometer algo
       // que el servidor va a rechazar en la mitad del envío.
       if (prev.length >= faltan) return prev;
-      return [...prev, id];
+      return [...prev, persona];
     });
   };
 
@@ -67,10 +94,8 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
     setAviso(null);
     let ok = 0;
     let fallo = null;
-    // Una por una y en orden a propósito: el servidor corta cuando se acaban
-    // los cupos, y en paralelo dos podrían pasar el chequeo a la vez.
-    for (const userId of elegidos) {
-      const { data, error } = await invitarJugador(reservaId, userId);
+    for (const p of elegidos) {
+      const { data, error } = await invitarJugador(reservaId, p.userId);
       if (data?.ok) ok += 1;
       else fallo = motivoLegible(data?.reason) || error?.message;
     }
@@ -83,7 +108,36 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
       ? `Invitamos a ${ok}, pero una no se pudo: ${fallo}`
       : fallo || 'No pudimos invitar.');
     setElegidos([]);
-    load();
+    cargarAmigos();
+  };
+
+  // Función que devuelve JSX y NO un componente declarado acá adentro: un
+  // componente definido dentro del render se vuelve a montar en cada tecla
+  // que se escribe en el buscador.
+  const fila = (persona) => {
+    const on = elegidos.some((p) => p.userId === persona.userId);
+    const tope = !on && elegidos.length >= faltan;
+    return (
+      <Pressable
+        key={persona.userId}
+        onPress={() => alternar(persona)}
+        disabled={tope}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: on, disabled: tope }}
+        style={({ pressed }) => [styles.fila, tope && { opacity: 0.4 }, pressed && { opacity: 0.85 }]}
+      >
+        <Foto uri={persona.fotoUrl} style={styles.avatar} iconSize={16} alt={`Foto de ${persona.nombre}`} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.nombre} numberOfLines={1}>{persona.nombre}</Text>
+          {persona.detalle ? (
+            <Text style={styles.sub} numberOfLines={1}>{persona.detalle}</Text>
+          ) : null}
+        </View>
+        <View style={[styles.check, on && styles.checkOn]}>
+          {on ? <Check color={C.textOnGreen} size={14} strokeWidth={3} /> : null}
+        </View>
+      </Pressable>
+    );
   };
 
   if (loading) {
@@ -94,6 +148,15 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
     );
   }
 
+  const enAmigos = pestana === 'amigos';
+  const lista = enAmigos
+    ? amigosVisibles.map((a) => ({
+      userId: a.user_id, nombre: a.username, fotoUrl: a.foto_url, detalle: a.comuna,
+    }))
+    : hallados.map((p) => ({
+      userId: p.id, nombre: p.username, fotoUrl: p.foto_url, detalle: p.comuna,
+    }));
+
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
@@ -101,53 +164,61 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Invitar jugadores</Text>
           <Text style={styles.headerSub}>
-            Quedan {faltan} {faltan === 1 ? 'cupo' : 'cupos'}
+            {elegidos.length > 0
+              ? `${elegidos.length} de ${faltan} ${faltan === 1 ? 'cupo' : 'cupos'}`
+              : `Quedan ${faltan} ${faltan === 1 ? 'cupo' : 'cupos'}`}
           </Text>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {amigos.length === 0 ? (
-          <NoticeCard tone="info" icon={Users}>
-            Todavía no tienes amigos agregados, o ya están todos en esta reserva. Agrega jugadores
-            desde su perfil y vuelve acá.
+      <View style={styles.pestanas}>
+        <Chip label="Mis amigos" active={enAmigos} onPress={() => setPestana('amigos')} icon={Users} />
+        <Chip label="Buscar" active={!enAmigos} onPress={() => setPestana('buscar')} icon={Search} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <TextField
+          value={busca}
+          onChangeText={setBusca}
+          placeholder={enAmigos ? 'Buscar entre tus amigos' : 'Nombre de usuario'}
+        />
+
+        {!enAmigos && busca.trim().length < 2 ? (
+          <NoticeCard tone="info" icon={Search}>
+            Escribe el nombre de usuario de quien quieres invitar. No hace falta que sea tu amigo:
+            le llega la invitación igual, con tu nombre.
           </NoticeCard>
-        ) : (
-          <>
-            <TextField value={busca} onChangeText={setBusca} placeholder="Buscar entre tus amigos" />
-            <Card padded={false} style={{ paddingVertical: 4 }}>
-              {visibles.map((a) => {
-                const on = elegidos.includes(a.user_id);
-                const tope = !on && elegidos.length >= faltan;
-                return (
-                  <Pressable
-                    key={a.user_id}
-                    onPress={() => alternar(a.user_id)}
-                    disabled={tope}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: on, disabled: tope }}
-                    style={({ pressed }) => [styles.fila, tope && { opacity: 0.4 }, pressed && { opacity: 0.85 }]}
-                  >
-                    <Foto uri={a.foto_url} style={styles.avatar} iconSize={16} alt={`Foto de ${a.username}`} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.nombre} numberOfLines={1}>{a.username}</Text>
-                      {a.comuna ? <Text style={styles.sub} numberOfLines={1}>{a.comuna}</Text> : null}
-                    </View>
-                    <View style={[styles.check, on && styles.checkOn]}>
-                      {on ? <Check color={C.textOnGreen} size={14} strokeWidth={3} /> : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
-              {visibles.length === 0 ? (
-                <View style={styles.vacio}>
-                  <Search color={C.textMuted} size={16} strokeWidth={2} />
-                  <Text style={styles.vacioTexto}>Ninguno con ese nombre.</Text>
-                </View>
-              ) : null}
-            </Card>
-          </>
-        )}
+        ) : null}
+
+        {!enAmigos && buscando ? (
+          <View style={{ paddingVertical: 20 }}><ActivityIndicator color={C.green} /></View>
+        ) : null}
+
+        {enAmigos && amigos.length === 0 ? (
+          <NoticeCard tone="info" icon={Users}>
+            Todavía no tienes amigos agregados, o ya están todos en esta reserva. Puedes invitar a
+            cualquiera desde «Buscar».
+          </NoticeCard>
+        ) : null}
+
+        {lista.length > 0 ? (
+          <Card padded={false} style={{ paddingVertical: 4 }}>
+            {lista.map(fila)}
+          </Card>
+        ) : null}
+
+        {lista.length === 0 && busca.trim().length >= 2 && !buscando ? (
+          <View style={styles.vacio}>
+            <Search color={C.textMuted} size={16} strokeWidth={2} />
+            <Text style={styles.vacioTexto}>
+              {enAmigos ? 'Ninguno de tus amigos con ese nombre.' : 'Nadie con ese nombre de usuario.'}
+            </Text>
+          </View>
+        ) : null}
 
         {aviso ? <NoticeCard tone="warning">{aviso}</NoticeCard> : null}
       </ScrollView>
@@ -155,7 +226,9 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
       {elegidos.length > 0 ? (
         <StickyFooter>
           <Button
-            label={`Invitar a ${elegidos.length}`}
+            label={elegidos.length === 1
+              ? `Invitar a ${elegidos[0].nombre}`
+              : `Invitar a ${elegidos.length}`}
             loading={enviando}
             onPress={invitar}
           />
@@ -172,7 +245,9 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 17, letterSpacing: -0.2 },
   headerSub: { fontFamily: F.medium, color: C.textSecondary, fontSize: 12, marginTop: 2 },
 
-  scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 130, gap: 14 },
+  pestanas: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 4 },
+
+  scroll: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 130, gap: 14 },
 
   fila: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 11 },
   avatar: {
@@ -187,6 +262,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: C.border,
   },
   checkOn: { borderWidth: 0, backgroundColor: C.green },
-  vacio: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 16 },
+  vacio: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4, paddingVertical: 8 },
   vacioTexto: { fontFamily: F.medium, fontSize: 13, color: C.textMuted },
 });
