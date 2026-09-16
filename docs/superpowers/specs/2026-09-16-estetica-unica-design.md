@@ -1,7 +1,7 @@
 # Una sola estética para toda la app
 
 Fecha: 2026-09-16
-Estado: aprobado, fase 1 en ejecución
+Estado: **terminado el 2026-09-16**. Las tres fases están en `main`.
 
 ## El problema
 

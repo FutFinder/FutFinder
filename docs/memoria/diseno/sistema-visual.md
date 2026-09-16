@@ -6,23 +6,56 @@
 
 Mantener las convenciones visuales verificadas del código para que los cambios reutilicen tokens y componentes existentes, sin convertir esta nota en un repositorio de capturas.
 
-## Tokens globales
+## La paleta, que es una sola
 
-`src/theme/colors.js` conserva la paleta global `colors`: fondos oscuro (`background`, `surface` y `surfaceAlt`), verdes corporativos (`primary`, `primaryDark` y `primarySoft`), jerarquía de texto, estados de error/éxito y bordes. Los tokens globales de geometría son `radius` (`sm` a `xl` y `pill`) y `spacing` (`xs` a `xxl`); la fuente declarada es `System` en los tres pesos disponibles.
+`src/theme/colors.js` exporta **una** paleta: `reservas`, con
+`reservasRadius`, `reservasSizes` y `reservasFonts` (Manrope, cargada en
+`App.js` con `expo-font`). Fondo `#0A0C0A`, superficie `#131613`, verde de
+acción `#55DF69`, ocho escalones de texto de `#F4F6F4` a `#565E57`.
 
-El rediseño compartido de Clubes y Perfil usa `dsColors`, `dsRadius` y `dsSizes`. Define sus propias superficies, verdes de acción, estados de resultado, dorado Premium, chips, bordes y divisor. `dsSizes` fija, cuando aplica, un gutter de 16, botón táctil de 44, botón de acción de 58 y logo de 72. Los alias `clubColors`, `clubRadius` y `clubSizes` mantienen compatibilidad con componentes de Clubes.
+Hasta el 2026-09-16 eran **siete familias** —`colors` (olivo `#71B533` sobre
+fondo café `#201F1D`), `dsColors`/`clubColors`, `chatColors`, `tactical`
+(flúor `#00FF66`), `partidos` y `clubsExplorer`— con cuatro verdes, tres
+fondos, dos tipografías y cuatro escalas de radios. Un solo recorrido
+—Inicio → Partidos → Clubes → Chat— las cruzaba todas. **Se borraron.**
 
-`src/theme/clubThemes.js` es la única fuente del color de identidad de un club. Ofrece cuatro temas —`green` (el verde corporativo tal cual), `blue`, `red` y `yellow`— y de cada uno una escala: `main`, `pressed`, `soft`, `softStrong`, `border`, `glow`, `ink` (tinta de contraste sobre `main`) y `bannerRgb`/`bannerGlow` para el fondo del banner. Los componentes de club reciben esa escala por prop `tema` y su valor por defecto es el verde, de modo que las pantallas que no son de un club —perfil de jugador, historial— siguen igual. Ningún componente pregunta por una clave concreta ni escribe su propio `rgba`. Los colores semánticos (`win`, `draw`, `loss`, `gold`, error) NO forman parte del tema: sus pruebas exigen distancia de color contra derrota, empate y el dorado de Premium, además de 4,5:1 de contraste WCAG.
+**Lo que impide que vuelvan** no es esta nota: es que el export no existe, más
+una regla `no-restricted-imports` en `eslint.config.mjs` que nombra las
+dieciséis y falla como error si alguien las recrea. Y
+`src/theme/__tests__/unaSolaEstetica.test.js`, que comprueba que el theme no
+exporte una segunda paleta y que ningún token que el código usa se quede sin
+valor —en React Native un token inexistente pinta transparente o negro y no
+avisa.
 
-Hay UNA excepción, y es deliberada: el tile «V» del resumen del club va en el acento del tema (`escala.main`) mientras «D» conserva el rojo semántico. Lo pide el handoff de diseño, que manda en color. En el tema rojo eso deja los dos tiles a **ΔE76 17,8** —seis veces más cerca que en cualquier otro tema, aunque por encima del umbral de confusión de un vistazo (ΔE 10)—, y ese contraste **se aceptó por decisión de diseño el 2026-09-02**, con la medición hecha: lo que distingue los tiles es la letra, dibujada tan legible como el número, y una excepción por tema («V es verde sólo si el club es rojo») sería una regla sorprendente. No es deuda pendiente.
+Diseño y fases: `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 
-Existen extensiones deliberadamente separadas: `chatColors` añade superficies y estados propios del chat; `tactical` corresponde a Inicio; y `clubsExplorer` y `clubsExplorerRadius` corresponden al explorador de clubes. No se debe sustituir la paleta global por una de estas familias de manera masiva: el propio código mantiene pantallas de distintos rediseños coexistiendo.
+### Lo que NO se unificó, a propósito
 
-## Tokens de Partidos
+Los colores que llevan **significado** y no estética: victoria/empate/derrota,
+el dorado Premium, el ámbar de advertencia y el `#FF2D55` del desafío recién
+aceptado (que no es un rojo de error: es «hay un partido nuevo que
+coordinar»). Viven dentro de `reservas` como tokens propios.
 
-El módulo Partidos no toma sus decisiones visuales de los tokens globales: usa `partidos` y `partidosRadius` en `src/theme/colors.js`. Sus superficies, verdes de acción, dorado de pendiente, coral de error/destructivo, escalones de texto, bordes, pistas y degradados de héroe son tokens del módulo. Sus radios definidos son `pill`, `chipSm`, `chip`, `control`, `input`, `card`, `list` y `sheet`.
+`clubTonos` y `clubSuperficies` tampoco: sus valores están **medidos**
+—`clubThemes.test.js` exige distancia de color entre el peligro y el tema rojo
+del club— y cambiarlos es volver a medir, no reemplazar un token.
 
-`src/components/partidos/ui.js` centraliza las primitivas de ese módulo: botones principal, fantasma, de superficie y de estado; botón de icono; pills; chips de opción; tags; etiquetas de sección y campo; controles de fecha/hora y notas. Sus botones reutilizables declaran alturas de 48 px o más, salvo que el componente exponga explícitamente otra medida.
+`src/theme/clubThemes.js` sigue siendo la única fuente del color de identidad
+de un club. Ofrece cuatro temas —`green` (el verde de acción tal cual), `blue`,
+`red` y `yellow`— y de cada uno una escala: `main`, `pressed`, `soft`,
+`softStrong`, `border`, `glow`, `ink` y `bannerRgb`/`bannerGlow`. Los
+componentes reciben esa escala por prop `tema`; ninguno pregunta por una clave
+concreta ni escribe su propio `rgba`.
+
+Hay UNA excepción documentada, y es deliberada: el tile «V» del resumen del
+club va en el acento del tema (`escala.main`) mientras «D» conserva el rojo
+semántico. Lo pide el handoff de diseño, que manda en color. En el tema rojo
+eso deja los dos tiles a **ΔE76 17,8** —seis veces más cerca que en cualquier
+otro tema, aunque por encima del umbral de confusión de un vistazo (ΔE 10)—, y
+ese contraste **se aceptó por decisión de diseño el 2026-09-02**, con la
+medición hecha: lo que distingue los tiles es la letra, dibujada tan legible
+como el número, y una excepción por tema («V es verde sólo si el club es
+rojo») sería una regla sorprendente. No es deuda pendiente.
 
 ## Familias reutilizables y copy
 

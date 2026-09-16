@@ -23,6 +23,9 @@ import react from 'eslint-plugin-react';
  *   react-hooks/rules-of-hooks — un hook dentro de una condición rompe la
  *     pantalla de formas que no se reproducen a mano.
  *
+ *   no-restricted-imports — impide resucitar cualquiera de las seis paletas
+ *     que se borraron al unificar la estética. Ver el bloque de la regla.
+ *
  *   no-unsafe-optional-chaining, no-dupe-keys, no-unreachable y compañía
  *     vienen del preset recomendado y son fallos, no estilo.
  *
@@ -44,7 +47,11 @@ export default [
       '**/dist/**',
       '**/node_modules/**',
       '**/.expo/**',
+      // Las dos rutas: `git worktree` clásico y los que crea Claude Code.
+      // Son copias de otra rama, con su propio historial; analizarlas mezcla
+      // hallazgos de un trabajo que no es el de esta rama.
       '.worktrees/**',
+      '.claude/worktrees/**',
       'supabase/functions/**', // Deno, con su propio runtime y sus tipos
     ],
   },
@@ -95,6 +102,39 @@ export default [
       'no-sparse-arrays': 'error',
       'require-yield': 'error',
       'getter-return': 'error',
+
+      // ── Una sola estética ──────────────────────────────────────
+      // La app tuvo SIETE paletas conviviendo (`colors` olivo, `dsColors`,
+      // `clubColors`, `chatColors`, `tactical` flúor, `partidos` y
+      // `reservas`): cuatro verdes y tres fondos en un solo recorrido. Se
+      // unificaron en `reservas` el 2026-09-16 y las otras seis se borraron.
+      //
+      // Hoy importar una de ellas ya falla al empaquetar, porque el export no
+      // existe. Esta regla está para el caso que el empaquetador NO cubre:
+      // que alguien vuelva a CREARLAS. Es error y no aviso porque acá un
+      // error de lint significa que algo está roto.
+      //
+      // Va por PATRÓN y no por ruta exacta: el mismo módulo se importa como
+      // `../theme/colors` desde `screens/` y como `../../theme/colors` desde
+      // `components/club/`, y una regla que solo mire la primera deja fuera
+      // media app.
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['**/theme/colors', '**/theme/colors.js', './colors.js'],
+          importNames: [
+            'colors', 'radius', 'spacing', 'fonts',
+            'dsColors', 'dsRadius', 'dsSizes',
+            'clubColors', 'clubRadius', 'clubSizes',
+            'chatColors', 'tactical', 'partidos', 'partidosRadius',
+            'clubsExplorer', 'clubsExplorerRadius',
+          ],
+          message:
+            'La app tiene UNA paleta: `reservas`/`reservasRadius`/'
+            + '`reservasSizes`/`reservasFonts`. Las familias viejas se '
+            + 'borraron el 2026-09-16 — ver '
+            + 'docs/superpowers/specs/2026-09-16-estetica-unica-design.md',
+        }],
+      }],
 
       // ── Señales útiles que no bloquean ─────────────────────────
       'react-hooks/exhaustive-deps': 'warn',
