@@ -55,6 +55,72 @@ Lo único que queda de la Fase 6 es la comprobación manual del historial en pan
 
 La Tarea 6.2 —historial real y apagado de los fixtures— tiene la migración 49 **aplicada en producción el 2026-08-17**, con `49_historial_test.sql` en 13/13 contra el esquema ya aplicado. El perfil del club ya no muestra nada inventado: el historial sale de `historial_club()` y las estadísticas de `club_estadisticas()`, y los tres partidos de ejemplo («Deportivo Ñuñoa 1-0», «Atlético Maipú 2-3», «Los Cóndores 2-2») con su récord 1-1-1 se borraron junto al interruptor `DEMO_HISTORIAL` que los encendía en `__DEV__`. Con ellos se fue también el placeholder de la galería, que colgaba del mismo interruptor. **`historial_publico_club()` no se tocó**: su LEFT JOIN publica cualquier partido `finalizado` aunque nadie haya confirmado el marcador —y eso pasa de verdad, porque `save_match_attendance()` de la 33 pone `finalizado` sin mirar `club_match_results`—, así que la tarjeta lo pintaba como partido jugado con un «vs» donde va el score. `historial_club()` hace ese join INTERNO: sin resultado `confirmado` el encuentro no aparece. La proyección de la 44d se conserva tal cual porque su forma es el contrato que comprueba `44d_partido_privado_test.sql` (caso 15), y el caso 5 del arnés nuevo comprueba justamente que las dos sigan difiriendo. El MARCADOR SE LEE DESDE EL CLUB QUE SE MIRA, no desde el local: la misma fila «Club A 3-1 Club B» es «Victoria 3-1» en el perfil de A y «Derrota 1-3» en el de B, y quién fue local se dice aparte, en la línea de contexto de la tarjeta. La letra V/E/D se deriva de los dos números que la tarjeta pinta —no de la columna `resultado`— para que la insignia no pueda contradecir al marcador; una prueba comprueba que la derivación y el servidor coincidan en los cinco casos y desde los cuatro lados. `club_estadisticas()` envuelve `club_record()` en vez de copiar su `case` y agrega PJ, GF y GC, que el cliente no puede calcular sin mentir porque el historial viaja paginado; `getClubRecord()` se retiró de `clubResults.js` para no dejar dos caminos de cliente al mismo dato. La lógica vive en `src/utils/historialClub.js`, que recibe el cliente por parámetro —`clubMatches.js` sólo le ata el de Supabase—, y ahí se corrigió un corrimiento de día real: `new Date('2026-07-28')` es medianoche UTC y en Chile eso es el 27, así que la fecha se parte a mano. Hoy `club_match_results` está vacía en producción, de modo que todos los perfiles muestran el estado vacío —«Aún no hay partidos en el historial»— y quien demuestra el caso poblado es el arnés SQL.
 
+## El tablero abierto de desafíos
+
+Hasta la migración 112, desafiar era siempre 1 a 1: se elige un club rival
+CONCRETO desde su ficha y se le manda el desafío a él. La 112 agrega un
+segundo camino EN PARALELO, no en vez de él: un club publica que busca
+rival —sin elegir a nadie todavía—, otros clubes cercanos responden, y el
+que publicó elige una respuesta y descarta el resto. El ciclo formal de
+arriba (pendiente → negociación → propuesta oficial → partido) no se
+duplica: en el instante en que se elige una respuesta, la RPC
+`aceptar_respuesta_desafio_abierto()` inserta una fila normal de
+`club_challenges` y llama a `aceptar_desafio()` tal cual (migración 42) —
+mismo hilo de negociación, misma propuesta oficial, mismo partido. El
+truco de permisos: la fila nueva nace con `club_retador_id` = el club que
+RESPONDIÓ y `club_retado_id` = el club que PUBLICÓ, porque `aceptar_desafio()`
+exige que quien acepta administre el retado, y acá quien acepta —elige la
+respuesta— es justamente el que publicó.
+
+`club_open_challenges` (una publicación por fila, un club puede tener
+varias a la vez) y `club_open_challenge_responses` (`unique
+(open_challenge_id, club_id)`: retirar y volver a responder mueven el
+`estado` de la MISMA fila, nunca crean una segunda) llegaron con la 112, sin
+migraciones intermedias — a diferencia de la alineación, esta se implementó
+completa de una vez porque el diseño (reusar `aceptar_desafio()` en vez de
+duplicar su lógica) quedó claro antes de escribir la primera línea de SQL.
+
+**Corresponde a un pedido explícito del usuario de construir la funcionalidad
+de verdad** (mockup «FutFinder Desafíos»), tras preguntar y descartar dos
+alternativas más chicas —redisño visual nada más, o un híbrido con sólo
+búsqueda real—. El mockup de referencia trae «nivel del rival» y
+«valoración» por club, y etiquetas «Revancha»/«Invicto» — **ninguno de los
+tres existe en la base**, `clubMeta.js` ya lo documentaba antes de esta
+migración («Hoy NO existe cálculo de nivel en la BD» / «Hoy no existe el
+campo rating»), así que no se agregó ninguno de los tres: sería inventar un
+dato, no traducir el diseño. Lo que sí es real y se usa tal cual: `modalidad`
+(mismo vocabulario que `matches.modalidad`), la distancia real por comuna
+(`distanciaEntreClubesKm`, el mismo cálculo de «Buscar rivales») y el
+historial real V/E/D (`club_estadisticas()`, migración 49) — ambos
+se piden por club candidato al armar la lista, no se inventan.
+
+También se dejó afuera, todo documentado en el propio archivo de la
+migración: **«pausar» una publicación** (no existe un estado intermedio,
+sólo abierto/cerrado/cancelado/expirado — el ciclo 1 a 1 tampoco tiene
+pausa), **«deshacer» una aceptación** (el ciclo formal no lo tiene una vez
+en negociación, inventarlo acá sería una regla nueva), **el calendario con
+«Entrenamiento»/«Fecha 4 · Liga Maipú»** del mockup (no existe ningún
+concepto de entrenamientos ni ligas; tras aceptar se abre el chat de
+negociación real, no un calendario que todavía no tendría nada que
+mostrar), y el selector país-completo de región/comuna con calendario de
+rango de fechas, horario y cupos del filtro del mockup — se redujo a
+modalidad + orden por distancia/fecha, que son las dos dimensiones reales
+con datos detrás; el resto habría sido una interfaz grande sin ninguna
+necesidad real que la respalde todavía.
+
+`ClubChallengesScreen` pasa a tener dos pestañas — **Tablero abierto**
+(por defecto) y **Directos** (el recibidos/enviados de siempre, sin tocar
+su lógica, sólo su estilo) — y adopta `clubColors`/`dsColors` en vez de los
+tokens de `reservas`, para verse igual que el resto de Clubes rediseñado,
+conservando `temaDeClub(clubActual)` para el acento (el color que cada club
+eligió, no un verde fijo), que es como ya lo hacía la pantalla antes de
+este cambio. Publicar, editar, ver respuestas y aceptar/rechazar exigen
+`soyAdminDeEsteClub` (`clubesAdmin.includes(clubId)`, la misma fuente que ya
+usa «Directos» vía `puedeResponderDesafio`/`puedeCancelarDesafio`); un
+jugador ve el tablero pero sólo navega, no publica ni responde — la RLS de
+la 94 ya lo exige del lado del servidor, la interfaz sólo deja de mostrar
+un botón que el servidor rechazaría.
+
 ## La portada de Clubes y sus tareas
 
 Las reglas viven en dos módulos puros y probados; `ClubsHomeContext` sólo ata servicios y ordena rondas. `clubsHomeSources.js` decide QUÉ FILAS entran y `clubsHomeTasks.js` las convierte en tareas y calcula el badge.
@@ -267,8 +333,8 @@ inscripción de una vez.
 ## Pantallas y dependencias
 
 - Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, alineación, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
-- Código: `src/services/clubs.js`, `clubLineup.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/utils/formacionClub.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
-- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`), 92 (`club_lineups`) y 93 (`club_lineups.puestos_personalizados`) están escritas y probadas, **pendientes de aplicar**. La **111** (permisos de `club_members`/`clubs` y puerta única para salirse de un partido de clubes) está **aplicada el 2026-09-15**, arnés 14/14.
+- Código: `src/services/clubs.js`, `clubLineup.js`, `clubGallery.js`, `clubChallenges.js`, `clubOpenChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/utils/formacionClub.js`, `src/utils/openChallengeBoard.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
+- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`), 92 (`club_lineups`) y 93 (`club_lineups.puestos_personalizados`) están **aplicadas el 2026-09-15**. La **111** (permisos de `club_members`/`clubs` y puerta única para salirse de un partido de clubes) está **aplicada el 2026-09-15**, arnés 14/14. La **112** (`club_open_challenges`/`club_open_challenge_responses`, el tablero abierto) está escrita y probada, **pendiente de aplicar** — renumerada desde el borrador original (94), que la 94 real (`armar_la_reserva_dividida`) ya ocupaba al traer esta rama al día.
 
 ## Estados, errores y problemas conocidos
 
