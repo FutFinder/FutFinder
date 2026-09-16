@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Image, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { Plus, Images } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 const COLUMNS = 3;
 const GAP = 8;
@@ -27,7 +32,7 @@ export default function PlayerPhotoGallery({
   onOpenPhoto,
 }) {
   const { width } = useWindowDimensions();
-  const size = Math.floor((width - dsSizes.gutter * 2 - GAP * (COLUMNS - 1)) / COLUMNS);
+  const size = Math.floor((width - S.screenPadding * 2 - GAP * (COLUMNS - 1)) / COLUMNS);
 
   const visibles = photos.slice(0, VISIBLE_PHOTOS);
   const restantes = photos.length - VISIBLE_PHOTOS;
@@ -47,7 +52,7 @@ export default function PlayerPhotoGallery({
             pressed && { backgroundColor: 'rgba(90, 224, 106, 0.15)' },
           ]}
         >
-          <Plus color={dsColors.green} size={20} strokeWidth={2.4} />
+          <Plus color={C.green} size={20} strokeWidth={2.4} />
           <Text style={styles.addLabel}>Añadir</Text>
         </Pressable>
       )}
@@ -93,7 +98,7 @@ export default function PlayerPhotoGallery({
             </>
           ) : (
             <>
-              <Images color={dsColors.textMuted} size={18} strokeWidth={2} />
+              <Images color={C.textMuted} size={18} strokeWidth={2} />
               <Text style={styles.emptyTitle}>Sin fotos públicas</Text>
             </>
           )}
@@ -108,9 +113,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GAP,
-    paddingHorizontal: dsSizes.gutter,
+    paddingHorizontal: S.screenPadding,
   },
-  cell: { borderRadius: dsRadius.lg, overflow: 'hidden' },
+  cell: { borderRadius: R.row, overflow: 'hidden' },
   addCell: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
@@ -120,7 +125,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
   },
-  addLabel: { color: dsColors.green, fontSize: 11, fontWeight: '700' },
+  addLabel: { color: C.green, fontSize: 11, fontFamily: F.bold },
   img: { width: '100%', height: '100%' },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -128,24 +133,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  overlayText: { color: dsColors.textPrimary, fontSize: 18, fontWeight: '800' },
+  overlayText: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold },
   empty: {
-    backgroundColor: dsColors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
+    borderColor: C.borderSoft,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 14,
     gap: 4,
   },
   emptyTitle: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     textAlign: 'center',
   },
   emptySub: {
-    color: dsColors.textMuted,
+    color: C.textMuted,
     fontSize: 11.5,
     lineHeight: 16,
     textAlign: 'center',

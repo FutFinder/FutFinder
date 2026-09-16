@@ -2,13 +2,17 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 
-import { dsColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /** Paleta por tono de estado, tal como la define el diseño. */
 const TONOS = {
-  green: { color: dsColors.green, chipBg: 'rgba(90, 224, 106, 0.14)' },
-  yellow: { color: dsColors.draw, chipBg: 'rgba(224, 194, 90, 0.14)' },
-  coral: { color: dsColors.loss, chipBg: 'rgba(232, 115, 123, 0.14)' },
+  green: { color: C.green, chipBg: 'rgba(90, 224, 106, 0.14)' },
+  yellow: { color: C.draw, chipBg: 'rgba(224, 194, 90, 0.14)' },
+  coral: { color: C.loss, chipBg: 'rgba(232, 115, 123, 0.14)' },
   muted: { color: 'rgba(255, 255, 255, 0.45)', chipBg: 'rgba(255, 255, 255, 0.07)' },
 };
 
@@ -65,21 +69,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: dsColors.surface,
-    borderRadius: dsRadius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
+    borderColor: C.borderSoft,
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
-  pressed: { backgroundColor: dsColors.surfaceHover },
+  pressed: { backgroundColor: C.surfaceHover },
   bar: { width: 4, height: 40, borderRadius: 3 },
   center: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     flexShrink: 1,
   },
   mvp: {
@@ -89,16 +93,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(240, 200, 90, 0.14)',
   },
   mvpText: {
-    color: dsColors.gold,
+    color: C.gold,
     fontSize: 9.5,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.5,
   },
-  meta: { color: dsColors.textMuted, fontSize: 11.5, marginTop: 3 },
+  meta: { color: C.textMuted, fontSize: 11.5, marginTop: 3 },
   chip: {
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
   },
-  chipText: { fontSize: 10.5, fontWeight: '700' },
+  chipText: { fontSize: 10.5, fontFamily: F.bold },
 });

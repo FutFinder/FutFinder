@@ -1,7 +1,11 @@
 import React, { useCallback, useState } from 'react';
 import { Modal, Pressable, Text, StyleSheet } from 'react-native';
 
-import { dsColors, dsRadius } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 
 /**
  * Confirmar algo, con un diálogo de la app.
@@ -90,23 +94,23 @@ const styles = StyleSheet.create({
   caja: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: dsColors.surface,
-    borderRadius: dsRadius.xl,
+    backgroundColor: C.surface,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: dsColors.border,
+    borderColor: C.border,
     padding: 20,
   },
-  titulo: { color: dsColors.textPrimary, fontSize: 17, fontWeight: '800' },
-  texto: { color: dsColors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 6 },
+  titulo: { color: C.textPrimary, fontSize: 17, fontFamily: F.extraBold },
+  texto: { color: C.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 6 },
   confirmar: {
     marginTop: 18,
     height: 46,
-    borderRadius: dsRadius.lg,
-    backgroundColor: dsColors.loss,
+    borderRadius: R.row,
+    backgroundColor: C.loss,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  confirmarTexto: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  confirmarTexto: { color: '#FFFFFF', fontSize: 15, fontFamily: F.extraBold },
   cancelar: { marginTop: 10, height: 44, alignItems: 'center', justifyContent: 'center' },
-  cancelarTexto: { color: dsColors.textSecondary, fontSize: 14, fontWeight: '700' },
+  cancelarTexto: { color: C.textSecondary, fontSize: 14, fontFamily: F.bold },
 });

@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { ShieldCheck, AlertCircle, ChevronDown } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * "Estado de la cuenta": cabecera verde (buen estado) o coral (sanción activa),
@@ -35,13 +40,13 @@ export default function AccountStatusCard({
       <View style={[styles.header, suspended ? styles.headerSanction : styles.headerOk]}>
         <View style={[styles.headerIcon, suspended ? styles.iconSanction : styles.iconOk]}>
           {suspended ? (
-            <AlertCircle color={dsColors.loss} size={18} strokeWidth={2} />
+            <AlertCircle color={C.loss} size={18} strokeWidth={2} />
           ) : (
-            <ShieldCheck color={dsColors.green} size={18} strokeWidth={2} />
+            <ShieldCheck color={C.green} size={18} strokeWidth={2} />
           )}
         </View>
         <View style={styles.headerTexts}>
-          <Text style={[styles.headerTitle, { color: suspended ? dsColors.loss : dsColors.green }]}>
+          <Text style={[styles.headerTitle, { color: suspended ? C.loss : C.green }]}>
             {suspended ? 'Sanción activa' : 'Cuenta en buen estado'}
           </Text>
           <Text style={styles.headerSub}>
@@ -99,7 +104,7 @@ export default function AccountStatusCard({
           >
             <Text style={styles.toggleText}>{abierto ? 'Ocultar detalle' : 'Ver detalle'}</Text>
             <ChevronDown
-              color={dsColors.green}
+              color={C.green}
               size={14}
               strokeWidth={2.4}
               style={abierto ? styles.chevronUp : undefined}
@@ -127,7 +132,7 @@ function Row({ label, value, danger, muted }) {
       <Text
         style={[
           styles.rowValue,
-          danger && { color: dsColors.loss },
+          danger && { color: C.loss },
           muted && { color: 'rgba(255, 255, 255, 0.6)' },
         ]}
       >
@@ -150,11 +155,11 @@ function fechaLegible(iso) {
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: dsSizes.gutter,
-    backgroundColor: dsColors.surface,
+    marginHorizontal: S.screenPadding,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    borderRadius: dsRadius.xl,
+    borderColor: C.borderSoft,
+    borderRadius: R.cardSm,
     overflow: 'hidden',
   },
   cardSanction: { borderColor: 'rgba(232, 115, 123, 0.28)' },
@@ -171,28 +176,28 @@ const styles = StyleSheet.create({
   headerIcon: {
     width: 36,
     height: 36,
-    borderRadius: dsRadius.sm,
+    borderRadius: R.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconOk: { backgroundColor: 'rgba(90, 224, 106, 0.14)' },
   iconSanction: { backgroundColor: 'rgba(232, 115, 123, 0.14)' },
   headerTexts: { flex: 1, minWidth: 0 },
-  headerTitle: { fontSize: 13.5, fontWeight: '700' },
+  headerTitle: { fontSize: 13.5, fontFamily: F.bold },
   headerSub: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 11.5, marginTop: 2 },
 
   counters: { flexDirection: 'row', gap: 6, paddingHorizontal: 13, paddingTop: 12 },
   counter: {
     flex: 1,
     minWidth: 0,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
+    borderColor: C.borderSoft,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     paddingHorizontal: 10,
     paddingVertical: 9,
   },
-  counterValue: { color: dsColors.textPrimary, fontSize: 18, fontWeight: '800', lineHeight: 20 },
+  counterValue: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, lineHeight: 20 },
   dim: { color: 'rgba(255, 255, 255, 0.5)' },
   counterLabel: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 10.5, marginTop: 4 },
 
@@ -204,22 +209,22 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: dsColors.divider,
+    borderTopColor: C.divider,
   },
   rowLabel: { color: 'rgba(255, 255, 255, 0.72)', fontSize: 13, flexShrink: 1 },
-  rowValue: { color: dsColors.textPrimary, fontSize: 13, fontWeight: '700' },
+  rowValue: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold },
 
   toggle: {
     minHeight: 44,
     marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: dsColors.divider,
+    borderTopColor: C.divider,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   togglePressed: { backgroundColor: 'rgba(255, 255, 255, 0.03)' },
-  toggleText: { color: dsColors.green, fontSize: 13, fontWeight: '700' },
+  toggleText: { color: C.green, fontSize: 13, fontFamily: F.bold },
   chevronUp: { transform: [{ rotate: '180deg' }] },
 });

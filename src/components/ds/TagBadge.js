@@ -1,7 +1,11 @@
 import React from 'react';
 import { Text, StyleSheet } from 'react-native';
 
-import { dsColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Chip pequeño en mayúsculas sobre un banner (club o jugador).
@@ -22,20 +26,20 @@ export default function TagBadge({ label, placeholder = false, style }) {
 const styles = StyleSheet.create({
   chip: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.6,
-    color: dsColors.textSecondary,
+    color: C.textSecondary,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     borderWidth: 1,
-    borderColor: dsColors.border,
+    borderColor: C.border,
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
     overflow: 'hidden',
   },
   placeholder: {
     borderStyle: 'dashed',
     borderColor: 'rgba(255, 255, 255, 0.18)',
-    color: dsColors.textMuted,
+    color: C.textMuted,
   },
 });

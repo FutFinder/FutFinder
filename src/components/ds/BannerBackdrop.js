@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-import { dsColors } from '../../theme/colors';
+import {
+  reservas as C,
+} from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 
 /** Nº de bandas del degradado diagonal (más bandas = transición más suave). */
@@ -111,7 +113,7 @@ const styles = StyleSheet.create({
   emptyLabelWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   emptyLabel: {
     fontSize: 10.5,
-    color: dsColors.textMuted,
+    color: C.textMuted,
     letterSpacing: 0.3,
   },
 });

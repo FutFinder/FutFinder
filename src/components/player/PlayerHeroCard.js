@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { MapPin, Shield, Star, BadgeCheck } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import BannerBackdrop from '../ds/BannerBackdrop';
 import TagBadge from '../ds/TagBadge';
 
@@ -86,7 +91,7 @@ export default function PlayerHeroCard({
             {verificado ? (
               <View style={styles.verifiedDot}>
                 <BadgeCheck
-                  color={dsColors.green}
+                  color={C.green}
                   size={18}
                   strokeWidth={2.4}
                   accessibilityLabel="Jugador verificado"
@@ -107,7 +112,7 @@ export default function PlayerHeroCard({
               @{profile?.username || 'jugador'}
             </Text>
             <View style={styles.metaRow}>
-              <MapPin color={dsColors.textMuted} size={12} strokeWidth={2} />
+              <MapPin color={C.textMuted} size={12} strokeWidth={2} />
               <Text style={styles.metaText} numberOfLines={1}>
                 {metaLabel}
               </Text>
@@ -119,7 +124,7 @@ export default function PlayerHeroCard({
           <Chip
             icon={
               <Shield
-                color={clubNombre ? dsColors.green : 'rgba(255,255,255,0.35)'}
+                color={clubNombre ? C.green : 'rgba(255,255,255,0.35)'}
                 size={15}
                 strokeWidth={1.8}
               />
@@ -132,10 +137,10 @@ export default function PlayerHeroCard({
           <Chip
             icon={
               <Star
-                color={rating.hasRatings ? dsColors.gold : 'rgba(255,255,255,0.35)'}
+                color={rating.hasRatings ? C.gold : 'rgba(255,255,255,0.35)'}
                 size={15}
                 strokeWidth={1.8}
-                fill={rating.hasRatings ? dsColors.gold : 'none'}
+                fill={rating.hasRatings ? C.gold : 'none'}
               />
             }
             label="Reputación"
@@ -192,17 +197,17 @@ function Chip({ icon, label, value, empty, gold, onPress }) {
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: dsSizes.gutter,
-    borderRadius: dsRadius.hero,
+    marginHorizontal: S.screenPadding,
+    borderRadius: R.hero,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
+    borderColor: C.borderSoft,
   },
 
   // ── Portada ──
   banner: {
     height: 118,
-    backgroundColor: dsColors.bannerTo,
+    backgroundColor: C.bannerTo,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -219,7 +224,7 @@ const styles = StyleSheet.create({
 
   // ── Cuerpo ──
   body: {
-    backgroundColor: dsColors.surface,
+    backgroundColor: C.surface,
     paddingHorizontal: 14,
     paddingBottom: 14,
   },
@@ -231,17 +236,17 @@ const styles = StyleSheet.create({
   },
   avatarWrap: { position: 'relative' },
   avatar: {
-    width: dsSizes.logo,
-    height: dsSizes.logo,
+    width: S.logo,
+    height: S.logo,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: dsColors.surface,
-    backgroundColor: dsColors.surfaceAlt,
+    borderColor: C.surface,
+    backgroundColor: C.surfaceAlt,
   },
   avatarEmpty: { alignItems: 'center', justifyContent: 'center' },
   avatarInitial: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     color: 'rgba(255, 255, 255, 0.4)',
   },
   verifiedDot: {
@@ -251,19 +256,19 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 9,
-    backgroundColor: dsColors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nameCol: { flex: 1, minWidth: 0, paddingBottom: 4 },
   username: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 21,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.4,
   },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
-  metaText: { color: dsColors.textMuted, fontSize: 12.5, flexShrink: 1 },
+  metaText: { color: C.textMuted, fontSize: 12.5, flexShrink: 1 },
 
   // ── Fichas ──
   chipsRow: { flexDirection: 'row', gap: 6, marginTop: 12 },
@@ -275,9 +280,9 @@ const styles = StyleSheet.create({
     gap: 7,
     paddingHorizontal: 10,
     paddingVertical: 9,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
+    borderColor: C.borderSoft,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   chipEmpty: {
@@ -292,12 +297,12 @@ const styles = StyleSheet.create({
   chipTexts: { flex: 1, minWidth: 0 },
   chipLabel: {
     fontSize: 9.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    color: dsColors.textMuted,
+    color: C.textMuted,
   },
   chipLabelGold: { color: 'rgba(240, 200, 90, 0.7)' },
-  chipValue: { color: dsColors.textPrimary, fontSize: 13, fontWeight: '700' },
+  chipValue: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold },
   chipDim: { color: 'rgba(255, 255, 255, 0.5)' },
 });

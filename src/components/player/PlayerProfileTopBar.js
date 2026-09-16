@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MapPin, ArrowLeft, Share2, Pencil, Settings, MoreVertical } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import NotificationBell from '../NotificationBell';
 
 /**
@@ -26,7 +31,7 @@ export default function PlayerProfileTopBar({
     <View style={styles.bar}>
       {isOwnProfile ? (
         <View style={styles.titleWrap}>
-          <MapPin color={dsColors.green} size={20} strokeWidth={1.8} />
+          <MapPin color={C.green} size={20} strokeWidth={1.8} />
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
@@ -39,7 +44,7 @@ export default function PlayerProfileTopBar({
             accessibilityLabel="Volver"
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
           >
-            <ArrowLeft color={dsColors.textPrimary} size={18} strokeWidth={2.2} />
+            <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
           </Pressable>
           <Text style={[styles.title, styles.titleOther]} numberOfLines={1}>
             {title}
@@ -53,7 +58,7 @@ export default function PlayerProfileTopBar({
         accessibilityLabel={isOwnProfile ? 'Compartir mi perfil' : `Compartir el perfil de ${title}`}
         style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
       >
-        <Share2 color={dsColors.textPrimary} size={17} strokeWidth={2} />
+        <Share2 color={C.textPrimary} size={17} strokeWidth={2} />
       </Pressable>
 
       {isOwnProfile ? (
@@ -66,7 +71,7 @@ export default function PlayerProfileTopBar({
               accessibilityLabel="Editar mi perfil"
               style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}
             >
-              <Pencil color={dsColors.textPrimary} size={15} strokeWidth={2} />
+              <Pencil color={C.textPrimary} size={15} strokeWidth={2} />
               <Text style={styles.editLabel}>Editar</Text>
             </Pressable>
           )}
@@ -77,7 +82,7 @@ export default function PlayerProfileTopBar({
               accessibilityLabel="Configuración"
               style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
             >
-              <Settings color={dsColors.textPrimary} size={17} strokeWidth={1.9} />
+              <Settings color={C.textPrimary} size={17} strokeWidth={1.9} />
             </Pressable>
           )}
           <NotificationBell />
@@ -89,7 +94,7 @@ export default function PlayerProfileTopBar({
           accessibilityLabel="Más opciones"
           style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
         >
-          <MoreVertical color={dsColors.textPrimary} size={17} strokeWidth={2} />
+          <MoreVertical color={C.textPrimary} size={17} strokeWidth={2} />
         </Pressable>
       )}
     </View>
@@ -101,40 +106,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: dsSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 4,
     paddingBottom: 12,
   },
   titleWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: -0.2,
     flexShrink: 1,
   },
   titleOther: { flex: 1, minWidth: 0, fontSize: 16 },
   iconBtn: {
-    width: dsSizes.tapBtn,
-    height: dsSizes.tapBtn,
-    borderRadius: dsRadius.md,
+    width: S.tapBtn,
+    height: S.tapBtn,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.border,
-    backgroundColor: dsColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: { backgroundColor: dsColors.chipStrong },
+  pressed: { backgroundColor: C.chipStrong },
   editBtn: {
-    height: dsSizes.tapBtn,
+    height: S.tapBtn,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.border,
-    backgroundColor: dsColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
   },
-  editLabel: { color: dsColors.textPrimary, fontSize: 13, fontWeight: '600' },
+  editLabel: { color: C.textPrimary, fontSize: 13, fontFamily: F.semiBold },
 });

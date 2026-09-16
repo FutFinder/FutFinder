@@ -11,7 +11,12 @@ import {
   Ban,
 } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Acciones sobre el perfil de OTRO jugador: amistad, contactar, invitar a mi
@@ -68,7 +73,7 @@ export default function PlayerPublicActions({
             <Primary
               onPress={onAdd}
               busy={busy}
-              icon={<UserPlus color={dsColors.greenInk} size={17} strokeWidth={2.4} />}
+              icon={<UserPlus color={C.greenInk} size={17} strokeWidth={2.4} />}
               label="Agregar amigo"
             />
           )}
@@ -77,7 +82,7 @@ export default function PlayerPublicActions({
             <Outline
               onPress={onCancel}
               busy={busy}
-              icon={<Clock color={dsColors.textSecondary} size={15} strokeWidth={2} />}
+              icon={<Clock color={C.textSecondary} size={15} strokeWidth={2} />}
               label="Solicitud enviada · cancelar"
             />
           )}
@@ -87,7 +92,7 @@ export default function PlayerPublicActions({
               <Primary
                 onPress={onAccept}
                 busy={busy}
-                icon={<UserCheck color={dsColors.greenInk} size={17} strokeWidth={2.4} />}
+                icon={<UserCheck color={C.greenInk} size={17} strokeWidth={2.4} />}
                 label="Aceptar"
               />
               <Pressable
@@ -101,7 +106,7 @@ export default function PlayerPublicActions({
                   pressed && { opacity: 0.7 },
                 ]}
               >
-                <UserX color={dsColors.loss} size={17} strokeWidth={2.2} />
+                <UserX color={C.loss} size={17} strokeWidth={2.2} />
               </Pressable>
             </>
           )}
@@ -111,13 +116,13 @@ export default function PlayerPublicActions({
               <Outline
                 onPress={onRemove}
                 busy={busy}
-                icon={<UserCheck color={dsColors.green} size={15} strokeWidth={2.2} />}
+                icon={<UserCheck color={C.green} size={15} strokeWidth={2.2} />}
                 label="Amigos · quitar"
-                tint={dsColors.green}
+                tint={C.green}
               />
               <Outline
                 onPress={onMessage}
-                icon={<MessageCircle color={dsColors.textPrimary} size={16} strokeWidth={2} />}
+                icon={<MessageCircle color={C.textPrimary} size={16} strokeWidth={2} />}
                 label="Contactar"
               />
             </>
@@ -132,7 +137,7 @@ export default function PlayerPublicActions({
           accessibilityLabel="Invitar a este jugador a mi club"
           style={({ pressed }) => [styles.clubBtn, pressed && { opacity: 0.85 }]}
         >
-          <Shield color={dsColors.green} size={16} strokeWidth={2} />
+          <Shield color={C.green} size={16} strokeWidth={2} />
           <Text style={styles.clubText}>Invitar a mi club</Text>
         </Pressable>
       )}
@@ -149,7 +154,7 @@ export default function PlayerPublicActions({
           pressed && { opacity: 0.85 },
         ]}
       >
-        <Ban color={isBlocked ? dsColors.loss : dsColors.textMuted} size={16} strokeWidth={2} />
+        <Ban color={isBlocked ? C.loss : C.textMuted} size={16} strokeWidth={2} />
         <Text style={[styles.blockText, isBlocked && styles.blockTextActive]}>
           {isBlocked ? 'Bloqueado · Desbloquear' : 'Bloquear usuario'}
         </Text>
@@ -169,7 +174,7 @@ export default function PlayerPublicActions({
         ]}
       >
         <Flag
-          color={yaReportado ? dsColors.textMuted : dsColors.loss}
+          color={yaReportado ? C.textMuted : C.loss}
           size={16}
           strokeWidth={2}
         />
@@ -216,42 +221,42 @@ function Outline({ onPress, busy, icon, label, tint }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: dsSizes.gutter, gap: 8 },
+  wrap: { paddingHorizontal: S.screenPadding, gap: 8 },
   row: { flexDirection: 'row', gap: 8 },
   busy: { opacity: 0.5 },
 
   primary: {
     flex: 1,
     minHeight: 50,
-    borderRadius: dsRadius.md,
-    backgroundColor: dsColors.green,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.green,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 12,
   },
-  primaryText: { color: dsColors.greenInk, fontSize: 14, fontWeight: '800', flexShrink: 1 },
+  primaryText: { color: C.greenInk, fontSize: 14, fontFamily: F.extraBold, flexShrink: 1 },
 
   outline: {
     flex: 1,
     minHeight: 50,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.border,
-    backgroundColor: dsColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 12,
   },
-  outlineText: { color: dsColors.textPrimary, fontSize: 13.5, fontWeight: '700', flexShrink: 1 },
+  outlineText: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.bold, flexShrink: 1 },
 
   iconBtn: {
     width: 50,
     minHeight: 50,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: 'rgba(232, 115, 123, 0.35)',
     backgroundColor: 'rgba(232, 115, 123, 0.08)',
@@ -261,7 +266,7 @@ const styles = StyleSheet.create({
 
   clubBtn: {
     minHeight: 48,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: 'rgba(90, 224, 106, 0.35)',
     backgroundColor: 'rgba(90, 224, 106, 0.10)',
@@ -270,14 +275,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  clubText: { color: dsColors.green, fontSize: 13.5, fontWeight: '700' },
+  clubText: { color: C.green, fontSize: 13.5, fontFamily: F.bold },
 
   blockBtn: {
     minHeight: 44,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.border,
-    backgroundColor: dsColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -287,12 +292,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(232, 115, 123, 0.35)',
     backgroundColor: 'rgba(232, 115, 123, 0.08)',
   },
-  blockText: { color: dsColors.textMuted, fontSize: 13.5, fontWeight: '700' },
-  blockTextActive: { color: dsColors.loss },
+  blockText: { color: C.textMuted, fontSize: 13.5, fontFamily: F.bold },
+  blockTextActive: { color: C.loss },
 
   reportBtn: {
     minHeight: 46,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: 'rgba(232, 115, 123, 0.3)',
     backgroundColor: 'rgba(232, 115, 123, 0.07)',
@@ -302,9 +307,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   reportDone: {
-    borderColor: dsColors.borderSoft,
-    backgroundColor: dsColors.chip,
+    borderColor: C.borderSoft,
+    backgroundColor: C.chip,
   },
-  reportText: { color: dsColors.loss, fontSize: 13.5, fontWeight: '700' },
-  reportTextDone: { color: dsColors.textMuted },
+  reportText: { color: C.loss, fontSize: 13.5, fontFamily: F.bold },
+  reportTextDone: { color: C.textMuted },
 });

@@ -1,7 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * "Rendimiento": jugados · inscritos · MVPs + tasa de asistencia.
@@ -83,11 +88,11 @@ function Cell({ value, label, highlight, dim }) {
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: dsSizes.gutter,
-    backgroundColor: dsColors.surface,
+    marginHorizontal: S.screenPadding,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    borderRadius: dsRadius.xl,
+    borderColor: C.borderSoft,
+    borderRadius: R.cardSm,
     padding: 12,
   },
   grid: { flexDirection: 'row', gap: 6 },
@@ -96,9 +101,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 9,
     paddingHorizontal: 4,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
+    borderColor: C.borderSoft,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   cellHighlight: {
@@ -106,17 +111,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(90, 224, 106, 0.24)',
   },
   cellValue: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 19,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     lineHeight: 22,
   },
-  cellValueHighlight: { color: dsColors.green },
+  cellValueHighlight: { color: C.green },
   cellValueDim: { color: 'rgba(255, 255, 255, 0.45)' },
   cellLabel: {
-    color: dsColors.textMuted,
+    color: C.textMuted,
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.7,
     marginTop: 4,
   },
@@ -129,8 +134,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 14,
   },
-  attLabel: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 13, fontWeight: '600' },
-  attValue: { color: dsColors.green, fontSize: 15, fontWeight: '800' },
+  attLabel: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 13, fontFamily: F.semiBold },
+  attValue: { color: C.green, fontSize: 15, fontFamily: F.extraBold },
   attValueEmpty: { color: 'rgba(255, 255, 255, 0.5)' },
   track: {
     height: 8,
@@ -139,6 +144,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     overflow: 'hidden',
   },
-  fill: { height: '100%', borderRadius: 5, backgroundColor: dsColors.green },
-  attHint: { color: dsColors.textMuted, fontSize: 11.5, marginTop: 7 },
+  fill: { height: '100%', borderRadius: 5, backgroundColor: C.green },
+  attHint: { color: C.textMuted, fontSize: 11.5, marginTop: 7 },
 });

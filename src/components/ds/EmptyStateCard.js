@@ -1,7 +1,12 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 
 /**
@@ -57,31 +62,31 @@ export default function EmptyStateCard({
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: dsSizes.gutter,
-    backgroundColor: dsColors.surface,
-    borderRadius: dsRadius.lg,
+    marginHorizontal: S.screenPadding,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
+    borderColor: C.borderSoft,
     padding: 16,
     alignItems: 'center',
   },
   icon: {
     width: 38,
     height: 38,
-    borderRadius: dsRadius.sm,
-    backgroundColor: dsColors.chip,
+    borderRadius: R.chip,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 9,
   },
   title: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     textAlign: 'center',
   },
   subtitle: {
-    color: dsColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 11.5,
     lineHeight: 16,
     textAlign: 'center',
@@ -92,10 +97,10 @@ const styles = StyleSheet.create({
     minWidth: 140,
     paddingHorizontal: 16,
     marginTop: 11,
-    borderRadius: dsRadius.sm,
+    borderRadius: R.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnGhostText: { fontSize: 12.5, fontWeight: '700' },
-  btnSolidText: { fontSize: 12.5, fontWeight: '800' },
+  btnGhostText: { fontSize: 12.5, fontFamily: F.bold },
+  btnSolidText: { fontSize: 12.5, fontFamily: F.extraBold },
 });

@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Star } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * "Reputación": valoración media con estrellas + Trust Score.
@@ -41,11 +46,11 @@ export default function ReputationCard({ rating, trust }) {
                 color={
                   rating.hasRatings
                     ? llena
-                      ? dsColors.gold
+                      ? C.gold
                       : 'rgba(240, 200, 90, 0.28)'
                     : 'rgba(255, 255, 255, 0.22)'
                 }
-                fill={llena ? dsColors.gold : 'none'}
+                fill={llena ? C.gold : 'none'}
               />
             );
           })}
@@ -83,11 +88,11 @@ export default function ReputationCard({ rating, trust }) {
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: dsSizes.gutter,
-    backgroundColor: dsColors.surface,
+    marginHorizontal: S.screenPadding,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    borderRadius: dsRadius.xl,
+    borderColor: C.borderSoft,
+    borderRadius: R.cardSm,
     padding: 13,
     flexDirection: 'row',
     alignItems: 'center',
@@ -95,34 +100,34 @@ const styles = StyleSheet.create({
   },
   left: { minWidth: 0 },
   score: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 28,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     lineHeight: 30,
     letterSpacing: -0.8,
   },
   dim: { color: 'rgba(255, 255, 255, 0.45)' },
   stars: { flexDirection: 'row', gap: 2, marginTop: 6 },
-  leftHint: { color: dsColors.textMuted, fontSize: 11.5, marginTop: 6 },
+  leftHint: { color: C.textMuted, fontSize: 11.5, marginTop: 6 },
 
-  divider: { width: 1, alignSelf: 'stretch', backgroundColor: dsColors.borderSoft },
+  divider: { width: 1, alignSelf: 'stretch', backgroundColor: C.borderSoft },
 
   right: { flex: 1, minWidth: 0 },
   trustLabel: {
-    color: dsColors.textMuted,
+    color: C.textMuted,
     fontSize: 9.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   trustRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4 },
   trustValue: {
-    color: dsColors.green,
+    color: C.green,
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     lineHeight: 26,
   },
-  trustMax: { color: dsColors.textMuted, fontSize: 12 },
+  trustMax: { color: C.textMuted, fontSize: 12 },
   track: {
     height: 6,
     borderRadius: 4,
@@ -130,6 +135,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     overflow: 'hidden',
   },
-  fill: { height: '100%', borderRadius: 4, backgroundColor: dsColors.green },
-  rightHint: { color: dsColors.textMuted, fontSize: 11, marginTop: 6 },
+  fill: { height: '100%', borderRadius: 4, backgroundColor: C.green },
+  rightHint: { color: C.textMuted, fontSize: 11, marginTop: 6 },
 });

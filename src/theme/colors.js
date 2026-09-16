@@ -195,6 +195,10 @@ export const reservasSizes = {
   ctaPrimary: 54, // 52–56
   ctaSecondary: 49, // 48–50
   iconBtn: 40,
+  // Mínimo táctil. Los botones de icono miden 40 y llegan a 44 con `hitSlop`;
+  // este es para los que no lo llevan.
+  tapBtn: 44,
+  logo: 72, // escudo de club y avatar grande de perfil
   chip: 33, // 32–34
   badge: 22, // 20–24
 };

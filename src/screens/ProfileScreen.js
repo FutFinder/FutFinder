@@ -22,7 +22,12 @@ import {
   X,
 } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import Banner from '../components/Banner';
 import SectionHeader from '../components/ds/SectionHeader';
 import EmptyStateCard from '../components/ds/EmptyStateCard';
@@ -396,9 +401,9 @@ export default function ProfileScreen({ navigation, route }) {
           <EmptyStateCard
             icon={
               loadError === 'no-existe' ? (
-                <UserX color={dsColors.loss} size={18} strokeWidth={2} />
+                <UserX color={C.loss} size={18} strokeWidth={2} />
               ) : (
-                <AlertCircle color={dsColors.loss} size={18} strokeWidth={2} />
+                <AlertCircle color={C.loss} size={18} strokeWidth={2} />
               )
             }
             title={
@@ -467,8 +472,8 @@ export default function ProfileScreen({ navigation, route }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={dsColors.green}
-            colors={[dsColors.green]}
+            tintColor={C.green}
+            colors={[C.green]}
           />
         }
       >
@@ -542,7 +547,7 @@ export default function ProfileScreen({ navigation, route }) {
         />
         {participaciones.length === 0 ? (
           <EmptyStateCard
-            icon={<Clock color={dsColors.textSecondary} size={18} strokeWidth={1.9} />}
+            icon={<Clock color={C.textSecondary} size={18} strokeWidth={1.9} />}
             title={isOwnProfile ? 'Aún no te has inscrito a partidos' : 'Sin participaciones'}
             subtitle={
               isOwnProfile
@@ -617,7 +622,7 @@ export default function ProfileScreen({ navigation, route }) {
                 puerta, y en el lugar que no depende de en qué pestaña
                 estés. */}
             <ProfileActionRow
-              icon={<Pencil color={dsColors.green} size={17} strokeWidth={2} />}
+              icon={<Pencil color={C.green} size={17} strokeWidth={2} />}
               label="Editar mi perfil"
               onPress={goEdit}
               style={styles.actionSpaced}
@@ -629,7 +634,7 @@ export default function ProfileScreen({ navigation, route }) {
               accessibilityLabel="Cerrar sesión"
               style={({ pressed }) => [styles.logout, pressed && { opacity: 0.8 }]}
             >
-              <LogOut color={dsColors.loss} size={17} strokeWidth={2} />
+              <LogOut color={C.loss} size={17} strokeWidth={2} />
               <Text style={styles.logoutText}>Cerrar sesión</Text>
             </Pressable>
           </>
@@ -750,7 +755,7 @@ export default function ProfileScreen({ navigation, route }) {
             accessibilityLabel="Cerrar la galería"
             style={styles.viewerClose}
           >
-            <X color={dsColors.textPrimary} size={22} strokeWidth={2.2} />
+            <X color={C.textPrimary} size={22} strokeWidth={2.2} />
           </Pressable>
 
           {galleryIndex !== null && photos[galleryIndex] && (
@@ -775,7 +780,7 @@ export default function ProfileScreen({ navigation, route }) {
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <ChevronLeft color={dsColors.textPrimary} size={22} strokeWidth={2.2} />
+              <ChevronLeft color={C.textPrimary} size={22} strokeWidth={2.2} />
             </Pressable>
             <Text style={styles.viewerCounter}>
               {(galleryIndex ?? 0) + 1} / {photos.length}
@@ -792,7 +797,7 @@ export default function ProfileScreen({ navigation, route }) {
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <ChevronRight color={dsColors.textPrimary} size={22} strokeWidth={2.2} />
+              <ChevronRight color={C.textPrimary} size={22} strokeWidth={2.2} />
             </Pressable>
           </View>
         </View>
@@ -802,20 +807,20 @@ export default function ProfileScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: dsColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: 36 },
-  bannerWrap: { paddingHorizontal: dsSizes.gutter, paddingBottom: 12 },
+  bannerWrap: { paddingHorizontal: S.screenPadding, paddingBottom: 12 },
   errorWrap: { paddingTop: 8 },
 
   publicActions: { marginTop: 14 },
-  participaciones: { paddingHorizontal: dsSizes.gutter, gap: 8 },
+  participaciones: { paddingHorizontal: S.screenPadding, gap: 8 },
 
   actionSpaced: { marginTop: 10 },
   logout: {
     minHeight: 50,
-    marginHorizontal: dsSizes.gutter,
+    marginHorizontal: S.screenPadding,
     marginTop: 8,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: 'rgba(232, 115, 123, 0.35)',
     backgroundColor: 'rgba(232, 115, 123, 0.07)',
@@ -824,13 +829,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  logoutText: { color: dsColors.loss, fontSize: 14, fontWeight: '700' },
+  logoutText: { color: C.loss, fontSize: 14, fontFamily: F.bold },
   demoNote: {
-    color: dsColors.textMuted,
+    color: C.textMuted,
     fontSize: 11.5,
     textAlign: 'center',
     marginTop: 16,
-    paddingHorizontal: dsSizes.gutter,
+    paddingHorizontal: S.screenPadding,
   },
 
   // Diálogo de confirmación
@@ -844,15 +849,15 @@ const styles = StyleSheet.create({
   dialog: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: dsColors.surface,
-    borderRadius: dsRadius.xl,
+    backgroundColor: C.surface,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: dsColors.border,
+    borderColor: C.border,
     padding: 18,
   },
-  dialogTitle: { color: dsColors.textPrimary, fontSize: 17, fontWeight: '800' },
+  dialogTitle: { color: C.textPrimary, fontSize: 17, fontFamily: F.extraBold },
   dialogText: {
-    color: dsColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 6,
@@ -860,16 +865,16 @@ const styles = StyleSheet.create({
   dialogDanger: {
     minHeight: 48,
     marginTop: 16,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: 'rgba(232, 115, 123, 0.35)',
     backgroundColor: 'rgba(232, 115, 123, 0.10)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dialogDangerText: { color: dsColors.loss, fontSize: 14.5, fontWeight: '700' },
+  dialogDangerText: { color: C.loss, fontSize: 14.5, fontFamily: F.bold },
   dialogCancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  dialogCancelText: { color: dsColors.textSecondary, fontSize: 14, fontWeight: '600' },
+  dialogCancelText: { color: C.textSecondary, fontSize: 14, fontFamily: F.semiBold },
 
   // Visores de imagen
   viewer: {
@@ -880,18 +885,18 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 14,
   },
-  viewerImg: { width: '100%', flex: 1, borderRadius: dsRadius.xl },
-  viewerHint: { color: dsColors.textSecondary, fontSize: 12.5 },
+  viewerImg: { width: '100%', flex: 1, borderRadius: R.cardSm },
+  viewerHint: { color: C.textSecondary, fontSize: 12.5 },
   viewerClose: { position: 'absolute', top: 44, right: 20, zIndex: 2, padding: 6 },
   viewerNav: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   viewerNavBtn: {
     width: 44,
     height: 44,
-    borderRadius: dsRadius.md,
-    backgroundColor: dsColors.chip,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
   viewerNavOff: { opacity: 0.3 },
-  viewerCounter: { color: dsColors.textPrimary, fontSize: 13, fontWeight: '700', minWidth: 56, textAlign: 'center' },
+  viewerCounter: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold, minWidth: 56, textAlign: 'center' },
 });

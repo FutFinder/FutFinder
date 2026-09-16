@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Pencil } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /** A partir de cuántos caracteres ofrecemos "Ver más". */
 const LIMITE_COLAPSADO = 150;
@@ -29,7 +34,7 @@ export default function PlayerBioSection({ bio, isOwnProfile, onEdit }) {
         accessibilityLabel="Agrega una descripción sobre tu trayectoria"
         style={({ pressed }) => [styles.cta, pressed && { opacity: 0.8 }]}
       >
-        <Pencil color={dsColors.green} size={16} strokeWidth={2} />
+        <Pencil color={C.green} size={16} strokeWidth={2} />
         <Text style={styles.ctaText}>Agrega una descripción sobre tu trayectoria</Text>
       </Pressable>
     );
@@ -59,11 +64,11 @@ export default function PlayerBioSection({ bio, isOwnProfile, onEdit }) {
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: dsSizes.gutter,
-    backgroundColor: dsColors.surface,
+    marginHorizontal: S.screenPadding,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    borderRadius: dsRadius.lg,
+    borderColor: C.borderSoft,
+    borderRadius: R.row,
     paddingHorizontal: 13,
     paddingVertical: 12,
   },
@@ -73,16 +78,16 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   more: { marginTop: 7, alignSelf: 'flex-start' },
-  moreText: { color: dsColors.green, fontSize: 12.5, fontWeight: '700' },
+  moreText: { color: C.green, fontSize: 12.5, fontFamily: F.bold },
 
   cta: {
-    marginHorizontal: dsSizes.gutter,
+    marginHorizontal: S.screenPadding,
     minHeight: 52,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: 'rgba(90, 224, 106, 0.35)',
     backgroundColor: 'rgba(90, 224, 106, 0.06)',
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -91,9 +96,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   ctaText: {
-    color: dsColors.green,
+    color: C.green,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     flexShrink: 1,
   },
 });

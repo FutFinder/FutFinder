@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Fila de acción del perfil: icono en recuadro, etiqueta y chevron.
@@ -46,31 +51,31 @@ export default function ProfileActionRow({
 const styles = StyleSheet.create({
   row: {
     minHeight: 44,
-    marginHorizontal: dsSizes.gutter,
+    marginHorizontal: S.screenPadding,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    backgroundColor: dsColors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    borderRadius: dsRadius.lg,
+    borderColor: C.borderSoft,
+    borderRadius: R.row,
     padding: 13,
   },
   rowDanger: {
     backgroundColor: 'rgba(232, 115, 123, 0.07)',
     borderColor: 'rgba(232, 115, 123, 0.35)',
   },
-  pressed: { backgroundColor: dsColors.surfaceHover },
+  pressed: { backgroundColor: C.surfaceHover },
   pressedDanger: { backgroundColor: 'rgba(232, 115, 123, 0.14)' },
   icon: {
     width: 36,
     height: 36,
-    borderRadius: dsRadius.sm,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(90, 224, 106, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconDanger: { backgroundColor: 'rgba(232, 115, 123, 0.14)' },
-  label: { flex: 1, color: dsColors.textPrimary, fontSize: 14, fontWeight: '700' },
-  labelDanger: { color: dsColors.loss },
+  label: { flex: 1, color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
+  labelDanger: { color: C.loss },
 });

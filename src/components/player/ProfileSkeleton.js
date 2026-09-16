@@ -1,7 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet } from 'react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+} from '../../theme/colors';
 
 /**
  * Skeleton de carga del perfil: replica la silueta del héroe y de las dos
@@ -64,21 +68,21 @@ export default function ProfileSkeleton() {
 const styles = StyleSheet.create({
   wrap: { paddingTop: 4, gap: 16 },
   hero: {
-    marginHorizontal: dsSizes.gutter,
-    borderRadius: dsRadius.hero,
+    marginHorizontal: S.screenPadding,
+    borderRadius: R.hero,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
+    borderColor: C.borderSoft,
   },
   banner: { height: 118, backgroundColor: 'rgba(255, 255, 255, 0.08)' },
-  heroBody: { backgroundColor: dsColors.surface, paddingHorizontal: 14, paddingBottom: 14 },
+  heroBody: { backgroundColor: C.surface, paddingHorizontal: 14, paddingBottom: 14 },
   heroRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginTop: -30 },
   avatar: {
-    width: dsSizes.logo,
-    height: dsSizes.logo,
+    width: S.logo,
+    height: S.logo,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: dsColors.surface,
+    borderColor: C.surface,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   heroTexts: { flex: 1, gap: 7, paddingBottom: 6 },
@@ -88,19 +92,19 @@ const styles = StyleSheet.create({
   chip: {
     flex: 1,
     height: 44,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   card: {
-    marginHorizontal: dsSizes.gutter,
+    marginHorizontal: S.screenPadding,
     height: 72,
-    borderRadius: dsRadius.lg,
+    borderRadius: R.row,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   cardTall: {
-    marginHorizontal: dsSizes.gutter,
+    marginHorizontal: S.screenPadding,
     height: 150,
-    borderRadius: dsRadius.xl,
+    borderRadius: R.cardSm,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
 });

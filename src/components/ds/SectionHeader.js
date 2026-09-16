@@ -1,7 +1,11 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
-import { dsColors, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 
 /**
@@ -37,20 +41,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: dsSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 26,
     paddingBottom: 10,
   },
   title: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: -0.2,
     flexShrink: 1,
   },
   action: { paddingVertical: 6, paddingLeft: 10 },
   actionText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
 });

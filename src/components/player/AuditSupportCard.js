@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { FileText, ChevronDown } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * "Auditoría y soporte" — SOLO perfil propio.
@@ -80,12 +85,12 @@ function Row({ label, value, muted }) {
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: dsSizes.gutter,
+    marginHorizontal: S.screenPadding,
     marginTop: 10,
-    backgroundColor: dsColors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    borderRadius: dsRadius.xl,
+    borderColor: C.borderSoft,
+    borderRadius: R.cardSm,
     overflow: 'hidden',
   },
   header: {
@@ -99,13 +104,13 @@ const styles = StyleSheet.create({
   icon: {
     width: 36,
     height: 36,
-    borderRadius: dsRadius.sm,
-    backgroundColor: dsColors.chip,
+    borderRadius: R.chip,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
   texts: { flex: 1, minWidth: 0 },
-  title: { color: dsColors.textPrimary, fontSize: 13.5, fontWeight: '700' },
+  title: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.bold },
   sub: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 11.5, marginTop: 2 },
   chevronUp: { transform: [{ rotate: '180deg' }] },
 
@@ -117,22 +122,22 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: dsColors.divider,
+    borderTopColor: C.divider,
   },
   rowLabel: { color: 'rgba(255, 255, 255, 0.72)', fontSize: 13, flexShrink: 1 },
-  rowValue: { color: dsColors.textPrimary, fontSize: 13, fontWeight: '700' },
+  rowValue: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold },
 
   disabledBtn: {
     minHeight: 44,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    borderRadius: dsRadius.md,
+    borderColor: C.borderSoft,
+    borderRadius: R.iconBtn,
     backgroundColor: 'rgba(255, 255, 255, 0.02)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  disabledText: { color: 'rgba(255, 255, 255, 0.3)', fontSize: 13, fontWeight: '600' },
+  disabledText: { color: 'rgba(255, 255, 255, 0.3)', fontSize: 13, fontFamily: F.semiBold },
   disabledHint: {
     color: 'rgba(255, 255, 255, 0.35)',
     fontSize: 11,

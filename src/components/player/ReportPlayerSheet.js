@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 import { Flag, Check, ArrowLeft } from 'lucide-react-native';
 
-import { dsColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { MOTIVOS_REPORTE } from '../../services/reports';
 
 const MAX_DESC = 600;
@@ -73,7 +78,7 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
           {paso === 'form' ? (
             <>
               <View style={styles.titleRow}>
-                <Flag color={dsColors.loss} size={18} strokeWidth={2} />
+                <Flag color={C.loss} size={18} strokeWidth={2} />
                 <Text style={styles.title}>Reportar esta cuenta</Text>
               </View>
               <Text style={styles.subtitle} numberOfLines={2}>
@@ -103,7 +108,7 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
                       <Text style={[styles.reasonText, activo && styles.reasonTextActive]}>
                         {m.label}
                       </Text>
-                      {activo && <Check color={dsColors.green} size={16} strokeWidth={2.6} />}
+                      {activo && <Check color={C.green} size={16} strokeWidth={2.6} />}
                     </Pressable>
                   );
                 })}
@@ -112,7 +117,7 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
                 <TextInput
                   style={styles.input}
                   placeholder="Cuenta brevemente qué pasó…"
-                  placeholderTextColor={dsColors.textMuted}
+                  placeholderTextColor={C.textMuted}
                   value={descripcion}
                   onChangeText={setDescripcion}
                   multiline
@@ -155,7 +160,7 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
                   accessibilityRole="button"
                   accessibilityLabel="Volver a editar el reporte"
                 >
-                  <ArrowLeft color={dsColors.textPrimary} size={18} strokeWidth={2.2} />
+                  <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
                 </Pressable>
                 <Text style={styles.title}>¿Enviar el reporte?</Text>
               </View>
@@ -185,7 +190,7 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
                 ]}
               >
                 {enviando ? (
-                  <ActivityIndicator color={dsColors.loss} />
+                  <ActivityIndicator color={C.loss} />
                 ) : (
                   <Text style={styles.dangerText}>Enviar reporte</Text>
                 )}
@@ -223,12 +228,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: dsColors.surface,
-    borderTopLeftRadius: dsRadius.sheet,
-    borderTopRightRadius: dsRadius.sheet,
+    backgroundColor: C.surface,
+    borderTopLeftRadius: R.hero,
+    borderTopRightRadius: R.hero,
     borderTopWidth: 1,
-    borderColor: dsColors.border,
-    paddingHorizontal: dsSizes.gutter,
+    borderColor: C.border,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 14,
     paddingBottom: 30,
     maxHeight: '88%',
@@ -243,13 +248,13 @@ const styles = StyleSheet.create({
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   title: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
     flexShrink: 1,
   },
-  subtitle: { color: dsColors.textSecondary, fontSize: 12.5, marginTop: 6, lineHeight: 18 },
+  subtitle: { color: C.textSecondary, fontSize: 12.5, marginTop: 6, lineHeight: 18 },
 
   reasons: { marginTop: 14 },
   reasonsContent: { gap: 6, paddingBottom: 4 },
@@ -260,46 +265,46 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
     paddingHorizontal: 13,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    backgroundColor: dsColors.chip,
+    borderColor: C.borderSoft,
+    backgroundColor: C.chip,
   },
   reasonActive: {
     borderColor: 'rgba(90, 224, 106, 0.4)',
     backgroundColor: 'rgba(90, 224, 106, 0.10)',
   },
-  reasonText: { color: dsColors.textPrimary, fontSize: 13.5, fontWeight: '600', flexShrink: 1 },
-  reasonTextActive: { color: dsColors.green, fontWeight: '700' },
+  reasonText: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.semiBold, flexShrink: 1 },
+  reasonTextActive: { color: C.green, fontFamily: F.bold },
 
   descLabel: {
-    color: dsColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     marginTop: 10,
   },
   input: {
     minHeight: 88,
     marginTop: 6,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    backgroundColor: dsColors.surfaceAlt,
-    color: dsColors.textPrimary,
+    borderColor: C.borderSoft,
+    backgroundColor: C.surfaceAlt,
+    color: C.textPrimary,
     fontSize: 13.5,
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 10,
     textAlignVertical: 'top',
   },
-  counter: { color: dsColors.textMuted, fontSize: 11, marginTop: 4, textAlign: 'right' },
+  counter: { color: C.textMuted, fontSize: 11, marginTop: 4, textAlign: 'right' },
 
   summary: {
     marginTop: 14,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: dsColors.borderSoft,
-    backgroundColor: dsColors.surfaceAlt,
+    borderColor: C.borderSoft,
+    backgroundColor: C.surfaceAlt,
     paddingHorizontal: 13,
     paddingVertical: 4,
   },
@@ -311,17 +316,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   sumRowColumn: { flexDirection: 'column', alignItems: 'flex-start', gap: 4 },
-  sumLabel: { color: dsColors.textMuted, fontSize: 12 },
+  sumLabel: { color: C.textMuted, fontSize: 12 },
   sumValue: {
-    color: dsColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
     flexShrink: 1,
     textAlign: 'right',
   },
   sumValueBlock: { textAlign: 'left', fontWeight: '400', lineHeight: 18 },
   warning: {
-    color: dsColors.textMuted,
+    color: C.textMuted,
     fontSize: 11.5,
     lineHeight: 16,
     marginTop: 10,
@@ -330,29 +335,29 @@ const styles = StyleSheet.create({
   primary: {
     minHeight: 52,
     marginTop: 14,
-    borderRadius: dsRadius.md,
-    backgroundColor: dsColors.green,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: dsColors.greenInk, fontSize: 15, fontWeight: '800' },
+  primaryText: { color: C.greenInk, fontSize: 15, fontFamily: F.extraBold },
   danger: {
     minHeight: 52,
     marginTop: 14,
-    borderRadius: dsRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: 'rgba(232, 115, 123, 0.35)',
     backgroundColor: 'rgba(232, 115, 123, 0.10)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dangerText: { color: dsColors.loss, fontSize: 15, fontWeight: '700' },
+  dangerText: { color: C.loss, fontSize: 15, fontFamily: F.bold },
   secondary: {
     minHeight: 46,
     marginTop: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryText: { color: dsColors.textSecondary, fontSize: 14, fontWeight: '600' },
+  secondaryText: { color: C.textSecondary, fontSize: 14, fontFamily: F.semiBold },
   disabled: { opacity: 0.45 },
 });
