@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -13,9 +12,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Clock, MapPin, Wallet, ArrowRight } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
+import { Card, Button, IconButton } from '../components/reservas/ui';
+import { FieldLabel, TextField } from '../components/reservas/recintoUi';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { supabase } from '../services/supabase';
 import { getMatchById, getClubMatchLocation } from '../services/matches';
@@ -326,7 +331,7 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={C.green} />
         </View>
       </SafeAreaView>
     );
@@ -344,14 +349,7 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
             {partido?.titulo || 'Partido de clubes'}
           </Text>
         </View>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Cerrar"
-          style={styles.closeBtn}
-        >
-          <X color={colors.textPrimary} size={20} strokeWidth={2.2} />
-        </Pressable>
+        <IconButton icon={X} onPress={() => navigation.goBack()} accessibilityLabel="Cerrar" />
       </View>
 
       <KeyboardAvoidingView
@@ -381,9 +379,9 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
               </Text>
 
               {/* ── Fecha y hora ─────────────────────────────── */}
-              <View style={styles.bloque}>
+              <Card style={styles.bloque}>
                 <View style={styles.bloqueHead}>
-                  <Clock color={colors.primary} size={16} strokeWidth={2.2} />
+                  <Clock color={C.green} size={16} strokeWidth={2.2} />
                   <Text style={styles.bloqueTitulo}>Fecha y hora</Text>
                 </View>
                 <Text style={styles.actual}>
@@ -391,36 +389,30 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
                 </Text>
                 <View style={styles.row2}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Fecha</Text>
-                    <TextInput
-                      style={styles.input}
+                    <FieldLabel>Fecha</FieldLabel>
+                    <TextField
                       placeholder="DD/MM/AAAA"
-                      placeholderTextColor={colors.textMuted}
                       value={fechaStr}
                       onChangeText={setFechaStr}
                       keyboardType="numbers-and-punctuation"
-                      accessibilityLabel="Fecha propuesta"
                     />
                   </View>
                   <View style={{ width: 110 }}>
-                    <Text style={styles.label}>Hora</Text>
-                    <TextInput
-                      style={styles.input}
+                    <FieldLabel>Hora</FieldLabel>
+                    <TextField
                       placeholder="HH:MM"
-                      placeholderTextColor={colors.textMuted}
                       value={horaStr}
                       onChangeText={setHoraStr}
                       keyboardType="numbers-and-punctuation"
-                      accessibilityLabel="Hora propuesta"
                     />
                   </View>
                 </View>
-              </View>
+              </Card>
 
               {/* ── Cancha ───────────────────────────────────── */}
-              <View style={styles.bloque}>
+              <Card style={styles.bloque}>
                 <View style={styles.bloqueHead}>
-                  <MapPin color={colors.primary} size={16} strokeWidth={2.2} />
+                  <MapPin color={C.green} size={16} strokeWidth={2.2} />
                   <Text style={styles.bloqueTitulo}>Cancha</Text>
                 </View>
                 <Text style={styles.actual}>
@@ -430,18 +422,15 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
 
                 {tocoCancha ? (
                   <>
-                    <Text style={styles.label}>Cancha o recinto</Text>
-                    <TextInput
-                      style={styles.input}
+                    <FieldLabel>Cancha o recinto</FieldLabel>
+                    <TextField
                       placeholder="Ej: Complejo Municipal"
-                      placeholderTextColor={colors.textMuted}
                       value={canchaNombre}
                       onChangeText={setCanchaNombre}
                       maxLength={120}
-                      accessibilityLabel="Nombre de la cancha propuesta"
                     />
 
-                    <Text style={styles.label}>Dirección exacta</Text>
+                    <FieldLabel>Dirección exacta</FieldLabel>
                     <LocationAutocomplete
                       value={ubicacion.direccion}
                       placeholder="Busca la cancha por nombre o dirección"
@@ -458,9 +447,9 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
                       onSelect={(lugar) => setUbicacion((prev) => seleccionarLugar(prev, lugar))}
                       inputRowStyle={styles.autoRow}
                       inputStyle={styles.autoInput}
-                      placeholderColor={colors.textMuted}
-                      accentColor={colors.primary}
-                      spinnerColor={colors.primary}
+                      placeholderColor={C.textSecondary}
+                      accentColor={C.green}
+                      spinnerColor={C.green}
                     />
                     <Text style={styles.hint}>
                       {hayUbicacion
@@ -502,27 +491,24 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
                     <Text style={styles.link}>Proponer otra cancha</Text>
                   </Pressable>
                 )}
-              </View>
+              </Card>
 
               {/* ── Cuota ────────────────────────────────────── */}
-              <View style={styles.bloque}>
+              <Card style={styles.bloque}>
                 <View style={styles.bloqueHead}>
-                  <Wallet color={colors.primary} size={16} strokeWidth={2.2} />
+                  <Wallet color={C.green} size={16} strokeWidth={2.2} />
                   <Text style={styles.bloqueTitulo}>Cuota por persona</Text>
                 </View>
                 <Text style={styles.actual}>
                   Actual: {partido?.precio_cuota ? `$${partido.precio_cuota}` : 'gratis'}
                 </Text>
-                <TextInput
-                  style={styles.input}
+                <TextField
                   placeholder="0"
-                  placeholderTextColor={colors.textMuted}
                   value={cuotaStr}
                   onChangeText={(v) => setCuotaStr(v.replace(/[^0-9]/g, ''))}
                   keyboardType="number-pad"
-                  accessibilityLabel="Cuota propuesta, en pesos"
                 />
-              </View>
+              </Card>
 
               {/* ── Resumen ──────────────────────────────────── */}
               <View style={styles.resumen}>
@@ -537,7 +523,7 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
                       <Text style={styles.filaEtiqueta}>{f.etiqueta}</Text>
                       <View style={styles.filaValores}>
                         <Text style={styles.filaAntes}>{f.antes}</Text>
-                        <ArrowRight color={colors.textMuted} size={13} strokeWidth={2.4} />
+                        <ArrowRight color={C.textMuted} size={13} strokeWidth={2.4} />
                         <Text style={styles.filaDespues}>{f.despues}</Text>
                       </View>
                     </View>
@@ -572,106 +558,87 @@ function fechaVigente(iso) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 12,
+    paddingHorizontal: S.screenPadding,
+    paddingTop: 6,
+    paddingBottom: 12,
     width: '100%',
     maxWidth: 932,
     alignSelf: 'center',
   },
   headerCenter: { flex: 1 },
-  headerTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  headerSubtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-  },
+  headerTitle: { fontFamily: F.extraBold, fontSize: 20, color: C.textPrimary, letterSpacing: -0.3 },
+  headerSubtitle: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 2 },
 
   content: {
-    padding: 16,
+    paddingHorizontal: S.screenPadding,
     paddingBottom: 48,
-    gap: 12,
+    gap: S.cardGap,
     width: '100%',
     // El tope es lo que evita que en un monitor ancho el «actual → propuesto»
     // quede separado por medio metro de vacío.
     maxWidth: 640,
     alignSelf: 'center',
   },
-  intro: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
+  intro: { fontFamily: F.medium, fontSize: 13, color: C.textSecondary, lineHeight: 19 },
 
   bloqueo: { gap: 12, paddingVertical: 8 },
-  bloqueoTxt: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  bloqueoTxt: { fontFamily: F.medium, fontSize: 14, color: C.textSecondary, lineHeight: 20 },
 
-  bloque: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: 14,
-    gap: 8,
-  },
+  bloque: { gap: 9 },
   bloqueHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bloqueTitulo: { color: colors.textPrimary, fontSize: 15, fontWeight: '800' },
-  actual: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
+  bloqueTitulo: { fontFamily: F.extraBold, fontSize: 15, color: C.textPrimary },
+  actual: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, lineHeight: 17 },
 
   row2: { flexDirection: 'row', gap: 10 },
-  label: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 4 },
-  input: {
-    minHeight: 44,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  autoRow: {
-    minHeight: 44,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-  },
-  autoInput: { color: colors.textPrimary, fontSize: 14 },
-  hint: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
+  hint: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary, lineHeight: 16.5 },
   linkBtn: { minHeight: 44, justifyContent: 'center' },
-  link: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  link: { fontFamily: F.bold, fontSize: 13, color: C.green },
 
-  resumen: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
+  autoRow: {
+    minHeight: 48,
+    borderRadius: R.row,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: colors.primary,
-    padding: 14,
-    gap: 8,
+    borderColor: C.border,
+    paddingHorizontal: 14,
   },
-  resumenTitulo: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
+  autoInput: { fontFamily: F.medium, fontSize: 14.5, color: C.textPrimary, paddingVertical: 12 },
+
+  // Borde verde: es el bloque que dice qué se va a mandar de verdad, y tiene
+  // que distinguirse de los campos que lo alimentan.
+  resumen: {
+    backgroundColor: C.selectedBg,
+    borderRadius: R.cardSm,
+    borderWidth: 1,
+    borderColor: C.green,
+    padding: 14,
+    gap: 9,
+  },
+  resumenTitulo: { fontFamily: F.extraBold, fontSize: 14.5, color: C.textPrimary },
   filaResumen: { gap: 3 },
   filaEtiqueta: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
+    fontFamily: F.bold,
+    fontSize: 10.5,
+    color: C.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.8,
   },
   filaValores: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   filaAntes: {
-    color: colors.textSecondary,
+    fontFamily: F.semiBold,
     fontSize: 13,
-    fontWeight: '600',
+    color: C.textSecondary,
     textDecorationLine: 'line-through',
     flexShrink: 1,
   },
-  filaDespues: { color: colors.textPrimary, fontSize: 14, fontWeight: '800', flexShrink: 1 },
+  filaDespues: { fontFamily: F.extraBold, fontSize: 14, color: C.textPrimary, flexShrink: 1 },
 
   submit: { marginTop: 4 },
 });

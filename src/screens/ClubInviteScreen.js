@@ -14,12 +14,17 @@ import {
   ArrowLeft,
   Search as SearchIcon,
   UserPlus,
-  Check,
   Shield,
 } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import Banner from '../components/Banner';
+import { IconButton, Badge } from '../components/reservas/ui';
 import { searchPlayers } from '../services/profile';
 import { inviteToClub, listMembers } from '../services/clubs';
 
@@ -80,13 +85,7 @@ export default function ClubInviteScreen({ navigation, route }) {
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-        >
-          <ArrowLeft color={colors.textPrimary} size={22} />
-        </Pressable>
+        <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Invitar jugadores</Text>
           {clubNombre ? (
@@ -98,11 +97,11 @@ export default function ClubInviteScreen({ navigation, route }) {
       </View>
 
       <View style={styles.searchBox}>
-        <SearchIcon color={colors.textMuted} size={18} />
+        <SearchIcon color={C.textSecondary} size={18} strokeWidth={2} />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar jugadores por username..."
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={C.textSecondary}
           value={query}
           onChangeText={onSearch}
           autoCapitalize="none"
@@ -118,7 +117,7 @@ export default function ClubInviteScreen({ navigation, route }) {
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       ) : (
         <FlatList
@@ -137,7 +136,7 @@ export default function ClubInviteScreen({ navigation, route }) {
                   <Image source={{ uri: item.foto_url }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarFallback]}>
-                    <Shield color={colors.textMuted} size={18} strokeWidth={1.8} />
+                    <Shield color={C.textMuted} size={18} strokeWidth={1.8} />
                   </View>
                 )}
                 <View style={{ flex: 1 }}>
@@ -148,19 +147,18 @@ export default function ClubInviteScreen({ navigation, route }) {
                   </Text>
                 </View>
                 {invited ? (
-                  <View style={styles.invitedChip}>
-                    <Check color={colors.primary} size={14} strokeWidth={2.6} />
-                    <Text style={styles.invitedText}>Invitado</Text>
-                  </View>
+                  <Badge label="Invitado" tone="green" />
                 ) : sendingId === item.id ? (
-                  <ActivityIndicator color={colors.primary} size="small" />
+                  <ActivityIndicator color={C.green} size="small" />
                 ) : (
                   <Pressable
                     onPress={() => handleInvite(item)}
                     hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Invitar a ${item.username}`}
                     style={({ pressed }) => [styles.inviteBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <UserPlus color="#0E0E0D" size={16} strokeWidth={2.4} />
+                    <UserPlus color={C.textOnGreen} size={16} strokeWidth={2.4} />
                   </Pressable>
                 )}
               </Pressable>
@@ -168,7 +166,7 @@ export default function ClubInviteScreen({ navigation, route }) {
           }}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <SearchIcon color={colors.textMuted} size={36} strokeWidth={1.5} />
+              <SearchIcon color={C.textMuted} size={36} strokeWidth={1.5} />
               <Text style={styles.emptyTitle}>
                 {query.trim() ? 'Sin resultados' : 'Busca jugadores'}
               </Text>
@@ -184,120 +182,76 @@ export default function ClubInviteScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     gap: 12,
+    paddingHorizontal: S.screenPadding,
+    paddingTop: 6,
+    paddingBottom: 12,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  headerSubtitle: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 1,
-  },
+  headerTitle: { fontFamily: F.extraBold, fontSize: 19, color: C.textPrimary, letterSpacing: -0.3 },
+  headerSubtitle: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 2 },
+
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
+    gap: 9,
+    minHeight: 48,
     paddingHorizontal: 14,
-    height: 48,
-    marginHorizontal: 16,
+    marginHorizontal: S.screenPadding,
     marginBottom: 12,
+    borderRadius: R.row,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
   },
-  searchInput: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  bannerWrap: { paddingHorizontal: 16 },
+  searchInput: { flex: 1, fontFamily: F.medium, fontSize: 14.5, color: C.textPrimary },
+
+  bannerWrap: { paddingHorizontal: S.screenPadding },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { paddingHorizontal: 16, paddingBottom: 40 },
+  listContent: { paddingHorizontal: S.screenPadding, paddingBottom: 40 },
+
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
+    gap: 11,
     padding: 12,
-    marginBottom: 8,
+    marginBottom: S.rowGap,
+    borderRadius: R.row,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
   },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-  },
+  avatar: { width: 42, height: 42, borderRadius: 21 },
   avatarFallback: {
-    backgroundColor: colors.surface,
+    backgroundColor: C.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.border,
   },
-  playerName: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  playerMeta: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
+  playerName: { fontFamily: F.bold, fontSize: 14, color: C.textPrimary },
+  playerMeta: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 2 },
+
   inviteBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  invitedChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  invitedText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  emptyBox: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    gap: 10,
-  },
-  emptyTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '800' },
+
+  emptyBox: { alignItems: 'center', paddingVertical: 40, gap: 10 },
+  emptyTitle: { fontFamily: F.extraBold, fontSize: 16, color: C.textPrimary },
   emptyText: {
-    color: colors.textSecondary,
+    fontFamily: F.medium,
     fontSize: 13,
+    color: C.textSecondary,
     textAlign: 'center',
     maxWidth: 260,
-    lineHeight: 18,
+    lineHeight: 18.5,
   },
 });

@@ -260,8 +260,18 @@ export function FieldLabel({ children, marca }) {
   );
 }
 
-/** Campo de texto con el aspecto del handoff. `contador` muestra «21/300». */
-export function TextField({ value, onChangeText, placeholder, multiline, maxLength, keyboardType, contador }) {
+/**
+ * Campo de texto con el aspecto del handoff. `contador` muestra «21/300».
+ *
+ * `error` pinta el borde de rojo. Existe porque las pantallas de club validan
+ * al intentar enviar y marcan los campos que faltan: sin el borde, el único
+ * aviso sería una línea de texto más abajo, y en un formulario largo eso
+ * obliga a leerlo entero para encontrar cuál falló.
+ */
+export function TextField({
+  value, onChangeText, placeholder, multiline, maxLength, keyboardType, contador, error,
+  autoFocus, onSubmitEditing, returnKeyType,
+}) {
   return (
     <View>
       <TextInput
@@ -272,7 +282,10 @@ export function TextField({ value, onChangeText, placeholder, multiline, maxLeng
         multiline={multiline}
         maxLength={maxLength}
         keyboardType={keyboardType}
-        style={[styles.input, multiline && styles.inputMulti]}
+        autoFocus={autoFocus}
+        onSubmitEditing={onSubmitEditing}
+        returnKeyType={returnKeyType}
+        style={[styles.input, multiline && styles.inputMulti, error && styles.inputError]}
       />
       {contador && maxLength ? (
         <Text style={styles.contador}>{String(value || '').length}/{maxLength}</Text>
@@ -575,6 +588,7 @@ const styles = StyleSheet.create({
     color: C.textPrimary,
   },
   inputMulti: { minHeight: 92, textAlignVertical: 'top' },
+  inputError: { borderColor: C.red },
   contador: { alignSelf: 'flex-end', marginTop: 5, fontFamily: F.medium, fontSize: 11, color: C.textSecondary },
   timeField: { justifyContent: 'center' },
   timeValor: { fontFamily: F.bold, fontSize: 15, color: C.textPrimary },

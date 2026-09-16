@@ -13,9 +13,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Check } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
+import { Card, Button, IconButton, SectionLabel } from '../components/reservas/ui';
 import { supabase } from '../services/supabase';
 import { getMatchById, withClubs } from '../services/matches';
 import { getMyClubs } from '../services/clubs';
@@ -209,18 +214,12 @@ export default function ClubResultScreen({ navigation, route }) {
               {match ? `${clubes.local.nombre} vs ${clubes.visitante.nombre}` : 'Cargando…'}
             </Text>
           </View>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
-          >
-            <X color={colors.textPrimary} size={20} />
-          </Pressable>
+          <IconButton icon={X} onPress={() => navigation.goBack()} accessibilityLabel="Cerrar" />
         </View>
 
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color={colors.primary} />
+            <ActivityIndicator color={C.green} />
           </View>
         ) : !match || !challenge ? (
           <View style={styles.content}>
@@ -277,8 +276,8 @@ export default function ClubResultScreen({ navigation, route }) {
 /** Marcador propuesto, y sólo el club contrario puede responderlo. */
 function ConfirmarPanel({ resultado, clubes, acciones, enviando, onAceptar, onRechazar }) {
   return (
-    <View style={styles.card}>
-      <Text style={styles.marcadorLabel}>Resultado propuesto</Text>
+    <Card style={styles.card}>
+      <SectionLabel>Resultado propuesto</SectionLabel>
       <View style={styles.marcadorRow}>
         <Text style={styles.equipoNombre} numberOfLines={1}>
           {clubes.local.nombre}
@@ -312,7 +311,7 @@ function ConfirmarPanel({ resultado, clubes, acciones, enviando, onAceptar, onRe
           {acciones.bloqueoConfirmar || 'Esperando confirmación del club contrario.'}
         </Text>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -331,8 +330,8 @@ function ProponerPanel({
 }) {
   return (
     <>
-      <View style={styles.card}>
-        <Text style={styles.marcadorLabel}>Marcador final</Text>
+      <Card style={styles.card}>
+        <SectionLabel>Marcador final</SectionLabel>
         <View style={styles.marcadorRow}>
           <Text style={styles.equipoNombre} numberOfLines={1}>
             {clubes.local.nombre}
@@ -344,7 +343,7 @@ function ProponerPanel({
             maxLength={2}
             style={styles.golInput}
             placeholder="0"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={C.textSecondary}
           />
           <Text style={styles.golGuion}>-</Text>
           <TextInput
@@ -354,16 +353,16 @@ function ProponerPanel({
             maxLength={2}
             style={styles.golInput}
             placeholder="0"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={C.textSecondary}
           />
           <Text style={styles.equipoNombre} numberOfLines={1}>
             {clubes.visitante.nombre}
           </Text>
         </View>
-      </View>
+      </Card>
 
-      <View style={styles.card}>
-        <Text style={styles.marcadorLabel}>Quién llegó</Text>
+      <Card style={styles.card}>
+        <SectionLabel>Quién llegó</SectionLabel>
         <Text style={styles.asistenciaAyuda}>
           Destilda a quien no se presentó. El resto queda confirmado.
         </Text>
@@ -385,12 +384,14 @@ function ProponerPanel({
                 {nombreDe(a)}
               </Text>
               <View style={[styles.check, asistieron[a.id_jugador] && styles.checkOn]}>
-                {asistieron[a.id_jugador] ? <Check color="#000" size={14} strokeWidth={3} /> : null}
+                {asistieron[a.id_jugador] ? (
+                  <Check color={C.textOnGreen} size={14} strokeWidth={3} />
+                ) : null}
               </View>
             </Pressable>
           ))
         )}
-      </View>
+      </Card>
 
       <Button label="Proponer resultado" onPress={onEnviar} loading={enviando} style={styles.accionBtn} />
     </>
@@ -402,90 +403,83 @@ function nombreDe(fila) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 12,
+    paddingHorizontal: S.screenPadding,
+    paddingTop: 6,
+    paddingBottom: 12,
     width: '100%',
     maxWidth: 932,
     alignSelf: 'center',
   },
   headerCenter: { flex: 1 },
-  headerTitle: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  headerSubtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-  },
+  headerTitle: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 20, letterSpacing: -0.3 },
+  headerSubtitle: { fontFamily: F.medium, color: C.textSecondary, fontSize: 12, marginTop: 2 },
   content: {
-    padding: 16,
+    paddingHorizontal: S.screenPadding,
     paddingBottom: 40,
-    gap: 12,
+    gap: S.cardGap,
     width: '100%',
     maxWidth: 600,
     alignSelf: 'center',
   },
 
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: 16,
-    gap: 12,
-  },
-  marcadorLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
+  card: { gap: 12 },
   marcadorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  equipoNombre: { flex: 1, color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  marcador: { color: colors.textPrimary, fontSize: 22, fontWeight: '800' },
+  equipoNombre: { flex: 1, fontFamily: F.bold, fontSize: 14, color: C.textPrimary },
+  marcador: { fontFamily: F.extraBold, fontSize: 24, color: C.textPrimary },
   golInput: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
-    color: colors.textPrimary,
+    width: 46,
+    height: 46,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1,
+    borderColor: C.border,
+    fontFamily: F.extraBold,
     fontSize: 18,
-    fontWeight: '800',
+    color: C.textPrimary,
     textAlign: 'center',
   },
-  golGuion: { color: colors.textMuted, fontSize: 16, fontWeight: '700' },
+  golGuion: { fontFamily: F.bold, fontSize: 16, color: C.textMuted },
 
   accionesRow: { flexDirection: 'row', gap: 10 },
   accionBtn: { marginTop: 4 },
-  motivo: { color: colors.textMuted, fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 18 },
+  motivo: {
+    fontFamily: F.medium,
+    fontSize: 13,
+    color: C.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 18,
+  },
 
-  asistenciaAyuda: { color: colors.textMuted, fontSize: 12, marginTop: -6 },
-  vacio: { color: colors.textMuted, fontSize: 13 },
-  jugadorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  asistenciaAyuda: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary, marginTop: -6, lineHeight: 16.5 },
+  vacio: { fontFamily: F.medium, fontSize: 13, color: C.textSecondary },
+  jugadorRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 7 },
   avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.background,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarTxt: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' },
-  jugadorNombre: { flex: 1, color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+  avatarTxt: { fontFamily: F.bold, fontSize: 11, color: C.textSecondary },
+  jugadorNombre: { flex: 1, fontFamily: F.semiBold, fontSize: 14, color: C.textPrimary },
   check: {
     width: 24,
     height: 24,
-    borderRadius: radius.sm,
+    borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkOn: { backgroundColor: C.green, borderColor: C.green },
 });

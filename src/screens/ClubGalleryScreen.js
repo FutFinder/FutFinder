@@ -22,8 +22,14 @@ import {
   ImagePlus,
 } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import Banner from '../components/Banner';
+import { IconButton } from '../components/reservas/ui';
 import { getCurrentUser } from '../services/auth';
 import { listMembers } from '../services/clubs';
 import { pickImages } from '../services/storage';
@@ -37,7 +43,9 @@ import useConfirmacion from '../components/useConfirmacion';
 
 const SCREEN_W = Dimensions.get('window').width;
 const GRID_GAP = 4;
-const THUMB = Math.floor((SCREEN_W - 32 - GRID_GAP * 2) / 3);
+// El ancho útil es la pantalla menos los dos márgenes laterales; los dos
+// huecos entre columnas salen del resto.
+const THUMB = Math.floor((SCREEN_W - S.screenPadding * 2 - GRID_GAP * 2) / 3);
 
 /**
  * Galería completa de fotos de un club. Cualquiera la ve; solo los admins
@@ -148,7 +156,7 @@ export default function ClubGalleryScreen({ navigation, route }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <Header navigation={navigation} canAdd={false} />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       </SafeAreaView>
     );
@@ -171,7 +179,7 @@ export default function ClubGalleryScreen({ navigation, route }) {
 
       {photos.length === 0 ? (
         <View style={styles.emptyBox}>
-          <ImagePlus color={colors.textMuted} size={36} />
+          <ImagePlus color={C.textMuted} size={36} strokeWidth={1.5} />
           <Text style={styles.emptyText}>
             {soyAdmin
               ? 'Aún no hay fotos. Toca + para subir la primera.'
@@ -210,7 +218,7 @@ export default function ClubGalleryScreen({ navigation, route }) {
             hitSlop={12}
             style={styles.viewerClose}
           >
-            <X color={colors.textPrimary} size={24} />
+            <X color={C.textPrimary} size={24} />
           </Pressable>
 
           {viewerIndex !== null && photos[viewerIndex] && (
@@ -234,7 +242,7 @@ export default function ClubGalleryScreen({ navigation, route }) {
                 disabled={viewerIndex === 0}
                 style={[styles.viewerNav, styles.viewerNavLeft, viewerIndex === 0 && { opacity: 0 }]}
               >
-                <ChevronLeft color={colors.textPrimary} size={28} />
+                <ChevronLeft color={C.textPrimary} size={28} />
               </Pressable>
               <Pressable
                 onPress={() => setViewerIndex((i) => Math.min(photos.length - 1, i + 1))}
@@ -245,7 +253,7 @@ export default function ClubGalleryScreen({ navigation, route }) {
                   viewerIndex === photos.length - 1 && { opacity: 0 },
                 ]}
               >
-                <ChevronRight color={colors.textPrimary} size={28} />
+                <ChevronRight color={C.textPrimary} size={28} />
               </Pressable>
             </>
           )}
@@ -255,7 +263,7 @@ export default function ClubGalleryScreen({ navigation, route }) {
               onPress={() => handleDelete(photos[viewerIndex])}
               style={({ pressed }) => [styles.viewerDelete, pressed && { opacity: 0.7 }]}
             >
-              <Trash2 color={colors.error} size={18} />
+              <Trash2 color={C.red} size={18} strokeWidth={2.2} />
               <Text style={styles.viewerDeleteText}>Eliminar</Text>
             </Pressable>
           )}
@@ -270,77 +278,73 @@ export default function ClubGalleryScreen({ navigation, route }) {
 function Header({ navigation, canAdd, uploading, onAdd }) {
   return (
     <View style={styles.header}>
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={12}
-        style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
-      >
-        <ArrowLeft color={colors.textPrimary} size={22} />
-      </Pressable>
+      <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
       <Text style={styles.headerTitle}>Fotos del club</Text>
       {canAdd ? (
         <Pressable
           onPress={onAdd}
           disabled={uploading}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Agregar fotos"
           style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.6 }]}
         >
           {uploading ? (
-            <ActivityIndicator color={colors.primary} size="small" />
+            <ActivityIndicator color={C.green} size="small" />
           ) : (
-            <Plus color={colors.primary} size={20} strokeWidth={2.4} />
+            <Plus color={C.green} size={20} strokeWidth={2.4} />
           )}
         </Pressable>
       ) : (
-        <View style={styles.iconBtn} />
+        <View style={styles.iconBtnHueco} />
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  bannerWrap: { paddingHorizontal: 16 },
+  bannerWrap: { paddingHorizontal: S.screenPadding },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     gap: 12,
+    paddingHorizontal: S.screenPadding,
+    paddingTop: 6,
+    paddingBottom: 12,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // El hueco que deja el botón de agregar cuando no eres administrador: sin
+  // él el título se corre y la pantalla se ve distinta según el rol.
+  iconBtnHueco: { width: S.iconBtn, height: S.iconBtn },
   headerTitle: {
     flex: 1,
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
+    fontSize: 19,
+    color: C.textPrimary,
     letterSpacing: -0.3,
   },
   addBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primarySoft,
+    width: S.iconBtn,
+    height: S.iconBtn,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.shieldBg,
+    borderWidth: 1,
+    borderColor: C.greenDeepBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  gridContent: { padding: 16, gap: GRID_GAP },
+  gridContent: { padding: S.screenPadding, gap: GRID_GAP },
   thumb: {
     width: THUMB,
     height: THUMB,
-    borderRadius: radius.md,
+    borderRadius: R.chip,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   thumbImg: { width: '100%', height: '100%' },
 
@@ -352,8 +356,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyText: {
-    color: colors.textMuted,
+    fontFamily: F.medium,
     fontSize: 14,
+    color: C.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -381,9 +386,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 58,
     alignSelf: 'center',
-    color: colors.textPrimary,
+    fontFamily: F.bold,
     fontSize: 14,
-    fontWeight: '700',
+    color: C.textPrimary,
   },
   viewerNav: {
     position: 'absolute',
@@ -406,10 +411,10 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: radius.pill,
+    borderRadius: R.pill,
     borderWidth: 1,
-    borderColor: colors.error,
-    backgroundColor: colors.errorSoft,
+    borderColor: 'rgba(237,107,118,0.4)',
+    backgroundColor: 'rgba(237,107,118,0.14)',
   },
-  viewerDeleteText: { color: colors.error, fontSize: 14, fontWeight: '700' },
+  viewerDeleteText: { fontFamily: F.bold, fontSize: 14, color: C.red },
 });

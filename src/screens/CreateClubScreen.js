@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   ScrollView,
   Pressable,
   KeyboardAvoidingView,
@@ -13,9 +12,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Shield, ChevronDown, Camera } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import Banner from '../components/Banner';
-import Button from '../components/Button';
+import { Button, IconButton, Chip } from '../components/reservas/ui';
+import { FieldLabel, TextField } from '../components/reservas/recintoUi';
 import { createClub } from '../services/clubs';
 import { pickImage, uploadClubLogo } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
@@ -88,13 +93,7 @@ export default function CreateClubScreen({ navigation }) {
           <Text style={styles.headerTitle}>Crear club</Text>
           <Text style={styles.headerSubtitle}>Quedarás como administrador</Text>
         </View>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
-        >
-          <X color={colors.textPrimary} size={20} />
-        </Pressable>
+        <IconButton icon={X} onPress={() => navigation.goBack()} accessibilityLabel="Cerrar" />
       </View>
 
       <KeyboardAvoidingView
@@ -109,126 +108,129 @@ export default function CreateClubScreen({ navigation }) {
 
           <Pressable
             onPress={handlePickLogo}
+            accessibilityRole="button"
+            accessibilityLabel={logoAsset ? 'Cambiar el logo del club' : 'Subir el logo del club'}
             style={({ pressed }) => [styles.logoTap, pressed && { opacity: 0.8 }]}
           >
             {logoAsset ? (
               <Image source={{ uri: logoAsset.uri }} style={styles.logoImg} />
             ) : (
               <View style={styles.logoPlaceholder}>
-                <Shield color={colors.primary} size={40} strokeWidth={1.5} />
+                <Shield color={C.green} size={40} strokeWidth={1.5} />
               </View>
             )}
             <View style={styles.logoHintRow}>
-              <Camera color={colors.textMuted} size={14} />
+              <Camera color={C.textSecondary} size={14} strokeWidth={2} />
               <Text style={styles.logoHint}>
                 {logoAsset ? 'Cambiar logo' : 'Subir logo (opcional)'}
               </Text>
             </View>
           </Pressable>
 
-          <Text style={styles.label}>Nombre del club</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej: Atlético La Reina"
-            placeholderTextColor={colors.textMuted}
-            value={nombre}
-            onChangeText={setNombre}
-            maxLength={40}
-          />
-
-          <Text style={styles.label}>Descripción (opcional)</Text>
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            placeholder="Cuenta de qué se trata tu club, dónde juegan, qué buscan..."
-            placeholderTextColor={colors.textMuted}
-            value={descripcion}
-            onChangeText={setDescripcion}
-            multiline
-            maxLength={500}
-          />
-
-          <Text style={styles.label}>Modalidad (opcional)</Text>
-          <View style={styles.modalidadRow}>
-            {OPCIONES_MODALIDAD.map((op) => {
-              const activa = modalidad === op.value;
-              return (
-                <Pressable
-                  key={op.value}
-                  // Volver a tocar la opción activa la deselecciona.
-                  onPress={() => setModalidad(activa ? null : op.value)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: activa }}
-                  accessibilityLabel={`Modalidad ${op.label}`}
-                  style={({ pressed }) => [
-                    styles.modalidadChip,
-                    activa && styles.modalidadChipActive,
-                    pressed && { opacity: 0.8 },
-                  ]}
-                >
-                  <Text style={[styles.modalidadText, activa && styles.modalidadTextActive]}>
-                    {op.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.grupo}>
+            <FieldLabel>Nombre del club</FieldLabel>
+            <TextField
+              placeholder="Ej: Atlético La Reina"
+              value={nombre}
+              onChangeText={setNombre}
+              maxLength={40}
+            />
           </View>
 
-          <Text style={styles.label}>Región (opcional)</Text>
-          <Pressable
-            onPress={() => {
-              setShowRegiones((v) => !v);
-              setShowComunas(false);
-            }}
-            style={({ pressed }) => [styles.select, pressed && { opacity: 0.85 }]}
-          >
-            <Text style={region ? styles.selectValue : styles.selectPlaceholder}>
-              {region || 'Selecciona una región'}
-            </Text>
-            <ChevronDown color={colors.textMuted} size={18} />
-          </Pressable>
-          {showRegiones && (
-            <View style={styles.optionsBox}>
-              {NOMBRES_REGIONES.map((r) => (
-                <Pressable
-                  key={r}
-                  onPress={() => {
-                    setRegion(r);
-                    setComuna(null);
-                    setShowRegiones(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.option,
-                    r === region && styles.optionActive,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      r === region && styles.optionTextActive,
+          <View style={styles.grupo}>
+            <FieldLabel marca="opcional">Descripción</FieldLabel>
+            <TextField
+              placeholder="Cuenta de qué se trata tu club, dónde juegan, qué buscan..."
+              value={descripcion}
+              onChangeText={setDescripcion}
+              multiline
+              maxLength={500}
+            />
+          </View>
+
+          <View style={styles.grupo}>
+            <FieldLabel marca="opcional">Modalidad</FieldLabel>
+            <View style={styles.modalidadRow}>
+              {OPCIONES_MODALIDAD.map((op) => {
+                const activa = modalidad === op.value;
+                return (
+                  <Chip
+                    key={op.value}
+                    label={op.label}
+                    active={activa}
+                    // Volver a tocar la opción activa la deselecciona.
+                    onPress={() => setModalidad(activa ? null : op.value)}
+                    style={styles.modalidadChip}
+                  />
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.grupo}>
+            <FieldLabel marca="opcional">Región</FieldLabel>
+            <Pressable
+              onPress={() => {
+                setShowRegiones((v) => !v);
+                setShowComunas(false);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Elegir región"
+              style={({ pressed }) => [styles.select, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={region ? styles.selectValue : styles.selectPlaceholder}>
+                {region || 'Selecciona una región'}
+              </Text>
+              <ChevronDown color={C.textSecondary} size={18} strokeWidth={2} />
+            </Pressable>
+            {showRegiones && (
+              <View style={styles.optionsBox}>
+                {NOMBRES_REGIONES.map((r) => (
+                  <Pressable
+                    key={r}
+                    onPress={() => {
+                      setRegion(r);
+                      setComuna(null);
+                      setShowRegiones(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: r === region }}
+                    style={({ pressed }) => [
+                      styles.option,
+                      r === region && styles.optionActive,
+                      pressed && { opacity: 0.7 },
                     ]}
                   >
-                    {r}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
+                    <Text
+                      style={[
+                        styles.optionText,
+                        r === region && styles.optionTextActive,
+                      ]}
+                    >
+                      {r}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
 
           {region && (
-            <>
-              <Text style={styles.label}>Comuna (opcional)</Text>
+            <View style={styles.grupo}>
+              <FieldLabel marca="opcional">Comuna</FieldLabel>
               <Pressable
                 onPress={() => {
                   setShowComunas((v) => !v);
                   setShowRegiones(false);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="Elegir comuna"
                 style={({ pressed }) => [styles.select, pressed && { opacity: 0.85 }]}
               >
                 <Text style={comuna ? styles.selectValue : styles.selectPlaceholder}>
                   {comuna || 'Selecciona una comuna'}
                 </Text>
-                <ChevronDown color={colors.textMuted} size={18} />
+                <ChevronDown color={C.textSecondary} size={18} strokeWidth={2} />
               </Pressable>
               {showComunas && (
                 <View style={styles.optionsBox}>
@@ -239,6 +241,8 @@ export default function CreateClubScreen({ navigation }) {
                         setComuna(c);
                         setShowComunas(false);
                       }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: c === comuna }}
                       style={({ pressed }) => [
                         styles.option,
                         c === comuna && styles.optionActive,
@@ -257,7 +261,7 @@ export default function CreateClubScreen({ navigation }) {
                   ))}
                 </View>
               )}
-            </>
+            </View>
           )}
 
           <Button
@@ -274,139 +278,85 @@ export default function CreateClubScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 12,
+    paddingHorizontal: S.screenPadding,
+    paddingTop: 6,
+    paddingBottom: 12,
   },
   headerCenter: { flex: 1 },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  headerSubtitle: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: { padding: 16, paddingBottom: 40 },
-  logoTap: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
+  headerTitle: { fontFamily: F.extraBold, fontSize: 20, color: C.textPrimary, letterSpacing: -0.3 },
+  headerSubtitle: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 2 },
+
+  content: { paddingHorizontal: S.screenPadding, paddingBottom: 40 },
+  grupo: { marginTop: 16 },
+
+  logoTap: { alignItems: 'center', marginBottom: 4 },
   logoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.lg,
-    backgroundColor: colors.primarySoft,
+    width: 84,
+    height: 84,
+    borderRadius: R.cardSm,
+    backgroundColor: C.shieldBg,
     borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderColor: C.greenDeepBorder,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 9,
   },
   logoImg: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.lg,
-    marginBottom: 8,
-  },
-  logoHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  logoHint: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    width: 84,
+    height: 84,
+    borderRadius: R.cardSm,
+    marginBottom: 9,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    color: colors.textPrimary,
-    fontSize: 15,
-    paddingHorizontal: 14,
-    height: 52,
-    marginBottom: 16,
+    borderColor: C.border,
   },
-  inputMultiline: {
-    height: 110,
-    paddingTop: 14,
-    textAlignVertical: 'top',
-  },
+  logoHintRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  logoHint: { fontFamily: F.semiBold, fontSize: 12, color: C.textSecondary },
+
   select: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
+    gap: 10,
+    minHeight: 48,
     paddingHorizontal: 14,
-    height: 52,
-    marginBottom: 16,
-  },
-  selectValue: { color: colors.textPrimary, fontSize: 15 },
-  selectPlaceholder: { color: colors.textMuted, fontSize: 15 },
-  optionsBox: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginTop: -10,
-    marginBottom: 16,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  selectValue: { fontFamily: F.semiBold, fontSize: 14.5, color: C.textPrimary },
+  selectPlaceholder: { fontFamily: F.medium, fontSize: 14.5, color: C.textSecondary },
+
+  optionsBox: {
+    marginTop: 8,
+    borderRadius: R.row,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surfaceAlt,
+    overflow: 'hidden',
   },
   option: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-  },
-  optionActive: { backgroundColor: colors.primarySoft },
-  optionText: { color: colors.textPrimary, fontSize: 14 },
-  optionTextActive: { color: colors.primary, fontWeight: '700' },
-  modalidadRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  modalidadChip: {
     minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: 14,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.dividerInner,
   },
-  modalidadChipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
-  },
-  modalidadText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
-  modalidadTextActive: { color: colors.primary, fontWeight: '700' },
-  submitBtn: { marginTop: 8 },
+  optionActive: { backgroundColor: C.shieldBg },
+  optionText: { fontFamily: F.medium, fontSize: 14, color: C.textPrimary },
+  optionTextActive: { fontFamily: F.extraBold, color: C.green },
+
+  modalidadRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // El kit dibuja el chip a 33 de alto porque allá son filtros; acá son la
+  // única forma de elegir modalidad, así que suben al mínimo táctil.
+  modalidadChip: { minHeight: 44, paddingHorizontal: 15 },
+
+  submitBtn: { marginTop: 24 },
 });

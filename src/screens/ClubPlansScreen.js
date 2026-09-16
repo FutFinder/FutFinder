@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,7 +26,13 @@ import {
   Lock,
 } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
+import { Card, IconButton } from '../components/reservas/ui';
 import PremiumBadge, { premiumGold } from '../components/PremiumBadge';
 import { getCurrentUser } from '../services/auth';
 import { listMembers } from '../services/clubs';
@@ -36,6 +41,9 @@ import { listMembers } from '../services/clubs';
  * Comparativa de planes del club.
  * Estándar (gratis) vs Premium (pago). Mientras no haya pasarela de
  * pagos, Premium se activa contactando al equipo de FutFinder.
+ *
+ * El dorado de Premium sigue siendo el de `PremiumBadge` y no un tono de la
+ * paleta nueva: es la marca del plan y aparece igual en el resto de la app.
  */
 
 const FEATURES_ESTANDAR = [
@@ -86,18 +94,9 @@ export default function ClubPlansScreen({ navigation, route }) {
   if (checking) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-          >
-            <ArrowLeft color={colors.textPrimary} size={22} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Planes del club</Text>
-        </View>
+        <Header navigation={navigation} />
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       </SafeAreaView>
     );
@@ -106,18 +105,9 @@ export default function ClubPlansScreen({ navigation, route }) {
   if (!soyMiembro) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-          >
-            <ArrowLeft color={colors.textPrimary} size={22} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Planes del club</Text>
-        </View>
+        <Header navigation={navigation} />
         <View style={styles.loadingBox}>
-          <Lock color={colors.textMuted} size={36} strokeWidth={1.5} />
+          <Lock color={C.textMuted} size={36} strokeWidth={1.5} />
           <Text style={styles.blockedText}>
             Solo los integrantes del club pueden ver esta sección.
           </Text>
@@ -128,23 +118,14 @@ export default function ClubPlansScreen({ navigation, route }) {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-        >
-          <ArrowLeft color={colors.textPrimary} size={22} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Planes del club</Text>
-      </View>
+      <Header navigation={navigation} />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Plan Estándar */}
-        <View style={styles.planCard}>
+        <Card style={styles.planCard}>
           <View style={styles.planHeader}>
             <View style={styles.planIconWrap}>
-              <Shield color={colors.primary} size={22} strokeWidth={2} />
+              <Shield color={C.green} size={22} strokeWidth={2} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.planName}>Estándar</Text>
@@ -154,10 +135,10 @@ export default function ClubPlansScreen({ navigation, route }) {
           {FEATURES_ESTANDAR.map((f, i) => (
             <FeatureRow key={i} icon={f.icon} text={f.text} />
           ))}
-        </View>
+        </Card>
 
         {/* Plan Premium */}
-        <View style={[styles.planCard, styles.premiumCard]}>
+        <Card style={[styles.planCard, styles.premiumCard]}>
           <View style={styles.planHeader}>
             <View style={[styles.planIconWrap, styles.premiumIconWrap]}>
               <Crown color={premiumGold} size={22} strokeWidth={2} />
@@ -180,9 +161,18 @@ export default function ClubPlansScreen({ navigation, route }) {
               Pronto podrás contratarlo directo desde la app.
             </Text>
           </View>
-        </View>
+        </Card>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function Header({ navigation }) {
+  return (
+    <View style={styles.header}>
+      <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+      <Text style={styles.headerTitle}>Planes del club</Text>
+    </View>
   );
 }
 
@@ -191,13 +181,13 @@ function FeatureRow({ icon: Icon, text, gold = false }) {
     <View style={styles.featureRow}>
       <View style={[styles.featureCheck, gold && styles.featureCheckGold]}>
         <Check
-          color={gold ? premiumGold : colors.primary}
+          color={gold ? premiumGold : C.green}
           size={12}
           strokeWidth={3}
         />
       </View>
       <Icon
-        color={gold ? premiumGold : colors.textSecondary}
+        color={gold ? premiumGold : C.textSecondary}
         size={16}
         strokeWidth={1.8}
       />
@@ -209,29 +199,18 @@ function FeatureRow({ icon: Icon, text, gold = false }) {
 const GOLD_SOFT = 'rgba(212, 164, 55, 0.12)';
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     gap: 12,
+    paddingHorizontal: S.screenPadding,
+    paddingTop: 6,
+    paddingBottom: 12,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  content: { padding: 16, paddingBottom: 40, gap: 16 },
+  headerTitle: { fontFamily: F.extraBold, fontSize: 19, color: C.textPrimary, letterSpacing: -0.3 },
+
+  content: { paddingHorizontal: S.screenPadding, paddingBottom: 40, gap: S.cardGap },
 
   loadingBox: {
     flex: 1,
@@ -241,60 +220,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
   },
   blockedText: {
-    color: colors.textMuted,
+    fontFamily: F.medium,
     fontSize: 14,
+    color: C.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
 
-  planCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    padding: 18,
-  },
-  premiumCard: {
-    borderColor: premiumGold,
-    borderWidth: 1.5,
-  },
+  planCard: { padding: 18 },
+  premiumCard: { borderColor: premiumGold, borderWidth: 1.5 },
   planHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   planIconWrap: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.shieldBg,
+    borderWidth: 1,
+    borderColor: C.greenDeepBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  premiumIconWrap: { backgroundColor: GOLD_SOFT },
-  planName: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  premiumNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  planPrice: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  planPriceSub: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
+  premiumIconWrap: { backgroundColor: GOLD_SOFT, borderColor: 'transparent' },
+  planName: { fontFamily: F.extraBold, fontSize: 18, color: C.textPrimary, letterSpacing: -0.3 },
+  premiumNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  planPrice: { fontFamily: F.bold, fontSize: 13, color: C.green, marginTop: 3 },
+  planPriceSub: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 3 },
+
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -305,26 +261,23 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.shieldBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   featureCheckGold: { backgroundColor: GOLD_SOFT },
-  featureText: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 13,
-    lineHeight: 18,
-  },
+  featureText: { flex: 1, fontFamily: F.medium, fontSize: 13, color: C.textPrimary, lineHeight: 18.5 },
+
   premiumCta: {
     backgroundColor: GOLD_SOFT,
-    borderRadius: radius.lg,
+    borderRadius: R.row,
     padding: 14,
     marginTop: 12,
   },
   premiumCtaText: {
-    color: colors.textSecondary,
+    fontFamily: F.medium,
     fontSize: 12,
+    color: C.textSecondary,
     lineHeight: 18,
     textAlign: 'center',
   },
