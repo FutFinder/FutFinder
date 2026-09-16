@@ -108,17 +108,41 @@ modalidad + orden por distancia/fecha, que son las dos dimensiones reales
 con datos detrás; el resto habría sido una interfaz grande sin ninguna
 necesidad real que la respalde todavía.
 
-`ClubChallengesScreen` pasa a tener dos pestañas — **Tablero abierto**
-(por defecto) y **Directos** (el recibidos/enviados de siempre, sin tocar
-su lógica, sólo su estilo) — y adopta `clubColors`/`dsColors` en vez de los
-tokens de `reservas`, para verse igual que el resto de Clubes rediseñado,
-conservando `temaDeClub(clubActual)` para el acento (el color que cada club
-eligió, no un verde fijo), que es como ya lo hacía la pantalla antes de
-este cambio. Publicar, editar, ver respuestas y aceptar/rechazar exigen
+`ClubChallengesScreen` se rediseñó una segunda vez porque la primera
+versión (dos pestañas «Tablero abierto»/«Directos», tarjetas sin distancia
+ni «Cerca», filtros en línea) **no calzaba con el mockup entregado** —
+el usuario lo marcó explícitamente («no es el mismo diseño»), tanto en lo
+visual como en la pestaña de más, que nunca se pidió. La versión actual es
+una sola pantalla, sin pestañas: arriba un carrusel horizontal deslizable
+(«Tus desafíos activos», con indicador de puntos) para las publicaciones
+propias; abajo la lista de otros clubes, con tarjeta de candidato
+(escudo, etiqueta «Cerca» real cuando `distanciaKm` está bajo 5 km,
+distancia, chips de modalidad/fecha/zona, «Cierra en…» con color de alerta
+si quedan menos de 24 h) que al tocarla abre una hoja de detalle con grilla
+de datos (Formato/Cuándo/Zona/Cierra) y ahí mismo el mensaje + responder —
+ya no un botón «Responder» aparte en la tarjeta. Los filtros (modalidad +
+orden) también pasaron a una hoja propia en vez de chips en línea, igual
+que en el mockup. **Directos** (recibidos/enviados de siempre, misma
+lógica intacta) dejó de ser pestaña: ahora vive tras un ícono pequeño en
+el header (con el contador de pendientes como insignia) que empuja una
+pantalla propia con su propio header — el mockup de referencia no modela
+«Directos» en absoluto, así que ese ícono y esa pantalla son un agregado
+nuestro para no perder el flujo 1 a 1 al sacarlo de las pestañas.
+`cierraEnLabel`/`esCerca`/`cierraPronto` (`openChallengeBoard.js`) calculan
+esos tres datos de verdad a partir de `created_at`/`distanciaKm` — nunca
+inventados. Una diferencia deliberada que se mantiene frente al mockup:
+el escudo de respaldo sigue siendo el ícono `Shield` genérico (igual que
+en el resto de Clubes), no las iniciales con color por club del mockup —
+reintroducir eso habría fragmentado visualmente lo que la unificación de
+estética de toda la app recién había resuelto. `ClubChallengesScreen` usa
+los tokens `reservas`/`reservasRadius`/`reservasSizes`/`reservasFonts`
+(la paleta única de toda la app) más `temaDeClub(clubActual)` para el
+acento de color del club, igual que el resto de Clubes ya rediseñado.
+Publicar, editar, ver respuestas y aceptar/rechazar exigen
 `soyAdminDeEsteClub` (`clubesAdmin.includes(clubId)`, la misma fuente que ya
 usa «Directos» vía `puedeResponderDesafio`/`puedeCancelarDesafio`); un
 jugador ve el tablero pero sólo navega, no publica ni responde — la RLS de
-la 94 ya lo exige del lado del servidor, la interfaz sólo deja de mostrar
+la 112 ya lo exige del lado del servidor, la interfaz sólo deja de mostrar
 un botón que el servidor rechazaría.
 
 ## La portada de Clubes y sus tareas

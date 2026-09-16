@@ -1,5 +1,5 @@
 /**
- * Pruebas del tablero abierto de desafíos (migración 94).
+ * Pruebas del tablero abierto de desafíos (migración 112).
  *
  * QUÉ SE FIJA ACÁ:
  *   · `parseFechaHora` acepta sólo fechas y horas reales, futuras exigidas
@@ -7,6 +7,9 @@
  *   · `ordenarPublicaciones` no muestra las de otra modalidad, deja sin
  *     distancia al final en vez de tratarlas como "0 km", y ordena por fecha
  *     próxima cuando se pide — nunca por nivel, que no existe.
+ *   · `cierraEnLabel` usa el mismo plazo de 7 días que el desafío 1 a 1.
+ *   · `esCerca` no marca «Cerca» sin distancia conocida.
+ *   · `cierraPronto` marca urgencia sólo dentro de las 24 h antes de expirar.
  *
  * Se ejecutan con: npm test
  */
@@ -18,6 +21,9 @@ const {
   parseFechaHora,
   formatFecha,
   formatHora,
+  cierraEnLabel,
+  esCerca,
+  cierraPronto,
   borradorListo,
   ordenarPublicaciones,
 } = require('../openChallengeBoard.js');
@@ -118,4 +124,59 @@ test('ordenarPublicaciones: "pronto" ordena por fecha propuesta más próxima', 
 test('ordenarPublicaciones: no revienta con lista vacía o ausente', () => {
   assert.deepEqual(ordenarPublicaciones([], {}), []);
   assert.deepEqual(ordenarPublicaciones(undefined, {}), []);
+});
+
+test('cierraEnLabel: recién publicada, cierra en 7 días', () => {
+  const ahora = new Date('2026-09-16T12:00:00Z');
+  const label = cierraEnLabel('2026-09-16T12:00:00Z', ahora);
+  assert.equal(label, 'Cierra en 7 días');
+});
+
+test('cierraEnLabel: a horas de expirar, avisa en horas', () => {
+  const ahora = new Date('2026-09-22T20:00:00Z');
+  const label = cierraEnLabel('2026-09-16T12:00:00Z', ahora); // vence 23/09 12:00
+  assert.match(label, /^Cierra en \d+ h/);
+});
+
+test('cierraEnLabel: pasado el plazo, dice Expiró', () => {
+  const ahora = new Date('2026-09-25T12:00:00Z');
+  assert.equal(cierraEnLabel('2026-09-16T12:00:00Z', ahora), 'Expiró');
+});
+
+test('cierraEnLabel: fecha inválida no revienta', () => {
+  assert.equal(cierraEnLabel(null), '');
+  assert.equal(cierraEnLabel('no-es-una-fecha'), '');
+});
+
+test('esCerca: dentro del umbral es cerca, fuera no', () => {
+  assert.equal(esCerca(1.1), true);
+  assert.equal(esCerca(5), true);
+  assert.equal(esCerca(5.1), false);
+  assert.equal(esCerca(20), false);
+});
+
+test('esCerca: sin distancia conocida, nunca es cerca', () => {
+  assert.equal(esCerca(null), false);
+  assert.equal(esCerca(undefined), false);
+  assert.equal(esCerca(NaN), false);
+});
+
+test('cierraPronto: a horas de expirar, es urgente', () => {
+  const ahora = new Date('2026-09-22T20:00:00Z');
+  assert.equal(cierraPronto('2026-09-16T12:00:00Z', ahora), true);
+});
+
+test('cierraPronto: recién publicada, no es urgente', () => {
+  const ahora = new Date('2026-09-16T12:00:00Z');
+  assert.equal(cierraPronto('2026-09-16T12:00:00Z', ahora), false);
+});
+
+test('cierraPronto: ya expiró, no es "urgente" (ya cerró)', () => {
+  const ahora = new Date('2026-09-25T12:00:00Z');
+  assert.equal(cierraPronto('2026-09-16T12:00:00Z', ahora), false);
+});
+
+test('cierraPronto: fecha inválida no revienta', () => {
+  assert.equal(cierraPronto(null), false);
+  assert.equal(cierraPronto('no-es-una-fecha'), false);
 });

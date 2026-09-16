@@ -1,13 +1,51 @@
 /**
  * Lógica pura del tablero abierto de desafíos (migración 112): validar la
- * fecha/hora de una publicación, y ordenar/filtrar la lista de publicaciones
- * de otros clubes.
+ * fecha/hora de una publicación, ordenar/filtrar la lista de publicaciones de
+ * otros clubes, el «Cierra en…» de cada tarjeta y si vale la pena marcarla
+ * «Cerca» (umbral de distancia, nunca inventado como «0 km» sin dato).
  *
  * Mismo estilo de validación que `ClubChallengeScreen.js` (fecha DD/MM/AAAA
  * + hora HH:MM en texto simple, validadas al enviar) — no la máscara en vivo
  * del mockup de referencia, para no duplicar dos maneras distintas de
  * escribir la misma fecha en la misma app.
  */
+
+import { EXPIRACION_PENDIENTE_DIAS, plazoRestante } from '../services/clubChallengeRules.js';
+
+const DIA_MS = 24 * 3600 * 1000;
+
+/**
+ * «Cierra en 3 h» / «Cierra en 2 días» / «Expiró», a partir de cuándo se
+ * publicó. Mismo plazo que el desafío 1 a 1 (`EXPIRACION_PENDIENTE_DIAS`,
+ * 7 días): es el mismo tipo de ventana —«pendiente sin que nadie la haya
+ * tomado»— aplicado a una publicación en vez de a un desafío directo, así
+ * que se reutiliza la misma constante en vez de inventar una nueva.
+ */
+export function cierraEnLabel(createdAtIso, ahora = new Date()) {
+  if (!createdAtIso) return '';
+  const creado = new Date(createdAtIso);
+  if (Number.isNaN(creado.getTime())) return '';
+  const vence = new Date(creado.getTime() + EXPIRACION_PENDIENTE_DIAS * DIA_MS);
+  const { vencido, label } = plazoRestante(vence, ahora);
+  return vencido ? 'Expiró' : `Cierra en ${label}`;
+}
+
+const CERCA_KM = 5;
+
+/** ¿Vale la pena marcar la tarjeta con la etiqueta «Cerca»? Distancia real, sin dato = no. */
+export function esCerca(distanciaKm) {
+  return typeof distanciaKm === 'number' && Number.isFinite(distanciaKm) && distanciaKm <= CERCA_KM;
+}
+
+/** ¿A la publicación le queda menos de 24 h antes de expirar? Para resaltarla. */
+export function cierraPronto(createdAtIso, ahora = new Date()) {
+  if (!createdAtIso) return false;
+  const creado = new Date(createdAtIso);
+  if (Number.isNaN(creado.getTime())) return false;
+  const vence = new Date(creado.getTime() + EXPIRACION_PENDIENTE_DIAS * DIA_MS);
+  const msRestante = vence.getTime() - ahora.getTime();
+  return msRestante > 0 && msRestante < 24 * 3600 * 1000;
+}
 
 /** DD/MM/AAAA + HH:MM → Date, o null si no se puede interpretar. */
 export function parseFechaHora(fechaStr, horaStr) {

@@ -10,10 +10,22 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, Shield, Swords, Check, X, Clock, MessageCircle, Pencil } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  ArrowLeft,
+  Shield,
+  Swords,
+  Check,
+  X,
+  Clock,
+  MessageCircle,
+  SlidersHorizontal,
+  ArrowUpDown,
+} from 'lucide-react-native';
 
 import Banner from '../components/Banner';
 import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
@@ -44,9 +56,19 @@ import {
 } from '../services/clubOpenChallenges';
 import { formatDistanciaKm, modalidadInline } from '../utils/clubMeta';
 import { resumenEstadisticas } from '../utils/historialClub';
-import { parseFechaHora, formatFecha, formatHora, borradorListo, ordenarPublicaciones } from '../utils/openChallengeBoard';
+import {
+  parseFechaHora,
+  formatFecha,
+  formatHora,
+  borradorListo,
+  ordenarPublicaciones,
+  cierraEnLabel,
+  esCerca,
+  cierraPronto,
+} from '../utils/openChallengeBoard';
 
 const BLANK_DRAFT = { modalidad: 'futbol7', fechaStr: '', horaStr: '', zona: '', mensaje: '' };
+const CARRUSEL_GAP = 11;
 
 function draftDesdeFecha(iso) {
   const d = iso ? new Date(iso) : null;
@@ -82,29 +104,31 @@ function fmtFecha(iso) {
 }
 
 /**
- * Desafíos de un club: «Directos» (1 a 1, recibidos/enviados, de siempre) y
- * «Tablero abierto» (migración 112): publicar que se busca rival sin elegir
- * a nadie todavía, otros clubes responden, y el que publicó elige una
- * respuesta y entra al mismo ciclo formal de «Directos» — mismo hilo, misma
- * propuesta oficial, mismo partido. No son dos sistemas: el tablero es una
- * puerta de entrada más al ciclo de siempre.
+ * Desafíos de un club: «Directos» (1 a 1, recibidos/enviados, de siempre —
+ * detrás del pequeño ícono del header, no una pestaña) y el «tablero
+ * abierto» (migración 112, pantalla principal): publicar que se busca
+ * rival sin elegir a nadie todavía, otros clubes responden, y el que
+ * publicó elige una respuesta y entra al mismo ciclo formal de «Directos»
+ * — mismo hilo, misma propuesta oficial, mismo partido. No son dos
+ * sistemas: el tablero es una puerta de entrada más al ciclo de siempre.
  *
  * A diferencia del mockup de referencia («FutFinder Desafíos»), NO hay
  * nivel del rival, valoración, ni etiquetas «Revancha»/«Invicto»: ninguno
  * de esos datos existe en la base (`clubMeta.js` ya lo documenta). Lo que
- * sí es real y se usa tal cual: modalidad, distancia por comuna y el
- * historial V/E/D del club (`club_estadisticas()`).
+ * sí es real y se usa tal cual: modalidad, distancia por comuna, el
+ * historial V/E/D del club (`club_estadisticas()`) y «Cerca»/urgencia de
+ * cierre calculados de verdad (`openChallengeBoard.js`).
  */
 export default function ClubChallengesScreen({ navigation, route }) {
   const { clubId } = route.params || {};
+  const { width } = useWindowDimensions();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
-  const [tab, setTab] = useState('tablero'); // 'tablero' | 'directos'
 
-  // ── Directos (sin cambios de lógica, sólo de estilo) ──────────
+  // ── Directos (sin cambios de lógica; ahora vive tras el ícono del header) ──
   const [recibidos, setRecibidos] = useState([]);
   const [enviados, setEnviados] = useState([]);
   const [clubesAdmin, setClubesAdmin] = useState(null);
@@ -118,13 +142,15 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [misRespuestas, setMisRespuestas] = useState(new Map());
   const [filtroModalidad, setFiltroModalidad] = useState(null);
   const [sort, setSort] = useState('cerca');
-  const [subScreen, setSubScreen] = useState('lista'); // 'lista' | 'publicar' | 'editar' | 'respuestas'
+  const [subScreen, setSubScreen] = useState('lista'); // 'lista' | 'publicar' | 'editar' | 'respuestas' | 'directos'
   const [editId, setEditId] = useState(null);
   const [draft, setDraft] = useState(BLANK_DRAFT);
   const [respuestasDe, setRespuestasDe] = useState(null);
   const [respuestas, setRespuestas] = useState([]);
-  const [responderSheet, setResponderSheet] = useState(null);
+  const [detalle, setDetalle] = useState(null);
   const [mensajeRespuesta, setMensajeRespuesta] = useState('');
+  const [filtroSheetOpen, setFiltroSheetOpen] = useState(false);
+  const [mineIndex, setMineIndex] = useState(0);
 
   const soyAdminDeEsteClub = Array.isArray(clubesAdmin) && clubesAdmin.includes(clubId);
 
@@ -344,22 +370,25 @@ export default function ClubChallengesScreen({ navigation, route }) {
     await recargarRespuestas();
   };
 
-  const abrirResponder = (pub) => {
-    setResponderSheet(pub);
+  const abrirDetalle = (pub) => {
+    setDetalle(pub);
     setMensajeRespuesta('');
   };
 
+  const cerrarDetalle = () => setDetalle(null);
+
   const handleEnviarRespuesta = async () => {
-    if (!responderSheet) return;
+    if (!detalle) return;
     setWorking(true);
-    const { error } = await respondToOpenChallenge(responderSheet.id, { clubId, mensaje: mensajeRespuesta });
+    const { error } = await respondToOpenChallenge(detalle.id, { clubId, mensaje: mensajeRespuesta });
     setWorking(false);
     if (error) {
       setBanner({ type: 'error', title: 'No se pudo responder', message: error.message });
       return;
     }
-    setResponderSheet(null);
-    setBanner({ type: 'success', title: 'Respuesta enviada', message: `${responderSheet.club?.nombre || 'El club'} la verá y podrá elegirla.` });
+    const club = detalle.club;
+    setDetalle(null);
+    setBanner({ type: 'success', title: 'Respuesta enviada', message: `${club?.nombre || 'El club'} la verá y podrá elegirla.` });
     await load();
   };
 
@@ -381,11 +410,19 @@ export default function ClubChallengesScreen({ navigation, route }) {
 
   const tema = temaDeClub(clubActual);
   const listaOrdenada = ordenarPublicaciones(browsing, { modalidad: filtroModalidad, sort });
+  const pendientesDirectos = recibidos.filter((c) => c.estado === 'pendiente').length;
+  const cardWidth = Math.max(0, width - S.screenPadding * 2);
 
   if (loading) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
-        <Header navigation={navigation} tema={tema} />
+        <View style={styles.header}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
+            <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Desafíos abiertos</Text>
+          <View style={{ width: S.iconBtn }} />
+        </View>
         <View style={styles.loadingBox}>
           <ActivityIndicator color={tema.main} />
         </View>
@@ -393,11 +430,29 @@ export default function ClubChallengesScreen({ navigation, route }) {
     );
   }
 
-  return (
-    <SafeAreaView edges={['top']} style={styles.root}>
-      {!(tab === 'tablero' && subScreen !== 'lista') && <Header navigation={navigation} tema={tema} />}
+  if (subScreen === 'directos') {
+    return (
+      <DirectosScreen
+        tema={tema}
+        banner={banner}
+        onCloseBanner={() => setBanner(null)}
+        onBack={() => setSubScreen('lista')}
+        recibidos={recibidos}
+        enviados={enviados}
+        clubesAdmin={clubesAdmin}
+        errorRol={errorRol}
+        working={working}
+        onRespond={handleRespond}
+        onCancel={handleCancel}
+        abrirNegociacion={abrirNegociacion}
+        abrirChatLegado={abrirChatLegado}
+      />
+    );
+  }
 
-      {tab === 'tablero' && subScreen !== 'lista' ? (
+  if (subScreen !== 'lista') {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
         <TableroSubScreen
           subScreen={subScreen}
           tema={tema}
@@ -419,114 +474,156 @@ export default function ClubChallengesScreen({ navigation, route }) {
           onRechazar={handleRechazarRespuesta}
           onReconsiderar={handleReconsiderarRespuesta}
         />
-      ) : (
-        <>
-          <View style={styles.tabRow}>
-            <Pressable onPress={() => setTab('tablero')} style={[styles.tabBtn, tab === 'tablero' && [styles.tabBtnActive, { borderColor: tema.border, backgroundColor: tema.soft }]]}>
-              <Text style={[styles.tabLabel, tab === 'tablero' && { color: tema.main }]}>Tablero abierto</Text>
-            </Pressable>
-            <Pressable onPress={() => setTab('directos')} style={[styles.tabBtn, tab === 'directos' && [styles.tabBtnActive, { borderColor: tema.border, backgroundColor: tema.soft }]]}>
-              <Text style={[styles.tabLabel, tab === 'directos' && { color: tema.main }]}>Directos</Text>
-              {recibidos.filter((c) => c.estado === 'pendiente').length > 0 && (
-                <View style={styles.tabBadge}>
-                  <Text style={styles.tabBadgeText}>{recibidos.filter((c) => c.estado === 'pendiente').length}</Text>
-                </View>
-              )}
-            </Pressable>
-          </View>
+      </SafeAreaView>
+    );
+  }
 
-          <ScrollView
-            contentContainerStyle={styles.content}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tema.main} colors={[tema.main]} />}
+  return (
+    <SafeAreaView edges={['top']} style={styles.root}>
+      <Header
+        navigation={navigation}
+        tema={tema}
+        openCount={browsing.length}
+        directosPendientes={pendientesDirectos}
+        onAbrirDirectos={() => setSubScreen('directos')}
+        onPublicar={abrirPublicar}
+        soyAdmin={soyAdminDeEsteClub}
+      />
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tema.main} colors={[tema.main]} />}
+      >
+        {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
+
+        <MisDesafiosCarrusel
+          tema={tema}
+          soyAdmin={soyAdminDeEsteClub}
+          misPublicaciones={misPublicaciones}
+          cardWidth={cardWidth}
+          mineIndex={mineIndex}
+          setMineIndex={setMineIndex}
+          onVerRespuestas={abrirRespuestas}
+          onEditar={abrirEditar}
+        />
+
+        <View style={styles.controlsRow}>
+          <Pressable
+            onPress={() => setFiltroSheetOpen(true)}
+            style={({ pressed }) => [styles.filterBtnBig, pressed && { opacity: 0.85 }]}
           >
-            {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
-
-            {tab === 'tablero' ? (
-              <TableroLista
-                tema={tema}
-                soyAdmin={soyAdminDeEsteClub}
-                misPublicaciones={misPublicaciones}
-                listaOrdenada={listaOrdenada}
-                filtroModalidad={filtroModalidad}
-                setFiltroModalidad={setFiltroModalidad}
-                sort={sort}
-                setSort={setSort}
-                onPublicar={abrirPublicar}
-                onEditar={abrirEditar}
-                onVerRespuestas={abrirRespuestas}
-                misRespuestas={misRespuestas}
-                onResponder={abrirResponder}
-                onRetirarMiRespuesta={handleRetirarMiRespuesta}
-                onReconsiderarMiRespuesta={handleReconsiderarMiRespuesta}
-              />
-            ) : (
-              <DirectosLista
-                tema={tema}
-                recibidos={recibidos}
-                enviados={enviados}
-                clubesAdmin={clubesAdmin}
-                errorRol={errorRol}
-                working={working}
-                onRespond={handleRespond}
-                onCancel={handleCancel}
-                abrirNegociacion={abrirNegociacion}
-                abrirChatLegado={abrirChatLegado}
-              />
-            )}
-          </ScrollView>
-        </>
-      )}
-
-      {/* Hoja: responder a una publicación */}
-      <Modal visible={!!responderSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setResponderSheet(null)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setResponderSheet(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.sheetHandle} />
-            {responderSheet && (
-              <>
-                <Text style={styles.sheetTitle}>Responder a {responderSheet.club?.nombre || 'este club'}</Text>
-                <Text style={styles.sheetSubtitle}>
-                  {modalidadInline(responderSheet.modalidad)} · {fmtFecha(responderSheet.fecha_propuesta)}
-                  {responderSheet.zona ? ` · ${responderSheet.zona}` : ''}
-                </Text>
-                <TextInput
-                  value={mensajeRespuesta}
-                  onChangeText={setMensajeRespuesta}
-                  placeholder="Contales por qué les sirve (opcional)"
-                  placeholderTextColor={C.textMuted}
-                  multiline
-                  maxLength={300}
-                  style={styles.sheetTextarea}
-                />
-                <Pressable
-                  onPress={handleEnviarRespuesta}
-                  disabled={working}
-                  style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }, working && { opacity: 0.6 }]}
-                >
-                  {working ? <ActivityIndicator color={tema.ink} /> : <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Enviar respuesta</Text>}
-                </Pressable>
-              </>
-            )}
+            <SlidersHorizontal color={C.textPrimary} size={16} strokeWidth={2.1} />
+            <Text style={styles.filterBtnBigText}>{filtroModalidad ? `Filtros · ${modalidadInline(filtroModalidad)}` : 'Filtros'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+          <Pressable
+            onPress={() => setSort((s) => (s === 'cerca' ? 'pronto' : 'cerca'))}
+            style={({ pressed }) => [styles.sortBtnBig, pressed && { opacity: 0.85 }]}
+          >
+            <ArrowUpDown color={C.textSecondary} size={14} strokeWidth={2.1} />
+            <Text style={styles.sortBtnBigText}>{sort === 'cerca' ? 'Más cerca' : 'Fecha más próxima'}</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.sectionTitle}>{filtroModalidad ? 'Resultados' : 'Cerca de ti'} ({listaOrdenada.length})</Text>
+        {listaOrdenada.length === 0 ? (
+          <View style={styles.emptyBoxDashed}>
+            <Text style={styles.emptyText}>Ningún desafío calza con tus filtros.{'\n'}Amplía la distancia o quita algún criterio.</Text>
+          </View>
+        ) : (
+          listaOrdenada.map((pub) => (
+            <CandidateCard key={pub.id} pub={pub} tema={tema} miRespuesta={misRespuestas.get(pub.id)} onOpen={() => abrirDetalle(pub)} />
+          ))
+        )}
+      </ScrollView>
+
+      <DetailSheet
+        visible={!!detalle}
+        pub={detalle}
+        tema={tema}
+        soyAdmin={soyAdminDeEsteClub}
+        miRespuesta={detalle ? misRespuestas.get(detalle.id) : null}
+        mensaje={mensajeRespuesta}
+        setMensaje={setMensajeRespuesta}
+        working={working}
+        onClose={cerrarDetalle}
+        onEnviar={handleEnviarRespuesta}
+        onRetirar={handleRetirarMiRespuesta}
+        onReconsiderar={handleReconsiderarMiRespuesta}
+      />
+
+      <FilterSheet
+        visible={filtroSheetOpen}
+        tema={tema}
+        filtroModalidad={filtroModalidad}
+        setFiltroModalidad={setFiltroModalidad}
+        sort={sort}
+        setSort={setSort}
+        count={listaOrdenada.length}
+        onClose={() => setFiltroSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }
 
-function Header({ navigation, tema }) {
+function Header({ navigation, tema, openCount, directosPendientes, onAbrirDirectos, onPublicar, soyAdmin }) {
   return (
     <View style={styles.header}>
       <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
         <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
       </Pressable>
-      <Text style={styles.headerTitle}>Desafíos</Text>
-      <View style={{ width: S.iconBtn }} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.headerTitle} numberOfLines={1}>Desafíos abiertos</Text>
+        <Text style={styles.headerSubtitle} numberOfLines={1}>
+          {openCount} {openCount === 1 ? 'club buscando' : 'clubes buscando'} rival
+        </Text>
+      </View>
+      <Pressable onPress={onAbrirDirectos} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
+        <Swords color={C.textPrimary} size={17} strokeWidth={2.1} />
+        {directosPendientes > 0 && (
+          <View style={styles.iconBtnBadge}>
+            <Text style={styles.iconBtnBadgeText}>{directosPendientes}</Text>
+          </View>
+        )}
+      </Pressable>
+      {soyAdmin && (
+        <Pressable onPress={onPublicar} style={({ pressed }) => [styles.publishBtnSmall, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
+          <Text style={[styles.publishBtnSmallText, { color: tema.ink }]}>Publicar</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
 
-/* ── Directos: la misma lógica de siempre, restyled ────────────── */
+/* ── Directos: pantalla propia, ya no una pestaña ───────────────── */
+
+function DirectosScreen({ tema, banner, onCloseBanner, onBack, recibidos, enviados, clubesAdmin, errorRol, working, onRespond, onCancel, abrirNegociacion, abrirChatLegado }) {
+  return (
+    <SafeAreaView edges={['top']} style={styles.root}>
+      <View style={styles.header}>
+        <Pressable onPress={onBack} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
+          <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Directos</Text>
+        <View style={{ width: S.iconBtn }} />
+      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        {banner && <Banner {...banner} onClose={onCloseBanner} />}
+        <DirectosLista
+          tema={tema}
+          recibidos={recibidos}
+          enviados={enviados}
+          clubesAdmin={clubesAdmin}
+          errorRol={errorRol}
+          working={working}
+          onRespond={onRespond}
+          onCancel={onCancel}
+          abrirNegociacion={abrirNegociacion}
+          abrirChatLegado={abrirChatLegado}
+        />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
 function DirectosLista({ tema, recibidos, enviados, clubesAdmin, errorRol, working, onRespond, onCancel, abrirNegociacion, abrirChatLegado }) {
   const sinNada = recibidos.length === 0 && enviados.length === 0;
@@ -634,141 +731,307 @@ function ChallengeRow({ challenge, tema, children }) {
   );
 }
 
-/* ── Tablero abierto: lista ─────────────────────────────────────── */
+/* ── Tablero abierto: carrusel de «Tus desafíos activos» ─────────── */
 
-function TableroLista({
-  tema,
-  soyAdmin,
-  misPublicaciones,
-  listaOrdenada,
-  filtroModalidad,
-  setFiltroModalidad,
-  sort,
-  setSort,
-  onPublicar,
-  onEditar,
-  onVerRespuestas,
-  misRespuestas,
-  onResponder,
-  onRetirarMiRespuesta,
-  onReconsiderarMiRespuesta,
-}) {
+function MisDesafiosCarrusel({ tema, soyAdmin, misPublicaciones, cardWidth, mineIndex, setMineIndex, onVerRespuestas, onEditar }) {
+  if (!soyAdmin) return null;
+  const activas = misPublicaciones.filter((p) => p.estado === 'abierto');
+  if (activas.length === 0 || cardWidth <= 0) return null;
+
+  const onScroll = (e) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const i = Math.max(0, Math.min(activas.length - 1, Math.round(x / (cardWidth + CARRUSEL_GAP))));
+    if (i !== mineIndex) setMineIndex(i);
+  };
+
   return (
-    <>
-      {soyAdmin && (
-        <Pressable onPress={onPublicar} style={({ pressed }) => [styles.publishBtn, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
-          <Swords color={tema.ink} size={17} strokeWidth={2.2} />
-          <Text style={[styles.publishBtnText, { color: tema.ink }]}>Publicar desafío</Text>
-        </Pressable>
-      )}
-
-      {soyAdmin && misPublicaciones.filter((p) => p.estado === 'abierto').length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Tus publicaciones ({misPublicaciones.filter((p) => p.estado === 'abierto').length})</Text>
-          {misPublicaciones
-            .filter((p) => p.estado === 'abierto')
-            .map((pub) => (
-              <View key={pub.id} style={[styles.mineCard, { borderColor: tema.border }]}>
-                <View style={styles.mineHeaderRow}>
-                  <Text style={[styles.mineBadge, { color: tema.main, backgroundColor: tema.soft }]}>{modalidadInline(pub.modalidad)}</Text>
-                  <Text style={styles.mineExpiry}>{fmtFecha(pub.fecha_propuesta)}</Text>
-                </View>
-                {pub.zona ? <Text style={styles.mineZona}>{pub.zona}</Text> : null}
-                {pub.mensaje ? <Text style={styles.mineMensaje} numberOfLines={2}>&quot;{pub.mensaje}&quot;</Text> : null}
-                <View style={styles.mineActionsRow}>
-                  <Pressable onPress={() => onVerRespuestas(pub)} style={({ pressed }) => [styles.mineCta, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
-                    <Text style={[styles.mineCtaText, { color: tema.ink }]}>Ver respuestas</Text>
-                  </Pressable>
-                  <Pressable onPress={() => onEditar(pub)} style={({ pressed }) => [styles.mineEditBtn, pressed && { opacity: 0.7 }]}>
-                    <Pencil color={C.textPrimary} size={15} strokeWidth={2} />
-                  </Pressable>
-                </View>
-              </View>
+    <View style={styles.carruselBox}>
+      <View style={styles.carruselHeadRow}>
+        <View style={styles.carruselHeadLeft}>
+          <View style={[styles.dotLive, { backgroundColor: tema.main }]} />
+          <Text style={[styles.carruselHeadLabel, { color: tema.main }]}>TUS DESAFÍOS ACTIVOS · {activas.length}</Text>
+        </View>
+        {activas.length > 1 && (
+          <View style={styles.dotsRow}>
+            {activas.map((_, i) => (
+              <View
+                key={i}
+                style={[styles.dot, { width: i === mineIndex ? 16 : 5, backgroundColor: i === mineIndex ? tema.main : C.chipStrong }]}
+              />
             ))}
-        </>
-      )}
+          </View>
+        )}
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={cardWidth + CARRUSEL_GAP}
+        decelerationRate="fast"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ gap: CARRUSEL_GAP }}
+      >
+        {activas.map((pub) => (
+          <LinearGradient
+            key={pub.id}
+            colors={[tema.soft, C.surface]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.mineCard, { width: cardWidth, borderColor: tema.border }]}
+          >
+            <View style={styles.mineHeaderRow}>
+              <View style={[styles.mineStateBadge, { backgroundColor: tema.soft }]}>
+                <Text style={[styles.mineStateBadgeText, { color: tema.main }]}>Publicado</Text>
+              </View>
+              <Text style={styles.mineExpiry}>{cierraEnLabel(pub.created_at)}</Text>
+            </View>
+            <Text style={styles.mineTitle}>{modalidadInline(pub.modalidad)} · {fmtFecha(pub.fecha_propuesta)}</Text>
+            <Text style={styles.mineSub} numberOfLines={1}>{pub.zona || 'Zona a coordinar por chat'}</Text>
+            <View style={styles.mineActionsRow}>
+              <Pressable onPress={() => onVerRespuestas(pub)} style={({ pressed }) => [styles.mineCta, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
+                <Text style={[styles.mineCtaText, { color: tema.ink }]}>Ver respuestas</Text>
+              </Pressable>
+              <Pressable onPress={() => onEditar(pub)} style={({ pressed }) => [styles.mineEditBtn, pressed && { opacity: 0.7 }]}>
+                <Text style={styles.mineEditBtnText}>Editar</Text>
+              </Pressable>
+            </View>
+          </LinearGradient>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
 
-      <View style={styles.filterRow}>
-        {['futbol7', 'futbol11'].map((m) => {
-          const activo = filtroModalidad === m;
-          return (
-            <Pressable
-              key={m}
-              onPress={() => setFiltroModalidad(activo ? null : m)}
-              style={[styles.filterChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}
-            >
-              <Text style={[styles.filterChipText, activo && { color: tema.ink }]}>{modalidadInline(m)}</Text>
-            </Pressable>
-          );
-        })}
-        <Pressable onPress={() => setSort((s) => (s === 'cerca' ? 'pronto' : 'cerca'))} style={styles.sortBtn}>
-          <Text style={styles.sortBtnText}>{sort === 'cerca' ? 'Más cerca' : 'Fecha más próxima'}</Text>
-        </Pressable>
+/* ── Tablero abierto: tarjeta de candidato ──────────────────────── */
+
+const RESPUESTA_MINI_LABEL = {
+  pendiente: 'Respondida',
+  retirada: null,
+  rechazada: 'No elegida',
+};
+
+function CandidateCard({ pub, tema, miRespuesta, onOpen }) {
+  const cerca = esCerca(pub.distanciaKm);
+  const urgente = cierraPronto(pub.created_at);
+  const chips = [modalidadInline(pub.modalidad), fmtFecha(pub.fecha_propuesta), pub.zona].filter(Boolean);
+  const miniLabel = miRespuesta ? RESPUESTA_MINI_LABEL[miRespuesta.estado] : null;
+
+  return (
+    <Pressable onPress={onOpen} style={({ pressed }) => [styles.browseCard, pressed && { borderColor: tema.border }]}>
+      <View style={styles.browseHeaderRow}>
+        {pub.club?.foto_url ? (
+          <Image source={{ uri: pub.club.foto_url }} style={styles.logo} />
+        ) : (
+          <View style={[styles.logo, styles.logoFallback]}>
+            <Shield color={C.textMuted} size={18} strokeWidth={1.7} />
+          </View>
+        )}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.browseNameRow}>
+            <Text style={styles.clubName} numberOfLines={1}>{pub.club?.nombre || 'Club'}</Text>
+            {cerca && (
+              <View style={[styles.tagChip, { backgroundColor: tema.soft }]}>
+                <Text style={[styles.tagChipText, { color: tema.main }]}>Cerca</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.metaText} numberOfLines={1}>
+            {resumenEstadisticas(pub.estadisticas) || 'Sin partidos jugados'}
+          </Text>
+        </View>
+        {pub.distanciaKm != null && (
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[styles.browseDist, { color: tema.main }]}>{formatDistanciaKm(pub.distanciaKm)}</Text>
+            <Text style={styles.browseDistSub}>de ti</Text>
+          </View>
+        )}
       </View>
 
-      <Text style={styles.sectionTitle}>Buscando rival ({listaOrdenada.length})</Text>
-      {listaOrdenada.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>Ningún club cercano está buscando rival ahora mismo.</Text>
-        </View>
-      ) : (
-        listaOrdenada.map((pub) => {
-          const miRespuesta = misRespuestas.get(pub.id);
-          return (
-            <View key={pub.id} style={styles.browseCard}>
-              <View style={styles.browseHeaderRow}>
-                {pub.club?.foto_url ? (
-                  <Image source={{ uri: pub.club.foto_url }} style={styles.logo} />
-                ) : (
-                  <View style={[styles.logo, styles.logoFallback]}>
-                    <Shield color={C.textMuted} size={18} strokeWidth={1.7} />
-                  </View>
-                )}
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.clubName} numberOfLines={1}>{pub.club?.nombre || 'Club'}</Text>
-                  <Text style={styles.metaText} numberOfLines={1}>
-                    {resumenEstadisticas(pub.estadisticas) || 'Sin partidos jugados'}
-                  </Text>
-                </View>
-                {pub.distanciaKm != null && (
-                  <Text style={[styles.browseDist, { color: tema.main }]}>{formatDistanciaKm(pub.distanciaKm)}</Text>
-                )}
-              </View>
-              <View style={styles.chipsRow}>
-                <View style={styles.infoChip}><Text style={styles.infoChipText}>{modalidadInline(pub.modalidad)}</Text></View>
-                <View style={styles.infoChip}><Text style={styles.infoChipText}>{fmtFecha(pub.fecha_propuesta)}</Text></View>
-                {pub.zona ? <View style={styles.infoChip}><Text style={styles.infoChipText} numberOfLines={1}>{pub.zona}</Text></View> : null}
-              </View>
-              {pub.mensaje ? <Text style={styles.mineMensaje} numberOfLines={2}>&quot;{pub.mensaje}&quot;</Text> : null}
+      <View style={styles.chipsRow}>
+        {chips.map((chip, i) => (
+          <View key={i} style={styles.infoChip}>
+            <Text style={styles.infoChipText} numberOfLines={1}>{chip}</Text>
+          </View>
+        ))}
+        {miniLabel && (
+          <View style={styles.infoChip}>
+            <Text style={styles.infoChipText}>{miniLabel}</Text>
+          </View>
+        )}
+      </View>
 
-              {soyAdmin &&
-                (miRespuesta ? (
-                  miRespuesta.estado === 'pendiente' ? (
-                    <View style={styles.respondedRow}>
-                      <Text style={styles.respondedText}>Respuesta enviada</Text>
-                      <Pressable onPress={() => onRetirarMiRespuesta(miRespuesta)} style={({ pressed }) => [styles.withdrawBtn, pressed && { opacity: 0.7 }]}>
-                        <Text style={styles.withdrawBtnText}>Retirar</Text>
-                      </Pressable>
-                    </View>
-                  ) : miRespuesta.estado === 'retirada' ? (
-                    <Pressable onPress={() => onReconsiderarMiRespuesta(miRespuesta)} style={({ pressed }) => [styles.mineEditBtn, styles.reconsiderBtn, pressed && { opacity: 0.7 }]}>
-                      <Text style={styles.reconsiderBtnText}>Volver a responder</Text>
-                    </Pressable>
-                  ) : miRespuesta.estado === 'rechazada' ? (
-                    <View style={styles.respondedRow}>
-                      <Text style={styles.respondedTextMuted}>No fue elegida esta vez</Text>
-                    </View>
-                  ) : null
-                ) : (
-                  <Pressable onPress={() => onResponder(pub)} style={({ pressed }) => [styles.mineCta, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
-                    <Text style={[styles.mineCtaText, { color: tema.ink }]}>Responder</Text>
-                  </Pressable>
-                ))}
+      <Text style={[styles.browseExpiry, urgente && { color: '#E09A5A' }]}>{cierraEnLabel(pub.created_at)}</Text>
+    </Pressable>
+  );
+}
+
+/* ── Tablero abierto: hoja de detalle + responder ───────────────── */
+
+function DetailSheet({ visible, pub, tema, soyAdmin, miRespuesta, mensaje, setMensaje, working, onClose, onEnviar, onRetirar, onReconsiderar }) {
+  if (!pub) return null;
+  const facts = [
+    { k: 'Formato', v: modalidadInline(pub.modalidad) },
+    { k: 'Cuándo', v: fmtFecha(pub.fecha_propuesta) },
+    { k: 'Zona', v: pub.zona || 'A coordinar' },
+    { k: 'Cierra', v: cierraEnLabel(pub.created_at) },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeaderRow}>
+            {pub.club?.foto_url ? (
+              <Image source={{ uri: pub.club.foto_url }} style={styles.logoLg} />
+            ) : (
+              <View style={[styles.logoLg, styles.logoFallback]}>
+                <Shield color={C.textMuted} size={20} strokeWidth={1.7} />
+              </View>
+            )}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.sheetTitle} numberOfLines={1}>{pub.club?.nombre || 'Club'}</Text>
+              <Text style={styles.sheetSubtitle} numberOfLines={1}>{resumenEstadisticas(pub.estadisticas) || 'Sin partidos jugados'}</Text>
             </View>
-          );
-        })
-      )}
-    </>
+          </View>
+
+          <View style={styles.factsGrid}>
+            {facts.map((fa) => (
+              <View key={fa.k} style={styles.factCard}>
+                <Text style={styles.factLabel}>{fa.k}</Text>
+                <Text style={styles.factValue} numberOfLines={2}>{fa.v}</Text>
+              </View>
+            ))}
+          </View>
+
+          {pub.mensaje ? <Text style={styles.sheetMensaje}>&quot;{pub.mensaje}&quot;</Text> : null}
+
+          {soyAdmin && (
+            miRespuesta ? (
+              miRespuesta.estado === 'pendiente' ? (
+                <View style={styles.sheetRespondedBox}>
+                  <Text style={styles.sheetRespondedText}>Ya enviaste tu respuesta. {pub.club?.nombre || 'El club'} todavía no elige.</Text>
+                  <Pressable
+                    onPress={() => onRetirar(miRespuesta)}
+                    disabled={working}
+                    style={({ pressed }) => [styles.withdrawFullBtn, pressed && !working && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.withdrawFullBtnText}>Retirar respuesta</Text>
+                  </Pressable>
+                </View>
+              ) : miRespuesta.estado === 'retirada' ? (
+                <Pressable
+                  onPress={() => onReconsiderar(miRespuesta)}
+                  disabled={working}
+                  style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }]}
+                >
+                  <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Volver a responder</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.sheetRespondedBox}>
+                  <Text style={styles.sheetRespondedTextMuted}>No fue elegida esta vez.</Text>
+                </View>
+              )
+            ) : (
+              <>
+                <TextInput
+                  value={mensaje}
+                  onChangeText={setMensaje}
+                  placeholder="Contales por qué les sirve (opcional)"
+                  placeholderTextColor={C.textMuted}
+                  multiline
+                  maxLength={300}
+                  style={styles.sheetTextarea}
+                />
+                <Pressable
+                  onPress={onEnviar}
+                  disabled={working}
+                  style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }, working && { opacity: 0.6 }]}
+                >
+                  {working ? <ActivityIndicator color={tema.ink} /> : <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Enviar respuesta</Text>}
+                </Pressable>
+              </>
+            )
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+/* ── Tablero abierto: hoja de filtros ────────────────────────────── */
+
+const MODALIDAD_OPCIONES = [
+  { value: null, label: 'Cualquiera' },
+  { value: 'futbol7', label: 'Fútbol 7' },
+  { value: 'futbol11', label: 'Fútbol 11' },
+];
+
+const SORT_OPCIONES = [
+  { value: 'cerca', label: 'Más cerca' },
+  { value: 'pronto', label: 'Fecha más próxima' },
+];
+
+function FilterSheet({ visible, tema, filtroModalidad, setFiltroModalidad, sort, setSort, count, onClose }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.filterSheetHeadRow}>
+            <View>
+              <Text style={styles.sheetTitle}>Filtros</Text>
+              <Text style={styles.sheetSubtitle}>{count} coinciden</Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                setFiltroModalidad(null);
+                setSort('cerca');
+              }}
+              style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.clearBtnText}>Limpiar</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.fieldLabel}>Formato</Text>
+          <View style={styles.chipsRow}>
+            {MODALIDAD_OPCIONES.map((o) => {
+              const activo = filtroModalidad === o.value;
+              return (
+                <Pressable
+                  key={o.label}
+                  onPress={() => setFiltroModalidad(o.value)}
+                  style={[styles.optionChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}
+                >
+                  <Text style={[styles.optionChipText, activo && { color: tema.ink }]}>{o.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.fieldLabel}>Ordenar por</Text>
+          <View style={styles.chipsRow}>
+            {SORT_OPCIONES.map((o) => {
+              const activo = sort === o.value;
+              return (
+                <Pressable
+                  key={o.value}
+                  onPress={() => setSort(o.value)}
+                  style={[styles.optionChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}
+                >
+                  <Text style={[styles.optionChipText, activo && { color: tema.ink }]}>{o.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable onPress={onClose} style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main, marginTop: 8 }, pressed && { opacity: 0.85 }]}>
+            <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Ver resultados</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -902,10 +1165,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     paddingHorizontal: S.screenPadding,
     paddingTop: 4,
-    paddingBottom: 8,
+    paddingBottom: 12,
   },
   iconBtn: {
     width: S.iconBtn,
@@ -918,28 +1181,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconBtnPressed: { backgroundColor: C.chipStrong },
-  headerTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3 },
-  content: { padding: S.screenPadding, paddingBottom: 40 },
-
-  tabRow: { flexDirection: 'row', gap: 8, paddingHorizontal: S.screenPadding, paddingBottom: 12 },
-  tabBtn: {
-    flex: 1,
-    flexDirection: 'row',
+  iconBtnBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: C.loss,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 42,
-    borderRadius: R.iconBtn,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.chip,
   },
-  tabBtnActive: {},
-  tabLabel: { color: C.textSecondary, fontSize: 13, fontFamily: F.extraBold },
-  tabBadge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.loss, alignItems: 'center', justifyContent: 'center' },
-  tabBadgeText: { color: '#2A0C0F', fontSize: 10, fontFamily: F.extraBold },
+  iconBtnBadgeText: { color: '#2A0C0F', fontSize: 9.5, fontFamily: F.extraBold },
+  headerTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3 },
+  headerSubtitle: { color: C.textMuted, fontSize: 11.5, fontFamily: F.semiBold, marginTop: 2 },
+  publishBtnSmall: { borderRadius: R.iconBtn, paddingHorizontal: 14, height: S.iconBtn, alignItems: 'center', justifyContent: 'center' },
+  publishBtnSmallText: { fontSize: 12.5, fontFamily: F.extraBold },
+  content: { padding: S.screenPadding, paddingBottom: 40 },
 
   emptyBox: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 40, paddingHorizontal: 20 },
+  emptyBoxDashed: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 34,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: C.border,
+    borderRadius: R.row,
+  },
   emptyText: { color: C.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
   sectionTitle: { color: C.textSecondary, fontSize: 10.5, fontFamily: F.extraBold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10, marginTop: 6 },
@@ -956,6 +1227,7 @@ const styles = StyleSheet.create({
     marginBottom: 9,
   },
   logo: { width: 44, height: 44, borderRadius: 13 },
+  logoLg: { width: 46, height: 46, borderRadius: 13 },
   logoFallback: { backgroundColor: C.chip, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderSoft },
   clubName: { color: C.textPrimary, fontSize: 15, fontFamily: F.extraBold },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
@@ -971,40 +1243,66 @@ const styles = StyleSheet.create({
   estadoBadge: { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4 },
   estadoBadgeText: { fontSize: 9.5, fontFamily: F.extraBold, letterSpacing: 0.4, textTransform: 'uppercase' },
 
-  publishBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, height: 50, borderRadius: R.iconBtn, marginBottom: 18 },
-  publishBtnText: { fontSize: 15, fontFamily: F.extraBold },
+  carruselBox: { marginBottom: 18 },
+  carruselHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
+  carruselHeadLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dotLive: { width: 7, height: 7, borderRadius: 4 },
+  carruselHeadLabel: { fontSize: 10.5, fontFamily: F.extraBold, letterSpacing: 1.4, textTransform: 'uppercase' },
+  dotsRow: { flexDirection: 'row', gap: 4 },
+  dot: { height: 5, borderRadius: 99 },
 
-  mineCard: { backgroundColor: C.surface, borderRadius: R.row, borderWidth: 1, padding: 15, marginBottom: 10 },
+  mineCard: { borderRadius: R.hero, borderWidth: 1, padding: 16, paddingHorizontal: 18 },
   mineHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  mineBadge: { fontSize: 10.5, fontFamily: F.extraBold, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4, overflow: 'hidden' },
+  mineStateBadge: { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4 },
+  mineStateBadgeText: { fontSize: 9.5, fontFamily: F.extraBold, letterSpacing: 0.6, textTransform: 'uppercase' },
   mineExpiry: { color: C.textMuted, fontSize: 11.5, fontFamily: F.semiBold },
-  mineZona: { color: C.textSecondary, fontSize: 12.5, fontFamily: F.semiBold, marginTop: 8 },
-  mineMensaje: { color: C.textSecondary, fontSize: 12, fontStyle: 'italic', marginTop: 6 },
-  mineActionsRow: { flexDirection: 'row', gap: 9, marginTop: 13 },
+  mineTitle: { color: C.textPrimary, fontSize: 17, fontFamily: F.extraBold, letterSpacing: -0.3, marginTop: 10 },
+  mineSub: { color: C.textMuted, fontSize: 12.5, fontFamily: F.semiBold, marginTop: 8 },
+  mineActionsRow: { flexDirection: 'row', gap: 9, marginTop: 14 },
   mineCta: { flex: 1, borderRadius: R.iconBtn, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   mineCtaText: { fontSize: 13.5, fontFamily: F.extraBold },
   mineEditBtn: { borderRadius: R.iconBtn, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  mineEditBtnText: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.bold },
   reconsiderBtn: { flex: 1 },
   reconsiderBtnText: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold },
 
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 4, flexWrap: 'wrap' },
-  filterChip: { borderRadius: 999, borderWidth: 1, borderColor: C.border, paddingHorizontal: 13, paddingVertical: 9 },
-  filterChipText: { color: C.textSecondary, fontSize: 12.5, fontFamily: F.bold },
-  sortBtn: { borderRadius: 999, borderWidth: 1, borderColor: C.border, paddingHorizontal: 13, paddingVertical: 9, marginLeft: 'auto' },
-  sortBtnText: { color: C.textSecondary, fontSize: 12, fontFamily: F.bold },
+  controlsRow: { flexDirection: 'row', gap: 9, marginBottom: 16 },
+  filterBtnBig: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: R.iconBtn,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.chip,
+    paddingVertical: 13,
+  },
+  filterBtnBigText: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.extraBold },
+  sortBtnBig: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: R.iconBtn,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  sortBtnBigText: { color: C.textSecondary, fontSize: 12, fontFamily: F.bold },
 
   browseCard: { backgroundColor: C.surface, borderRadius: R.row, borderWidth: 1, borderColor: C.borderSoft, padding: 15, marginBottom: 10 },
   browseHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  browseNameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   browseDist: { fontSize: 13, fontFamily: F.extraBold },
+  browseDistSub: { color: C.textMuted, fontSize: 10.5, fontFamily: F.semiBold, marginTop: 3 },
+  browseExpiry: { color: C.textMuted, fontSize: 11.5, fontFamily: F.semiBold, marginTop: 12 },
+  tagChip: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  tagChipText: { fontSize: 9.5, fontFamily: F.extraBold, letterSpacing: 0.6, textTransform: 'uppercase' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
   infoChip: { backgroundColor: C.chip, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, maxWidth: 200 },
   infoChipText: { color: C.textSecondary, fontSize: 11, fontFamily: F.bold },
-
-  respondedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 13 },
-  respondedText: { color: C.textSecondary, fontSize: 12.5, fontFamily: F.bold },
-  respondedTextMuted: { color: C.textMuted, fontSize: 12.5, fontFamily: F.semiBold },
-  withdrawBtn: { borderRadius: 999, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 7 },
-  withdrawBtnText: { color: C.textSecondary, fontSize: 11.5, fontFamily: F.bold },
 
   subHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
   subHeaderTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3 },
@@ -1049,9 +1347,15 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 30,
   },
-  sheetHandle: { width: 40, height: 4, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 14 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 3, backgroundColor: C.chipStrong, alignSelf: 'center', marginBottom: 14 },
+  sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sheetTitle: { color: C.textPrimary, fontSize: 17, fontFamily: F.extraBold, letterSpacing: -0.3 },
-  sheetSubtitle: { color: C.textSecondary, fontSize: 12.5, marginTop: 4, marginBottom: 14 },
+  sheetSubtitle: { color: C.textSecondary, fontSize: 12.5, marginTop: 4 },
+  factsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
+  factCard: { width: '47%', backgroundColor: C.chip, borderWidth: 1, borderColor: C.borderSoft, borderRadius: R.iconBtn, padding: 12 },
+  factLabel: { color: C.textMuted, fontSize: 9.5, fontFamily: F.extraBold, letterSpacing: 1, textTransform: 'uppercase' },
+  factValue: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.bold, marginTop: 5 },
+  sheetMensaje: { color: C.textSecondary, fontSize: 12.5, fontStyle: 'italic', marginTop: 14 },
   sheetTextarea: {
     backgroundColor: C.chip,
     borderRadius: R.iconBtn,
@@ -1062,8 +1366,16 @@ const styles = StyleSheet.create({
     padding: 14,
     height: 90,
     textAlignVertical: 'top',
+    marginTop: 16,
     marginBottom: 14,
   },
-  sheetPrimary: { height: 52, borderRadius: R.iconBtn, alignItems: 'center', justifyContent: 'center' },
+  sheetPrimary: { height: 52, borderRadius: R.iconBtn, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
   sheetPrimaryText: { fontSize: 15, fontFamily: F.extraBold },
+  sheetRespondedBox: { marginTop: 16 },
+  sheetRespondedText: { color: C.textSecondary, fontSize: 12.5, fontFamily: F.semiBold, lineHeight: 18 },
+  sheetRespondedTextMuted: { color: C.textMuted, fontSize: 12.5, fontFamily: F.semiBold },
+
+  filterSheetHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  clearBtn: { borderRadius: R.iconBtn, borderWidth: 1, borderColor: C.border, paddingHorizontal: 13, paddingVertical: 9 },
+  clearBtnText: { color: C.textSecondary, fontSize: 12, fontFamily: F.bold },
 });
