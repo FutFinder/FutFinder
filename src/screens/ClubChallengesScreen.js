@@ -868,90 +868,98 @@ function CandidateCard({ pub, tema, miRespuesta, onOpen }) {
 /* ── Tablero abierto: hoja de detalle + responder ───────────────── */
 
 function DetailSheet({ visible, pub, tema, soyAdmin, miRespuesta, mensaje, setMensaje, working, onClose, onEnviar, onRetirar, onReconsiderar }) {
-  if (!pub) return null;
-  const facts = [
-    { k: 'Formato', v: modalidadInline(pub.modalidad) },
-    { k: 'Cuándo', v: fmtFecha(pub.fecha_propuesta) },
-    { k: 'Zona', v: pub.zona || 'A coordinar' },
-    { k: 'Cierra', v: cierraEnLabel(pub.created_at) },
-  ];
+  const facts = pub
+    ? [
+        { k: 'Formato', v: modalidadInline(pub.modalidad) },
+        { k: 'Cuándo', v: fmtFecha(pub.fecha_propuesta) },
+        { k: 'Zona', v: pub.zona || 'A coordinar' },
+        { k: 'Cierra', v: cierraEnLabel(pub.created_at) },
+      ]
+    : [];
 
+  // El Modal se mantiene montado aunque `pub` ya se haya limpiado, para que
+  // el fade de cierre alcance a jugar (si se desmonta junto con `pub` en el
+  // mismo render, la hoja desaparece de golpe en vez de apagarse).
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={() => {}}>
           <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeaderRow}>
-            {pub.club?.foto_url ? (
-              <Image source={{ uri: pub.club.foto_url }} style={styles.logoLg} />
-            ) : (
-              <View style={[styles.logoLg, styles.logoFallback]}>
-                <Shield color={C.textMuted} size={20} strokeWidth={1.7} />
-              </View>
-            )}
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.sheetTitle} numberOfLines={1}>{pub.club?.nombre || 'Club'}</Text>
-              <Text style={styles.sheetSubtitle} numberOfLines={1}>{resumenEstadisticas(pub.estadisticas) || 'Sin partidos jugados'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.factsGrid}>
-            {facts.map((fa) => (
-              <View key={fa.k} style={styles.factCard}>
-                <Text style={styles.factLabel}>{fa.k}</Text>
-                <Text style={styles.factValue} numberOfLines={2}>{fa.v}</Text>
-              </View>
-            ))}
-          </View>
-
-          {pub.mensaje ? <Text style={styles.sheetMensaje}>&quot;{pub.mensaje}&quot;</Text> : null}
-
-          {soyAdmin && (
-            miRespuesta ? (
-              miRespuesta.estado === 'pendiente' ? (
-                <View style={styles.sheetRespondedBox}>
-                  <Text style={styles.sheetRespondedText}>Ya enviaste tu respuesta. {pub.club?.nombre || 'El club'} todavía no elige.</Text>
-                  <Pressable
-                    onPress={() => onRetirar(miRespuesta)}
-                    disabled={working}
-                    style={({ pressed }) => [styles.withdrawFullBtn, pressed && !working && { opacity: 0.7 }]}
-                  >
-                    <Text style={styles.withdrawFullBtnText}>Retirar respuesta</Text>
-                  </Pressable>
+          {pub && (
+            <>
+              <View style={styles.sheetHeaderRow}>
+                {pub.club?.foto_url ? (
+                  <Image source={{ uri: pub.club.foto_url }} style={styles.logoLg} />
+                ) : (
+                  <View style={[styles.logoLg, styles.logoFallback]}>
+                    <Shield color={C.textMuted} size={20} strokeWidth={1.7} />
+                  </View>
+                )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.sheetTitle} numberOfLines={1}>{pub.club?.nombre || 'Club'}</Text>
+                  <Text style={styles.sheetSubtitle} numberOfLines={1}>{resumenEstadisticas(pub.estadisticas) || 'Sin partidos jugados'}</Text>
                 </View>
-              ) : miRespuesta.estado === 'retirada' ? (
-                <Pressable
-                  onPress={() => onReconsiderar(miRespuesta)}
-                  disabled={working}
-                  style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }]}
-                >
-                  <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Volver a responder</Text>
-                </Pressable>
-              ) : (
-                <View style={styles.sheetRespondedBox}>
-                  <Text style={styles.sheetRespondedTextMuted}>No fue elegida esta vez.</Text>
-                </View>
-              )
-            ) : (
-              <>
-                <TextInput
-                  value={mensaje}
-                  onChangeText={setMensaje}
-                  placeholder="Contales por qué les sirve (opcional)"
-                  placeholderTextColor={C.textMuted}
-                  multiline
-                  maxLength={300}
-                  style={styles.sheetTextarea}
-                />
-                <Pressable
-                  onPress={onEnviar}
-                  disabled={working}
-                  style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }, working && { opacity: 0.6 }]}
-                >
-                  {working ? <ActivityIndicator color={tema.ink} /> : <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Enviar respuesta</Text>}
-                </Pressable>
-              </>
-            )
+              </View>
+
+              <View style={styles.factsGrid}>
+                {facts.map((fa) => (
+                  <View key={fa.k} style={styles.factCard}>
+                    <Text style={styles.factLabel}>{fa.k}</Text>
+                    <Text style={styles.factValue} numberOfLines={2}>{fa.v}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {pub.mensaje ? <Text style={styles.sheetMensaje}>&quot;{pub.mensaje}&quot;</Text> : null}
+
+              {soyAdmin && (
+                miRespuesta ? (
+                  miRespuesta.estado === 'pendiente' ? (
+                    <View style={styles.sheetRespondedBox}>
+                      <Text style={styles.sheetRespondedText}>Ya enviaste tu respuesta. {pub.club?.nombre || 'El club'} todavía no elige.</Text>
+                      <Pressable
+                        onPress={() => onRetirar(miRespuesta)}
+                        disabled={working}
+                        style={({ pressed }) => [styles.withdrawFullBtn, pressed && !working && { opacity: 0.7 }]}
+                      >
+                        <Text style={styles.withdrawFullBtnText}>Retirar respuesta</Text>
+                      </Pressable>
+                    </View>
+                  ) : miRespuesta.estado === 'retirada' ? (
+                    <Pressable
+                      onPress={() => onReconsiderar(miRespuesta)}
+                      disabled={working}
+                      style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }]}
+                    >
+                      <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Volver a responder</Text>
+                    </Pressable>
+                  ) : (
+                    <View style={styles.sheetRespondedBox}>
+                      <Text style={styles.sheetRespondedTextMuted}>No fue elegida esta vez.</Text>
+                    </View>
+                  )
+                ) : (
+                  <>
+                    <TextInput
+                      value={mensaje}
+                      onChangeText={setMensaje}
+                      placeholder="Contales por qué les sirve (opcional)"
+                      placeholderTextColor={C.textMuted}
+                      multiline
+                      maxLength={300}
+                      style={styles.sheetTextarea}
+                    />
+                    <Pressable
+                      onPress={onEnviar}
+                      disabled={working}
+                      style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }, working && { opacity: 0.6 }]}
+                    >
+                      {working ? <ActivityIndicator color={tema.ink} /> : <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Enviar respuesta</Text>}
+                    </Pressable>
+                  </>
+                )
+              )}
+            </>
           )}
         </Pressable>
       </Pressable>
