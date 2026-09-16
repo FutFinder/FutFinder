@@ -32,7 +32,7 @@ import PendingTaskCard from '../components/club/PendingTaskCard';
 import AllClearBanner from '../components/club/AllClearBanner';
 import NextMatchCard from '../components/club/NextMatchCard';
 import QuickActionGrid from '../components/club/QuickActionGrid';
-import ClubSummaryCard from '../components/club/ClubSummaryCard';
+import ClubSummaryCarousel from '../components/club/ClubSummaryCarousel';
 import ActivityList from '../components/club/ActivityList';
 import SkeletonHome from '../components/club/SkeletonHome';
 import RivalClubCard from '../components/club/RivalClubCard';
@@ -69,9 +69,7 @@ export default function ClubsScreen({ navigation, route }) {
     clubs,
     activeClubId,
     club,
-    role,
     can,
-    limits,
     tasks,
     reparto,
     badgeCount,
@@ -233,9 +231,7 @@ export default function ClubsScreen({ navigation, route }) {
           clubs,
           activeClubId,
           club,
-          role,
           can,
-          limits,
           tasks,
           reparto,
           badgeCount,
@@ -338,9 +334,7 @@ function Portada({
   clubs,
   activeClubId,
   club,
-  role,
   can,
-  limits,
   tasks,
   reparto,
   badgeCount,
@@ -465,15 +459,12 @@ function Portada({
       </View>
 
       <View style={styles.seccion}>
-        <ClubSummaryCard
-          club={club}
+        <ClubSummaryCarousel
+          clubs={clubs}
+          activeClubId={activeClubId}
           tema={tema}
-          rol={role}
-          stats={club?.estadisticas}
-          ratingLabel={formatearRating(club?.rating)}
-          totalMiembros={limits?.members?.used}
-          maxMiembros={limits?.members?.max}
-          onVerClub={() => irA('ClubDetail', { clubId: activeClubId })}
+          onSelect={setActiveClub}
+          onVerClub={(clubId) => irA('ClubDetail', { clubId })}
         />
       </View>
 
