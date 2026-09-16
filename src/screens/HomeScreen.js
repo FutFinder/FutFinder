@@ -201,6 +201,21 @@ export default function HomeScreen({ navigation }) {
       }
     : null;
 
+  /**
+   * «ADMIN · 2 CLUBES». El número estuvo escrito a mano —siempre «1 CLUB»—
+   * desde que se dibujó la cabecera, así que a quien administra dos clubes
+   * leía en su propia portada que administra uno. La cuenta real ya venía
+   * cargada en `misClubIds`; lo único que faltaba era usarla.
+   *
+   * El `|| 1` es para el instante entre que `getMyClub()` responde y
+   * `getMyClubIds()` todavía no: si administra un club, administra al menos
+   * uno, y «ADMIN · 0 CLUBES» sería peor que esperar.
+   */
+  const clubRoleLabel =
+    club?.role === 'admin'
+      ? `ADMIN · ${misClubIds.length || 1} ${(misClubIds.length || 1) === 1 ? 'CLUB' : 'CLUBES'}`
+      : undefined;
+
   const summary = matches.length
     ? `${matches.length} ${matches.length === 1 ? 'partido cerca de ti' : 'partidos cerca de ti'}`
     : 'Sin partidos cerca';
@@ -261,7 +276,7 @@ export default function HomeScreen({ navigation }) {
             greeting={greetingFor()}
             trustScore={trustScore}
             verified={verified}
-            clubRoleLabel={club?.role === 'admin' ? 'ADMIN · 1 CLUB' : undefined}
+            clubRoleLabel={clubRoleLabel}
           />
 
           {banner && (

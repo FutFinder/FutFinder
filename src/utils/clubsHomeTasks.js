@@ -171,7 +171,7 @@ function agregarSiQuedaAlgo(tareas, tarea) {
 /**
  * ¿Hay cupos que confirmar, y los números para decirlo?
  *
- * La tarea de nómina promete «9 de 11 cupos confirmados», así que sin dos
+ * La tarea de nómina promete «9 de 11 cupos tomados», así que sin dos
  * cuentas de verdad no se dibuja: `null < 11` es `true` en JavaScript y sin
  * esta guardia la tarjeta salía con la palabra «null» adentro.
  *
@@ -383,9 +383,13 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
       id: `nomina:${f.nomina.matchId}`,
       type: 'nomina',
       tone: 'info',
-      title: 'Jugadores por confirmar',
-      // Esta la ven igual los dos: cualquiera confirma su propia asistencia.
-      subtitle: `${f.nomina.confirmados} de ${f.nomina.cupos} cupos confirmados`,
+      // «Faltan jugadores» y no «Jugadores por confirmar»: lo que cuenta
+      // `confirmados` son las filas de nómina que OCUPAN cupo, o sea quién se
+      // inscribió, y en un partido por orden de llegada nadie confirma nada.
+      // El título viejo prometía un paso que no existe.
+      title: 'Faltan jugadores',
+      // Esta la ven igual los dos: cualquiera se inscribe por sí mismo.
+      subtitle: `${f.nomina.confirmados} de ${f.nomina.cupos} cupos tomados`,
       cta: 'Ver nómina',
       target: 'ClubMatchRoster',
       status: 'abierta',

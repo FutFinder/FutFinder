@@ -37,6 +37,7 @@ import {
   respondToRequest,
   listRivalCandidates,
 } from '../../services/clubs';
+import { idsConDesafioPendiente } from '../../services/clubChallenges';
 import { NOMBRES_REGIONES } from '../../data/regiones-chile';
 
 /**
@@ -74,6 +75,8 @@ export default function ClubExplorer({
   const [soyAdminDeAlgo, setSoyAdminDeAlgo] = useState(false);
   const [misClubIds, setMisClubIds] = useState(new Set());
   const [hasMaxClubs, setHasMaxClubs] = useState(false);
+  // Clubes a los que mi club ya les mandó un desafío sin responder.
+  const [yaDesafiados, setYaDesafiados] = useState(new Set());
   const [banner, setBanner] = useState(initialBanner);
 
   const [query, setQuery] = useState('');
@@ -83,13 +86,18 @@ export default function ClubExplorer({
   const [picker, setPicker] = useState(null); // null | 'region' | 'comuna'
 
   const load = useCallback(async () => {
-    const [{ data: found, error: err }, { data: mine }] = await Promise.all([
+    const [{ data: found, error: err }, { data: mine }, { data: pendientes }] = await Promise.all([
       // En modo rival la exclusión viaja dentro de la consulta, no como un
       // filtro posterior: un club propio no debe llegar ni a la respuesta.
       modoRival ? listRivalCandidates({ retadorClubId }) : searchClubs(''),
       getMyClubs(),
+      // Los que ya tienen un desafío mío sin responder. Se pide siempre que
+      // haya un club que reta, incluso fuera de `modoRival`: el botón
+      // «Desafiar» también sale en el catálogo completo.
+      idsConDesafioPendiente(retadorClubId),
     ]);
     setError(Boolean(err));
+    setYaDesafiados(new Set(pendientes || []));
     setClubs(found || []);
     const misIds = new Set((mine || []).map((m) => m.club?.id).filter(Boolean));
     setMisClubIds(misIds);
@@ -334,13 +342,22 @@ export default function ClubExplorer({
             // todo lo que se ve es desafiable.
             const puedoDesafiar =
               modoRival || (soyAdminDeAlgo && !misClubIds.has(item.id));
+            // Ya le mandé uno y sigue sin responder: el índice único del
+            // servidor rechazaría el segundo, así que en vez del botón va el
+            // estado. Antes seguía diciendo «Desafiar» y el error aparecía
+            // recién al final del formulario siguiente.
+            const yaLoDesafie = yaDesafiados.has(item.id);
             return (
               <ClubExplorerCard
                 club={item}
                 onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
                 onPressMembers={() => navigation.navigate('ClubMembers', { clubId: item.id })}
                 rightAccessory={
-                  puedoDesafiar ? (
+                  puedoDesafiar && yaLoDesafie ? (
+                    <View style={styles.pendienteChip}>
+                      <Text style={styles.pendienteText}>Desafío enviado</Text>
+                    </View>
+                  ) : puedoDesafiar ? (
                     <Pressable
                       onPress={(e) => {
                         e.stopPropagation?.();
@@ -351,7 +368,7 @@ export default function ClubExplorer({
                         });
                       }}
                       hitSlop={6}
-                      accessibilityRole="button"
+                      accessible
                       accessibilityLabel={`Desafiar a ${item.nombre}`}
                       style={({ pressed }) => [styles.desafiarBtn, pressed && { opacity: 0.7 }]}
                     >
@@ -679,6 +696,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   desafiarText: { color: CE.greenInk, fontSize: 12, fontWeight: '800' },
+
+  // El mismo tamaño que el botón, apagado: la fila no cambia de alto cuando
+  // un club pasa de «Desafiar» a «Desafío enviado».
+  pendienteChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: CER.pill,
+    borderWidth: 1,
+    borderColor: CE.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  pendienteText: { color: CE.textSecondary, fontSize: 12, fontWeight: '700' },
 
   stateBox: { alignItems: 'center', textAlign: 'center', paddingVertical: 48, paddingHorizontal: 24, gap: 4 },
   stateIconWrap: {

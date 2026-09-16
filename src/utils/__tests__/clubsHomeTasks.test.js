@@ -477,7 +477,7 @@ test('un partido sin hora usable se anuncia sin plazo, pero se anuncia', () => {
 // LA NÓMINA, CUANDO LOS DATOS VIENEN INCOMPLETOS
 //
 // La tarea se genera si faltan cupos por confirmar. El riesgo no es que
-// no aparezca: es que aparezca diciendo «null de 11 cupos confirmados».
+// no aparezca: es que aparezca diciendo «null de 11 cupos tomados».
 //
 // `cupos_por_club` tiene `check (between 4 and 15)` en la migración
 // 43_desafios_plazos_y_propuesta.sql:177, así que 0 o nulo NUNCA es un
@@ -492,7 +492,7 @@ function tareaNomina(nomina) {
 test('con cupos por llenar, la nómina dice cuántos van de cuántos', () => {
   const t = tareaNomina({ matchId: 'm1', confirmados: 9, cupos: 11 });
   assert.equal(t.type, 'nomina');
-  assert.equal(t.subtitle, '9 de 11 cupos confirmados');
+  assert.equal(t.subtitle, '9 de 11 cupos tomados');
   assert.equal(t.status, 'abierta');
 });
 

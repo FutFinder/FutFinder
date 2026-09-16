@@ -894,14 +894,20 @@ export default function ChatThreadScreen({ route, navigation }) {
   const refrescarDesafio = useCallback(
     async ({ silencioso = false } = {}) => {
       if (!isChallengeThread || !challengeId) return;
-      const [{ data: eventos }, { data: fila }] = await Promise.all([
+      // `getPropuestaVigente` ENTRA ACÁ, y antes no. Es lo que decide si la
+      // barra ofrece «Crear propuesta oficial» o «Revisar propuesta», así que
+      // sin releerla el hilo seguía invitando a crear una propuesta que ya
+      // existía — incluso después de que la mandara esta misma sesión.
+      const [{ data: eventos }, { data: fila }, { data: prop }] = await Promise.all([
         listChallengeEvents(challengeId),
         getChallenge(challengeId),
+        getPropuestaVigente(challengeId),
         cargarCambio({ silencioso }),
         cargarExpediente(),
         cargarResultado(),
       ]);
       if (!mountedRef.current) return;
+      setChallengeProposal(prop || null);
 
       // El estado del desafío decide si el compositor escribe. `getThreadAccess`
       // lo mira una sola vez al montar, así que cuando el rival congela el hilo
@@ -948,6 +954,14 @@ export default function ChatThreadScreen({ route, navigation }) {
     if (!route?.params?.resultadoRegistrado) return;
     refrescarDesafio();
   }, [route?.params?.resultadoRegistrado, refrescarDesafio]);
+
+  // Y al volver de mandar, aprobar o rechazar una propuesta oficial: sin
+  // esto, quien acababa de mandarla volvía al hilo y la barra seguía
+  // diciéndole «Crear propuesta oficial».
+  useEffect(() => {
+    if (!route?.params?.propuestaCambiada) return;
+    refrescarDesafio();
+  }, [route?.params?.propuestaCambiada, refrescarDesafio]);
 
   /**
    * SONDEO DE RESPALDO, Y ACÁ ES LA ÚNICA VÍA.

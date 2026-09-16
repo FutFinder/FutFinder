@@ -328,3 +328,34 @@ export async function getChallenge(challengeId) {
   }
   return { data, error: null };
 }
+
+/**
+ * Los clubes a los que `clubId` YA les mandó un desafío que sigue pendiente.
+ *
+ * Existe para que el explorador no ofrezca «Desafiar» sobre un club que el
+ * servidor va a rechazar: `club_challenges_unique_pending` es único por
+ * (retador, retado) mientras el desafío está pendiente, así que el segundo
+ * intento choca con un 23505. Ofrecer un botón que sólo puede terminar en
+ * error es peor que no ofrecerlo.
+ *
+ * SÓLO MIRA LOS SALIENTES, que son los que bloquean. Que ellos te hayan
+ * desafiado a ti no te impide desafiarlos: el índice es por par ordenado, y
+ * esconder esos clubes escondería un desafío que además podrías responder.
+ *
+ * No saber no puede romper la lista: si la consulta falla se devuelve vacío y
+ * el explorador se comporta como antes — el servidor sigue siendo quien
+ * rechaza de verdad.
+ */
+export async function idsConDesafioPendiente(clubId) {
+  if (!isSupabaseConfigured || !clubId) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('club_challenges')
+    .select('club_retado_id')
+    .eq('club_retador_id', clubId)
+    .eq('estado', 'pendiente');
+  if (error) {
+    console.error('[FutFinder] idsConDesafioPendiente:', error);
+    return { data: [], error: null };
+  }
+  return { data: (data || []).map((r) => r.club_retado_id).filter(Boolean), error: null };
+}

@@ -157,8 +157,6 @@ export default function ClubChallengeScreen({ navigation, route }) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
-
             {/* Rival */}
             <View style={[styles.rivalCard, { borderColor: tema.border }]}>
               <Swords color={tema.main} size={18} strokeWidth={2} />
@@ -261,6 +259,16 @@ export default function ClubChallengeScreen({ navigation, route }) {
               multiline
               maxLength={300}
             />
+
+            {/*
+              EL AVISO VA JUNTO AL BOTÓN, no arriba del formulario. Estaba
+              arriba, y como el botón queda al final de una pantalla que se
+              desplaza, mandar dos veces el mismo desafío se veía como que no
+              pasaba nada: el «ya tienes un desafío pendiente con este club»
+              se dibujaba fuera de la vista. Un error que hay que ir a buscar
+              es un error que nadie lee.
+            */}
+            {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
             <Button
               label={sent ? 'Desafío enviado' : 'Enviar desafío'}

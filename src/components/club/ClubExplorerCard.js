@@ -7,9 +7,21 @@ import { clubsExplorer as CE, clubsExplorerRadius as CER } from '../../theme/col
  * Tarjeta de club del explorador (handoff `Clubes.dc.html`): escudo o foto,
  * nombre, comuna e integrantes, con flecha o un accesorio custom a la derecha
  * (p.ej. el botón «Desafiar» para admins elegibles).
+ *
+ * LOS CONTROLES DE ADENTRO NO LLEVAN `accessibilityRole="button"`, y es a
+ * propósito. La tarjeta entera SÍ es un botón, y en react-native-web ese rol
+ * se traduce a un `<button>` de verdad: con el enlace de integrantes y el
+ * accesorio marcados también como botón quedaban dos `<button>` anidados,
+ * que es HTML inválido y rompía la hidratación en la web («<button> cannot be
+ * a descendant of <button>»). Sin el rol, react-native-web los dibuja como
+ * `<div>`, que sí puede vivir dentro de un botón, y el toque sigue
+ * funcionando igual. `accessible` y `accessibilityLabel` se conservan para
+ * que en el móvil se sigan anunciando.
  */
 export default function ClubExplorerCard({ club, totalMiembros, onPress, onPressMembers, rightAccessory }) {
   const miembros = totalMiembros ?? club.total_miembros ?? 0;
+  // Un club recién creado tiene UN integrante, no «1 integrantes».
+  const etiquetaMiembros = `${miembros} ${miembros === 1 ? 'integrante' : 'integrantes'}`;
 
   return (
     <Pressable
@@ -46,17 +58,17 @@ export default function ClubExplorerCard({ club, totalMiembros, onPress, onPress
                 onPressMembers();
               }}
               hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`Ver ${miembros} integrantes de ${club.nombre}`}
+              accessible
+              accessibilityLabel={`Ver ${etiquetaMiembros} de ${club.nombre}`}
               style={({ pressed }) => [styles.metaItem, pressed && { opacity: 0.6 }]}
             >
               <Users color={CE.textSecondary} size={13} strokeWidth={2} />
-              <Text style={[styles.metaText, styles.metaTextLink]}>{miembros} integrantes</Text>
+              <Text style={[styles.metaText, styles.metaTextLink]}>{etiquetaMiembros}</Text>
             </Pressable>
           ) : (
             <View style={styles.metaItem}>
               <Users color={CE.textSecondary} size={13} strokeWidth={2} />
-              <Text style={styles.metaText}>{miembros} integrantes</Text>
+              <Text style={styles.metaText}>{etiquetaMiembros}</Text>
             </View>
           )}
         </View>

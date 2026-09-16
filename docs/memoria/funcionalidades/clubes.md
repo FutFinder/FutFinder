@@ -177,11 +177,98 @@ Se llega desde el acceso rápido «Alineación» de la portada de Clubes
 `ClubDetailScreen` no se perdió: sigue disponible desde «Ver club» en
 `ClubSummaryCard`, más abajo en la misma portada.
 
+## Estética: siete pantallas más en la paleta nueva
+
+El 2026-09-15 `ClubProposalScreen`, `ClubResultScreen`, `ClubMatchChangeScreen`,
+`CreateClubScreen`, `ClubInviteScreen`, `ClubPlansScreen` y `ClubGalleryScreen`
+pasaron de `colors`/`radius` (la paleta legada: fondo `#201F1D`, verde oliva
+`#71B533`, tipografía del sistema) a `reservas`/`reservasRadius`/`reservasSizes`/
+`reservasFonts` y a las primitivas de `src/components/reservas/`. Es la misma
+familia que ya usaban «Desafiar club» y la bandeja de desafíos, así que el
+recorrido Desafiar → Propuesta → Resultado dejó de mostrar dos verdes y dos
+tipografías distintas. **Cambio sólo visual**: ningún servicio, RPC, validación
+ni permiso se tocó.
+
+Lo que sí cambió de estructura, y por qué: los selectores de método de
+inscripción son ahora `ChoiceCard` (radio + consecuencia de elegirlo) en vez de
+filas con tilde; «Invitado» es un `Badge` del kit; y los chips de duración,
+modalidad y sí/no son el `Chip` del kit con `minHeight` subido a 44 — el kit lo
+dibuja a 33 porque allá son filtros, y acá son la única forma de elegir. Para no
+perder el borde rojo de campo inválido al pasar a `TextField`, el componente
+compartido de `components/reservas/recintoUi.js` recibió una prop `error`
+opcional; sin ella se comporta igual que antes.
+
+`Banner` NO se migró: es el canal de error/éxito de toda la app, no sólo de
+Clubes, y repintarlo restilizaría pantallas fuera de este alcance. Sigue en la
+paleta legada dentro de estas pantallas, igual que en «Desafiar club».
+
+## El club tiene dueño (migración 111)
+
+Revisando el apartado entero contra producción aparecieron **cinco agujeros de
+permisos**, los cinco reproducidos con un arnés antes de tocar nada. La **111**
+los cierra y tiene su propio arnés, `111_el_club_tiene_dueno_y_puerta_unica_test.sql`,
+con **14 casos: 6 de lo que ya no se puede y 8 de regresión**. Aplicada el
+2026-09-15.
+
+**El fundador expulsado volvía solo, y de admin.** `club_members_founder_insert`
+sólo miraba `clubs.created_by`, sin comprobar si seguía siendo miembro: ceder la
+administración o que te echaran del club que fundaste no servía de nada. Y
+**el arreglo estaba escrito y nunca funcionó**: la política hermana
+`club_members_insert` llevaba `not exists (select 1 from club_members m where
+m.club_id = m.club_id)` — la misma clase de auto-referencia que la 90 corrigió
+en `club_members_update`, pero peor, porque comparada consigo misma la
+condición es siempre verdadera y la política entera no autorizaba nada. La que
+mandaba era la otra, la que no tiene la guarda. Ahora hay UNA sola política y
+lleva la comprobación que se quiso hacer: el fundador se inserta cuando el club
+todavía no tiene a nadie, o sea al crearlo y nunca más.
+
+**Un admin metía a quien quisiera reescribiendo `user_id`.** `club_members_update`
+sólo exige ser admin del club, y nada impedía cambiarle el `user_id` a una fila
+de nómina: el socio pasaba a ser alguien que jamás pidió entrar. El trigger no
+ayudaba porque es `before insert or update OF rol` y no se dispara cuando el SET
+toca otra columna. Se cierra con **grants por columna** —`revoke update … grant
+update (rol)`—, la misma técnica que la 102 con `trust_score`, y no con otra
+política: el cliente sólo escribe `rol` (promover a admin y el interruptor de
+capitán), así que quitarle el resto no le saca nada que use.
+
+**El único admin se salía y dejaba el club huérfano**, con miembros y sin nadie
+que pueda editar la ficha, aceptar solicitudes ni responder un desafío. La regla
+existía —«nombra otro admin antes de salir»— pero **sólo en el cliente**, en
+`leaveClub`. Ahora es el trigger `trg_el_club_no_se_queda_sin_admin`, que cubre
+todas las puertas. Tiene dos salidas tempranas que son la mitad del trabajo: si
+el club ya no existe deja pasar (es el cascade de borrarlo, y sin eso borrar un
+club con nómina se bloquearía a sí mismo), y si no queda nadie más también (ahí
+el club se borra solo por `trg_auto_delete_empty_club`).
+
+**Y el club lo borraba quien no debía.** `clubs_delete` tenía tres ramas, y dos
+sobraban: `auth.uid() = created_by` dejaba al **fundador expulsado borrar el
+club entero con sus miembros dentro** —haber fundado un club no puede ser un
+poder que sobreviva a que te vayas—, y «si no hay miembros distintos de mí» es
+cierto para todo el mundo cuando el club está vacío. Ahora borra quien
+ADMINISTRA hoy, con un solo resto de `created_by`: el creador puede deshacer su
+club mientras no tenga ningún miembro, porque `createClub` deshace a mano el
+club recién creado si falla la inserción del fundador y sin esa rama ese
+rollback dejaría un club vacío para siempre.
+
+**Sexto, y no es de permisos: salirse de un partido de clubes costaba distinto
+según el botón.** Por la nómina (`leave_club_match`) era gratis; por la puerta
+normal (`leave_match` → `leave_match_penalized`) cobraba 3 puntos — comprobado,
+100 → 97. Es el mismo caso que cerró la 106 para los partidos normales, que en
+clubes quedó abierto. **Se cierra la puerta, no se cambia el precio**:
+`leave_match_penalized` ahora rechaza los partidos entre clubes igual que
+`join_match` ya rechazaba la inscripción, y manda a la nómina, que es donde la
+interfaz ya mandaba. La economía queda exactamente como estaba en la práctica.
+
+Lo que NO era un agujero, y se comprobó: `swap_match` no deja colar a un ajeno
+en un partido de clubes. No por una guarda propia sino por el trigger
+`tg_enforce_join_rules` sobre `attendees`, que cubre todas las puertas de
+inscripción de una vez.
+
 ## Pantallas y dependencias
 
 - Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, alineación, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
 - Código: `src/services/clubs.js`, `clubLineup.js`, `clubGallery.js`, `clubChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/utils/formacionClub.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
-- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`), 92 (`club_lineups`) y 93 (`club_lineups.puestos_personalizados`) están escritas y probadas, **pendientes de aplicar**.
+- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`), 92 (`club_lineups`) y 93 (`club_lineups.puestos_personalizados`) están escritas y probadas, **pendientes de aplicar**. La **111** (permisos de `club_members`/`clubs` y puerta única para salirse de un partido de clubes) está **aplicada el 2026-09-15**, arnés 14/14.
 
 ## Estados, errores y problemas conocidos
 
