@@ -2,7 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Star } from 'lucide-react-native';
 
-import { clubColors, clubRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Fila de 4 estadísticas del club: V · E · D · RATING.
@@ -22,7 +26,7 @@ export default function ClubStatsRow({ record, ratingLabel }) {
       <Cell
         value={record.v}
         label="V"
-        valueColor={clubColors.win}
+        valueColor={C.win}
         labelColor="rgba(90, 224, 106, 0.75)"
         cellStyle={styles.cellWin}
       />
@@ -30,7 +34,7 @@ export default function ClubStatsRow({ record, ratingLabel }) {
       <Cell
         value={record.d}
         label="D"
-        valueColor={clubColors.loss}
+        valueColor={C.loss}
         labelColor="rgba(232, 115, 123, 0.7)"
         cellStyle={styles.cellLoss}
       />
@@ -41,7 +45,7 @@ export default function ClubStatsRow({ record, ratingLabel }) {
         }
       >
         <View style={styles.ratingRow}>
-          {sinRating && <Star color={clubColors.textMuted} size={13} strokeWidth={2.2} />}
+          {sinRating && <Star color={C.textMuted} size={13} strokeWidth={2.2} />}
           <Text style={styles.value}>{ratingLabel}</Text>
         </View>
         <Text style={styles.label}>RATING</Text>
@@ -67,9 +71,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 9,
     paddingHorizontal: 4,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   cellWin: {
@@ -82,15 +86,15 @@ const styles = StyleSheet.create({
   },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   value: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 19,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     lineHeight: 22,
   },
   label: {
-    color: clubColors.textMuted,
+    color: C.textMuted,
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 1,
     marginTop: 4,
   },

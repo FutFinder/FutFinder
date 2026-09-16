@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { MapPin, BadgeCheck } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 import ClubLogo from './ClubLogo';
 import TagBadge from '../ds/TagBadge';
@@ -50,7 +55,7 @@ export default function ClubHeroCard({
         <View style={styles.identityRow}>
           <ClubLogo
             uri={club.foto_url}
-            size={clubSizes.logo}
+            size={S.logo}
             borderRadius={22}
             tema={tema}
             style={styles.logo}
@@ -62,7 +67,7 @@ export default function ClubHeroCard({
               </Text>
               {club.verificado ? (
                 <BadgeCheck
-                  color={clubColors.gold}
+                  color={C.gold}
                   size={17}
                   strokeWidth={2.2}
                   accessibilityLabel="Club verificado"
@@ -76,7 +81,7 @@ export default function ClubHeroCard({
               accessibilityLabel={`Ver integrantes. ${miembrosLabel}`}
               style={({ pressed }) => [styles.metaRow, pressed && { opacity: 0.7 }]}
             >
-              <MapPin color={clubColors.textSecondary} size={12} strokeWidth={2} />
+              <MapPin color={C.textSecondary} size={12} strokeWidth={2} />
               <Text style={styles.metaText} numberOfLines={1}>
                 {miembrosLabel}
               </Text>
@@ -92,17 +97,17 @@ export default function ClubHeroCard({
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: clubSizes.gutter,
-    borderRadius: clubRadius.hero,
+    marginHorizontal: S.screenPadding,
+    borderRadius: R.hero,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
   },
 
   // ── Banner ──
   banner: {
     height: 118,
-    backgroundColor: clubColors.bannerTo,
+    backgroundColor: C.bannerTo,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -117,7 +122,7 @@ const styles = StyleSheet.create({
 
   // ── Cuerpo ──
   body: {
-    backgroundColor: clubColors.surface,
+    backgroundColor: C.surface,
     paddingHorizontal: 14,
     paddingBottom: 14,
   },
@@ -131,14 +136,14 @@ const styles = StyleSheet.create({
   // tema lo pone ClubLogo cuando no hay imagen.
   logo: {
     borderWidth: 2,
-    borderColor: clubColors.surface,
+    borderColor: C.surface,
   },
   nameCol: { flex: 1, minWidth: 0, paddingBottom: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 21,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.4,
     flexShrink: 1,
   },
@@ -149,7 +154,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   metaText: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12.5,
     flexShrink: 1,
   },

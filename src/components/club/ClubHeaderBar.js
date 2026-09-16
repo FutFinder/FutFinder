@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { ArrowLeft, Share2, Pencil } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import ClubPlanBadge from './ClubPlanBadge';
 
 /**
@@ -30,7 +35,7 @@ export default function ClubHeaderBar({
         accessibilityLabel="Volver"
         style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
       >
-        <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
+        <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
       </Pressable>
 
       <Text style={styles.title} numberOfLines={1}>
@@ -44,7 +49,7 @@ export default function ClubHeaderBar({
         accessibilityLabel="Compartir club"
         style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
       >
-        <Share2 color={clubColors.textPrimary} size={17} strokeWidth={2} />
+        <Share2 color={C.textPrimary} size={17} strokeWidth={2} />
       </Pressable>
 
       {puedeEditar && (
@@ -55,7 +60,7 @@ export default function ClubHeaderBar({
           accessibilityLabel="Editar club"
           style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}
         >
-          <Pencil color={clubColors.textPrimary} size={15} strokeWidth={2} />
+          <Pencil color={C.textPrimary} size={15} strokeWidth={2} />
           <Text style={styles.editLabel}>Editar</Text>
         </Pressable>
       )}
@@ -70,43 +75,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 4,
     paddingBottom: 12,
   },
   iconBtn: {
-    width: clubSizes.iconBtn,
-    height: clubSizes.iconBtn,
-    borderRadius: clubRadius.md,
+    width: S.iconBtn,
+    height: S.iconBtn,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: { backgroundColor: clubColors.chipStrong },
+  pressed: { backgroundColor: C.chipStrong },
   title: {
     flex: 1,
     minWidth: 0,
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: -0.2,
   },
   editBtn: {
-    height: clubSizes.iconBtn,
+    height: S.iconBtn,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
   },
   editLabel: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
 });

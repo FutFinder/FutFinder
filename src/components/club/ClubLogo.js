@@ -2,7 +2,9 @@ import React from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { Shield } from 'lucide-react-native';
 
-import { clubColors } from '../../theme/colors';
+import {
+  reservas as C,
+} from '../../theme/colors';
 
 /**
  * Logo de club con fallback a escudo.
@@ -26,7 +28,7 @@ export default function ClubLogo({
   accent,
   style,
 }) {
-  const color = accent || tema?.main || clubColors.textMuted;
+  const color = accent || tema?.main || C.textMuted;
   const br = borderRadius ?? Math.round(size * 0.3);
 
   if (uri) {
@@ -55,9 +57,9 @@ export default function ClubLogo({
 
 const styles = StyleSheet.create({
   fallback: {
-    backgroundColor: clubColors.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

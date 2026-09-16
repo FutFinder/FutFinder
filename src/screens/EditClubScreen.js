@@ -14,7 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, ChevronDown, Shield, Camera, Lock, Check } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import { temaClub, TEMA_CLUB_POR_DEFECTO } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import ClubThemePicker from '../components/club/ClubThemePicker';
@@ -27,7 +32,7 @@ import { getEditClubStatus, NOMBRE_MIN } from '../utils/clubEdit';
 /**
  * Editar los datos del club (modal sobre las tabs, como CreateClub).
  *
- * MISMA ESTÉTICA QUE «MI CLUB». Usa los tokens de `clubColors`/`clubRadius`
+ * MISMA ESTÉTICA QUE «MI CLUB». Usa los tokens de `reservas`/`reservasRadius`
  * —fondo casi negro, tarjetas #141715, bordes de un blanco muy tenue— en vez
  * de la paleta global antigua: entrar a editar no debería sentirse como
  * cambiar de aplicación.
@@ -183,7 +188,7 @@ export default function EditClubScreen({ navigation, route }) {
         accessibilityLabel="Cerrar"
         style={({ pressed }) => [styles.closeBtn, pressed && styles.pressedChip]}
       >
-        <X color={clubColors.textPrimary} size={19} strokeWidth={2.2} />
+        <X color={C.textPrimary} size={19} strokeWidth={2.2} />
       </Pressable>
     </View>
   );
@@ -265,13 +270,13 @@ export default function EditClubScreen({ navigation, route }) {
                 <Image source={{ uri: club.banner_url }} style={styles.bannerImg} resizeMode="cover" />
               ) : (
                 <View style={styles.bannerPlaceholder}>
-                  <Camera color={clubColors.textMuted} size={20} strokeWidth={2} />
+                  <Camera color={C.textMuted} size={20} strokeWidth={2} />
                   <Text style={styles.bannerHint}>Subir banner (opcional)</Text>
                 </View>
               )}
               {(newBannerAsset || club?.banner_url) && (
                 <View style={styles.bannerEditChip}>
-                  <Camera color={clubColors.textPrimary} size={13} strokeWidth={2} />
+                  <Camera color={C.textPrimary} size={13} strokeWidth={2} />
                   <Text style={styles.bannerEditChipText}>Cambiar banner</Text>
                 </View>
               )}
@@ -301,7 +306,7 @@ export default function EditClubScreen({ navigation, route }) {
                 </View>
               )}
               <View style={styles.logoHintRow}>
-                <Camera color={clubColors.textMuted} size={14} strokeWidth={2} />
+                <Camera color={C.textMuted} size={14} strokeWidth={2} />
                 <Text style={styles.logoHint}>
                   {newLogoAsset || club?.foto_url ? 'Cambiar logo' : 'Subir logo (opcional)'}
                 </Text>
@@ -315,7 +320,7 @@ export default function EditClubScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="Ej: Atlético La Reina"
-              placeholderTextColor={clubColors.textFaint}
+              placeholderTextColor={C.textFaint}
               value={nombre}
               onChangeText={setNombre}
               maxLength={40}
@@ -332,7 +337,7 @@ export default function EditClubScreen({ navigation, route }) {
             <TextInput
               style={[styles.input, styles.inputMultiline]}
               placeholder="Cuenta de qué se trata tu club, dónde juegan, qué buscan..."
-              placeholderTextColor={clubColors.textFaint}
+              placeholderTextColor={C.textFaint}
               value={descripcion}
               onChangeText={setDescripcion}
               multiline
@@ -362,7 +367,7 @@ export default function EditClubScreen({ navigation, route }) {
                       pressed && { opacity: 0.8 },
                     ]}
                   >
-                    <Text style={[styles.chipText, activa && { color: t.main, fontWeight: '700' }]}>
+                    <Text style={[styles.chipText, activa && { color: t.main, fontFamily: F.bold }]}>
                       {op.label}
                     </Text>
                   </Pressable>
@@ -387,7 +392,7 @@ export default function EditClubScreen({ navigation, route }) {
               <Text style={region ? styles.selectValue : styles.selectPlaceholder}>
                 {region || 'Selecciona una región'}
               </Text>
-              <ChevronDown color={clubColors.textMuted} size={18} strokeWidth={2} />
+              <ChevronDown color={C.textMuted} size={18} strokeWidth={2} />
             </Pressable>
             {showRegiones && (
               <View style={styles.optionsBox}>
@@ -410,7 +415,7 @@ export default function EditClubScreen({ navigation, route }) {
                       ]}
                     >
                       <Text
-                        style={[styles.optionText, activa && { color: t.main, fontWeight: '700' }]}
+                        style={[styles.optionText, activa && { color: t.main, fontFamily: F.bold }]}
                       >
                         {r}
                       </Text>
@@ -437,7 +442,7 @@ export default function EditClubScreen({ navigation, route }) {
                   <Text style={comuna ? styles.selectValue : styles.selectPlaceholder}>
                     {comuna || 'Selecciona una comuna'}
                   </Text>
-                  <ChevronDown color={clubColors.textMuted} size={18} strokeWidth={2} />
+                  <ChevronDown color={C.textMuted} size={18} strokeWidth={2} />
                 </Pressable>
                 {showComunas && (
                   <View style={styles.optionsBox}>
@@ -461,7 +466,7 @@ export default function EditClubScreen({ navigation, route }) {
                           <Text
                             style={[
                               styles.optionText,
-                              activa && { color: t.main, fontWeight: '700' },
+                              activa && { color: t.main, fontFamily: F.bold },
                             ]}
                           >
                             {c}
@@ -516,13 +521,13 @@ export default function EditClubScreen({ navigation, route }) {
 const ANCHO_FORMULARIO = 600;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: clubColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
 
   // ── Cabecera ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 6,
     paddingBottom: 14,
     width: '100%',
@@ -531,56 +536,56 @@ const styles = StyleSheet.create({
   },
   headerCenter: { flex: 1, minWidth: 0 },
   headerTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 22,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.5,
   },
   headerSubtitle: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12.5,
     marginTop: 3,
   },
   closeBtn: {
-    width: clubSizes.iconBtn,
-    height: clubSizes.iconBtn,
-    borderRadius: clubSizes.iconBtn / 2,
+    width: S.iconBtn,
+    height: S.iconBtn,
+    borderRadius: S.iconBtn / 2,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressedChip: { backgroundColor: clubColors.chipStrong },
+  pressedChip: { backgroundColor: C.chipStrong },
 
   // ── Estados sin formulario ──
-  centerBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: clubSizes.gutter },
+  centerBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: S.screenPadding },
   centerCard: {
     width: '100%',
     maxWidth: 380,
     alignItems: 'center',
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.xl,
+    backgroundColor: C.surface,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     padding: 22,
   },
   centerIcon: {
     width: 44,
     height: 44,
-    borderRadius: clubRadius.sm,
+    borderRadius: R.chip,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   centerTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: F.bold,
     textAlign: 'center',
   },
   centerSub: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12.5,
     lineHeight: 18,
     textAlign: 'center',
@@ -591,16 +596,16 @@ const styles = StyleSheet.create({
     minWidth: 150,
     paddingHorizontal: 18,
     marginTop: 16,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  centerBtnText: { fontSize: 13.5, fontWeight: '700' },
+  centerBtnText: { fontSize: 13.5, fontFamily: F.bold },
 
   // ── Contenido ──
   content: {
-    padding: clubSizes.gutter,
+    padding: S.screenPadding,
     paddingTop: 0,
     paddingBottom: 40,
     gap: 12,
@@ -609,10 +614,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   card: {
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.xl,
+    backgroundColor: C.surface,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     padding: 14,
   },
 
@@ -620,7 +625,7 @@ const styles = StyleSheet.create({
   bannerTap: {
     width: '100%',
     height: 132,
-    borderRadius: clubRadius.lg,
+    borderRadius: R.row,
     overflow: 'hidden',
   },
   bannerImg: { width: '100%', height: '100%' },
@@ -632,13 +637,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: clubColors.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1.5,
-    borderColor: clubColors.border,
+    borderColor: C.border,
     borderStyle: 'dashed',
-    borderRadius: clubRadius.lg,
+    borderRadius: R.row,
   },
-  bannerHint: { color: clubColors.textMuted, fontSize: 13 },
+  bannerHint: { color: C.textMuted, fontSize: 13 },
   bannerEditChip: {
     position: 'absolute',
     right: 10,
@@ -651,12 +656,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
-  bannerEditChipText: { color: clubColors.textPrimary, fontSize: 12, fontWeight: '600' },
+  bannerEditChipText: { color: C.textPrimary, fontSize: 12, fontFamily: F.semiBold },
   logoTap: { alignItems: 'center', marginTop: 14 },
   logoPlaceholder: {
     width: 80,
     height: 80,
-    borderRadius: clubRadius.lg,
+    borderRadius: R.row,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     alignItems: 'center',
@@ -666,33 +671,33 @@ const styles = StyleSheet.create({
   logoImg: {
     width: 80,
     height: 80,
-    borderRadius: clubRadius.lg,
+    borderRadius: R.row,
     marginBottom: 8,
   },
   logoHintRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  logoHint: { color: clubColors.textMuted, fontSize: 12 },
+  logoHint: { color: C.textMuted, fontSize: 12 },
 
   // ── Campos ──
   label: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
     marginBottom: 9,
   },
   labelSpaced: { marginTop: 16 },
   help: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12,
     lineHeight: 17,
     marginTop: -4,
     marginBottom: 12,
   },
   input: {
-    backgroundColor: clubColors.surfaceAlt,
-    borderRadius: clubRadius.md,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
-    color: clubColors.textPrimary,
+    borderColor: C.borderSoft,
+    color: C.textPrimary,
     fontSize: 15,
     paddingHorizontal: 14,
     height: 52,
@@ -702,9 +707,9 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     textAlignVertical: 'top',
   },
-  inputError: { color: clubColors.loss, fontSize: 11.5, marginTop: 6 },
+  inputError: { color: C.loss, fontSize: 11.5, marginTop: 6 },
   counter: {
-    color: clubColors.textFaint,
+    color: C.textFaint,
     fontSize: 11,
     textAlign: 'right',
     marginTop: 6,
@@ -716,32 +721,32 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: 14,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1.5,
-    borderColor: clubColors.borderSoft,
-    backgroundColor: clubColors.surfaceAlt,
+    borderColor: C.borderSoft,
+    backgroundColor: C.surfaceAlt,
   },
-  chipText: { color: clubColors.textSecondary, fontSize: 13.5, fontWeight: '600' },
+  chipText: { color: C.textSecondary, fontSize: 13.5, fontFamily: F.semiBold },
 
   // ── Selectores ──
   select: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: clubColors.surfaceAlt,
-    borderRadius: clubRadius.md,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     paddingHorizontal: 14,
     height: 52,
   },
-  selectValue: { color: clubColors.textPrimary, fontSize: 15, flexShrink: 1 },
-  selectPlaceholder: { color: clubColors.textFaint, fontSize: 15, flexShrink: 1 },
+  selectValue: { color: C.textPrimary, fontSize: 15, flexShrink: 1 },
+  selectPlaceholder: { color: C.textFaint, fontSize: 15, flexShrink: 1 },
   optionsBox: {
-    backgroundColor: clubColors.surfaceAlt,
-    borderRadius: clubRadius.md,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     marginTop: 8,
     overflow: 'hidden',
   },
@@ -754,15 +759,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: clubColors.divider,
+    borderBottomColor: C.divider,
   },
-  optionText: { color: clubColors.textPrimary, fontSize: 14, flexShrink: 1 },
+  optionText: { color: C.textPrimary, fontSize: 14, flexShrink: 1 },
 
   // ── Guardar ──
   submitBtn: {
     height: 54,
     marginTop: 4,
-    borderRadius: clubRadius.lg,
+    borderRadius: R.row,
     alignItems: 'center',
     justifyContent: 'center',
     // Resplandor discreto del color elegido.
@@ -772,5 +777,5 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   submitDisabled: { opacity: 0.45, shadowOpacity: 0, elevation: 0 },
-  submitLabel: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  submitLabel: { fontSize: 16, fontFamily: F.extraBold, letterSpacing: -0.2 },
 });

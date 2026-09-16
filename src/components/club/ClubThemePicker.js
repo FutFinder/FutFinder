@@ -2,7 +2,11 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Check } from 'lucide-react-native';
 
-import { clubColors, clubRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { TEMAS_CLUB, temaClub } from '../../theme/clubThemes';
 
 /**
@@ -51,7 +55,7 @@ export default function ClubThemePicker({ value, onChange, disabled = false }) {
               {elegida ? <Check color={escala.ink} size={18} strokeWidth={3} /> : null}
             </View>
             <Text
-              style={[styles.label, elegida && { color: escala.main, fontWeight: '700' }]}
+              style={[styles.label, elegida && { color: escala.main, fontFamily: F.bold }]}
               numberOfLines={1}
             >
               {opcion.label}
@@ -78,10 +82,10 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 6,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1.5,
-    borderColor: clubColors.borderSoft,
-    backgroundColor: clubColors.surfaceAlt,
+    borderColor: C.borderSoft,
+    backgroundColor: C.surfaceAlt,
   },
   disabled: { opacity: 0.5 },
   swatch: {
@@ -92,8 +96,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
 });

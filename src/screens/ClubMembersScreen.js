@@ -33,7 +33,12 @@ import {
   Send,
 } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import { etiquetaPosiciones } from '../utils/playerMeta';
 import Banner from '../components/Banner';
 import { getCurrentUser } from '../services/auth';
@@ -396,11 +401,11 @@ export default function ClubMembersScreen({ navigation, route }) {
             hitSlop={12}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           >
-            <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
+            <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
           </Pressable>
         </View>
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={clubColors.green} />
+          <ActivityIndicator color={C.green} />
         </View>
       </SafeAreaView>
     );
@@ -422,7 +427,7 @@ export default function ClubMembersScreen({ navigation, route }) {
           hitSlop={8}
           style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
         >
-          <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
+          <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
         </Pressable>
         <View style={styles.headerTitles}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -445,7 +450,7 @@ export default function ClubMembersScreen({ navigation, route }) {
             hitSlop={8}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           >
-            <MessageCircle color={clubColors.green} size={18} strokeWidth={2.2} />
+            <MessageCircle color={C.green} size={18} strokeWidth={2.2} />
           </Pressable>
         )}
       </View>
@@ -458,8 +463,8 @@ export default function ClubMembersScreen({ navigation, route }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={clubColors.green}
-            colors={[clubColors.green]}
+            tintColor={C.green}
+            colors={[C.green]}
           />
         }
         ListHeaderComponent={
@@ -499,10 +504,10 @@ export default function ClubMembersScreen({ navigation, route }) {
                 ]}
               >
                 {working ? (
-                  <ActivityIndicator color={myRequest ? clubColors.textPrimary : clubColors.greenInk} />
+                  <ActivityIndicator color={myRequest ? C.textPrimary : C.greenInk} />
                 ) : (
                   <>
-                    {!myRequest && <UserPlus color={clubColors.greenInk} size={18} strokeWidth={2.4} />}
+                    {!myRequest && <UserPlus color={C.greenInk} size={18} strokeWidth={2.4} />}
                     <Text style={myRequest ? styles.secondaryBtnText : styles.primaryBtnText}>
                       {myRequest ? 'Cancelar solicitud' : 'Solicitar unirme'}
                     </Text>
@@ -529,7 +534,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                 }
                 style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
               >
-                <UserPlus color={clubColors.greenInk} size={18} strokeWidth={2.4} />
+                <UserPlus color={C.greenInk} size={18} strokeWidth={2.4} />
                 <Text style={styles.primaryBtnText}>Invitar jugadores</Text>
               </Pressable>
             )}
@@ -562,17 +567,17 @@ export default function ClubMembersScreen({ navigation, route }) {
 
             {!isSolicitudesTab && (
               <View style={styles.searchBox}>
-                <Search color={clubColors.textSecondary} size={18} strokeWidth={2} />
+                <Search color={C.textSecondary} size={18} strokeWidth={2} />
                 <TextInput
                   value={query}
                   onChangeText={setQuery}
                   placeholder="Buscar por nombre, apodo o posición"
-                  placeholderTextColor={clubColors.textSecondary}
+                  placeholderTextColor={C.textSecondary}
                   style={styles.searchInput}
                 />
                 {query.length > 0 && (
                   <Pressable onPress={() => setQuery('')} hitSlop={8} style={styles.searchClear}>
-                    <X color={clubColors.textSecondary} size={14} strokeWidth={2.4} />
+                    <X color={C.textSecondary} size={14} strokeWidth={2.4} />
                   </Pressable>
                 )}
               </View>
@@ -607,7 +612,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                       pressed && { opacity: 0.7 },
                     ]}
                   >
-                    <Check color={clubColors.greenInk} size={16} strokeWidth={2.6} />
+                    <Check color={C.greenInk} size={16} strokeWidth={2.6} />
                   </Pressable>
                   <Pressable
                     onPress={() => handleRespond(item, false)}
@@ -618,7 +623,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                       pressed && { opacity: 0.7 },
                     ]}
                   >
-                    <X color={clubColors.loss} size={16} strokeWidth={2.6} />
+                    <X color={C.loss} size={16} strokeWidth={2.6} />
                   </Pressable>
                 </View>
               )
@@ -639,13 +644,13 @@ export default function ClubMembersScreen({ navigation, route }) {
                         <View style={styles.badgeRow}>
                           {item.rol === 'admin' && (
                             <View style={styles.adminChip}>
-                              <Crown color={clubColors.green} size={10} strokeWidth={2.4} />
+                              <Crown color={C.green} size={10} strokeWidth={2.4} />
                               <Text style={styles.adminChipText}>Admin</Text>
                             </View>
                           )}
                           {item.rol === 'capitan' && (
                             <View style={styles.capitanChip}>
-                              <Star color={clubColors.gold} size={10} strokeWidth={2.4} />
+                              <Star color={C.gold} size={10} strokeWidth={2.4} />
                               <Text style={styles.capitanChipText}>Capitán</Text>
                             </View>
                           )}
@@ -671,7 +676,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                       hitSlop={8}
                       style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.6 }]}
                     >
-                      <MoreVertical color={clubColors.textMuted} size={18} />
+                      <MoreVertical color={C.textMuted} size={18} />
                     </Pressable>
                   </Pressable>
                 );
@@ -683,7 +688,7 @@ export default function ClubMembersScreen({ navigation, route }) {
               onPress={handleLeave}
               style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
             >
-              <LogOut color={clubColors.loss} size={16} />
+              <LogOut color={C.loss} size={16} />
               <Text style={styles.leaveText}>Salir del club</Text>
             </Pressable>
           ) : null
@@ -709,7 +714,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                 </Text>
 
                 <SheetAction
-                  icon={<User color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                  icon={<User color={C.textPrimary} size={18} strokeWidth={2} />}
                   label="Ver perfil"
                   onPress={() => {
                     setActionSheet(null);
@@ -719,7 +724,7 @@ export default function ClubMembersScreen({ navigation, route }) {
 
                 {(actionSheet.user_id === me || soyAdmin) && (
                   <SheetAction
-                    icon={<Pencil color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                    icon={<Pencil color={C.textPrimary} size={18} strokeWidth={2} />}
                     label="Editar apodo"
                     onPress={() => {
                       const member = actionSheet;
@@ -731,7 +736,7 @@ export default function ClubMembersScreen({ navigation, route }) {
 
                 {actionSheet.user_id !== me && (
                   <SheetAction
-                    icon={<Send color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                    icon={<Send color={C.textPrimary} size={18} strokeWidth={2} />}
                     label="Enviar mensaje"
                     onPress={() => openMessage(actionSheet)}
                   />
@@ -740,7 +745,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                 {soyAdmin && actionSheet.user_id !== me && actionSheet.rol !== 'admin' && (
                   <>
                     <SheetAction
-                      icon={<Crown color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                      icon={<Crown color={C.textPrimary} size={18} strokeWidth={2} />}
                       label="Hacer administrador"
                       onPress={() => {
                         const member = actionSheet;
@@ -750,7 +755,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                     />
                     {actionSheet.rol === 'capitan' ? (
                       <SheetAction
-                        icon={<Star color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                        icon={<Star color={C.textPrimary} size={18} strokeWidth={2} />}
                         label="Quitar como capitán"
                         onPress={() => {
                           const member = actionSheet;
@@ -760,7 +765,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                       />
                     ) : (
                       <SheetAction
-                        icon={<Star color={clubColors.textPrimary} size={18} strokeWidth={2} />}
+                        icon={<Star color={C.textPrimary} size={18} strokeWidth={2} />}
                         label="Nombrar capitán"
                         onPress={() => {
                           const member = actionSheet;
@@ -774,7 +779,7 @@ export default function ClubMembersScreen({ navigation, route }) {
 
                 {soyAdmin && actionSheet.user_id !== me && (
                   <SheetAction
-                    icon={<UserMinus color={clubColors.loss} size={18} strokeWidth={2} />}
+                    icon={<UserMinus color={C.loss} size={18} strokeWidth={2} />}
                     label="Quitar del club"
                     destructive
                     onPress={() => {
@@ -809,7 +814,7 @@ export default function ClubMembersScreen({ navigation, route }) {
               value={apodoEdit?.value || ''}
               onChangeText={(v) => setApodoEdit((prev) => (prev ? { ...prev, value: v } : prev))}
               placeholder="Ej: El Muro"
-              placeholderTextColor={clubColors.textMuted}
+              placeholderTextColor={C.textMuted}
               maxLength={18}
               autoFocus
               style={styles.apodoInput}
@@ -824,7 +829,7 @@ export default function ClubMembersScreen({ navigation, route }) {
               ]}
             >
               {working ? (
-                <ActivityIndicator color={clubColors.greenInk} />
+                <ActivityIndicator color={C.greenInk} />
               ) : (
                 <Text style={styles.sheetPrimaryText}>Guardar</Text>
               )}
@@ -844,7 +849,7 @@ function MemberAvatar({ foto }) {
   }
   return (
     <View style={[styles.avatar, styles.avatarFallback]}>
-      <Shield color={clubColors.textMuted} size={18} strokeWidth={1.8} />
+      <Shield color={C.textMuted} size={18} strokeWidth={1.8} />
     </View>
   );
 }
@@ -860,14 +865,14 @@ function FriendControl({ status, onAdd, onAccept }) {
   if (status === 'friends') {
     return (
       <View style={styles.friendIconBox} accessibilityLabel="Ya son amigos">
-        <UserCheck color={clubColors.green} size={16} strokeWidth={2.2} />
+        <UserCheck color={C.green} size={16} strokeWidth={2.2} />
       </View>
     );
   }
   if (status === 'sent') {
     return (
       <View style={styles.friendIconBoxMuted} accessibilityLabel="Solicitud enviada">
-        <Clock color={clubColors.textMuted} size={14} strokeWidth={2.2} />
+        <Clock color={C.textMuted} size={14} strokeWidth={2.2} />
       </View>
     );
   }
@@ -879,7 +884,7 @@ function FriendControl({ status, onAdd, onAccept }) {
         style={({ pressed }) => [styles.friendIconBox, pressed && { opacity: 0.7 }]}
         accessibilityLabel="Aceptar solicitud de amistad"
       >
-        <Check color={clubColors.green} size={16} strokeWidth={2.6} />
+        <Check color={C.green} size={16} strokeWidth={2.6} />
       </Pressable>
     );
   }
@@ -890,7 +895,7 @@ function FriendControl({ status, onAdd, onAccept }) {
       style={({ pressed }) => [styles.friendIconBoxMuted, pressed && { opacity: 0.7 }]}
       accessibilityLabel="Agregar amigo"
     >
-      <UserPlus color={clubColors.textSecondary} size={14} strokeWidth={2.4} />
+      <UserPlus color={C.textSecondary} size={14} strokeWidth={2.4} />
     </Pressable>
   );
 }
@@ -915,46 +920,46 @@ function SheetAction({ icon, label, onPress, destructive, disabled }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: clubColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 4,
     paddingBottom: 12,
     gap: 8,
   },
   iconBtn: {
-    width: clubSizes.iconBtn,
-    height: clubSizes.iconBtn,
-    borderRadius: clubRadius.md,
+    width: S.iconBtn,
+    height: S.iconBtn,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconBtnPressed: { backgroundColor: clubColors.chipStrong },
+  iconBtnPressed: { backgroundColor: C.chipStrong },
   headerTitles: { flex: 1, minWidth: 0 },
   headerTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: -0.2,
   },
   headerSubtitle: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12.5,
     marginTop: 1,
   },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { paddingHorizontal: clubSizes.gutter, paddingBottom: 40 },
+  listContent: { paddingHorizontal: S.screenPadding, paddingBottom: 40 },
 
   summaryCard: {
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     padding: 14,
     marginBottom: 14,
   },
@@ -964,25 +969,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   summaryTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.2,
   },
   progressTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: clubColors.chip,
+    backgroundColor: C.chip,
     marginTop: 10,
     overflow: 'hidden',
   },
   progressFill: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: clubColors.green,
+    backgroundColor: C.green,
   },
   summaryHint: {
-    color: clubColors.textMuted,
+    color: C.textMuted,
     fontSize: 12,
     marginTop: 8,
   },
@@ -993,14 +998,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     height: 50,
-    borderRadius: clubRadius.md,
-    backgroundColor: clubColors.green,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.green,
     marginBottom: 12,
   },
   primaryBtnText: {
-    color: clubColors.greenInk,
+    color: C.greenInk,
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
   },
   secondaryBtn: {
     flexDirection: 'row',
@@ -1008,16 +1013,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     height: 50,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     marginBottom: 12,
   },
   secondaryBtnText: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
 
   tabRow: {
@@ -1032,60 +1037,60 @@ const styles = StyleSheet.create({
     gap: 6,
     flex: 1,
     height: 40,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
   },
   tabBtnActive: {
-    backgroundColor: clubColors.greenSoft,
-    borderColor: clubColors.greenBorder,
+    backgroundColor: C.greenSoft,
+    borderColor: C.greenBorder,
   },
   tabLabel: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
-  tabLabelActive: { color: clubColors.green },
+  tabLabelActive: { color: C.green },
   tabBadge: {
     minWidth: 18,
     height: 18,
     paddingHorizontal: 5,
     borderRadius: 9,
-    backgroundColor: clubColors.loss,
+    backgroundColor: C.loss,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabBadgeText: { color: '#2A0C0F', fontSize: 10, fontWeight: '800' },
+  tabBadgeText: { color: '#2A0C0F', fontSize: 10, fontFamily: F.extraBold },
 
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     height: 46,
-    backgroundColor: clubColors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    borderRadius: clubRadius.md,
+    borderColor: C.border,
+    borderRadius: R.iconBtn,
     paddingHorizontal: 14,
     marginBottom: 12,
   },
   searchInput: {
     flex: 1,
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
   },
   searchClear: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: clubColors.chip,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   emptyHint: {
-    color: clubColors.textMuted,
+    color: C.textMuted,
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 20,
@@ -1095,10 +1100,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: clubColors.greenBorder,
+    borderColor: C.greenBorder,
     padding: 12,
     marginBottom: 8,
   },
@@ -1106,10 +1111,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     padding: 12,
     marginBottom: 8,
   },
@@ -1119,24 +1124,24 @@ const styles = StyleSheet.create({
     borderRadius: 21,
   },
   avatarFallback: {
-    backgroundColor: clubColors.chip,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
   },
   memberName: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   memberApodo: {
-    color: clubColors.textSecondary,
-    fontWeight: '500',
+    color: C.textSecondary,
+    fontFamily: F.medium,
     fontSize: 13,
   },
   memberMeta: {
-    color: clubColors.textMuted,
+    color: C.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -1149,30 +1154,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: clubColors.greenSoft,
+    backgroundColor: C.greenSoft,
     borderRadius: 999,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   adminChipText: {
-    color: clubColors.green,
+    color: C.green,
     fontSize: 9,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.3,
   },
   capitanChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: clubColors.goldSoft,
+    backgroundColor: C.goldSoft,
     borderRadius: 999,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   capitanChipText: {
-    color: clubColors.gold,
+    color: C.gold,
     fontSize: 9,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.3,
   },
   reqBtn: {
@@ -1182,17 +1187,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  reqAccept: { backgroundColor: clubColors.green },
+  reqAccept: { backgroundColor: C.green },
   reqReject: {
-    backgroundColor: clubColors.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: clubColors.loss,
+    borderColor: C.loss,
   },
   friendIconBox: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: clubColors.greenSoft,
+    backgroundColor: C.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1200,9 +1205,9 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: clubColors.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1220,15 +1225,15 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 16,
     paddingVertical: 14,
-    borderRadius: clubRadius.lg,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: clubColors.loss,
+    borderColor: C.loss,
     backgroundColor: 'rgba(232, 115, 123, 0.1)',
   },
   leaveText: {
-    color: clubColors.loss,
+    color: C.loss,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
 
   sheetBackdrop: {
@@ -1237,12 +1242,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: clubColors.surface,
-    borderTopLeftRadius: clubRadius.sheet,
-    borderTopRightRadius: clubRadius.sheet,
+    backgroundColor: C.surface,
+    borderTopLeftRadius: R.hero,
+    borderTopRightRadius: R.hero,
     borderTopWidth: 1,
-    borderColor: clubColors.border,
-    paddingHorizontal: clubSizes.gutter,
+    borderColor: C.border,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 14,
     paddingBottom: 30,
   },
@@ -1255,14 +1260,14 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sheetTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
     marginBottom: 6,
   },
   sheetSubtitle: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12.5,
     marginBottom: 14,
   },
@@ -1278,32 +1283,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sheetActionLabel: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
-  sheetActionLabelDanger: { color: clubColors.loss },
+  sheetActionLabelDanger: { color: C.loss },
   apodoInput: {
     height: 48,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     paddingHorizontal: 14,
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
     marginBottom: 14,
   },
   sheetPrimary: {
     height: 50,
-    borderRadius: clubRadius.md,
-    backgroundColor: clubColors.green,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sheetPrimaryText: {
-    color: clubColors.greenInk,
+    color: C.greenInk,
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
   },
 });

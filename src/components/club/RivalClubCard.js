@@ -2,7 +2,11 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Star } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
 import ClubLogo from './ClubLogo';
 
@@ -40,7 +44,7 @@ export default function RivalClubCard({
         accessibilityLabel={`Ver el club ${club.nombre}. ${meta}`}
         style={({ pressed }) => [styles.top, pressed && { opacity: 0.7 }]}
       >
-        <ClubLogo uri={club.foto_url} size={42} borderRadius={clubRadius.md} />
+        <ClubLogo uri={club.foto_url} size={42} borderRadius={R.iconBtn} />
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>
             {club.nombre}
@@ -58,7 +62,7 @@ export default function RivalClubCard({
             ratingLabel === 'N.A.' ? 'Valoración no disponible' : `Valoración ${ratingLabel}`
           }
         >
-          <Star color={clubColors.textPrimary} size={11} strokeWidth={2.4} />
+          <Star color={C.textPrimary} size={11} strokeWidth={2.4} />
           <Text style={styles.chipText}>{ratingLabel}</Text>
         </View>
         <View style={styles.chip}>
@@ -89,24 +93,34 @@ export default function RivalClubCard({
   );
 }
 
+/**
+ * Ancho de la tarjeta, en puntos.
+ *
+ * Vive acá y no en el theme porque no es un token de la paleta: es una
+ * medida de ESTA tarjeta. El carrusel de `ClubDetailScreen` la importa para
+ * su `snapToInterval`, que tiene que ser el mismo número o el desplazamiento
+ * deja de caer sobre una tarjeta.
+ */
+export const ANCHO_TARJETA_RIVAL = 196;
+
 const styles = StyleSheet.create({
   card: {
-    width: clubSizes.rivalCard,
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.xl,
+    width: ANCHO_TARJETA_RIVAL,
+    backgroundColor: C.surface,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     padding: 12,
   },
   top: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   info: { flex: 1, minWidth: 0 },
   name: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   meta: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 11.5,
     marginTop: 2,
   },
@@ -118,24 +132,24 @@ const styles = StyleSheet.create({
     maxWidth: '58%',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: clubRadius.chip,
-    backgroundColor: clubColors.chip,
+    borderRadius: R.chip,
+    backgroundColor: C.chip,
   },
   chipText: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 11.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   challengeBtn: {
     height: 38,
     marginTop: 10,
-    borderRadius: clubRadius.sm,
+    borderRadius: R.chip,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   challengeText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
 });

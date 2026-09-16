@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Image, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { Plus, Image as ImageIcon } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 
 const COLUMNS = 3;
@@ -68,7 +73,7 @@ export default function ClubPhotoGallery({
 }) {
   const { width } = useWindowDimensions();
   const size = Math.floor(
-    (width - clubSizes.gutter * 2 - GAP * (COLUMNS - 1)) / COLUMNS
+    (width - S.screenPadding * 2 - GAP * (COLUMNS - 1)) / COLUMNS
   );
 
   const reales = photos.slice(0, VISIBLE_PHOTOS);
@@ -110,7 +115,7 @@ export default function ClubPhotoGallery({
 
       {!usarDemo && photos.length === 0 && (
         <View style={[styles.cell, styles.empty, { height: size, width: size * 2 + GAP }]}>
-          <ImageIcon color={clubColors.textMuted} size={18} strokeWidth={2} />
+          <ImageIcon color={C.textMuted} size={18} strokeWidth={2} />
           <Text style={styles.emptyTitle}>Aún no hay fotos</Text>
           <Text style={styles.emptySub}>Sube la primera imagen del club</Text>
         </View>
@@ -124,10 +129,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GAP,
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
   },
   cell: {
-    borderRadius: clubRadius.lg,
+    borderRadius: R.row,
     overflow: 'hidden',
   },
   addCell: {
@@ -139,7 +144,7 @@ const styles = StyleSheet.create({
   },
   addLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   img: { width: '100%', height: '100%' },
   overlay: {
@@ -149,14 +154,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   overlayText: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
   },
   placeholder: {
     backgroundColor: '#161A18',
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -172,26 +177,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#1B1F1D',
   },
   placeholderText: {
-    color: clubColors.textFaint,
+    color: C.textFaint,
     fontSize: 8.5,
     letterSpacing: 0.3,
   },
   empty: {
-    backgroundColor: clubColors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
     gap: 4,
   },
   emptyTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   emptySub: {
-    color: clubColors.textMuted,
+    color: C.textMuted,
     fontSize: 11.5,
     textAlign: 'center',
   },

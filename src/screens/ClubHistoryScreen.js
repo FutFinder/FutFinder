@@ -12,7 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Trophy } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import MatchHistoryCard from '../components/club/MatchHistoryCard';
 import EmptyStateCard from '../components/ds/EmptyStateCard';
 import { getClubMatchHistory, getClubEstadisticas, ESTADISTICAS_VACIAS } from '../services/clubMatches';
@@ -97,7 +102,7 @@ export default function ClubHistoryScreen({ navigation, route }) {
           accessibilityLabel="Volver"
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
         >
-          <ArrowLeft color={clubColors.textPrimary} size={20} strokeWidth={2.2} />
+          <ArrowLeft color={C.textPrimary} size={20} strokeWidth={2.2} />
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -134,7 +139,7 @@ export default function ClubHistoryScreen({ navigation, route }) {
           ListEmptyComponent={
             error ? (
               <EmptyStateCard
-                icon={<Trophy color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+                icon={<Trophy color={C.textSecondary} size={18} strokeWidth={2} />}
                 title="No se pudo cargar el historial"
                 subtitle="Revisa tu conexión y vuelve a intentarlo"
                 actionLabel="Reintentar"
@@ -142,7 +147,7 @@ export default function ClubHistoryScreen({ navigation, route }) {
               />
             ) : (
               <EmptyStateCard
-                icon={<Trophy color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+                icon={<Trophy color={C.textSecondary} size={18} strokeWidth={2} />}
                 title="Aún no hay partidos en el historial"
                 subtitle="Los partidos aparecerán acá cuando tengan un resultado confirmado"
                 variant="solid"
@@ -179,40 +184,40 @@ export default function ClubHistoryScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: clubColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingVertical: 10,
   },
   backBtn: {
     width: 38,
     height: 38,
-    borderRadius: clubRadius.md,
-    backgroundColor: clubColors.surface,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerCenter: { flex: 1, minWidth: 0 },
   headerTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
   },
-  headerSubtitle: { color: clubColors.textMuted, fontSize: 12, marginTop: 2 },
+  headerSubtitle: { color: C.textMuted, fontSize: 12, marginTop: 2 },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingBottom: 40, paddingTop: 4 },
-  fila: { paddingHorizontal: clubSizes.gutter, paddingBottom: 8 },
+  fila: { paddingHorizontal: S.screenPadding, paddingBottom: 8 },
   resumen: {
-    color: clubColors.textFaint,
+    color: C.textFaint,
     fontSize: 11.5,
     textAlign: 'center',
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingBottom: 12,
   },
 });

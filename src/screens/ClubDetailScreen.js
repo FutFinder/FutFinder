@@ -21,14 +21,19 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import ClubHeaderBar from '../components/club/ClubHeaderBar';
 import ClubHeroCard from '../components/club/ClubHeroCard';
 import CreateChallengeButton from '../components/club/CreateChallengeButton';
 import SectionHeader from '../components/ds/SectionHeader';
-import RivalClubCard from '../components/club/RivalClubCard';
+import RivalClubCard, { ANCHO_TARJETA_RIVAL } from '../components/club/RivalClubCard';
 import MatchHistoryCard from '../components/club/MatchHistoryCard';
 import ClubPhotoGallery from '../components/club/ClubPhotoGallery';
 import PremiumUpsellCard from '../components/club/PremiumUpsellCard';
@@ -288,7 +293,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             accessibilityLabel="Volver"
             style={({ pressed }) => [styles.loadingBackBtn, pressed && { opacity: 0.6 }]}
           >
-            <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
+            <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
           </Pressable>
         </View>
         <View style={styles.loadingBox}>
@@ -414,7 +419,7 @@ export default function ClubDetailScreen({ navigation, route }) {
                 <Text style={styles.rowBadgeText}>{pendingChallenges}</Text>
               </View>
             )}
-            <ChevronRight color={clubColors.textMuted} size={18} strokeWidth={2.2} />
+            <ChevronRight color={C.textMuted} size={18} strokeWidth={2.2} />
           </Pressable>
         )}
 
@@ -429,7 +434,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             />
             {rivals.length === 0 ? (
               <EmptyStateCard
-                icon={<Search color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+                icon={<Search color={C.textSecondary} size={18} strokeWidth={2} />}
                 title="Sin rivales cerca"
                 subtitle="Amplía la búsqueda para encontrar más clubes"
                 actionLabel="Buscar clubes"
@@ -442,7 +447,7 @@ export default function ClubDetailScreen({ navigation, route }) {
                 showsHorizontalScrollIndicator={false}
                 snapToAlignment="start"
                 decelerationRate="fast"
-                snapToInterval={clubSizes.rivalCard + 10}
+                snapToInterval={ANCHO_TARJETA_RIVAL + 10}
                 contentContainerStyle={styles.rivalsRow}
               >
                 {rivals.map((r) => (
@@ -481,7 +486,7 @@ export default function ClubDetailScreen({ navigation, route }) {
           // no hay partidos» cuando el club sí los tiene es peor que decir que
           // no se pudo cargar.
           <EmptyStateCard
-            icon={<Trophy color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+            icon={<Trophy color={C.textSecondary} size={18} strokeWidth={2} />}
             title="No se pudo cargar el historial"
             subtitle="Revisa tu conexión y vuelve a intentarlo"
             actionLabel="Reintentar"
@@ -490,7 +495,7 @@ export default function ClubDetailScreen({ navigation, route }) {
           />
         ) : historialVisible.length === 0 ? (
           <EmptyStateCard
-            icon={<Trophy color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+            icon={<Trophy color={C.textSecondary} size={18} strokeWidth={2} />}
             title="Aún no hay partidos en el historial"
             subtitle="Los partidos aparecerán acá cuando tengan un resultado confirmado"
             actionLabel={soyAdmin ? 'Buscar un rival' : null}
@@ -561,7 +566,7 @@ export default function ClubDetailScreen({ navigation, route }) {
               style={({ pressed }) => [styles.adminRow, pressed && styles.rowPressed]}
             >
               <Text style={styles.adminRowText}>Gestionar miembros</Text>
-              <ChevronRight color={clubColors.textMuted} size={18} strokeWidth={2.2} />
+              <ChevronRight color={C.textMuted} size={18} strokeWidth={2.2} />
             </Pressable>
             <View style={styles.adminDivider} />
             <Pressable
@@ -571,7 +576,7 @@ export default function ClubDetailScreen({ navigation, route }) {
               style={({ pressed }) => [styles.adminRow, pressed && styles.rowPressed]}
             >
               <Text style={styles.adminRowText}>Ajustes del club</Text>
-              <ChevronRight color={clubColors.textMuted} size={18} strokeWidth={2.2} />
+              <ChevronRight color={C.textMuted} size={18} strokeWidth={2.2} />
             </Pressable>
           </View>
         )}
@@ -631,77 +636,77 @@ export default function ClubDetailScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: clubColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   scrollContent: { paddingBottom: 40 },
 
   // Carga
-  loadingBar: { paddingHorizontal: clubSizes.gutter, paddingTop: 4, paddingBottom: 12 },
+  loadingBar: { paddingHorizontal: S.screenPadding, paddingTop: 4, paddingBottom: 12 },
   loadingBackBtn: {
-    width: clubSizes.iconBtn,
-    height: clubSizes.iconBtn,
-    borderRadius: clubRadius.md,
+    width: S.iconBtn,
+    height: S.iconBtn,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  bannerWrap: { paddingHorizontal: clubSizes.gutter, paddingBottom: 12 },
+  bannerWrap: { paddingHorizontal: S.screenPadding, paddingBottom: 12 },
 
   // Fila genérica (Desafíos)
   rowItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginHorizontal: clubSizes.gutter,
+    marginHorizontal: S.screenPadding,
     marginTop: 10,
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  rowPressed: { backgroundColor: clubColors.surfaceHover },
+  rowPressed: { backgroundColor: C.surfaceHover },
   rowIcon: {
     width: 32,
     height: 32,
-    borderRadius: clubRadius.icon,
+    borderRadius: R.iconBtn,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowLabel: {
     flex: 1,
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   rowBadge: {
     minWidth: 20,
     height: 20,
     paddingHorizontal: 6,
     borderRadius: 10,
-    backgroundColor: clubColors.loss,
+    backgroundColor: C.loss,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowBadgeText: { color: '#2A0C0F', fontSize: 11, fontWeight: '800' },
+  rowBadgeText: { color: '#2A0C0F', fontSize: 11, fontFamily: F.extraBold },
 
   // Rivales
   rivalsRow: {
     gap: 10,
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingBottom: 4,
   },
 
   // Historial
-  historyList: { paddingHorizontal: clubSizes.gutter, gap: 8 },
+  historyList: { paddingHorizontal: S.screenPadding, gap: 8 },
   // PJ · goles a favor · goles en contra, bajo las tarjetas: son del club
   // completo, no de los tres partidos que se muestran.
   historyResumen: {
-    color: clubColors.textFaint,
+    color: C.textFaint,
     fontSize: 11,
     textAlign: 'center',
     marginTop: 2,
@@ -709,12 +714,12 @@ const styles = StyleSheet.create({
 
   // Acciones de admin
   adminList: {
-    marginHorizontal: clubSizes.gutter,
+    marginHorizontal: S.screenPadding,
     marginTop: 10,
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     overflow: 'hidden',
   },
   adminRow: {
@@ -727,9 +732,9 @@ const styles = StyleSheet.create({
   adminRowText: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 13.5,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
-  adminDivider: { height: 1, backgroundColor: clubColors.divider },
+  adminDivider: { height: 1, backgroundColor: C.divider },
 
   // Hoja "Crear desafío"
   sheetBackdrop: {
@@ -738,12 +743,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: clubColors.surface,
-    borderTopLeftRadius: clubRadius.sheet,
-    borderTopRightRadius: clubRadius.sheet,
+    backgroundColor: C.surface,
+    borderTopLeftRadius: R.hero,
+    borderTopRightRadius: R.hero,
     borderTopWidth: 1,
-    borderColor: clubColors.border,
-    paddingHorizontal: clubSizes.gutter,
+    borderColor: C.border,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 14,
     paddingBottom: 30,
   },
@@ -756,44 +761,44 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sheetTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
   },
   sheetSubtitle: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12.5,
     marginTop: 4,
   },
   sheetPrimary: {
     height: 52,
     marginTop: 14,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sheetPrimaryText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
   },
   sheetSecondary: {
     height: 52,
     marginTop: 8,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sheetSecondaryText: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   sheetSecondaryHint: {
-    color: clubColors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 2,
   },

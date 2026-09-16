@@ -2,7 +2,12 @@ import React from 'react';
 import { Text, Pressable, StyleSheet } from 'react-native';
 import { Crown } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Insignia del plan del club en la barra superior: corona + GRATIS/PREMIUM.
@@ -10,7 +15,7 @@ import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
  */
 export default function ClubPlanBadge({ esPremium, onPress }) {
   const label = esPremium ? 'PREMIUM' : 'GRATIS';
-  const tint = esPremium ? clubColors.gold : clubColors.textSecondary;
+  const tint = esPremium ? C.gold : C.textSecondary;
 
   return (
     <Pressable
@@ -27,7 +32,7 @@ export default function ClubPlanBadge({ esPremium, onPress }) {
       ]}
     >
       <Crown color={tint} size={15} strokeWidth={2} />
-      <Text style={[styles.label, { color: esPremium ? clubColors.gold : clubColors.textPrimary }]}>
+      <Text style={[styles.label, { color: esPremium ? C.gold : C.textPrimary }]}>
         {label}
       </Text>
     </Pressable>
@@ -36,23 +41,23 @@ export default function ClubPlanBadge({ esPremium, onPress }) {
 
 const styles = StyleSheet.create({
   chip: {
-    height: clubSizes.iconBtn,
+    height: S.iconBtn,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 11,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
   },
   chipPremium: {
     borderColor: 'rgba(240, 200, 90, 0.35)',
-    backgroundColor: clubColors.goldSoft,
+    backgroundColor: C.goldSoft,
   },
   label: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.4,
   },
 });

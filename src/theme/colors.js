@@ -14,10 +14,10 @@
 // módulo migra a los nombres nuevos, y cuando no quede ninguna, una regla de
 // lint impedirá volver a importarlas.
 //
-// YA NO EXISTEN: `colors`, `radius`, `spacing` y `fonts` —la paleta legada del
-// fondo café #201F1D y el verde oliva #71B533, con la tipografía del sistema—
-// se borraron el 2026-09-16 al migrar el onboarding y los compartidos. Quedan
-// `dsColors`/`clubColors`, `chatColors`, `tactical` y `partidos`.
+// YA NO EXISTEN, todas borradas el 2026-09-16: `colors`, `radius`, `spacing` y
+// `fonts` (la paleta legada del fondo café #201F1D y el verde oliva #71B533,
+// con la tipografía del sistema), y `clubColors`/`clubRadius`/`clubSizes`.
+// Quedan `chatColors`, `tactical` y `partidos`.
 //
 // Ver `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 //
@@ -243,8 +243,12 @@ export const clubsExplorer = {
   textMuted: reservas.textMuted,
 };
 
-/** Perfil de jugador y `components/ds/`. */
-export const dsColors = {
+/**
+ * Ya no la importa ninguna pantalla: Perfil migró el 2026-09-16 y Clubes
+ * también. Sobrevive sin `export` como base de `chatColors`, que la extiende;
+ * desaparece del todo cuando Chat migre.
+ */
+const dsColors = {
   background: reservas.bg,
   surface: reservas.surface,
   surfaceAlt: reservas.surfaceAlt,
@@ -414,9 +418,6 @@ export const partidos = {
   avatar: reservas.avatar,
 };
 
-// Alias retrocompatibles: los componentes de club importan estos nombres.
-export const clubColors = dsColors;
-
 /** Radios, alturas y espaciados del rediseño de club. */
 export const dsRadius = {
   chip: 9,
@@ -437,9 +438,6 @@ export const dsSizes = {
   logo: 72,
   rivalCard: 196,
 };
-
-export const clubRadius = dsRadius;
-export const clubSizes = dsSizes;
 
 export const partidosRadius = {
   pill: 999,

@@ -37,8 +37,6 @@ const RAIZ = path.resolve(__dirname, '../..');
 
 /** Las familias de color que el rediseño unifica. Sin radios ni tipografías. */
 const FAMILIAS = [
-  'dsColors',
-  'clubColors',
   'chatColors',
   'tactical',
   'partidos',
@@ -71,8 +69,13 @@ function clavesUsadas() {
 
   for (const archivo of archivosDeFuente()) {
     const codigo = fs.readFileSync(archivo, 'utf8');
+    // El patrón acepta `theme/colors` Y `./colors.js`: `theme/clubThemes.js`
+    // importa por la ruta corta, y con el patrón que sólo miraba `theme/colors`
+    // este recorrido no lo veía. Se descubrió al borrar `dsColors` — la prueba
+    // pasó y el empaquetado falló, que es exactamente al revés de lo que esta
+    // prueba existe para lograr.
     const imports = codigo.matchAll(
-      /import\s*\{([^}]+)\}\s*from\s*['"][^'"]*theme\/colors['"]/g
+      /import\s*\{([^}]+)\}\s*from\s*['"][^'"]*colors(?:\.js)?['"]/g
     );
     for (const imp of imports) {
       for (const parte of imp[1].split(',')) {
@@ -132,8 +135,6 @@ test('el recorrido del código toca las familias que quedan, no solo una', () =>
  * exactamente la deuda que estas pruebas cierran.
  */
 const VERDE_DE = {
-  dsColors: 'green',
-  clubColors: 'green',
   chatColors: 'green',
   tactical: 'neon',
   partidos: 'green',
@@ -142,8 +143,6 @@ const VERDE_DE = {
 };
 
 const FONDO_DE = {
-  dsColors: 'background',
-  clubColors: 'background',
   chatColors: 'background',
   tactical: 'bg',
   partidos: 'bg',
@@ -178,8 +177,7 @@ test('los cinco rojos de la app son uno solo', () => {
   // Existían con cinco valores distintos en cinco familias: `colors.error`,
   // `clubColors.loss`, `partidos.coral`, `chatColors.danger` y `reservas.red`.
   const esperado = tema.reservas.red;
-  assert.equal(tema.clubColors.loss, esperado);
-  assert.equal(tema.dsColors.loss, esperado);
+  assert.equal(tema.chatColors.loss, esperado);
   assert.equal(tema.partidos.coral, esperado);
   assert.equal(tema.chatColors.danger, esperado);
   assert.equal(tema.tactical.danger, esperado);

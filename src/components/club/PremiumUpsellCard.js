@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Crown, ChevronRight } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Tarjeta de promoción de Premium: corona dorada, título, texto secundario
@@ -21,7 +26,7 @@ export default function PremiumUpsellCard({
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.icon}>
-        <Crown color={clubColors.gold} size={18} strokeWidth={2} />
+        <Crown color={C.gold} size={18} strokeWidth={2} />
       </View>
       <View style={styles.texts}>
         <Text style={styles.title}>{title}</Text>
@@ -29,7 +34,7 @@ export default function PremiumUpsellCard({
           {subtitle}
         </Text>
       </View>
-      <ChevronRight color={clubColors.textMuted} size={16} strokeWidth={2.2} />
+      <ChevronRight color={C.textMuted} size={16} strokeWidth={2.2} />
     </Pressable>
   );
 }
@@ -39,32 +44,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    marginHorizontal: clubSizes.gutter,
+    marginHorizontal: S.screenPadding,
     marginTop: 22,
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: clubColors.border,
+    borderColor: C.border,
     paddingHorizontal: 13,
     paddingVertical: 12,
   },
-  pressed: { backgroundColor: clubColors.surfaceHover },
+  pressed: { backgroundColor: C.surfaceHover },
   icon: {
     width: 36,
     height: 36,
-    borderRadius: clubRadius.sm,
-    backgroundColor: clubColors.goldSoft,
+    borderRadius: R.chip,
+    backgroundColor: C.goldSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   texts: { flex: 1, minWidth: 0 },
   title: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   subtitle: {
-    color: clubColors.textSecondary,
+    color: C.textSecondary,
     fontSize: 11.5,
     marginTop: 2,
   },

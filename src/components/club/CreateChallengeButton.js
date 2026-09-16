@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Swords, Search } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 
 /**
@@ -53,7 +58,7 @@ export default function CreateChallengeButton({
         accessibilityLabel={searchAccessibilityLabel}
         style={({ pressed }) => [styles.searchBtn, pressed && styles.searchPressed]}
       >
-        <Search color={clubColors.textPrimary} size={20} strokeWidth={2} />
+        <Search color={C.textPrimary} size={20} strokeWidth={2} />
       </Pressable>
     </View>
   );
@@ -63,13 +68,13 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 14,
   },
   primary: {
     flex: 1,
-    height: clubSizes.actionBtn,
-    borderRadius: clubRadius.xl,
+    height: S.ctaPrimary,
+    borderRadius: R.cardSm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -83,18 +88,18 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   primaryLabel: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.2,
   },
   searchBtn: {
-    width: clubSizes.actionBtn,
-    height: clubSizes.actionBtn,
-    borderRadius: clubRadius.xl,
+    width: S.ctaPrimary,
+    height: S.ctaPrimary,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchPressed: { backgroundColor: clubColors.chipStrong },
+  searchPressed: { backgroundColor: C.chipStrong },
 });

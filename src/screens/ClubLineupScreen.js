@@ -14,7 +14,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Shield } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import { etiquetaPosiciones } from '../utils/playerMeta';
 import { haceCuanto } from '../utils/tiempoRelativo.js';
 import {
@@ -298,11 +303,11 @@ export default function ClubLineupScreen({ navigation, route }) {
             hitSlop={12}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           >
-            <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
+            <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
           </Pressable>
         </View>
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={clubColors.green} />
+          <ActivityIndicator color={C.green} />
         </View>
       </SafeAreaView>
     );
@@ -320,7 +325,7 @@ export default function ClubLineupScreen({ navigation, route }) {
           hitSlop={8}
           style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
         >
-          <ArrowLeft color={clubColors.textPrimary} size={18} strokeWidth={2.2} />
+          <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
         </Pressable>
         <View style={styles.headerTitles}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -345,7 +350,7 @@ export default function ClubLineupScreen({ navigation, route }) {
             ]}
           >
             {saving ? (
-              <ActivityIndicator color={clubColors.greenInk} size="small" />
+              <ActivityIndicator color={C.greenInk} size="small" />
             ) : (
               <Text style={styles.saveBtnText}>Guardar</Text>
             )}
@@ -413,7 +418,7 @@ export default function ClubLineupScreen({ navigation, route }) {
           <View style={styles.pitchWrap}>
             {!canEdit && !lineup ? (
               <View style={styles.emptyBox}>
-                <Shield color={clubColors.textMuted} size={32} strokeWidth={1.6} />
+                <Shield color={C.textMuted} size={32} strokeWidth={1.6} />
                 <Text style={styles.emptyTitle}>Aún no hay alineación</Text>
                 <Text style={styles.emptyText}>
                   Un administrador o capitán del club puede armarla.
@@ -463,7 +468,7 @@ export default function ClubLineupScreen({ navigation, route }) {
                         {occupant?.foto_url ? (
                           <Image source={{ uri: occupant.foto_url }} style={styles.slotAvatar} />
                         ) : (
-                          <Text style={[styles.slotFace, !occupant && isFit && { color: clubColors.green }]}>
+                          <Text style={[styles.slotFace, !occupant && isFit && { color: C.green }]}>
                             {occupant ? (occupant.username || '?')[0]?.toUpperCase() : slot.label[0]}
                           </Text>
                         )}
@@ -582,78 +587,78 @@ export default function ClubLineupScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: clubColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingTop: 4,
     paddingBottom: 12,
     gap: 8,
   },
   iconBtn: {
-    width: clubSizes.iconBtn,
-    height: clubSizes.iconBtn,
-    borderRadius: clubRadius.md,
+    width: S.iconBtn,
+    height: S.iconBtn,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
-    backgroundColor: clubColors.chip,
+    borderColor: C.border,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconBtnPressed: { backgroundColor: clubColors.chipStrong },
+  iconBtnPressed: { backgroundColor: C.chipStrong },
   headerTitles: { flex: 1, minWidth: 0 },
   headerTitle: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: -0.2,
   },
-  headerSubtitle: { color: clubColors.textSecondary, fontSize: 12.5, marginTop: 1 },
+  headerSubtitle: { color: C.textSecondary, fontSize: 12.5, marginTop: 1 },
   saveBtn: {
     height: 38,
     paddingHorizontal: 16,
-    borderRadius: clubRadius.md,
-    backgroundColor: clubColors.green,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  saveBtnText: { color: clubColors.greenInk, fontSize: 13, fontWeight: '800' },
+  saveBtnText: { color: C.greenInk, fontSize: 13, fontFamily: F.extraBold },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  modeRow: { flexDirection: 'row', gap: 8, paddingHorizontal: clubSizes.gutter, paddingBottom: 10 },
+  modeRow: { flexDirection: 'row', gap: 8, paddingHorizontal: S.screenPadding, paddingBottom: 10 },
   modeBtn: {
     flex: 1,
     height: 42,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modeBtnActive: { backgroundColor: clubColors.greenSoft, borderColor: clubColors.greenBorder },
-  modeLabel: { color: clubColors.textSecondary, fontSize: 13, fontWeight: '800' },
-  modeLabelActive: { color: clubColors.green },
+  modeBtnActive: { backgroundColor: C.greenSoft, borderColor: C.greenBorder },
+  modeLabel: { color: C.textSecondary, fontSize: 13, fontFamily: F.extraBold },
+  modeLabelActive: { color: C.green },
 
   formationRow: { flexGrow: 0, marginBottom: 11 },
-  formationRowContent: { paddingHorizontal: clubSizes.gutter, gap: 8 },
+  formationRowContent: { paddingHorizontal: S.screenPadding, gap: 8 },
   formationChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: clubColors.border,
+    borderColor: C.border,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  formationChipActive: { backgroundColor: clubColors.green, borderColor: clubColors.green },
-  formationChipText: { color: clubColors.textSecondary, fontSize: 12.5, fontWeight: '700' },
-  formationChipTextActive: { color: clubColors.greenInk },
+  formationChipActive: { backgroundColor: C.green, borderColor: C.green },
+  formationChipText: { color: C.textSecondary, fontSize: 12.5, fontFamily: F.bold },
+  formationChipTextActive: { color: C.greenInk },
 
-  pitchWrap: { flex: 1, paddingHorizontal: clubSizes.gutter, paddingTop: 2 },
+  pitchWrap: { flex: 1, paddingHorizontal: S.screenPadding, paddingTop: 2 },
   pitch: {
     flex: 1,
-    borderRadius: clubRadius.xl,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: clubColors.greenBorder,
+    borderColor: C.greenBorder,
     overflow: 'hidden',
   },
   pitchBorder: {
@@ -712,7 +717,7 @@ const styles = StyleSheet.create({
   },
 
   dragHint: {
-    color: clubColors.textFaint,
+    color: C.textFaint,
     fontSize: 11,
     textAlign: 'center',
     paddingTop: 8,
@@ -733,20 +738,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  slotCircleFilled: { backgroundColor: '#1E231E', borderWidth: 2, borderColor: clubColors.green },
-  slotCircleCaptain: { borderColor: clubColors.gold },
+  slotCircleFilled: { backgroundColor: '#1E231E', borderWidth: 2, borderColor: C.green },
+  slotCircleCaptain: { borderColor: C.gold },
   slotCircleEmpty: {
     backgroundColor: 'rgba(5,6,5,.55)',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,.2)',
     borderStyle: 'dashed',
   },
-  slotCircleFit: { backgroundColor: 'rgba(90,224,106,.3)', borderWidth: 2.5, borderColor: clubColors.green },
+  slotCircleFit: { backgroundColor: 'rgba(90,224,106,.3)', borderWidth: 2.5, borderColor: C.green },
   slotAvatar: { width: 44, height: 44, borderRadius: 22 },
-  slotFace: { color: 'rgba(255,255,255,.4)', fontSize: 14, fontWeight: '800' },
+  slotFace: { color: 'rgba(255,255,255,.4)', fontSize: 14, fontFamily: F.extraBold },
   slotLabel: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: F.bold,
     color: 'rgba(255,255,255,.5)',
     backgroundColor: 'rgba(5,6,5,.6)',
     borderRadius: 5,
@@ -754,7 +759,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     maxWidth: 62,
   },
-  slotLabelCaptain: { color: clubColors.gold, backgroundColor: 'rgba(240,200,90,.16)' },
+  slotLabelCaptain: { color: C.gold, backgroundColor: 'rgba(240,200,90,.16)' },
   captainBadge: {
     position: 'absolute',
     top: -3,
@@ -762,7 +767,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: clubColors.gold,
+    backgroundColor: C.gold,
     borderWidth: 2,
     borderColor: '#0A140B',
     alignItems: 'center',
@@ -775,40 +780,40 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: clubColors.gold,
+    backgroundColor: C.gold,
     borderWidth: 2,
-    borderColor: clubColors.surfaceAlt,
+    borderColor: C.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  captainBadgeText: { color: clubColors.background, fontSize: 9, fontWeight: '800' },
+  captainBadgeText: { color: C.bg, fontSize: 9, fontFamily: F.extraBold },
 
-  benchWrap: { paddingHorizontal: clubSizes.gutter, paddingVertical: 12 },
+  benchWrap: { paddingHorizontal: S.screenPadding, paddingVertical: 12 },
   benchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   benchTitle: {
     fontSize: 10.5,
     letterSpacing: 1.4,
-    color: clubColors.textMuted,
-    fontWeight: '700',
+    color: C.textMuted,
+    fontFamily: F.bold,
   },
   benchActions: { flexDirection: 'row', gap: 8 },
   benchActionBtn: {
-    borderRadius: clubRadius.chip,
+    borderRadius: R.chip,
     borderWidth: 1,
-    borderColor: clubColors.greenBorder,
-    backgroundColor: clubColors.greenSoft,
+    borderColor: C.greenBorder,
+    backgroundColor: C.greenSoft,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
-  benchActionText: { color: clubColors.green, fontSize: 11.5, fontWeight: '700' },
+  benchActionText: { color: C.green, fontSize: 11.5, fontFamily: F.bold },
   benchActionBtnMuted: {
-    borderRadius: clubRadius.chip,
+    borderRadius: R.chip,
     borderWidth: 1,
-    borderColor: clubColors.border,
+    borderColor: C.border,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
-  benchActionTextMuted: { color: clubColors.textSecondary, fontSize: 11.5, fontWeight: '700' },
+  benchActionTextMuted: { color: C.textSecondary, fontSize: 11.5, fontFamily: F.bold },
   benchList: { gap: 9, paddingTop: 10, paddingBottom: 2, minHeight: 84 },
   benchEmpty: {
     flex: 1,
@@ -817,37 +822,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: clubColors.border,
-    borderRadius: clubRadius.md,
+    borderColor: C.border,
+    borderRadius: R.iconBtn,
   },
-  benchEmptyText: { color: clubColors.textMuted, fontSize: 12, fontWeight: '600' },
+  benchEmptyText: { color: C.textMuted, fontSize: 12, fontFamily: F.semiBold },
   benchCard: {
     width: 74,
-    borderRadius: clubRadius.md,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
-    backgroundColor: clubColors.surfaceAlt,
+    borderColor: C.borderSoft,
+    backgroundColor: C.surfaceAlt,
     paddingVertical: 9,
     paddingHorizontal: 6,
     alignItems: 'center',
     gap: 5,
   },
-  benchCardSelected: { borderColor: clubColors.green, backgroundColor: clubColors.greenSoft },
+  benchCardSelected: { borderColor: C.green, backgroundColor: C.greenSoft },
   benchAvatarWrap: { position: 'relative' },
   benchAvatar: { width: 36, height: 36, borderRadius: 18 },
-  benchAvatarCaptain: { borderWidth: 2, borderColor: clubColors.gold },
-  benchAvatarFallback: { backgroundColor: clubColors.chip, alignItems: 'center', justifyContent: 'center' },
-  benchAvatarInitial: { color: clubColors.textPrimary, fontSize: 13, fontWeight: '800' },
-  benchName: { color: clubColors.textPrimary, fontSize: 11, fontWeight: '700', maxWidth: 64 },
-  benchPos: { color: clubColors.textMuted, fontSize: 9.5, maxWidth: 64 },
+  benchAvatarCaptain: { borderWidth: 2, borderColor: C.gold },
+  benchAvatarFallback: { backgroundColor: C.chip, alignItems: 'center', justifyContent: 'center' },
+  benchAvatarInitial: { color: C.textPrimary, fontSize: 13, fontFamily: F.extraBold },
+  benchName: { color: C.textPrimary, fontSize: 11, fontFamily: F.bold, maxWidth: 64 },
+  benchPos: { color: C.textMuted, fontSize: 9.5, maxWidth: 64 },
 
   emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24 },
-  emptyTitle: { color: clubColors.textPrimary, fontSize: 15, fontWeight: '800' },
-  emptyText: { color: clubColors.textMuted, fontSize: 13, textAlign: 'center' },
+  emptyTitle: { color: C.textPrimary, fontSize: 15, fontFamily: F.extraBold },
+  emptyText: { color: C.textMuted, fontSize: 13, textAlign: 'center' },
 
   savedCaption: {
     textAlign: 'center',
-    color: clubColors.textMuted,
+    color: C.textMuted,
     fontSize: 12,
     paddingBottom: 16,
   },
@@ -857,12 +862,12 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     bottom: 30,
-    backgroundColor: clubColors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: clubColors.greenBorder,
-    borderRadius: clubRadius.md,
+    borderColor: C.greenBorder,
+    borderRadius: R.iconBtn,
     paddingHorizontal: 16,
     paddingVertical: 13,
   },
-  toastText: { color: clubColors.textPrimary, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  toastText: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold, textAlign: 'center' },
 });

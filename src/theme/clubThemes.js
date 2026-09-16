@@ -16,18 +16,18 @@
  * seleccionados, enlaces «Ver todos», «Añadir foto» y los botones atados al
  * club. El fondo oscuro, los textos, la navegación, el botón flotante
  * global, el dorado de Premium y los colores de victoria / empate / derrota
- * / error siguen siendo los de `dsColors` para todos los clubes: un club
+ * / error siguen siendo los de la paleta única para todos los clubes: un club
  * rojo no puede hacer que una victoria parezca una derrota.
  *
  * CADA TEMA ES UNA ESCALA, no un color: principal, presionado, fondo suave
  * (normal y presionado), borde, resplandor y la tinta de contraste que va
  * ENCIMA del principal. Las tintas están elegidas para cumplir 4,5:1 de la
  * WCAG sobre su color principal, y cada principal cumple 4,5:1 sobre el
- * fondo `dsColors.background`. Lo comprueba `__tests__/clubThemes.test.js`,
+ * fondo `reservas.bg`. Lo comprueba `__tests__/clubThemes.test.js`,
  * que además exige distancia de color contra derrota, empate y Premium.
  */
 
-import { dsColors } from './colors.js';
+import { reservas as C } from './colors.js';
 
 /** Clave que se guarda para un club que nunca eligió tema. */
 export const TEMA_CLUB_POR_DEFECTO = 'green';
@@ -47,9 +47,9 @@ const DEFINICIONES = [
     label: 'Verde',
     // El verde corporativo de la app, tal cual: un club sin tema no cambia
     // de aspecto por esta funcionalidad.
-    main: dsColors.green,
-    pressed: dsColors.greenDark,
-    ink: dsColors.greenInk,
+    main: C.green,
+    pressed: C.greenDark,
+    ink: C.greenInk,
     bannerRgb: '23, 58, 28',
   },
   {

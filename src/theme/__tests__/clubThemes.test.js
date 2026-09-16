@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const T = require('../clubThemes.js');
-const { dsColors, clubTonos, clubSuperficies } = require('../colors.js');
+const { reservas: C, clubTonos, clubSuperficies } = require('../colors.js');
 
 /**
  * Tema de color del club.
@@ -200,10 +200,10 @@ test('el texto sobre el color principal cumple 4,5:1', () => {
 test('el color principal sobre el fondo oscuro cumple 4,5:1', () => {
   for (const clave of CLAVES) {
     const { main } = T.temaClub(clave);
-    const razon = contraste(main, dsColors.background);
+    const razon = contraste(main, C.bg);
     assert.ok(
       razon >= 4.5,
-      `${clave}: contraste ${razon.toFixed(2)} de ${main} sobre ${dsColors.background}`
+      `${clave}: contraste ${razon.toFixed(2)} de ${main} sobre ${C.bg}`
     );
   }
 });
@@ -212,9 +212,9 @@ test('el color principal sobre el fondo oscuro cumple 4,5:1', () => {
 
 test('ningún tema se confunde con derrota, empate ni con el dorado de Premium', () => {
   const SEMANTICOS = {
-    derrota: dsColors.loss,
-    empate: dsColors.draw,
-    premium: dsColors.gold,
+    derrota: C.loss,
+    empate: C.draw,
+    premium: C.gold,
   };
   for (const clave of CLAVES) {
     const { main } = T.temaClub(clave);
@@ -229,8 +229,8 @@ test('ningún tema se confunde con derrota, empate ni con el dorado de Premium',
 });
 
 test('el verde del club sigue siendo el verde corporativo de la app', () => {
-  assert.equal(T.temaClub('green').main, dsColors.green);
-  assert.equal(T.temaClub('green').ink, dsColors.greenInk);
+  assert.equal(T.temaClub('green').main, C.green);
+  assert.equal(T.temaClub('green').ink, C.greenInk);
 });
 
 // ── Banner del encabezado ────────────────────────────────────────────
@@ -262,7 +262,7 @@ test('resolver el tema de un club no altera el de otro', () => {
 
   assert.notEqual(rojo.main, azul.main);
   assert.equal(rojo.main, rojoOtraVez.main);
-  assert.equal(T.temaClub('green').main, dsColors.green);
+  assert.equal(T.temaClub('green').main, C.green);
 });
 
 test('la escala que se entrega no puede modificar el catálogo', () => {
@@ -283,7 +283,7 @@ test('la escala que se entrega no puede modificar el catálogo', () => {
 
 test('los alfas del acento son los que fija el handoff de la portada', () => {
   // Estos tres números son una decisión, no un detalle: el handoff los pide
-  // así y `dsColors.winSoft` ya usa .14. Sin esta prueba, el próximo retoque
+  // así y `reservas.winSoft` ya usa .14. Sin esta prueba, el próximo retoque
   // de color los pierde en silencio y la portada deja de calzar con el resto.
   const alfa = (c) => Number(c.match(/,\s*([\d.]+)\)$/)[1]);
   for (const clave of CLAVES) {

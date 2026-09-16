@@ -13,7 +13,12 @@ import {
   Swords,
 } from 'lucide-react-native';
 
-import { clubColors, clubRadius, clubSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import EmptyStateCard from '../components/ds/EmptyStateCard';
 import { getClubMatchCalendar } from '../services/clubMatches';
@@ -129,7 +134,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
           accessibilityLabel="Volver"
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
         >
-          <ArrowLeft color={clubColors.textPrimary} size={20} strokeWidth={2.2} />
+          <ArrowLeft color={C.textPrimary} size={20} strokeWidth={2.2} />
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>Calendario de partidos</Text>
@@ -146,7 +151,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
       ) : error ? (
         <View style={styles.listContent}>
           <EmptyStateCard
-            icon={<CalendarX color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+            icon={<CalendarX color={C.textSecondary} size={18} strokeWidth={2} />}
             title="No se pudo cargar el calendario"
             subtitle="Revisa tu conexión y vuelve a intentarlo"
             actionLabel="Reintentar"
@@ -169,7 +174,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
               ]}
             >
               <ChevronLeft
-                color={noSePuedeRetroceder ? clubColors.textFaint : clubColors.textPrimary}
+                color={noSePuedeRetroceder ? C.textFaint : C.textPrimary}
                 size={18}
                 strokeWidth={2.4}
               />
@@ -182,7 +187,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
               accessibilityLabel="Mes siguiente"
               style={({ pressed }) => [styles.mesBtn, pressed && { opacity: 0.6 }]}
             >
-              <ChevronRight color={clubColors.textPrimary} size={18} strokeWidth={2.4} />
+              <ChevronRight color={C.textPrimary} size={18} strokeWidth={2.4} />
             </Pressable>
           </View>
 
@@ -225,7 +230,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                       style={[
                         styles.celdaTexto,
                         (esPasado || fueraDeRango) && styles.celdaTextoApagado,
-                        seleccionado && { color: tema.ink, fontWeight: '800' },
+                        seleccionado && { color: tema.ink, fontFamily: F.extraBold },
                       ]}
                     >
                       {d.dia}
@@ -283,8 +288,8 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                   accessibilityLabel="Publicar un desafío para este día"
                   style={({ pressed }) => [styles.accionBtn, styles.accionBtnGhost, pressed && { opacity: 0.8 }]}
                 >
-                  <Swords color={clubColors.textSecondary} size={16} strokeWidth={2.2} />
-                  <Text style={[styles.accionTexto, { color: clubColors.textSecondary }]}>Publicar un desafío</Text>
+                  <Swords color={C.textSecondary} size={16} strokeWidth={2.2} />
+                  <Text style={[styles.accionTexto, { color: C.textSecondary }]}>Publicar un desafío</Text>
                 </Pressable>
                 {avisoPublicar ? (
                   <Text style={styles.avisoPublicar}>
@@ -295,7 +300,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
             </View>
           ) : entradas.length === 0 ? (
             <EmptyStateCard
-              icon={<CalendarX color={clubColors.textSecondary} size={18} strokeWidth={2} />}
+              icon={<CalendarX color={C.textSecondary} size={18} strokeWidth={2} />}
               title="Aún no hay partidos que mostrar"
               subtitle="Acá van a aparecer los que ya jugaron y los que se programen cuando un desafío sea aceptado"
               variant="solid"
@@ -316,8 +321,8 @@ function EntradaDetalle({ entrada, tema, onVerPartido }) {
     : entrada.resultado === 'V'
       ? tema.main
       : entrada.resultado === 'D'
-        ? clubColors.loss
-        : clubColors.textSecondary;
+        ? C.loss
+        : C.textSecondary;
 
   return (
     <Pressable
@@ -335,13 +340,13 @@ function EntradaDetalle({ entrada, tema, onVerPartido }) {
           <View style={{ gap: 4, marginTop: 8 }}>
             {entrada.horaLabel ? (
               <View style={styles.tarjetaFila}>
-                <Clock color={clubColors.textFaint} size={13} strokeWidth={2.2} />
+                <Clock color={C.textFaint} size={13} strokeWidth={2.2} />
                 <Text style={styles.tarjetaFilaTexto}>{entrada.horaLabel}</Text>
               </View>
             ) : null}
             {entrada.lugar ? (
               <View style={styles.tarjetaFila}>
-                <MapPin color={clubColors.textFaint} size={13} strokeWidth={2.2} />
+                <MapPin color={C.textFaint} size={13} strokeWidth={2.2} />
                 <Text style={styles.tarjetaFilaTexto} numberOfLines={1}>{entrada.lugar}</Text>
               </View>
             ) : null}
@@ -363,43 +368,43 @@ function fechaISO(d) {
 const CELDA = `${100 / 7}%`;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: clubColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: clubSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingVertical: 10,
   },
   backBtn: {
     width: 38,
     height: 38,
-    borderRadius: clubRadius.md,
-    backgroundColor: clubColors.surface,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerCenter: { flex: 1, minWidth: 0 },
-  headerTitle: { color: clubColors.textPrimary, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
-  headerSubtitle: { color: clubColors.textMuted, fontSize: 12, marginTop: 2 },
+  headerTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3 },
+  headerSubtitle: { color: C.textMuted, fontSize: 12, marginTop: 2 },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { paddingHorizontal: clubSizes.gutter, paddingBottom: 40, paddingTop: 4 },
+  listContent: { paddingHorizontal: S.screenPadding, paddingBottom: 40, paddingTop: 4 },
 
   mesRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14,
   },
   mesBtn: {
-    width: 34, height: 34, borderRadius: clubRadius.md, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: clubColors.surface, borderWidth: 1, borderColor: clubColors.borderSoft,
+    width: 34, height: 34, borderRadius: R.iconBtn, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderSoft,
   },
   mesBtnApagado: { opacity: 0.4 },
-  mesTexto: { color: clubColors.textPrimary, fontSize: 15.5, fontWeight: '800', letterSpacing: -0.2 },
+  mesTexto: { color: C.textPrimary, fontSize: 15.5, fontFamily: F.extraBold, letterSpacing: -0.2 },
 
   semanaRow: { flexDirection: 'row', marginBottom: 6 },
   semanaLetra: {
-    width: CELDA, textAlign: 'center', color: clubColors.textFaint, fontSize: 11, fontWeight: '700',
+    width: CELDA, textAlign: 'center', color: C.textFaint, fontSize: 11, fontFamily: F.bold,
   },
 
   grilla: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -407,37 +412,37 @@ const styles = StyleSheet.create({
   celdaCirculo: {
     width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
   },
-  celdaTexto: { color: clubColors.textSecondary, fontSize: 13, fontWeight: '600' },
-  celdaTextoApagado: { color: clubColors.textFaint },
+  celdaTexto: { color: C.textSecondary, fontSize: 13, fontFamily: F.semiBold },
+  celdaTextoApagado: { color: C.textFaint },
   punto: { width: 5, height: 5, borderRadius: 999 },
   puntoHueco: { width: 5, height: 5 },
 
   detalle: { marginTop: 18, gap: 8 },
   pista: {
-    marginTop: 18, textAlign: 'center', color: clubColors.textFaint, fontSize: 12,
+    marginTop: 18, textAlign: 'center', color: C.textFaint, fontSize: 12,
   },
   tarjeta: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: clubColors.surface, borderWidth: 1, borderColor: clubColors.borderSoft,
-    borderRadius: clubRadius.md, padding: 14,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderSoft,
+    borderRadius: R.iconBtn, padding: 14,
   },
-  tarjetaRival: { color: clubColors.textPrimary, fontSize: 14, fontWeight: '700' },
-  tarjetaEstado: { fontSize: 12.5, fontWeight: '600', marginTop: 3 },
+  tarjetaRival: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
+  tarjetaEstado: { fontSize: 12.5, fontFamily: F.semiBold, marginTop: 3 },
   tarjetaFila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tarjetaFilaTexto: { color: clubColors.textMuted, fontSize: 12 },
+  tarjetaFilaTexto: { color: C.textMuted, fontSize: 12 },
 
   sinPartidos: {
-    marginTop: 18, backgroundColor: clubColors.surface, borderWidth: 1, borderColor: clubColors.borderSoft,
-    borderRadius: clubRadius.md, padding: 16,
+    marginTop: 18, backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderSoft,
+    borderRadius: R.iconBtn, padding: 16,
   },
-  sinPartidosTitulo: { color: clubColors.textPrimary, fontSize: 14.5, fontWeight: '700', textAlign: 'center' },
+  sinPartidosTitulo: { color: C.textPrimary, fontSize: 14.5, fontFamily: F.bold, textAlign: 'center' },
   accionBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    height: 44, borderRadius: clubRadius.md, borderWidth: 1,
+    height: 44, borderRadius: R.iconBtn, borderWidth: 1,
   },
-  accionBtnGhost: { backgroundColor: clubColors.surfaceAlt, borderColor: clubColors.borderSoft },
-  accionTexto: { fontSize: 13.5, fontWeight: '700' },
+  accionBtnGhost: { backgroundColor: C.surfaceAlt, borderColor: C.borderSoft },
+  accionTexto: { fontSize: 13.5, fontFamily: F.bold },
   avisoPublicar: {
-    color: clubColors.textFaint, fontSize: 11.5, lineHeight: 16, textAlign: 'center', marginTop: 2,
+    color: C.textFaint, fontSize: 11.5, lineHeight: 16, textAlign: 'center', marginTop: 2,
   },
 });

@@ -2,22 +2,26 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 
-import { clubColors, clubRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import ClubLogo from './ClubLogo';
 import { RESULTADO } from '../../utils/historialClub';
 
 /** Color e insignia por resultado. Sin resultado → neutro, sin insignia. */
 function estiloResultado(resultado) {
   if (resultado === RESULTADO.VICTORIA) {
-    return { color: clubColors.win, chipBg: clubColors.winSoft, letra: 'V' };
+    return { color: C.win, chipBg: C.winSoft, letra: 'V' };
   }
   if (resultado === RESULTADO.DERROTA) {
-    return { color: clubColors.loss, chipBg: clubColors.lossSoft, letra: 'D' };
+    return { color: C.loss, chipBg: C.lossSoft, letra: 'D' };
   }
   if (resultado === RESULTADO.EMPATE) {
-    return { color: clubColors.draw, chipBg: clubColors.drawSoft, letra: 'E' };
+    return { color: C.draw, chipBg: C.drawSoft, letra: 'E' };
   }
-  return { color: clubColors.textFaint, chipBg: 'transparent', letra: null };
+  return { color: C.textFaint, chipBg: 'transparent', letra: null };
 }
 
 /**
@@ -115,7 +119,7 @@ export default function MatchHistoryCard({
         </View>
       ) : null}
 
-      {onPress ? <ChevronRight color={clubColors.textFaint} size={16} strokeWidth={2.2} /> : null}
+      {onPress ? <ChevronRight color={C.textFaint} size={16} strokeWidth={2.2} /> : null}
     </Pressable>
   );
 }
@@ -125,30 +129,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: clubColors.surface,
-    borderRadius: clubRadius.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: clubColors.borderSoft,
+    borderColor: C.borderSoft,
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
-  pressed: { backgroundColor: clubColors.surfaceHover },
+  pressed: { backgroundColor: C.surfaceHover },
   bar: { width: 4, height: 46, borderRadius: 3 },
   center: { flex: 1, minWidth: 0 },
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   mine: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     maxWidth: 96,
     flexShrink: 1,
   },
   // El marcador nunca se comprime ni se parte en dos líneas: si falta
   // espacio, se recortan los nombres a los lados.
   score: {
-    color: clubColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.5,
     flexShrink: 0,
     flexGrow: 0,
@@ -156,15 +160,15 @@ const styles = StyleSheet.create({
   rival: {
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     flexShrink: 1,
   },
   sub: {
-    color: clubColors.textMuted,
+    color: C.textMuted,
     fontSize: 11.5,
     marginTop: 3,
   },
-  resultado: { fontWeight: '700' },
+  resultado: { fontFamily: F.bold },
   badge: {
     width: 24,
     height: 24,
@@ -172,5 +176,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeText: { fontSize: 11, fontWeight: '800' },
+  badgeText: { fontSize: 11, fontFamily: F.extraBold },
 });
