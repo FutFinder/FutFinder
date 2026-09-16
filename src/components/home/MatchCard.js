@@ -2,7 +2,9 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import StatusPill from './StatusPill';
-import { tactical as t } from '../../theme/colors';
+import {
+  reservas as C,
+} from '../../theme/colors';
 
 function formatHora(iso) {
   try {
@@ -67,7 +69,7 @@ export default function MatchCard({ match: m, onJoin, onPress, width = 238 }) {
 
   return (
     <Pressable onPress={() => onPress?.(m.id)} style={{ width }}>
-      <LinearGradient colors={[t.surface, t.surfaceAlt]} className="gap-3 rounded-[20px] border border-white/8 p-3.5">
+      <LinearGradient colors={[C.surface, C.surfaceAlt]} className="gap-3 rounded-[20px] border border-white/8 p-3.5">
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center gap-1.5">
             <StatusPill label={status} tone={full ? 'danger' : 'neon'} dot />

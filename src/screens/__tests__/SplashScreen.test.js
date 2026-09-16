@@ -10,7 +10,9 @@ function readSplashSrc() {
 test('usa el mismo ícono y wordmark oficiales que BrandMark, no un ícono propio', () => {
   const src = readSplashSrc();
   assert.match(src, /MapPin/, 'debe usar el ícono MapPin, igual que BrandMark');
-  assert.match(src, /tactical\.neon/, 'el ícono y el acento del wordmark deben usar tactical.neon');
+  // El acento salía de `tactical.neon` (#00FF66) hasta que la app se unificó
+  // en una sola estética el 2026-09-16; ahora es el verde único.
+  assert.match(src, /C\.green/, 'el ícono y el acento del wordmark deben usar el verde de la paleta');
   assert.match(src, /fut<Text/, 'el wordmark "fut...finder" debe estar presente');
   assert.doesNotMatch(
     src,
@@ -29,11 +31,20 @@ test('nunca repite la animación (sin Animated.loop)', () => {
   assert.doesNotMatch(src, /Animated\.loop/);
 });
 
-test('usa la paleta oscura de Clubes, no la paleta global antigua', () => {
+test('usa la paleta única, no ninguna de las familias viejas', () => {
+  // Nació comprobando que el splash no volviera a la paleta global antigua, y
+  // después que usara la de Clubes. Desde que la app tiene UNA estética
+  // (2026-09-16) la comprobación es la misma idea con una sola respuesta: la
+  // primera pantalla que se ve no puede ser la que se quede atrás.
   const src = readSplashSrc();
-  assert.match(src, /clubsExplorer/, 'debe usar clubsExplorer.bg como fondo');
-  assert.doesNotMatch(src, /colors\.primary/, 'no debe quedar el verde global antiguo');
-  assert.doesNotMatch(src, /colors\.background/, 'no debe quedar el fondo global antiguo');
+  assert.match(src, /reservas as C/, 'debe importar la paleta única');
+  for (const vieja of ['colors', 'dsColors', 'clubColors', 'chatColors', 'tactical', 'partidos']) {
+    assert.doesNotMatch(
+      src,
+      new RegExp(`\\b${vieja}\\.`),
+      `no debe quedar ninguna referencia a ${vieja}`
+    );
+  }
 });
 
 test('no agrega un retraso artificial desacoplado de la carga real', () => {
@@ -70,7 +81,9 @@ test('los valores del pin y el wordmark coinciden con BrandMark.js (mismo ícono
   const sharedValues = [
     /strokeWidth={2\.2}/,
     /fontSize: 21/,
-    /fontWeight: '800'/,
+    // Era `fontWeight: '800'` hasta que la app pasó a Manrope: en React Native
+    // el peso se fija con `fontFamily`, no con `fontWeight`.
+    /fontFamily: F\.extraBold/,
     /letterSpacing: -0\.4/,
     /gap: 8/,
   ];

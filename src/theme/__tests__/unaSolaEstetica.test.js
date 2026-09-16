@@ -35,12 +35,11 @@ const tema = require('../colors.js');
 
 const RAIZ = path.resolve(__dirname, '../..');
 
-/** Las familias de color que el rediseño unifica. Sin radios ni tipografías. */
-const FAMILIAS = [
-  'tactical',
-  'clubsExplorer',
-  'reservas',
-];
+/**
+ * La paleta. Era una lista de siete y hoy es una: las otras seis se borraron
+ * a medida que su módulo migró.
+ */
+const FAMILIAS = ['reservas'];
 
 function archivosDeFuente(dir = RAIZ, acc = []) {
   for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -124,71 +123,44 @@ test('el recorrido del código toca las familias que quedan, no solo una', () =>
   );
 });
 
-// ─────────────────────────────── la unificación propiamente tal
+// ─────────────────────────────── que no nazca una segunda
 
-/**
- * El verde de acción de cada familia, con el nombre que usa cada una.
- *
- * `tactical` lo llama `neon` y el resto `green`. Que se llamen distinto es
- * exactamente la deuda que estas pruebas cierran.
- */
-const VERDE_DE = {
-  tactical: 'neon',
-  clubsExplorer: 'green',
-  reservas: 'green',
-};
-
-const FONDO_DE = {
-  tactical: 'bg',
-  clubsExplorer: 'bg',
-  reservas: 'bg',
-};
-
-test('todas las familias comparten el mismo verde de acción', () => {
-  const esperado = tema.reservas.green;
-  for (const [familia, clave] of Object.entries(VERDE_DE)) {
-    assert.equal(
-      tema[familia][clave],
-      esperado,
-      `${familia}.${clave} no es el verde único (${esperado}). `
-        + `Un segundo verde en la app es la deuda que este rediseño cierra.`
-    );
-  }
+test('el theme exporta UNA sola paleta de color', () => {
+  // Ésta es la prueba que reemplaza a las de «todas las familias comparten el
+  // verde / el fondo / el rojo». Mientras hubo seis familias derivadas, tenía
+  // sentido comprobar que coincidían; desde que no queda ninguna, lo único que
+  // puede volver atrás es que alguien agregue una paleta nueva al lado.
+  //
+  // Lo que sí puede crecer son los tokens DENTRO de `reservas`: agregar un
+  // tono es normal, agregar una paleta es la deuda que costó siete handoffs
+  // deshacer.
+  const permitidos = new Set([
+    'reservas', 'reservasRadius', 'reservasSizes', 'reservasFonts',
+    // No son paletas: son tonos semánticos y superficies con valores medidos,
+    // que el tema de club no puede repintar. Ver `clubThemes.test.js`.
+    'clubTonos', 'clubSuperficies',
+  ]);
+  const exportados = Object.keys(tema);
+  const intrusos = exportados.filter((k) => !permitidos.has(k));
+  assert.deepEqual(
+    intrusos,
+    [],
+    'El theme volvió a exportar más de una paleta: ' + intrusos.join(', ')
+  );
 });
 
-test('todas las familias comparten el mismo fondo de página', () => {
-  const esperado = tema.reservas.bg;
-  for (const [familia, clave] of Object.entries(FONDO_DE)) {
-    assert.equal(
-      tema[familia][clave],
-      esperado,
-      `${familia}.${clave} no es el fondo único (${esperado}).`
-    );
-  }
+test('el texto principal no es el color de acción', () => {
+  // La garantía que se le dio a Vicente cuando se unificó: el verde cambia de
+  // tono, no se expande. Si el texto principal terminara en el verde de
+  // acción, el mapeo por rol se hizo mal.
+  assert.notEqual(tema.reservas.textPrimary, tema.reservas.green);
 });
 
 test('los cinco rojos de la app son uno solo', () => {
   // Existían con cinco valores distintos en cinco familias: `colors.error`
   // (#E5484D), `clubColors.loss` y `partidos.coral` (#E8737B),
-  // `chatColors.danger` (#FF7A6B) y `reservas.red` (#ED6B76). Las familias se
-  // van borrando a medida que su módulo migra, así que esta lista ENCOGE: lo
-  // que no puede pasar es que alguna de las que quedan se desvíe.
-  const esperado = tema.reservas.red;
-  assert.equal(tema.tactical.danger, esperado);
-});
-
-test('el texto principal no se volvió verde en ninguna familia', () => {
-  // La garantía que se le dio a Vicente: el verde cambia de tono, no se
-  // expande. Si el texto principal de alguna familia terminara en el verde de
-  // acción, el mapeo por rol se hizo mal.
-  const verde = tema.reservas.green;
-  for (const familia of FAMILIAS) {
-    const paleta = tema[familia];
-    const texto = paleta.textPrimary ?? paleta.text;
-    assert.notEqual(
-      texto,
-      verde,
-      `${familia}: el texto principal quedó del color de acción.`
-    );
-  }
+  // `chatColors.danger` (#FF7A6B) y `reservas.red` (#ED6B76). Hoy el rojo de
+  // error, el de derrota y el destructivo son el mismo token.
+  assert.equal(tema.reservas.loss, tema.reservas.red);
+  assert.equal(tema.reservas.lossSoft, tema.reservas.redSoft);
 });

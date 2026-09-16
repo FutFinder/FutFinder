@@ -18,7 +18,9 @@ import ReservasScreen from '../screens/ReservasScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchFootballIcon from '../components/SearchFootballIcon';
-import { tactical } from '../theme/colors';
+import {
+  reservas as C,
+} from '../theme/colors';
 import { countUnreadTotal, subscribeToMessages } from '../services/messages';
 
 import { ClubsHomeProvider, useClubsHome } from '../contexts/ClubsHomeContext';
@@ -97,7 +99,7 @@ function CustomTabBar({ state, navigation }) {
   const renderTab = (route) => {
     const index = state.routes.indexOf(route);
     const isFocused = state.index === index;
-    const color = isFocused ? tactical.neon : 'rgba(255,255,255,0.42)';
+    const color = isFocused ? C.green : 'rgba(255,255,255,0.42)';
     const Icon = iconFor(route.name);
     const badge =
       route.name === 'ChatTab'
@@ -146,9 +148,9 @@ function CustomTabBar({ state, navigation }) {
             // discrepando.
             <View
               className="absolute -right-2 -top-1.5 min-w-[15px] items-center justify-center rounded-full px-1"
-              style={{ backgroundColor: tactical.neon }}
+              style={{ backgroundColor: C.green }}
             >
-              <Text className="text-[9.5px] font-bold" style={{ color: tactical.neonInk }}>
+              <Text className="text-[9.5px] font-bold" style={{ color: C.greenInk }}>
                 {etiquetaBadge(badge)}
               </Text>
             </View>
@@ -178,13 +180,13 @@ function CustomTabBar({ state, navigation }) {
         hitSlop={6}
         className="absolute -top-5 left-1/2 h-[58px] w-[58px] -translate-x-[29px] items-center justify-center rounded-full border-4 border-[#050605] bg-[#00FF66] active:opacity-85"
         style={{
-          shadowColor: tactical.neon,
+          shadowColor: C.green,
           shadowOpacity: 0.45,
           shadowRadius: 16,
           shadowOffset: { width: 0, height: 8 },
         }}
       >
-        <Plus size={28} color={tactical.neonInk} strokeWidth={3} />
+        <Plus size={28} color={C.greenInk} strokeWidth={3} />
       </Pressable>
     </View>
   );

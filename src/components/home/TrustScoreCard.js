@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { tactical as t } from '../../theme/colors';
+import {
+  reservas as C,
+} from '../../theme/colors';
 
 export default function TrustScoreCard({
   score, max = 100, matchesPlayed, reports = 0, tierLabel = 'ÉLITE', onPress,
@@ -10,7 +12,7 @@ export default function TrustScoreCard({
   return (
     <Pressable onPress={onPress}>
       <LinearGradient
-        colors={t.metal}
+        colors={C.metal}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         className="overflow-hidden rounded-[20px] border border-white/10 p-4"
@@ -25,7 +27,7 @@ export default function TrustScoreCard({
 
         <View className="mt-4 h-[7px] overflow-hidden rounded-full bg-white/8">
           <LinearGradient
-            colors={['#0A7A3C', t.neon]}
+            colors={['#0A7A3C', C.green]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ width: `${pct}%`, height: '100%', borderRadius: 999 }}

@@ -1,7 +1,11 @@
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { Shield, MapPin, Users, ChevronRight } from 'lucide-react-native';
-import { clubsExplorer as CE, clubsExplorerRadius as CER } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Tarjeta de club del explorador (handoff `Clubes.dc.html`): escudo o foto,
@@ -34,7 +38,7 @@ export default function ClubExplorerCard({ club, totalMiembros, onPress, onPress
         <Image source={{ uri: club.foto_url }} style={styles.logo} />
       ) : (
         <View style={[styles.logo, styles.logoFallback]}>
-          <Shield color={CE.green} size={26} strokeWidth={2} />
+          <Shield color={C.green} size={26} strokeWidth={2} />
         </View>
       )}
 
@@ -45,7 +49,7 @@ export default function ClubExplorerCard({ club, totalMiembros, onPress, onPress
         <View style={styles.metaRow}>
           {club.comuna ? (
             <View style={styles.metaItem}>
-              <MapPin color={CE.textSecondary} size={13} strokeWidth={2} />
+              <MapPin color={C.textSecondary} size={13} strokeWidth={2} />
               <Text style={styles.metaText} numberOfLines={1}>
                 {club.comuna}
               </Text>
@@ -62,12 +66,12 @@ export default function ClubExplorerCard({ club, totalMiembros, onPress, onPress
               accessibilityLabel={`Ver ${etiquetaMiembros} de ${club.nombre}`}
               style={({ pressed }) => [styles.metaItem, pressed && { opacity: 0.6 }]}
             >
-              <Users color={CE.textSecondary} size={13} strokeWidth={2} />
+              <Users color={C.textSecondary} size={13} strokeWidth={2} />
               <Text style={[styles.metaText, styles.metaTextLink]}>{etiquetaMiembros}</Text>
             </Pressable>
           ) : (
             <View style={styles.metaItem}>
-              <Users color={CE.textSecondary} size={13} strokeWidth={2} />
+              <Users color={C.textSecondary} size={13} strokeWidth={2} />
               <Text style={styles.metaText}>{etiquetaMiembros}</Text>
             </View>
           )}
@@ -77,7 +81,7 @@ export default function ClubExplorerCard({ club, totalMiembros, onPress, onPress
       {rightAccessory !== undefined ? (
         rightAccessory
       ) : (
-        <ChevronRight color={CE.textMuted} size={20} strokeWidth={2.2} />
+        <ChevronRight color={C.textMuted} size={20} strokeWidth={2.2} />
       )}
     </Pressable>
   );
@@ -88,31 +92,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: CE.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: CE.border,
-    borderRadius: CER.card,
+    borderColor: C.border,
+    borderRadius: R.card,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 12,
   },
-  cardPressed: { borderColor: CE.green },
+  cardPressed: { borderColor: C.green },
   logo: {
     width: 56,
     height: 56,
-    borderRadius: CER.icon,
+    borderRadius: R.ctaSecondary,
     flexShrink: 0,
   },
   logoFallback: {
-    backgroundColor: CE.shieldBg,
+    backgroundColor: C.shieldBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   info: { flex: 1, minWidth: 0 },
   name: {
-    color: CE.textPrimary,
+    color: C.textPrimary,
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: F.bold,
     marginBottom: 4,
   },
   metaRow: {
@@ -127,9 +131,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    color: CE.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
   metaTextLink: {
     textDecorationLine: 'underline',

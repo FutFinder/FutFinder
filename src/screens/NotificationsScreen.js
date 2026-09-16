@@ -11,7 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Check, Trash2, BellOff, ServerCrash } from 'lucide-react-native';
 
-import { tactical as t } from '../theme/colors';
+import {
+  reservas as C,
+} from '../theme/colors';
 import Banner from '../components/Banner';
 import NotificationCard, { CATEGORY } from '../components/notifications/NotificationCard';
 import FilterChips from '../components/notifications/FilterChips';
@@ -379,10 +381,10 @@ export default function NotificationsScreen({ navigation }) {
   }, [items, filter, clubesAdmin]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: t.bg }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.bg }}>
         <LinearGradient
-          colors={t.headerGradient}
+          colors={C.headerGradient}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
           className="px-5 pb-4 pt-3"
@@ -396,7 +398,7 @@ export default function NotificationsScreen({ navigation }) {
                 accessibilityLabel="Salir de Avisos"
                 className="h-[34px] w-[34px] items-center justify-center rounded-xl border border-white/12 bg-black/45 active:opacity-70"
               >
-                <ArrowLeft size={16} color={t.text} strokeWidth={2.2} />
+                <ArrowLeft size={16} color={C.textPrimary} strokeWidth={2.2} />
               </Pressable>
               <View>
                 <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00FF66]/75">Centro de actividad</Text>
@@ -411,9 +413,9 @@ export default function NotificationsScreen({ navigation }) {
                 style={items.length === 0 || busyIds.has(MARK_ALL_ID) ? { opacity: 0.3 } : null}
               >
                 {busyIds.has(MARK_ALL_ID) ? (
-                  <ActivityIndicator size="small" color={t.neon} />
+                  <ActivityIndicator size="small" color={C.green} />
                 ) : (
-                  <Check size={14} color={t.neon} strokeWidth={2.6} />
+                  <Check size={14} color={C.green} strokeWidth={2.6} />
                 )}
                 <Text className="text-[10.5px] font-bold tracking-[0.14em] text-white/85">LEER TODO</Text>
               </Pressable>
@@ -424,9 +426,9 @@ export default function NotificationsScreen({ navigation }) {
                 style={items.length === 0 || busyIds.has(CLEAR_ALL_ID) ? { opacity: 0.3 } : null}
               >
                 {busyIds.has(CLEAR_ALL_ID) ? (
-                  <ActivityIndicator size="small" color={t.danger} />
+                  <ActivityIndicator size="small" color={C.red} />
                 ) : (
-                  <Trash2 size={15} color={t.danger} strokeWidth={1.9} />
+                  <Trash2 size={15} color={C.red} strokeWidth={1.9} />
                 )}
               </Pressable>
             </View>
@@ -445,12 +447,12 @@ export default function NotificationsScreen({ navigation }) {
 
         {status === 'loading' ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color={t.neon} />
+            <ActivityIndicator color={C.green} />
           </View>
         ) : status === 'error' ? (
           <View className="flex-1 items-center justify-center gap-3 px-8">
             <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-[#FF6B6B]/30 bg-[#FF6B6B]/8">
-              <ServerCrash size={21} color={t.danger} strokeWidth={1.9} />
+              <ServerCrash size={21} color={C.red} strokeWidth={1.9} />
             </View>
             <Text className="text-[16px] font-bold text-white">No pudimos cargar tus avisos</Text>
             <Text className="text-center text-[13.5px] leading-5 text-white/45">
@@ -467,14 +469,14 @@ export default function NotificationsScreen({ navigation }) {
           <SectionList
             sections={sections}
             keyExtractor={(item) => item.id}
-            style={{ backgroundColor: t.bg }}
+            style={{ backgroundColor: C.bg }}
             contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 120 }}
             stickySectionHeadersEnabled={false}
             showsVerticalScrollIndicator={false}
             ItemSeparatorComponent={() => <View style={{ height: 9 }} />}
             SectionSeparatorComponent={() => <View style={{ height: 9 }} />}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.neon} colors={[t.neon]} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.green} colors={[C.green]} />
             }
             renderSectionHeader={({ section }) => (
               <View className="mb-1 mt-2 flex-row items-center gap-2.5">
@@ -495,7 +497,7 @@ export default function NotificationsScreen({ navigation }) {
             ListEmptyComponent={
               <View className="mt-10 items-center gap-3 rounded-[20px] border border-dashed border-[#00FF66]/28 bg-[#00FF66]/5 px-5 py-7">
                 <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-[#00FF66]/30 bg-[#00FF66]/8">
-                  <BellOff size={21} color={t.neon} strokeWidth={1.9} />
+                  <BellOff size={21} color={C.green} strokeWidth={1.9} />
                 </View>
                 <Text className="text-[16px] font-bold text-white">Todo al día</Text>
                 <Text className="text-center text-[13.5px] leading-5 text-white/45">No tienes avisos pendientes en este filtro.</Text>

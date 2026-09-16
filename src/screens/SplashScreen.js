@@ -10,7 +10,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MapPin } from 'lucide-react-native';
-import { clubsExplorer, tactical } from '../theme/colors';
+import {
+  reservas as C,
+  reservasFonts as F,
+} from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
 import { getInitialRouteName } from '../utils/routing';
 import { conTecho } from '../utils/conTecho';
@@ -21,7 +24,7 @@ function clamp(value, min, max) {
 
 // El ícono y el wordmark reproducen exactamente los valores de
 // BrandMark.js (pin + "fut...finder"): mismo ícono, mismo tamaño 26, mismo
-// color tactical.neon, mismo estilo de texto. Se reconstruyen acá — en vez
+// color C.green, mismo estilo de texto. Se reconstruyen acá — en vez
 // de renderizar <BrandMark /> — porque esta pantalla necesita animar el
 // pin y el texto en momentos distintos (el pin se asienta, luego el texto
 // se desliza a su derecha), algo que un <BrandMark /> fusionado no puede
@@ -167,7 +170,7 @@ export default function SplashScreen({ navigation }) {
               transform: [{ scale: iconScale }],
             }}
           >
-            <MapPin size={ICON_SIZE} color={tactical.neon} strokeWidth={2.2} />
+            <MapPin size={ICON_SIZE} color={C.green} strokeWidth={2.2} />
           </Animated.View>
           <Animated.View
             style={{
@@ -188,7 +191,7 @@ export default function SplashScreen({ navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: clubsExplorer.bg,
+    backgroundColor: C.bg,
   },
   safeArea: {
     flex: 1,
@@ -202,11 +205,11 @@ const styles = StyleSheet.create({
   },
   word: {
     fontSize: 21,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.4,
-    color: tactical.text,
+    color: C.textPrimary,
   },
   wordAccent: {
-    color: tactical.neon,
+    color: C.green,
   },
 });

@@ -6,7 +6,9 @@ import StatusPill from './StatusPill';
 import BrandMark from '../BrandMark';
 import NotificationBell from '../NotificationBell';
 import WalletButton from '../WalletButton';
-import { tactical as t } from '../../theme/colors';
+import {
+  reservas as C,
+} from '../../theme/colors';
 
 export default function TacticalHeader({
   userName, comuna, summary, greeting = 'Buenas noches',
@@ -14,7 +16,7 @@ export default function TacticalHeader({
 }) {
   return (
     <LinearGradient
-      colors={t.headerGradient}
+      colors={C.headerGradient}
       start={{ x: 0.1, y: 0 }}
       end={{ x: 0.9, y: 1 }}
       className="px-5 pb-5 pt-3"
@@ -40,7 +42,7 @@ export default function TacticalHeader({
       <View className="mt-4 flex-row flex-wrap gap-2">
         {verified ? (
           <View className="flex-row items-center gap-1.5 rounded-full border border-[#00FF66]/40 bg-[#00FF66]/14 px-2.5 py-1">
-            <ShieldCheck size={13} color={t.neon} />
+            <ShieldCheck size={13} color={C.green} />
             <Text className="text-[10.5px] font-bold tracking-[0.15em] text-[#00FF66]">VERIFICADO</Text>
           </View>
         ) : null}

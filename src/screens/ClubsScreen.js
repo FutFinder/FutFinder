@@ -12,7 +12,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native';
 import { AlertTriangle, Check, X, Clock } from 'lucide-react-native';
 
-import { clubsExplorer as CE, clubTonos, clubSuperficies } from '../theme/colors';
+import {
+  reservas as C,
+  reservasFonts as F,
+  clubTonos,
+  clubSuperficies,
+} from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import { respondToRequest, cancelRequest } from '../services/clubs';
 import { lugarLabel } from '../services/clubMatchRules';
@@ -750,7 +755,7 @@ function fechaLegible(iso) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: CE.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingTop: 4 },
   bannerHueco: { paddingHorizontal: 16, paddingBottom: 8 },
   seccion: { paddingHorizontal: 16, gap: 12, marginBottom: 23 },
@@ -763,7 +768,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   tituloConBadge: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tituloSeccion: { fontSize: 15.5, fontWeight: '800', color: '#FFFFFF' },
+  tituloSeccion: { fontSize: 15.5, fontFamily: F.extraBold, color: '#FFFFFF' },
   badge: {
     minWidth: 21,
     height: 21,
@@ -772,8 +777,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeTexto: { fontSize: 12, fontWeight: '800' },
-  verTodo: { fontSize: 12.5, fontWeight: '700' },
+  badgeTexto: { fontSize: 12, fontFamily: F.extraBold },
+  verTodo: { fontSize: 12.5, fontFamily: F.bold },
   verMas: {
     paddingVertical: 12,
     borderRadius: 14,
@@ -782,7 +787,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.16)',
     alignItems: 'center',
   },
-  verMasTexto: { fontSize: 12.5, fontWeight: '700', color: 'rgba(255, 255, 255, 0.6)' },
+  verMasTexto: { fontSize: 12.5, fontFamily: F.bold, color: 'rgba(255, 255, 255, 0.6)' },
   carrusel: { paddingHorizontal: 16, gap: 10 },
   rival: { width: 172 },
 
@@ -796,7 +801,7 @@ const styles = StyleSheet.create({
     backgroundColor: clubTonos.danger.soft,
     marginBottom: 4,
   },
-  tituloVacio: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
+  tituloVacio: { fontSize: 17, fontFamily: F.extraBold, color: '#FFFFFF', textAlign: 'center' },
   textoVacio: {
     fontSize: 13,
     lineHeight: 19,
@@ -810,9 +815,9 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: CE.green,
+    backgroundColor: C.green,
   },
-  botonPrimarioTexto: { fontSize: 14, fontWeight: '700', color: '#04140A' },
+  botonPrimarioTexto: { fontSize: 14, fontFamily: F.bold, color: '#04140A' },
   botonSecundario: {
     minWidth: 140,
     height: 46,
@@ -824,7 +829,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  botonSecundarioTexto: { fontSize: 13.5, fontWeight: '700', color: '#FFFFFF' },
+  botonSecundarioTexto: { fontSize: 13.5, fontFamily: F.bold, color: '#FFFFFF' },
   crece: { flex: 1 },
 
   tarjetaEspera: {
@@ -846,7 +851,7 @@ const styles = StyleSheet.create({
   },
   esperaAcciones: { flexDirection: 'row', gap: 9 },
   textos: { flex: 1, minWidth: 0, gap: 2 },
-  tituloTarjeta: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  tituloTarjeta: { fontSize: 14, fontFamily: F.bold, color: '#FFFFFF' },
   subtituloTarjeta: { fontSize: 12, color: 'rgba(255, 255, 255, 0.5)' },
 
   invitacion: {
@@ -865,7 +870,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: CE.green,
+    backgroundColor: C.green,
   },
   iconoRechazar: {
     width: 36,

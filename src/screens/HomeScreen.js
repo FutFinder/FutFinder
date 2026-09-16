@@ -12,7 +12,9 @@ import SectionHeader from '../components/home/SectionHeader';
 import Banner from '../components/Banner';
 import MatchPreviewSheet from '../components/MatchPreviewSheet';
 
-import { tactical } from '../theme/colors';
+import {
+  reservas as C,
+} from '../theme/colors';
 import { notify } from '../utils/notify';
 import {
   listOpenMatches,
@@ -254,18 +256,18 @@ export default function HomeScreen({ navigation }) {
   // ── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <View style={{ flex: 1, backgroundColor: tactical.bg }}>
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: tactical.bg }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView
-          style={{ backgroundColor: tactical.bg }}
+          style={{ backgroundColor: C.bg }}
           contentContainerStyle={{ paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={tactical.neon}
-              colors={[tactical.neon]}
+              tintColor={C.green}
+              colors={[C.green]}
             />
           }
         >

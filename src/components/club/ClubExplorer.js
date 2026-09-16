@@ -25,7 +25,11 @@ import {
   AlertCircle,
 } from 'lucide-react-native';
 
-import { clubsExplorer as CE, clubsExplorerRadius as CER } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import Banner from '../Banner';
 import BrandMark from '../BrandMark';
 import ClubExplorerCard from './ClubExplorerCard';
@@ -202,8 +206,8 @@ export default function ClubExplorer({
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={CE.green}
-              colors={[CE.green]}
+              tintColor={C.green}
+              colors={[C.green]}
             />
           }
           contentContainerStyle={[styles.listContent, { paddingBottom: fabBottom + 80 }]}
@@ -218,7 +222,7 @@ export default function ClubExplorer({
                     accessibilityLabel="Volver"
                     style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <ArrowLeft color={CE.textPrimary} size={20} strokeWidth={2.2} />
+                    <ArrowLeft color={C.textPrimary} size={20} strokeWidth={2.2} />
                   </Pressable>
                 ) : (
                   <BrandMark />
@@ -252,7 +256,7 @@ export default function ClubExplorer({
                             accessibilityLabel="Aceptar invitación"
                             style={({ pressed }) => [styles.invBtn, styles.invAccept, pressed && { opacity: 0.7 }]}
                           >
-                            <Check color={CE.bg} size={16} strokeWidth={2.6} />
+                            <Check color={C.bg} size={16} strokeWidth={2.6} />
                           </Pressable>
                           <Pressable
                             onPress={() => handleInvitation(inv, false)}
@@ -272,12 +276,12 @@ export default function ClubExplorer({
 
               <View style={[styles.searchRow, { marginBottom: filterOpen ? 12 : 24 }]}>
                 <View style={styles.searchBox}>
-                  <SearchIcon color={CE.textSecondary} size={18} strokeWidth={2} />
+                  <SearchIcon color={C.textSecondary} size={18} strokeWidth={2} />
                   <TextInput
                     value={query}
                     onChangeText={setQuery}
                     placeholder="Buscar clubes por nombre..."
-                    placeholderTextColor={CE.textSecondary}
+                    placeholderTextColor={C.textSecondary}
                     style={styles.searchInput}
                     autoCapitalize="none"
                   />
@@ -287,9 +291,9 @@ export default function ClubExplorer({
                       hitSlop={8}
                       accessibilityRole="button"
                       accessibilityLabel="Limpiar búsqueda"
-                      style={({ pressed }) => [styles.clearBtn, pressed && { backgroundColor: CE.border }]}
+                      style={({ pressed }) => [styles.clearBtn, pressed && { backgroundColor: C.border }]}
                     >
-                      <X color={CE.textSecondary} size={13} strokeWidth={2.4} />
+                      <X color={C.textSecondary} size={13} strokeWidth={2.4} />
                     </Pressable>
                   )}
                 </View>
@@ -303,7 +307,7 @@ export default function ClubExplorer({
                     pressed && { opacity: 0.85 },
                   ]}
                 >
-                  <SlidersHorizontal color={CE.textPrimary} size={18} strokeWidth={2} />
+                  <SlidersHorizontal color={C.textPrimary} size={18} strokeWidth={2} />
                   {filtersActive && <View style={styles.filterDot} />}
                 </Pressable>
               </View>
@@ -372,7 +376,7 @@ export default function ClubExplorer({
                       accessibilityLabel={`Desafiar a ${item.nombre}`}
                       style={({ pressed }) => [styles.desafiarBtn, pressed && { opacity: 0.7 }]}
                     >
-                      <Swords color={CE.bg} size={14} strokeWidth={2.4} />
+                      <Swords color={C.bg} size={14} strokeWidth={2.4} />
                       <Text style={styles.desafiarText}>Desafiar</Text>
                     </Pressable>
                   ) : undefined
@@ -383,7 +387,7 @@ export default function ClubExplorer({
           ListEmptyComponent={
             loading ? (
               <View style={styles.stateBox}>
-                <ActivityIndicator color={CE.green} />
+                <ActivityIndicator color={C.green} />
               </View>
             ) : error ? (
               <View style={styles.stateBox}>
@@ -402,7 +406,7 @@ export default function ClubExplorer({
             ) : showEmptyNoClubs ? (
               <View style={styles.stateBox}>
                 <View style={styles.stateIconWrap}>
-                  <Shield color={CE.green} size={34} strokeWidth={2} />
+                  <Shield color={C.green} size={34} strokeWidth={2} />
                 </View>
                 <Text style={styles.stateTitle}>Todavía no tienes clubes</Text>
                 <Text style={styles.stateText}>
@@ -412,7 +416,7 @@ export default function ClubExplorer({
             ) : showEmptyNoResults ? (
               <View style={styles.stateBox}>
                 <View style={styles.stateIconWrap}>
-                  <SearchIcon color={CE.textMuted} size={28} strokeWidth={2} />
+                  <SearchIcon color={C.textMuted} size={28} strokeWidth={2} />
                 </View>
                 <Text style={styles.stateTitle}>Sin resultados</Text>
                 <Text style={styles.stateText}>
@@ -442,10 +446,10 @@ export default function ClubExplorer({
           style={({ pressed }) => [
             styles.createFab,
             { bottom: fabBottom },
-            pressed && { backgroundColor: CE.greenActive },
+            pressed && { backgroundColor: C.greenActive },
           ]}
         >
-          <Plus color={CE.greenInk} size={20} strokeWidth={2.6} />
+          <Plus color={C.greenInk} size={20} strokeWidth={2.6} />
           <Text style={styles.createFabText}>Crear club</Text>
         </Pressable>
       )}
@@ -483,12 +487,12 @@ function FilterField({ label, value, placeholder, onPress }) {
       <Text style={styles.filterLabel}>{label}</Text>
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.filterSelect, pressed && { borderColor: CE.green }]}
+        style={({ pressed }) => [styles.filterSelect, pressed && { borderColor: C.green }]}
       >
         <Text style={value ? styles.filterValue : styles.filterPlaceholder} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <ChevronDown color={CE.textSecondary} size={16} strokeWidth={2.2} />
+        <ChevronDown color={C.textSecondary} size={16} strokeWidth={2.2} />
       </Pressable>
     </View>
   );
@@ -542,18 +546,18 @@ function OptionRow({ label, selected, onPress }) {
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      style={({ pressed }) => [styles.optionRow, pressed && { backgroundColor: CE.surfaceAlt }]}
+      style={({ pressed }) => [styles.optionRow, pressed && { backgroundColor: C.surfaceAlt }]}
     >
       <Text style={[styles.optionText, selected && styles.optionTextActive]} numberOfLines={1}>
         {label}
       </Text>
-      {selected && <Check color={CE.green} size={16} strokeWidth={2.6} />}
+      {selected && <Check color={C.green} size={16} strokeWidth={2.6} />}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: CE.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   glow: {
     position: 'absolute',
     top: -160,
@@ -561,7 +565,7 @@ const styles = StyleSheet.create({
     right: '10%',
     height: 260,
     borderRadius: 999,
-    backgroundColor: CE.headerGlowFrom,
+    backgroundColor: C.headerGlowFrom,
     opacity: 0.35,
   },
   safe: { flex: 1 },
@@ -573,17 +577,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: CE.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: CE.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontSize: 32,
     lineHeight: 38,
-    fontWeight: '800',
-    color: CE.textPrimary,
+    fontFamily: F.extraBold,
+    color: C.textPrimary,
     letterSpacing: -0.5,
     paddingTop: 8,
     paddingBottom: 20,
@@ -594,9 +598,9 @@ const styles = StyleSheet.create({
   section: { marginBottom: 20 },
   sectionLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 1,
-    color: CE.textMuted,
+    color: C.textMuted,
     marginBottom: 12,
     textTransform: 'uppercase',
   },
@@ -608,7 +612,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  invAccept: { backgroundColor: CE.green },
+  invAccept: { backgroundColor: C.green },
   invReject: {
     backgroundColor: 'rgba(232,115,123,0.12)',
     borderWidth: 1,
@@ -622,34 +626,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: CE.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: CE.border,
-    borderRadius: CER.input,
+    borderColor: C.border,
+    borderRadius: R.row,
     paddingHorizontal: 14,
   },
-  searchInput: { flex: 1, color: CE.textPrimary, fontSize: 15, fontWeight: '500' },
+  searchInput: { flex: 1, color: C.textPrimary, fontSize: 15, fontFamily: F.medium },
   clearBtn: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: CE.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1,
-    borderColor: CE.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   filterBtn: {
     width: 48,
     height: 48,
-    borderRadius: CER.input,
-    backgroundColor: CE.surface,
+    borderRadius: R.row,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: CE.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterBtnActive: { borderColor: CE.green },
+  filterBtnActive: { borderColor: C.green },
   filterDot: {
     position: 'absolute',
     top: 7,
@@ -657,75 +661,75 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: CE.green,
+    backgroundColor: C.green,
   },
 
   filterPanel: {
-    backgroundColor: CE.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: CE.border,
-    borderRadius: CER.panel,
+    borderColor: C.border,
+    borderRadius: R.row,
     padding: 16,
     gap: 12,
     marginBottom: 24,
   },
   filterField: { gap: 6 },
-  filterLabel: { fontSize: 12, fontWeight: '600', color: CE.textSecondary },
+  filterLabel: { fontSize: 12, fontFamily: F.semiBold, color: C.textSecondary },
   filterSelect: {
     height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: CE.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1,
-    borderColor: CE.border,
+    borderColor: C.border,
     borderRadius: 14,
     paddingHorizontal: 12,
   },
-  filterValue: { color: CE.textPrimary, fontSize: 14, fontWeight: '500', flex: 1 },
-  filterPlaceholder: { color: CE.textSecondary, fontSize: 14, fontWeight: '500', flex: 1 },
-  clearFiltersText: { color: CE.green, fontSize: 13, fontWeight: '600' },
+  filterValue: { color: C.textPrimary, fontSize: 14, fontFamily: F.medium, flex: 1 },
+  filterPlaceholder: { color: C.textSecondary, fontSize: 14, fontFamily: F.medium, flex: 1 },
+  clearFiltersText: { color: C.green, fontSize: 13, fontFamily: F.semiBold },
 
   desafiarBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: CE.green,
-    borderRadius: CER.pill,
+    backgroundColor: C.green,
+    borderRadius: R.iconBtn,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  desafiarText: { color: CE.greenInk, fontSize: 12, fontWeight: '800' },
+  desafiarText: { color: C.greenInk, fontSize: 12, fontFamily: F.extraBold },
 
   // El mismo tamaño que el botón, apagado: la fila no cambia de alto cuando
   // un club pasa de «Desafiar» a «Desafío enviado».
   pendienteChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: CER.pill,
+    borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: CE.border,
+    borderColor: C.border,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  pendienteText: { color: CE.textSecondary, fontSize: 12, fontWeight: '700' },
+  pendienteText: { color: C.textSecondary, fontSize: 12, fontFamily: F.bold },
 
   stateBox: { alignItems: 'center', textAlign: 'center', paddingVertical: 48, paddingHorizontal: 24, gap: 4 },
   stateIconWrap: {
     width: 72,
     height: 72,
-    borderRadius: CER.empty,
-    backgroundColor: CE.surface,
+    borderRadius: R.hero,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: CE.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
-  stateTitle: { fontSize: 19, fontWeight: '700', color: CE.textPrimary, marginBottom: 8 },
+  stateTitle: { fontSize: 19, fontFamily: F.bold, color: C.textPrimary, marginBottom: 8 },
   stateText: {
     fontSize: 14,
-    color: CE.textSecondary,
+    color: C.textSecondary,
     lineHeight: 20,
     textAlign: 'center',
     maxWidth: 280,
@@ -737,19 +741,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: CE.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  retryText: { color: CE.textPrimary, fontSize: 14, fontWeight: '600' },
+  retryText: { color: C.textPrimary, fontSize: 14, fontFamily: F.semiBold },
 
   createFab: {
     position: 'absolute',
     left: 20,
     right: 20,
     height: 56,
-    borderRadius: CER.fab,
-    backgroundColor: CE.green,
+    borderRadius: R.row,
+    backgroundColor: C.green,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -760,7 +764,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
   },
-  createFabText: { color: CE.greenInk, fontSize: 16, fontWeight: '700' },
+  createFabText: { color: C.greenInk, fontSize: 16, fontFamily: F.bold },
 
   modalBackdrop: {
     flex: 1,
@@ -768,23 +772,23 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: CE.surface,
+    backgroundColor: C.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
-    borderColor: CE.border,
+    borderColor: C.border,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 32,
   },
   modalTitle: {
-    color: CE.textPrimary,
+    color: C.textPrimary,
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     marginBottom: 8,
   },
   modalEmpty: {
-    color: CE.textMuted,
+    color: C.textMuted,
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 20,
@@ -796,8 +800,8 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: CE.border,
+    borderBottomColor: C.border,
   },
-  optionText: { color: CE.textSecondary, fontSize: 14, fontWeight: '600', flex: 1 },
-  optionTextActive: { color: CE.green },
+  optionText: { color: C.textSecondary, fontSize: 14, fontFamily: F.semiBold, flex: 1 },
+  optionTextActive: { color: C.green },
 });

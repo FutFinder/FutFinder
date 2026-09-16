@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Plus } from 'lucide-react-native';
-import { tactical as t } from '../../theme/colors';
+import {
+  reservas as C,
+} from '../../theme/colors';
 
 export default function EmptyMatchesCard({ comuna, onCreate }) {
   return (
     <View className="items-center gap-3 rounded-[20px] border border-dashed border-[#00FF66]/28 bg-[#00FF66]/5 px-5 py-6">
       <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-[#00FF66]/30 bg-[#00FF66]/8">
-        <Plus size={22} color={t.neon} strokeWidth={2.6} />
+        <Plus size={22} color={C.green} strokeWidth={2.6} />
       </View>
       <View className="items-center">
         <Text className="text-[16px] font-bold text-white">Sin partidos en tu radio</Text>

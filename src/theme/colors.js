@@ -17,8 +17,9 @@
 // YA NO EXISTEN, todas borradas el 2026-09-16: `colors`, `radius`, `spacing` y
 // `fonts` (la paleta legada del fondo café #201F1D y el verde oliva #71B533,
 // con la tipografía del sistema), `clubColors`/`clubRadius`/`clubSizes`, y
-// `dsColors`/`dsRadius`/`dsSizes` con `chatColors`, y `partidos` con
-// `partidosRadius`. Queda `tactical`.
+// `dsColors`/`dsRadius`/`dsSizes` con `chatColors`, `partidos` con
+// `partidosRadius`, `tactical`, y `clubsExplorer`/`clubsExplorerRadius`.
+// NO QUEDA NINGUNA: este archivo exporta UNA paleta.
 //
 // Ver `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 //
@@ -225,68 +226,6 @@ export const reservasFonts = {
 //
 // Cada una es la misma paleta con el vocabulario que su módulo aprendió. Se
 // borran cuando su módulo migre a los nombres de `reservas`.
-
-/** Explorar clubes. Siempre fue la misma paleta; ahora lo dice el código. */
-export const clubsExplorer = {
-  bg: reservas.bg,
-  headerGlowFrom: reservas.headerGlowFrom,
-  headerGlowTo: reservas.headerGlowTo,
-  surface: reservas.surface,
-  surfaceAlt: reservas.surfaceAlt,
-  border: reservas.border,
-  green: reservas.green,
-  greenHover: reservas.greenHover,
-  greenActive: reservas.greenActive,
-  greenInk: reservas.greenInk,
-  shieldBg: reservas.shieldBg,
-  textPrimary: reservas.textPrimary,
-  textSecondary: reservas.textSecondary,
-  textMuted: reservas.textMuted,
-};
-
-/**
- * Inicio, Splash, Avisos y el wordmark.
- *
- * Era la excepción declarada: negro puro con verde flúor #00FF66, «más cancha
- * nocturna que el resto de la app». Entra igual en la unificación por decisión
- * de Vicente el 2026-09-16, logo incluido — una excepción que hay que explicar
- * cada vez no es una decisión de diseño, es una deuda con buena prensa.
- *
- * Sus tres degradados sí necesitaron valores nuevos: `reservas` no tenía
- * ninguno, y el metal y el degradado de cabecera no se pueden deducir de un
- * color plano.
- */
-export const tactical = {
-  bg: reservas.bg,
-  surface: reservas.surface,
-  surfaceAlt: reservas.surfaceAlt,
-  metal: reservas.metal,
-  headerGradient: reservas.headerGradient,
-
-  neon: reservas.green,
-  neonInk: reservas.greenInk,
-  neonSoft: reservas.greenSoft,
-  neonBorder: reservas.greenBorder,
-
-  danger: reservas.red,
-
-  border: reservas.border,
-  borderStrong: reservas.borderStrong,
-
-  text: reservas.textPrimary,
-  textDim: reservas.textSecondary,
-  textFaint: reservas.textFaint,
-};
-
-export const clubsExplorerRadius = {
-  input: 16,
-  card: 22,
-  icon: 16,
-  panel: 18,
-  empty: 24,
-  pill: 14,
-  fab: 18,
-};
 
 /**
  * Tonos semánticos del módulo Clubes que NO se tematizan.
