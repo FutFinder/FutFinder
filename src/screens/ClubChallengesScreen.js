@@ -28,8 +28,10 @@ import {
 } from 'lucide-react-native';
 
 import Banner from '../components/Banner';
+import PickerSheet from '../components/partidos/PickerSheet';
 import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
+import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { getMisClubesAdmin, getClubById } from '../services/clubs';
 import { puedeResponderDesafio, puedeCancelarDesafio } from '../utils/permisosDesafio';
 import {
@@ -56,6 +58,7 @@ import {
 } from '../services/clubOpenChallenges';
 import { formatDistanciaKm, modalidadInline } from '../utils/clubMeta';
 import { resumenEstadisticas } from '../utils/historialClub';
+import { haceCuanto } from '../utils/tiempoRelativo';
 import {
   parseFechaHora,
   formatFecha,
@@ -65,6 +68,7 @@ import {
   cierraEnLabel,
   esCerca,
   cierraPronto,
+  contarFiltrosActivos,
 } from '../utils/openChallengeBoard';
 
 const BLANK_DRAFT = { modalidad: 'futbol7', fechaStr: '', horaStr: '', zona: '', mensaje: '' };
@@ -141,15 +145,21 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [browsing, setBrowsing] = useState([]);
   const [misRespuestas, setMisRespuestas] = useState(new Map());
   const [filtroModalidad, setFiltroModalidad] = useState(null);
+  const [filtroRegion, setFiltroRegion] = useState(null);
+  const [filtroComuna, setFiltroComuna] = useState(null);
+  const [filtroFromHour, setFiltroFromHour] = useState(0);
+  const [filtroToHour, setFiltroToHour] = useState(23);
   const [sort, setSort] = useState('cerca');
   const [subScreen, setSubScreen] = useState('lista'); // 'lista' | 'publicar' | 'editar' | 'respuestas' | 'directos'
   const [editId, setEditId] = useState(null);
+  const [editingPub, setEditingPub] = useState(null);
   const [draft, setDraft] = useState(BLANK_DRAFT);
   const [respuestasDe, setRespuestasDe] = useState(null);
   const [respuestas, setRespuestas] = useState([]);
   const [detalle, setDetalle] = useState(null);
   const [mensajeRespuesta, setMensajeRespuesta] = useState('');
   const [filtroSheetOpen, setFiltroSheetOpen] = useState(false);
+  const [picker, setPicker] = useState(null); // 'region' | 'comuna' (del filtro)
   const [mineIndex, setMineIndex] = useState(0);
 
   const soyAdminDeEsteClub = Array.isArray(clubesAdmin) && clubesAdmin.includes(clubId);
@@ -271,6 +281,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
       mensaje: pub.mensaje || '',
     });
     setEditId(pub.id);
+    setEditingPub(pub);
     setSubScreen('editar');
   };
 
@@ -409,9 +420,19 @@ export default function ClubChallengesScreen({ navigation, route }) {
   };
 
   const tema = temaDeClub(clubActual);
-  const listaOrdenada = ordenarPublicaciones(browsing, { modalidad: filtroModalidad, sort });
+  const filtros = { modalidad: filtroModalidad, region: filtroRegion, comuna: filtroComuna, fromHour: filtroFromHour, toHour: filtroToHour };
+  const listaOrdenada = ordenarPublicaciones(browsing, { ...filtros, sort });
+  const filtrosActivos = contarFiltrosActivos(filtros);
   const pendientesDirectos = recibidos.filter((c) => c.estado === 'pendiente').length;
   const cardWidth = Math.max(0, width - S.screenPadding * 2);
+
+  const limpiarFiltros = () => {
+    setFiltroModalidad(null);
+    setFiltroRegion(null);
+    setFiltroComuna(null);
+    setFiltroFromHour(0);
+    setFiltroToHour(23);
+  };
 
   if (loading) {
     return (
@@ -465,6 +486,8 @@ export default function ClubChallengesScreen({ navigation, route }) {
           setDraft={setDraft}
           onSubmitDraft={handleSubmitDraft}
           editId={editId}
+          editingPub={editingPub}
+          nombreDeMiClub={nombreDeMiClub}
           onCancelPublicacion={() => {
             const pub = misPublicaciones.find((p) => p.id === editId);
             if (pub) handleCancelPublicacion(pub);
@@ -513,7 +536,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
             style={({ pressed }) => [styles.filterBtnBig, pressed && { opacity: 0.85 }]}
           >
             <SlidersHorizontal color={C.textPrimary} size={16} strokeWidth={2.1} />
-            <Text style={styles.filterBtnBigText}>{filtroModalidad ? `Filtros · ${modalidadInline(filtroModalidad)}` : 'Filtros'}</Text>
+            <Text style={styles.filterBtnBigText}>{filtrosActivos ? `Filtros · ${filtrosActivos}` : 'Filtros'}</Text>
           </Pressable>
           <Pressable
             onPress={() => setSort((s) => (s === 'cerca' ? 'pronto' : 'cerca'))}
@@ -524,7 +547,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
           </Pressable>
         </View>
 
-        <Text style={styles.sectionTitle}>{filtroModalidad ? 'Resultados' : 'Cerca de ti'} ({listaOrdenada.length})</Text>
+        <Text style={styles.sectionTitle}>{filtrosActivos ? 'Resultados' : 'Cerca de ti'} ({listaOrdenada.length})</Text>
         {listaOrdenada.length === 0 ? (
           <View style={styles.emptyBoxDashed}>
             <Text style={styles.emptyText}>Ningún desafío calza con tus filtros.{'\n'}Amplía la distancia o quita algún criterio.</Text>
@@ -556,10 +579,44 @@ export default function ClubChallengesScreen({ navigation, route }) {
         tema={tema}
         filtroModalidad={filtroModalidad}
         setFiltroModalidad={setFiltroModalidad}
-        sort={sort}
-        setSort={setSort}
+        filtroRegion={filtroRegion}
+        filtroComuna={filtroComuna}
+        filtroFromHour={filtroFromHour}
+        filtroToHour={filtroToHour}
+        setFiltroFromHour={setFiltroFromHour}
+        setFiltroToHour={setFiltroToHour}
+        onAbrirPickerRegion={() => setPicker('region')}
+        onAbrirPickerComuna={() => filtroRegion && setPicker('comuna')}
         count={listaOrdenada.length}
+        onLimpiar={limpiarFiltros}
         onClose={() => setFiltroSheetOpen(false)}
+      />
+
+      <PickerSheet
+        visible={picker === 'region'}
+        onClose={() => setPicker(null)}
+        title="Región"
+        options={REGIONES.map((r) => r.nombre)}
+        value={filtroRegion}
+        searchPlaceholder="Buscar región…"
+        allowClear
+        clearLabel="Cualquier región"
+        onSelect={(v) => {
+          setFiltroRegion(v);
+          setFiltroComuna(null);
+        }}
+      />
+      <PickerSheet
+        visible={picker === 'comuna'}
+        onClose={() => setPicker(null)}
+        title="Comuna"
+        subtitle={filtroRegion ? `${getComunasOfRegion(filtroRegion).length} en ${filtroRegion}` : ''}
+        options={filtroRegion ? getComunasOfRegion(filtroRegion) : []}
+        value={filtroComuna}
+        searchPlaceholder="Buscar comuna…"
+        allowClear
+        clearLabel="Cualquier comuna"
+        onSelect={setFiltroComuna}
       />
     </SafeAreaView>
   );
@@ -771,32 +828,47 @@ function MisDesafiosCarrusel({ tema, soyAdmin, misPublicaciones, cardWidth, mine
         scrollEventThrottle={16}
         contentContainerStyle={{ gap: CARRUSEL_GAP }}
       >
-        {activas.map((pub) => (
-          <LinearGradient
-            key={pub.id}
-            colors={[tema.soft, C.surface]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.mineCard, { width: cardWidth, borderColor: tema.border }]}
-          >
-            <View style={styles.mineHeaderRow}>
-              <View style={[styles.mineStateBadge, { backgroundColor: tema.soft }]}>
-                <Text style={[styles.mineStateBadgeText, { color: tema.main }]}>Publicado</Text>
+        {activas.map((pub) => {
+          const n = pub.respuestasCount || 0;
+          const hayRespuestas = n > 0;
+          return (
+            <LinearGradient
+              key={pub.id}
+              colors={[tema.soft, C.surface]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.mineCard, { width: cardWidth, borderColor: tema.border }]}
+            >
+              <View style={styles.mineHeaderRow}>
+                <View style={[styles.mineStateBadge, { backgroundColor: hayRespuestas ? tema.soft : C.chip }]}>
+                  <Text style={[styles.mineStateBadgeText, { color: hayRespuestas ? tema.main : C.textMuted }]}>
+                    {hayRespuestas ? 'Publicado' : 'Sin respuestas'}
+                  </Text>
+                </View>
+                <Text style={styles.mineExpiry}>{cierraEnLabel(pub.created_at)}</Text>
               </View>
-              <Text style={styles.mineExpiry}>{cierraEnLabel(pub.created_at)}</Text>
-            </View>
-            <Text style={styles.mineTitle}>{modalidadInline(pub.modalidad)} · {fmtFecha(pub.fecha_propuesta)}</Text>
-            <Text style={styles.mineSub} numberOfLines={1}>{pub.zona || 'Zona a coordinar por chat'}</Text>
-            <View style={styles.mineActionsRow}>
-              <Pressable onPress={() => onVerRespuestas(pub)} style={({ pressed }) => [styles.mineCta, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
-                <Text style={[styles.mineCtaText, { color: tema.ink }]}>Ver respuestas</Text>
-              </Pressable>
-              <Pressable onPress={() => onEditar(pub)} style={({ pressed }) => [styles.mineEditBtn, pressed && { opacity: 0.7 }]}>
-                <Text style={styles.mineEditBtnText}>Editar</Text>
-              </Pressable>
-            </View>
-          </LinearGradient>
-        ))}
+              <Text style={styles.mineTitle}>{modalidadInline(pub.modalidad)} · {fmtFecha(pub.fecha_propuesta)}</Text>
+              <Text style={styles.mineSub} numberOfLines={1}>{pub.zona || 'Zona a coordinar por chat'}</Text>
+              <View style={styles.mineActionsRow}>
+                <Pressable
+                  onPress={() => onVerRespuestas(pub)}
+                  style={({ pressed }) => [
+                    styles.mineCta,
+                    { backgroundColor: hayRespuestas ? tema.main : C.chip },
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <Text style={[styles.mineCtaText, { color: hayRespuestas ? tema.ink : C.textPrimary }]}>
+                    {hayRespuestas ? `Ver ${n} ${n === 1 ? 'respuesta' : 'respuestas'}` : 'Ver respuestas'}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => onEditar(pub)} style={({ pressed }) => [styles.mineEditBtn, pressed && { opacity: 0.7 }]}>
+                  <Text style={styles.mineEditBtnText}>Editar</Text>
+                </Pressable>
+              </View>
+            </LinearGradient>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -975,12 +1047,34 @@ const MODALIDAD_OPCIONES = [
   { value: 'futbol11', label: 'Fútbol 11' },
 ];
 
-const SORT_OPCIONES = [
-  { value: 'cerca', label: 'Más cerca' },
-  { value: 'pronto', label: 'Fecha más próxima' },
-];
+const hhmm = (h) => `${String(h).padStart(2, '0')}:00`;
 
-function FilterSheet({ visible, tema, filtroModalidad, setFiltroModalidad, sort, setSort, count, onClose }) {
+/**
+ * Región, comuna y horario filtran contra datos que el club y la
+ * publicación YA tienen registrados (`clubs.region`/`clubs.comuna`,
+ * `fecha_propuesta`) — no piden nada nuevo. El orden («Ordenar por») vive
+ * afuera de esta hoja, como botón aparte junto a «Filtros»: no es un
+ * filtro que reduzca la lista, así que no compite por espacio acá dentro.
+ */
+function FilterSheet({
+  visible,
+  tema,
+  filtroModalidad,
+  setFiltroModalidad,
+  filtroRegion,
+  filtroComuna,
+  filtroFromHour,
+  filtroToHour,
+  setFiltroFromHour,
+  setFiltroToHour,
+  onAbrirPickerRegion,
+  onAbrirPickerComuna,
+  count,
+  onLimpiar,
+  onClose,
+}) {
+  const horarioAcotado = filtroFromHour > 0 || filtroToHour < 23;
+
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
@@ -989,53 +1083,60 @@ function FilterSheet({ visible, tema, filtroModalidad, setFiltroModalidad, sort,
           <View style={styles.filterSheetHeadRow}>
             <View>
               <Text style={styles.sheetTitle}>Filtros</Text>
-              <Text style={styles.sheetSubtitle}>{count} coinciden</Text>
+              <Text style={styles.sheetSubtitle}>{count} {count === 1 ? 'coincide' : 'coinciden'}</Text>
             </View>
-            <Pressable
-              onPress={() => {
-                setFiltroModalidad(null);
-                setSort('cerca');
-              }}
-              style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}
-            >
+            <Pressable onPress={onLimpiar} style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}>
               <Text style={styles.clearBtnText}>Limpiar</Text>
             </Pressable>
           </View>
 
-          <Text style={styles.fieldLabel}>Formato</Text>
-          <View style={styles.chipsRow}>
-            {MODALIDAD_OPCIONES.map((o) => {
-              const activo = filtroModalidad === o.value;
-              return (
-                <Pressable
-                  key={o.label}
-                  onPress={() => setFiltroModalidad(o.value)}
-                  style={[styles.optionChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}
-                >
-                  <Text style={[styles.optionChipText, activo && { color: tema.ink }]}>{o.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+            <Text style={styles.fieldLabel}>Formato</Text>
+            <View style={styles.chipsRow}>
+              {MODALIDAD_OPCIONES.map((o) => {
+                const activo = filtroModalidad === o.value;
+                return (
+                  <Pressable
+                    key={o.label}
+                    onPress={() => setFiltroModalidad(o.value)}
+                    style={[styles.optionChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}
+                  >
+                    <Text style={[styles.optionChipText, activo && { color: tema.ink }]}>{o.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-          <Text style={styles.fieldLabel}>Ordenar por</Text>
-          <View style={styles.chipsRow}>
-            {SORT_OPCIONES.map((o) => {
-              const activo = sort === o.value;
-              return (
-                <Pressable
-                  key={o.value}
-                  onPress={() => setSort(o.value)}
-                  style={[styles.optionChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}
-                >
-                  <Text style={[styles.optionChipText, activo && { color: tema.ink }]}>{o.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+            <Text style={styles.fieldLabel}>Región</Text>
+            <Pressable onPress={onAbrirPickerRegion} style={({ pressed }) => [styles.pickerField, pressed && { opacity: 0.85 }]}>
+              <Text style={[styles.pickerFieldText, !filtroRegion && { color: C.textMuted }]} numberOfLines={1}>
+                {filtroRegion || 'Todas las regiones'}
+              </Text>
+            </Pressable>
 
-          <Pressable onPress={onClose} style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main, marginTop: 8 }, pressed && { opacity: 0.85 }]}>
-            <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Ver resultados</Text>
+            <Text style={styles.fieldLabel}>Comuna</Text>
+            <Pressable
+              onPress={onAbrirPickerComuna}
+              disabled={!filtroRegion}
+              style={({ pressed }) => [styles.pickerField, pressed && filtroRegion && { opacity: 0.85 }, !filtroRegion && { opacity: 0.5 }]}
+            >
+              <Text style={[styles.pickerFieldText, !filtroComuna && { color: C.textMuted }]} numberOfLines={1}>
+                {filtroComuna || (filtroRegion ? 'Todas las comunas' : 'Elige primero la región')}
+              </Text>
+            </Pressable>
+
+            <View style={styles.fieldLabelRow}>
+              <Text style={styles.fieldLabel}>Horario posible</Text>
+              {horarioAcotado && <Text style={[styles.fieldLabelValue, { color: tema.main }]}>{hhmm(filtroFromHour)} a {hhmm(filtroToHour)}</Text>}
+            </View>
+            <View style={styles.hourBoundsRow}>
+              <HourBound label="Desde" value={filtroFromHour} min={0} max={filtroToHour} onChange={setFiltroFromHour} tema={tema} />
+              <HourBound label="Hasta" value={filtroToHour} min={filtroFromHour} max={23} onChange={setFiltroToHour} tema={tema} />
+            </View>
+          </ScrollView>
+
+          <Pressable onPress={onClose} style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main, marginTop: 16 }, pressed && { opacity: 0.85 }]}>
+            <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>{count ? `Ver ${count} ${count === 1 ? 'desafío' : 'desafíos'}` : 'Ajustar filtros'}</Text>
           </Pressable>
         </Pressable>
       </Pressable>
@@ -1043,11 +1144,72 @@ function FilterSheet({ visible, tema, filtroModalidad, setFiltroModalidad, sort,
   );
 }
 
+function HourBound({ label, value, min, max, onChange, tema }) {
+  const atMin = value <= min;
+  const atMax = value >= max;
+  return (
+    <View style={styles.hourBoundBox}>
+      <Text style={styles.hourBoundLabel}>{label}</Text>
+      <View style={styles.hourBoundRow2}>
+        <Pressable
+          disabled={atMin}
+          onPress={() => onChange(value - 1)}
+          style={({ pressed }) => [styles.hourBoundBtn, pressed && !atMin && { opacity: 0.7 }, atMin && { opacity: 0.35 }]}
+        >
+          <Text style={styles.hourBoundBtnText}>−</Text>
+        </Pressable>
+        <Text style={styles.hourBoundValue}>{hhmm(value)}</Text>
+        <Pressable
+          disabled={atMax}
+          onPress={() => onChange(value + 1)}
+          style={({ pressed }) => [styles.hourBoundBtn, pressed && !atMax && { opacity: 0.7, borderColor: tema.main }, atMax && { opacity: 0.35 }]}
+        >
+          <Text style={[styles.hourBoundBtnText, !atMax && { color: tema.main }]}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 /* ── Tablero abierto: publicar/editar/respuestas ────────────────── */
 
-function TableroSubScreen({ subScreen, tema, soyAdmin, working, banner, onCloseBanner, onBack, draft, setDraft, onSubmitDraft, editId, onCancelPublicacion, respuestas, onAceptar, onRechazar, onReconsiderar }) {
+function TableroSubScreen({
+  subScreen,
+  tema,
+  soyAdmin,
+  working,
+  banner,
+  onCloseBanner,
+  onBack,
+  draft,
+  setDraft,
+  onSubmitDraft,
+  editId,
+  editingPub,
+  nombreDeMiClub,
+  onCancelPublicacion,
+  respuestas,
+  onAceptar,
+  onRechazar,
+  onReconsiderar,
+}) {
   const patch = (key, value) => setDraft((d) => ({ ...d, [key]: value }));
   const listo = borradorListo(draft);
+
+  const subtitulo =
+    subScreen === 'publicar'
+      ? `${nombreDeMiClub} · admin`
+      : subScreen === 'editar' && editingPub
+      ? `Publicada hace ${haceCuanto(editingPub.created_at) || 'poco'}${
+          editingPub.respuestasCount ? ` · ${editingPub.respuestasCount} ${editingPub.respuestasCount === 1 ? 'respuesta' : 'respuestas'}` : ''
+        }`
+      : subScreen === 'respuestas' && respuestas.length
+      ? `${respuestas.length} ${respuestas.length === 1 ? 'respuesta' : 'respuestas'}`
+      : '';
+
+  const resumenTexto = listo
+    ? `${modalidadInline(draft.modalidad)} · ${draft.fechaStr} ${draft.horaStr}${draft.zona ? ` · ${draft.zona}` : ''}`
+    : 'Completa la fecha y hora para continuar.';
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -1055,9 +1217,16 @@ function TableroSubScreen({ subScreen, tema, soyAdmin, working, banner, onCloseB
         <Pressable onPress={onBack} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
           <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
         </Pressable>
-        <Text style={styles.subHeaderTitle}>
-          {subScreen === 'publicar' ? 'Publicar desafío' : subScreen === 'editar' ? 'Editar publicación' : 'Respuestas'}
-        </Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.subHeaderTitle} numberOfLines={1}>
+            {subScreen === 'publicar' ? 'Publicar desafío' : subScreen === 'editar' ? 'Editar publicación' : 'Respuestas'}
+          </Text>
+          {!!subtitulo && (
+            <Text style={styles.subHeaderSubtitle} numberOfLines={1}>
+              {subtitulo}
+            </Text>
+          )}
+        </View>
       </View>
 
       {banner && <Banner {...banner} onClose={onCloseBanner} />}
@@ -1100,6 +1269,8 @@ function TableroSubScreen({ subScreen, tema, soyAdmin, working, banner, onCloseB
           <Text style={styles.fieldLabel}>Mensaje (opcional)</Text>
           <TextInput style={[styles.input, styles.inputMultiline]} placeholder="Un saludo o detalles del reto..." placeholderTextColor={C.textMuted} value={draft.mensaje} onChangeText={(v) => patch('mensaje', v)} multiline maxLength={300} />
 
+          <Text style={styles.formSummary}>{resumenTexto}</Text>
+
           <Pressable
             onPress={onSubmitDraft}
             disabled={!listo || working}
@@ -1109,7 +1280,7 @@ function TableroSubScreen({ subScreen, tema, soyAdmin, working, banner, onCloseB
               <ActivityIndicator color={listo ? tema.ink : C.textMuted} />
             ) : (
               <Text style={[styles.submitBtnText, { color: listo ? tema.ink : C.textMuted }]}>
-                {editId ? 'Guardar cambios' : 'Publicar desafío'}
+                {listo ? (editId ? 'Guardar cambios' : 'Publicar desafío') : 'Falta la fecha y hora'}
               </Text>
             )}
           </Pressable>
@@ -1314,6 +1485,8 @@ const styles = StyleSheet.create({
 
   subHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
   subHeaderTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3 },
+  subHeaderSubtitle: { color: C.textMuted, fontSize: 11.5, fontFamily: F.semiBold, marginTop: 2 },
+  formSummary: { color: C.textMuted, fontSize: 12, fontFamily: F.semiBold, lineHeight: 17, marginTop: 14 },
 
   fieldLabel: { color: C.textSecondary, fontSize: 11, fontFamily: F.extraBold, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 9, marginTop: 6 },
   optionChip: { borderRadius: R.iconBtn, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 4 },
@@ -1386,4 +1559,24 @@ const styles = StyleSheet.create({
   filterSheetHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   clearBtn: { borderRadius: R.iconBtn, borderWidth: 1, borderColor: C.border, paddingHorizontal: 13, paddingVertical: 9 },
   clearBtnText: { color: C.textSecondary, fontSize: 12, fontFamily: F.bold },
+
+  pickerField: {
+    backgroundColor: C.chip,
+    borderRadius: R.iconBtn,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    marginBottom: 6,
+  },
+  pickerFieldText: { color: C.textPrimary, fontSize: 14, fontFamily: F.semiBold },
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  fieldLabelValue: { fontSize: 11.5, fontFamily: F.bold, marginBottom: 9, marginTop: 6 },
+  hourBoundsRow: { flexDirection: 'row', gap: 9, marginTop: 2 },
+  hourBoundBox: { flex: 1, backgroundColor: C.chip, borderWidth: 1, borderColor: C.border, borderRadius: R.iconBtn, padding: 10 },
+  hourBoundLabel: { color: C.textMuted, fontSize: 9.5, fontFamily: F.extraBold, letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center' },
+  hourBoundRow2: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  hourBoundBtn: { flex: 0, width: 32, height: 32, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  hourBoundBtnText: { color: C.textPrimary, fontSize: 18, fontFamily: F.bold, lineHeight: 20 },
+  hourBoundValue: { flex: 1, textAlign: 'center', color: C.textPrimary, fontSize: 15, fontFamily: F.extraBold },
 });

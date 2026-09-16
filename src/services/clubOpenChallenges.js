@@ -97,7 +97,12 @@ export async function cancelOpenChallenge(openChallengeId) {
   return { error };
 }
 
-/** Mis publicaciones (cualquier estado), la más nueva primero. */
+/**
+ * Mis publicaciones (cualquier estado), la más nueva primero, con la
+ * cantidad real de respuestas de cada una (`respuestasCount`) — cuenta las
+ * mismas filas que vería «Ver respuestas», salvo las retiradas: un club que
+ * se arrepintió no cuenta como interés recibido.
+ */
 export async function listMyOpenChallenges(clubId) {
   if (!isSupabaseConfigured || !clubId) return { data: [], error: null };
   await expireOld();
@@ -111,7 +116,20 @@ export async function listMyOpenChallenges(clubId) {
     console.error('[FutFinder] listMyOpenChallenges:', error);
     return { data: [], error };
   }
-  return { data: data || [], error: null };
+  const rows = data || [];
+  if (rows.length === 0) return { data: [], error: null };
+
+  const counts = await Promise.all(
+    rows.map((r) =>
+      supabase
+        .from('club_open_challenge_responses')
+        .select('id', { count: 'exact', head: true })
+        .eq('open_challenge_id', r.id)
+        .neq('estado', 'retirada')
+    )
+  );
+  const enriched = rows.map((r, i) => ({ ...r, respuestasCount: counts[i]?.count ?? 0 }));
+  return { data: enriched, error: null };
 }
 
 /**

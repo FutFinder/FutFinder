@@ -10,6 +10,9 @@
  *   · `cierraEnLabel` usa el mismo plazo de 7 días que el desafío 1 a 1.
  *   · `esCerca` no marca «Cerca» sin distancia conocida.
  *   · `cierraPronto` marca urgencia sólo dentro de las 24 h antes de expirar.
+ *   · `dentroDeHorario`/región/comuna en `ordenarPublicaciones` filtran con
+ *     datos reales del club y de la fecha propuesta, nunca inventados.
+ *   · `contarFiltrosActivos` no cuenta el orden, sólo lo que reduce la lista.
  *
  * Se ejecutan con: npm test
  */
@@ -24,6 +27,8 @@ const {
   cierraEnLabel,
   esCerca,
   cierraPronto,
+  dentroDeHorario,
+  contarFiltrosActivos,
   borradorListo,
   ordenarPublicaciones,
 } = require('../openChallengeBoard.js');
@@ -124,6 +129,53 @@ test('ordenarPublicaciones: "pronto" ordena por fecha propuesta más próxima', 
 test('ordenarPublicaciones: no revienta con lista vacía o ausente', () => {
   assert.deepEqual(ordenarPublicaciones([], {}), []);
   assert.deepEqual(ordenarPublicaciones(undefined, {}), []);
+});
+
+test('ordenarPublicaciones: filtra por región/comuna del club (dato real, ya registrado)', () => {
+  const rows = [
+    { id: 'a', club: { region: 'Región Metropolitana de Santiago', comuna: 'Maipú' } },
+    { id: 'b', club: { region: 'Región de Valparaíso', comuna: 'Viña del Mar' } },
+  ];
+  assert.deepEqual(
+    ordenarPublicaciones(rows, { region: 'Región de Valparaíso' }).map((r) => r.id),
+    ['b']
+  );
+  assert.deepEqual(ordenarPublicaciones(rows, { comuna: 'Maipú' }).map((r) => r.id), ['a']);
+});
+
+test('ordenarPublicaciones: filtra por horario cuando el rango no es el completo', () => {
+  const rows = [
+    { id: 'tarde', fecha_propuesta: '2026-09-20T22:00:00' },
+    { id: 'temprano', fecha_propuesta: '2026-09-20T09:00:00' },
+  ];
+  const out = ordenarPublicaciones(rows, { fromHour: 18, toHour: 23 });
+  assert.deepEqual(out.map((r) => r.id), ['tarde']);
+});
+
+test('dentroDeHorario: rango completo 0–23 nunca descarta', () => {
+  assert.equal(dentroDeHorario('2026-09-20T03:00:00'), true);
+});
+
+test('dentroDeHorario: respeta ambos bordes del rango', () => {
+  assert.equal(dentroDeHorario('2026-09-20T18:00:00', 18, 20), true);
+  assert.equal(dentroDeHorario('2026-09-20T20:00:00', 18, 20), true);
+  assert.equal(dentroDeHorario('2026-09-20T21:00:00', 18, 20), false);
+  assert.equal(dentroDeHorario('2026-09-20T17:00:00', 18, 20), false);
+});
+
+test('dentroDeHorario: fecha inválida no descarta la fila', () => {
+  assert.equal(dentroDeHorario('no-es-una-fecha', 18, 20), true);
+});
+
+test('contarFiltrosActivos: cuenta modalidad, región, comuna y horario acotado', () => {
+  assert.equal(contarFiltrosActivos({}), 0);
+  assert.equal(contarFiltrosActivos({ modalidad: 'futbol7' }), 1);
+  assert.equal(
+    contarFiltrosActivos({ modalidad: 'futbol7', region: 'Región de Valparaíso', comuna: 'Viña del Mar' }),
+    3
+  );
+  assert.equal(contarFiltrosActivos({ fromHour: 18, toHour: 23 }), 1);
+  assert.equal(contarFiltrosActivos({ fromHour: 0, toHour: 23 }), 0);
 });
 
 test('cierraEnLabel: recién publicada, cierra en 7 días', () => {

@@ -47,6 +47,33 @@ export function cierraPronto(createdAtIso, ahora = new Date()) {
   return msRestante > 0 && msRestante < 24 * 3600 * 1000;
 }
 
+/**
+ * ¿La hora propuesta cae dentro de [fromHour, toHour] (ambos incluidos)?
+ * El rango completo 0–23 significa «sin filtro» — nunca descarta por falta
+ * de dato: una fecha ilegible pasa el filtro en vez de desaparecer.
+ */
+export function dentroDeHorario(fechaPropuestaIso, fromHour = 0, toHour = 23) {
+  if (fromHour <= 0 && toHour >= 23) return true;
+  const d = new Date(fechaPropuestaIso);
+  if (Number.isNaN(d.getTime())) return true;
+  const h = d.getHours();
+  return h >= fromHour && h <= toHour;
+}
+
+/**
+ * Cuántas dimensiones de filtro están activas ahora mismo (para el
+ * «Filtros · N» del botón). El orden (`sort`) no cuenta: es un control
+ * aparte, no un filtro que reduzca la lista.
+ */
+export function contarFiltrosActivos({ modalidad, region, comuna, fromHour = 0, toHour = 23 } = {}) {
+  let n = 0;
+  if (modalidad) n += 1;
+  if (region) n += 1;
+  if (comuna) n += 1;
+  if (fromHour > 0 || toHour < 23) n += 1;
+  return n;
+}
+
 /** DD/MM/AAAA + HH:MM → Date, o null si no se puede interpretar. */
 export function parseFechaHora(fechaStr, horaStr) {
   const dParts = (fechaStr || '').split('/');
@@ -97,9 +124,24 @@ export function borradorListo({ fechaStr, horaStr }, ahora = new Date()) {
  *
  * `modalidad`: si viene puesta, sólo deja pasar publicaciones de esa
  * modalidad; vacío/null = todas.
+ *
+ * `region`/`comuna`: contra `r.club.region`/`r.club.comuna` — el club ya
+ * las tiene registradas (`clubs.region`/`clubs.comuna`), así que filtrar
+ * por ellas no inventa ningún dato nuevo.
+ *
+ * `fromHour`/`toHour`: contra la hora de `r.fecha_propuesta`, real también.
  */
-export function ordenarPublicaciones(rows, { modalidad = null, sort = 'cerca' } = {}) {
-  const filtradas = (rows || []).filter((r) => !modalidad || r.modalidad === modalidad);
+export function ordenarPublicaciones(
+  rows,
+  { modalidad = null, region = null, comuna = null, fromHour = 0, toHour = 23, sort = 'cerca' } = {}
+) {
+  const filtradas = (rows || []).filter(
+    (r) =>
+      (!modalidad || r.modalidad === modalidad) &&
+      (!region || r.club?.region === region) &&
+      (!comuna || r.club?.comuna === comuna) &&
+      dentroDeHorario(r.fecha_propuesta, fromHour, toHour)
+  );
   const conIndice = filtradas.map((r, i) => ({ r, i }));
 
   conIndice.sort((a, b) => {

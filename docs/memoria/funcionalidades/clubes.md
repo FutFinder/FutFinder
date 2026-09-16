@@ -102,11 +102,13 @@ en negociación, inventarlo acá sería una regla nueva), **el calendario con
 «Entrenamiento»/«Fecha 4 · Liga Maipú»** del mockup (no existe ningún
 concepto de entrenamientos ni ligas; tras aceptar se abre el chat de
 negociación real, no un calendario que todavía no tendría nada que
-mostrar), y el selector país-completo de región/comuna con calendario de
-rango de fechas, horario y cupos del filtro del mockup — se redujo a
-modalidad + orden por distancia/fecha, que son las dos dimensiones reales
-con datos detrás; el resto habría sido una interfaz grande sin ninguna
-necesidad real que la respalde todavía.
+mostrar), y del filtro del mockup: el calendario de rango de fechas y el
+tope de «jugadores por equipo» (ningún dato respalda ninguno de los dos:
+no hay cupos por publicación). Región, comuna y horario del filtro SÍ se
+implementaron — no son fabricados: el club ya tiene región/comuna
+registradas (`clubs.region`/`clubs.comuna`) y la hora sale de la propia
+`fecha_propuesta`; sólo faltaba exponerlos como filtro. «Nivel del rival»
+del filtro del mockup sigue afuera, como el resto de nivel/valoración.
 
 `ClubChallengesScreen` se rediseñó una segunda vez porque la primera
 versión (dos pestañas «Tablero abierto»/«Directos», tarjetas sin distancia
@@ -141,6 +143,30 @@ acento de color del club, igual que el resto de Clubes ya rediseñado.
 Publicar, editar, ver respuestas y aceptar/rechazar exigen
 `soyAdminDeEsteClub` (`clubesAdmin.includes(clubId)`, la misma fuente que ya
 usa «Directos» vía `puedeResponderDesafio`/`puedeCancelarDesafio`); un
+Tercera corrección, sobre filtros y el formulario de publicar: el usuario
+marcó que ninguno de los dos calzaba con lo entregado. La hoja de filtros
+ganó Región y Comuna (mismo `PickerSheet` que ya usa Partidos, con
+`REGIONES`/`getComunasOfRegion` de `regiones-chile.js`) y «Horario
+posible» (dos topes de hora con +/−, igual que el mockup); «Ordenar por»
+se sacó de la hoja — vive sólo como el botón aparte junto a «Filtros» que
+ya existía, sin repetirse dos veces. El formulario de publicar/editar
+ganó un subtítulo real bajo el título (`{club} · admin` al publicar,
+`Publicada hace {N} · {M} respuestas` al editar, con `haceCuanto()` y el
+conteo real de `club_open_challenge_responses`) y una línea de resumen en
+vivo antes del botón (`Fútbol 7 · 25/12/2026 20:00 · Cancha X`, o «Completa
+la fecha y hora para continuar.» si falta algo) — igual función que el
+`formSummary` del mockup, pero con los campos que de verdad existen acá:
+sin «cancha obligatoria» (en el ciclo 1 a 1 la zona/cancha también es
+opcional, `ClubChallengeScreen.js`; volverla obligatoria sólo acá habría
+sido una inconsistencia nueva) y sin la máscara de fecha en vivo del
+mockup (deliberado desde la primera versión: el ciclo 1 a 1 valida al
+enviar, no en vivo, y tener dos maneras de escribir la misma fecha en la
+misma app sería peor que no calzar con el mockup en ese detalle).
+Las tarjetas de «Tus desafíos activos» también pasaron a mostrar el
+estado real («Publicado» / «Sin respuestas») y el CTA con el conteo real
+(«Ver 4 respuestas» en vez de «Ver respuestas» siempre), en vez de un
+badge «Publicado» fijo que no decía nada.
+
 jugador ve el tablero pero sólo navega, no publica ni responde — la RLS de
 la 112 ya lo exige del lado del servidor, la interfaz sólo deja de mostrar
 un botón que el servidor rechazaría.
