@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { MapPin, Search as SearchIcon, Star } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { searchCanchas } from '../services/canchas';
 
 /**
@@ -287,16 +287,16 @@ export default function LocationAutocomplete({
   return (
     <View style={styles.wrap}>
       <View style={[styles.inputRow, inputRowStyle]}>
-        <SearchIcon color={placeholderColor || colors.textMuted} size={16} />
+        <SearchIcon color={placeholderColor || C.textMuted} size={16} />
         <TextInput
           style={[styles.input, inputStyle]}
           placeholder={placeholder || 'Busca por nombre, dirección o sector…'}
-          placeholderTextColor={placeholderColor || colors.textMuted}
+          placeholderTextColor={placeholderColor || C.textMuted}
           value={value}
           onChangeText={handleChange}
           onFocus={() => results.length > 0 && setOpen(true)}
         />
-        {loading && <ActivityIndicator color={spinnerColor || colors.primary} size="small" />}
+        {loading && <ActivityIndicator color={spinnerColor || C.green} size="small" />}
       </View>
 
       {open && results.length > 0 && (
@@ -316,13 +316,13 @@ export default function LocationAutocomplete({
               >
                 {isFut ? (
                   <Star
-                    color={accentColor || colors.primary}
+                    color={accentColor || C.green}
                     size={14}
-                    fill={accentColor || colors.primary}
+                    fill={accentColor || C.green}
                     style={{ marginTop: 2 }}
                   />
                 ) : (
-                  <MapPin color={accentColor || colors.primary} size={14} style={{ marginTop: 2 }} />
+                  <MapPin color={accentColor || C.green} size={14} style={{ marginTop: 2 }} />
                 )}
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.optionText, optionTextStyle]} numberOfLines={2}>
@@ -360,24 +360,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     height: 48,
-    borderRadius: radius.md,
-    backgroundColor: colors.background,
+    borderRadius: R.row,
+    backgroundColor: C.bg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: C.border,
     paddingHorizontal: 14,
   },
   input: {
     flex: 1,
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
     ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
   dropdown: {
     marginTop: 6,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    backgroundColor: C.surface,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: C.border,
     overflow: 'hidden',
   },
   option: {
@@ -387,27 +387,27 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
+    borderTopColor: C.borderSoft,
   },
   optionFut: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.greenSoft,
   },
   optionBadge: {
-    color: colors.primary,
+    color: C.green,
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.3,
     marginTop: 2,
     textTransform: 'uppercase',
   },
   optionText: {
     flex: 1,
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
     lineHeight: 18,
   },
   noResults: {
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 8,
     lineHeight: 15,

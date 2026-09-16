@@ -11,7 +11,7 @@ import { CheckCircle2 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { APP_VERSION } from '../utils/appVersion';
 
 export default function SuccessScreen({ navigation }) {
@@ -37,7 +37,7 @@ export default function SuccessScreen({ navigation }) {
           {/* Card */}
           <View style={styles.card}>
             <View style={styles.iconCircle}>
-              <CheckCircle2 color={colors.primary} size={48} strokeWidth={2.2} />
+              <CheckCircle2 color={C.green} size={48} strokeWidth={2.2} />
             </View>
 
             <Text style={styles.title}>¡Todo listo!</Text>
@@ -71,7 +71,7 @@ export default function SuccessScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: {
     paddingHorizontal: 20,
     paddingBottom: 40,
@@ -84,34 +84,34 @@ const styles = StyleSheet.create({
   },
   card: {
     marginTop: 24,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.xl,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.hero,
     padding: 28,
     borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderColor: C.green,
     alignItems: 'center',
   },
   iconCircle: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.greenSoft,
     borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 22,
   },
   title: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 26,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.5,
     textAlign: 'center',
     marginBottom: 10,
   },
   subtitle: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -124,21 +124,21 @@ const styles = StyleSheet.create({
   outlineBtn: {
     flex: 1,
     height: 54,
-    borderRadius: radius.lg,
+    borderRadius: R.cardSm,
     borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderColor: C.border,
+    backgroundColor: C.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineLabel: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   footer: {
     textAlign: 'center',
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 28,
     letterSpacing: 0.5,

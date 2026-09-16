@@ -14,7 +14,7 @@ import { ArrowLeft, ShieldCheck, AlertCircle } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { APP_VERSION } from '../utils/appVersion';
 import {
   verifyEmailOtp,
@@ -148,7 +148,7 @@ export default function VerificationScreen({ navigation, route }) {
               hitSlop={12}
               style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
             >
-              <ArrowLeft color={colors.textPrimary} size={22} />
+              <ArrowLeft color={C.textPrimary} size={22} />
             </Pressable>
             <View style={styles.logoCenter}>
               <Logo size={32} />
@@ -158,7 +158,7 @@ export default function VerificationScreen({ navigation, route }) {
 
           <View style={styles.card}>
             <View style={styles.titleRow}>
-              <ShieldCheck color={colors.primary} size={20} />
+              <ShieldCheck color={C.green} size={20} />
               <Text style={styles.title}>Verificación de cuenta</Text>
             </View>
             <Text style={styles.subtitle}>
@@ -217,7 +217,7 @@ export default function VerificationScreen({ navigation, route }) {
                 <Text
                   style={[
                     styles.resend,
-                    seconds === 0 && { color: colors.primary },
+                    seconds === 0 && { color: C.green },
                   ]}
                 >
                   {seconds > 0 ? `Reenviar en ${fmt}` : 'Reenviar código'}
@@ -236,7 +236,7 @@ export default function VerificationScreen({ navigation, route }) {
 
             {error && (
               <View style={styles.errorBox}>
-                <AlertCircle color={colors.error} size={16} />
+                <AlertCircle color={C.red} size={16} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -257,7 +257,7 @@ export default function VerificationScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 },
   header: {
     flexDirection: 'row',
@@ -269,18 +269,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoCenter: { flex: 1, alignItems: 'center' },
   card: {
     marginTop: 12,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.xl,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.hero,
     padding: 22,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.borderSoft,
   },
   titleRow: {
     flexDirection: 'row',
@@ -289,13 +289,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
   },
   subtitle: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
     marginBottom: 22,
   },
@@ -310,17 +310,17 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     minWidth: 38,
     maxWidth: 56,
-    borderRadius: radius.md,
+    borderRadius: R.row,
     borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    color: colors.textPrimary,
+    borderColor: C.border,
+    backgroundColor: C.bg,
+    color: C.textPrimary,
     fontSize: 22,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
-  codeBoxFilled: { borderColor: colors.primary },
-  codeBoxError: { borderColor: colors.error },
+  codeBoxFilled: { borderColor: C.green },
+  codeBoxError: { borderColor: C.red },
   channelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -330,38 +330,38 @@ const styles = StyleSheet.create({
   },
   channelGroup: {
     flexDirection: 'row',
-    backgroundColor: colors.background,
-    borderRadius: radius.pill,
+    backgroundColor: C.bg,
+    borderRadius: R.pill,
     padding: 3,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: C.border,
   },
-  channelBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: radius.pill },
-  channelBtnActive: { backgroundColor: colors.primary },
-  channelText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  channelBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: R.pill },
+  channelBtnActive: { backgroundColor: C.green },
+  channelText: { color: C.textSecondary, fontSize: 13, fontFamily: F.semiBold },
   channelTextActive: { color: '#0E0E0D' },
-  resend: { color: colors.textSecondary, fontSize: 13, fontWeight: '500' },
+  resend: { color: C.textSecondary, fontSize: 13, fontFamily: F.medium },
   errorBox: {
     marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.errorSoft,
-    borderRadius: radius.md,
+    backgroundColor: C.redSoft,
+    borderRadius: R.row,
     padding: 12,
     borderWidth: 1,
-    borderColor: colors.error,
+    borderColor: C.red,
   },
-  errorText: { color: colors.error, fontSize: 13, fontWeight: '600', flex: 1 },
+  errorText: { color: C.red, fontSize: 13, fontFamily: F.semiBold, flex: 1 },
   hint: {
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 14,
     textAlign: 'center',
   },
   footer: {
     textAlign: 'center',
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 24,
     letterSpacing: 0.5,

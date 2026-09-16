@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, G } from 'react-native-svg';
-import { colors } from '../theme/colors';
+import { reservas as C, reservasFonts as F } from '../theme/colors';
 
 /**
  * Logo de FutFinder: pin de ubicación con balón de fútbol dentro
@@ -20,29 +20,29 @@ export default function Logo({ size = 48, showText = true, textColor = '#FFFFFF'
         <Path
           d="M50 5 C25 5 8 22 8 47 C8 78 50 115 50 115 C50 115 92 78 92 47 C92 22 75 5 50 5 Z"
           fill="none"
-          stroke={colors.primary}
+          stroke={C.green}
           strokeWidth={6}
         />
         {/* Balón de fútbol dentro del pin */}
         <G>
-          <Circle cx={50} cy={47} r={22} fill={colors.background} stroke={colors.primary} strokeWidth={3} />
+          <Circle cx={50} cy={47} r={22} fill={C.bg} stroke={C.green} strokeWidth={3} />
           {/* Pentágono central del balón */}
           <Path
             d="M50 35 L60 42 L56 53 L44 53 L40 42 Z"
-            fill={colors.primary}
+            fill={C.green}
           />
           {/* Detalles del balón */}
-          <Path d="M50 35 L50 28" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-          <Path d="M60 42 L67 39" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-          <Path d="M56 53 L60 60" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-          <Path d="M44 53 L40 60" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
-          <Path d="M40 42 L33 39" stroke={colors.primary} strokeWidth={2.5} strokeLinecap="round" />
+          <Path d="M50 35 L50 28" stroke={C.green} strokeWidth={2.5} strokeLinecap="round" />
+          <Path d="M60 42 L67 39" stroke={C.green} strokeWidth={2.5} strokeLinecap="round" />
+          <Path d="M56 53 L60 60" stroke={C.green} strokeWidth={2.5} strokeLinecap="round" />
+          <Path d="M44 53 L40 60" stroke={C.green} strokeWidth={2.5} strokeLinecap="round" />
+          <Path d="M40 42 L33 39" stroke={C.green} strokeWidth={2.5} strokeLinecap="round" />
         </G>
       </Svg>
 
       {showText && (
         <Text style={[styles.text, { color: textColor, fontSize: size * 0.78 }]}>
-          fut<Text style={{ color: colors.primary }}>finder</Text>
+          fut<Text style={{ color: C.green }}>finder</Text>
         </Text>
       )}
     </View>
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   text: {
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.5,
   },
 });

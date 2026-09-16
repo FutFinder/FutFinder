@@ -17,7 +17,7 @@ import {
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { getCurrentLocation } from '../services/location';
 import { saveMyLocation } from '../services/profile';
 import { APP_VERSION } from '../utils/appVersion';
@@ -76,7 +76,7 @@ export default function LocationPermissionScreen({ navigation }) {
               hitSlop={12}
               style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
             >
-              <ArrowLeft color={colors.textPrimary} size={22} />
+              <ArrowLeft color={C.textPrimary} size={22} />
             </Pressable>
             <View style={styles.logoCenter}>
               <Logo size={32} />
@@ -87,7 +87,7 @@ export default function LocationPermissionScreen({ navigation }) {
           {/* Card destacada con marco verde */}
           <View style={styles.card}>
             <View style={styles.titleRow}>
-              <Navigation color={colors.primary} size={20} />
+              <Navigation color={C.green} size={20} />
               <Text style={styles.title}>Permiso de ubicación</Text>
             </View>
             <Text style={styles.subtitle}>
@@ -100,7 +100,7 @@ export default function LocationPermissionScreen({ navigation }) {
             {REASONS.map((r, idx) => (
               <View key={idx} style={styles.reasonRow}>
                 <View style={styles.reasonIcon}>
-                  <r.icon color={colors.primary} size={18} strokeWidth={2.2} />
+                  <r.icon color={C.green} size={18} strokeWidth={2.2} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.reasonTitle}>{r.title}</Text>
@@ -136,7 +136,7 @@ export default function LocationPermissionScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 },
   header: {
     flexDirection: 'row',
@@ -148,18 +148,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoCenter: { flex: 1, alignItems: 'center' },
   card: {
     marginTop: 12,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.xl,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.hero,
     padding: 22,
     borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderColor: C.green,
   },
   titleRow: {
     flexDirection: 'row',
@@ -168,13 +168,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
   },
   subtitle: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -187,40 +187,40 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.greenSoft,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reasonTitle: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: F.bold,
     marginBottom: 2,
   },
   reasonDesc: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12,
     lineHeight: 16,
   },
   skipBtn: {
     height: 50,
-    borderRadius: radius.lg,
-    backgroundColor: colors.background,
+    borderRadius: R.cardSm,
+    backgroundColor: C.bg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   skipText: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
   footer: {
     textAlign: 'center',
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 24,
     letterSpacing: 0.5,

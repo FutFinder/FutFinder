@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ShieldOff, AlertTriangle } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { listBlockedUsers, unblockUser } from '../services/blockedUsers';
 
 function inicialDe(profile) {
@@ -87,7 +87,7 @@ export default function BlockedUsersScreen({ navigation }) {
           hitSlop={12}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
         >
-          <ArrowLeft color={colors.textPrimary} size={20} />
+          <ArrowLeft color={C.textPrimary} size={20} />
         </Pressable>
         <Text style={styles.headerTitle}>Bloqueados</Text>
         <View style={{ width: 40 }} />
@@ -95,11 +95,11 @@ export default function BlockedUsersScreen({ navigation }) {
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       ) : error ? (
         <View style={styles.loadingBox}>
-          <AlertTriangle color={colors.error} size={30} strokeWidth={1.8} />
+          <AlertTriangle color={C.red} size={30} strokeWidth={1.8} />
           <Text style={styles.errorTitle}>No pudimos cargar tu lista</Text>
           <Text style={styles.errorMsg}>{error?.message || 'Revisa tu conexión e intenta de nuevo.'}</Text>
           <Pressable
@@ -111,7 +111,7 @@ export default function BlockedUsersScreen({ navigation }) {
         </View>
       ) : items.length === 0 ? (
         <View style={styles.empty}>
-          <ShieldOff color={colors.textMuted} size={40} />
+          <ShieldOff color={C.textMuted} size={40} />
           <Text style={styles.emptyTitle}>No has bloqueado a nadie</Text>
           <Text style={styles.emptyText}>
             Cuando bloqueas a alguien desde su perfil, aparece en esta lista y puedes desbloquearlo cuando quieras.
@@ -134,7 +134,7 @@ export default function BlockedUsersScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
 
   header: {
     flexDirection: 'row',
@@ -145,71 +145,71 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 18, fontWeight: '800', letterSpacing: -0.3,
+    color: C.textPrimary,
+    fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3,
   },
 
   loadingBox: {
     flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 30,
   },
-  errorTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  errorMsg: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  errorTitle: { color: C.textPrimary, fontSize: 16, fontFamily: F.extraBold, textAlign: 'center' },
+  errorMsg: { color: C.textSecondary, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   retryBtn: {
     marginTop: 4,
     height: 44,
     paddingHorizontal: 24,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+    borderRadius: R.pill,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  retryLabel: { color: '#0E0E0D', fontSize: 14, fontWeight: '800' },
+  retryLabel: { color: '#0E0E0D', fontSize: 14, fontFamily: F.extraBold },
 
   empty: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 40, gap: 12,
   },
-  emptyTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
-  emptyText: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  emptyTitle: { color: C.textPrimary, fontSize: 17, fontFamily: F.bold },
+  emptyText: { color: C.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
 
   list: { paddingHorizontal: 16, paddingBottom: 32 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.row,
     padding: 12,
     gap: 12,
   },
   avatar: { width: 44, height: 44, borderRadius: 22 },
   avatarFallback: {
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.borderSoft,
   },
-  avatarInitial: { color: colors.textSecondary, fontSize: 16, fontWeight: '700' },
+  avatarInitial: { color: C.textSecondary, fontSize: 16, fontFamily: F.bold },
   rowInfo: { flex: 1 },
-  rowName: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
-  rowUsername: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  rowName: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
+  rowUsername: { color: C.textMuted, fontSize: 12, marginTop: 2 },
 
   unblockBtn: {
     height: 38,
     paddingHorizontal: 14,
-    borderRadius: radius.md,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: C.border,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  unblockText: { color: colors.textPrimary, fontSize: 12.5, fontWeight: '700' },
+  unblockText: { color: C.textPrimary, fontSize: 12.5, fontFamily: F.bold },
 
   separator: { height: 8 },
 });

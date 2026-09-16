@@ -11,7 +11,7 @@ import { ArrowLeft, FileText, Check } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { completeOnboarding } from '../services/profile';
 import { APP_VERSION } from '../utils/appVersion';
 
@@ -60,7 +60,7 @@ export default function TermsScreen({ navigation }) {
               hitSlop={12}
               style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
             >
-              <ArrowLeft color={colors.textPrimary} size={22} />
+              <ArrowLeft color={C.textPrimary} size={22} />
             </Pressable>
             <View style={styles.logoCenter}>
               <Logo size={32} />
@@ -70,7 +70,7 @@ export default function TermsScreen({ navigation }) {
 
           <View style={styles.card}>
             <View style={styles.titleRow}>
-              <FileText color={colors.primary} size={20} />
+              <FileText color={C.green} size={20} />
               <Text style={styles.title}>Términos y condiciones</Text>
             </View>
 
@@ -108,7 +108,7 @@ export default function TermsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 },
   header: {
     flexDirection: 'row',
@@ -120,18 +120,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoCenter: { flex: 1, alignItems: 'center' },
   card: {
     marginTop: 12,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.xl,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.hero,
     padding: 22,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.borderSoft,
   },
   titleRow: {
     flexDirection: 'row',
@@ -140,21 +140,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
   },
   legalBox: {
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
+    backgroundColor: C.bg,
+    borderRadius: R.row,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.borderSoft,
     marginBottom: 18,
   },
   legalText: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -169,24 +169,24 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
   },
   checkboxActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: C.green,
+    borderColor: C.green,
   },
   checkLabel: {
     flex: 1,
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
     lineHeight: 18,
   },
   footer: {
     textAlign: 'center',
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 24,
     letterSpacing: 0.5,

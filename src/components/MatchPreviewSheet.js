@@ -25,7 +25,7 @@ import {
   Trophy,
 } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import MatchMap from './MatchMap';
 import { getMatchById, getMatchAttendees } from '../services/matches';
 
@@ -83,9 +83,9 @@ function Avatar({ uri, name, size = 38 }) {
   );
 }
 const avStyles = StyleSheet.create({
-  wrap: { backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  wrap: { backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   img: { width: '100%', height: '100%' },
-  initial: { color: colors.primary, fontWeight: '800' },
+  initial: { color: C.green, fontFamily: F.extraBold },
 });
 
 function MetaRow({ icon, label, value }) {
@@ -103,11 +103,11 @@ const metaS = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   iconWrap: {
     width: 32, height: 32, borderRadius: 8,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.greenSoft,
     alignItems: 'center', justifyContent: 'center',
   },
-  label: { color: colors.textMuted, fontSize: 11, fontWeight: '600', marginBottom: 1 },
-  value: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
+  label: { color: C.textMuted, fontSize: 11, fontFamily: F.semiBold, marginBottom: 1 },
+  value: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold },
 });
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -247,7 +247,7 @@ export default function MatchPreviewSheet({
           >
             {loading ? (
               <View style={styles.loadingBox}>
-                <ActivityIndicator color={colors.primary} size="large" />
+                <ActivityIndicator color={C.green} size="large" />
                 <Text style={styles.loadingText}>Cargando partido…</Text>
               </View>
             ) : !match ? (
@@ -275,7 +275,7 @@ export default function MatchPreviewSheet({
                     hitSlop={12}
                     style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
                   >
-                    <X color={colors.textSecondary} size={18} />
+                    <X color={C.textSecondary} size={18} />
                   </Pressable>
                 </View>
 
@@ -288,7 +288,7 @@ export default function MatchPreviewSheet({
                       <Text style={styles.organizerSub}>Organizador</Text>
                     </View>
                     <View style={styles.trustPill}>
-                      <ShieldCheck color={colors.primary} size={12} />
+                      <ShieldCheck color={C.green} size={12} />
                       <Text style={styles.trustPillText}>{organizer.trust_score}</Text>
                     </View>
                   </View>
@@ -298,22 +298,22 @@ export default function MatchPreviewSheet({
 
                 {/* Meta info */}
                 <MetaRow
-                  icon={<Clock color={colors.primary} size={16} />}
+                  icon={<Clock color={C.green} size={16} />}
                   label="Fecha y hora"
                   value={formatHora(match.hora)}
                 />
                 <MetaRow
-                  icon={<Users color={colors.primary} size={16} />}
+                  icon={<Users color={C.green} size={16} />}
                   label="Cupos disponibles"
                   value={`${match.cupos_disponibles ?? 0} de ${match.cupos_totales ?? 0} libres`}
                 />
                 <MetaRow
-                  icon={<Trophy color={colors.primary} size={16} />}
+                  icon={<Trophy color={C.green} size={16} />}
                   label="Nivel"
                   value={nivelLabel(match.nivel)}
                 />
                 <MetaRow
-                  icon={<Banknote color={colors.primary} size={16} />}
+                  icon={<Banknote color={C.green} size={16} />}
                   label="Precio de entrada"
                   value={
                     match.precio_cuota === 0
@@ -327,7 +327,7 @@ export default function MatchPreviewSheet({
                 {/* Location */}
                 <Text style={styles.sectionLabel}>Ubicación</Text>
                 <View style={styles.locationRow}>
-                  <MapPin color={colors.primary} size={15} />
+                  <MapPin color={C.green} size={15} />
                   <View style={{ flex: 1, marginLeft: 8 }}>
                     <Text style={styles.locationVenue}>{match.cancha_nombre}</Text>
                     <Text style={styles.locationComuna}>
@@ -393,7 +393,7 @@ export default function MatchPreviewSheet({
                           </Text>
                         </View>
                         <View style={styles.playerTrustPill}>
-                          <ShieldCheck color={colors.primary} size={10} />
+                          <ShieldCheck color={C.green} size={10} />
                           <Text style={styles.playerTrustText}>{a.trust_score}</Text>
                         </View>
                       </View>
@@ -440,7 +440,7 @@ export default function MatchPreviewSheet({
                 style={({ pressed }) => [styles.detailBtn, pressed && { opacity: 0.7 }]}
               >
                 <Text style={styles.detailLabel}>Ver partido completo</Text>
-                <ArrowRight color={colors.primary} size={14} />
+                <ArrowRight color={C.green} size={14} />
               </Pressable>
             </SafeAreaView>
           ) : null}
@@ -460,9 +460,9 @@ const styles = StyleSheet.create({
   },
   sheet: {
     height: SHEET_H,
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    backgroundColor: C.bg,
+    borderTopLeftRadius: R.hero,
+    borderTopRightRadius: R.hero,
     overflow: 'hidden',
     ...Platform.select({
       web: { boxShadow: '0 -12px 40px rgba(0,0,0,0.6)' },
@@ -478,13 +478,13 @@ const styles = StyleSheet.create({
   handleArea: {
     alignItems: 'center',
     paddingVertical: 12,
-    backgroundColor: colors.background,
+    backgroundColor: C.bg,
   },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.border,
+    backgroundColor: C.border,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 14,
   },
 
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   cover: {
     width: '100%',
     height: 180,
-    borderRadius: radius.lg,
+    borderRadius: R.cardSm,
     marginBottom: 16,
   },
 
@@ -519,9 +519,9 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.4,
     lineHeight: 26,
   },
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -539,20 +539,20 @@ const styles = StyleSheet.create({
   organizerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.row,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.borderSoft,
   },
   organizerName: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   organizerSub: {
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -560,31 +560,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.greenSoft,
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderRadius: radius.pill,
+    borderRadius: R.pill,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: C.green,
   },
   trustPillText: {
-    color: colors.primary,
+    color: C.green,
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
   },
 
   // Separator
   sep: {
     height: 1,
-    backgroundColor: colors.borderSoft,
+    backgroundColor: C.borderSoft,
     marginVertical: 16,
   },
 
   // Location
   sectionLabel: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 10,
@@ -595,17 +595,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   locationVenue: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   locationComuna: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
     marginTop: 2,
   },
   locationAddr: {
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 12,
     marginTop: 3,
   },
@@ -613,16 +613,16 @@ const styles = StyleSheet.create({
   // Mini map
   miniMapWrap: {
     height: 140,
-    borderRadius: radius.md,
+    borderRadius: R.row,
     overflow: 'hidden',
     marginBottom: 4,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.borderSoft,
   },
 
   // Description
   descripcion: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -633,21 +633,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
+    borderBottomColor: C.borderSoft,
     gap: 10,
   },
   playerInfo: { flex: 1 },
   playerName: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   organizerBadge: {
-    color: colors.primary,
-    fontWeight: '600',
+    color: C.green,
+    fontFamily: F.semiBold,
   },
   playerPos: {
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 2,
     textTransform: 'capitalize',
@@ -656,51 +656,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.greenSoft,
     paddingHorizontal: 7,
     paddingVertical: 4,
-    borderRadius: radius.pill,
+    borderRadius: R.pill,
   },
   playerTrustText: {
-    color: colors.primary,
+    color: C.green,
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
   },
 
   // Action bar
   actionsBar: {
     borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
+    borderTopColor: C.borderSoft,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 8,
-    backgroundColor: colors.background,
+    backgroundColor: C.bg,
     gap: 8,
   },
   joinBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
+    backgroundColor: C.green,
+    borderRadius: R.row,
     paddingVertical: 14,
     alignItems: 'center',
   },
   joinBtnDone: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.greenSoft,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: C.green,
   },
   joinBtnFull: {
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: C.border,
   },
   joinLabel: {
     color: '#0E0E0D',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.2,
   },
   joinLabelMuted: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
   },
   detailBtn: {
     flexDirection: 'row',
@@ -710,8 +710,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   detailLabel: {
-    color: colors.primary,
+    color: C.green,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
 });

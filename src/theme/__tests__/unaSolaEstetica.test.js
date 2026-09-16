@@ -37,7 +37,6 @@ const RAIZ = path.resolve(__dirname, '../..');
 
 /** Las familias de color que el rediseño unifica. Sin radios ni tipografías. */
 const FAMILIAS = [
-  'colors',
   'dsColors',
   'clubColors',
   'chatColors',
@@ -113,7 +112,7 @@ test('ninguna clave de color que el código usa se quedó sin valor', () => {
   );
 });
 
-test('el recorrido del código toca las siete familias, no solo una', () => {
+test('el recorrido del código toca las familias que quedan, no solo una', () => {
   // Si esta prueba deja de encontrar una familia es porque ya nadie la usa:
   // ahí toca borrarla de `FAMILIAS` y del theme, no relajar la comprobación.
   const usadas = clavesUsadas();
@@ -129,11 +128,10 @@ test('el recorrido del código toca las siete familias, no solo una', () => {
 /**
  * El verde de acción de cada familia, con el nombre que usa cada una.
  *
- * `colors` lo llama `primary`, `tactical` lo llama `neon` y el resto `green`.
- * Que se llamen distinto es exactamente la deuda que estas pruebas cierran.
+ * `tactical` lo llama `neon` y el resto `green`. Que se llamen distinto es
+ * exactamente la deuda que estas pruebas cierran.
  */
 const VERDE_DE = {
-  colors: 'primary',
   dsColors: 'green',
   clubColors: 'green',
   chatColors: 'green',
@@ -144,7 +142,6 @@ const VERDE_DE = {
 };
 
 const FONDO_DE = {
-  colors: 'background',
   dsColors: 'background',
   clubColors: 'background',
   chatColors: 'background',
@@ -181,7 +178,6 @@ test('los cinco rojos de la app son uno solo', () => {
   // Existían con cinco valores distintos en cinco familias: `colors.error`,
   // `clubColors.loss`, `partidos.coral`, `chatColors.danger` y `reservas.red`.
   const esperado = tema.reservas.red;
-  assert.equal(tema.colors.error, esperado);
   assert.equal(tema.clubColors.loss, esperado);
   assert.equal(tema.dsColors.loss, esperado);
   assert.equal(tema.partidos.coral, esperado);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 
 /**
  * Botón corporativo de FutFinder
@@ -45,7 +45,7 @@ export default function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? '#000' : colors.primary} />
+        <ActivityIndicator color={isPrimary ? '#000' : C.green} />
       ) : (
         <View style={styles.row}>
           {icon}
@@ -58,8 +58,11 @@ export default function Button({
 
 const styles = StyleSheet.create({
   base: {
+    // 54 de alto y radio de CTA primario: los mismos que el `Button` del kit
+    // (`components/reservas/ui.js`), para que los dos botones que conviven
+    // mientras dure la migración no se vean como dos botones distintos.
     height: 54,
-    borderRadius: radius.lg,
+    borderRadius: R.ctaPrimary,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -70,12 +73,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   primary: {
-    backgroundColor: colors.primary,
+    backgroundColor: C.green,
   },
   secondary: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: C.border,
   },
   ghost: {
     backgroundColor: 'transparent',
@@ -85,15 +88,15 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   labelPrimary: {
     color: '#0E0E0D',
   },
   labelSecondary: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
   },
   labelGhost: {
-    color: colors.primary,
+    color: C.green,
   },
 });

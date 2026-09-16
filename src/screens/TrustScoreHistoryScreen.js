@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ShieldCheck, TrendingUp, TrendingDown } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { getTrustScoreHistory } from '../services/settings';
 import { getMyProfile } from '../services/profile';
 
@@ -27,13 +27,13 @@ function formatDate(iso) {
 
 function HistoryItem({ item }) {
   const isPositive = item.change_amount > 0;
-  const color = isPositive ? colors.primary : colors.error;
+  const color = isPositive ? C.green : C.red;
   const sign = isPositive ? '+' : '';
   const Icon = isPositive ? TrendingUp : TrendingDown;
 
   return (
     <View style={styles.item}>
-      <View style={[styles.iconBubble, { backgroundColor: isPositive ? colors.primarySoft : 'rgba(229,72,77,0.12)' }]}>
+      <View style={[styles.iconBubble, { backgroundColor: isPositive ? C.greenSoft : 'rgba(229,72,77,0.12)' }]}>
         <Icon color={color} size={16} />
       </View>
       <View style={styles.itemInfo}>
@@ -73,7 +73,7 @@ export default function TrustScoreHistoryScreen({ navigation }) {
           hitSlop={12}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
         >
-          <ArrowLeft color={colors.textPrimary} size={20} />
+          <ArrowLeft color={C.textPrimary} size={20} />
         </Pressable>
         <Text style={styles.headerTitle}>Trust Score</Text>
         <View style={{ width: 40 }} />
@@ -81,7 +81,7 @@ export default function TrustScoreHistoryScreen({ navigation }) {
 
       {/* Score actual */}
       <View style={styles.scoreCard}>
-        <ShieldCheck color={colors.primary} size={28} />
+        <ShieldCheck color={C.green} size={28} />
         <Text style={styles.scoreValue}>{trustScore ?? '—'}</Text>
         <Text style={styles.scoreLabel}>Puntuación actual</Text>
         <Text style={styles.scoreHint}>
@@ -91,11 +91,11 @@ export default function TrustScoreHistoryScreen({ navigation }) {
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={C.green} />
         </View>
       ) : history.length === 0 ? (
         <View style={styles.empty}>
-          <ShieldCheck color={colors.textMuted} size={40} />
+          <ShieldCheck color={C.textMuted} size={40} />
           <Text style={styles.emptyTitle}>Sin historial aún</Text>
           <Text style={styles.emptyText}>
             Confirma tu asistencia a partidos por GPS para ver los cambios aquí.
@@ -116,7 +116,7 @@ export default function TrustScoreHistoryScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
 
   header: {
     flexDirection: 'row',
@@ -127,36 +127,36 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 18, fontWeight: '800', letterSpacing: -0.3,
+    color: C.textPrimary,
+    fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3,
   },
 
   scoreCard: {
     marginHorizontal: 16,
     marginBottom: 16,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.cardSm,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     padding: 24,
     gap: 6,
   },
   scoreValue: {
-    color: colors.primary,
-    fontSize: 52, fontWeight: '900', letterSpacing: -1,
+    color: C.green,
+    fontSize: 52, fontFamily: F.extraBold, letterSpacing: -1,
     marginTop: 4,
   },
   scoreLabel: {
-    color: colors.textSecondary,
-    fontSize: 13, fontWeight: '600',
+    color: C.textSecondary,
+    fontSize: 13, fontFamily: F.semiBold,
   },
   scoreHint: {
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 12, lineHeight: 17, textAlign: 'center',
     marginTop: 8, paddingHorizontal: 8,
   },
@@ -168,11 +168,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40, gap: 12,
   },
   emptyTitle: {
-    color: colors.textPrimary,
-    fontSize: 17, fontWeight: '700',
+    color: C.textPrimary,
+    fontSize: 17, fontFamily: F.bold,
   },
   emptyText: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 14, lineHeight: 20, textAlign: 'center',
   },
 
@@ -181,8 +181,8 @@ const styles = StyleSheet.create({
   item: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.row,
     padding: 14,
     gap: 12,
   },
@@ -193,12 +193,12 @@ const styles = StyleSheet.create({
   },
   itemInfo: { flex: 1 },
   itemReason: {
-    color: colors.textPrimary,
-    fontSize: 14, fontWeight: '600', marginBottom: 2,
+    color: C.textPrimary,
+    fontSize: 14, fontFamily: F.semiBold, marginBottom: 2,
   },
-  itemDate: { color: colors.textMuted, fontSize: 12 },
+  itemDate: { color: C.textMuted, fontSize: 12 },
   itemChange: {
-    fontSize: 18, fontWeight: '800',
+    fontSize: 18, fontFamily: F.extraBold,
     flexShrink: 0,
   },
 

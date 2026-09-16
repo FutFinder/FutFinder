@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { TriangleAlert, RotateCcw, ArrowLeft } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 
 /**
  * Red de seguridad para una excepción durante el render.
@@ -53,7 +53,7 @@ export default class ErrorBoundary extends React.Component {
       <View style={styles.root}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.icono}>
-            <TriangleAlert color={colors.error} size={26} strokeWidth={2} />
+            <TriangleAlert color={C.red} size={26} strokeWidth={2} />
           </View>
 
           <Text style={styles.titulo}>Algo se rompió en esta pantalla</Text>
@@ -79,7 +79,7 @@ export default class ErrorBoundary extends React.Component {
                 accessibilityLabel="Volver atrás"
                 style={({ pressed }) => [styles.btnSecundario, pressed && { opacity: 0.7 }]}
               >
-                <ArrowLeft color={colors.textSecondary} size={17} strokeWidth={2.1} />
+                <ArrowLeft color={C.textSecondary} size={17} strokeWidth={2.1} />
                 <Text style={styles.btnSecundarioTexto}>Volver</Text>
               </Pressable>
             )}
@@ -105,13 +105,13 @@ export default class ErrorBoundary extends React.Component {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   content: { padding: 24, paddingTop: 64, gap: 12 },
 
   icono: {
     width: 52,
     height: 52,
-    borderRadius: radius.lg,
+    borderRadius: R.cardSm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,107,107,0.10)',
@@ -119,8 +119,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,107,107,0.28)',
   },
 
-  titulo: { color: colors.textPrimary, fontSize: 19, fontWeight: '800' },
-  mensaje: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  titulo: { color: C.textPrimary, fontSize: 19, fontFamily: F.extraBold },
+  mensaje: { color: C.textSecondary, fontSize: 14, lineHeight: 20 },
 
   acciones: { flexDirection: 'row', gap: 10, marginTop: 8 },
   btnPrimario: {
@@ -130,10 +130,10 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 48,
     paddingHorizontal: 18,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    borderRadius: R.row,
+    backgroundColor: C.green,
   },
-  btnPrimarioTexto: { color: '#0B0D0B', fontSize: 14, fontWeight: '800' },
+  btnPrimarioTexto: { color: '#0B0D0B', fontSize: 14, fontFamily: F.extraBold },
   btnSecundario: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -141,21 +141,21 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 48,
     paddingHorizontal: 18,
-    borderRadius: radius.md,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: C.border,
   },
-  btnSecundarioTexto: { color: colors.textSecondary, fontSize: 14, fontWeight: '700' },
+  btnSecundarioTexto: { color: C.textSecondary, fontSize: 14, fontFamily: F.bold },
 
   detalle: {
     marginTop: 18,
     padding: 12,
-    borderRadius: radius.md,
+    borderRadius: R.row,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: C.border,
     gap: 8,
   },
-  detalleTitulo: { color: colors.error, fontSize: 12, fontWeight: '800' },
-  stack: { color: colors.textSecondary, fontSize: 10, lineHeight: 15 },
+  detalleTitulo: { color: C.red, fontSize: 12, fontFamily: F.extraBold },
+  stack: { color: C.textSecondary, fontSize: 10, lineHeight: 15 },
 });

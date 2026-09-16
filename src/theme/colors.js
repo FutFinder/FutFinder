@@ -8,13 +8,16 @@
 // nació de un handoff distinto y ninguna estaba mal por su cuenta; el problema
 // era verlas juntas.
 //
-// Ahora hay una sola paleta de verdad, `reservas`, y todo lo demás se DERIVA
-// de ella. Las familias viejas siguen exportadas con sus nombres de siempre
-// para que ninguna pantalla tenga que cambiar de golpe, pero ya no tienen
-// valores propios: son vistas de la misma paleta con el vocabulario que cada
-// módulo aprendió. Se van borrando a medida que cada módulo migra a los
-// nombres nuevos, y cuando no quede ninguna, una regla de lint impedirá
-// volver a importarlas.
+// Ahora hay una sola paleta de verdad, `reservas`, y lo que queda de las
+// otras se DERIVA de ella: son vistas de la misma paleta con el vocabulario
+// que cada módulo aprendió, sin valores propios. Cada una se BORRA cuando su
+// módulo migra a los nombres nuevos, y cuando no quede ninguna, una regla de
+// lint impedirá volver a importarlas.
+//
+// YA NO EXISTEN: `colors`, `radius`, `spacing` y `fonts` —la paleta legada del
+// fondo café #201F1D y el verde oliva #71B533, con la tipografía del sistema—
+// se borraron el 2026-09-16 al migrar el onboarding y los compartidos. Quedan
+// `dsColors`/`clubColors`, `chatColors`, `tactical` y `partidos`.
 //
 // Ver `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 //
@@ -236,37 +239,6 @@ export const clubsExplorer = {
   textMuted: reservas.textMuted,
 };
 
-/**
- * La paleta legada (fondo café #201F1D, verde oliva #71B533).
- *
- * Es la más antigua y la que quedaba en el onboarding, en Términos, en
- * Bloqueados y en tres componentes compartidos —`Banner`, `Button`, `Logo`—,
- * que es lo que la hacía asomarse dentro de pantallas ya rediseñadas.
- *
- * `success` era `primary` y ahora también: un éxito se dice con el verde de
- * acción, no con un verde propio.
- */
-export const colors = {
-  background: reservas.bg,
-  surface: reservas.surface,
-  surfaceAlt: reservas.surfaceAlt,
-
-  primary: reservas.green,
-  primaryDark: reservas.greenActive,
-  primarySoft: reservas.greenSoft,
-
-  textPrimary: reservas.textPrimary,
-  textSecondary: reservas.textSecondary,
-  textMuted: reservas.textMuted,
-
-  error: reservas.red,
-  errorSoft: reservas.redSoft,
-  success: reservas.green,
-
-  border: reservas.border,
-  borderSoft: reservas.borderSoft,
-};
-
 /** Perfil de jugador y `components/ds/`. */
 export const dsColors = {
   background: reservas.bg,
@@ -484,29 +456,6 @@ export const clubsExplorerRadius = {
   empty: 24,
   pill: 14,
   fab: 18,
-};
-
-export const fonts = {
-  regular: 'System',
-  medium: 'System',
-  bold: 'System',
-};
-
-export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  pill: 999,
-};
-
-export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
 };
 
 /**

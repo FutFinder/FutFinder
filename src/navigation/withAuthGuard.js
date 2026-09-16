@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { colors } from '../theme/colors';
+import { reservas as C } from '../theme/colors';
 import { useAuth } from '../contexts/AuthContext';
 import withErrorBoundary from './withErrorBoundary';
 
@@ -47,5 +47,5 @@ export default function withAuthGuard(ScreenComponent, routeName) {
 }
 
 const styles = StyleSheet.create({
-  fallback: { flex: 1, backgroundColor: colors.background },
+  fallback: { flex: 1, backgroundColor: C.bg },
 });

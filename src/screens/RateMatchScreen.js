@@ -20,7 +20,7 @@ import {
   Check,
 } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 import { getMatchById } from '../services/matches';
 import {
   getRatableAttendees,
@@ -41,7 +41,7 @@ function StarRow({ label, Icon, value, onChange }) {
   return (
     <View style={styles.starBlock}>
       <View style={styles.starHeader}>
-        <Icon color={colors.textSecondary} size={14} />
+        <Icon color={C.textSecondary} size={14} />
         <Text style={styles.starLabel}>{label}</Text>
       </View>
       <View style={styles.starRow}>
@@ -55,8 +55,8 @@ function StarRow({ label, Icon, value, onChange }) {
               style={styles.starBtn}
             >
               <Star
-                color={active ? colors.primary : colors.textMuted}
-                fill={active ? colors.primary : 'transparent'}
+                color={active ? C.green : C.textMuted}
+                fill={active ? C.green : 'transparent'}
                 size={26}
                 strokeWidth={1.8}
               />
@@ -183,7 +183,7 @@ export default function RateMatchScreen({ route, navigation }) {
               pressed && { opacity: 0.6 },
             ]}
           >
-            <ArrowLeft color={colors.textPrimary} size={22} />
+            <ArrowLeft color={C.textPrimary} size={22} />
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>Calificar partido</Text>
@@ -197,11 +197,11 @@ export default function RateMatchScreen({ route, navigation }) {
 
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color={colors.primary} />
+            <ActivityIndicator color={C.green} />
           </View>
         ) : attendees.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Star color={colors.textMuted} size={42} strokeWidth={1.5} />
+            <Star color={C.textMuted} size={42} strokeWidth={1.5} />
             <Text style={styles.emptyTitle}>Nada por calificar</Text>
             <Text style={styles.emptyText}>
               Solo puedes evaluar a compañeros que confirmaron su asistencia
@@ -257,7 +257,7 @@ export default function RateMatchScreen({ route, navigation }) {
                       </View>
                       {locked && (
                         <View style={styles.doneChip}>
-                          <Check color={colors.primary} size={12} />
+                          <Check color={C.green} size={12} />
                           <Text style={styles.doneChipText}>Listo</Text>
                         </View>
                       )}
@@ -291,7 +291,7 @@ export default function RateMatchScreen({ route, navigation }) {
                           ? r.comentario || 'Sin comentario'
                           : 'Comentario opcional (jugó bien, llegó tarde…)'
                       }
-                      placeholderTextColor={colors.textMuted}
+                      placeholderTextColor={C.textMuted}
                       value={r.comentario}
                       onChangeText={(t) => update(p.id, 'comentario', t)}
                       multiline
@@ -336,7 +336,7 @@ export default function RateMatchScreen({ route, navigation }) {
 const AVATAR = 44;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -348,41 +348,41 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerCenter: { flex: 1 },
   headerTitle: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
   },
   headerSubtitle: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   scroll: { paddingHorizontal: 16, paddingBottom: 24 },
   intro: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
     lineHeight: 18,
     marginVertical: 12,
   },
   card: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.lg,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.cardSm,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: C.borderSoft,
     gap: 14,
   },
   cardLocked: {
     opacity: 0.6,
-    borderColor: colors.primary + '55',
+    borderColor: C.green + '55',
   },
   userRow: {
     flexDirection: 'row',
@@ -393,25 +393,25 @@ const styles = StyleSheet.create({
     width: AVATAR,
     height: AVATAR,
     borderRadius: AVATAR / 2,
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
   },
   avatarFallback: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarLetter: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
   },
   username: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.2,
   },
   meta: {
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 2,
   },
@@ -419,15 +419,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: C.greenSoft,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: radius.pill,
+    borderRadius: R.pill,
   },
   doneChipText: {
-    color: colors.primary,
+    color: C.green,
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: F.bold,
   },
   starBlock: {
     gap: 6,
@@ -438,9 +438,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   starLabel: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -452,11 +452,11 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   comment: {
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
+    backgroundColor: C.bg,
+    borderRadius: R.row,
     borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.textPrimary,
+    borderColor: C.border,
+    color: C.textPrimary,
     fontSize: 13,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -469,29 +469,29 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 18,
     borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-    backgroundColor: colors.background,
+    borderTopColor: C.borderSoft,
+    backgroundColor: C.bg,
     gap: 8,
   },
   submitInfo: {
-    color: colors.textMuted,
+    color: C.textMuted,
     fontSize: 11,
     textAlign: 'center',
   },
   submitBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
+    backgroundColor: C.green,
+    borderRadius: R.pill,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitBtnDisabled: {
-    backgroundColor: colors.surface,
+    backgroundColor: C.surface,
   },
   submitBtnText: {
     color: '#0E0E0D',
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.2,
   },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -503,13 +503,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyTitle: {
-    color: colors.textPrimary,
+    color: C.textPrimary,
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     marginTop: 6,
   },
   emptyText: {
-    color: colors.textSecondary,
+    color: C.textSecondary,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,

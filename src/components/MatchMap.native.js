@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { Search as SearchIcon } from 'lucide-react-native';
 
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 
 function fmtHora(iso) {
   try {
@@ -161,7 +161,7 @@ export default function MatchMap({
           onPress={onSearchHere}
           style={({ pressed }) => [styles.searchHere, pressed && { opacity: 0.85 }]}
         >
-          <SearchIcon color={colors.primary} size={13} />
+          <SearchIcon color={C.green} size={13} />
           <Text style={styles.searchHereText}>Buscar en esta zona</Text>
         </Pressable>
       )}
@@ -173,19 +173,19 @@ const styles = StyleSheet.create({
   wrap: {
     width: '100%',
     height: 320,
-    borderRadius: radius.lg,
+    borderRadius: R.cardSm,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.background,
+    borderColor: C.borderSoft,
+    backgroundColor: C.bg,
     marginBottom: 12,
   },
   map: { ...StyleSheet.absoluteFillObject },
 
   // Burbuja Airbnb-like, compacta y oscura
   pill: {
-    backgroundColor: colors.background,
-    borderColor: colors.primary,
+    backgroundColor: C.bg,
+    borderColor: C.green,
     borderWidth: 1,
     borderRadius: 999,
     paddingVertical: 4,
@@ -201,13 +201,13 @@ const styles = StyleSheet.create({
     }),
   },
   pillSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: C.green,
+    borderColor: C.green,
   },
   pillText: {
-    color: colors.primary,
+    color: C.green,
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.2,
   },
   pillTextSelected: { color: '#0E0E0D' },
@@ -218,13 +218,13 @@ const styles = StyleSheet.create({
     marginLeft: -3,
     width: 6,
     height: 6,
-    backgroundColor: colors.background,
+    backgroundColor: C.bg,
     borderRightWidth: 1,
     borderBottomWidth: 1,
-    borderColor: colors.primary,
+    borderColor: C.green,
     transform: [{ rotate: '45deg' }],
   },
-  pillTipSelected: { backgroundColor: colors.primary },
+  pillTipSelected: { backgroundColor: C.green },
 
   userDotOuter: {
     width: 26,
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: colors.primary,
+    backgroundColor: C.green,
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
@@ -252,9 +252,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: C.green,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
@@ -269,9 +269,9 @@ const styles = StyleSheet.create({
     }),
   },
   searchHereText: {
-    color: colors.primary,
+    color: C.green,
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.3,
   },
 });

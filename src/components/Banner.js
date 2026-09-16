@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { CheckCircle2, AlertCircle, X, Info } from 'lucide-react-native';
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 
 /**
  * Banner inline para mostrar feedback al usuario.
@@ -11,22 +11,22 @@ import { colors, radius } from '../theme/colors';
 export default function Banner({ type = 'info', title, message, onClose }) {
   const palette = {
     success: {
-      bg: colors.primarySoft,
-      border: colors.primary,
-      icon: <CheckCircle2 color={colors.primary} size={18} />,
-      titleColor: colors.primary,
+      bg: C.greenSoft,
+      border: C.green,
+      icon: <CheckCircle2 color={C.green} size={18} />,
+      titleColor: C.green,
     },
     error: {
-      bg: colors.errorSoft,
-      border: colors.error,
-      icon: <AlertCircle color={colors.error} size={18} />,
-      titleColor: colors.error,
+      bg: C.redSoft,
+      border: C.red,
+      icon: <AlertCircle color={C.red} size={18} />,
+      titleColor: C.red,
     },
     info: {
-      bg: colors.surfaceAlt,
-      border: colors.borderSoft,
-      icon: <Info color={colors.textSecondary} size={18} />,
-      titleColor: colors.textPrimary,
+      bg: C.surfaceAlt,
+      border: C.borderSoft,
+      icon: <Info color={C.textSecondary} size={18} />,
+      titleColor: C.textPrimary,
     },
   }[type];
 
@@ -48,7 +48,7 @@ export default function Banner({ type = 'info', title, message, onClose }) {
       </View>
       {onClose ? (
         <Pressable onPress={onClose} hitSlop={8} style={styles.close}>
-          <X color={colors.textSecondary} size={16} />
+          <X color={C.textSecondary} size={16} />
         </Pressable>
       ) : null}
     </View>
@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
     padding: 12,
-    borderRadius: radius.md,
+    borderRadius: R.row,
     borderWidth: 1,
     marginBottom: 12,
   },
   iconWrap: { paddingTop: 2 },
   content: { flex: 1 },
-  title: { fontSize: 13, fontWeight: '700' },
-  message: { color: colors.textPrimary, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  title: { fontSize: 13, fontFamily: F.bold },
+  message: { color: C.textPrimary, fontSize: 13, lineHeight: 18, marginTop: 2 },
   close: { padding: 2 },
 });

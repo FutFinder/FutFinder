@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Lock, Crown } from 'lucide-react-native';
-import { colors, radius } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
 
 // Dorado premium — único acento fuera de la paleta verde, reservado
 // exclusivamente para distinguir features de pago.
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     backgroundColor: GOLD_SOFT,
     borderWidth: 1,
     borderColor: GOLD,
-    borderRadius: radius.pill,
+    borderRadius: R.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
     alignSelf: 'flex-start',
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   text: {
     color: GOLD,
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.6,
   },
 });
