@@ -24,7 +24,11 @@ import {
   X,
 } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 import { Pill, Tag, Avatar, PrimaryButton, SurfaceButton } from '../components/partidos/ui';
 import PartidoCard from '../components/partidos/PartidoCard';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
@@ -472,8 +476,8 @@ export default function PartidosScreen({ navigation, route }) {
                 setRefreshing(true);
                 load();
               }}
-              tintColor={P.green}
-              colors={[P.green]}
+              tintColor={C.green}
+              colors={[C.green]}
             />
           }
         >
@@ -503,7 +507,7 @@ export default function PartidosScreen({ navigation, route }) {
 
           {/* Buscador */}
           <View style={[styles.search, hasQuery && styles.searchActive]}>
-            <SearchIcon color={hasQuery ? P.green : P.textMuted} size={16} strokeWidth={2} />
+            <SearchIcon color={hasQuery ? C.green : C.textSecondary} size={16} strokeWidth={2} />
             <TextInput
               value={text}
               onChangeText={setText}
@@ -512,7 +516,7 @@ export default function PartidosScreen({ navigation, route }) {
                   ? 'Buscar por comuna, cancha o nombre…'
                   : 'Buscar jugador por nombre de usuario…'
               }
-              placeholderTextColor={P.textPlaceholder}
+              placeholderTextColor={C.textPlaceholder}
               style={styles.searchInput}
               autoCapitalize="none"
               autoCorrect={false}
@@ -525,7 +529,7 @@ export default function PartidosScreen({ navigation, route }) {
                 accessibilityLabel="Limpiar búsqueda"
                 style={styles.clearBtn}
               >
-                <X color={P.textSoft} size={11} strokeWidth={3} />
+                <X color={C.textSoft} size={11} strokeWidth={3} />
               </Pressable>
             ) : null}
           </View>
@@ -613,7 +617,7 @@ export default function PartidosScreen({ navigation, route }) {
                   ) : null}
                 </View>
                 <View style={styles.statusRight}>
-                  <ArrowDownUp color={P.green} size={13} strokeWidth={2} />
+                  <ArrowDownUp color={C.green} size={13} strokeWidth={2} />
                   <Text style={styles.sort}>{userCoords ? 'Más cercanos' : 'Próximos en hora'}</Text>
                   <Pressable
                     onPress={() => setView(view === 'lista' ? 'mapa' : 'lista')}
@@ -622,9 +626,9 @@ export default function PartidosScreen({ navigation, route }) {
                     style={styles.viewToggle}
                   >
                     {view === 'lista' ? (
-                      <MapIcon color={P.textStrong} size={14} strokeWidth={2} />
+                      <MapIcon color={C.textStrong} size={14} strokeWidth={2} />
                     ) : (
-                      <ListIcon color={P.textStrong} size={14} strokeWidth={2} />
+                      <ListIcon color={C.textStrong} size={14} strokeWidth={2} />
                     )}
                   </Pressable>
                 </View>
@@ -722,7 +726,7 @@ export default function PartidosScreen({ navigation, route }) {
                 <>
                   {locationDenied ? (
                     <Pressable onPress={handleEnableLocation} style={styles.locHint}>
-                      <MapPin color={P.gold} size={14} strokeWidth={2} />
+                      <MapPin color={C.gold} size={14} strokeWidth={2} />
                       <Text style={styles.locHintText}>
                         Sin ubicación no calculamos la distancia. Toca para activarla.
                       </Text>
@@ -818,7 +822,7 @@ export default function PartidosScreen({ navigation, route }) {
 
               {loadingPlayers ? (
                 <View style={{ paddingVertical: 34 }}>
-                  <ActivityIndicator color={P.green} />
+                  <ActivityIndicator color={C.green} />
                 </View>
               ) : players.length === 0 ? (
                 <View style={{ paddingVertical: 30, paddingHorizontal: 20, alignItems: 'center' }}>
@@ -858,7 +862,7 @@ export default function PartidosScreen({ navigation, route }) {
                           />
                         </View>
                       </View>
-                      <ChevronRight color={P.textMuted} size={17} />
+                      <ChevronRight color={C.textSecondary} size={17} />
                     </Pressable>
                   ))}
                 </View>
@@ -927,7 +931,7 @@ function Header({ onFilters, activeCount = 0, showFilters }) {
               pressed && { opacity: 0.7 },
             ]}
           >
-            <Filter color={activeCount > 0 ? P.green : P.textDim} size={16} strokeWidth={2} />
+            <Filter color={activeCount > 0 ? C.green : C.textDim} size={16} strokeWidth={2} />
             {activeCount > 0 ? (
               <View style={styles.headerBadge}>
                 <Text style={styles.headerBadgeText}>{activeCount}</Text>
@@ -952,7 +956,7 @@ function ModeTab({ label, icon: Icon, active, onPress }) {
         pressed && { opacity: 0.85 },
       ]}
     >
-      <Icon color={active ? P.greenInk : P.textMuted} size={16} strokeWidth={active ? 2.3 : 1.9} />
+      <Icon color={active ? C.greenInk : C.textSecondary} size={16} strokeWidth={active ? 2.3 : 1.9} />
       <Text style={[styles.modeTabText, active && styles.modeTabTextOn]}>{label}</Text>
     </Pressable>
   );
@@ -963,7 +967,7 @@ function capitalize(s) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: P.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16, paddingBottom: 26 },
 
   header: {
@@ -979,13 +983,13 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 11,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.hairline,
+    borderColor: C.hairline,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerBtnActive: { backgroundColor: 'rgba(90,224,106,0.13)', borderColor: P.greenBorder },
+  headerBtnActive: { backgroundColor: 'rgba(90,224,106,0.13)', borderColor: C.greenBorder },
   headerBadge: {
     position: 'absolute',
     top: -3,
@@ -994,17 +998,17 @@ const styles = StyleSheet.create({
     height: 15,
     paddingHorizontal: 3,
     borderRadius: 8,
-    backgroundColor: P.green,
+    backgroundColor: C.green,
     borderWidth: 2,
-    borderColor: P.bg,
+    borderColor: C.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerBadgeText: { fontSize: 9, fontWeight: '700', color: P.greenInk },
+  headerBadgeText: { fontSize: 9, fontFamily: F.bold, color: C.greenInk },
 
   titleBlock: { marginBottom: 14 },
-  h1: { fontSize: 31, fontWeight: '800', color: P.text, letterSpacing: -1, lineHeight: 34 },
-  h1sub: { fontSize: 12.5, fontWeight: '500', color: P.textFaint, marginTop: 4 },
+  h1: { fontSize: 31, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -1, lineHeight: 34 },
+  h1sub: { fontSize: 12.5, fontFamily: F.medium, color: C.textFaint, marginTop: 4 },
 
   modeRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
   modeTab: {
@@ -1016,10 +1020,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
   },
-  modeTabOn: { backgroundColor: P.green },
-  modeTabOff: { backgroundColor: P.surface, borderWidth: 1, borderColor: P.hairline },
-  modeTabText: { fontSize: 13.5, fontWeight: '600', color: P.textMuted },
-  modeTabTextOn: { color: P.greenInk, fontWeight: '700' },
+  modeTabOn: { backgroundColor: C.green },
+  modeTabOff: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.hairline },
+  modeTabText: { fontSize: 13.5, fontFamily: F.semiBold, color: C.textSecondary },
+  modeTabTextOn: { color: C.greenInk, fontFamily: F.bold },
 
   search: {
     flexDirection: 'row',
@@ -1027,25 +1031,25 @@ const styles = StyleSheet.create({
     gap: 9,
     height: 46,
     paddingHorizontal: 13,
-    borderRadius: R.input,
-    backgroundColor: P.surface,
+    borderRadius: R.row,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
   },
   searchActive: { borderColor: 'rgba(90,224,106,0.45)' },
   searchInput: {
     flex: 1,
     minWidth: 0,
     fontSize: 13.5,
-    fontWeight: '500',
-    color: P.text,
+    fontFamily: F.medium,
+    color: C.textPrimary,
     ...({ outlineStyle: 'none' }),
   },
   clearBtn: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: P.track,
+    backgroundColor: C.track,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1062,16 +1066,16 @@ const styles = StyleSheet.create({
   },
   statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  count: { fontSize: 12, fontWeight: '600', color: P.textMuted },
-  clearLink: { fontSize: 12, fontWeight: '600', color: P.coral },
-  sort: { fontSize: 12, fontWeight: '600', color: P.green },
+  count: { fontSize: 12, fontFamily: F.semiBold, color: C.textSecondary },
+  clearLink: { fontSize: 12, fontFamily: F.semiBold, color: C.red },
+  sort: { fontSize: 12, fontFamily: F.semiBold, color: C.green },
   viewToggle: {
     width: 30,
     height: 30,
     borderRadius: 10,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.hairline,
+    borderColor: C.hairline,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 4,
@@ -1081,52 +1085,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: P.goldSoft,
+    backgroundColor: C.goldSoft,
     borderWidth: 1,
-    borderColor: P.goldBorder,
-    borderRadius: R.input,
+    borderColor: C.goldBorder,
+    borderRadius: R.row,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 10,
   },
-  locHintText: { flex: 1, fontSize: 11.5, fontWeight: '600', color: P.gold },
+  locHintText: { flex: 1, fontSize: 11.5, fontFamily: F.semiBold, color: C.gold },
 
   playerCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.border,
-    borderRadius: R.card,
+    borderColor: C.border,
+    borderRadius: R.cardSm,
     padding: 12,
   },
-  playerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: P.chip },
-  playerName: { fontSize: 14.5, fontWeight: '700', color: P.text },
+  playerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.chip },
+  playerName: { fontSize: 14.5, fontFamily: F.bold, color: C.textPrimary },
 
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: P.text },
+  emptyTitle: { fontSize: 16, fontFamily: F.bold, color: C.textPrimary },
   emptyText: {
     fontSize: 12.5,
     lineHeight: 19,
-    color: P.textFaint,
+    color: C.textFaint,
     textAlign: 'center',
     marginTop: 6,
   },
 
   suspended: {
-    backgroundColor: P.coralSoft,
+    backgroundColor: C.redSoft,
     borderWidth: 1,
-    borderColor: P.coralBorder,
-    borderRadius: R.card,
+    borderColor: C.redBorder,
+    borderRadius: R.cardSm,
     padding: 20,
   },
-  suspendedTitle: { fontSize: 17, fontWeight: '700', color: P.coral },
-  suspendedText: { fontSize: 13, lineHeight: 20, color: P.textSoft, marginTop: 8 },
+  suspendedTitle: { fontSize: 17, fontFamily: F.bold, color: C.red },
+  suspendedText: { fontSize: 13, lineHeight: 20, color: C.textSoft, marginTop: 8 },
 
   demo: {
     fontSize: 11,
     lineHeight: 16,
-    color: P.textGhost,
+    color: C.textGhost,
     textAlign: 'center',
     marginTop: 18,
   },

@@ -4,7 +4,11 @@ import { Check, Search } from 'lucide-react-native';
 
 import Sheet from './Sheet';
 import { GhostButton, PrimaryButton } from './ui';
-import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Selector con búsqueda para listas largas (región, comuna, cancha…).
@@ -75,12 +79,12 @@ export default function PickerSheet({
       }
     >
       <View style={styles.search}>
-        <Search color={P.textMuted} size={15} strokeWidth={2} />
+        <Search color={C.textSecondary} size={15} strokeWidth={2} />
         <TextInput
           value={q}
           onChangeText={setQ}
           placeholder={searchPlaceholder}
-          placeholderTextColor={P.textPlaceholder}
+          placeholderTextColor={C.textPlaceholder}
           style={styles.searchInput}
           autoCorrect={false}
         />
@@ -118,10 +122,10 @@ function Row({ label, selected, onPress }) {
       accessibilityState={{ selected }}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
     >
-      <Text style={[styles.rowText, selected && { color: P.green, fontWeight: '700' }]} numberOfLines={1}>
+      <Text style={[styles.rowText, selected && { color: C.green, fontFamily: F.bold }]} numberOfLines={1}>
         {label}
       </Text>
-      {selected ? <Check color={P.green} size={16} strokeWidth={2.6} /> : null}
+      {selected ? <Check color={C.green} size={16} strokeWidth={2.6} /> : null}
     </Pressable>
   );
 }
@@ -134,7 +138,7 @@ const styles = StyleSheet.create({
     height: 42,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: P.chipAlt,
+    backgroundColor: C.chipAlt,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     marginBottom: 10,
@@ -143,8 +147,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontSize: 13,
-    fontWeight: '500',
-    color: P.text,
+    fontFamily: F.medium,
+    color: C.textPrimary,
     ...({ outlineStyle: 'none' }),
   },
   row: {
@@ -155,9 +159,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12.5,
     paddingHorizontal: 2,
     borderBottomWidth: 1,
-    borderBottomColor: P.divider,
+    borderBottomColor: C.divider,
     minHeight: 48,
   },
-  rowText: { flex: 1, fontSize: 13.5, fontWeight: '600', color: P.textStrong },
-  empty: { paddingVertical: 26, textAlign: 'center', fontSize: 12.5, color: P.textFaint },
+  rowText: { flex: 1, fontSize: 13.5, fontFamily: F.semiBold, color: C.textStrong },
+  empty: { paddingVertical: 26, textAlign: 'center', fontSize: 12.5, color: C.textFaint },
 });

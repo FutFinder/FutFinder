@@ -11,7 +11,11 @@ import {
   MessageSquareOff,
 } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   Avatar,
   Callout,
@@ -135,9 +139,9 @@ export default function MatchRequestStatusScreen({ route, navigation }) {
           <View style={{ alignItems: 'center', gap: 12, paddingVertical: 14 }}>
             <View style={[styles.bigIcon, accepted ? styles.bigIconOk : styles.bigIconPending]}>
               {accepted ? (
-                <CheckCircle2 color={P.green} size={28} strokeWidth={2} />
+                <CheckCircle2 color={C.green} size={28} strokeWidth={2} />
               ) : (
-                <Clock color={P.gold} size={28} strokeWidth={2} />
+                <Clock color={C.gold} size={28} strokeWidth={2} />
               )}
             </View>
             <Text style={styles.bigTitle}>
@@ -268,7 +272,7 @@ function Shell({ onBack, title, children }) {
 }
 
 function Step({ title, sub, done, active, tone = 'green', last }) {
-  const color = done ? P.green : active ? (tone === 'gold' ? P.gold : P.green) : P.grip;
+  const color = done ? C.green : active ? (tone === 'gold' ? C.gold : C.green) : C.grip;
   return (
     <View style={{ flexDirection: 'row', gap: 12 }}>
       <View style={{ alignItems: 'center' }}>
@@ -278,7 +282,7 @@ function Step({ title, sub, done, active, tone = 'green', last }) {
         {!last ? <View style={styles.line} /> : null}
       </View>
       <View style={{ flex: 1, paddingBottom: last ? 0 : 16 }}>
-        <Text style={[styles.stepTitle, { color: done || active ? (active && tone === 'gold' ? P.gold : P.text) : P.textGhost }]}>
+        <Text style={[styles.stepTitle, { color: done || active ? (active && tone === 'gold' ? C.gold : C.textPrimary) : C.textGhost }]}>
           {title}
         </Text>
         <Text style={styles.stepSub}>{sub}</Text>
@@ -290,8 +294,8 @@ function Step({ title, sub, done, active, tone = 'green', last }) {
 function Row({ icon: Icon, children }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-      <Icon color={P.textMuted} size={15} strokeWidth={2} />
-      <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '600', color: P.textSoft }}>{children}</Text>
+      <Icon color={C.textSecondary} size={15} strokeWidth={2} />
+      <Text style={{ flex: 1, fontSize: 12.5, fontFamily: F.semiBold, color: C.textSoft }}>{children}</Text>
     </View>
   );
 }
@@ -326,7 +330,7 @@ function capitalize(s) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: P.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16, paddingBottom: 24 },
   topBar: {
     flexDirection: 'row',
@@ -336,7 +340,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 12,
   },
-  topTitle: { fontSize: 15, fontWeight: '700', color: P.text },
+  topTitle: { fontSize: 15, fontFamily: F.bold, color: C.textPrimary },
 
   bigIcon: {
     width: 66,
@@ -346,28 +350,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  bigIconPending: { backgroundColor: 'rgba(240,200,90,0.10)', borderColor: P.goldBorder },
-  bigIconOk: { backgroundColor: 'rgba(90,224,106,0.13)', borderColor: P.greenBorder },
-  bigTitle: { fontSize: 22, fontWeight: '800', color: P.text, letterSpacing: -0.4, textAlign: 'center' },
-  bigText: { fontSize: 13, lineHeight: 20, color: P.textMuted, textAlign: 'center' },
+  bigIconPending: { backgroundColor: 'rgba(240,200,90,0.10)', borderColor: C.goldBorder },
+  bigIconOk: { backgroundColor: 'rgba(90,224,106,0.13)', borderColor: C.greenBorder },
+  bigTitle: { fontSize: 22, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.4, textAlign: 'center' },
+  bigText: { fontSize: 13, lineHeight: 20, color: C.textSecondary, textAlign: 'center' },
 
-  matchTitle: { fontSize: 16, fontWeight: '800', color: P.text },
+  matchTitle: { fontSize: 16, fontFamily: F.extraBold, color: C.textPrimary },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  metaLabel: { fontSize: 12, color: P.textMuted },
-  metaValue: { fontSize: 14, fontWeight: '800', color: P.green },
-  orgName: { fontSize: 12.5, fontWeight: '700', color: P.text },
-  orgSub: { fontSize: 11, color: P.textFaint, marginTop: 1 },
+  metaLabel: { fontSize: 12, color: C.textSecondary },
+  metaValue: { fontSize: 14, fontFamily: F.extraBold, color: C.green },
+  orgName: { fontSize: 12.5, fontFamily: F.bold, color: C.textPrimary },
+  orgSub: { fontSize: 11, color: C.textFaint, marginTop: 1 },
   smallBtn: {
     height: 32,
     paddingHorizontal: 11,
     borderRadius: 9,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  smallBtnText: { fontSize: 11.5, fontWeight: '700', color: P.textStrong },
+  smallBtnText: { fontSize: 11.5, fontFamily: F.bold, color: C.textStrong },
 
   dot: {
     width: 18,
@@ -378,15 +382,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dotInner: { width: 7, height: 7, borderRadius: 4 },
-  line: { width: 1.5, flex: 1, minHeight: 26, backgroundColor: P.track },
-  stepTitle: { fontSize: 12.5, fontWeight: '700' },
-  stepSub: { fontSize: 11, color: P.textFaint, marginTop: 1 },
+  line: { width: 1.5, flex: 1, minHeight: 26, backgroundColor: C.track },
+  stepTitle: { fontSize: 12.5, fontFamily: F.bold },
+  stepSub: { fontSize: 11, color: C.textFaint, marginTop: 1 },
 
   footer: {
     paddingHorizontal: 16,
     paddingTop: 14,
-    backgroundColor: P.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderTopWidth: 1,
-    borderTopColor: P.hairline,
+    borderTopColor: C.hairline,
   },
 });

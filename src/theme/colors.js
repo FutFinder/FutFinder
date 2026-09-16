@@ -17,8 +17,8 @@
 // YA NO EXISTEN, todas borradas el 2026-09-16: `colors`, `radius`, `spacing` y
 // `fonts` (la paleta legada del fondo café #201F1D y el verde oliva #71B533,
 // con la tipografía del sistema), `clubColors`/`clubRadius`/`clubSizes`, y
-// `dsColors`/`dsRadius`/`dsSizes` con `chatColors`. Quedan `tactical` y
-// `partidos`.
+// `dsColors`/`dsRadius`/`dsSizes` con `chatColors`, y `partidos` con
+// `partidosRadius`. Queda `tactical`.
 //
 // Ver `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 //
@@ -276,66 +276,6 @@ export const tactical = {
   text: reservas.textPrimary,
   textDim: reservas.textSecondary,
   textFaint: reservas.textFaint,
-};
-
-/** El módulo Partidos. Es el que traía la escala de texto más completa. */
-export const partidos = {
-  bg: reservas.bg,
-  bgDeep: reservas.bgDeep,
-  surface: reservas.surface,
-  surfaceAlt: reservas.surfaceAlt,
-  chip: reservas.chip,
-  chipAlt: reservas.chipAlt,
-
-  green: reservas.green,
-  greenDark: reservas.greenDark,
-  greenInk: reservas.greenInk,
-  greenSoft: reservas.greenSoft,
-  greenSoftStrong: reservas.greenSoftStrong,
-  greenBorder: reservas.greenBorder,
-  greenBorderStrong: reservas.greenBorderStrong,
-  greenGlow: reservas.greenGlow,
-
-  gold: reservas.gold,
-  goldSoft: reservas.goldSoft,
-  goldBorder: reservas.goldBorder,
-
-  coral: reservas.red,
-  coralSoft: reservas.redSoft,
-  coralBorder: reservas.redBorder,
-
-  text: reservas.textPrimary,
-  textStrong: reservas.textStrong,
-  textSoft: reservas.textSoft,
-  textDim: reservas.textDim,
-  textMuted: reservas.textSecondary,
-  textFaint: reservas.textFaint,
-  textGhost: reservas.textGhost,
-  textPlaceholder: reservas.textPlaceholder,
-
-  hairline: reservas.hairline,
-  border: reservas.border,
-  borderStrong: reservas.borderStrong,
-  divider: reservas.divider,
-  track: reservas.track,
-  grip: reservas.grip,
-  dashed: reservas.dashed,
-  scrim: reservas.scrim,
-
-  hero: reservas.hero,
-  heroNeutral: reservas.heroNeutral,
-  avatar: reservas.avatar,
-};
-
-export const partidosRadius = {
-  pill: 999,
-  chipSm: 7,
-  chip: 9,
-  control: 11,
-  input: 14,
-  card: 20,
-  list: 24,
-  sheet: 26,
 };
 
 export const clubsExplorerRadius = {

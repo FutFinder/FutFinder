@@ -3,7 +3,11 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 
 import Sheet from './Sheet';
 import { GhostButton, PrimaryButton } from './ui';
-import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Selectores de fecha y hora propios, sin dependencias nuevas.
@@ -185,7 +189,7 @@ export function TimeSheet({ visible, onClose, value, onSelect, minDate = null })
                 pressed && !past && { opacity: 0.8 },
               ]}
             >
-              <Text style={[styles.slotText, on && { color: P.text }, past && { color: '#434A44' }]}>
+              <Text style={[styles.slotText, on && { color: C.textPrimary }, past && { color: '#434A44' }]}>
                 {t}
               </Text>
             </Pressable>
@@ -209,24 +213,24 @@ const styles = StyleSheet.create({
     paddingVertical: 12.5,
     paddingHorizontal: 2,
     borderBottomWidth: 1,
-    borderBottomColor: P.divider,
+    borderBottomColor: C.divider,
   },
-  rowText: { flex: 1, fontSize: 13.5, fontWeight: '600', color: P.textStrong },
-  rowTextOn: { color: P.green, fontWeight: '700' },
-  rowMeta: { fontSize: 11.5, color: P.textFaint },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: P.green },
+  rowText: { flex: 1, fontSize: 13.5, fontFamily: F.semiBold, color: C.textStrong },
+  rowTextOn: { color: C.green, fontFamily: F.bold },
+  rowMeta: { fontSize: 11.5, color: C.textFaint },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.green },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingBottom: 8 },
   slot: {
     width: '22.6%',
     height: 44,
-    borderRadius: R.control,
-    backgroundColor: P.chipAlt,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.chipAlt,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  slotOn: { backgroundColor: P.greenSoftStrong, borderColor: P.greenBorder },
-  slotPast: { backgroundColor: P.surfaceAlt, borderColor: P.divider },
-  slotText: { fontSize: 12.5, fontWeight: '700', color: '#8D958D' },
+  slotOn: { backgroundColor: C.greenSoftStrong, borderColor: C.greenBorder },
+  slotPast: { backgroundColor: C.surfaceAlt, borderColor: C.divider },
+  slotText: { fontSize: 12.5, fontFamily: F.bold, color: '#8D958D' },
 });

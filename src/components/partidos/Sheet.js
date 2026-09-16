@@ -3,7 +3,11 @@ import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Bottom sheet del módulo Partidos.
@@ -45,7 +49,7 @@ export default function Sheet({
                 accessibilityLabel="Cerrar"
                 style={({ pressed }) => [styles.close, pressed && { opacity: 0.7 }]}
               >
-                <X color={P.textSoft} size={15} strokeWidth={2.6} />
+                <X color={C.textSoft} size={15} strokeWidth={2.6} />
               </Pressable>
             </View>
           ) : null}
@@ -75,16 +79,16 @@ export default function Sheet({
 }
 
 const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: P.scrim, justifyContent: 'flex-end' },
+  scrim: { flex: 1, backgroundColor: C.scrim, justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: P.surfaceAlt,
-    borderTopLeftRadius: R.sheet,
-    borderTopRightRadius: R.sheet,
+    backgroundColor: C.surfaceAlt,
+    borderTopLeftRadius: R.hero,
+    borderTopRightRadius: R.hero,
     borderTopWidth: 1,
-    borderTopColor: P.border,
+    borderTopColor: C.border,
   },
   gripWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 2 },
-  grip: { width: 38, height: 4, borderRadius: 2, backgroundColor: P.grip },
+  grip: { width: 38, height: 4, borderRadius: 2, backgroundColor: C.grip },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -94,13 +98,13 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 10,
   },
-  title: { fontSize: 17, fontWeight: '700', color: P.text },
-  subtitle: { fontSize: 11.5, color: P.textGhost, marginTop: 2 },
+  title: { fontSize: 17, fontFamily: F.bold, color: C.textPrimary },
+  subtitle: { fontSize: 11.5, color: C.textGhost, marginTop: 2 },
   close: {
     width: 28,
     height: 28,
     borderRadius: 9,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -111,7 +115,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: P.hairline,
-    backgroundColor: P.surfaceAlt,
+    borderTopColor: C.hairline,
+    backgroundColor: C.surfaceAlt,
   },
 });

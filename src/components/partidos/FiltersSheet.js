@@ -5,7 +5,11 @@ import { MapPin } from 'lucide-react-native';
 import Sheet from './Sheet';
 import PickerSheet from './PickerSheet';
 import { GhostButton, PrimaryButton, OptionChip, SectionLabel, Note, ErrorHint, SelectField } from './ui';
-import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { DIST_OPTS, EDAD_PRESETS, MODALIDADES, NIVELES } from '../../services/matchRules';
 import { REGIONES, getComunasOfRegion } from '../../data/regiones-chile';
 
@@ -222,7 +226,7 @@ export default function FiltersSheet({ visible, onClose, filters, onApply, previ
                 value={String(temp.edadMin ?? '')}
                 onChangeText={(v) => set({ edadMin: v.replace(/\D/g, '').slice(0, 2) })}
                 placeholder="17"
-                placeholderTextColor={P.textPlaceholder}
+                placeholderTextColor={C.textPlaceholder}
                 keyboardType="number-pad"
                 style={styles.edadInput}
               />
@@ -231,7 +235,7 @@ export default function FiltersSheet({ visible, onClose, filters, onApply, previ
                 value={String(temp.edadMax ?? '')}
                 onChangeText={(v) => set({ edadMax: v.replace(/\D/g, '').slice(0, 2) })}
                 placeholder="26"
-                placeholderTextColor={P.textPlaceholder}
+                placeholderTextColor={C.textPlaceholder}
                 keyboardType="number-pad"
                 style={styles.edadInput}
               />
@@ -347,8 +351,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     marginTop: 2,
   },
-  rowLabel: { fontSize: 12, color: P.textFaint },
-  rowValue: { fontSize: 12.5, fontWeight: '700', color: P.green },
+  rowLabel: { fontSize: 12, color: C.textFaint },
+  rowValue: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
   edadBox: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -357,7 +361,7 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: P.chipAlt,
+    backgroundColor: C.chipAlt,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.10)',
   },
@@ -365,10 +369,10 @@ const styles = StyleSheet.create({
     width: 34,
     textAlign: 'center',
     fontSize: 14,
-    fontWeight: '700',
-    color: P.text,
+    fontFamily: F.bold,
+    color: C.textPrimary,
     ...({ outlineStyle: 'none' }),
   },
-  edadDash: { fontSize: 12, fontWeight: '600', color: P.textPlaceholder },
-  edadUnit: { fontSize: 11, color: P.textGhost },
+  edadDash: { fontSize: 12, fontFamily: F.semiBold, color: C.textPlaceholder },
+  edadUnit: { fontSize: 11, color: C.textGhost },
 });

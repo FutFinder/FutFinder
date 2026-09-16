@@ -3,7 +3,11 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MapPin, ShieldCheck, Users, Zap, Swords } from 'lucide-react-native';
 
 import { Avatar, Tag } from './ui';
-import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import {
   cuotaLabel,
   edadLabel,
@@ -62,13 +66,13 @@ export default function PartidoCard({ match, onPress, isMine, distanceKm }) {
         <View style={{ flex: 1 }} />
         {match.club_local_id ? (
           <View style={styles.clubBadge}>
-            <Swords color={P.green} size={11} strokeWidth={2.4} />
+            <Swords color={C.green} size={11} strokeWidth={2.4} />
             <Text style={styles.clubBadgeText}>CLUBES</Text>
           </View>
         ) : null}
         <View style={styles.aprobRow}>
-          <ShieldCheck color={manual ? P.gold : P.textFaint} size={12} strokeWidth={2} />
-          <Text style={[styles.aprobText, manual && { color: P.gold }]}>
+          <ShieldCheck color={manual ? C.gold : C.textFaint} size={12} strokeWidth={2} />
+          <Text style={[styles.aprobText, manual && { color: C.gold }]}>
             {manual ? 'Con aprobación' : 'Inmediata'}
           </Text>
         </View>
@@ -80,7 +84,7 @@ export default function PartidoCard({ match, onPress, isMine, distanceKm }) {
           {match.titulo}
         </Text>
         <View style={styles.placeRow}>
-          <MapPin color={P.textFaint} size={12.5} strokeWidth={2} />
+          <MapPin color={C.textFaint} size={12.5} strokeWidth={2} />
           <Text numberOfLines={1} style={styles.placeText}>
             {[match.cancha_nombre, match.comuna].filter(Boolean).join(' · ')}
             {distanceKm != null ? ` · ${fmtKm(distanceKm)}` : ''}
@@ -112,14 +116,14 @@ export default function PartidoCard({ match, onPress, isMine, distanceKm }) {
       <View style={styles.bottomRow}>
         <View style={styles.cuposRow}>
           <Users
-            color={full ? P.textMuted : pocos ? P.gold : P.green}
+            color={full ? C.textSecondary : pocos ? C.gold : C.green}
             size={13}
             strokeWidth={2}
           />
           <Text
             style={[
               styles.cupos,
-              { color: full ? P.textMuted : pocos ? P.gold : P.green },
+              { color: full ? C.textSecondary : pocos ? C.gold : C.green },
             ]}
           >
             {full ? 'Sin cupos' : `${libres} de ${totales} cupos`}
@@ -146,7 +150,7 @@ export default function PartidoCard({ match, onPress, isMine, distanceKm }) {
         {espontaneo ? (
           <>
             <View style={{ flex: 1 }} />
-            <Zap color={P.green} size={12} strokeWidth={2.4} />
+            <Zap color={C.green} size={12} strokeWidth={2.4} />
           </>
         ) : null}
       </View>
@@ -190,16 +194,16 @@ export function fmtKm(km) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.border,
-    borderRadius: R.list,
+    borderColor: C.border,
+    borderRadius: R.card,
     paddingHorizontal: 13,
     paddingTop: 12,
     paddingBottom: 11,
     gap: 9,
   },
-  cardMine: { borderColor: P.greenBorder },
+  cardMine: { borderColor: C.greenBorder },
 
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   whenPill: {
@@ -208,46 +212,46 @@ const styles = StyleSheet.create({
     borderRadius: R.chip,
     backgroundColor: 'rgba(90,224,106,0.11)',
   },
-  whenText: { fontSize: 11.5, fontWeight: '700', color: P.green, letterSpacing: -0.2 },
+  whenText: { fontSize: 11.5, fontFamily: F.bold, color: C.green, letterSpacing: -0.2 },
   clubBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: R.chipSm,
-    backgroundColor: P.greenSoft,
+    borderRadius: R.chip,
+    backgroundColor: C.greenSoft,
   },
-  clubBadgeText: { fontSize: 9.5, fontWeight: '800', color: P.green, letterSpacing: 0.4 },
+  clubBadgeText: { fontSize: 9.5, fontFamily: F.extraBold, color: C.green, letterSpacing: 0.4 },
   aprobRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  aprobText: { fontSize: 10.5, fontWeight: '600', color: P.textFaint },
+  aprobText: { fontSize: 10.5, fontFamily: F.semiBold, color: C.textFaint },
 
-  title: { fontSize: 16.5, fontWeight: '700', color: P.text, letterSpacing: -0.25 },
+  title: { fontSize: 16.5, fontFamily: F.bold, color: C.textPrimary, letterSpacing: -0.25 },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
-  placeText: { flex: 1, fontSize: 12.5, fontWeight: '500', color: P.textMuted },
+  placeText: { flex: 1, fontSize: 12.5, fontFamily: F.medium, color: C.textSecondary },
 
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  divider: { height: 1, backgroundColor: P.hairline },
+  divider: { height: 1, backgroundColor: C.hairline },
 
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   cuposRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
-  cupos: { fontSize: 13, fontWeight: '700' },
+  cupos: { fontSize: 13, fontFamily: F.bold },
   dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#434A44' },
-  cuota: { fontSize: 13, fontWeight: '700', color: P.text },
+  cuota: { fontSize: 13, fontFamily: F.bold, color: C.textPrimary },
   ctaBtn: {
     height: 34,
     paddingHorizontal: 15,
-    borderRadius: R.control,
-    backgroundColor: P.chip,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { fontSize: 12.5, fontWeight: '700', color: P.textStrong },
+  ctaText: { fontSize: 12.5, fontFamily: F.bold, color: C.textStrong },
 
   orgRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  orgName: { fontSize: 11.5, fontWeight: '600', color: P.textMuted, maxWidth: '55%' },
-  tsBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: P.chip },
-  tsText: { fontSize: 10, fontWeight: '700', color: P.textMuted },
+  orgName: { fontSize: 11.5, fontFamily: F.semiBold, color: C.textSecondary, maxWidth: '55%' },
+  tsBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: C.chip },
+  tsText: { fontSize: 10, fontFamily: F.bold, color: C.textSecondary },
 });

@@ -3,7 +3,11 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AlertTriangle, Check, Info } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   duracionDeAviso, quitarAviso, suscribirseAAvisos,
 } from '../utils/avisos';
@@ -45,7 +49,7 @@ export default function AvisosHost() {
     <View style={[styles.capa, { top: insets.top + 8 }]} pointerEvents="box-none">
       {avisos.map((a) => {
         const Icono = a.tono === 'error' ? AlertTriangle : a.tono === 'exito' ? Check : Info;
-        const color = a.tono === 'error' ? P.coral : a.tono === 'exito' ? P.green : P.textSoft;
+        const color = a.tono === 'error' ? C.red : a.tono === 'exito' ? C.green : C.textSoft;
         return (
           <Pressable
             key={a.id}
@@ -82,10 +86,10 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: R.card,
-    backgroundColor: P.surface,
+    borderRadius: R.cardSm,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.borderStrong,
+    borderColor: C.borderStrong,
     // La sombra es lo que lo despega de la pantalla que hay debajo: sin
     // ella, encima de una tarjeta oscura parece parte de la lista.
     shadowColor: '#000',
@@ -94,6 +98,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
-  titulo: { fontSize: 14, fontWeight: '800', letterSpacing: -0.2 },
-  mensaje: { color: P.textDim, fontSize: 12.5, lineHeight: 17.5, marginTop: 3 },
+  titulo: { fontSize: 14, fontFamily: F.extraBold, letterSpacing: -0.2 },
+  mensaje: { color: C.textDim, fontSize: 12.5, lineHeight: 17.5, marginTop: 3 },
 });

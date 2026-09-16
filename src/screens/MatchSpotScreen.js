@@ -12,7 +12,11 @@ import {
   Navigation,
 } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   Avatar,
   Callout,
@@ -205,9 +209,9 @@ export default function MatchSpotScreen({ route, navigation }) {
           <View style={{ alignItems: 'center', gap: 12, paddingVertical: 14 }}>
             <View style={[styles.bigIcon, sinCupo && styles.bigIconMuted]}>
               {sinCupo ? (
-                <AlertCircle color={P.textMuted} size={28} strokeWidth={2} />
+                <AlertCircle color={C.textSecondary} size={28} strokeWidth={2} />
               ) : (
-                <CheckCircle2 color={P.green} size={28} strokeWidth={2} />
+                <CheckCircle2 color={C.green} size={28} strokeWidth={2} />
               )}
             </View>
             <Text style={styles.bigTitle}>{miCupo?.titulo}</Text>
@@ -394,13 +398,13 @@ function Shell({ onBack, children }) {
 function Row({ icon: Icon, children, strong }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-      <Icon color={strong ? P.green : P.textMuted} size={15} strokeWidth={2} />
+      <Icon color={strong ? C.green : C.textSecondary} size={15} strokeWidth={2} />
       <Text
         style={{
           flex: 1,
           fontSize: strong ? 13 : 12.5,
           fontWeight: strong ? '700' : '500',
-          color: strong ? P.text : P.textDim,
+          color: strong ? C.textPrimary : C.textDim,
         }}
       >
         {children}
@@ -410,11 +414,11 @@ function Row({ icon: Icon, children, strong }) {
 }
 
 function Bullet({ text, tone }) {
-  const color = tone === 'danger' ? P.coral : tone === 'gold' ? P.gold : P.textMuted;
+  const color = tone === 'danger' ? C.red : tone === 'gold' ? C.gold : C.textSecondary;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9 }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color, marginTop: 6 }} />
-      <Text style={{ flex: 1, fontSize: 12, lineHeight: 18, color: P.textSoft }}>{text}</Text>
+      <Text style={{ flex: 1, fontSize: 12, lineHeight: 18, color: C.textSoft }}>{text}</Text>
     </View>
   );
 }
@@ -432,7 +436,7 @@ function capitalize(s) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: P.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16, paddingBottom: 24 },
   topBar: {
     flexDirection: 'row',
@@ -442,7 +446,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 12,
   },
-  topTitle: { fontSize: 15, fontWeight: '700', color: P.text },
+  topTitle: { fontSize: 15, fontFamily: F.bold, color: C.textPrimary },
 
   bigIcon: {
     width: 66,
@@ -450,7 +454,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: 'rgba(90,224,106,0.13)',
     borderWidth: 1,
-    borderColor: P.greenBorder,
+    borderColor: C.greenBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -458,35 +462,35 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderColor: 'rgba(255,255,255,0.10)',
   },
-  bigTitle: { fontSize: 22, fontWeight: '800', color: P.text, letterSpacing: -0.4 },
-  bigText: { fontSize: 13, lineHeight: 20, color: P.textMuted, textAlign: 'center' },
+  bigTitle: { fontSize: 22, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.4 },
+  bigText: { fontSize: 13, lineHeight: 20, color: C.textSecondary, textAlign: 'center' },
 
-  matchTitle: { fontSize: 16, fontWeight: '800', color: P.text },
+  matchTitle: { fontSize: 16, fontFamily: F.extraBold, color: C.textPrimary },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  metaLabel: { fontSize: 12, color: P.textMuted },
-  metaValue: { fontSize: 15, fontWeight: '800', color: P.green },
-  link: { fontSize: 12, fontWeight: '700', color: P.green },
+  metaLabel: { fontSize: 12, color: C.textSecondary },
+  metaValue: { fontSize: 15, fontFamily: F.extraBold, color: C.green },
+  link: { fontSize: 12, fontFamily: F.bold, color: C.green },
 
   ghostAvatar: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: P.chipAlt,
+    backgroundColor: C.chipAlt,
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: P.dashed,
+    borderColor: C.dashed,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ghostAvatarText: { fontSize: 10, fontWeight: '700', color: P.textGhost },
+  ghostAvatarText: { fontSize: 10, fontFamily: F.bold, color: C.textGhost },
 
   footer: {
     paddingHorizontal: 16,
     paddingTop: 14,
     gap: 9,
-    backgroundColor: P.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderTopWidth: 1,
-    borderTopColor: P.hairline,
+    borderTopColor: C.hairline,
   },
-  sheetBack: { fontSize: 13.5, fontWeight: '700', color: P.textMuted },
+  sheetBack: { fontSize: 13.5, fontFamily: F.bold, color: C.textSecondary },
 });

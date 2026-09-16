@@ -38,7 +38,6 @@ const RAIZ = path.resolve(__dirname, '../..');
 /** Las familias de color que el rediseño unifica. Sin radios ni tipografías. */
 const FAMILIAS = [
   'tactical',
-  'partidos',
   'clubsExplorer',
   'reservas',
 ];
@@ -135,14 +134,12 @@ test('el recorrido del código toca las familias que quedan, no solo una', () =>
  */
 const VERDE_DE = {
   tactical: 'neon',
-  partidos: 'green',
   clubsExplorer: 'green',
   reservas: 'green',
 };
 
 const FONDO_DE = {
   tactical: 'bg',
-  partidos: 'bg',
   clubsExplorer: 'bg',
   reservas: 'bg',
 };
@@ -177,7 +174,6 @@ test('los cinco rojos de la app son uno solo', () => {
   // van borrando a medida que su módulo migra, así que esta lista ENCOGE: lo
   // que no puede pasar es que alguna de las que quedan se desvíe.
   const esperado = tema.reservas.red;
-  assert.equal(tema.partidos.coral, esperado);
   assert.equal(tema.tactical.danger, esperado);
 });
 

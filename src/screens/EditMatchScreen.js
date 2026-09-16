@@ -21,7 +21,11 @@ import {
   Locate,
 } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   Callout,
   Card,
@@ -478,7 +482,7 @@ export default function EditMatchScreen({ route, navigation }) {
                 <Image source={{ uri: coverUrl }} style={styles.coverImg} />
               ) : (
                 <View style={styles.coverEmpty}>
-                  <Camera color={P.green} size={24} strokeWidth={2} />
+                  <Camera color={C.green} size={24} strokeWidth={2} />
                   <Text style={styles.coverEmptyText}>
                     {uploadingCover ? 'Subiendo la foto…' : 'Toca para subir una foto'}
                   </Text>
@@ -487,9 +491,9 @@ export default function EditMatchScreen({ route, navigation }) {
               {coverUrl ? (
                 <View style={styles.coverBadge}>
                   {uploadingCover ? (
-                    <ActivityIndicator color={P.greenInk} size="small" />
+                    <ActivityIndicator color={C.greenInk} size="small" />
                   ) : (
-                    <Camera color={P.greenInk} size={14} strokeWidth={2.4} />
+                    <Camera color={C.greenInk} size={14} strokeWidth={2.4} />
                   )}
                 </View>
               ) : null}
@@ -613,15 +617,15 @@ export default function EditMatchScreen({ route, navigation }) {
                 dropdownStyle={styles.autoDropdown}
                 optionStyle={styles.autoOption}
                 optionTextStyle={styles.autoOptionText}
-                placeholderColor={P.textPlaceholder}
-                accentColor={P.green}
-                spinnerColor={P.green}
+                placeholderColor={C.textPlaceholder}
+                accentColor={C.green}
+                spinnerColor={C.green}
               />
               <Pressable
                 onPress={useMyLocation}
                 style={({ pressed }) => [styles.locBtn, pressed && { opacity: 0.8 }]}
               >
-                <Locate color={P.green} size={15} strokeWidth={2} />
+                <Locate color={C.green} size={15} strokeWidth={2} />
                 <Text style={styles.locBtnText}>Usar mi ubicación</Text>
               </Pressable>
               <ErrorHint>{errors.direccion}</ErrorHint>
@@ -759,7 +763,7 @@ export default function EditMatchScreen({ route, navigation }) {
 
           {/* Avisos y descripción */}
           <Group label="Avisos y descripción">
-            <Card style={{ paddingVertical: 4, paddingHorizontal: 13 }} radius={R.input}>
+            <Card style={{ paddingVertical: 4, paddingHorizontal: 13 }} radius={R.row}>
               <ToggleRow
                 title="Notificar jugadores 1 h antes"
                 value={form.recordatorio1h}
@@ -994,21 +998,21 @@ function ToggleRow({ title, value, onChange, last }) {
         gap: 12,
         paddingVertical: 13,
         borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: P.divider,
+        borderBottomColor: C.divider,
       }}
     >
-      <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: P.text }}>{title}</Text>
+      <Text style={{ flex: 1, fontSize: 13, fontFamily: F.bold, color: C.textPrimary }}>{title}</Text>
       <Toggle value={value} onValueChange={onChange} accessibilityLabel={title} />
     </View>
   );
 }
 
 function Bullet({ text, tone }) {
-  const color = tone === 'danger' ? P.coral : tone === 'gold' ? P.gold : P.textMuted;
+  const color = tone === 'danger' ? C.red : tone === 'gold' ? C.gold : C.textSecondary;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9 }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color, marginTop: 6 }} />
-      <Text style={{ flex: 1, fontSize: 12, lineHeight: 18, color: P.textSoft }}>{text}</Text>
+      <Text style={{ flex: 1, fontSize: 12, lineHeight: 18, color: C.textSoft }}>{text}</Text>
     </View>
   );
 }
@@ -1018,7 +1022,7 @@ function capitalize(s) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: P.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16, paddingBottom: 20 },
 
   topBar: {
@@ -1029,41 +1033,41 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 12,
   },
-  topTitle: { fontSize: 15, fontWeight: '700', color: P.text },
-  topSub: { fontSize: 11.5, fontWeight: '500', color: P.textFaint, marginTop: 1 },
+  topTitle: { fontSize: 15, fontFamily: F.bold, color: C.textPrimary },
+  topSub: { fontSize: 11.5, fontFamily: F.medium, color: C.textFaint, marginTop: 1 },
 
   row: { flexDirection: 'row', gap: 8 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 
   edadBox: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
   edadInput: { width: 62, textAlign: 'center' },
-  edadDash: { fontSize: 13, fontWeight: '600', color: P.textPlaceholder },
-  edadUnit: { fontSize: 11.5, color: P.textGhost },
+  edadDash: { fontSize: 13, fontFamily: F.semiBold, color: C.textPlaceholder },
+  edadUnit: { fontSize: 11.5, color: C.textGhost },
 
   autoRow: {
     height: 48,
-    borderRadius: R.input,
-    backgroundColor: P.surface,
-    borderColor: P.border,
+    borderRadius: R.row,
+    backgroundColor: C.surface,
+    borderColor: C.border,
     paddingHorizontal: 13,
   },
-  autoInput: { fontSize: 14, fontWeight: '600', color: P.text },
-  autoDropdown: { backgroundColor: P.surface, borderColor: P.border, borderRadius: R.input },
-  autoOption: { borderTopColor: P.divider, backgroundColor: 'transparent' },
-  autoOptionText: { color: P.textStrong, fontSize: 13 },
+  autoInput: { fontSize: 14, fontFamily: F.semiBold, color: C.textPrimary },
+  autoDropdown: { backgroundColor: C.surface, borderColor: C.border, borderRadius: R.row },
+  autoOption: { borderTopColor: C.divider, backgroundColor: 'transparent' },
+  autoOptionText: { color: C.textStrong, fontSize: 13 },
 
   coverBox: {
     height: 150,
-    borderRadius: R.card,
-    backgroundColor: P.surface,
+    borderRadius: R.cardSm,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
     overflow: 'hidden',
     justifyContent: 'center',
   },
   coverImg: { width: '100%', height: '100%' },
   coverEmpty: { alignItems: 'center', gap: 8 },
-  coverEmptyText: { fontSize: 12.5, fontWeight: '600', color: P.textMuted },
+  coverEmptyText: { fontSize: 12.5, fontFamily: F.semiBold, color: C.textSecondary },
   coverBadge: {
     position: 'absolute',
     right: 12,
@@ -1071,7 +1075,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: P.green,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1083,20 +1087,20 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: 'rgba(90,224,106,0.35)',
   },
-  locBtnText: { fontSize: 12.5, fontWeight: '700', color: P.green },
+  locBtnText: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
 
   footer: {
     paddingHorizontal: 16,
     paddingTop: 14,
     gap: 8,
-    backgroundColor: P.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderTopWidth: 1,
-    borderTopColor: P.hairline,
+    borderTopColor: C.hairline,
   },
-  sheetBack: { fontSize: 13.5, fontWeight: '700', color: P.textMuted },
+  sheetBack: { fontSize: 13.5, fontFamily: F.bold, color: C.textSecondary },
 });

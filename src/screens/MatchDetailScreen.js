@@ -37,7 +37,11 @@ import {
   Users,
 } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   Avatar,
   Callout,
@@ -708,7 +712,7 @@ export default function MatchDetailScreen({ route, navigation }) {
   const estado = estadoLabel(match);
   const modalidad = modalidadLabel(match);
   const closed = ['cancelado', 'finalizado'].includes(match.estado) || hasFinished(match);
-  const heroColors = closed || libres <= 0 ? P.heroNeutral : P.hero;
+  const heroColors = closed || libres <= 0 ? C.heroNeutral : C.hero;
 
   return (
     <View style={styles.root}>
@@ -722,7 +726,7 @@ export default function MatchDetailScreen({ route, navigation }) {
               setRefreshing(true);
               load();
             }}
-            tintColor={P.green}
+            tintColor={C.green}
           />
         }
       >
@@ -767,13 +771,13 @@ export default function MatchDetailScreen({ route, navigation }) {
               <Text style={styles.heroTitle}>{match.titulo}</Text>
 
               <View style={styles.heroRow}>
-                <Calendar color={closed ? P.textMuted : P.green} size={15} strokeWidth={2} />
+                <Calendar color={closed ? C.textSecondary : C.green} size={15} strokeWidth={2} />
                 <Text style={styles.heroWhen}>
                   {capitalize(formatFechaLarga(match.hora))} · {timeOf(match.hora)}
                 </Text>
               </View>
               <View style={styles.heroRow}>
-                <MapPin color={P.textMuted} size={15} strokeWidth={2} />
+                <MapPin color={C.textSecondary} size={15} strokeWidth={2} />
                 <Text style={styles.heroPlace} numberOfLines={2}>
                   {[match.cancha_nombre, match.comuna].filter(Boolean).join(' · ')}
                   {distanceKm != null ? ` · ${fmtKm(distanceKm)}` : ''}
@@ -1100,7 +1104,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                     accessibilityLabel="Escribir al organizador"
                     style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.8 }]}
                   >
-                    <MessageSquare color={P.green} size={16} strokeWidth={2} />
+                    <MessageSquare color={C.green} size={16} strokeWidth={2} />
                   </Pressable>
                 ) : null}
               </Card>
@@ -1220,7 +1224,7 @@ export default function MatchDetailScreen({ route, navigation }) {
               <View style={styles.blockCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={styles.blockIcon}>
-                    <AlertCircle color={P.coral} size={18} strokeWidth={2} />
+                    <AlertCircle color={C.red} size={18} strokeWidth={2} />
                   </View>
                   <Text style={styles.blockTitle}>{block.title}</Text>
                 </View>
@@ -1236,7 +1240,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                     </View>
                     <View style={styles.trustTrack}>
                       <LinearGradient
-                        colors={[P.coral, P.gold]}
+                        colors={[C.red, C.gold]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={{
@@ -1356,7 +1360,7 @@ export default function MatchDetailScreen({ route, navigation }) {
           <View style={{ gap: 9 }}>
             <View style={styles.confirmedBox}>
               <View style={styles.confirmedIcon}>
-                <CheckCircle2 color={P.green} size={18} strokeWidth={2} />
+                <CheckCircle2 color={C.green} size={18} strokeWidth={2} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.confirmedTitle}>Cupo confirmado</Text>
@@ -1366,7 +1370,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                 </Text>
               </View>
               <Pressable onPress={() => navigation.navigate('MatchSpot', { matchId })} hitSlop={8}>
-                <ChevronRight color={P.green} size={18} />
+                <ChevronRight color={C.green} size={18} />
               </Pressable>
             </View>
             {!closed ? (
@@ -1530,13 +1534,13 @@ export default function MatchDetailScreen({ route, navigation }) {
         <Card style={{ padding: 14, gap: 10 }}>
           <Text style={styles.sheetTitle}>{match.titulo}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-            <Calendar color={P.green} size={15} strokeWidth={2} />
+            <Calendar color={C.green} size={15} strokeWidth={2} />
             <Text style={styles.sheetWhen}>
               {capitalize(formatFechaLarga(match.hora))} · {timeOf(match.hora)} · {match.duracion_min ?? 90} min
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-            <MapPin color={P.textMuted} size={15} strokeWidth={2} />
+            <MapPin color={C.textSecondary} size={15} strokeWidth={2} />
             <Text style={styles.sheetPlace}>
               {[match.cancha_nombre, match.comuna].filter(Boolean).join(' · ')}
               {distanceKm != null ? ` · ${fmtKm(distanceKm)}` : ''}
@@ -1699,7 +1703,7 @@ function ClubLado({ club, etiqueta }) {
 }
 
 function Requisito({ text, ok, tone }) {
-  const color = tone === 'danger' ? P.coral : tone === 'gold' ? P.gold : ok ? P.green : P.textMuted;
+  const color = tone === 'danger' ? C.red : tone === 'gold' ? C.gold : ok ? C.green : C.textSecondary;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9 }}>
       {ok ? (
@@ -1707,7 +1711,7 @@ function Requisito({ text, ok, tone }) {
       ) : (
         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color, marginTop: 6 }} />
       )}
-      <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 18.5, color: P.textStrong }}>{text}</Text>
+      <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 18.5, color: C.textStrong }}>{text}</Text>
     </View>
   );
 }
@@ -1720,13 +1724,13 @@ function AltRow({ icon: Icon, title, sub, onPress }) {
       style={({ pressed }) => [styles.altRow, pressed && { opacity: 0.85 }]}
     >
       <View style={styles.altIcon}>
-        <Icon color={P.green} size={16} strokeWidth={2} />
+        <Icon color={C.green} size={16} strokeWidth={2} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.altTitle}>{title}</Text>
         <Text style={styles.altSub}>{sub}</Text>
       </View>
-      <ChevronRight color={P.textMuted} size={17} />
+      <ChevronRight color={C.textSecondary} size={17} />
     </Pressable>
   );
 }
@@ -1746,9 +1750,9 @@ function capitalize(s) {
 const styles = StyleSheet.create({
   clubesRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   clubesVs: {
-    color: P.green,
+    color: C.green,
     fontSize: 15,
-    fontWeight: '900',
+    fontFamily: F.extraBold,
     letterSpacing: 1,
     paddingTop: 20,
     width: 30,
@@ -1759,25 +1763,25 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: P.greenBorder,
+    borderColor: C.greenBorder,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   clubEscudoImg: { width: 46, height: 46, borderRadius: 23 },
-  clubIniciales: { color: P.green, fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
-  clubEtiqueta: { color: P.textFaint, fontSize: 9.5, fontWeight: '800', letterSpacing: 1 },
+  clubIniciales: { color: C.green, fontSize: 15, fontFamily: F.extraBold, letterSpacing: 0.5 },
+  clubEtiqueta: { color: C.textFaint, fontSize: 9.5, fontFamily: F.extraBold, letterSpacing: 1 },
   clubNombre: {
-    color: P.textStrong,
+    color: C.textStrong,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     textAlign: 'center',
     lineHeight: 17,
   },
 
-  root: { flex: 1, backgroundColor: P.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   topBar: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 },
 
   heroBar: {
@@ -1790,46 +1794,46 @@ const styles = StyleSheet.create({
   },
   heroBody: { paddingHorizontal: 18, paddingBottom: 18, gap: 10 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  heroTitle: { fontSize: 25, lineHeight: 29, fontWeight: '800', color: P.text, letterSpacing: -0.7 },
+  heroTitle: { fontSize: 25, lineHeight: 29, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.7 },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  heroWhen: { flex: 1, fontSize: 14, fontWeight: '700', color: P.text },
-  heroPlace: { flex: 1, fontSize: 13, fontWeight: '500', color: P.textDim },
+  heroWhen: { flex: 1, fontSize: 14, fontFamily: F.bold, color: C.textPrimary },
+  heroPlace: { flex: 1, fontSize: 13, fontFamily: F.medium, color: C.textDim },
 
   body: { paddingHorizontal: 16, paddingTop: 14, gap: 10 },
   stats: { flexDirection: 'row', gap: 7, marginTop: 4 },
 
-  cardTitle: { fontSize: 14, fontWeight: '700', color: P.text },
+  cardTitle: { fontSize: 14, fontFamily: F.bold, color: C.textPrimary },
   canchaAyuda: {
-    fontFamily: 'Manrope_500Medium', fontSize: 11.5, color: P.textMuted,
+    fontFamily: 'Manrope_500Medium', fontSize: 11.5, color: C.textSecondary,
     lineHeight: 16, marginTop: 8, paddingHorizontal: 2,
   },
-  cardSub: { fontSize: 12, color: P.textMuted, marginTop: 2 },
+  cardSub: { fontSize: 12, color: C.textSecondary, marginTop: 2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  metaText: { fontSize: 11.5, fontWeight: '600', color: P.textFaint },
+  metaText: { fontSize: 11.5, fontFamily: F.semiBold, color: C.textFaint },
   metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#434A44' },
-  tsText: { fontSize: 11.5, fontWeight: '700', color: P.green },
-  link: { fontSize: 12, fontWeight: '700', color: P.green },
-  desc: { fontSize: 13, lineHeight: 21, color: P.textDim },
+  tsText: { fontSize: 11.5, fontFamily: F.bold, color: C.green },
+  link: { fontSize: 12, fontFamily: F.bold, color: C.green },
+  desc: { fontSize: 13, lineHeight: 21, color: C.textDim },
 
-  orgName: { fontSize: 14, fontWeight: '700', color: P.text },
+  orgName: { fontSize: 14, fontFamily: F.bold, color: C.textPrimary },
   smallBtn: {
     height: 34,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  smallBtnText: { fontSize: 12, fontWeight: '700', color: P.textStrong },
+  smallBtnText: { fontSize: 12, fontFamily: F.bold, color: C.textStrong },
   chatBtn: {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: P.greenSoft,
+    backgroundColor: C.greenSoft,
     borderWidth: 1,
-    borderColor: P.greenBorder,
+    borderColor: C.greenBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1838,14 +1842,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: P.chipAlt,
+    backgroundColor: C.chipAlt,
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: P.dashed,
+    borderColor: C.dashed,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ghostAvatarText: { fontSize: 10.5, fontWeight: '700', color: P.textGhost },
+  ghostAvatarText: { fontSize: 10.5, fontFamily: F.bold, color: C.textGhost },
 
   wlRow: {
     flexDirection: 'row',
@@ -1853,16 +1857,16 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: P.divider,
+    borderBottomColor: C.divider,
   },
-  wlPos: { width: 20, fontSize: 12, fontWeight: '700', color: P.textGhost },
-  wlName: { flex: 1, fontSize: 12.5, fontWeight: '600', color: P.textStrong },
+  wlPos: { width: 20, fontSize: 12, fontFamily: F.bold, color: C.textGhost },
+  wlName: { flex: 1, fontSize: 12.5, fontFamily: F.semiBold, color: C.textStrong },
 
   blockCard: {
     backgroundColor: 'rgba(232,115,123,0.07)',
     borderWidth: 1,
     borderColor: 'rgba(232,115,123,0.30)',
-    borderRadius: R.card,
+    borderRadius: R.cardSm,
     padding: 15,
     gap: 11,
   },
@@ -1874,22 +1878,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  blockTitle: { flex: 1, fontSize: 14.5, fontWeight: '700', color: P.coral },
-  blockText: { fontSize: 12.5, lineHeight: 19, color: P.textSoft },
+  blockTitle: { flex: 1, fontSize: 14.5, fontFamily: F.bold, color: C.red },
+  blockText: { fontSize: 12.5, lineHeight: 19, color: C.textSoft },
   trustBox: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 12, gap: 8 },
   trustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  trustLabel: { fontSize: 11.5, fontWeight: '600', color: P.textMuted },
-  trustValue: { fontSize: 12.5, fontWeight: '700', color: P.text },
-  trustTrack: { height: 6, borderRadius: 3, backgroundColor: P.chip, overflow: 'hidden' },
-  trustHint: { fontSize: 11, lineHeight: 16, color: P.textFaint },
+  trustLabel: { fontSize: 11.5, fontFamily: F.semiBold, color: C.textSecondary },
+  trustValue: { fontSize: 12.5, fontFamily: F.bold, color: C.textPrimary },
+  trustTrack: { height: 6, borderRadius: 3, backgroundColor: C.chip, overflow: 'hidden' },
+  trustHint: { fontSize: 11, lineHeight: 16, color: C.textFaint },
 
   altRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.hairline,
+    borderColor: C.hairline,
     borderRadius: 16,
     padding: 13,
   },
@@ -1897,29 +1901,29 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: P.greenSoft,
+    backgroundColor: C.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  altTitle: { fontSize: 13, fontWeight: '700', color: P.text },
-  altSub: { fontSize: 11.5, color: P.textFaint, marginTop: 1 },
+  altTitle: { fontSize: 13, fontFamily: F.bold, color: C.textPrimary },
+  altSub: { fontSize: 11.5, color: C.textFaint, marginTop: 1 },
 
   footer: {
     paddingHorizontal: 16,
     paddingTop: 14,
-    backgroundColor: P.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderTopWidth: 1,
-    borderTopColor: P.hairline,
+    borderTopColor: C.hairline,
   },
   confirmedBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
     padding: 13,
-    borderRadius: R.input,
+    borderRadius: R.row,
     backgroundColor: 'rgba(90,224,106,0.11)',
     borderWidth: 1,
-    borderColor: P.greenBorder,
+    borderColor: C.greenBorder,
   },
   confirmedIcon: {
     width: 34,
@@ -1929,11 +1933,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  confirmedTitle: { fontSize: 13.5, fontWeight: '700', color: P.green },
-  confirmedText: { fontSize: 11.5, color: P.textMuted, marginTop: 1 },
+  confirmedTitle: { fontSize: 13.5, fontFamily: F.bold, color: C.green },
+  confirmedText: { fontSize: 11.5, color: C.textSecondary, marginTop: 1 },
 
-  sheetTitle: { fontSize: 17, fontWeight: '800', color: P.text, letterSpacing: -0.3 },
-  sheetWhen: { flex: 1, fontSize: 13, fontWeight: '700', color: P.text },
-  sheetPlace: { flex: 1, fontSize: 12.5, fontWeight: '500', color: P.textDim },
-  sheetBack: { fontSize: 13.5, fontWeight: '700', color: P.textMuted },
+  sheetTitle: { fontSize: 17, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.3 },
+  sheetWhen: { flex: 1, fontSize: 13, fontFamily: F.bold, color: C.textPrimary },
+  sheetPlace: { flex: 1, fontSize: 12.5, fontFamily: F.medium, color: C.textDim },
+  sheetBack: { fontSize: 13.5, fontFamily: F.bold, color: C.textSecondary },
 });

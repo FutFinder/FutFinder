@@ -9,7 +9,11 @@ import {
 } from 'lucide-react-native';
 
 import { GhostButton, PrimaryButton, SurfaceButton, Note } from './ui';
-import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { cacheAgeLabel } from '../../services/connectivity';
 
 /**
@@ -82,7 +86,7 @@ export function ErrorState({
   return (
     <View style={styles.box}>
       <View style={styles.icon}>
-        <Icon color={P.textPlaceholder} size={26} strokeWidth={1.8} />
+        <Icon color={C.textPlaceholder} size={26} strokeWidth={1.8} />
       </View>
       <Text style={styles.title}>{title || 'No pudimos cargar los partidos'}</Text>
       <Text style={styles.text}>
@@ -108,7 +112,7 @@ export function ErrorState({
 export function OfflineNotice({ at, onRetry }) {
   return (
     <View style={styles.offline}>
-      <CloudOff color={P.gold} size={16} strokeWidth={2} />
+      <CloudOff color={C.gold} size={16} strokeWidth={2} />
       <View style={{ flex: 1 }}>
         <Text style={styles.offlineTitle}>Sin conexión</Text>
         <Text style={styles.offlineText}>
@@ -127,7 +131,7 @@ export function NoLocationState({ onEnable, onPickManually, regionLabel }) {
   return (
     <View style={styles.box}>
       <View style={styles.icon}>
-        <MapPinOff color={P.textPlaceholder} size={26} strokeWidth={1.8} />
+        <MapPinOff color={C.textPlaceholder} size={26} strokeWidth={1.8} />
       </View>
       <Text style={styles.title}>Ubicación desactivada</Text>
       <Text style={styles.text}>
@@ -155,7 +159,7 @@ export function EmptyByFilters({ suggestions = [], onClearFilters, onPublish }) 
   return (
     <View style={styles.box}>
       <View style={styles.icon}>
-        <SearchX color={P.textPlaceholder} size={26} strokeWidth={1.8} />
+        <SearchX color={C.textPlaceholder} size={26} strokeWidth={1.8} />
       </View>
       <Text style={styles.title}>No encontramos partidos</Text>
       <Text style={styles.text}>
@@ -200,7 +204,7 @@ export function EmptyByRegion({ regionLabel, onPublish, onChangeRegion }) {
   return (
     <View style={styles.box}>
       <View style={styles.icon}>
-        <Trophy color={P.textPlaceholder} size={26} strokeWidth={1.8} />
+        <Trophy color={C.textPlaceholder} size={26} strokeWidth={1.8} />
       </View>
       <Text style={styles.title}>Todavía no hay partidos aquí</Text>
       <Text style={styles.text}>
@@ -228,7 +232,7 @@ export function InlineEmpty({ icon: Icon = SearchX, title, text, action, onActio
   return (
     <View style={{ alignItems: 'center', gap: 8, paddingVertical: 38, paddingHorizontal: 20 }}>
       <View style={[styles.icon, { width: 58, height: 58, borderRadius: 20, marginBottom: 4 }]}>
-        <Icon color={P.textPlaceholder} size={22} strokeWidth={1.8} />
+        <Icon color={C.textPlaceholder} size={22} strokeWidth={1.8} />
       </View>
       <Text style={[styles.title, { fontSize: 16 }]}>{title}</Text>
       {text ? <Text style={styles.text}>{text}</Text> : null}
@@ -241,14 +245,14 @@ export function InlineEmpty({ icon: Icon = SearchX, title, text, action, onActio
 
 const styles = StyleSheet.create({
   skeleton: {
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.hairline,
-    borderRadius: R.list,
+    borderColor: C.hairline,
+    borderRadius: R.card,
     padding: 13,
     gap: 9,
   },
-  bone: { backgroundColor: P.chip, borderRadius: 6, opacity: 0.6 },
+  bone: { backgroundColor: C.chip, borderRadius: 6, opacity: 0.6 },
 
   box: {
     alignItems: 'center',
@@ -259,18 +263,18 @@ const styles = StyleSheet.create({
     width: 66,
     height: 66,
     borderRadius: 22,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.hairline,
+    borderColor: C.hairline,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
-  title: { fontSize: 18, fontWeight: '700', color: P.text, textAlign: 'center' },
+  title: { fontSize: 18, fontFamily: F.bold, color: C.textPrimary, textAlign: 'center' },
   text: {
     fontSize: 13,
     lineHeight: 20,
-    color: P.textFaint,
+    color: C.textFaint,
     textAlign: 'center',
     marginTop: 6,
   },
@@ -279,28 +283,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: P.goldSoft,
+    backgroundColor: C.goldSoft,
     borderWidth: 1,
-    borderColor: P.goldBorder,
-    borderRadius: R.input,
+    borderColor: C.goldBorder,
+    borderRadius: R.row,
     padding: 12,
   },
-  offlineTitle: { fontSize: 12.5, fontWeight: '700', color: P.gold },
+  offlineTitle: { fontSize: 12.5, fontFamily: F.bold, color: C.gold },
   offlineText: { fontSize: 11, lineHeight: 16, color: '#8D958D', marginTop: 1 },
 
   suggestions: {
     alignSelf: 'stretch',
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.hairline,
+    borderColor: C.hairline,
     borderRadius: 16,
     padding: 13,
     marginTop: 16,
     gap: 9,
   },
-  suggestionsLabel: { fontSize: 10.5, fontWeight: '700', color: P.textGhost, letterSpacing: 0.9 },
+  suggestionsLabel: { fontSize: 10.5, fontFamily: F.bold, color: C.textGhost, letterSpacing: 0.9 },
   suggestionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  suggestionText: { flex: 1, fontSize: 12.5, fontWeight: '600', color: P.textStrong },
-  suggestionCount: { fontSize: 11.5, fontWeight: '700', color: P.green },
-  suggestionDivider: { height: 1, backgroundColor: P.divider, marginVertical: 9 },
+  suggestionText: { flex: 1, fontSize: 12.5, fontFamily: F.semiBold, color: C.textStrong },
+  suggestionCount: { fontSize: 11.5, fontFamily: F.bold, color: C.green },
+  suggestionDivider: { height: 1, backgroundColor: C.divider, marginVertical: 9 },
 });

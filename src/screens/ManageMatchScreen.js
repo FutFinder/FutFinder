@@ -23,7 +23,11 @@ import {
   X,
 } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   Avatar,
   Callout,
@@ -348,7 +352,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                 setRefreshing(true);
                 load();
               }}
-              tintColor={P.green}
+              tintColor={C.green}
             />
           }
         >
@@ -673,7 +677,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                             pressed && { opacity: 0.8 },
                           ]}
                         >
-                          <Check color={mark === 'presente' ? P.greenInk : P.green} size={15} strokeWidth={2.8} />
+                          <Check color={mark === 'presente' ? C.greenInk : C.green} size={15} strokeWidth={2.8} />
                         </Pressable>
                         <Pressable
                           onPress={() => setMarks((m) => ({ ...m, [a.user_id]: 'ausente' }))}
@@ -685,7 +689,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                             pressed && { opacity: 0.8 },
                           ]}
                         >
-                          <UserX color={mark === 'ausente' ? '#2B0F11' : P.coral} size={15} strokeWidth={2.4} />
+                          <UserX color={mark === 'ausente' ? '#2B0F11' : C.red} size={15} strokeWidth={2.4} />
                         </Pressable>
                       </View>
                     );
@@ -803,21 +807,21 @@ function TopBar({ onBack, title, subtitle }) {
 }
 
 function SummaryCell({ value, label, tone }) {
-  const color = tone === 'green' ? P.green : tone === 'gold' ? P.gold : P.text;
+  const color = tone === 'green' ? C.green : tone === 'gold' ? C.gold : C.textPrimary;
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontSize: 20, fontWeight: '800', color, lineHeight: 22 }}>{value}</Text>
+      <Text style={{ fontSize: 20, fontFamily: F.extraBold, color, lineHeight: 22 }}>{value}</Text>
       <Text style={styles.summaryLabel}>{label}</Text>
     </View>
   );
 }
 
 function Bullet({ text, tone }) {
-  const color = tone === 'danger' ? P.coral : tone === 'gold' ? P.gold : P.textMuted;
+  const color = tone === 'danger' ? C.red : tone === 'gold' ? C.gold : C.textSecondary;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9 }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color, marginTop: 6 }} />
-      <Text style={{ flex: 1, fontSize: 12, lineHeight: 18, color: P.textSoft }}>{text}</Text>
+      <Text style={{ flex: 1, fontSize: 12, lineHeight: 18, color: C.textSoft }}>{text}</Text>
     </View>
   );
 }
@@ -847,7 +851,7 @@ function timeOf(iso) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: P.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingHorizontal: 16, paddingBottom: 26 },
 
   topBar: {
@@ -858,51 +862,51 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 12,
   },
-  topTitle: { fontSize: 15, fontWeight: '700', color: P.text },
-  topSub: { fontSize: 11.5, fontWeight: '500', color: P.textFaint, marginTop: 1 },
+  topTitle: { fontSize: 15, fontFamily: F.bold, color: C.textPrimary },
+  topSub: { fontSize: 11.5, fontFamily: F.medium, color: C.textFaint, marginTop: 1 },
 
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.hairline,
+    borderColor: C.hairline,
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 6,
     marginBottom: 12,
   },
-  summaryDivider: { width: 1, height: 34, backgroundColor: P.hairline },
-  summaryLabel: { fontSize: 10, fontWeight: '600', color: P.textFaint, letterSpacing: 0.5, marginTop: 3 },
+  summaryDivider: { width: 1, height: 34, backgroundColor: C.hairline },
+  summaryLabel: { fontSize: 10, fontFamily: F.semiBold, color: C.textFaint, letterSpacing: 0.5, marginTop: 3 },
 
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 },
   quickBtn: { width: '48.4%' },
 
   tabs: { flexDirection: 'row', gap: 6, marginBottom: 14 },
   tab: { flex: 1, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  tabOn: { backgroundColor: 'rgba(90,224,106,0.14)', borderWidth: 1, borderColor: P.greenBorder },
-  tabOff: { backgroundColor: P.surface, borderWidth: 1, borderColor: P.hairline },
-  tabText: { fontSize: 12.5, fontWeight: '600', color: P.textMuted },
-  tabTextOn: { color: P.green, fontWeight: '700' },
+  tabOn: { backgroundColor: 'rgba(90,224,106,0.14)', borderWidth: 1, borderColor: C.greenBorder },
+  tabOff: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.hairline },
+  tabText: { fontSize: 12.5, fontFamily: F.semiBold, color: C.textSecondary },
+  tabTextOn: { color: C.green, fontFamily: F.bold },
 
-  playerName: { fontSize: 13.5, fontWeight: '700', color: P.text },
+  playerName: { fontSize: 13.5, fontFamily: F.bold, color: C.textPrimary },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
-  metaText: { fontSize: 11.5, fontWeight: '500', color: P.textFaint },
+  metaText: { fontSize: 11.5, fontFamily: F.medium, color: C.textFaint },
   metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#434A44' },
-  tsText: { fontSize: 11.5, fontWeight: '700', color: P.green },
-  historyText: { fontSize: 10.5, color: P.textGhost, marginTop: 2 },
+  tsText: { fontSize: 11.5, fontFamily: F.bold, color: C.green },
+  historyText: { fontSize: 10.5, color: C.textGhost, marginTop: 2 },
 
   smallBtn: {
     height: 32,
     paddingHorizontal: 11,
     borderRadius: 9,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  smallBtnText: { fontSize: 11.5, fontWeight: '700', color: P.textStrong },
+  smallBtnText: { fontSize: 11.5, fontFamily: F.bold, color: C.textStrong },
 
   playerRow: {
     flexDirection: 'row',
@@ -910,33 +914,33 @@ const styles = StyleSheet.create({
     gap: 11,
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: P.divider,
+    borderBottomColor: C.divider,
   },
   iconSquare: {
     width: 28,
     height: 28,
     borderRadius: 9,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconSquareText: { fontSize: 17, fontWeight: '700', color: P.textMuted, lineHeight: 19 },
+  iconSquareText: { fontSize: 17, fontFamily: F.bold, color: C.textSecondary, lineHeight: 19 },
 
   markBtn: {
     width: 38,
     height: 38,
     borderRadius: 11,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  markBtnOn: { backgroundColor: P.green, borderColor: P.green },
-  markBtnOff: { backgroundColor: P.coral, borderColor: P.coral },
+  markBtnOn: { backgroundColor: C.green, borderColor: C.green },
+  markBtnOff: { backgroundColor: C.red, borderColor: C.red },
 
-  planLabel: { fontSize: 12, fontWeight: '600', color: P.textMuted },
-  planValue: { fontSize: 12.5, fontWeight: '700', color: P.green },
+  planLabel: { fontSize: 12, fontFamily: F.semiBold, color: C.textSecondary },
+  planValue: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
 
   wlRow: {
     flexDirection: 'row',
@@ -944,18 +948,18 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: P.divider,
+    borderBottomColor: C.divider,
   },
-  wlPos: { width: 20, fontSize: 12, fontWeight: '700', color: P.textGhost },
-  wlName: { flex: 1, fontSize: 12.5, fontWeight: '600', color: P.textStrong },
+  wlPos: { width: 20, fontSize: 12, fontFamily: F.bold, color: C.textGhost },
+  wlName: { flex: 1, fontSize: 12.5, fontFamily: F.semiBold, color: C.textStrong },
 
   footer: {
     paddingHorizontal: 16,
     paddingTop: 10,
-    backgroundColor: P.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderTopWidth: 1,
-    borderTopColor: P.hairline,
+    borderTopColor: C.hairline,
   },
-  cancelLink: { fontSize: 13.5, fontWeight: '700', color: P.coral },
-  sheetBack: { fontSize: 13.5, fontWeight: '700', color: P.textMuted },
+  cancelLink: { fontSize: 13.5, fontFamily: F.bold, color: C.red },
+  sheetBack: { fontSize: 13.5, fontFamily: F.bold, color: C.textSecondary },
 });

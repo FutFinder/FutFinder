@@ -10,7 +10,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, UserX, Shield, Clock } from 'lucide-react-native';
 
-import { partidos as P } from '../theme/colors';
+import {
+  reservas as C,
+  reservasFonts as F,
+} from '../theme/colors';
 import Banner from '../components/Banner';
 import {
   Avatar, Card, GhostButton, IconButton, PrimaryButton, SectionLabel,
@@ -203,7 +206,7 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={P.green} />
+          <ActivityIndicator color={C.green} />
         </View>
       ) : !match ? (
         <View style={styles.content}>
@@ -406,9 +409,9 @@ function Jugador({ fila, esYo, acciones }) {
         {!!etiqueta && (
           <View style={styles.etiquetaFila}>
             {fila.estado === 'pendiente' ? (
-              <Clock color={P.textMuted} size={11} />
+              <Clock color={C.textSecondary} size={11} />
             ) : (
-              <Shield color={P.textMuted} size={11} />
+              <Shield color={C.textSecondary} size={11} />
             )}
             <Text style={styles.etiqueta}>{etiqueta}</Text>
           </View>
@@ -428,7 +431,7 @@ const ETIQUETA_ORIGEN = {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: P.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: {
@@ -442,8 +445,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   headerCenter: { flex: 1 },
-  headerTitle: { color: P.text, fontSize: 19, fontWeight: '800', letterSpacing: -0.4 },
-  headerSubtitle: { color: P.textMuted, fontSize: 12, marginTop: 2 },
+  headerTitle: { color: C.textPrimary, fontSize: 19, fontFamily: F.extraBold, letterSpacing: -0.4 },
+  headerSubtitle: { color: C.textSecondary, fontSize: 12, marginTop: 2 },
 
   content: {
     padding: 16,
@@ -453,7 +456,7 @@ const styles = StyleSheet.create({
     maxWidth: 932,
     alignSelf: 'center',
   },
-  aviso: { color: P.textMuted, fontSize: 12, lineHeight: 17 },
+  aviso: { color: C.textSecondary, fontSize: 12, lineHeight: 17 },
 
   // Apiladas en teléfono, lado a lado desde 720 px. El `maxWidth` es lo que
   // evita que en un monitor ancho las dos columnas se estiren hasta dejar los
@@ -464,20 +467,20 @@ const styles = StyleSheet.create({
   columna: { gap: 8 },
   // El club propio se marca con el verde de la app, no con un borde de otro
   // tono: es la misma señal que usan las tarjetas de partidos.
-  columnaMia: { borderColor: P.greenBorder },
+  columnaMia: { borderColor: C.greenBorder },
   columnaHead: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 4 },
-  clubNombre: { color: P.text, fontSize: 15.5, fontWeight: '800', letterSpacing: -0.2 },
-  conteo: { color: P.green, fontSize: 12, fontWeight: '700', marginTop: 2 },
+  clubNombre: { color: C.textPrimary, fontSize: 15.5, fontFamily: F.extraBold, letterSpacing: -0.2 },
+  conteo: { color: C.green, fontSize: 12, fontFamily: F.bold, marginTop: 2 },
 
-  vacio: { color: P.textFaint, fontSize: 13, paddingVertical: 2 },
+  vacio: { color: C.textFaint, fontSize: 13, paddingVertical: 2 },
 
   jugador: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 6 },
-  jugadorNombre: { color: P.textStrong, fontSize: 14, fontWeight: '600' },
+  jugadorNombre: { color: C.textStrong, fontSize: 14, fontFamily: F.semiBold },
   etiquetaFila: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  etiqueta: { color: P.textMuted, fontSize: 11, flexShrink: 1 },
+  etiqueta: { color: C.textSecondary, fontSize: 11, flexShrink: 1 },
 
   accionesFila: { flexDirection: 'row', gap: 6 },
 
   accionBtn: { marginTop: 8 },
-  motivo: { color: P.textMuted, fontSize: 13, textAlign: 'center', marginTop: 12, lineHeight: 18 },
+  motivo: { color: C.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 12, lineHeight: 18 },
 });

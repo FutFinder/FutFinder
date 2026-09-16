@@ -13,7 +13,11 @@ import {
 
 import Sheet from './Sheet';
 import { GhostButton, Note } from './ui';
-import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { formatFechaCorta } from './DateTimeSheets';
 import { cuotaLabel } from '../../services/matchRules';
 
@@ -139,7 +143,7 @@ export default function ShareSheet({ visible, onClose, match, onShareInApp }) {
     >
       <View style={styles.preview}>
         <View style={styles.previewIcon}>
-          <Trophy color={P.green} size={18} strokeWidth={2} />
+          <Trophy color={C.green} size={18} strokeWidth={2} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text numberOfLines={1} style={styles.previewTitle}>
@@ -161,7 +165,7 @@ export default function ShareSheet({ visible, onClose, match, onShareInApp }) {
             style={({ pressed }) => [styles.opt, pressed && { opacity: 0.75 }]}
           >
             <View style={styles.optIcon}>
-              <o.icon color={P.green} size={20} strokeWidth={2} />
+              <o.icon color={C.green} size={20} strokeWidth={2} />
             </View>
             <Text numberOfLines={1} style={styles.optLabel}>
               {o.label}
@@ -183,10 +187,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: P.border,
-    borderRadius: R.card,
+    borderColor: C.border,
+    borderRadius: R.cardSm,
     padding: 12,
     marginBottom: 14,
   },
@@ -194,23 +198,23 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: P.greenSoft,
+    backgroundColor: C.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewTitle: { fontSize: 13, fontWeight: '700', color: P.text },
-  previewUrl: { fontSize: 11, color: P.textFaint, marginTop: 1 },
+  previewTitle: { fontSize: 13, fontFamily: F.bold, color: C.textPrimary },
+  previewUrl: { fontSize: 11, color: C.textFaint, marginTop: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   opt: { width: '22.5%', alignItems: 'center', gap: 6 },
   optIcon: {
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
-    borderColor: P.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optLabel: { fontSize: 10.5, fontWeight: '600', color: P.textDim, textAlign: 'center' },
+  optLabel: { fontSize: 10.5, fontFamily: F.semiBold, color: C.textDim, textAlign: 'center' },
 });

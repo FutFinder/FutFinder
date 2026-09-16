@@ -24,7 +24,11 @@ import {
   ShieldCheck,
 } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   Card,
   DetailRow,
@@ -458,7 +462,7 @@ export default function PublishMatchScreen({ navigation, route }) {
             accessibilityLabel={step === 1 ? 'Cancelar' : 'Volver al paso anterior'}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
           >
-            <ArrowLeft color={P.text} size={19} strokeWidth={2} />
+            <ArrowLeft color={C.textPrimary} size={19} strokeWidth={2} />
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.topTitle}>Publicar partido abierto</Text>
@@ -479,7 +483,7 @@ export default function PublishMatchScreen({ navigation, route }) {
               <View key={i} style={styles.progressTrack}>
                 {i <= step ? (
                   <LinearGradient
-                    colors={i === step ? [P.greenDark, P.green] : [P.greenDark, P.greenDark]}
+                    colors={i === step ? [C.greenDark, C.green] : [C.greenDark, C.greenDark]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={StyleSheet.absoluteFill}
@@ -504,7 +508,7 @@ export default function PublishMatchScreen({ navigation, route }) {
           {/* Banner de errores / éxito de validación */}
           {errorCount > 0 ? (
             <View style={styles.errBanner}>
-              <AlertCircle color={P.coral} size={17} strokeWidth={2} />
+              <AlertCircle color={C.red} size={17} strokeWidth={2} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.errBannerTitle}>
                   {errorCount === 1 ? 'Falta 1 campo por corregir' : `Faltan ${errorCount} campos por corregir`}
@@ -516,21 +520,21 @@ export default function PublishMatchScreen({ navigation, route }) {
             </View>
           ) : touchedStep === step && !submitError ? (
             <View style={styles.okBanner}>
-              <CheckCircle2 color={P.green} size={17} strokeWidth={2} />
+              <CheckCircle2 color={C.green} size={17} strokeWidth={2} />
               <Text style={styles.okBannerText}>Todo listo, puedes continuar</Text>
             </View>
           ) : null}
 
           {submitError ? (
             <View style={styles.errBanner}>
-              <AlertCircle color={P.coral} size={17} strokeWidth={2} />
-              <Text style={[styles.errBannerText, { flex: 1, color: P.textSoft }]}>{submitError}</Text>
+              <AlertCircle color={C.red} size={17} strokeWidth={2} />
+              <Text style={[styles.errBannerText, { flex: 1, color: C.textSoft }]}>{submitError}</Text>
             </View>
           ) : null}
 
           {clubChallenge ? (
             <View style={styles.okBanner}>
-              <ShieldCheck color={P.green} size={17} strokeWidth={2} />
+              <ShieldCheck color={C.green} size={17} strokeWidth={2} />
               <Text style={styles.okBannerText}>
                 Partido de Clubes — al publicarlo aparece para ambos equipos.
               </Text>
@@ -735,9 +739,9 @@ export default function PublishMatchScreen({ navigation, route }) {
                   dropdownStyle={styles.autoDropdown}
                   optionStyle={styles.autoOption}
                   optionTextStyle={styles.autoOptionText}
-                  placeholderColor={P.textPlaceholder}
-                  accentColor={P.green}
-                  spinnerColor={P.green}
+                  placeholderColor={C.textPlaceholder}
+                  accentColor={C.green}
+                  spinnerColor={C.green}
                 />
                 <Pressable
                   onPress={useMyLocation}
@@ -745,7 +749,7 @@ export default function PublishMatchScreen({ navigation, route }) {
                   accessibilityRole="button"
                   style={({ pressed }) => [styles.locBtn, pressed && { opacity: 0.8 }]}
                 >
-                  <Locate color={P.green} size={15} strokeWidth={2} />
+                  <Locate color={C.green} size={15} strokeWidth={2} />
                   <Text style={styles.locBtnText}>
                     {locBusy ? 'Leyendo tu ubicación…' : 'Usar mi ubicación'}
                   </Text>
@@ -861,7 +865,7 @@ export default function PublishMatchScreen({ navigation, route }) {
               </Field>
 
               <Field label="Recordatorios">
-                <Card style={{ paddingVertical: 4, paddingHorizontal: 13 }} radius={R.input}>
+                <Card style={{ paddingVertical: 4, paddingHorizontal: 13 }} radius={R.row}>
                   <ToggleRow
                     title="Notificar jugadores 1 h antes"
                     desc="Enviamos un aviso con la cancha y la hora a los confirmados."
@@ -886,7 +890,7 @@ export default function PublishMatchScreen({ navigation, route }) {
                     <Tag label={nivelLabel(draft.nivel)} />
                     <Tag label={`${draft.duracion} min`} />
                   </View>
-                  <View style={{ height: 1, backgroundColor: P.hairline }} />
+                  <View style={{ height: 1, backgroundColor: C.hairline }} />
                   <DetailRow
                     label="Fecha y hora"
                     value={dt ? `${capitalize(formatFechaLarga(dt))} · ${draft.hora}` : '—'}
@@ -1015,7 +1019,7 @@ function PublishedView({ match, onOpen, onShare, onBack, shareOpen, onCloseShare
         >
           <View style={{ alignItems: 'center', gap: 12 }}>
             <View style={styles.successIcon}>
-              <CheckCircle2 color={P.green} size={30} strokeWidth={2} />
+              <CheckCircle2 color={C.green} size={30} strokeWidth={2} />
             </View>
             <Text style={styles.successTitle}>Partido publicado</Text>
             <Text style={styles.successText}>
@@ -1032,7 +1036,7 @@ function PublishedView({ match, onOpen, onShare, onBack, shareOpen, onCloseShare
               <Tag label={nivelLabel(match?.nivel)} />
               <Tag label={`${match?.duracion_min} min`} />
             </View>
-            <View style={{ height: 1, backgroundColor: P.hairline }} />
+            <View style={{ height: 1, backgroundColor: C.hairline }} />
             <Row icon={Calendar} tone="green">
               {match?.hora
                 ? `${capitalize(formatFechaLarga(match.hora))} · ${new Date(match.hora).toTimeString().slice(0, 5)}`
@@ -1050,7 +1054,7 @@ function PublishedView({ match, onOpen, onShare, onBack, shareOpen, onCloseShare
             <PrimaryButton label="Ver mi partido" onPress={onOpen} height={52} />
             <SurfaceButton label="Compartir el partido" icon={Share2} onPress={onShare} height={48} />
             <Pressable onPress={onBack} style={({ pressed }) => [{ height: 44, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.7 }]}>
-              <Text style={{ fontSize: 13.5, fontWeight: '700', color: P.textMuted }}>
+              <Text style={{ fontSize: 13.5, fontFamily: F.bold, color: C.textSecondary }}>
                 Volver a Partidos
               </Text>
             </Pressable>
@@ -1084,12 +1088,12 @@ function ToggleRow({ title, desc, value, onChange, last }) {
         gap: 12,
         paddingVertical: 12,
         borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: P.divider,
+        borderBottomColor: C.divider,
       }}
     >
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: P.text }}>{title}</Text>
-        <Text style={{ fontSize: 11, lineHeight: 16, color: P.textFaint, marginTop: 2 }}>{desc}</Text>
+        <Text style={{ fontSize: 13, fontFamily: F.bold, color: C.textPrimary }}>{title}</Text>
+        <Text style={{ fontSize: 11, lineHeight: 16, color: C.textFaint, marginTop: 2 }}>{desc}</Text>
       </View>
       <Toggle value={value} onValueChange={onChange} accessibilityLabel={title} />
     </View>
@@ -1099,13 +1103,13 @@ function ToggleRow({ title, desc, value, onChange, last }) {
 function Row({ icon: Icon, children, tone }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Icon color={tone === 'green' ? P.green : P.textMuted} size={15} strokeWidth={2} />
+      <Icon color={tone === 'green' ? C.green : C.textSecondary} size={15} strokeWidth={2} />
       <Text
         style={{
           flex: 1,
           fontSize: tone === 'green' ? 13 : 12.5,
           fontWeight: tone === 'green' ? '700' : '500',
-          color: tone === 'green' ? P.text : P.textDim,
+          color: tone === 'green' ? C.textPrimary : C.textDim,
         }}
       >
         {children}
@@ -1159,7 +1163,7 @@ function makeToken() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: P.bg },
+  root: { flex: 1, backgroundColor: C.bg },
 
   topBar: {
     flexDirection: 'row',
@@ -1173,14 +1177,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  topTitle: { fontSize: 15, fontWeight: '700', color: P.text },
-  topSub: { fontSize: 11.5, fontWeight: '500', color: P.textFaint, marginTop: 1 },
+  topTitle: { fontSize: 15, fontFamily: F.bold, color: C.textPrimary },
+  topSub: { fontSize: 11.5, fontFamily: F.medium, color: C.textFaint, marginTop: 1 },
 
   progressWrap: { paddingHorizontal: 16, paddingBottom: 14 },
   progressRow: { flexDirection: 'row', gap: 5, marginBottom: 9 },
@@ -1188,13 +1192,13 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 4,
     borderRadius: 2,
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     overflow: 'hidden',
   },
   stepHeadRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  stepTitle: { fontSize: 19, fontWeight: '800', color: P.text, letterSpacing: -0.4 },
-  stepCount: { fontSize: 11, fontWeight: '700', color: P.textFaint },
-  stepSub: { fontSize: 12, fontWeight: '500', color: P.textFaint, marginTop: 3 },
+  stepTitle: { fontSize: 19, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.4 },
+  stepCount: { fontSize: 11, fontFamily: F.bold, color: C.textFaint },
+  stepSub: { fontSize: 12, fontFamily: F.medium, color: C.textFaint, marginTop: 3 },
 
   scroll: { paddingHorizontal: 16, paddingBottom: 20 },
 
@@ -1204,12 +1208,12 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: 'rgba(232,115,123,0.09)',
     borderWidth: 1,
-    borderColor: P.coralBorder,
-    borderRadius: R.input,
+    borderColor: C.redBorder,
+    borderRadius: R.row,
     padding: 12,
     marginBottom: 12,
   },
-  errBannerTitle: { fontSize: 13, fontWeight: '700', color: P.coral },
+  errBannerTitle: { fontSize: 13, fontFamily: F.bold, color: C.red },
   errBannerText: { fontSize: 11.5, lineHeight: 17, color: '#8D958D', marginTop: 2 },
   okBanner: {
     flexDirection: 'row',
@@ -1217,40 +1221,40 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: 'rgba(90,224,106,0.10)',
     borderWidth: 1,
-    borderColor: P.greenBorder,
-    borderRadius: R.input,
+    borderColor: C.greenBorder,
+    borderRadius: R.row,
     padding: 12,
     marginBottom: 12,
   },
-  okBannerText: { flex: 1, fontSize: 12.5, fontWeight: '700', color: P.green },
+  okBannerText: { flex: 1, fontSize: 12.5, fontFamily: F.bold, color: C.green },
 
-  cardTitle: { fontSize: 14, fontWeight: '700', color: P.text },
-  cardSub: { fontSize: 11.5, lineHeight: 17, color: P.textFaint, marginTop: 2 },
-  summaryTitle: { fontSize: 17, fontWeight: '800', color: P.text, letterSpacing: -0.3 },
+  cardTitle: { fontSize: 14, fontFamily: F.bold, color: C.textPrimary },
+  cardSub: { fontSize: 11.5, lineHeight: 17, color: C.textFaint, marginTop: 2 },
+  summaryTitle: { fontSize: 17, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.3 },
 
   row: { flexDirection: 'row', gap: 8 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 
   edadBox: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
   edadInput: { width: 62, textAlign: 'center' },
-  edadDash: { fontSize: 13, fontWeight: '600', color: P.textPlaceholder },
-  edadUnit: { fontSize: 11.5, color: P.textGhost },
+  edadDash: { fontSize: 13, fontFamily: F.semiBold, color: C.textPlaceholder },
+  edadUnit: { fontSize: 11.5, color: C.textGhost },
 
   autoRow: {
     height: 48,
-    borderRadius: R.input,
-    backgroundColor: P.surface,
-    borderColor: P.border,
+    borderRadius: R.row,
+    backgroundColor: C.surface,
+    borderColor: C.border,
     paddingHorizontal: 13,
   },
-  autoInput: { fontSize: 14, fontWeight: '600', color: P.text },
+  autoInput: { fontSize: 14, fontFamily: F.semiBold, color: C.textPrimary },
   autoDropdown: {
-    backgroundColor: P.surface,
-    borderColor: P.border,
-    borderRadius: R.input,
+    backgroundColor: C.surface,
+    borderColor: C.border,
+    borderRadius: R.row,
   },
-  autoOption: { borderTopColor: P.divider, backgroundColor: 'transparent' },
-  autoOptionText: { color: P.textStrong, fontSize: 13 },
+  autoOption: { borderTopColor: C.divider, backgroundColor: 'transparent' },
+  autoOptionText: { color: C.textStrong, fontSize: 13 },
 
   locBtn: {
     flexDirection: 'row',
@@ -1259,19 +1263,19 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: P.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: 'rgba(90,224,106,0.35)',
   },
-  locBtnText: { fontSize: 12.5, fontWeight: '700', color: P.green },
+  locBtnText: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
 
   footer: {
     paddingHorizontal: 16,
     paddingTop: 14,
-    backgroundColor: P.surfaceAlt,
+    backgroundColor: C.surfaceAlt,
     borderTopWidth: 1,
-    borderTopColor: P.hairline,
+    borderTopColor: C.hairline,
   },
 
   successScroll: { paddingHorizontal: 22, paddingTop: 40 },
@@ -1281,10 +1285,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: 'rgba(90,224,106,0.13)',
     borderWidth: 1,
-    borderColor: P.greenBorder,
+    borderColor: C.greenBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  successTitle: { fontSize: 24, fontWeight: '800', color: P.text, letterSpacing: -0.5 },
-  successText: { fontSize: 13, lineHeight: 20, color: P.textMuted, textAlign: 'center' },
+  successTitle: { fontSize: 24, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.5 },
+  successText: { fontSize: 13, lineHeight: 20, color: C.textSecondary, textAlign: 'center' },
 });

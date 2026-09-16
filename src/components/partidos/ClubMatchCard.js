@@ -3,7 +3,11 @@ import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Users, Swords, Wallet } from 'lucide-react-native';
 
-import { partidos as P, partidosRadius as R } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaDeClub, temaClub } from '../../theme/clubThemes';
 import { cuotaLabel } from '../../services/matchRules';
 import {
@@ -114,7 +118,7 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
         </View>
 
         <View style={styles.lugarRow}>
-          <MapPin color={P.textFaint} size={12.5} strokeWidth={2} />
+          <MapPin color={C.textFaint} size={12.5} strokeWidth={2} />
           <Text numberOfLines={compacta ? 1 : 2} style={styles.lugarText}>
             {lugarLabel(match, misClubIds)}
           </Text>
@@ -134,7 +138,7 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
           </View>
           {!compacta && match?.precio_cuota != null ? (
             <View style={styles.datoRow}>
-              <Wallet color={P.textFaint} size={12.5} strokeWidth={2} />
+              <Wallet color={C.textFaint} size={12.5} strokeWidth={2} />
               <Text style={styles.cuota} numberOfLines={1}>
                 {cuotaLabel(match.precio_cuota)}
               </Text>
@@ -205,7 +209,7 @@ const styles = StyleSheet.create({
   // pone el tema del club en cada instancia, así que estas reglas solo traen
   // la forma —radio, ancho, opacidad— y nunca un verde fijo.
   glow: {
-    borderRadius: R.card + 2,
+    borderRadius: R.cardSm + 2,
     shadowOpacity: 0.34,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 0 },
@@ -215,12 +219,12 @@ const styles = StyleSheet.create({
   glowApagado: { shadowOpacity: 0, elevation: 0 },
 
   card: {
-    backgroundColor: P.surface,
-    borderRadius: R.card,
+    backgroundColor: C.surface,
+    borderRadius: R.cardSm,
     borderWidth: 1.5,
     overflow: 'hidden',
   },
-  cardCancelado: { borderColor: P.border, opacity: 0.72 },
+  cardCancelado: { borderColor: C.border, opacity: 0.72 },
 
   franja: {
     flexDirection: 'row',
@@ -232,10 +236,10 @@ const styles = StyleSheet.create({
   },
   franjaText: {
     fontSize: 10.5,
-    fontWeight: '900',
+    fontFamily: F.extraBold,
     letterSpacing: 1.1,
   },
-  canceladoText: { color: P.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  canceladoText: { color: C.textSecondary, fontSize: 10, fontFamily: F.extraBold, letterSpacing: 0.8 },
 
   // `maxWidth` + centrado: sin tope, en web los escudos se van a los
   // extremos de la tarjeta y dejan un vacío enorme entre ellos y el VS. El
@@ -260,18 +264,18 @@ const styles = StyleSheet.create({
   clubColDerecha: { alignItems: 'center' },
 
   escudo: {
-    backgroundColor: P.chip,
+    backgroundColor: C.chip,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  inicialesText: { fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
+  inicialesText: { fontSize: 15, fontFamily: F.extraBold, letterSpacing: 0.5 },
 
   clubNombre: {
-    color: P.textStrong,
+    color: C.textStrong,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     textAlign: 'center',
     lineHeight: 17,
   },
@@ -280,7 +284,7 @@ const styles = StyleSheet.create({
   vsCol: { width: 34, alignItems: 'center', paddingTop: 12 },
   vs: {
     fontSize: 15,
-    fontWeight: '900',
+    fontFamily: F.extraBold,
     letterSpacing: 1,
   },
 
@@ -290,9 +294,9 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 13,
   },
-  cuando: { color: P.text, fontSize: 19, fontWeight: '900', letterSpacing: 0.2, flexShrink: 1 },
+  cuando: { color: C.textPrimary, fontSize: 19, fontFamily: F.extraBold, letterSpacing: 0.2, flexShrink: 1 },
   cuandoCompacta: { fontSize: 16.5 },
-  duracion: { color: P.textFaint, fontSize: 12, fontWeight: '700' },
+  duracion: { color: C.textFaint, fontSize: 12, fontFamily: F.bold },
 
   lugarRow: {
     flexDirection: 'row',
@@ -301,9 +305,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingTop: 5,
   },
-  lugarText: { color: P.textDim, fontSize: 12.5, flex: 1, minWidth: 0 },
+  lugarText: { color: C.textDim, fontSize: 12.5, flex: 1, minWidth: 0 },
   aproximada: {
-    color: P.textFaint,
+    color: C.textFaint,
     fontSize: 11,
     fontStyle: 'italic',
     paddingHorizontal: 13,
@@ -312,7 +316,7 @@ const styles = StyleSheet.create({
 
   divider: {
     height: 1,
-    backgroundColor: P.divider,
+    backgroundColor: C.divider,
     marginHorizontal: 13,
     marginTop: 11,
   },
@@ -326,8 +330,8 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   datoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0, flexShrink: 1 },
-  cupos: { fontSize: 12.5, fontWeight: '800', flexShrink: 1 },
-  cuota: { color: P.textDim, fontSize: 12.5, fontWeight: '600', flexShrink: 1 },
+  cupos: { fontSize: 12.5, fontFamily: F.extraBold, flexShrink: 1 },
+  cuota: { color: C.textDim, fontSize: 12.5, fontFamily: F.semiBold, flexShrink: 1 },
 
   cta: {
     // `marginLeft: 'auto'` y no un separador flexible: con `flexWrap`, cuando
@@ -340,5 +344,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { fontSize: 12.5, fontWeight: '900', letterSpacing: 0.2 },
+  ctaText: { fontSize: 12.5, fontFamily: F.extraBold, letterSpacing: 0.2 },
 });
