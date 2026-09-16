@@ -14,7 +14,11 @@ import {
   FilterEmpty,
 } from '../components/chat/ChatStates';
 
-import { chatColors, dsSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import { listMyThreads, subscribeToMessages } from '../services/messages';
 import { listIncomingRequests, subscribeToFriendships } from '../services/friends';
 import { isSupabaseConfigured } from '../services/supabase';
@@ -215,7 +219,7 @@ export default function ChatScreen({ navigation }) {
               setRefreshing(true);
               load();
             }}
-            tintColor={chatColors.green}
+            tintColor={C.green}
           />
         }
       />
@@ -240,16 +244,16 @@ export default function ChatScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: chatColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   list: {
-    paddingHorizontal: dsSizes.gutter,
+    paddingHorizontal: S.screenPadding,
     paddingBottom: 120, // deja aire sobre la tab bar flotante
   },
   softError: {
     marginTop: 18,
-    color: chatColors.warn,
+    color: C.amber,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
     textAlign: 'center',
   },
   demo: {

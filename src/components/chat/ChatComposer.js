@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-native';
 import { Send, Smile, Lock, WifiOff } from 'lucide-react-native';
 
-import { chatColors } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { canSendDraft } from '../../utils/chatMeta';
 import { MAX_MESSAGE_LENGTH } from '../../services/messages';
 
@@ -57,7 +60,7 @@ export default function ChatComposer({
       {offline && (
         <View style={styles.offlineWrap}>
           <View style={styles.offlineCard} accessibilityRole="summary">
-            <WifiOff color={chatColors.warn} size={16} strokeWidth={2} />
+            <WifiOff color={C.amber} size={16} strokeWidth={2} />
             <Text style={styles.offlineText}>Sin conexión — no puedes enviar mensajes ahora.</Text>
           </View>
         </View>
@@ -132,7 +135,7 @@ export default function ChatComposer({
           ]}
         >
           <Send
-            color={enabled ? chatColors.inkOnGreen : 'rgba(255,255,255,0.25)'}
+            color={enabled ? C.greenInk : 'rgba(255,255,255,0.25)'}
             size={20}
             strokeWidth={enabled ? 2.1 : 1.9}
           />
@@ -150,9 +153,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: Platform.OS === 'ios' ? 10 : 14,
-    backgroundColor: chatColors.composerBar,
+    backgroundColor: C.composerBar,
     borderTopWidth: 1,
-    borderTopColor: chatColors.cardBorder,
+    borderTopColor: C.hairline,
   },
   emojiBtn: {
     width: 44,
@@ -166,12 +169,12 @@ const styles = StyleSheet.create({
     minHeight: 46,
     maxHeight: 132,
     borderRadius: 23,
-    backgroundColor: chatColors.inputBg,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.borderSoft,
-    color: chatColors.textPrimary,
+    borderColor: C.borderSoft,
+    color: C.textPrimary,
     fontSize: 14.5,
-    fontWeight: '500',
+    fontFamily: F.medium,
     paddingHorizontal: 18,
     paddingTop: Platform.OS === 'ios' ? 13 : 10,
     paddingBottom: Platform.OS === 'ios' ? 13 : 10,
@@ -183,7 +186,7 @@ const styles = StyleSheet.create({
   // navegador: se ve igual en web y en nativo, y sigue sin depender del color
   // porque el cursor también entra en el campo.
   inputFocused: { borderColor: 'rgba(90,224,106,0.35)' },
-  inputCommand: { borderColor: 'rgba(90,224,106,0.55)', color: chatColors.green },
+  inputCommand: { borderColor: 'rgba(90,224,106,0.55)', color: C.green },
   sendBtn: {
     width: 46,
     height: 46,
@@ -191,8 +194,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnOn: { backgroundColor: chatColors.green },
-  sendBtnOff: { backgroundColor: chatColors.sendIdle },
+  sendBtnOn: { backgroundColor: C.green },
+  sendBtnOff: { backgroundColor: C.sendIdle },
 
   // Sin conexión — visible aunque el compositor tenga texto escrito (a
   // diferencia del placeholder, que desaparece apenas hay valor).
@@ -204,20 +207,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: chatColors.warnSoft,
+    backgroundColor: C.amberSoft,
     borderWidth: 1,
-    borderColor: chatColors.warnBorder,
+    borderColor: C.amberBorder,
   },
-  offlineText: { flex: 1, color: chatColors.warn, fontSize: 12, fontWeight: '700' },
+  offlineText: { flex: 1, color: C.amber, fontSize: 12, fontFamily: F.bold },
 
   // Solo lectura
   readOnlyBar: {
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: Platform.OS === 'ios' ? 14 : 18,
-    backgroundColor: chatColors.composerBar,
+    backgroundColor: C.composerBar,
     borderTopWidth: 1,
-    borderTopColor: chatColors.cardBorder,
+    borderTopColor: C.hairline,
   },
   readOnlyCard: {
     flexDirection: 'row',
@@ -225,18 +228,18 @@ const styles = StyleSheet.create({
     gap: 11,
     padding: 14,
     borderRadius: 20,
-    backgroundColor: chatColors.card,
+    backgroundColor: C.surface,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: 'rgba(255,255,255,0.16)',
   },
-  readOnlyTitle: { color: chatColors.textPrimary, fontSize: 13, fontWeight: '800' },
+  readOnlyTitle: { color: C.textPrimary, fontSize: 13, fontFamily: F.extraBold },
   readOnlyText: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.48)',
     fontSize: 11.5,
     lineHeight: 17,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
 
   // Comandos
@@ -245,7 +248,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: chatColors.inputBg,
+    backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.28)',
   },
@@ -255,7 +258,7 @@ const styles = StyleSheet.create({
     paddingBottom: 7,
     color: 'rgba(255,255,255,0.4)',
     fontSize: 9.5,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 1,
   },
   commandRow: {
@@ -269,13 +272,13 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
   commandRowFirst: { backgroundColor: 'rgba(90,224,106,0.08)', borderTopWidth: 0 },
-  commandName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '800' },
-  commandNameAccent: { color: chatColors.green },
+  commandName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontFamily: F.extraBold },
+  commandNameAccent: { color: C.green },
   commandHint: {
     flex: 1,
     color: 'rgba(255,255,255,0.5)',
     fontSize: 11.5,
     lineHeight: 16,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
 });

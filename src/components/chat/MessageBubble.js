@@ -10,7 +10,10 @@ import {
   TriangleAlert,
 } from 'lucide-react-native';
 
-import { chatColors } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { hourLabel, initialOf } from '../../utils/chatMeta';
 
 /**
@@ -45,7 +48,7 @@ export default function MessageBubble({
     <>
       {important && (
         <View style={styles.importantHeader}>
-          <TriangleAlert color={chatColors.warn} size={12} strokeWidth={2.4} />
+          <TriangleAlert color={C.amber} size={12} strokeWidth={2.4} />
           <Text style={styles.importantHeaderText}>AVISO IMPORTANTE</Text>
         </View>
       )}
@@ -73,7 +76,7 @@ export default function MessageBubble({
             : time}
         </Text>
         {failed ? (
-          <CircleAlert color={chatColors.danger} size={12} strokeWidth={2.2} />
+          <CircleAlert color={C.red} size={12} strokeWidth={2.2} />
         ) : (
           isMine && !important && <DeliveryIcon status={status} isGroup={isGroup} message={message} />
         )}
@@ -161,7 +164,7 @@ export default function MessageBubble({
             accessibilityLabel="Reintentar el envío del mensaje"
             style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.8 }]}
           >
-            <RotateCw color={chatColors.green} size={14} strokeWidth={2.2} />
+            <RotateCw color={C.green} size={14} strokeWidth={2.2} />
             <Text style={styles.retryText}>Reintentar</Text>
           </Pressable>
           <Pressable
@@ -222,9 +225,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 10,
-    backgroundColor: chatColors.avatarNeutralBg,
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1,
-    borderColor: chatColors.avatarNeutralBorder,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -233,7 +236,7 @@ const styles = StyleSheet.create({
   avatarInitial: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
 
@@ -241,36 +244,36 @@ const styles = StyleSheet.create({
   senderName: {
     marginBottom: 4,
     marginLeft: 2,
-    color: chatColors.green,
+    color: C.green,
     fontSize: 11.5,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
   },
 
   bubble: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8, borderWidth: 1 },
   bubbleTheirs: {
-    backgroundColor: chatColors.bubbleTheirs,
-    borderColor: chatColors.bubbleTheirsBorder,
+    backgroundColor: C.surface,
+    borderColor: C.hairline,
   },
-  bubbleMine: { backgroundColor: chatColors.green, borderColor: chatColors.green },
+  bubbleMine: { backgroundColor: C.green, borderColor: C.green },
   bubbleSending: { opacity: 0.72 },
   bubbleImportant: { borderColor: 'rgba(255,190,90,0.4)' },
   bubbleFailed: {
     backgroundColor: 'rgba(90,224,106,0.14)',
-    borderColor: chatColors.dangerBorder,
+    borderColor: C.redBorder,
     borderStyle: 'dashed',
   },
-  bubbleFailedBorder: { borderColor: chatColors.dangerBorder, borderStyle: 'dashed' },
+  bubbleFailedBorder: { borderColor: C.redBorder, borderStyle: 'dashed' },
 
   importantHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   importantHeaderText: {
-    color: chatColors.warn,
+    color: C.amber,
     fontSize: 9.5,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 1,
   },
 
-  text: { color: chatColors.textPrimary, fontSize: 14.5, lineHeight: 21, fontWeight: '500' },
-  textMine: { color: chatColors.inkOnGreen, fontWeight: '600' },
+  text: { color: C.textPrimary, fontSize: 14.5, lineHeight: 21, fontFamily: F.medium },
+  textMine: { color: C.greenInk, fontFamily: F.semiBold },
 
   metaRow: {
     flexDirection: 'row',
@@ -283,11 +286,11 @@ const styles = StyleSheet.create({
   time: {
     color: 'rgba(255,255,255,0.35)',
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: F.bold,
     flexShrink: 1,
   },
-  timeMine: { color: 'rgba(11,13,11,0.55)', fontWeight: '800' },
-  timeFailed: { color: chatColors.danger, fontWeight: '800' },
+  timeMine: { color: 'rgba(11,13,11,0.55)', fontFamily: F.extraBold },
+  timeFailed: { color: C.red, fontFamily: F.extraBold },
 
   failedActions: {
     flexDirection: 'row',
@@ -305,14 +308,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.45)',
   },
-  retryText: { color: chatColors.green, fontSize: 12.5, fontWeight: '800' },
+  retryText: { color: C.green, fontSize: 12.5, fontFamily: F.extraBold },
   discardBtn: {
     justifyContent: 'center',
     minHeight: 44,
     paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: chatColors.border,
+    borderColor: C.border,
   },
-  discardText: { color: 'rgba(255,255,255,0.7)', fontSize: 12.5, fontWeight: '800' },
+  discardText: { color: 'rgba(255,255,255,0.7)', fontSize: 12.5, fontFamily: F.extraBold },
 });

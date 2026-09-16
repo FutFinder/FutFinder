@@ -4,7 +4,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BellOff, Shield, Video, TriangleAlert, Swords } from 'lucide-react-native';
 
 import ThreadAvatar from './ThreadAvatar';
-import { chatColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { threadTimeLabel, threadPreview } from '../../utils/chatMeta';
 import { resolveThreadAccent, challengeCardLabel } from '../../utils/challengeThread';
 
@@ -114,7 +118,7 @@ export default function ConversationCard({ thread, now, onPress }) {
         <View style={styles.bottomRow}>
           {isChallenge ? (
             <View style={[styles.kindPill, styles.kindPillChallenge]}>
-              <Swords color={chatColors.neon} size={11} strokeWidth={2.3} />
+              <Swords color={C.neon} size={11} strokeWidth={2.3} />
               <Text style={[styles.kindPillText, styles.kindPillTextChallenge]}>
                 {challengeCardLabel(thread).toUpperCase()}
               </Text>
@@ -122,9 +126,9 @@ export default function ConversationCard({ thread, now, onPress }) {
           ) : isClub ? (
             <View style={[styles.kindPill, important && styles.kindPillImportant]}>
               {important ? (
-                <TriangleAlert color={chatColors.warn} size={11} strokeWidth={2.4} />
+                <TriangleAlert color={C.amber} size={11} strokeWidth={2.4} />
               ) : (
-                <Shield color={chatColors.green} size={11} strokeWidth={2.2} />
+                <Shield color={C.green} size={11} strokeWidth={2.2} />
               )}
               <Text style={[styles.kindPillText, important && styles.kindPillTextImportant]}>
                 {important ? 'IMPORTANTE' : 'CHAT DEL CLUB'}
@@ -134,7 +138,7 @@ export default function ConversationCard({ thread, now, onPress }) {
             <View style={styles.kindRow}>
               {thread.type === 'match' && (
                 <Video
-                  color={hasUnread ? chatColors.green : 'rgba(255,255,255,0.4)'}
+                  color={hasUnread ? C.green : 'rgba(255,255,255,0.4)'}
                   size={12}
                   strokeWidth={2}
                 />
@@ -181,59 +185,59 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 13,
     paddingHorizontal: 12,
-    borderRadius: dsRadius.xl,
-    backgroundColor: chatColors.card,
+    borderRadius: R.cardSm,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.cardBorder,
+    borderColor: C.hairline,
     overflow: 'hidden',
   },
   cardUnread: {
-    backgroundColor: chatColors.cardUnread,
-    borderColor: chatColors.cardBorderUnread,
+    backgroundColor: C.cardUnread,
+    borderColor: C.greenSoft,
   },
   cardClub: {
-    backgroundColor: chatColors.cardClub,
-    borderColor: chatColors.cardBorderClub,
+    backgroundColor: C.surface,
+    borderColor: C.greenBorder,
   },
-  cardImportant: { borderColor: chatColors.warnBorder },
+  cardImportant: { borderColor: C.amberBorder },
   // Ya visto: el hilo sigue siendo reconocible, sin gritar.
   cardChallenge: {
-    backgroundColor: chatColors.cardChallenge,
-    borderColor: chatColors.challengeBorder,
+    backgroundColor: C.cardChallenge,
+    borderColor: C.challengeBorder,
   },
   // Recién aceptado y sin abrir. Borde, no animación: el enunciado pide
   // que se note, no que parpadee.
-  cardChallengeNeon: { borderColor: chatColors.neonBorder },
+  cardChallengeNeon: { borderColor: C.neonBorder },
 
   body: { flex: 1, minWidth: 0 },
 
   topRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   title: {
     flex: 1,
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: F.bold,
     includeFontPadding: false,
   },
-  titleUnread: { fontWeight: '800' },
+  titleUnread: { fontFamily: F.extraBold },
   time: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
     includeFontPadding: false,
   },
-  timeUnread: { color: chatColors.green, fontWeight: '700' },
-  timeImportant: { color: chatColors.warn, fontWeight: '800' },
+  timeUnread: { color: C.green, fontFamily: F.bold },
+  timeImportant: { color: C.amber, fontFamily: F.extraBold },
 
   preview: {
     marginTop: 3,
     color: 'rgba(255,255,255,0.5)',
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: F.medium,
     lineHeight: 18,
   },
   previewUnread: { color: 'rgba(255,255,255,0.68)' },
-  previewAviso: { color: chatColors.warn, fontWeight: '800' },
+  previewAviso: { color: C.amber, fontFamily: F.extraBold },
   prefix: { color: 'rgba(255,255,255,0.72)' },
   prefixUnread: { color: 'rgba(255,255,255,0.85)' },
 
@@ -248,11 +252,11 @@ const styles = StyleSheet.create({
   kindText: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.2,
     flexShrink: 1,
   },
-  kindTextUnread: { color: chatColors.green },
+  kindTextUnread: { color: C.green },
 
   kindPill: {
     flexDirection: 'row',
@@ -260,27 +264,27 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 4,
     paddingHorizontal: 9,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(90,224,106,0.16)',
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.34)',
   },
   kindPillImportant: {
-    backgroundColor: chatColors.warnSoft,
+    backgroundColor: C.amberSoft,
     borderColor: 'rgba(255,190,90,0.35)',
   },
   kindPillChallenge: {
-    backgroundColor: chatColors.neonSoft,
+    backgroundColor: C.neonSoft,
     borderColor: 'rgba(255,45,85,0.35)',
   },
   kindPillText: {
-    color: chatColors.green,
+    color: C.green,
     fontSize: 9.5,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 1,
   },
-  kindPillTextImportant: { color: chatColors.warn },
-  kindPillTextChallenge: { color: chatColors.neon },
+  kindPillTextImportant: { color: C.amber },
+  kindPillTextChallenge: { color: C.neon },
 
   badges: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   unread: {
@@ -288,15 +292,15 @@ const styles = StyleSheet.create({
     height: 20,
     paddingHorizontal: 6,
     borderRadius: 10,
-    backgroundColor: chatColors.green,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  unreadImportant: { backgroundColor: chatColors.warn },
+  unreadImportant: { backgroundColor: C.amber },
   unreadText: {
-    color: chatColors.inkOnGreen,
+    color: C.greenInk,
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
 });

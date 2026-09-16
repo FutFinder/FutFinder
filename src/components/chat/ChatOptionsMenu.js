@@ -1,7 +1,10 @@
 import React from 'react';
 import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 
-import { chatColors } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Menú de opciones de la conversación (los tres puntos de la cabecera).
@@ -60,9 +63,9 @@ const styles = StyleSheet.create({
     width: 244,
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: chatColors.cardUnread,
+    backgroundColor: C.cardUnread,
     borderWidth: 1,
-    borderColor: chatColors.border,
+    borderColor: C.border,
     shadowColor: '#000',
     shadowOpacity: 0.5,
     shadowRadius: 24,
@@ -78,6 +81,6 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
-  label: { flex: 1, color: chatColors.textPrimary, fontSize: 13.5, fontWeight: '700' },
-  labelDanger: { color: chatColors.danger },
+  label: { flex: 1, color: C.textPrimary, fontSize: 13.5, fontFamily: F.bold },
+  labelDanger: { color: C.red },
 });

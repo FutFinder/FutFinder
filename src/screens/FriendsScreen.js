@@ -12,7 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, UserPlus, RotateCw, Search } from 'lucide-react-native';
 
 import PersonRow from '../components/chat/PersonRow';
-import { chatColors, dsSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   listMyFriends,
   listIncomingRequests,
@@ -188,7 +192,7 @@ export default function FriendsScreen({ navigation }) {
               accessibilityLabel={`Ahora son amigos. Abrir el chat con @${r.username}`}
               style={({ pressed }) => [styles.doneAccepted, pressed && { opacity: 0.85 }]}
             >
-              <Check color={chatColors.green} size={16} strokeWidth={2.4} />
+              <Check color={C.green} size={16} strokeWidth={2.4} />
               <Text style={styles.doneAcceptedText}>Ahora son amigos · Abrir chat</Text>
             </Pressable>
           )}
@@ -291,7 +295,7 @@ export default function FriendsScreen({ navigation }) {
             accessibilityLabel="Volver"
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           >
-            <ArrowLeft color={chatColors.textPrimary} size={22} strokeWidth={2.1} />
+            <ArrowLeft color={C.textPrimary} size={22} strokeWidth={2.1} />
           </Pressable>
           <Text style={styles.headerTitle} accessibilityRole="header">
             Amigos y solicitudes
@@ -324,7 +328,7 @@ export default function FriendsScreen({ navigation }) {
 
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={chatColors.green} />
+            <ActivityIndicator color={C.green} />
             <Text style={styles.loadingText}>Cargando…</Text>
           </View>
         ) : error ? (
@@ -339,7 +343,7 @@ export default function FriendsScreen({ navigation }) {
               accessibilityLabel="Reintentar"
               style={({ pressed }) => [styles.retry, pressed && { opacity: 0.85 }]}
             >
-              <RotateCw color={chatColors.inkOnGreen} size={17} strokeWidth={2.2} />
+              <RotateCw color={C.greenInk} size={17} strokeWidth={2.2} />
               <Text style={styles.retryText}>Reintentar</Text>
             </Pressable>
           </View>
@@ -354,7 +358,7 @@ export default function FriendsScreen({ navigation }) {
                   setRefreshing(true);
                   load();
                 }}
-                tintColor={chatColors.green}
+                tintColor={C.green}
               />
             }
           >
@@ -372,7 +376,7 @@ function Empty({ title, text, action, onAction }) {
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
-        <UserPlus color={chatColors.green} size={26} strokeWidth={1.7} />
+        <UserPlus color={C.green} size={26} strokeWidth={1.7} />
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyText}>{text}</Text>
@@ -383,7 +387,7 @@ function Empty({ title, text, action, onAction }) {
           accessibilityLabel={action}
           style={({ pressed }) => [styles.emptyBtn, pressed && { opacity: 0.85 }]}
         >
-          <Search color={chatColors.green} size={16} strokeWidth={2} />
+          <Search color={C.green} size={16} strokeWidth={2} />
           <Text style={styles.emptyBtnText}>{action}</Text>
         </Pressable>
       )}
@@ -392,56 +396,56 @@ function Empty({ title, text, action, onAction }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: chatColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingLeft: 6,
-    paddingRight: dsSizes.gutter,
+    paddingRight: S.screenPadding,
     paddingTop: 4,
     paddingBottom: 12,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: chatColors.textPrimary, fontSize: 17, fontWeight: '800' },
+  headerTitle: { color: C.textPrimary, fontSize: 17, fontFamily: F.extraBold },
 
   segmented: {
     flexDirection: 'row',
-    marginHorizontal: dsSizes.gutter,
+    marginHorizontal: S.screenPadding,
     marginBottom: 16,
     padding: 4,
     borderRadius: 22,
-    backgroundColor: chatColors.card,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.borderSoft,
+    borderColor: C.borderSoft,
   },
   segment: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
-  segmentActive: { backgroundColor: chatColors.green },
-  segmentText: { color: 'rgba(255,255,255,0.6)', fontSize: 12.5, fontWeight: '700' },
-  segmentTextActive: { color: chatColors.inkOnGreen, fontWeight: '800' },
+  segmentActive: { backgroundColor: C.green },
+  segmentText: { color: 'rgba(255,255,255,0.6)', fontSize: 12.5, fontFamily: F.bold },
+  segmentTextActive: { color: C.greenInk, fontFamily: F.extraBold },
 
-  list: { paddingHorizontal: dsSizes.gutter, paddingBottom: 40, gap: 10 },
+  list: { paddingHorizontal: S.screenPadding, paddingBottom: 40, gap: 10 },
 
   actionRow: { flexDirection: 'row', gap: 9, marginTop: 12 },
   accept: {
     flex: 1,
     minHeight: 44,
     borderRadius: 22,
-    backgroundColor: chatColors.green,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  acceptText: { color: chatColors.inkOnGreen, fontSize: 13, fontWeight: '800' },
+  acceptText: { color: C.greenInk, fontSize: 13, fontFamily: F.extraBold },
   reject: {
     flex: 1,
     minHeight: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: chatColors.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rejectText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '800' },
+  rejectText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontFamily: F.extraBold },
 
   doneAccepted: {
     flexDirection: 'row',
@@ -455,18 +459,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.35)',
   },
-  doneAcceptedText: { color: chatColors.green, fontSize: 13, fontWeight: '800' },
+  doneAcceptedText: { color: C.green, fontSize: 13, fontFamily: F.extraBold },
   doneRejected: {
     marginTop: 12,
     minHeight: 44,
     borderRadius: 22,
-    backgroundColor: chatColors.surface,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  doneRejectedText: { color: 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: '700' },
+  doneRejectedText: { color: 'rgba(255,255,255,0.45)', fontSize: 13, fontFamily: F.bold },
 
   cancelBtn: {
     minHeight: 38,
@@ -474,9 +478,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: chatColors.border,
+    borderColor: C.border,
   },
-  cancelText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '800' },
+  cancelText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontFamily: F.extraBold },
 
   chatBtn: {
     minHeight: 38,
@@ -487,11 +491,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.4)',
   },
-  chatBtnText: { color: chatColors.green, fontSize: 12, fontWeight: '800' },
+  chatBtnText: { color: C.green, fontSize: 12, fontFamily: F.extraBold },
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  loadingText: { color: chatColors.textSecondary, fontSize: 13 },
-  errorTitle: { color: chatColors.textPrimary, fontSize: 15, fontWeight: '800' },
+  loadingText: { color: C.textSecondary, fontSize: 13 },
+  errorTitle: { color: C.textPrimary, fontSize: 15, fontFamily: F.extraBold },
   retry: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -499,9 +503,9 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: 20,
     borderRadius: 23,
-    backgroundColor: chatColors.green,
+    backgroundColor: C.green,
   },
-  retryText: { color: chatColors.inkOnGreen, fontSize: 13.5, fontWeight: '800' },
+  retryText: { color: C.greenInk, fontSize: 13.5, fontFamily: F.extraBold },
 
   empty: { alignItems: 'center', paddingVertical: 50, paddingHorizontal: 24 },
   emptyIcon: {
@@ -515,7 +519,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
-  emptyTitle: { color: chatColors.textPrimary, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  emptyTitle: { color: C.textPrimary, fontSize: 16, fontFamily: F.extraBold, textAlign: 'center' },
   emptyText: {
     marginTop: 7,
     color: 'rgba(255,255,255,0.48)',
@@ -534,5 +538,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.45)',
   },
-  emptyBtnText: { color: chatColors.green, fontSize: 13, fontWeight: '800' },
+  emptyBtnText: { color: C.green, fontSize: 13, fontFamily: F.extraBold },
 });

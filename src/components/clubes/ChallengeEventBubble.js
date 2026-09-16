@@ -1,7 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-import { chatColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { hourLabel } from '../../utils/chatMeta';
 import { textoCambioPropuesto, textoCambioRespondido } from '../../utils/cambioPartido';
 import {
@@ -133,23 +137,23 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
     paddingVertical: 7,
     paddingHorizontal: 12,
-    borderRadius: dsRadius.chip,
-    backgroundColor: chatColors.neonSoft,
+    borderRadius: R.chip,
+    backgroundColor: C.neonSoft,
     borderWidth: 1,
-    borderColor: chatColors.challengeBorder,
+    borderColor: C.challengeBorder,
   },
   text: {
     flexShrink: 1,
     color: 'rgba(255,255,255,0.72)',
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
     textAlign: 'center',
   },
   hora: {
     color: 'rgba(255,255,255,0.35)',
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: F.bold,
     includeFontPadding: false,
   },
 });

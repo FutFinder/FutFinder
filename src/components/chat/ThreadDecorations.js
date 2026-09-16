@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { ChevronRight, MessageSquare, UserPlus } from 'lucide-react-native';
 
-import { chatColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Piezas sueltas de la conversación y de la bandeja: separador de día,
@@ -42,7 +47,7 @@ export function LoadEarlier({ loading, onPress }) {
       style={({ pressed }) => [styles.earlier, pressed && { opacity: 0.7 }]}
     >
       {loading ? (
-        <ActivityIndicator color={chatColors.green} size="small" />
+        <ActivityIndicator color={C.green} size="small" />
       ) : (
         <Text style={styles.earlierText}>Cargar mensajes anteriores</Text>
       )}
@@ -101,7 +106,7 @@ export function FriendRequestsCard({ requests, onPress }) {
       style={({ pressed }) => [styles.reqCard, pressed && { opacity: 0.85 }]}
     >
       <View style={styles.reqIcon}>
-        <UserPlus color={chatColors.green} size={19} strokeWidth={1.9} />
+        <UserPlus color={C.green} size={19} strokeWidth={1.9} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.reqTitle}>
@@ -112,7 +117,7 @@ export function FriendRequestsCard({ requests, onPress }) {
           {n > 2 ? ` y ${n - 2} más` : ''}
         </Text>
       </View>
-      <ChevronRight color={chatColors.green} size={18} strokeWidth={2} />
+      <ChevronRight color={C.green} size={18} strokeWidth={2} />
     </Pressable>
   );
 }
@@ -123,7 +128,7 @@ const styles = StyleSheet.create({
   dayText: {
     color: 'rgba(255,255,255,0.35)',
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 1.2,
   },
 
@@ -136,11 +141,11 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 13,
     borderRadius: 16,
-    backgroundColor: chatColors.card,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.bubbleTheirsBorder,
+    borderColor: C.hairline,
   },
-  pillText: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700' },
+  pillText: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontFamily: F.bold },
 
   earlier: {
     alignSelf: 'center',
@@ -149,7 +154,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  earlierText: { color: chatColors.green, fontSize: 12.5, fontWeight: '800' },
+  earlierText: { color: C.green, fontSize: 12.5, fontFamily: F.extraBold },
 
   empty: {
     flex: 1,
@@ -163,16 +168,16 @@ const styles = StyleSheet.create({
     height: 62,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: chatColors.border,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
-  emptyIconMuted: { borderColor: chatColors.borderSoft },
+  emptyIconMuted: { borderColor: C.borderSoft },
   emptyTitle: {
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     textAlign: 'center',
   },
   emptyText: {
@@ -191,7 +196,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.45)',
   },
-  deniedBtnText: { color: chatColors.green, fontSize: 13.5, fontWeight: '800' },
+  deniedBtnText: { color: C.green, fontSize: 13.5, fontFamily: F.extraBold },
 
   reqCard: {
     flexDirection: 'row',
@@ -199,7 +204,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 13,
     paddingHorizontal: 14,
-    borderRadius: dsRadius.xl,
+    borderRadius: R.cardSm,
     backgroundColor: 'rgba(90,224,106,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.3)',
@@ -212,13 +217,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  reqTitle: { color: chatColors.textPrimary, fontSize: 14, fontWeight: '800' },
+  reqTitle: { color: C.textPrimary, fontSize: 14, fontFamily: F.extraBold },
   reqNames: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
 });
 
-export const CHAT_GUTTER = dsSizes.gutter;
+export const CHAT_GUTTER = S.screenPadding;

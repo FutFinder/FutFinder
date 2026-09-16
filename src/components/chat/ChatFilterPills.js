@@ -1,7 +1,11 @@
 import React from 'react';
 import { ScrollView, Pressable, Text, StyleSheet } from 'react-native';
 
-import { chatColors, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { CHAT_FILTERS } from '../../utils/chatMeta';
 
 /**
@@ -56,7 +60,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: dsSizes.gutter + 4,
+    paddingHorizontal: S.screenPadding + 4,
     paddingBottom: 14,
   },
   pill: {
@@ -68,7 +72,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#121412',
     borderWidth: 1,
-    borderColor: chatColors.borderSoft,
+    borderColor: C.borderSoft,
   },
   pillActive: {
     backgroundColor: 'rgba(90,224,106,0.14)',
@@ -77,15 +81,15 @@ const styles = StyleSheet.create({
   label: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     includeFontPadding: false,
   },
-  labelActive: { color: chatColors.green, fontWeight: '800' },
+  labelActive: { color: C.green, fontFamily: F.extraBold },
   count: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 12.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     includeFontPadding: false,
   },
-  countActive: { color: chatColors.green },
+  countActive: { color: C.green },
 });

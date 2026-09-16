@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { UserPlus } from 'lucide-react-native';
 
-import { chatColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 import BrandMark from '../BrandMark';
 import NotificationBell from '../NotificationBell';
 
@@ -54,17 +59,17 @@ export default function ChatInboxHeader({ pendingRequests = 0, onPressFriends })
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: dsSizes.gutter + 4, paddingTop: 4, paddingBottom: 14 },
+  wrap: { paddingHorizontal: S.screenPadding + 4, paddingTop: 4, paddingBottom: 14 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rightGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   iconBtn: {
     width: 38,
     height: 38,
-    borderRadius: dsRadius.sm,
-    backgroundColor: chatColors.surface,
+    borderRadius: R.chip,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -76,24 +81,24 @@ const styles = StyleSheet.create({
     height: 16,
     paddingHorizontal: 3,
     borderRadius: 8,
-    backgroundColor: chatColors.green,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: chatColors.background,
+    borderColor: C.bg,
   },
   badgeText: {
-    color: chatColors.inkOnGreen,
+    color: C.greenInk,
     fontSize: 9.5,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
 
   title: {
     marginTop: 12,
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 27,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.7,
   },
 });

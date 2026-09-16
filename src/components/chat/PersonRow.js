@@ -2,7 +2,11 @@ import React from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 
-import { chatColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { initialOf, playerLine } from '../../utils/chatMeta';
 
 /**
@@ -107,7 +111,7 @@ export function FriendActionButton({ status, busy, onAdd, onCancel, onOpenReques
   if (status === 'friends') {
     return (
       <View style={[styles.action, styles.actionFriends]} accessibilityRole="text">
-        <Text style={[styles.actionText, { color: chatColors.green }]}>Amigos</Text>
+        <Text style={[styles.actionText, { color: C.green }]}>Amigos</Text>
       </View>
     );
   }
@@ -139,7 +143,7 @@ export function FriendActionButton({ status, busy, onAdd, onCancel, onOpenReques
         accessibilityLabel="Te envió una solicitud. Ver para aceptar o rechazar"
         style={({ pressed }) => [styles.action, styles.actionFriends, pressed && { opacity: 0.8 }]}
       >
-        <Text style={[styles.actionText, { color: chatColors.green }]}>Responder</Text>
+        <Text style={[styles.actionText, { color: C.green }]}>Responder</Text>
       </Pressable>
     );
   }
@@ -157,7 +161,7 @@ export function FriendActionButton({ status, busy, onAdd, onCancel, onOpenReques
         pressed && { opacity: 0.8 },
       ]}
     >
-      <Text style={[styles.actionText, { color: chatColors.green }]}>Agregar</Text>
+      <Text style={[styles.actionText, { color: C.green }]}>Agregar</Text>
     </Pressable>
   );
 }
@@ -165,10 +169,10 @@ export function FriendActionButton({ status, busy, onAdd, onCancel, onOpenReques
 const styles = StyleSheet.create({
   card: {
     padding: 12,
-    borderRadius: dsRadius.lg,
-    backgroundColor: chatColors.card,
+    borderRadius: R.row,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.cardBorder,
+    borderColor: C.hairline,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   identity: { flex: 1, minWidth: 0 },
@@ -178,29 +182,29 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor: chatColors.avatarNeutralBg,
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1,
-    borderColor: chatColors.avatarNeutralBorder,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   avatarGreen: {
-    backgroundColor: chatColors.avatarGreenBg,
+    backgroundColor: C.shieldBg,
     borderColor: 'rgba(90,224,106,0.2)',
   },
   avatarImg: { width: '100%', height: '100%' },
-  initial: { color: 'rgba(255,255,255,0.75)', fontSize: 16, fontWeight: '800' },
-  initialGreen: { color: chatColors.green },
+  initial: { color: 'rgba(255,255,255,0.75)', fontSize: 16, fontFamily: F.extraBold },
+  initialGreen: { color: C.green },
 
   texts: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  name: { color: chatColors.textPrimary, fontSize: 14.5, fontWeight: '800', flexShrink: 1 },
+  name: { color: C.textPrimary, fontSize: 14.5, fontFamily: F.extraBold, flexShrink: 1 },
   line: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
 
   badge: {
@@ -209,7 +213,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#181C18',
     borderWidth: 1,
-    borderColor: chatColors.border,
+    borderColor: C.border,
   },
   badgeAccent: {
     backgroundColor: 'rgba(90,224,106,0.14)',
@@ -218,10 +222,10 @@ const styles = StyleSheet.create({
   badgeText: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 9,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.5,
   },
-  badgeTextAccent: { color: chatColors.green },
+  badgeTextAccent: { color: C.green },
 
   action: {
     minHeight: 36,
@@ -231,10 +235,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   actionAdd: { borderColor: 'rgba(90,224,106,0.45)' },
-  actionSent: { backgroundColor: chatColors.sendIdle, borderColor: 'transparent' },
+  actionSent: { backgroundColor: C.sendIdle, borderColor: 'transparent' },
   actionFriends: {
     backgroundColor: 'rgba(90,224,106,0.14)',
     borderColor: 'rgba(90,224,106,0.4)',
   },
-  actionText: { fontSize: 12, fontWeight: '800' },
+  actionText: { fontSize: 12, fontFamily: F.extraBold },
 });

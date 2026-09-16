@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
 import { ArrowRight, RefreshCw, TriangleAlert } from 'lucide-react-native';
 
-import { chatColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
 import { filasDeComparacion, mensajeDeEspera } from '../../utils/cambioPartido';
 
@@ -51,7 +55,7 @@ export default function CambioPartidoCard({
   return (
     <View style={styles.card}>
       <View style={styles.head}>
-        <RefreshCw color={chatColors.neon} size={15} strokeWidth={2.2} />
+        <RefreshCw color={C.neon} size={15} strokeWidth={2.2} />
         <Text style={styles.titulo} numberOfLines={2}>
           {acciones?.esMiSolicitud ? 'Pediste un cambio' : `${club} pide un cambio`}
         </Text>
@@ -80,14 +84,14 @@ export default function CambioPartidoCard({
 
       {!!error && (
         <View style={styles.errorBox}>
-          <TriangleAlert color={chatColors.warn} size={13} strokeWidth={2.2} />
+          <TriangleAlert color={C.amber} size={13} strokeWidth={2.2} />
           <Text style={styles.errorTxt}>{error}</Text>
         </View>
       )}
 
       {ocupado ? (
         <View style={styles.cargando}>
-          <ActivityIndicator size="small" color={chatColors.neon} />
+          <ActivityIndicator size="small" color={C.neon} />
           <Text style={styles.hint}>Enviando la respuesta…</Text>
         </View>
       ) : puedeResponder ? (
@@ -188,10 +192,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     padding: 12,
     gap: 8,
-    borderRadius: dsRadius.lg,
-    backgroundColor: chatColors.cardChallenge,
+    borderRadius: R.row,
+    backgroundColor: C.cardChallenge,
     borderWidth: 1,
-    borderColor: chatColors.challengeBorder,
+    borderColor: C.challengeBorder,
     // En web, sin tope, la tarjeta se estira hasta dejar el «actual → nuevo»
     // separado por medio monitor.
     maxWidth: 560,
@@ -201,9 +205,9 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   titulo: {
     flex: 1,
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   aviso: { color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 16 },
@@ -213,7 +217,7 @@ const styles = StyleSheet.create({
   etiqueta: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: F.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -223,39 +227,39 @@ const styles = StyleSheet.create({
   antes: {
     color: 'rgba(255,255,255,0.55)',
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
     textDecorationLine: 'line-through',
     flexShrink: 1,
   },
-  despues: { color: chatColors.textPrimary, fontSize: 14, fontWeight: '800', flexShrink: 1 },
+  despues: { color: C.textPrimary, fontSize: 14, fontFamily: F.extraBold, flexShrink: 1 },
 
   errorBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 6,
     padding: 8,
-    borderRadius: dsRadius.chip,
-    backgroundColor: chatColors.warnSoft,
+    borderRadius: R.chip,
+    backgroundColor: C.amberSoft,
   },
-  errorTxt: { flex: 1, color: chatColors.warn, fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  errorTxt: { flex: 1, color: C.amber, fontSize: 12, lineHeight: 16, fontFamily: F.semiBold },
 
   cargando: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 
   label: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: F.bold,
     marginTop: 2,
   },
   input: {
     minHeight: 60,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     paddingHorizontal: 10,
     paddingVertical: 8,
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
     textAlignVertical: 'top',
   },
@@ -265,7 +269,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: dsRadius.lg,
+    borderRadius: R.row,
     // El fondo es el acento del club: sale por estilo en línea en el JSX.
     paddingHorizontal: 12,
   },
@@ -273,21 +277,21 @@ const styles = StyleSheet.create({
   btnTxt: {
     // La tinta es el acento del club: sale por estilo en línea en el JSX.
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   btnGhost: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: chatColors.challengeBorder,
+    borderColor: C.challengeBorder,
   },
   btnGhostTxt: {
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   pressed: { opacity: 0.85 },
 
-  hint: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  hint: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16, fontFamily: F.medium },
 });

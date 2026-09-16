@@ -37,7 +37,6 @@ const RAIZ = path.resolve(__dirname, '../..');
 
 /** Las familias de color que el rediseño unifica. Sin radios ni tipografías. */
 const FAMILIAS = [
-  'chatColors',
   'tactical',
   'partidos',
   'clubsExplorer',
@@ -135,7 +134,6 @@ test('el recorrido del código toca las familias que quedan, no solo una', () =>
  * exactamente la deuda que estas pruebas cierran.
  */
 const VERDE_DE = {
-  chatColors: 'green',
   tactical: 'neon',
   partidos: 'green',
   clubsExplorer: 'green',
@@ -143,7 +141,6 @@ const VERDE_DE = {
 };
 
 const FONDO_DE = {
-  chatColors: 'background',
   tactical: 'bg',
   partidos: 'bg',
   clubsExplorer: 'bg',
@@ -174,12 +171,13 @@ test('todas las familias comparten el mismo fondo de página', () => {
 });
 
 test('los cinco rojos de la app son uno solo', () => {
-  // Existían con cinco valores distintos en cinco familias: `colors.error`,
-  // `clubColors.loss`, `partidos.coral`, `chatColors.danger` y `reservas.red`.
+  // Existían con cinco valores distintos en cinco familias: `colors.error`
+  // (#E5484D), `clubColors.loss` y `partidos.coral` (#E8737B),
+  // `chatColors.danger` (#FF7A6B) y `reservas.red` (#ED6B76). Las familias se
+  // van borrando a medida que su módulo migra, así que esta lista ENCOGE: lo
+  // que no puede pasar es que alguna de las que quedan se desvíe.
   const esperado = tema.reservas.red;
-  assert.equal(tema.chatColors.loss, esperado);
   assert.equal(tema.partidos.coral, esperado);
-  assert.equal(tema.chatColors.danger, esperado);
   assert.equal(tema.tactical.danger, esperado);
 });
 

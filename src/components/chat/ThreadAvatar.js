@@ -3,7 +3,10 @@ import { View, Text, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Shield, Video, Swords } from 'lucide-react-native';
 
-import { chatColors } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { initialOf } from '../../utils/chatMeta';
 
 /**
@@ -33,12 +36,12 @@ export default function ThreadAvatar({ type, fotoUrl, name, size = 46, radius = 
   if (type === 'club') {
     return (
       <LinearGradient
-        colors={chatColors.clubShield}
+        colors={C.clubShield}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.9, y: 1 }}
         style={[styles.base, box, styles.clubShield]}
       >
-        <Shield color={chatColors.inkOnGreen} size={iconSize} strokeWidth={2.2} />
+        <Shield color={C.greenInk} size={iconSize} strokeWidth={2.2} />
       </LinearGradient>
     );
   }
@@ -46,7 +49,7 @@ export default function ThreadAvatar({ type, fotoUrl, name, size = 46, radius = 
   if (type === 'challenge') {
     return (
       <LinearGradient
-        colors={chatColors.challengeShield}
+        colors={C.challengeShield}
         start={{ x: 0.1, y: 0 }}
         end={{ x: 0.9, y: 1 }}
         style={[styles.base, box, styles.challengeShield]}
@@ -59,7 +62,7 @@ export default function ThreadAvatar({ type, fotoUrl, name, size = 46, radius = 
   if (type === 'match') {
     return (
       <View style={[styles.base, box, styles.green]}>
-        <Video color={chatColors.green} size={iconSize} strokeWidth={1.7} />
+        <Video color={C.green} size={iconSize} strokeWidth={1.7} />
       </View>
     );
   }
@@ -82,26 +85,26 @@ const styles = StyleSheet.create({
   },
   img: { width: '100%', height: '100%' },
   green: {
-    backgroundColor: chatColors.avatarGreenBg,
-    borderColor: chatColors.avatarGreenBorder,
+    backgroundColor: C.shieldBg,
+    borderColor: C.greenDeepBorder,
   },
   neutral: {
-    backgroundColor: chatColors.avatarNeutralBg,
-    borderColor: chatColors.avatarNeutralBorder,
+    backgroundColor: C.surfaceAlt,
+    borderColor: C.border,
   },
   clubShield: {
     borderColor: 'rgba(90,224,106,0.5)',
-    shadowColor: chatColors.green,
+    shadowColor: C.green,
     shadowOpacity: 0.22,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
   },
   challengeShield: {
-    borderColor: chatColors.neonBorder,
-    shadowColor: chatColors.neon,
+    borderColor: C.neonBorder,
+    shadowColor: C.neon,
     shadowOpacity: 0.22,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
   },
-  initial: { color: chatColors.green, fontWeight: '800' },
+  initial: { color: C.green, fontFamily: F.extraBold },
 });

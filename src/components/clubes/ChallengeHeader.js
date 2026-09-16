@@ -2,7 +2,11 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Swords, Clock, TriangleAlert } from 'lucide-react-native';
 
-import { chatColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
 import { estadoLabel, esEstadoCerrado } from '../../services/clubChallengeRules';
 import { challengeCountdown } from '../../utils/challengeThread';
@@ -16,7 +20,7 @@ import { challengeCountdown } from '../../utils/challengeThread';
  * negociación. `ahora` entra por parámetro para que la pantalla decida cada
  * cuánto refrescarlo y para poder probar el cálculo sin congelar el reloj.
  *
- * Usa `chatColors` (que ya extiende `dsColors`) porque vive dentro del
+ * Usa la paleta única (`reservas`) porque vive dentro del
  * módulo de chat, no en una pantalla de Clubes: mezclar las dos familias en
  * la misma vista se vería como dos verdes distintos.
  *
@@ -66,7 +70,7 @@ export default function ChallengeHeader({
     <View style={[styles.bar, cerrado && styles.barCerrado]}>
       <View style={styles.row}>
         <Swords
-          color={cerrado ? 'rgba(255,255,255,0.4)' : chatColors.neon}
+          color={cerrado ? 'rgba(255,255,255,0.4)' : C.neon}
           size={16}
           strokeWidth={2.2}
         />
@@ -77,7 +81,7 @@ export default function ChallengeHeader({
         {cuenta && (
           <View style={[styles.plazo, cuenta.vencido && styles.plazoVencido]}>
             {cuenta.vencido ? (
-              <TriangleAlert color={chatColors.warn} size={12} strokeWidth={2.2} />
+              <TriangleAlert color={C.amber} size={12} strokeWidth={2.2} />
             ) : (
               <Clock color="rgba(255,255,255,0.55)" size={12} strokeWidth={2} />
             )}
@@ -159,21 +163,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     gap: 8,
-    backgroundColor: chatColors.cardChallenge,
+    backgroundColor: C.cardChallenge,
     borderTopWidth: 1,
-    borderTopColor: chatColors.challengeBorder,
+    borderTopColor: C.challengeBorder,
   },
   barCerrado: {
-    backgroundColor: chatColors.composerBar,
+    backgroundColor: C.composerBar,
     borderTopColor: 'rgba(255,255,255,0.07)',
   },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   estado: {
     flex: 1,
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
 
@@ -183,38 +187,38 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 3,
     paddingHorizontal: 8,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  plazoVencido: { backgroundColor: chatColors.warnSoft },
+  plazoVencido: { backgroundColor: C.amberSoft },
   plazoText: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: F.bold,
     includeFontPadding: false,
   },
-  plazoTextVencido: { color: chatColors.warn },
+  plazoTextVencido: { color: C.amber },
 
   cta: {
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: dsRadius.lg,
+    borderRadius: R.row,
     // El fondo es el acento del club: sale por estilo en línea en el JSX.
     paddingHorizontal: 14,
   },
   ctaText: {
     // La tinta es el acento del club: sale por estilo en línea en el JSX.
     fontSize: 14,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   ctaOcupado: { opacity: 0.6 },
 
   pregunta: {
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
     includeFontPadding: false,
   },
   dosBotones: { flexDirection: 'row', gap: 8 },
@@ -224,14 +228,14 @@ const styles = StyleSheet.create({
   ctaNo: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: chatColors.challengeBorder,
+    borderColor: C.challengeBorder,
   },
-  ctaTextNo: { color: chatColors.textPrimary },
+  ctaTextNo: { color: C.textPrimary },
 
   hint: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
 });

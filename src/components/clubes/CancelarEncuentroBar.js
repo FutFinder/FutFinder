@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
 import { CalendarX, TriangleAlert, ShieldAlert } from 'lucide-react-native';
 
-import { chatColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import {
   MOTIVO_MAX,
   avisoDeCancelacion,
@@ -61,7 +65,7 @@ export default function CancelarEncuentroBar({
     <View style={styles.bar}>
       {!!sancion && (
         <View style={styles.sancionBox}>
-          <ShieldAlert color={chatColors.warn} size={13} strokeWidth={2.2} />
+          <ShieldAlert color={C.amber} size={13} strokeWidth={2.2} />
           <Text style={styles.sancionTxt} numberOfLines={3}>
             {textoDeSancion(sancion)}
           </Text>
@@ -83,7 +87,7 @@ export default function CancelarEncuentroBar({
           accessibilityLabel="Cancelar el encuentro"
           style={({ pressed }) => [styles.row, styles.tocable, pressed && styles.pressed]}
         >
-          <CalendarX color={chatColors.warn} size={15} strokeWidth={2.2} />
+          <CalendarX color={C.amber} size={15} strokeWidth={2.2} />
           <Text style={styles.accionTxt}>Cancelar encuentro</Text>
           {aviso.sanciona && <Text style={styles.chip}>sanciona</Text>}
         </Pressable>
@@ -91,7 +95,7 @@ export default function CancelarEncuentroBar({
         <>
           <View style={[styles.avisoBox, aviso.sanciona && styles.avisoBoxGrave]}>
             <TriangleAlert
-              color={aviso.sanciona ? chatColors.warn : 'rgba(255,255,255,0.55)'}
+              color={aviso.sanciona ? C.amber : 'rgba(255,255,255,0.55)'}
               size={13}
               strokeWidth={2.2}
             />
@@ -118,14 +122,14 @@ export default function CancelarEncuentroBar({
 
           {!!error && (
             <View style={styles.errorBox}>
-              <TriangleAlert color={chatColors.warn} size={13} strokeWidth={2.2} />
+              <TriangleAlert color={C.amber} size={13} strokeWidth={2.2} />
               <Text style={styles.errorTxt}>{error}</Text>
             </View>
           )}
 
           {ocupado ? (
             <View style={styles.cargando}>
-              <ActivityIndicator size="small" color={chatColors.warn} />
+              <ActivityIndicator size="small" color={C.amber} />
               <Text style={styles.hint}>Cancelando el encuentro…</Text>
             </View>
           ) : (
@@ -177,7 +181,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     gap: 8,
-    backgroundColor: chatColors.composerBar,
+    backgroundColor: C.composerBar,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.07)',
   },
@@ -187,23 +191,23 @@ const styles = StyleSheet.create({
 
   accionTxt: {
     flex: 1,
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   // Se avisa YA en el botón, sin abrir nada: quien llega con el partido encima
   // merece saber lo que va a costarle antes de tocarlo.
   chip: {
-    color: chatColors.warn,
+    color: C.amber,
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: dsRadius.chip,
-    backgroundColor: chatColors.warnSoft,
+    borderRadius: R.chip,
+    backgroundColor: C.amberSoft,
     overflow: 'hidden',
   },
 
@@ -212,35 +216,35 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 6,
     padding: 8,
-    borderRadius: dsRadius.chip,
-    backgroundColor: chatColors.warnSoft,
+    borderRadius: R.chip,
+    backgroundColor: C.amberSoft,
   },
-  sancionTxt: { flex: 1, color: chatColors.warn, fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  sancionTxt: { flex: 1, color: C.amber, fontSize: 12, lineHeight: 16, fontFamily: F.bold },
 
   avisoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 6,
     padding: 8,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  avisoBoxGrave: { backgroundColor: chatColors.warnSoft },
+  avisoBoxGrave: { backgroundColor: C.amberSoft },
   avisoTexto: { flex: 1, gap: 2 },
-  avisoTitulo: { color: chatColors.textPrimary, fontSize: 12, fontWeight: '800' },
-  avisoTituloGrave: { color: chatColors.warn },
+  avisoTitulo: { color: C.textPrimary, fontSize: 12, fontFamily: F.extraBold },
+  avisoTituloGrave: { color: C.amber },
   avisoDetalle: { color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 16 },
 
-  label: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '700' },
+  label: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: F.bold },
   input: {
     minHeight: 60,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     paddingHorizontal: 10,
     paddingVertical: 8,
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
     textAlignVertical: 'top',
   },
@@ -250,10 +254,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 6,
     padding: 8,
-    borderRadius: dsRadius.chip,
-    backgroundColor: chatColors.warnSoft,
+    borderRadius: R.chip,
+    backgroundColor: C.amberSoft,
   },
-  errorTxt: { flex: 1, color: chatColors.warn, fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  errorTxt: { flex: 1, color: C.amber, fontSize: 12, lineHeight: 16, fontFamily: F.semiBold },
 
   cargando: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 
@@ -262,28 +266,28 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: dsRadius.lg,
+    borderRadius: R.row,
     paddingHorizontal: 12,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: chatColors.challengeBorder,
+    borderColor: C.challengeBorder,
   },
   btnMitad: { flex: 1 },
   btnTxt: {
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   // Cancelar no se ve como el resto de las acciones: termina el encuentro.
-  btnGrave: { borderColor: chatColors.warn },
+  btnGrave: { borderColor: C.amber },
   btnGraveTxt: {
-    color: chatColors.warn,
+    color: C.amber,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   btnInactivo: { opacity: 0.45 },
 
-  hint: { flex: 1, color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  hint: { flex: 1, color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16, fontFamily: F.medium },
 });

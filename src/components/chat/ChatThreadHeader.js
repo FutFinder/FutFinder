@@ -4,7 +4,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, ChevronRight, EllipsisVertical, BellOff } from 'lucide-react-native';
 
 import ThreadAvatar from './ThreadAvatar';
-import { chatColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Cabecera de la conversación.
@@ -47,7 +51,7 @@ export default function ChatThreadHeader({
         accessibilityLabel="Volver"
         style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
       >
-        <ArrowLeft color={chatColors.textPrimary} size={22} strokeWidth={2.1} />
+        <ArrowLeft color={C.textPrimary} size={22} strokeWidth={2.1} />
       </Pressable>
 
       <Pressable
@@ -87,7 +91,7 @@ export default function ChatThreadHeader({
                 : subtitle}
             </Text>
             {!reconnecting && (
-              <ChevronRight color={chatColors.green} size={11} strokeWidth={2.4} />
+              <ChevronRight color={C.green} size={11} strokeWidth={2.4} />
             )}
           </View>
         </View>
@@ -117,7 +121,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  barPlain: { borderBottomColor: chatColors.cardBorder },
+  barPlain: { borderBottomColor: C.hairline },
   barClub: { borderBottomColor: 'rgba(90,224,106,0.26)' },
 
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -126,27 +130,27 @@ const styles = StyleSheet.create({
   texts: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: {
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     flexShrink: 1,
   },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   subtitle: {
-    color: chatColors.green,
+    color: C.green,
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: F.bold,
     flexShrink: 1,
   },
-  subtitleWarn: { color: chatColors.warn },
+  subtitleWarn: { color: C.amber },
 
   menuBtn: {
     width: 36,
     height: 36,
-    borderRadius: dsRadius.sm,
-    backgroundColor: chatColors.surface,
+    borderRadius: R.chip,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.borderSoft,
+    borderColor: C.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

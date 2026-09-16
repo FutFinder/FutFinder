@@ -13,7 +13,11 @@ import { ArrowLeft, Bell, BellOff, Info } from 'lucide-react-native';
 
 import ThreadAvatar from '../components/chat/ThreadAvatar';
 import PersonRow from '../components/chat/PersonRow';
-import { chatColors, dsSizes } from '../theme/colors';
+import {
+  reservas as C,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../theme/colors';
 import {
   parseThreadKey,
   getThreadParticipants,
@@ -135,7 +139,7 @@ export default function ChatDetailsScreen({ route, navigation }) {
             accessibilityLabel="Volver"
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           >
-            <ArrowLeft color={chatColors.textPrimary} size={22} strokeWidth={2.1} />
+            <ArrowLeft color={C.textPrimary} size={22} strokeWidth={2.1} />
           </Pressable>
           <Text style={styles.headerTitle} accessibilityRole="header">
             Detalles del chat
@@ -144,7 +148,7 @@ export default function ChatDetailsScreen({ route, navigation }) {
 
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={chatColors.green} />
+            <ActivityIndicator color={C.green} />
           </View>
         ) : denied ? (
           <View style={styles.loading}>
@@ -272,21 +276,21 @@ export default function ChatDetailsScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: chatColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingLeft: 6,
-    paddingRight: dsSizes.gutter,
+    paddingRight: S.screenPadding,
     paddingTop: 4,
     paddingBottom: 10,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: chatColors.textPrimary, fontSize: 17, fontWeight: '800' },
+  headerTitle: { color: C.textPrimary, fontSize: 17, fontFamily: F.extraBold },
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 30 },
-  deniedTitle: { color: chatColors.textPrimary, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  deniedTitle: { color: C.textPrimary, fontSize: 16, fontFamily: F.extraBold, textAlign: 'center' },
   deniedText: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 13,
@@ -294,7 +298,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  body: { paddingHorizontal: dsSizes.gutter, paddingBottom: 40, gap: 12 },
+  body: { paddingHorizontal: S.screenPadding, paddingBottom: 40, gap: 12 },
 
   identity: {
     flexDirection: 'row',
@@ -302,16 +306,16 @@ const styles = StyleSheet.create({
     gap: 13,
     padding: 16,
     borderRadius: 22,
-    backgroundColor: chatColors.cardClub,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.cardBorderClub,
+    borderColor: C.greenBorder,
   },
-  identityTitle: { color: chatColors.textPrimary, fontSize: 18, fontWeight: '800' },
+  identityTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold },
   identitySub: {
     marginTop: 3,
     color: 'rgba(255,255,255,0.5)',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
 
   settingRow: {
@@ -322,9 +326,9 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 64,
     borderRadius: 20,
-    backgroundColor: chatColors.card,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.cardBorder,
+    borderColor: C.hairline,
   },
   settingLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 11 },
   toggle: {
@@ -332,9 +336,9 @@ const styles = StyleSheet.create({
     height: 27,
     borderRadius: 14,
     padding: 3,
-    backgroundColor: chatColors.sendIdle,
+    backgroundColor: C.sendIdle,
     borderWidth: 1,
-    borderColor: chatColors.border,
+    borderColor: C.border,
     justifyContent: 'center',
   },
   toggleOn: {
@@ -348,13 +352,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.35)',
   },
-  knobOn: { backgroundColor: chatColors.green },
-  settingTitle: { color: chatColors.textPrimary, fontSize: 14, fontWeight: '700' },
+  knobOn: { backgroundColor: C.green },
+  settingTitle: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
   settingHint: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.45)',
     fontSize: 11.5,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
 
   sectionHead: {
@@ -366,10 +370,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: 0.8,
   },
-  sectionAction: { color: chatColors.green, fontSize: 11.5, fontWeight: '800' },
+  sectionAction: { color: C.green, fontSize: 11.5, fontFamily: F.extraBold },
 
   note: {
     flexDirection: 'row',
@@ -377,16 +381,16 @@ const styles = StyleSheet.create({
     marginTop: 6,
     padding: 14,
     borderRadius: 18,
-    backgroundColor: chatColors.card,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: chatColors.bubbleTheirsBorder,
+    borderColor: C.hairline,
   },
   noteText: {
     flex: 1,
     color: 'rgba(255,255,255,0.5)',
     fontSize: 11.5,
     lineHeight: 18,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
-  noteAccent: { color: chatColors.green, fontWeight: '800' },
+  noteAccent: { color: C.green, fontFamily: F.extraBold },
 });

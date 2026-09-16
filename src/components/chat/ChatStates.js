@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { MessageSquare, RotateCw, TriangleAlert, WifiOff, Video, UserPlus } from 'lucide-react-native';
 
-import { chatColors, dsRadius, dsSizes } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasSizes as S,
+  reservasFonts as F,
+} from '../../theme/colors';
 
 /**
  * Estados de sistema de la bandeja: cargando, vacía, error, sin conexión y
@@ -34,7 +39,7 @@ export function InboxSkeleton() {
         </View>
       ))}
       <View style={styles.skelFooter}>
-        <ActivityIndicator color={chatColors.green} size="small" />
+        <ActivityIndicator color={C.green} size="small" />
         <Text style={styles.skelFooterText}>Cargando conversaciones…</Text>
       </View>
     </View>
@@ -46,7 +51,7 @@ export function InboxEmpty({ onSearchPlayers, onSearchMatches }) {
   return (
     <View style={styles.centered}>
       <View style={styles.bigIcon}>
-        <MessageSquare color={chatColors.green} size={32} strokeWidth={1.6} />
+        <MessageSquare color={C.green} size={32} strokeWidth={1.6} />
       </View>
       <Text style={styles.bigTitle}>Aún no tienes conversaciones</Text>
       <Text style={styles.bigText}>
@@ -61,7 +66,7 @@ export function InboxEmpty({ onSearchPlayers, onSearchMatches }) {
           accessibilityLabel="Buscar jugadores"
           style={({ pressed }) => [styles.ctaPrimary, pressed && { opacity: 0.85 }]}
         >
-          <UserPlus color={chatColors.inkOnGreen} size={18} strokeWidth={2} />
+          <UserPlus color={C.greenInk} size={18} strokeWidth={2} />
           <Text style={styles.ctaPrimaryText}>Buscar jugadores</Text>
         </Pressable>
         <Pressable
@@ -70,7 +75,7 @@ export function InboxEmpty({ onSearchPlayers, onSearchMatches }) {
           accessibilityLabel="Buscar partidos"
           style={({ pressed }) => [styles.ctaOutline, pressed && { opacity: 0.8 }]}
         >
-          <Video color={chatColors.green} size={18} strokeWidth={1.9} />
+          <Video color={C.green} size={18} strokeWidth={1.9} />
           <Text style={styles.ctaOutlineText}>Buscar partidos</Text>
         </Pressable>
       </View>
@@ -83,7 +88,7 @@ export function InboxError({ code, onRetry }) {
   return (
     <View style={styles.centered}>
       <View style={[styles.bigIcon, styles.bigIconDanger]}>
-        <TriangleAlert color={chatColors.danger} size={30} strokeWidth={1.7} />
+        <TriangleAlert color={C.red} size={30} strokeWidth={1.7} />
       </View>
       <Text style={styles.bigTitle}>No pudimos cargar tus chats</Text>
       <Text style={styles.bigText}>Algo falló de nuestro lado. Tus mensajes están a salvo.</Text>
@@ -94,7 +99,7 @@ export function InboxError({ code, onRetry }) {
         accessibilityLabel="Reintentar la carga de conversaciones"
         style={({ pressed }) => [styles.ctaPrimary, styles.ctaStretch, pressed && { opacity: 0.85 }]}
       >
-        <RotateCw color={chatColors.inkOnGreen} size={18} strokeWidth={2.2} />
+        <RotateCw color={C.greenInk} size={18} strokeWidth={2.2} />
         <Text style={styles.ctaPrimaryText}>Reintentar</Text>
       </Pressable>
 
@@ -107,7 +112,7 @@ export function InboxError({ code, onRetry }) {
 export function OfflineBanner() {
   return (
     <View style={styles.offline} accessibilityRole="alert">
-      <WifiOff color={chatColors.warn} size={17} strokeWidth={1.9} />
+      <WifiOff color={C.amber} size={17} strokeWidth={1.9} />
       <View style={{ flex: 1 }}>
         <Text style={styles.offlineTitle}>Sin conexión</Text>
         <Text style={styles.offlineText}>Estás viendo los últimos mensajes guardados.</Text>
@@ -158,13 +163,13 @@ export function FilterEmpty({ filter, onExploreClubs }) {
 
 const styles = StyleSheet.create({
   // Cargando
-  skelWrap: { paddingHorizontal: dsSizes.gutter, gap: 8 },
+  skelWrap: { paddingHorizontal: S.screenPadding, gap: 8 },
   skelCard: {
     flexDirection: 'row',
     gap: 12,
     paddingVertical: 13,
     paddingHorizontal: 12,
-    borderRadius: dsRadius.xl,
+    borderRadius: R.cardSm,
     backgroundColor: '#0F110F',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
@@ -178,7 +183,7 @@ const styles = StyleSheet.create({
     gap: 9,
     marginTop: 22,
   },
-  skelFooterText: { color: 'rgba(255,255,255,0.4)', fontSize: 12.5, fontWeight: '700' },
+  skelFooterText: { color: 'rgba(255,255,255,0.4)', fontSize: 12.5, fontFamily: F.bold },
 
   // Estados grandes centrados
   centered: {
@@ -200,13 +205,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   bigIconDanger: {
-    backgroundColor: chatColors.dangerSoft,
-    borderColor: chatColors.dangerBorder,
+    backgroundColor: C.redSoft,
+    borderColor: C.redBorder,
   },
   bigTitle: {
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 19,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.3,
     textAlign: 'center',
   },
@@ -223,14 +228,14 @@ const styles = StyleSheet.create({
   ctaPrimary: {
     minHeight: 48,
     borderRadius: 24,
-    backgroundColor: chatColors.green,
+    backgroundColor: C.green,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 18,
   },
-  ctaPrimaryText: { color: chatColors.inkOnGreen, fontSize: 14, fontWeight: '800' },
+  ctaPrimaryText: { color: C.greenInk, fontSize: 14, fontFamily: F.extraBold },
   ctaOutline: {
     minHeight: 48,
     borderRadius: 24,
@@ -242,12 +247,12 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
   },
-  ctaOutlineText: { color: chatColors.green, fontSize: 14, fontWeight: '800' },
+  ctaOutlineText: { color: C.green, fontSize: 14, fontFamily: F.extraBold },
   errorCode: {
     marginTop: 16,
     color: 'rgba(255,255,255,0.32)',
     fontSize: 11.5,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
 
   // Sin conexión
@@ -255,7 +260,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    marginHorizontal: dsSizes.gutter,
+    marginHorizontal: S.screenPadding,
     marginBottom: 12,
     paddingVertical: 11,
     paddingHorizontal: 14,
@@ -264,12 +269,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,190,90,0.32)',
   },
-  offlineTitle: { color: chatColors.warn, fontSize: 12.5, fontWeight: '800' },
+  offlineTitle: { color: C.amber, fontSize: 12.5, fontFamily: F.extraBold },
   offlineText: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.5)',
     fontSize: 11.5,
-    fontWeight: '500',
+    fontFamily: F.medium,
   },
 
   // Filtro vacío
@@ -277,16 +282,16 @@ const styles = StyleSheet.create({
     marginTop: 34,
     marginHorizontal: 10,
     padding: 16,
-    borderRadius: dsRadius.lg,
+    borderRadius: R.row,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: chatColors.border,
+    borderColor: C.border,
     alignItems: 'center',
   },
   dashedTitle: {
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     textAlign: 'center',
   },
   dashedText: {
@@ -305,5 +310,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.45)',
   },
-  dashedBtnText: { color: chatColors.green, fontSize: 12.5, fontWeight: '800' },
+  dashedBtnText: { color: C.green, fontSize: 12.5, fontFamily: F.extraBold },
 });

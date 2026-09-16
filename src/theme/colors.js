@@ -16,8 +16,9 @@
 //
 // YA NO EXISTEN, todas borradas el 2026-09-16: `colors`, `radius`, `spacing` y
 // `fonts` (la paleta legada del fondo café #201F1D y el verde oliva #71B533,
-// con la tipografía del sistema), y `clubColors`/`clubRadius`/`clubSizes`.
-// Quedan `chatColors`, `tactical` y `partidos`.
+// con la tipografía del sistema), `clubColors`/`clubRadius`/`clubSizes`, y
+// `dsColors`/`dsRadius`/`dsSizes` con `chatColors`. Quedan `tactical` y
+// `partidos`.
 //
 // Ver `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 //
@@ -244,98 +245,6 @@ export const clubsExplorer = {
 };
 
 /**
- * Ya no la importa ninguna pantalla: Perfil migró el 2026-09-16 y Clubes
- * también. Sobrevive sin `export` como base de `chatColors`, que la extiende;
- * desaparece del todo cuando Chat migre.
- */
-const dsColors = {
-  background: reservas.bg,
-  surface: reservas.surface,
-  surfaceAlt: reservas.surfaceAlt,
-  surfaceHover: reservas.surfaceHover,
-
-  green: reservas.green,
-  greenDark: reservas.greenDark,
-  greenInk: reservas.greenInk,
-  greenSoft: reservas.greenSoft,
-  greenSoftStrong: reservas.greenSoftStrong,
-  greenBorder: reservas.greenBorder,
-  greenGlow: reservas.greenGlow,
-
-  bannerFrom: reservas.bannerFrom,
-  bannerMid: reservas.bannerMid,
-  bannerTo: reservas.bannerTo,
-
-  textPrimary: reservas.textPrimary,
-  textSecondary: reservas.textSecondary,
-  textMuted: reservas.textMuted,
-  textFaint: reservas.textFaint,
-
-  win: reservas.win,
-  winSoft: reservas.winSoft,
-  draw: reservas.draw,
-  drawSoft: reservas.drawSoft,
-  loss: reservas.loss,
-  lossSoft: reservas.lossSoft,
-
-  gold: reservas.gold,
-  goldSoft: reservas.goldSoft,
-
-  chip: reservas.chip,
-  chipStrong: reservas.chipStrong,
-  border: reservas.border,
-  borderSoft: reservas.borderSoft,
-  divider: reservas.divider,
-};
-
-/**
- * Chats y amigos, más las barras del hilo de desafío.
- *
- * Tenía cinco superficies de tarjeta separadas por cinco puntos de gris. Las
- * que de verdad se distinguen —normal, no leída, desafío— se conservan; las
- * que no, se colapsaron en la superficie base.
- */
-export const chatColors = {
-  ...dsColors,
-
-  card: reservas.surface,
-  cardUnread: reservas.cardUnread,
-  cardClub: reservas.surface,
-  composerBar: reservas.composerBar,
-  inputBg: reservas.surface,
-  sendIdle: reservas.sendIdle,
-
-  cardBorder: reservas.hairline,
-  cardBorderUnread: reservas.greenSoft,
-  cardBorderClub: reservas.greenBorder,
-
-  warn: reservas.amber,
-  warnSoft: reservas.amberSoft,
-  warnBorder: reservas.amberBorder,
-
-  danger: reservas.red,
-  dangerSoft: reservas.redSoft,
-  dangerBorder: reservas.redBorder,
-
-  neon: reservas.neon,
-  neonSoft: reservas.neonSoft,
-  neonBorder: reservas.neonBorder,
-  cardChallenge: reservas.cardChallenge,
-  challengeBorder: reservas.challengeBorder,
-  challengeShield: reservas.challengeShield,
-
-  clubShield: reservas.clubShield,
-  avatarGreenBg: reservas.shieldBg,
-  avatarGreenBorder: reservas.greenDeepBorder,
-  avatarNeutralBg: reservas.surfaceAlt,
-  avatarNeutralBorder: reservas.border,
-
-  bubbleTheirs: reservas.surface,
-  bubbleTheirsBorder: reservas.hairline,
-  inkOnGreen: reservas.greenInk,
-};
-
-/**
  * Inicio, Splash, Avisos y el wordmark.
  *
  * Era la excepción declarada: negro puro con verde flúor #00FF66, «más cancha
@@ -416,27 +325,6 @@ export const partidos = {
   hero: reservas.hero,
   heroNeutral: reservas.heroNeutral,
   avatar: reservas.avatar,
-};
-
-/** Radios, alturas y espaciados del rediseño de club. */
-export const dsRadius = {
-  chip: 9,
-  icon: 10,
-  sm: 12,
-  md: 14,
-  lg: 18,
-  xl: 20,
-  hero: 24,
-  sheet: 28,
-};
-
-export const dsSizes = {
-  gutter: 16, // margen lateral de la pantalla
-  iconBtn: 40, // botones cuadrados de la barra de club (con hitSlop → ≥44)
-  tapBtn: 44, // botones que ya cumplen el mínimo táctil sin hitSlop
-  actionBtn: 58, // botón "Crear desafío" y lupa
-  logo: 72,
-  rivalCard: 196,
 };
 
 export const partidosRadius = {

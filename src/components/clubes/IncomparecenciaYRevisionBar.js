@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
 import { UserX, Scale, TriangleAlert } from 'lucide-react-native';
 
-import { chatColors, dsRadius } from '../../theme/colors';
+import {
+  reservas as C,
+  reservasRadius as R,
+  reservasFonts as F,
+} from '../../theme/colors';
 import {
   MOTIVO_INCOMPARECENCIA_MAX,
   MOTIVO_REVISION_MAX,
@@ -80,7 +84,7 @@ export default function IncomparecenciaYRevisionBar({
             dijo ni por qué, y no tiene con qué pedir la revisión. */}
           {!!acusacion && (
             <View style={styles.row}>
-              <TriangleAlert color={chatColors.warn} size={15} strokeWidth={2.2} />
+              <TriangleAlert color={C.amber} size={15} strokeWidth={2.2} />
               <Text style={styles.hint} numberOfLines={4}>
                 {`El club rival informó que tu club no se presentó: «${acusacion.motivo}».`}
               </Text>
@@ -96,7 +100,7 @@ export default function IncomparecenciaYRevisionBar({
                 accessibilityLabel="Informar que el club rival no se presentó"
                 style={({ pressed }) => [styles.row, styles.tocable, pressed && styles.pressed]}
               >
-                <UserX color={chatColors.warn} size={15} strokeWidth={2.2} />
+                <UserX color={C.amber} size={15} strokeWidth={2.2} />
                 <Text style={styles.accionTxt}>Informar incomparecencia</Text>
               </Pressable>
             ) : (
@@ -120,7 +124,7 @@ export default function IncomparecenciaYRevisionBar({
                 accessibilityLabel="Solicitar una revisión de la medida"
                 style={({ pressed }) => [styles.row, styles.tocable, pressed && styles.pressed]}
               >
-                <Scale color={chatColors.textPrimary} size={15} strokeWidth={2.2} />
+                <Scale color={C.textPrimary} size={15} strokeWidth={2.2} />
                 <Text style={styles.accionTxt}>Solicitar revisión</Text>
               </Pressable>
             ) : (
@@ -136,7 +140,7 @@ export default function IncomparecenciaYRevisionBar({
       ) : (
         <>
           <View style={styles.avisoBox}>
-            <TriangleAlert color={chatColors.warn} size={13} strokeWidth={2.2} />
+            <TriangleAlert color={C.amber} size={13} strokeWidth={2.2} />
             <View style={styles.avisoTexto}>
               <Text style={styles.avisoTitulo}>
                 {esRevision ? 'Cuenta qué pasó' : 'Esto sanciona al club rival'}
@@ -167,14 +171,14 @@ export default function IncomparecenciaYRevisionBar({
 
           {!!error && (
             <View style={styles.errorBox}>
-              <TriangleAlert color={chatColors.warn} size={13} strokeWidth={2.2} />
+              <TriangleAlert color={C.amber} size={13} strokeWidth={2.2} />
               <Text style={styles.errorTxt}>{error}</Text>
             </View>
           )}
 
           {ocupado ? (
             <View style={styles.cargando}>
-              <ActivityIndicator size="small" color={chatColors.warn} />
+              <ActivityIndicator size="small" color={C.amber} />
               <Text style={styles.hint}>
                 {esRevision ? 'Enviando la revisión…' : 'Informando la incomparecencia…'}
               </Text>
@@ -227,7 +231,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     gap: 8,
-    backgroundColor: chatColors.composerBar,
+    backgroundColor: C.composerBar,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.07)',
   },
@@ -237,9 +241,9 @@ const styles = StyleSheet.create({
 
   accionTxt: {
     flex: 1,
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   hint: {
@@ -247,38 +251,38 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.55)',
     fontSize: 11.5,
     lineHeight: 15,
-    fontWeight: '600',
+    fontFamily: F.semiBold,
   },
 
   avisoBox: {
     flexDirection: 'row',
     gap: 8,
     padding: 10,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(245,196,81,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(245,196,81,0.26)',
   },
   avisoTexto: { flex: 1, gap: 2 },
-  avisoTitulo: { color: chatColors.warn, fontSize: 12, fontWeight: '800' },
-  avisoDetalle: { color: 'rgba(255,255,255,0.7)', fontSize: 11.5, lineHeight: 15, fontWeight: '600' },
+  avisoTitulo: { color: C.amber, fontSize: 12, fontFamily: F.extraBold },
+  avisoDetalle: { color: 'rgba(255,255,255,0.7)', fontSize: 11.5, lineHeight: 15, fontFamily: F.semiBold },
 
   input: {
     minHeight: 64,
     maxHeight: 140,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
     textAlignVertical: 'top',
   },
 
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  errorTxt: { flex: 1, color: chatColors.warn, fontSize: 11.5, fontWeight: '700' },
+  errorTxt: { flex: 1, color: C.amber, fontSize: 11.5, fontFamily: F.bold },
 
   cargando: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 
@@ -288,7 +292,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 14,
-    borderRadius: dsRadius.chip,
+    borderRadius: R.chip,
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
@@ -299,6 +303,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(245,196,81,0.4)',
   },
   btnInactivo: { opacity: 0.45 },
-  btnTxt: { color: chatColors.textPrimary, fontSize: 12.5, fontWeight: '800' },
-  btnGraveTxt: { color: chatColors.warn, fontSize: 12.5, fontWeight: '800' },
+  btnTxt: { color: C.textPrimary, fontSize: 12.5, fontFamily: F.extraBold },
+  btnGraveTxt: { color: C.amber, fontSize: 12.5, fontFamily: F.extraBold },
 });

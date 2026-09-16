@@ -45,7 +45,10 @@ import CancelarEncuentroBar from '../components/clubes/CancelarEncuentroBar';
 import IncomparecenciaYRevisionBar from '../components/clubes/IncomparecenciaYRevisionBar';
 import Banner from '../components/Banner';
 
-import { chatColors } from '../theme/colors';
+import {
+  reservas as C,
+  reservasFonts as F,
+} from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import {
   listThreadMessages,
@@ -1406,7 +1409,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         key: 'report',
         label: 'Reportar cuenta',
         destructive: true,
-        icon: <Flag color={chatColors.danger} size={17} strokeWidth={1.8} />,
+        icon: <Flag color={C.red} size={17} strokeWidth={1.8} />,
         onPress: () => setReportOpen(true),
       });
     }
@@ -1504,7 +1507,7 @@ export default function ChatThreadScreen({ route, navigation }) {
 
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={chatColors.green} />
+            <ActivityIndicator color={C.green} />
             <Text style={styles.loadingText}>Cargando mensajes…</Text>
           </View>
         ) : timeline.length === 0 ? (
@@ -1547,7 +1550,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                 {hasMore && <LoadEarlier loading={loadingEarlier} onPress={loadEarlier} />}
                 {context?.kind === 'match' && (
                   <ContextPill
-                    icon={<Video color={chatColors.green} size={13} strokeWidth={2} />}
+                    icon={<Video color={C.green} size={13} strokeWidth={2} />}
                     label={`Chat del partido · ${context.confirmados} ${
                       context.confirmados === 1 ? 'confirmado' : 'confirmados'
                     }`}
@@ -1598,7 +1601,7 @@ export default function ChatThreadScreen({ route, navigation }) {
               accessibilityLabel="Calificar el partido"
               style={({ pressed }) => [styles.endedBtn, pressed && { opacity: 0.8 }]}
             >
-              <Star color={chatColors.green} size={16} fill={chatColors.green} />
+              <Star color={C.green} size={16} fill={C.green} />
               <Text style={styles.endedBtnText}>Calificar</Text>
             </Pressable>
             <Pressable
@@ -1608,7 +1611,7 @@ export default function ChatThreadScreen({ route, navigation }) {
               accessibilityLabel="Confirmar asistencia con GPS"
               style={({ pressed }) => [styles.endedBtn, pressed && { opacity: 0.8 }]}
             >
-              <MapPin color={chatColors.green} size={16} />
+              <MapPin color={C.green} size={16} />
               <Text style={styles.endedBtnText}>GPS</Text>
             </Pressable>
             <Pressable
@@ -1618,7 +1621,7 @@ export default function ChatThreadScreen({ route, navigation }) {
               accessibilityLabel="Eliminar esta conversación"
               style={({ pressed }) => [styles.endedBtnDanger, pressed && { opacity: 0.75 }]}
             >
-              <Trash2 color={chatColors.danger} size={16} />
+              <Trash2 color={C.red} size={16} />
               <Text style={styles.endedBtnDangerText}>Eliminar</Text>
             </Pressable>
           </View>
@@ -1657,7 +1660,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                 accessibilityLabel="Pedir un cambio de hora, cancha o cuota del partido"
                 style={({ pressed }) => [styles.cambioBar, pressed && { opacity: 0.85 }]}
               >
-                <RefreshCw color={chatColors.neon} size={16} strokeWidth={2.2} />
+                <RefreshCw color={C.neon} size={16} strokeWidth={2.2} />
                 <Text style={styles.cambioBarText}>Pedir un cambio del partido</Text>
               </Pressable>
             )}
@@ -1749,20 +1752,20 @@ export default function ChatThreadScreen({ route, navigation }) {
               onEmojiSelected={handleEmojiSelected}
               theme={{
                 backdrop: 'rgba(0,0,0,0.55)',
-                knob: chatColors.green,
-                container: chatColors.surface,
-                header: chatColors.textPrimary,
+                knob: C.green,
+                container: C.surface,
+                header: C.textPrimary,
                 category: {
-                  icon: chatColors.textMuted,
-                  iconActive: chatColors.green,
-                  container: chatColors.surfaceAlt,
-                  containerActive: chatColors.greenSoft,
+                  icon: C.textMuted,
+                  iconActive: C.green,
+                  container: C.surfaceAlt,
+                  containerActive: C.greenSoft,
                 },
                 search: {
-                  background: chatColors.surfaceAlt,
-                  placeholder: chatColors.textMuted,
-                  text: chatColors.textPrimary,
-                  icon: chatColors.textMuted,
+                  background: C.surfaceAlt,
+                  placeholder: C.textMuted,
+                  text: C.textPrimary,
+                  icon: C.textMuted,
                 },
               }}
             />
@@ -1789,13 +1792,13 @@ export default function ChatThreadScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: chatColors.background },
+  root: { flex: 1, backgroundColor: C.bg },
   bannerWrap: { paddingHorizontal: 14, paddingTop: 10 },
 
   list: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: chatColors.textSecondary, fontSize: 13 },
+  loadingText: { color: C.textSecondary, fontSize: 13 },
 
   challengeBar: {
     flexDirection: 'row',
@@ -1823,16 +1826,16 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: chatColors.challengeBorder,
+    borderColor: C.challengeBorder,
     backgroundColor: 'transparent',
     maxWidth: 560,
     width: '100%',
     alignSelf: 'center',
   },
   cambioBarText: {
-    color: chatColors.textPrimary,
+    color: C.textPrimary,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     includeFontPadding: false,
   },
   cambioHint: {
@@ -1843,9 +1846,9 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: 'center',
   },
-  challengeBarText: { color: chatColors.green, fontSize: 14, fontWeight: '800' },
-  challengeBarCreate: { backgroundColor: chatColors.green, borderColor: chatColors.green },
-  challengeBarCreateText: { color: chatColors.inkOnGreen, fontSize: 14, fontWeight: '800' },
+  challengeBarText: { color: C.green, fontSize: 14, fontFamily: F.extraBold },
+  challengeBarCreate: { backgroundColor: C.green, borderColor: C.green },
+  challengeBarCreateText: { color: C.greenInk, fontSize: 14, fontFamily: F.extraBold },
 
   endedBar: {
     flexDirection: 'row',
@@ -1854,9 +1857,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: Platform.OS === 'ios' ? 10 : 16,
-    backgroundColor: chatColors.composerBar,
+    backgroundColor: C.composerBar,
     borderTopWidth: 1,
-    borderTopColor: chatColors.cardBorder,
+    borderTopColor: C.hairline,
   },
   endedBtn: {
     flex: 1,
@@ -1867,11 +1870,11 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: 10,
     borderRadius: 23,
-    backgroundColor: chatColors.card,
+    backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: 'rgba(90,224,106,0.35)',
   },
-  endedBtnText: { color: chatColors.textPrimary, fontSize: 13, fontWeight: '800' },
+  endedBtnText: { color: C.textPrimary, fontSize: 13, fontFamily: F.extraBold },
   endedBtnDanger: {
     flex: 1.1,
     flexDirection: 'row',
@@ -1881,9 +1884,9 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: 10,
     borderRadius: 23,
-    backgroundColor: chatColors.dangerSoft,
+    backgroundColor: C.redSoft,
     borderWidth: 1,
-    borderColor: chatColors.dangerBorder,
+    borderColor: C.redBorder,
   },
-  endedBtnDangerText: { color: chatColors.danger, fontSize: 13, fontWeight: '800' },
+  endedBtnDangerText: { color: C.red, fontSize: 13, fontFamily: F.extraBold },
 });
