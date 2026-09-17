@@ -1228,7 +1228,7 @@ const styles = StyleSheet.create({
     borderRadius: R.row,
     borderWidth: 1,
     borderColor: C.loss,
-    backgroundColor: 'rgba(232, 115, 123, 0.1)',
+    backgroundColor: 'rgba(237,107,118, 0.1)',
   },
   leaveText: {
     color: C.loss,

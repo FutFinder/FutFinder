@@ -31,7 +31,7 @@ export default function TacticalHeader({
       </View>
 
       <View className="mt-5">
-        <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00FF66]/75">{greeting}</Text>
+        <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-verde/75">{greeting}</Text>
         <Text className="mt-1 text-[30px] font-extrabold tracking-tight text-white">¡Hola, {userName}!</Text>
         <View className="mt-1.5 flex-row items-center gap-1.5">
           <MapPin size={12} color="rgba(255,255,255,0.5)" />
@@ -41,9 +41,9 @@ export default function TacticalHeader({
 
       <View className="mt-4 flex-row flex-wrap gap-2">
         {verified ? (
-          <View className="flex-row items-center gap-1.5 rounded-full border border-[#00FF66]/40 bg-[#00FF66]/14 px-2.5 py-1">
+          <View className="flex-row items-center gap-1.5 rounded-full border border-verde/40 bg-verde/14 px-2.5 py-1">
             <ShieldCheck size={13} color={C.green} />
-            <Text className="text-[10.5px] font-bold tracking-[0.15em] text-[#00FF66]">VERIFICADO</Text>
+            <Text className="text-[10.5px] font-bold tracking-[0.15em] text-verde">VERIFICADO</Text>
           </View>
         ) : null}
         {typeof trustScore === 'number' ? <StatusPill tone="neutral" label={`TRUST ${trustScore}`} /> : null}

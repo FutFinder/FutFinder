@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MapPin, ChevronRight, Crown } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubTonos, clubSuperficies } from '../../theme/colors';
+import { clubTonos, clubSuperficies, reservasFonts as F } from '../../theme/colors';
 import ClubLogo from './ClubLogo';
 import VerifiedBadge from './VerifiedBadge';
 
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   identidad: { flexDirection: 'row', gap: 12, padding: 14 },
   identidadTextos: { flex: 1, minWidth: 0, gap: 5 },
   nombreFila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  nombre: { flexShrink: 1, fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
+  nombre: { flexShrink: 1, fontSize: 17, fontFamily: F.extraBold, color: '#FFFFFF' },
   comunaFila: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   comuna: { fontSize: 12, color: 'rgba(255, 255, 255, 0.4)' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
-  chipTexto: { fontSize: 11, fontWeight: '700', color: 'rgba(255, 255, 255, 0.7)' },
+  chipTexto: { fontSize: 11, fontFamily: F.bold, color: 'rgba(255, 255, 255, 0.7)' },
   stats: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 14 },
   statTile: {
     flex: 1,
@@ -177,11 +177,11 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: 'rgba(255, 255, 255, 0.045)',
   },
-  statValor: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
+  statValor: { fontSize: 17, fontFamily: F.extraBold, color: '#FFFFFF' },
   statVacio: { fontSize: 13, color: 'rgba(255, 255, 255, 0.45)' },
   statRotulo: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.5,
     color: 'rgba(255, 255, 255, 0.4)',
   },
@@ -195,5 +195,5 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.07)',
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
-  verClubTexto: { fontSize: 13.5, fontWeight: '700', color: '#FFFFFF' },
+  verClubTexto: { fontSize: 13.5, fontFamily: F.bold, color: '#FFFFFF' },
 });

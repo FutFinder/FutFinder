@@ -401,7 +401,7 @@ export default function NotificationsScreen({ navigation }) {
                 <ArrowLeft size={16} color={C.textPrimary} strokeWidth={2.2} />
               </Pressable>
               <View>
-                <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#00FF66]/75">Centro de actividad</Text>
+                <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-verde/75">Centro de actividad</Text>
                 <Text className="mt-1 text-[30px] font-extrabold tracking-tight text-white">Avisos</Text>
               </View>
             </View>
@@ -422,7 +422,7 @@ export default function NotificationsScreen({ navigation }) {
               <Pressable
                 onPress={handleClearAll}
                 disabled={items.length === 0 || busyIds.has(CLEAR_ALL_ID)}
-                className="h-[34px] w-[34px] items-center justify-center rounded-xl border border-[#FF6B6B]/28 bg-[#FF6B6B]/10 active:opacity-70"
+                className="h-[34px] w-[34px] items-center justify-center rounded-xl border border-rojo/28 bg-rojo/10 active:opacity-70"
                 style={items.length === 0 || busyIds.has(CLEAR_ALL_ID) ? { opacity: 0.3 } : null}
               >
                 {busyIds.has(CLEAR_ALL_ID) ? (
@@ -451,7 +451,7 @@ export default function NotificationsScreen({ navigation }) {
           </View>
         ) : status === 'error' ? (
           <View className="flex-1 items-center justify-center gap-3 px-8">
-            <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-[#FF6B6B]/30 bg-[#FF6B6B]/8">
+            <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-rojo/30 bg-rojo/8">
               <ServerCrash size={21} color={C.red} strokeWidth={1.9} />
             </View>
             <Text className="text-[16px] font-bold text-white">No pudimos cargar tus avisos</Text>
@@ -460,9 +460,9 @@ export default function NotificationsScreen({ navigation }) {
             </Text>
             <Pressable
               onPress={handleRetry}
-              className="mt-1 h-11 items-center justify-center rounded-[13px] bg-[#00FF66] px-6 active:opacity-80"
+              className="mt-1 h-11 items-center justify-center rounded-[13px] bg-verde px-6 active:opacity-80"
             >
-              <Text className="text-[14px] font-bold text-[#04120A]">Reintentar</Text>
+              <Text className="text-[14px] font-bold text-verde-ink">Reintentar</Text>
             </Pressable>
           </View>
         ) : (
@@ -495,8 +495,8 @@ export default function NotificationsScreen({ navigation }) {
               />
             )}
             ListEmptyComponent={
-              <View className="mt-10 items-center gap-3 rounded-[20px] border border-dashed border-[#00FF66]/28 bg-[#00FF66]/5 px-5 py-7">
-                <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-[#00FF66]/30 bg-[#00FF66]/8">
+              <View className="mt-10 items-center gap-3 rounded-[20px] border border-dashed border-verde/28 bg-verde/5 px-5 py-7">
+                <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-verde/30 bg-verde/8">
                   <BellOff size={21} color={C.green} strokeWidth={1.9} />
                 </View>
                 <Text className="text-[16px] font-bold text-white">Todo al día</Text>

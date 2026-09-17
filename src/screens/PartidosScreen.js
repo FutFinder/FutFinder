@@ -989,7 +989,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerBtnActive: { backgroundColor: 'rgba(90,224,106,0.13)', borderColor: C.greenBorder },
+  headerBtnActive: { backgroundColor: 'rgba(85,223,105,0.13)', borderColor: C.greenBorder },
   headerBadge: {
     position: 'absolute',
     top: -3,
@@ -1036,7 +1036,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  searchActive: { borderColor: 'rgba(90,224,106,0.45)' },
+  searchActive: { borderColor: 'rgba(85,223,105,0.45)' },
   searchInput: {
     flex: 1,
     minWidth: 0,

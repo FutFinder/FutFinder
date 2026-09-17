@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   bubbleSending: { opacity: 0.72 },
   bubbleImportant: { borderColor: 'rgba(255,190,90,0.4)' },
   bubbleFailed: {
-    backgroundColor: 'rgba(90,224,106,0.14)',
+    backgroundColor: 'rgba(85,223,105,0.14)',
     borderColor: C.redBorder,
     borderStyle: 'dashed',
   },
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(90,224,106,0.45)',
+    borderColor: 'rgba(85,223,105,0.45)',
   },
   retryText: { color: C.green, fontSize: 12.5, fontFamily: F.extraBold },
   discardBtn: {

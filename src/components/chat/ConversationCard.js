@@ -73,7 +73,7 @@ export default function ConversationCard({ thread, now, onPress }) {
               ? ['rgba(255,190,90,0.12)', 'rgba(255,190,90,0)']
               : accent === 'neon'
               ? ['rgba(255,45,85,0.14)', 'rgba(255,45,85,0)']
-              : ['rgba(90,224,106,0.13)', 'rgba(90,224,106,0)']
+              : ['rgba(85,223,105,0.13)', 'rgba(85,223,105,0)']
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 0.75, y: 1 }}
@@ -265,9 +265,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 9,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(90,224,106,0.16)',
+    backgroundColor: 'rgba(85,223,105,0.16)',
     borderWidth: 1,
-    borderColor: 'rgba(90,224,106,0.34)',
+    borderColor: 'rgba(85,223,105,0.34)',
   },
   kindPillImportant: {
     backgroundColor: C.amberSoft,

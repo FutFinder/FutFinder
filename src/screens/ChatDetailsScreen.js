@@ -159,7 +159,7 @@ export default function ChatDetailsScreen({ route, navigation }) {
           <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
             {/* Identidad */}
             <LinearGradient
-              colors={['rgba(90,224,106,0.14)', 'rgba(90,224,106,0)']}
+              colors={['rgba(85,223,105,0.14)', 'rgba(85,223,105,0)']}
               start={{ x: 0, y: 0 }}
               end={{ x: 0.75, y: 1 }}
               style={styles.identity}
@@ -342,8 +342,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   toggleOn: {
-    backgroundColor: 'rgba(90,224,106,0.22)',
-    borderColor: 'rgba(90,224,106,0.45)',
+    backgroundColor: 'rgba(85,223,105,0.22)',
+    borderColor: 'rgba(85,223,105,0.45)',
     alignItems: 'flex-end',
   },
   knob: {

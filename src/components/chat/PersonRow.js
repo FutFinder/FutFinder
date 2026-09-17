@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   avatarGreen: {
     backgroundColor: C.shieldBg,
-    borderColor: 'rgba(90,224,106,0.2)',
+    borderColor: 'rgba(85,223,105,0.2)',
   },
   avatarImg: { width: '100%', height: '100%' },
   initial: { color: 'rgba(255,255,255,0.75)', fontSize: 16, fontFamily: F.extraBold },
@@ -216,8 +216,8 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   badgeAccent: {
-    backgroundColor: 'rgba(90,224,106,0.14)',
-    borderColor: 'rgba(90,224,106,0.32)',
+    backgroundColor: 'rgba(85,223,105,0.14)',
+    borderColor: 'rgba(85,223,105,0.32)',
   },
   badgeText: {
     color: 'rgba(255,255,255,0.6)',
@@ -234,11 +234,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
   },
-  actionAdd: { borderColor: 'rgba(90,224,106,0.45)' },
+  actionAdd: { borderColor: 'rgba(85,223,105,0.45)' },
   actionSent: { backgroundColor: C.sendIdle, borderColor: 'transparent' },
   actionFriends: {
-    backgroundColor: 'rgba(90,224,106,0.14)',
-    borderColor: 'rgba(90,224,106,0.4)',
+    backgroundColor: 'rgba(85,223,105,0.14)',
+    borderColor: 'rgba(85,223,105,0.4)',
   },
   actionText: { fontSize: 12, fontFamily: F.extraBold },
 });

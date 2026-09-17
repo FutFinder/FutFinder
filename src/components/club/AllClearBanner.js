@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Check } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
+import { reservasFonts as F } from '../../theme/colors';
 
 /**
  * Lo que ocupa el lugar de «Pendiente para ti» cuando no hay nada pendiente.
@@ -54,6 +55,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   textos: { flex: 1, minWidth: 0, gap: 2 },
-  titulo: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  titulo: { fontSize: 14, fontFamily: F.bold, color: '#FFFFFF' },
   subtitulo: { fontSize: 12, color: 'rgba(255, 255, 255, 0.45)' },
 });

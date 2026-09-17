@@ -168,7 +168,7 @@ function CustomTabBar({ state, navigation }) {
 
   return (
     <View
-      className="absolute inset-x-0 bottom-0 flex-row items-start border-t border-white/8 bg-[#050605] px-3.5 pt-3"
+      className="absolute inset-x-0 bottom-0 flex-row items-start border-t border-white/8 bg-fondo px-3.5 pt-3"
       style={{ height: 88 + insets.bottom, paddingBottom: insets.bottom }}
     >
       {leftRoutes.map(renderTab)}
@@ -178,7 +178,7 @@ function CustomTabBar({ state, navigation }) {
       <Pressable
         onPress={() => navigation.getParent()?.navigate('CreateMatch')}
         hitSlop={6}
-        className="absolute -top-5 left-1/2 h-[58px] w-[58px] -translate-x-[29px] items-center justify-center rounded-full border-4 border-[#050605] bg-[#00FF66] active:opacity-85"
+        className="absolute -top-5 left-1/2 h-[58px] w-[58px] -translate-x-[29px] items-center justify-center rounded-full border-4 border-fondo bg-verde active:opacity-85"
         style={{
           shadowColor: C.green,
           shadowOpacity: 0.45,

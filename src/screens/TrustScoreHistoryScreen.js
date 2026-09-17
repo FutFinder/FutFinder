@@ -33,7 +33,7 @@ function HistoryItem({ item }) {
 
   return (
     <View style={styles.item}>
-      <View style={[styles.iconBubble, { backgroundColor: isPositive ? C.greenSoft : 'rgba(229,72,77,0.12)' }]}>
+      <View style={[styles.iconBubble, { backgroundColor: isPositive ? C.greenSoft : 'rgba(237,107,118,0.12)' }]}>
         <Icon color={color} size={16} />
       </View>
       <View style={styles.itemInfo}>

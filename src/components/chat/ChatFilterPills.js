@@ -75,8 +75,8 @@ const styles = StyleSheet.create({
     borderColor: C.borderSoft,
   },
   pillActive: {
-    backgroundColor: 'rgba(90,224,106,0.14)',
-    borderColor: 'rgba(90,224,106,0.45)',
+    backgroundColor: 'rgba(85,223,105,0.14)',
+    borderColor: 'rgba(85,223,105,0.45)',
   },
   label: {
     color: 'rgba(255,255,255,0.6)',

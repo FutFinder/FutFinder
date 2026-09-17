@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Swords, CalendarClock, UserPlus, AlertTriangle, Bell } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubTonos, clubSuperficies } from '../../theme/colors';
+import { clubTonos, clubSuperficies, reservasFonts as F } from '../../theme/colors';
 import { haceCuanto } from '../../utils/tiempoRelativo.js';
 
 /**
@@ -110,8 +110,8 @@ const ICONOS = {
 const styles = StyleSheet.create({
   seccion: { gap: 10 },
   cabecera: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tituloSeccion: { fontSize: 15.5, fontWeight: '800', color: '#FFFFFF' },
-  verToda: { fontSize: 12.5, fontWeight: '700' },
+  tituloSeccion: { fontSize: 15.5, fontFamily: F.extraBold, color: '#FFFFFF' },
+  verToda: { fontSize: 12.5, fontFamily: F.bold },
   lista: {
     borderRadius: 18,
     borderWidth: 1,
@@ -134,6 +134,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titulo: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
+  titulo: { flex: 1, minWidth: 0, fontSize: 13, fontFamily: F.semiBold, color: '#FFFFFF' },
   cuando: { fontSize: 11, color: 'rgba(255, 255, 255, 0.35)' },
 });

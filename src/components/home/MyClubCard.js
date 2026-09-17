@@ -19,9 +19,9 @@ export default function MyClubCard({ club, onPressClub, onCreateMatch }) {
         className="flex-row items-center gap-3 px-4 pb-3.5 pt-4 active:opacity-90"
       >
         {club.foto_url ? (
-          <Image source={{ uri: club.foto_url }} className="h-14 w-14 rounded-2xl border border-[#00FF66]/25" />
+          <Image source={{ uri: club.foto_url }} className="h-14 w-14 rounded-2xl border border-verde/25" />
         ) : (
-          <View className="h-14 w-14 items-center justify-center rounded-2xl border border-[#00FF66]/25 bg-white/5">
+          <View className="h-14 w-14 items-center justify-center rounded-2xl border border-verde/25 bg-white/5">
             <Shield color={C.green} size={22} strokeWidth={1.8} />
           </View>
         )}
@@ -41,11 +41,11 @@ export default function MyClubCard({ club, onPressClub, onCreateMatch }) {
         <View className="px-4 pb-4 pt-1">
           <Pressable
             onPress={() => onCreateMatch(club.id)}
-            className="h-[46px] flex-row items-center justify-center gap-1.5 rounded-2xl bg-[#00FF66] active:opacity-80"
+            className="h-[46px] flex-row items-center justify-center gap-1.5 rounded-2xl bg-verde active:opacity-80"
             style={{ shadowColor: C.green, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }}
           >
             <Plus size={18} color={C.greenInk} strokeWidth={3} />
-            <Text className="text-[14px] font-bold text-[#04120A]">Crear partido de club</Text>
+            <Text className="text-[14px] font-bold text-verde-ink">Crear partido de club</Text>
           </Pressable>
         </View>
       ) : null}

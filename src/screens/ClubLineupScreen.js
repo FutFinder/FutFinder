@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
     top: 5,
     bottom: 5,
     borderWidth: 1.5,
-    borderColor: 'rgba(90,224,106,.16)',
+    borderColor: 'rgba(85,223,105,.16)',
     borderRadius: 10,
   },
   pitchHalfway: {
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
     right: '8%',
     top: '50%',
     height: 1.5,
-    backgroundColor: 'rgba(90,224,106,.16)',
+    backgroundColor: 'rgba(85,223,105,.16)',
   },
   pitchCircle: {
     position: 'absolute',
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     marginLeft: -37,
     marginTop: -37,
     borderWidth: 1.5,
-    borderColor: 'rgba(90,224,106,.16)',
+    borderColor: 'rgba(85,223,105,.16)',
     borderRadius: 37,
   },
   pitchBoxBottom: {
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
     bottom: 5,
     height: 52,
     borderWidth: 1.5,
-    borderColor: 'rgba(90,224,106,.16)',
+    borderColor: 'rgba(85,223,105,.16)',
     borderBottomWidth: 0,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
     top: 5,
     height: 52,
     borderWidth: 1.5,
-    borderColor: 'rgba(90,224,106,.16)',
+    borderColor: 'rgba(85,223,105,.16)',
     borderTopWidth: 0,
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
@@ -746,7 +746,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,.2)',
     borderStyle: 'dashed',
   },
-  slotCircleFit: { backgroundColor: 'rgba(90,224,106,.3)', borderWidth: 2.5, borderColor: C.green },
+  slotCircleFit: { backgroundColor: 'rgba(85,223,105,.3)', borderWidth: 2.5, borderColor: C.green },
   slotAvatar: { width: 44, height: 44, borderRadius: 22 },
   slotFace: { color: 'rgba(255,255,255,.4)', fontSize: 14, fontFamily: F.extraBold },
   slotLabel: {

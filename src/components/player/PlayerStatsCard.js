@@ -107,8 +107,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   cellHighlight: {
-    backgroundColor: 'rgba(90, 224, 106, 0.11)',
-    borderColor: 'rgba(90, 224, 106, 0.24)',
+    backgroundColor: 'rgba(85,223,105, 0.11)',
+    borderColor: 'rgba(85,223,105, 0.24)',
   },
   cellValue: {
     color: C.textPrimary,
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     marginTop: 4,
   },
-  cellLabelHighlight: { color: 'rgba(90, 224, 106, 0.75)' },
+  cellLabelHighlight: { color: 'rgba(85,223,105, 0.75)' },
   cellLabelDim: { color: 'rgba(255, 255, 255, 0.4)' },
 
   attRow: {

@@ -10,9 +10,9 @@ import {
 
 /** Paleta por tono de estado, tal como la define el diseño. */
 const TONOS = {
-  green: { color: C.green, chipBg: 'rgba(90, 224, 106, 0.14)' },
+  green: { color: C.green, chipBg: 'rgba(85,223,105, 0.14)' },
   yellow: { color: C.draw, chipBg: 'rgba(224, 194, 90, 0.14)' },
-  coral: { color: C.loss, chipBg: 'rgba(232, 115, 123, 0.14)' },
+  coral: { color: C.loss, chipBg: 'rgba(237,107,118, 0.14)' },
   muted: { color: 'rgba(255, 255, 255, 0.45)', chipBg: 'rgba(255, 255, 255, 0.07)' },
 };
 

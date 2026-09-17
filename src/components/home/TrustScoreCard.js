@@ -36,7 +36,7 @@ export default function TrustScoreCard({
 
         <View className="mt-3 flex-row items-center justify-between">
           <Text className="text-[12.5px] text-white/45">{matchesPlayed} partidos jugados · {reports} reportes</Text>
-          <Text className="text-[10.5px] font-bold tracking-[0.15em] text-[#00FF66]">{tierLabel}</Text>
+          <Text className="text-[10.5px] font-bold tracking-[0.15em] text-verde">{tierLabel}</Text>
         </View>
       </LinearGradient>
     </Pressable>

@@ -3,7 +3,7 @@ import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Bell } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasSizes as S } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
 import useUnreadNotifications from '../utils/useUnreadNotifications';
 
 /**
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     color: C.textOnRed,
   },
 });

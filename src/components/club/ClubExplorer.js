@@ -265,7 +265,7 @@ export default function ClubExplorer({
                             accessibilityLabel="Rechazar invitación"
                             style={({ pressed }) => [styles.invBtn, styles.invReject, pressed && { opacity: 0.7 }]}
                           >
-                            <X color="#E8737B" size={16} strokeWidth={2.6} />
+                            <X color={C.red} size={16} strokeWidth={2.6} />
                           </Pressable>
                         </View>
                       }
@@ -392,7 +392,7 @@ export default function ClubExplorer({
             ) : error ? (
               <View style={styles.stateBox}>
                 <View style={styles.stateIconWrap}>
-                  <AlertCircle color="#E8737B" size={30} strokeWidth={1.8} />
+                  <AlertCircle color={C.red} size={30} strokeWidth={1.8} />
                 </View>
                 <Text style={styles.stateTitle}>No se pudo cargar</Text>
                 <Text style={styles.stateText}>Revisa tu conexión e inténtalo de nuevo.</Text>
@@ -614,9 +614,9 @@ const styles = StyleSheet.create({
   },
   invAccept: { backgroundColor: C.green },
   invReject: {
-    backgroundColor: 'rgba(232,115,123,0.12)',
+    backgroundColor: 'rgba(237,107,118,0.12)',
     borderWidth: 1,
-    borderColor: '#E8737B',
+    borderColor: C.red,
   },
 
   searchRow: { flexDirection: 'row', gap: 10 },

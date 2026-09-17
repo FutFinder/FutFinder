@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { CalendarDays, MapPin } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubSuperficies } from '../../theme/colors';
+import { clubSuperficies, reservasFonts as F } from '../../theme/colors';
 import { clubesDelPartido } from '../../services/clubMatchRules';
 import ClubLogo from './ClubLogo';
 
@@ -194,10 +194,10 @@ const styles = StyleSheet.create({
   },
   cabecera: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pill: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 9 },
-  pillTexto: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.4 },
+  pillTexto: { fontSize: 10.5, fontFamily: F.extraBold, letterSpacing: 0.4 },
   modalidad: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.4,
     color: 'rgba(255, 255, 255, 0.35)',
   },
@@ -214,13 +214,13 @@ const styles = StyleSheet.create({
   lado: { flex: 1, alignItems: 'center', gap: 8 },
   nombreClub: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: F.bold,
     color: '#FFFFFF',
     textAlign: 'center',
   },
   vs: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     color: 'rgba(255, 255, 255, 0.35)',
     marginTop: 18,
   },
@@ -235,15 +235,15 @@ const styles = StyleSheet.create({
   tileCabecera: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   tileRotulo: {
     fontSize: 9.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     letterSpacing: 0.5,
     color: 'rgba(255, 255, 255, 0.35)',
   },
-  tileValor: { fontSize: 12.5, fontWeight: '600', color: '#FFFFFF' },
+  tileValor: { fontSize: 12.5, fontFamily: F.semiBold, color: '#FFFFFF' },
   cupos: { gap: 7 },
   cuposFila: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cuposRotulo: { fontSize: 11.5, color: 'rgba(255, 255, 255, 0.45)' },
-  cuposValor: { fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' },
+  cuposValor: { fontSize: 12.5, fontFamily: F.bold, color: '#FFFFFF' },
   pista: {
     height: 6,
     borderRadius: 99,
@@ -265,5 +265,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  accionTexto: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  accionTexto: { fontSize: 14, fontFamily: F.bold, color: '#FFFFFF' },
 });

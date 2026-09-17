@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Search, Bell } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubSuperficies } from '../../theme/colors';
+import { clubSuperficies, reservasFonts as F } from '../../theme/colors';
 import BrandMark from '../BrandMark';
 
 /**
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   textos: { minWidth: 0, marginTop: 12 },
   titulo: {
     fontSize: 27,
-    fontWeight: '800',
+    fontFamily: F.extraBold,
     letterSpacing: -0.7,
     color: '#FFFFFF',
   },

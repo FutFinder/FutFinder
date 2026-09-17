@@ -5,6 +5,8 @@ import {
   RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone, CalendarX, ShieldAlert, Scale,
 } from 'lucide-react-native';
 
+import { reservas as C } from '../../theme/colors';
+
 /** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
 export const CATEGORY = {
   friend_request: 'social',
@@ -76,52 +78,71 @@ const ICON = {
   club_revision_resuelta: Scale,
 };
 
+/**
+ * Los cuatro tonos de la tabla, definidos una vez.
+ *
+ * Antes cada fila repetía su color, su fondo y su borde en hexadecimal: 40
+ * literales para cuatro tonos, y tres ámbares distintos (#F5C451, #FFB347 y
+ * el de la paleta) haciendo el mismo trabajo. Ahora salen del token, así que
+ * cambiar el verde de la app cambia también el de los avisos.
+ *
+ * Los tres de CATEGORÍA —social, mensajes, clubes— no son tonos semánticos
+ * sino identidad de sección, y por eso conservan su hue propio: lo que
+ * distingue un aviso de amistad de uno de club no es la urgencia.
+ */
+const VERDE = { color: C.green, bg: C.greenSoft, border: C.greenBorder };
+const ROJO = { color: C.red, bg: C.redSoft, border: C.redBorder };
+const AMBAR = { color: C.amber, bg: C.amberSoft, border: C.amberBorder };
+const SOCIAL = { color: '#7DD3FC', bg: 'rgba(125,211,252,0.10)', border: 'rgba(125,211,252,0.26)' };
+const MENSAJES = { color: '#C4B5FD', bg: 'rgba(196,181,253,0.10)', border: 'rgba(196,181,253,0.26)' };
+const CLUBES = { color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' };
+
 const TAG = {
-  friend_request: { label: 'SOCIAL', color: '#7DD3FC', bg: 'rgba(125,211,252,0.10)', border: 'rgba(125,211,252,0.26)' },
-  friend_accept: { label: 'SOCIAL', color: '#7DD3FC', bg: 'rgba(125,211,252,0.10)', border: 'rgba(125,211,252,0.26)' },
-  message_new: { label: 'MENSAJES', color: '#C4B5FD', bg: 'rgba(196,181,253,0.10)', border: 'rgba(196,181,253,0.26)' },
-  chat_mention_all: { label: 'MENCIÓN', color: '#C4B5FD', bg: 'rgba(196,181,253,0.10)', border: 'rgba(196,181,253,0.26)' },
-  match_join: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  match_reminder: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  match_rate: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  match_cancelled: { label: 'PARTIDO', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },
-  join_request: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  join_approved: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  join_rejected: { label: 'PARTIDO', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },
-  match_updated: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  match_slot_free: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  waitlist_turn: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  match_left: { label: 'PARTIDO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  match_attendance: { label: 'PARTIDO', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },
-  club_request: { label: 'CLUBES', color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' },
-  club_request_accepted: { label: 'CLUBES', color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' },
-  club_request_rejected: { label: 'CLUBES', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },
-  club_member_joined: { label: 'CLUBES', color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' },
-  club_member_left: { label: 'CLUBES', color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' },
-  club_invite_accepted: { label: 'CLUBES', color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' },
-  club_challenge: { label: 'DESAFÍO', color: '#FFB347', bg: 'rgba(255,179,71,0.10)', border: 'rgba(255,179,71,0.28)' },
-  club_challenge_accepted: { label: 'DESAFÍO', color: '#00FF66', bg: 'rgba(0,255,102,0.10)', border: 'rgba(0,255,102,0.28)' },
-  club_challenge_rejected: { label: 'DESAFÍO', color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)', border: 'rgba(255,107,107,0.28)' },
+  friend_request: { label: 'SOCIAL', ...SOCIAL },
+  friend_accept: { label: 'SOCIAL', ...SOCIAL },
+  message_new: { label: 'MENSAJES', ...MENSAJES },
+  chat_mention_all: { label: 'MENCIÓN', ...MENSAJES },
+  match_join: { label: 'PARTIDO', ...VERDE },
+  match_reminder: { label: 'PARTIDO', ...VERDE },
+  match_rate: { label: 'PARTIDO', ...VERDE },
+  match_cancelled: { label: 'PARTIDO', ...ROJO },
+  join_request: { label: 'PARTIDO', ...VERDE },
+  join_approved: { label: 'PARTIDO', ...VERDE },
+  join_rejected: { label: 'PARTIDO', ...ROJO },
+  match_updated: { label: 'PARTIDO', ...VERDE },
+  match_slot_free: { label: 'PARTIDO', ...VERDE },
+  waitlist_turn: { label: 'PARTIDO', ...VERDE },
+  match_left: { label: 'PARTIDO', ...VERDE },
+  match_attendance: { label: 'PARTIDO', ...ROJO },
+  club_request: { label: 'CLUBES', ...CLUBES },
+  club_request_accepted: { label: 'CLUBES', ...CLUBES },
+  club_request_rejected: { label: 'CLUBES', ...ROJO },
+  club_member_joined: { label: 'CLUBES', ...CLUBES },
+  club_member_left: { label: 'CLUBES', ...CLUBES },
+  club_invite_accepted: { label: 'CLUBES', ...CLUBES },
+  club_challenge: { label: 'DESAFÍO', ...AMBAR },
+  club_challenge_accepted: { label: 'DESAFÍO', ...VERDE },
+  club_challenge_rejected: { label: 'DESAFÍO', ...ROJO },
   // Verde, no rojo: el rojo está reservado a lo que necesita atención
   // (una negociación trabada), y un partido publicado es una buena noticia.
-  club_match_published: { label: 'PARTIDO DE CLUBES', color: '#5AE06A', bg: 'rgba(90,224,106,0.10)', border: 'rgba(90,224,106,0.30)' },
+  club_match_published: { label: 'PARTIDO DE CLUBES', ...VERDE },
   // Ámbar y no rojo: el partido salió bien, lo que no se pudo aplicar es
   // sólo el cupo de quien lo pidió. Es un «revisa esto», no una alarma.
-  club_match_reserva_omitida: { label: 'TU CUPO', color: '#F5C451', bg: 'rgba(245,196,81,0.10)', border: 'rgba(245,196,81,0.28)' },
+  club_match_reserva_omitida: { label: 'TU CUPO', ...AMBAR },
   // Ámbar: pedir un cambio no es una alarma, pero SÍ espera algo del club que
   // lo recibe —mientras nadie responda, el partido sigue como estaba—.
-  club_match_change: { label: 'CAMBIO PEDIDO', color: '#F5C451', bg: 'rgba(245,196,81,0.10)', border: 'rgba(245,196,81,0.28)' },
+  club_match_change: { label: 'CAMBIO PEDIDO', ...AMBAR },
   // La respuesta ya no espera nada de nadie, así que vuelve al verde del
   // partido de clubes. Que fuera un rechazo no lo convierte en un problema:
   // el partido simplemente se queda como estaba.
-  club_match_change_responded: { label: 'PARTIDO DE CLUBES', color: '#5AE06A', bg: 'rgba(90,224,106,0.10)', border: 'rgba(90,224,106,0.30)' },
+  club_match_change_responded: { label: 'PARTIDO DE CLUBES', ...VERDE },
   // Rojo, y es de las pocas veces que corresponde: el encuentro se terminó y
   // quien lee esto tiene que reorganizar a su gente.
-  club_match_cancelled: { label: 'ENCUENTRO CANCELADO', color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)' },
-  club_sancionado: { label: 'CLUB SANCIONADO', color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)' },
+  club_match_cancelled: { label: 'ENCUENTRO CANCELADO', ...ROJO },
+  club_sancionado: { label: 'CLUB SANCIONADO', ...ROJO },
   // Ni rojo ni verde: la revisión puede terminar de las dos formas y el color
   // no puede adelantar cuál, porque la misma etiqueta sirve para las dos.
-  club_revision_resuelta: { label: 'REVISIÓN RESUELTA', color: '#F5C451', bg: 'rgba(245,196,81,0.10)', border: 'rgba(245,196,81,0.28)' },
+  club_revision_resuelta: { label: 'REVISIÓN RESUELTA', ...AMBAR },
 };
 
 const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
@@ -235,10 +256,10 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
               disabled={busy}
               accessibilityRole="button"
               accessibilityLabel={atajo.accesible}
-              className="h-[38px] flex-1 items-center justify-center rounded-xl bg-[#00FF66] active:opacity-80"
+              className="h-[38px] flex-1 items-center justify-center rounded-xl bg-verde active:opacity-80"
               style={busy ? { opacity: 0.6 } : null}
             >
-              <Text className="text-[13px] font-bold text-[#04120A]">{atajo.label}</Text>
+              <Text className="text-[13px] font-bold text-verde-ink">{atajo.label}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -248,13 +269,13 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
             <Pressable
               onPress={() => onPrimary?.(n)}
               disabled={busy}
-              className="h-[38px] flex-1 items-center justify-center rounded-xl bg-[#00FF66] active:opacity-80"
+              className="h-[38px] flex-1 items-center justify-center rounded-xl bg-verde active:opacity-80"
               style={busy ? { opacity: 0.6 } : null}
             >
               {busy ? (
-                <ActivityIndicator size="small" color="#04120A" />
+                <ActivityIndicator size="small" color={C.greenInk} />
               ) : (
-                <Text className="text-[13px] font-bold text-[#04120A]">{n.actions[0]}</Text>
+                <Text className="text-[13px] font-bold text-verde-ink">{n.actions[0]}</Text>
               )}
             </Pressable>
             <Pressable
@@ -273,7 +294,7 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
         onPress={() => !busy && onDelete(n.id)}
         disabled={busy}
         hitSlop={8}
-        className="h-[30px] w-[30px] items-center justify-center rounded-[10px] active:bg-[#FF6B6B]/14"
+        className="h-[30px] w-[30px] items-center justify-center rounded-[10px] active:bg-rojo/14"
       >
         <Trash2 size={14} color="rgba(255,255,255,0.32)" strokeWidth={1.9} />
       </Pressable>

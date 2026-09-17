@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import { reservas as C } from '../theme/colors';
 
 import { supabase, isSupabaseConfigured } from './supabase';
 // El multiplexado de un canal Realtime es lógica pura y ya estaba resuelta
@@ -66,7 +67,7 @@ export async function registerForPushNotifications(userId) {
         name: 'FutFinder',
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#71B533',
+        lightColor: C.green,
       });
     }
 

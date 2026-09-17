@@ -12,7 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubTonos, clubSuperficies } from '../../theme/colors';
+import { clubTonos, clubSuperficies, reservasFonts as F } from '../../theme/colors';
 
 /**
  * Una tarea de «Pendiente para ti».
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   textos: { flex: 1, minWidth: 0, gap: 2 },
-  titulo: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  titulo: { fontSize: 14, fontFamily: F.bold, color: '#FFFFFF' },
   subtitulo: { fontSize: 12, color: 'rgba(255, 255, 255, 0.5)' },
   boton: {
     paddingVertical: 9,
@@ -213,12 +213,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  botonTexto: { fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' },
+  botonTexto: { fontSize: 12.5, fontFamily: F.bold, color: '#FFFFFF' },
   chip: {
     paddingVertical: 7,
     paddingHorizontal: 11,
     borderRadius: 11,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
-  chipTexto: { fontSize: 11.5, fontWeight: '600', color: 'rgba(255, 255, 255, 0.6)' },
+  chipTexto: { fontSize: 11.5, fontFamily: F.semiBold, color: 'rgba(255, 255, 255, 0.6)' },
 });

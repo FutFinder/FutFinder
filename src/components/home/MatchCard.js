@@ -44,9 +44,9 @@ function distanceLabel(km) {
 
 function Meta({ label, value, tone }) {
   return (
-    <View className={`flex-1 rounded-xl border px-2.5 py-2 ${tone === 'neon' ? 'border-[#00FF66]/15 bg-[#00FF66]/6' : 'border-white/8 bg-white/5'}`}>
+    <View className={`flex-1 rounded-xl border px-2.5 py-2 ${tone === 'neon' ? 'border-verde/15 bg-verde/6' : 'border-white/8 bg-white/5'}`}>
       <Text className="text-[9.5px] font-bold tracking-[0.18em] text-white/40">{label}</Text>
-      <Text className={`mt-0.5 text-[14px] font-bold ${tone === 'neon' ? 'text-[#00FF66]' : 'text-white'}`}>{value}</Text>
+      <Text className={`mt-0.5 text-[14px] font-bold ${tone === 'neon' ? 'text-verde' : 'text-white'}`}>{value}</Text>
     </View>
   );
 }
@@ -62,9 +62,9 @@ export default function MatchCard({ match: m, onJoin, onPress, width = 238 }) {
   const ctaClass = full
     ? 'border-white/12 bg-white/5'
     : joined
-      ? 'border-[#00FF66]/40 bg-[#00FF66]/14'
-      : 'border-[#00FF66] bg-[#00FF66]';
-  const ctaText = full ? 'text-white/70' : joined ? 'text-[#00FF66]' : 'text-[#04120A]';
+      ? 'border-verde/40 bg-verde/14'
+      : 'border-verde bg-verde';
+  const ctaText = full ? 'text-white/70' : joined ? 'text-verde' : 'text-verde-ink';
   const dist = distanceLabel(m._distanciaKm);
 
   return (

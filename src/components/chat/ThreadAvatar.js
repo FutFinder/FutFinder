@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   clubShield: {
-    borderColor: 'rgba(90,224,106,0.5)',
+    borderColor: 'rgba(85,223,105,0.5)',
     shadowColor: C.green,
     shadowOpacity: 0.22,
     shadowRadius: 12,

@@ -49,7 +49,7 @@ export default function PlayerPhotoGallery({
             styles.cell,
             styles.addCell,
             { width: size, height: size },
-            pressed && { backgroundColor: 'rgba(90, 224, 106, 0.15)' },
+            pressed && { backgroundColor: 'rgba(85,223,105, 0.15)' },
           ]}
         >
           <Plus color={C.green} size={20} strokeWidth={2.4} />
@@ -119,8 +119,8 @@ const styles = StyleSheet.create({
   addCell: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(90, 224, 106, 0.4)',
-    backgroundColor: 'rgba(90, 224, 106, 0.08)',
+    borderColor: 'rgba(85,223,105, 0.4)',
+    backgroundColor: 'rgba(85,223,105, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,

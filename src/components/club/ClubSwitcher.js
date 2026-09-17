@@ -4,6 +4,7 @@ import { Shield, Plus } from 'lucide-react-native';
 
 import { temaClub, temaDeClub } from '../../theme/clubThemes';
 import VerifiedBadge from './VerifiedBadge';
+import { reservasFonts as F } from '../../theme/colors';
 
 /**
  * Selector horizontal del club activo.
@@ -110,8 +111,8 @@ const styles = StyleSheet.create({
   nombre: {
     flexShrink: 1,
     fontSize: 13.5,
-    fontWeight: '700',
+    fontFamily: F.bold,
     color: '#FFFFFF',
   },
-  nombreInactivo: { fontWeight: '600', color: 'rgba(255, 255, 255, 0.6)' },
+  nombreInactivo: { fontFamily: F.semiBold, color: 'rgba(255, 255, 255, 0.6)' },
 });

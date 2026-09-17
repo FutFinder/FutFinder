@@ -1,4 +1,5 @@
 import React from 'react';
+import { reservas as C } from '../theme/colors';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 /**
@@ -9,7 +10,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
  * Es el mismo dibujo de `Logo.js` —que sigue sirviendo al resto de la app—
  * pero sin las cinco líneas de detalle del balón y sin texto, y tomando el
  * verde por prop en vez de `colors.primary`: estas pantallas usan la paleta
- * nueva (#5AE06A) y `Logo` está cableado a la vieja (#71B533). Vive aparte
+ * única y `Logo` estaba cableado a la paleta legada. Vive aparte
  * para no arrastrar a esas decenas de pantallas a un cambio de paleta que
  * no pidieron.
  *
@@ -19,7 +20,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
  * `bgColor` rellena el balón para que tape el trazo del pin que queda
  * detrás: tiene que ser el fondo sobre el que se dibuja la marca.
  */
-export default function FutfinderMark({ size = 24, color = '#5AE06A', bgColor = '#0B0D0C' }) {
+export default function FutfinderMark({ size = 24, color = C.green, bgColor = C.bg }) {
   return (
     <Svg width={size} height={size * 1.2} viewBox="0 0 100 120" fill="none">
       <Path

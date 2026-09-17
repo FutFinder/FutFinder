@@ -1090,7 +1090,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: 'rgba(90,224,106,0.35)',
+    borderColor: 'rgba(85,223,105,0.35)',
   },
   locBtnText: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
 

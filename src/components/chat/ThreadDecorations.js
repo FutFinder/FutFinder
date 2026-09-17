@@ -60,7 +60,7 @@ export function ThreadEmpty({ title, message }) {
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
-        <MessageSquare color="rgba(90,224,106,0.75)" size={26} strokeWidth={1.6} />
+        <MessageSquare color="rgba(85,223,105,0.75)" size={26} strokeWidth={1.6} />
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyText}>{message}</Text>
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     borderRadius: 23,
     borderWidth: 1,
-    borderColor: 'rgba(90,224,106,0.45)',
+    borderColor: 'rgba(85,223,105,0.45)',
   },
   deniedBtnText: { color: C.green, fontSize: 13.5, fontFamily: F.extraBold },
 
@@ -205,15 +205,15 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 14,
     borderRadius: R.cardSm,
-    backgroundColor: 'rgba(90,224,106,0.08)',
+    backgroundColor: 'rgba(85,223,105,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(90,224,106,0.3)',
+    borderColor: 'rgba(85,223,105,0.3)',
   },
   reqIcon: {
     width: 40,
     height: 40,
     borderRadius: 13,
-    backgroundColor: 'rgba(90,224,106,0.16)',
+    backgroundColor: 'rgba(85,223,105,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },

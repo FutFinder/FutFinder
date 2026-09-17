@@ -114,9 +114,9 @@ const styles = StyleSheet.create({
     borderRadius: R.cardSm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,107,107,0.10)',
+    backgroundColor: 'rgba(237,107,118,0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(255,107,107,0.28)',
+    borderColor: 'rgba(237,107,118,0.28)',
   },
 
   titulo: { color: C.textPrimary, fontSize: 19, fontFamily: F.extraBold },

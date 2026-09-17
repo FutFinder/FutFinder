@@ -63,7 +63,7 @@ const DEFINICIONES = [
   {
     value: 'red',
     label: 'Rojo',
-    // Bermellón, no el coral de la derrota (#E8737B) ni el rojo de error:
+    // Bermellón, no el coral de la derrota ni el rojo de error:
     // se eligió por distancia de color, no por gusto. Ver la prueba
     // «ningún tema se confunde con derrota, empate ni con el dorado».
     main: '#FF4B2E',

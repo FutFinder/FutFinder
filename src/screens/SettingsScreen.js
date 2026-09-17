@@ -618,8 +618,8 @@ export default function SettingsScreen({ navigation }) {
         cancelButtonIndex: 2,
         title: '¿Quién puede enviarte solicitudes de amistad?',
         containerStyle: { backgroundColor: C.surface },
-        textStyle: { color: C.textPrimary, fontSize: 15, fontWeight: '500' },
-        titleTextStyle: { color: C.textSecondary, fontSize: 13, fontWeight: '600' },
+        textStyle: { color: C.textPrimary, fontSize: 15, fontFamily: F.medium },
+        titleTextStyle: { color: C.textSecondary, fontSize: 13, fontFamily: F.semiBold },
         separatorStyle: { backgroundColor: C.border },
       },
       (index) => {

@@ -27,7 +27,7 @@ export default function ClubStatsRow({ record, ratingLabel }) {
         value={record.v}
         label="V"
         valueColor={C.win}
-        labelColor="rgba(90, 224, 106, 0.75)"
+        labelColor="rgba(85,223,105, 0.75)"
         cellStyle={styles.cellWin}
       />
       <Cell value={record.e} label="E" />
@@ -35,7 +35,7 @@ export default function ClubStatsRow({ record, ratingLabel }) {
         value={record.d}
         label="D"
         valueColor={C.loss}
-        labelColor="rgba(232, 115, 123, 0.7)"
+        labelColor="rgba(237,107,118, 0.7)"
         cellStyle={styles.cellLoss}
       />
       <View
@@ -77,12 +77,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   cellWin: {
-    backgroundColor: 'rgba(90, 224, 106, 0.11)',
-    borderColor: 'rgba(90, 224, 106, 0.24)',
+    backgroundColor: 'rgba(85,223,105, 0.11)',
+    borderColor: 'rgba(85,223,105, 0.24)',
   },
   cellLoss: {
-    backgroundColor: 'rgba(232, 115, 123, 0.10)',
-    borderColor: 'rgba(232, 115, 123, 0.24)',
+    backgroundColor: 'rgba(237,107,118, 0.10)',
+    borderColor: 'rgba(237,107,118, 0.24)',
   },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   value: {

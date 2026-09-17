@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Rows3, Swords, Search, CalendarDays, Users, Settings } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubSuperficies } from '../../theme/colors';
+import { clubSuperficies, reservasFonts as F } from '../../theme/colors';
 
 /**
  * Los accesos rápidos del club, en grilla de tres.
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  etiqueta: { fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' },
+  etiqueta: { fontSize: 12.5, fontFamily: F.bold, color: '#FFFFFF' },
   badge: {
     position: 'absolute',
     top: 10,
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeTexto: { fontSize: 11, fontWeight: '800' },
+  badgeTexto: { fontSize: 11, fontFamily: F.extraBold },
   nota: {
     fontSize: 11.5,
     lineHeight: 16,

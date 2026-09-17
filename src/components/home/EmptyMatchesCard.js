@@ -7,8 +7,8 @@ import {
 
 export default function EmptyMatchesCard({ comuna, onCreate }) {
   return (
-    <View className="items-center gap-3 rounded-[20px] border border-dashed border-[#00FF66]/28 bg-[#00FF66]/5 px-5 py-6">
-      <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-[#00FF66]/30 bg-[#00FF66]/8">
+    <View className="items-center gap-3 rounded-[20px] border border-dashed border-verde/28 bg-verde/5 px-5 py-6">
+      <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-verde/30 bg-verde/8">
         <Plus size={22} color={C.green} strokeWidth={2.6} />
       </View>
       <View className="items-center">
@@ -19,8 +19,8 @@ export default function EmptyMatchesCard({ comuna, onCreate }) {
             : 'Publica el primero y sé el pionero en tu zona.'}
         </Text>
       </View>
-      <Pressable onPress={onCreate} className="h-11 w-full items-center justify-center rounded-[13px] bg-[#00FF66] active:opacity-80">
-        <Text className="text-[14px] font-bold text-[#04120A]">Publicar partido</Text>
+      <Pressable onPress={onCreate} className="h-11 w-full items-center justify-center rounded-[13px] bg-verde active:opacity-80">
+        <Text className="text-[14px] font-bold text-verde-ink">Publicar partido</Text>
       </Pressable>
     </View>
   );

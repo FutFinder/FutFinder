@@ -1810,8 +1810,8 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(90,224,106,0.45)',
-    backgroundColor: 'rgba(90,224,106,0.10)',
+    borderColor: 'rgba(85,223,105,0.45)',
+    backgroundColor: 'rgba(85,223,105,0.10)',
   },
 
   // Pedir un cambio es una acción secundaria: discreta y sin relleno verde,
@@ -1872,7 +1872,7 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: 'rgba(90,224,106,0.35)',
+    borderColor: 'rgba(85,223,105,0.35)',
   },
   endedBtnText: { color: C.textPrimary, fontSize: 13, fontFamily: F.extraBold },
   endedBtnDanger: {

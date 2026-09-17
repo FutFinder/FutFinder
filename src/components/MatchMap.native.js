@@ -21,25 +21,25 @@ function fmtHora(iso) {
  * estética dark sutil.
  */
 const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#201F1D' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#201F1D' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#A7A7A5' }] },
+  { elementType: 'geometry', stylers: [{ color: C.bg }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: C.bg }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: C.textSecondary }] },
   { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
   {
     featureType: 'administrative.locality',
     elementType: 'labels.text.fill',
-    stylers: [{ color: '#71B533' }],
+    stylers: [{ color: C.green }],
   },
   { featureType: 'poi', stylers: [{ visibility: 'off' }] },
   {
     featureType: 'poi.park',
     elementType: 'geometry',
-    stylers: [{ color: '#2A2927' }],
+    stylers: [{ color: C.surface }],
   },
   {
     featureType: 'road',
     elementType: 'geometry',
-    stylers: [{ color: '#2A2927' }],
+    stylers: [{ color: C.surface }],
   },
   {
     featureType: 'road',
@@ -230,9 +230,9 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: 'rgba(113,181,51,0.22)',
+    backgroundColor: 'rgba(85,223,105,0.22)',
     borderWidth: 1,
-    borderColor: 'rgba(113,181,51,0.45)',
+    borderColor: 'rgba(85,223,105,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },

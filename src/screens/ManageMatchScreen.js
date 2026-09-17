@@ -884,7 +884,7 @@ const styles = StyleSheet.create({
 
   tabs: { flexDirection: 'row', gap: 6, marginBottom: 14 },
   tab: { flex: 1, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  tabOn: { backgroundColor: 'rgba(90,224,106,0.14)', borderWidth: 1, borderColor: C.greenBorder },
+  tabOn: { backgroundColor: 'rgba(85,223,105,0.14)', borderWidth: 1, borderColor: C.greenBorder },
   tabOff: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.hairline },
   tabText: { fontSize: 12.5, fontFamily: F.semiBold, color: C.textSecondary },
   tabTextOn: { color: C.green, fontFamily: F.bold },

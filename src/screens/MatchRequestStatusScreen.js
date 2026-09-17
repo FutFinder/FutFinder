@@ -276,7 +276,7 @@ function Step({ title, sub, done, active, tone = 'green', last }) {
   return (
     <View style={{ flexDirection: 'row', gap: 12 }}>
       <View style={{ alignItems: 'center' }}>
-        <View style={[styles.dot, { borderColor: color, backgroundColor: done ? 'rgba(90,224,106,0.18)' : 'transparent' }]}>
+        <View style={[styles.dot, { borderColor: color, backgroundColor: done ? 'rgba(85,223,105,0.18)' : 'transparent' }]}>
           {done || active ? <View style={[styles.dotInner, { backgroundColor: color }]} /> : null}
         </View>
         {!last ? <View style={styles.line} /> : null}
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   bigIconPending: { backgroundColor: 'rgba(240,200,90,0.10)', borderColor: C.goldBorder },
-  bigIconOk: { backgroundColor: 'rgba(90,224,106,0.13)', borderColor: C.greenBorder },
+  bigIconOk: { backgroundColor: 'rgba(85,223,105,0.13)', borderColor: C.greenBorder },
   bigTitle: { fontSize: 22, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.4, textAlign: 'center' },
   bigText: { fontSize: 13, lineHeight: 20, color: C.textSecondary, textAlign: 'center' },
 

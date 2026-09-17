@@ -403,7 +403,7 @@ function Row({ icon: Icon, children, strong }) {
         style={{
           flex: 1,
           fontSize: strong ? 13 : 12.5,
-          fontWeight: strong ? '700' : '500',
+          fontFamily: strong ? F.bold : F.medium,
           color: strong ? C.textPrimary : C.textDim,
         }}
       >
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     width: 66,
     height: 66,
     borderRadius: 22,
-    backgroundColor: 'rgba(90,224,106,0.13)',
+    backgroundColor: 'rgba(85,223,105,0.13)',
     borderWidth: 1,
     borderColor: C.greenBorder,
     alignItems: 'center',

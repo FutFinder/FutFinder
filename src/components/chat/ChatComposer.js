@@ -185,8 +185,8 @@ const styles = StyleSheet.create({
   // El foco se marca con el borde verde del propio campo, no con el anillo del
   // navegador: se ve igual en web y en nativo, y sigue sin depender del color
   // porque el cursor también entra en el campo.
-  inputFocused: { borderColor: 'rgba(90,224,106,0.35)' },
-  inputCommand: { borderColor: 'rgba(90,224,106,0.55)', color: C.green },
+  inputFocused: { borderColor: 'rgba(85,223,105,0.35)' },
+  inputCommand: { borderColor: 'rgba(85,223,105,0.55)', color: C.green },
   sendBtn: {
     width: 46,
     height: 46,
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: 'rgba(90,224,106,0.28)',
+    borderColor: 'rgba(85,223,105,0.28)',
   },
   commandsTitle: {
     paddingHorizontal: 14,
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
-  commandRowFirst: { backgroundColor: 'rgba(90,224,106,0.08)', borderTopWidth: 0 },
+  commandRowFirst: { backgroundColor: 'rgba(85,223,105,0.08)', borderTopWidth: 0 },
   commandName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontFamily: F.extraBold },
   commandNameAccent: { color: C.green },
   commandHint: {
