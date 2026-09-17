@@ -466,6 +466,8 @@ function Portada({
           tema={tema}
           onSelect={setActiveClub}
           onVerClub={(clubId) => irA('ClubDetail', { clubId })}
+          onCrear={() => irA('CreateClub')}
+          onUnirse={() => irA('ExploreClubs')}
         />
       </View>
 
