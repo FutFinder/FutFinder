@@ -43,6 +43,7 @@ export default function CreateClubScreen({ navigation }) {
   const [logoAsset, setLogoAsset] = useState(null);
 
   const comunas = region ? getComunasOfRegion(region) : [];
+  const listo = nombre.trim().length >= 3 && !!modalidad && !!region && !!comuna;
 
   const handlePickLogo = async () => {
     const result = await pickImage({ aspect: [1, 1], quality: 0.8 });
@@ -54,14 +55,10 @@ export default function CreateClubScreen({ navigation }) {
   };
 
   const handleCreate = async () => {
-    if (nombre.trim().length < 3) {
-      setBanner({
-        type: 'error',
-        title: 'Nombre muy corto',
-        message: 'El nombre del club debe tener al menos 3 caracteres.',
-      });
-      return;
-    }
+    // El botón ya queda deshabilitado sin estos cuatro datos (`listo`); esta
+    // comprobación es sólo la segunda barrera, no la que informa al usuario
+    // qué falta — para eso está el botón inactivo, no un cartel.
+    if (!listo) return;
     setSaving(true);
     const { data, error } = await createClub({ nombre, descripcion, region, comuna, modalidad });
 
@@ -149,7 +146,7 @@ export default function CreateClubScreen({ navigation }) {
           </View>
 
           <View style={styles.grupo}>
-            <FieldLabel marca="opcional">Modalidad</FieldLabel>
+            <FieldLabel>Modalidad</FieldLabel>
             <View style={styles.modalidadRow}>
               {OPCIONES_MODALIDAD.map((op) => {
                 const activa = modalidad === op.value;
@@ -168,7 +165,7 @@ export default function CreateClubScreen({ navigation }) {
           </View>
 
           <View style={styles.grupo}>
-            <FieldLabel marca="opcional">Región</FieldLabel>
+            <FieldLabel>Región</FieldLabel>
             <Pressable
               onPress={() => {
                 setShowRegiones((v) => !v);
@@ -217,7 +214,7 @@ export default function CreateClubScreen({ navigation }) {
 
           {region && (
             <View style={styles.grupo}>
-              <FieldLabel marca="opcional">Comuna</FieldLabel>
+              <FieldLabel>Comuna</FieldLabel>
               <Pressable
                 onPress={() => {
                   setShowComunas((v) => !v);
@@ -268,7 +265,7 @@ export default function CreateClubScreen({ navigation }) {
             label="Crear club"
             onPress={handleCreate}
             loading={saving}
-            disabled={nombre.trim().length < 3}
+            disabled={!listo}
             style={styles.submitBtn}
           />
         </ScrollView>

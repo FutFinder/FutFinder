@@ -360,7 +360,15 @@ export default function ClubDetailScreen({ navigation, route }) {
           tema={tema}
         />
 
-        {/* Acción principal, según mi relación con el club */}
+        {/* Acción principal, según mi relación con el club.
+            SOLICITAR UNIRME NO SE ESCONDE PORQUE TAMBIÉN PUEDA DESAFIAR.
+            Antes, quien administraba otro club veía sólo «Desafiar a este
+            club» al mirar uno del que no era miembro — nunca la opción de
+            pedir entrar, aunque las dos cosas son independientes (se puede
+            administrar un club y a la vez querer sumarse a otro como
+            jugador). Ahora, mientras se pueda pedir entrar (no soy miembro,
+            no llegué al tope de 3 clubes), esa es la acción principal, y
+            «Desafiar» se ofrece además, como acción secundaria, si aplica. */}
         {soyAdmin ? (
           <CreateChallengeButton
             label="Crear desafío"
@@ -368,25 +376,44 @@ export default function ClubDetailScreen({ navigation, route }) {
             onSearch={goToElegirRival}
             tema={tema}
           />
+        ) : !soyMiembro && !tengoMaxClubs ? (
+          <>
+            <CreateChallengeButton
+              label={myRequest ? 'Cancelar solicitud' : 'Solicitar unirme'}
+              icon={
+                myRequest
+                  ? null
+                  : (ink) => <UserPlus color={ink} size={20} strokeWidth={2.4} />
+              }
+              disabled={working}
+              onPress={myRequest ? handleCancelRequest : handleJoin}
+              onSearch={goToExplore}
+              tema={tema}
+            />
+            {puedoDesafiar && (
+              <Pressable
+                onPress={() => goToChallenge(club)}
+                accessibilityRole="button"
+                accessibilityLabel={`Desafiar a ${club.nombre}`}
+                style={({ pressed }) => [
+                  styles.desafiarSecundario,
+                  { borderColor: tema.border },
+                  pressed && { backgroundColor: tema.soft },
+                ]}
+              >
+                <Swords color={tema.main} size={17} strokeWidth={2.2} />
+                <Text style={[styles.desafiarSecundarioText, { color: tema.main }]}>
+                  Desafiar a este club
+                </Text>
+              </Pressable>
+            )}
+          </>
         ) : puedoDesafiar ? (
           <CreateChallengeButton
             label="Desafiar a este club"
             accessibilityLabel={`Desafiar a ${club.nombre}`}
             onPress={() => goToChallenge(club)}
             onSearch={goToElegirRival}
-            tema={tema}
-          />
-        ) : !soyMiembro && !tengoMaxClubs ? (
-          <CreateChallengeButton
-            label={myRequest ? 'Cancelar solicitud' : 'Solicitar unirme'}
-            icon={
-              myRequest
-                ? null
-                : (ink) => <UserPlus color={ink} size={20} strokeWidth={2.4} />
-            }
-            disabled={working}
-            onPress={myRequest ? handleCancelRequest : handleJoin}
-            onSearch={goToExplore}
             tema={tema}
           />
         ) : soyMiembro ? (
@@ -655,6 +682,20 @@ const styles = StyleSheet.create({
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   bannerWrap: { paddingHorizontal: S.screenPadding, paddingBottom: 12 },
+
+  // Acción secundaria «Desafiar a este club», bajo «Solicitar unirme»
+  desafiarSecundario: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    marginHorizontal: S.screenPadding,
+    marginTop: 10,
+    borderRadius: R.cardSm,
+    borderWidth: 1,
+  },
+  desafiarSecundarioText: { fontSize: 14, fontFamily: F.bold },
 
   // Fila genérica (Desafíos)
   rowItem: {

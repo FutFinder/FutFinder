@@ -59,8 +59,18 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
   if (nombreClean.length < 3 || nombreClean.length > 40) {
     return { error: { message: 'El nombre debe tener entre 3 y 40 caracteres' } };
   }
-  if (modalidad != null && !esModalidadValida(modalidad)) {
-    return { error: { message: 'Modalidad no válida' } };
+  // Modalidad, región y comuna dejaron de ser opcionales: un club sin ellas
+  // no se puede ubicar ni saber a qué juega. La pantalla ya deshabilita el
+  // botón sin los cuatro datos; esto es la misma regla del lado del
+  // servicio, para quien llame a `createClub()` sin pasar por esa pantalla.
+  if (!esModalidadValida(modalidad)) {
+    return { error: { message: 'Elige una modalidad' } };
+  }
+  if (!region) {
+    return { error: { message: 'Elige una región' } };
+  }
+  if (!comuna) {
+    return { error: { message: 'Elige una comuna' } };
   }
 
   // Máximo 3 clubes por jugador
