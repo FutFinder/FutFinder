@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ShieldCheck, TrendingUp, TrendingDown } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F, alfa } from '../theme/colors';
 import { getTrustScoreHistory } from '../services/settings';
 import { getMyProfile } from '../services/profile';
 
@@ -33,7 +33,7 @@ function HistoryItem({ item }) {
 
   return (
     <View style={styles.item}>
-      <View style={[styles.iconBubble, { backgroundColor: isPositive ? C.greenSoft : 'rgba(237,107,118,0.12)' }]}>
+      <View style={[styles.iconBubble, { backgroundColor: isPositive ? C.greenSoft : alfa(C.red, 0.12) }]}>
         <Icon color={color} size={16} />
       </View>
       <View style={styles.itemInfo}>

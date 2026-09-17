@@ -16,6 +16,7 @@ import {
   reservas as C,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import {
   listMyFriends,
@@ -455,9 +456,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     minHeight: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(85,223,105,0.12)',
+    backgroundColor: alfa(C.green, 0.12),
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.35)',
+    borderColor: alfa(C.green, 0.35),
   },
   doneAcceptedText: { color: C.green, fontSize: 13, fontFamily: F.extraBold },
   doneRejected: {
@@ -487,9 +488,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 13,
     borderRadius: 18,
-    backgroundColor: 'rgba(85,223,105,0.14)',
+    backgroundColor: alfa(C.green, 0.14),
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.4)',
+    borderColor: alfa(C.green, 0.4),
   },
   chatBtnText: { color: C.green, fontSize: 12, fontFamily: F.extraBold },
 
@@ -512,9 +513,9 @@ const styles = StyleSheet.create({
     width: 62,
     height: 62,
     borderRadius: 20,
-    backgroundColor: 'rgba(85,223,105,0.08)',
+    backgroundColor: alfa(C.green, 0.08),
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.28)',
+    borderColor: alfa(C.green, 0.28),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -536,7 +537,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 23,
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.45)',
+    borderColor: alfa(C.green, 0.45),
   },
   emptyBtnText: { color: C.green, fontSize: 13, fontFamily: F.extraBold },
 });

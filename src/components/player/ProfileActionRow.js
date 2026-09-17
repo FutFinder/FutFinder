@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -40,7 +41,7 @@ export default function ProfileActionRow({
       <View style={[styles.icon, danger && styles.iconDanger]}>{icon}</View>
       <Text style={[styles.label, danger && styles.labelDanger]}>{label}</Text>
       <ChevronRight
-        color={danger ? 'rgba(237,107,118, 0.55)' : 'rgba(255, 255, 255, 0.35)'}
+        color={danger ? alfa(C.red, 0.55) : 'rgba(255, 255, 255, 0.35)'}
         size={16}
         strokeWidth={2.2}
       />
@@ -62,20 +63,20 @@ const styles = StyleSheet.create({
     padding: 13,
   },
   rowDanger: {
-    backgroundColor: 'rgba(237,107,118, 0.07)',
-    borderColor: 'rgba(237,107,118, 0.35)',
+    backgroundColor: alfa(C.red, 0.07),
+    borderColor: alfa(C.red, 0.35),
   },
   pressed: { backgroundColor: C.surfaceHover },
-  pressedDanger: { backgroundColor: 'rgba(237,107,118, 0.14)' },
+  pressedDanger: { backgroundColor: alfa(C.red, 0.14) },
   icon: {
     width: 36,
     height: 36,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(85,223,105, 0.12)',
+    backgroundColor: alfa(C.green, 0.12),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconDanger: { backgroundColor: 'rgba(237,107,118, 0.14)' },
+  iconDanger: { backgroundColor: alfa(C.red, 0.14) },
   label: { flex: 1, color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
   labelDanger: { color: C.loss },
 });

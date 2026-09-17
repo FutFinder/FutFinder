@@ -28,6 +28,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import { Pill, Tag, Avatar, PrimaryButton, SurfaceButton } from '../components/partidos/ui';
 import PartidoCard from '../components/partidos/PartidoCard';
@@ -989,7 +990,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerBtnActive: { backgroundColor: 'rgba(85,223,105,0.13)', borderColor: C.greenBorder },
+  headerBtnActive: { backgroundColor: alfa(C.green, 0.13), borderColor: C.greenBorder },
   headerBadge: {
     position: 'absolute',
     top: -3,
@@ -1036,7 +1037,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  searchActive: { borderColor: 'rgba(85,223,105,0.45)' },
+  searchActive: { borderColor: alfa(C.green, 0.45) },
   searchInput: {
     flex: 1,
     minWidth: 0,

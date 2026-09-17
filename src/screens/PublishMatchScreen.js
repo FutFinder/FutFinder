@@ -28,6 +28,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import {
   Card,
@@ -1206,7 +1207,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: 'rgba(237,107,118,0.09)',
+    backgroundColor: alfa(C.red, 0.09),
     borderWidth: 1,
     borderColor: C.redBorder,
     borderRadius: R.row,
@@ -1219,7 +1220,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: 'rgba(85,223,105,0.10)',
+    backgroundColor: alfa(C.green, 0.10),
     borderWidth: 1,
     borderColor: C.greenBorder,
     borderRadius: R.row,
@@ -1266,7 +1267,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: 'rgba(85,223,105,0.35)',
+    borderColor: alfa(C.green, 0.35),
   },
   locBtnText: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
 
@@ -1283,7 +1284,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 24,
-    backgroundColor: 'rgba(85,223,105,0.13)',
+    backgroundColor: alfa(C.green, 0.13),
     borderWidth: 1,
     borderColor: C.greenBorder,
     alignItems: 'center',

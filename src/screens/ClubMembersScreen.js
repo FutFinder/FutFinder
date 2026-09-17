@@ -38,6 +38,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import { etiquetaPosiciones } from '../utils/playerMeta';
 import Banner from '../components/Banner';
@@ -1228,7 +1229,7 @@ const styles = StyleSheet.create({
     borderRadius: R.row,
     borderWidth: 1,
     borderColor: C.loss,
-    backgroundColor: 'rgba(237,107,118, 0.1)',
+    backgroundColor: alfa(C.red, 0.1),
   },
   leaveText: {
     color: C.loss,

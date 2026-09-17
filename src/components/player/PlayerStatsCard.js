@@ -6,6 +6,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -107,8 +108,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   cellHighlight: {
-    backgroundColor: 'rgba(85,223,105, 0.11)',
-    borderColor: 'rgba(85,223,105, 0.24)',
+    backgroundColor: alfa(C.green, 0.11),
+    borderColor: alfa(C.green, 0.24),
   },
   cellValue: {
     color: C.textPrimary,
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     marginTop: 4,
   },
-  cellLabelHighlight: { color: 'rgba(85,223,105, 0.75)' },
+  cellLabelHighlight: { color: alfa(C.green, 0.75) },
   cellLabelDim: { color: 'rgba(255, 255, 255, 0.4)' },
 
   attRow: {

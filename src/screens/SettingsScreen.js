@@ -40,7 +40,7 @@ import {
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F, alfa } from '../theme/colors';
 import { Card, SectionLabel, Sheet, Button, IconButton } from '../components/reservas/ui';
 import NotificationBell from '../components/NotificationBell';
 import Banner from '../components/Banner';
@@ -1155,7 +1155,7 @@ const styles = StyleSheet.create({
 
   footerBtns: { gap: 10, marginTop: 22 },
   deleteBtn: {
-    height: 48, borderRadius: R.ctaSecondary, borderWidth: 1, borderColor: 'rgba(237,107,118,0.35)',
+    height: 48, borderRadius: R.ctaSecondary, borderWidth: 1, borderColor: alfa(C.red, 0.35),
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   deleteBtnText: { fontFamily: F.bold, color: C.red, fontSize: 14.5 },

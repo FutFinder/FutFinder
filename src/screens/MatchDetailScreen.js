@@ -41,6 +41,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import {
   Avatar,
@@ -1863,9 +1864,9 @@ const styles = StyleSheet.create({
   wlName: { flex: 1, fontSize: 12.5, fontFamily: F.semiBold, color: C.textStrong },
 
   blockCard: {
-    backgroundColor: 'rgba(237,107,118,0.07)',
+    backgroundColor: alfa(C.red, 0.07),
     borderWidth: 1,
-    borderColor: 'rgba(237,107,118,0.30)',
+    borderColor: alfa(C.red, 0.30),
     borderRadius: R.cardSm,
     padding: 15,
     gap: 11,
@@ -1874,7 +1875,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 11,
-    backgroundColor: 'rgba(237,107,118,0.14)',
+    backgroundColor: alfa(C.red, 0.14),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1921,7 +1922,7 @@ const styles = StyleSheet.create({
     gap: 11,
     padding: 13,
     borderRadius: R.row,
-    backgroundColor: 'rgba(85,223,105,0.11)',
+    backgroundColor: alfa(C.green, 0.11),
     borderWidth: 1,
     borderColor: C.greenBorder,
   },
@@ -1929,7 +1930,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 11,
-    backgroundColor: 'rgba(85,223,105,0.18)',
+    backgroundColor: alfa(C.green, 0.18),
     alignItems: 'center',
     justifyContent: 'center',
   },

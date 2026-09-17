@@ -5,7 +5,7 @@ import { Check } from 'lucide-react-native';
 
 import FutfinderMark from '../components/FutfinderMark';
 import { Button } from '../components/reservas/ui';
-import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { reservas as C, reservasFonts as F, alfa } from '../theme/colors';
 
 
 /**
@@ -67,9 +67,9 @@ function Step2Crear() {
 
 function AsistenciaRow({ letter, handle, estado, tono }) {
   const paleta = {
-    ok: { bg: 'rgba(85,223,105,.09)', border: C.greenDeepBorder, avatarBg: C.shieldBg, avatarBorder: C.greenDeepBorder, text: C.green },
+    ok: { bg: alfa(C.green, 0.09), border: C.greenDeepBorder, avatarBg: C.shieldBg, avatarBorder: C.greenDeepBorder, text: C.green },
     pendiente: { bg: 'rgba(255,255,255,.03)', border: C.border, avatarBg: C.surfaceAlt, avatarBorder: C.border, text: C.textSecondary },
-    no: { bg: 'rgba(237,107,118,.08)', border: 'rgba(237,107,118,.32)', avatarBg: '#241618', avatarBorder: 'rgba(237,107,118,.22)', text: C.red },
+    no: { bg: alfa(C.red, 0.08), border: alfa(C.red, 0.32), avatarBg: '#241618', avatarBorder: alfa(C.red, 0.22), text: C.red },
   }[tono];
   return (
     <View style={[styles.asistRow, { backgroundColor: paleta.bg, borderColor: paleta.border }]}>
@@ -133,11 +133,11 @@ function Step5Club() {
           </View>
         </View>
         <View style={{ flexDirection: 'row', gap: 6, marginTop: 12 }}>
-          <View style={[styles.recordTile, { backgroundColor: 'rgba(85,223,105,.09)', borderColor: 'rgba(85,223,105,.28)' }]}>
+          <View style={[styles.recordTile, { backgroundColor: alfa(C.green, 0.09), borderColor: alfa(C.green, 0.28) }]}>
             <Text style={[styles.recordNumber, { color: C.green }]}>8</Text><Text style={styles.recordCaption}>V</Text>
           </View>
           <View style={styles.recordTile}><Text style={styles.recordNumber}>3</Text><Text style={styles.recordCaption}>E</Text></View>
-          <View style={[styles.recordTile, { backgroundColor: 'rgba(237,107,118,.08)', borderColor: 'rgba(237,107,118,.28)' }]}>
+          <View style={[styles.recordTile, { backgroundColor: alfa(C.red, 0.08), borderColor: alfa(C.red, 0.28) }]}>
             <Text style={[styles.recordNumber, { color: C.red }]}>2</Text><Text style={styles.recordCaption}>D</Text>
           </View>
           <View style={styles.recordTile}><Text style={styles.recordNumber}>4.6</Text><Text style={styles.recordCaption}>RAT</Text></View>
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
   pillNeutral: { backgroundColor: C.surfaceAlt, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 6 },
   pillNeutralText: { fontFamily: F.semiBold, fontSize: 11.5, color: C.textSecondary },
   pillGreen: {
-    backgroundColor: 'rgba(85,223,105,.12)', borderWidth: 1, borderColor: C.greenDeepBorder,
+    backgroundColor: alfa(C.green, 0.12), borderWidth: 1, borderColor: C.greenDeepBorder,
     borderRadius: 9, paddingHorizontal: 10, paddingVertical: 5,
   },
   pillGreenText: { fontFamily: F.bold, fontSize: 11.5, color: C.green },
@@ -315,14 +315,14 @@ const styles = StyleSheet.create({
   },
   previewCtaText: { fontFamily: F.bold, fontSize: 14.5, color: C.textOnGreen },
   previewCtaSoft: {
-    height: 44, borderRadius: 14, backgroundColor: 'rgba(85,223,105,.12)', borderWidth: 1,
+    height: 44, borderRadius: 14, backgroundColor: alfa(C.green, 0.12), borderWidth: 1,
     borderColor: C.greenDeepBorder, alignItems: 'center', justifyContent: 'center',
   },
   previewCtaSoftText: { fontFamily: F.bold, fontSize: 14.5, color: C.green },
 
   modeChip: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11 },
   modeChipOff: { backgroundColor: C.surfaceAlt },
-  modeChipOn: { backgroundColor: 'rgba(85,223,105,.12)', borderWidth: 1, borderColor: C.greenDeepBorder },
+  modeChipOn: { backgroundColor: alfa(C.green, 0.12), borderWidth: 1, borderColor: C.greenDeepBorder },
 
   progressLabel: { fontFamily: F.bold, fontSize: 14, color: C.textPrimary },
   progressHint: { fontFamily: F.semiBold, fontSize: 12, color: C.textSecondary },

@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 const COLUMNS = 3;
@@ -49,7 +50,7 @@ export default function PlayerPhotoGallery({
             styles.cell,
             styles.addCell,
             { width: size, height: size },
-            pressed && { backgroundColor: 'rgba(85,223,105, 0.15)' },
+            pressed && { backgroundColor: alfa(C.green, 0.15) },
           ]}
         >
           <Plus color={C.green} size={20} strokeWidth={2.4} />
@@ -119,8 +120,8 @@ const styles = StyleSheet.create({
   addCell: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(85,223,105, 0.4)',
-    backgroundColor: 'rgba(85,223,105, 0.08)',
+    borderColor: alfa(C.green, 0.4),
+    backgroundColor: alfa(C.green, 0.08),
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,

@@ -16,6 +16,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import {
   Avatar,
@@ -452,7 +453,7 @@ const styles = StyleSheet.create({
     width: 66,
     height: 66,
     borderRadius: 22,
-    backgroundColor: 'rgba(85,223,105,0.13)',
+    backgroundColor: alfa(C.green, 0.13),
     borderWidth: 1,
     borderColor: C.greenBorder,
     alignItems: 'center',

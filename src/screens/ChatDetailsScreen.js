@@ -17,6 +17,7 @@ import {
   reservas as C,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import {
   parseThreadKey,
@@ -159,7 +160,7 @@ export default function ChatDetailsScreen({ route, navigation }) {
           <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
             {/* Identidad */}
             <LinearGradient
-              colors={['rgba(85,223,105,0.14)', 'rgba(85,223,105,0)']}
+              colors={[alfa(C.green, 0.14), alfa(C.green, 0)]}
               start={{ x: 0, y: 0 }}
               end={{ x: 0.75, y: 1 }}
               style={styles.identity}
@@ -342,8 +343,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   toggleOn: {
-    backgroundColor: 'rgba(85,223,105,0.22)',
-    borderColor: 'rgba(85,223,105,0.45)',
+    backgroundColor: alfa(C.green, 0.22),
+    borderColor: alfa(C.green, 0.45),
     alignItems: 'flex-end',
   },
   knob: {

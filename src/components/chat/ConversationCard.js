@@ -8,6 +8,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import { threadTimeLabel, threadPreview } from '../../utils/chatMeta';
 import { resolveThreadAccent, challengeCardLabel } from '../../utils/challengeThread';
@@ -72,8 +73,8 @@ export default function ConversationCard({ thread, now, onPress }) {
             important
               ? ['rgba(255,190,90,0.12)', 'rgba(255,190,90,0)']
               : accent === 'neon'
-              ? ['rgba(255,45,85,0.14)', 'rgba(255,45,85,0)']
-              : ['rgba(85,223,105,0.13)', 'rgba(85,223,105,0)']
+              ? [alfa(C.neon, 0.14), alfa(C.neon, 0)]
+              : [alfa(C.green, 0.13), alfa(C.green, 0)]
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 0.75, y: 1 }}
@@ -265,9 +266,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 9,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(85,223,105,0.16)',
+    backgroundColor: alfa(C.green, 0.16),
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.34)',
+    borderColor: alfa(C.green, 0.34),
   },
   kindPillImportant: {
     backgroundColor: C.amberSoft,
@@ -275,7 +276,7 @@ const styles = StyleSheet.create({
   },
   kindPillChallenge: {
     backgroundColor: C.neonSoft,
-    borderColor: 'rgba(255,45,85,0.35)',
+    borderColor: alfa(C.neon, 0.35),
   },
   kindPillText: {
     color: C.green,

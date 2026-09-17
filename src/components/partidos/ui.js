@@ -15,6 +15,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -239,7 +240,7 @@ export function Tag({ label, tone = 'neutral' }) {
     neutral: { bg: C.chip, fg: C.textDim },
     green: { bg: C.greenSoft, fg: C.green },
     gold: { bg: 'rgba(240,200,90,0.14)', fg: C.gold },
-    danger: { bg: 'rgba(237,107,118,0.13)', fg: C.red },
+    danger: { bg: alfa(C.red, 0.13), fg: C.red },
     solid: { bg: 'rgba(255,255,255,0.10)', fg: C.textPrimary },
   }[tone];
   return (
@@ -298,8 +299,8 @@ export function Note({ children, icon: Icon = Info, tone = 'plain' }) {
 export function Callout({ title, text, tone = 'gold', icon: Icon, onPress, style }) {
   const map = {
     gold: { bg: C.goldSoft, border: C.goldBorder, fg: C.gold },
-    green: { bg: 'rgba(85,223,105,0.10)', border: C.greenBorder, fg: C.green },
-    danger: { bg: 'rgba(237,107,118,0.09)', border: C.redBorder, fg: C.red },
+    green: { bg: alfa(C.green, 0.10), border: C.greenBorder, fg: C.green },
+    danger: { bg: alfa(C.red, 0.09), border: C.redBorder, fg: C.red },
     neutral: { bg: C.surface, border: C.border, fg: C.textStrong },
   }[tone];
   const Wrapper = onPress ? Pressable : View;
@@ -336,7 +337,7 @@ export function Callout({ title, text, tone = 'gold', icon: Icon, onPress, style
 
 export function Input({ value, onChangeText, placeholder, error, keyboardType, multiline, maxLength, style, prefix, suffix }) {
   const borderColor = error ? C.red : C.border;
-  const bg = error ? 'rgba(237,107,118,0.06)' : C.surface;
+  const bg = error ? alfa(C.red, 0.06) : C.surface;
   if (prefix || suffix) {
     return (
       <View style={[s.inputRow, { borderColor, borderWidth: error ? 1.5 : 1, backgroundColor: bg }, style]}>
@@ -375,7 +376,7 @@ export function Input({ value, onChangeText, placeholder, error, keyboardType, m
 /** Campo que abre un selector (región, comuna, fecha, hora). */
 export function SelectField({ value, placeholder, onPress, error, icon: Icon, chevron = true }) {
   const borderColor = error ? C.red : C.border;
-  const bg = error ? 'rgba(237,107,118,0.06)' : C.surface;
+  const bg = error ? alfa(C.red, 0.06) : C.surface;
   return (
     <Pressable
       onPress={onPress}
@@ -457,7 +458,7 @@ export function RadioRow({ label, desc, selected, onPress, error }) {
           gap: 11,
           padding: 13,
           borderRadius: R.row,
-          backgroundColor: error ? 'rgba(237,107,118,0.06)' : C.surface,
+          backgroundColor: error ? alfa(C.red, 0.06) : C.surface,
           borderWidth: error ? 1.5 : 1,
           borderColor: error ? C.red : selected ? C.greenBorder : C.border,
         },
@@ -531,7 +532,7 @@ export function Stepper({ value, onChange, min = 1, max = 30, error }) {
         borderRadius: R.row,
         borderWidth: error ? 1.5 : 0,
         borderColor: error ? C.red : 'transparent',
-        backgroundColor: error ? 'rgba(237,107,118,0.06)' : 'transparent',
+        backgroundColor: error ? alfa(C.red, 0.06) : 'transparent',
       }}
     >
       <Pressable
@@ -591,7 +592,7 @@ export function StatCell({ value, label, highlight, small }) {
         flex: 1,
         backgroundColor: C.surface,
         borderWidth: 1,
-        borderColor: highlight ? 'rgba(85,223,105,0.30)' : C.hairline,
+        borderColor: highlight ? alfa(C.green, 0.30) : C.hairline,
         borderRadius: R.row,
         paddingVertical: 10,
         paddingHorizontal: 6,
@@ -794,7 +795,7 @@ const s = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: R.row,
-    backgroundColor: 'rgba(85,223,105,0.14)',
+    backgroundColor: alfa(C.green, 0.14),
     borderWidth: 1,
     borderColor: C.greenBorder,
     alignItems: 'center',

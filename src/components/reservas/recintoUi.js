@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import { Card, Sheet, Button } from './ui';
 import { formatCLP } from '../../services/reservasRules';
@@ -58,7 +59,7 @@ export function SkeletonLineas({ lineas = 3, style }) {
 export function StatusBanner({ texto, tono = 'amber', onPress, accion }) {
   const map = {
     amber: { bg: C.amberSoft, border: C.amberBorder, fg: C.textAmber },
-    red: { bg: 'rgba(237,107,118,0.14)', border: 'rgba(237,107,118,0.4)', fg: C.red },
+    red: { bg: alfa(C.red, 0.14), border: alfa(C.red, 0.4), fg: C.red },
   }[tono] || { bg: C.amberSoft, border: C.amberBorder, fg: C.textAmber };
 
   const contenido = (

@@ -38,6 +38,39 @@
 // las familias comparten verde, fondo y rojo.
 
 /**
+ * El mismo color de la paleta, con otra opacidad.
+ *
+ * POR QUÉ HACE FALTA. Un borde al 35% y un fondo al 12% del verde de acción
+ * son el MISMO color, pero escritos a mano quedan como `rgba(85,223,105,0.35)`
+ * y `rgba(85,223,105,0.12)`: dos literales que no saben que vienen de `green`.
+ * Llegaron a ser ~180 repartidos por la app, con cuarenta opacidades distintas
+ * y escritos de cuatro formas (`0.4`, `0.40`, `.16`). El día que el verde
+ * cambie, ninguno lo sigue.
+ *
+ * Tokens fijos no sirven acá: no son cuatro alfas repetidos, son cuarenta
+ * elegidos uno por uno para su sitio. Lo que tiene que ser único es el COLOR;
+ * la opacidad es una decisión local y se queda donde está.
+ *
+ *     backgroundColor: alfa(C.green, 0.12)
+ *
+ * Acepta `#RGB` y `#RRGGBB`. Si le llega algo que no sabe leer devuelve el
+ * valor tal cual en vez de lanzar: un color raro se ve raro, pero una pantalla
+ * que revienta al montarse no se ve.
+ */
+export function alfa(color, opacidad) {
+  if (typeof color !== 'string') return color;
+  const hex = color.trim().replace('#', '');
+  const corto = hex.length === 3;
+  if (hex.length !== 6 && !corto) return color;
+  const lee = (c) => parseInt(corto ? c + c : c, 16);
+  const r = lee(corto ? hex[0] : hex.slice(0, 2));
+  const g = lee(corto ? hex[1] : hex.slice(2, 4));
+  const b = lee(corto ? hex[2] : hex.slice(4, 6));
+  if ([r, g, b].some(Number.isNaN)) return color;
+  return `rgba(${r}, ${g}, ${b}, ${opacidad})`;
+}
+
+/**
  * LA PALETA. Todo lo demás en este archivo sale de acá.
  *
  * Nació del handoff «Reservas» (`Reservas.dc.html`) y comparte diseñador y

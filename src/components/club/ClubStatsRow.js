@@ -6,6 +6,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -27,7 +28,7 @@ export default function ClubStatsRow({ record, ratingLabel }) {
         value={record.v}
         label="V"
         valueColor={C.win}
-        labelColor="rgba(85,223,105, 0.75)"
+        labelColor={alfa(C.green, 0.75)}
         cellStyle={styles.cellWin}
       />
       <Cell value={record.e} label="E" />
@@ -35,7 +36,7 @@ export default function ClubStatsRow({ record, ratingLabel }) {
         value={record.d}
         label="D"
         valueColor={C.loss}
-        labelColor="rgba(237,107,118, 0.7)"
+        labelColor={alfa(C.red, 0.7)}
         cellStyle={styles.cellLoss}
       />
       <View
@@ -77,12 +78,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   cellWin: {
-    backgroundColor: 'rgba(85,223,105, 0.11)',
-    borderColor: 'rgba(85,223,105, 0.24)',
+    backgroundColor: alfa(C.green, 0.11),
+    borderColor: alfa(C.green, 0.24),
   },
   cellLoss: {
-    backgroundColor: 'rgba(237,107,118, 0.10)',
-    borderColor: 'rgba(237,107,118, 0.24)',
+    backgroundColor: alfa(C.red, 0.10),
+    borderColor: alfa(C.red, 0.24),
   },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   value: {

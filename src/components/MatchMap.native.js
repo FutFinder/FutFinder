@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { Search as SearchIcon } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasFonts as F, alfa } from '../theme/colors';
 
 function fmtHora(iso) {
   try {
@@ -230,9 +230,9 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: 'rgba(85,223,105,0.22)',
+    backgroundColor: alfa(C.green, 0.22),
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.45)',
+    borderColor: alfa(C.green, 0.45),
     alignItems: 'center',
     justifyContent: 'center',
   },

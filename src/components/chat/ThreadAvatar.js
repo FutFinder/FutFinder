@@ -6,6 +6,7 @@ import { Shield, Video, Swords } from 'lucide-react-native';
 import {
   reservas as C,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import { initialOf } from '../../utils/chatMeta';
 
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   clubShield: {
-    borderColor: 'rgba(85,223,105,0.5)',
+    borderColor: alfa(C.green, 0.5),
     shadowColor: C.green,
     shadowOpacity: 0.22,
     shadowRadius: 12,

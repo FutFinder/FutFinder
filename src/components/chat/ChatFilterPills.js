@@ -5,6 +5,7 @@ import {
   reservas as C,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import { CHAT_FILTERS } from '../../utils/chatMeta';
 
@@ -75,8 +76,8 @@ const styles = StyleSheet.create({
     borderColor: C.borderSoft,
   },
   pillActive: {
-    backgroundColor: 'rgba(85,223,105,0.14)',
-    borderColor: 'rgba(85,223,105,0.45)',
+    backgroundColor: alfa(C.green, 0.14),
+    borderColor: alfa(C.green, 0.45),
   },
   label: {
     color: 'rgba(255,255,255,0.6)',

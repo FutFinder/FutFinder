@@ -29,6 +29,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import Banner from '../Banner';
 import BrandMark from '../BrandMark';
@@ -614,7 +615,7 @@ const styles = StyleSheet.create({
   },
   invAccept: { backgroundColor: C.green },
   invReject: {
-    backgroundColor: 'rgba(237,107,118,0.12)',
+    backgroundColor: alfa(C.red, 0.12),
     borderWidth: 1,
     borderColor: C.red,
   },

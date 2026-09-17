@@ -7,6 +7,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import {
   cuotaLabel,
@@ -210,7 +211,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(85,223,105,0.11)',
+    backgroundColor: alfa(C.green, 0.11),
   },
   whenText: { fontSize: 11.5, fontFamily: F.bold, color: C.green, letterSpacing: -0.2 },
   clubBadge: {

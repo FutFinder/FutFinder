@@ -27,6 +27,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import Banner from '../components/Banner';
 import { IconButton } from '../components/reservas/ui';
@@ -413,8 +414,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: R.pill,
     borderWidth: 1,
-    borderColor: 'rgba(237,107,118,0.4)',
-    backgroundColor: 'rgba(237,107,118,0.14)',
+    borderColor: alfa(C.red, 0.4),
+    backgroundColor: alfa(C.red, 0.14),
   },
   viewerDeleteText: { fontFamily: F.bold, fontSize: 14, color: C.red },
 });

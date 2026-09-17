@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /** A partir de cuántos caracteres ofrecemos "Ver más". */
@@ -85,8 +86,8 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(85,223,105, 0.35)',
-    backgroundColor: 'rgba(85,223,105, 0.06)',
+    borderColor: alfa(C.green, 0.35),
+    backgroundColor: alfa(C.green, 0.06),
     borderRadius: R.iconBtn,
     flexDirection: 'row',
     alignItems: 'center',

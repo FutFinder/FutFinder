@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertTriangle, Lock } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F, alfa } from '../theme/colors';
 import { Card, IconButton, Button, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { ChoiceCard, FieldLabel, TextField, TimeField } from '../components/reservas/recintoUi';
 import { crearBloqueo } from '../services/recinto';
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   ayuda: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary, lineHeight: 16.5, marginTop: 7 },
   errorCampo: { fontFamily: F.semiBold, fontSize: 11.5, color: C.red, marginTop: 6 },
 
-  choqueCard: { borderColor: 'rgba(237,107,118,0.4)', backgroundColor: 'rgba(237,107,118,0.08)' },
+  choqueCard: { borderColor: alfa(C.red, 0.4), backgroundColor: alfa(C.red, 0.08) },
   choqueTitulo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   choqueTituloTexto: { flex: 1, fontFamily: F.extraBold, fontSize: 14.5, color: C.textPrimary },
   choqueTexto: { fontFamily: F.medium, fontSize: 12.5, color: C.textSecondary, lineHeight: 18, marginTop: 8 },

@@ -25,6 +25,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import {
   Callout,
@@ -1090,7 +1091,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: 'rgba(85,223,105,0.35)',
+    borderColor: alfa(C.green, 0.35),
   },
   locBtnText: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
 

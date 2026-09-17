@@ -27,6 +27,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import Banner from '../components/Banner';
 import SectionHeader from '../components/ds/SectionHeader';
@@ -822,8 +823,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: 'rgba(237,107,118, 0.35)',
-    backgroundColor: 'rgba(237,107,118, 0.07)',
+    borderColor: alfa(C.red, 0.35),
+    backgroundColor: alfa(C.red, 0.07),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -867,8 +868,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: 'rgba(237,107,118, 0.35)',
-    backgroundColor: 'rgba(237,107,118, 0.10)',
+    borderColor: alfa(C.red, 0.35),
+    backgroundColor: alfa(C.red, 0.10),
     alignItems: 'center',
     justifyContent: 'center',
   },

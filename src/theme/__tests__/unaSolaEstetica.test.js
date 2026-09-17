@@ -139,6 +139,8 @@ test('el theme exporta UNA sola paleta de color', () => {
     // No son paletas: son tonos semánticos y superficies con valores medidos,
     // que el tema de club no puede repintar. Ver `clubThemes.test.js`.
     'clubTonos', 'clubSuperficies',
+    // Tampoco: es la función que aplica una opacidad a un color de la paleta.
+    'alfa',
   ]);
   const exportados = Object.keys(tema);
   const intrusos = exportados.filter((k) => !permitidos.has(k));

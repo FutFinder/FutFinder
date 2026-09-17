@@ -16,6 +16,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import { MOTIVOS_REPORTE } from '../../services/reports';
 
@@ -271,8 +272,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.chip,
   },
   reasonActive: {
-    borderColor: 'rgba(85,223,105, 0.4)',
-    backgroundColor: 'rgba(85,223,105, 0.10)',
+    borderColor: alfa(C.green, 0.4),
+    backgroundColor: alfa(C.green, 0.10),
   },
   reasonText: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.semiBold, flexShrink: 1 },
   reasonTextActive: { color: C.green, fontFamily: F.bold },
@@ -346,8 +347,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
     borderRadius: R.iconBtn,
     borderWidth: 1,
-    borderColor: 'rgba(237,107,118, 0.35)',
-    backgroundColor: 'rgba(237,107,118, 0.10)',
+    borderColor: alfa(C.red, 0.35),
+    backgroundColor: alfa(C.red, 0.10),
     alignItems: 'center',
     justifyContent: 'center',
   },

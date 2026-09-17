@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -162,7 +163,7 @@ const styles = StyleSheet.create({
     borderRadius: R.cardSm,
     overflow: 'hidden',
   },
-  cardSanction: { borderColor: 'rgba(237,107,118, 0.28)' },
+  cardSanction: { borderColor: alfa(C.red, 0.28) },
 
   header: {
     flexDirection: 'row',
@@ -171,8 +172,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 12,
   },
-  headerOk: { backgroundColor: 'rgba(85,223,105, 0.08)' },
-  headerSanction: { backgroundColor: 'rgba(237,107,118, 0.08)' },
+  headerOk: { backgroundColor: alfa(C.green, 0.08) },
+  headerSanction: { backgroundColor: alfa(C.red, 0.08) },
   headerIcon: {
     width: 36,
     height: 36,
@@ -180,8 +181,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconOk: { backgroundColor: 'rgba(85,223,105, 0.14)' },
-  iconSanction: { backgroundColor: 'rgba(237,107,118, 0.14)' },
+  iconOk: { backgroundColor: alfa(C.green, 0.14) },
+  iconSanction: { backgroundColor: alfa(C.red, 0.14) },
   headerTexts: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 13.5, fontFamily: F.bold },
   headerSub: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 11.5, marginTop: 2 },

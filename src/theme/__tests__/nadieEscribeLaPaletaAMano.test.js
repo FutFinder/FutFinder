@@ -36,10 +36,11 @@ const path = require('node:path');
  * sacarlo del archivo y usar el token (`reservas.*`) o, en NativeWind, la
  * clase con nombre que define `tailwind.config.js`.
  *
- * LO QUE NO CUBRE, dicho de frente: no prohíbe escribir a mano un color que SÍ
- * es de la paleta actual (`#55DF69`, `rgba(85,223,105,0.12)`). Eso sigue
- * siendo deuda —hay ~130 alfas literales que deberían salir de un token— pero
- * no es un fallo: pinta bien. Esta prueba existe para lo que pinta MAL.
+ * Y DESDE QUE EXISTE `alfa()` TAMPOCO SE ESCRIBE LA PALETA ACTUAL A MANO.
+ * Había ~150 `rgba(85,223,105,0.35)` con cuarenta opacidades distintas: el
+ * color correcto, pero escrito de nuevo en cada sitio, así que el día que el
+ * verde cambie ninguno lo sigue. Ahora se escribe `alfa(C.green, 0.35)` y el
+ * color tiene un solo dueño. La segunda prueba de este archivo lo vigila.
  */
 
 const RAIZ = path.resolve(__dirname, '../..');
@@ -108,6 +109,34 @@ test('ningún color de las paletas borradas está escrito a mano en src/', () =>
     'Hay colores de las paletas borradas escritos a mano. Usa el token de '
       + '`reservas`, o la clase con nombre de `tailwind.config.js` si es '
       + `NativeWind:\n  ${hallazgos.join('\n  ')}`
+  );
+});
+
+/** Las tripletas de la paleta ACTUAL: correctas, pero no se escriben a mano. */
+const A_MANO = {
+  '85,223,105': 'green',
+  '237,107,118': 'red',
+  '232,179,75': 'amber',
+  '255,45,85': 'neon',
+};
+
+test('la paleta actual tampoco se escribe a mano: para eso está alfa()', () => {
+  const hallazgos = [];
+  for (const archivo of archivosDeFuente()) {
+    const codigo = fs.readFileSync(archivo, 'utf8');
+    const relativo = path.relative(RAIZ, archivo);
+    for (const [rgb, nombre] of Object.entries(A_MANO)) {
+      const [r, g, b] = rgb.split(',');
+      const re = new RegExp(`rgba?\\(\\s*${r}\\s*,\\s*${g}\\s*,\\s*${b}\\s*[,)]`, 'g');
+      const veces = (codigo.match(re) || []).length;
+      if (veces > 0) hallazgos.push(`${relativo}: ${nombre} × ${veces}`);
+    }
+  }
+  assert.deepEqual(
+    hallazgos,
+    [],
+    'Estos escriben un color de la paleta con su opacidad en vez de usar '
+      + `\`alfa(C.<color>, opacidad)\`:\n  ${hallazgos.join('\n  ')}`
   );
 });
 

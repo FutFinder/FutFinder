@@ -9,6 +9,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -257,7 +258,7 @@ export function Chip({ label, active, onPress, icon: Icon, style }) {
 export function Badge({ label, tone = 'green' }) {
   const map = {
     green: { bg: C.shieldBg, border: C.greenDeepBorder, fg: C.green },
-    red: { bg: 'rgba(237,107,118,0.14)', border: 'rgba(237,107,118,0.4)', fg: C.red },
+    red: { bg: alfa(C.red, 0.14), border: alfa(C.red, 0.4), fg: C.red },
     amber: { bg: C.amberSoft, border: C.amberBorder, fg: C.textAmber },
     neutral: { bg: C.surfaceAlt, border: C.border, fg: C.textSecondary },
   }[tone];

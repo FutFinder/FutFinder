@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -197,9 +198,9 @@ const styles = StyleSheet.create({
     width: 74,
     height: 74,
     borderRadius: 24,
-    backgroundColor: 'rgba(85,223,105,0.08)',
+    backgroundColor: alfa(C.green, 0.08),
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.28)',
+    borderColor: alfa(C.green, 0.28),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -240,7 +241,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.45)',
+    borderColor: alfa(C.green, 0.45),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(85,223,105,0.45)',
+    borderColor: alfa(C.green, 0.45),
   },
   dashedBtnText: { color: C.green, fontSize: 12.5, fontFamily: F.extraBold },
 });

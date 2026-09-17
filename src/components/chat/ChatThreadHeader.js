@@ -8,6 +8,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -36,7 +37,7 @@ export default function ChatThreadHeader({
   const Bar = isClub ? LinearGradient : View;
   const barProps = isClub
     ? {
-        colors: ['rgba(85,223,105,0.12)', 'rgba(85,223,105,0)'],
+        colors: [alfa(C.green, 0.12), alfa(C.green, 0)],
         start: { x: 0, y: 0 },
         end: { x: 0, y: 1 },
       }
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   barPlain: { borderBottomColor: C.hairline },
-  barClub: { borderBottomColor: 'rgba(85,223,105,0.26)' },
+  barClub: { borderBottomColor: alfa(C.green, 0.26) },
 
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
