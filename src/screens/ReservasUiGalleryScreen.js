@@ -21,7 +21,7 @@ import {
   NoticeCard,
   StickyFooter,
 } from '../components/reservas/ui';
-import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { paleta as C, fuentes as F } from '../theme/colors';
 
 /**
  * Pantalla interna de QA — NO es parte del producto.

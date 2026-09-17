@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, AlertTriangle, MapPin, CalendarDays } from 'lucide-react-native';
 
 import {
-  reservas as C, reservasSizes as S, reservasFonts as F, reservasRadius as R,
+  paleta as C, medidas as S, fuentes as F, radios as R,
 } from '../theme/colors';
 import { Card, IconButton, Button, Badge, NoticeCard, Sheet, Foto } from '../components/reservas/ui';
 import { Skeleton } from '../components/reservas/recintoUi';

@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MapPin, ChevronRight, Crown } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { reservas as C, clubTonos, clubSuperficies, reservasFonts as F, alfa } from '../../theme/colors';
+import { paleta as C, clubTonos, clubSuperficies, fuentes as F, alfa } from '../../theme/colors';
 import ClubLogo from './ClubLogo';
 import VerifiedBadge from './VerifiedBadge';
 

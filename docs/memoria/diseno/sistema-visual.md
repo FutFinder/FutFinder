@@ -8,8 +8,8 @@ Mantener las convenciones visuales verificadas del código para que los cambios 
 
 ## La paleta, que es una sola
 
-`src/theme/colors.js` exporta **una** paleta: `reservas`, con
-`reservasRadius`, `reservasSizes` y `reservasFonts` (Manrope, cargada en
+`src/theme/colors.js` exporta **una** paleta: `paleta`, con
+`radios`, `medidas` y `fuentes` (Manrope, cargada en
 `App.js` con `expo-font`). Fondo `#0A0C0A`, superficie `#131613`, verde de
 acción `#55DF69`, ocho escalones de texto de `#F4F6F4` a `#565E57`.
 
@@ -34,7 +34,7 @@ Diseño y fases: `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 Los colores que llevan **significado** y no estética: victoria/empate/derrota,
 el dorado Premium, el ámbar de advertencia y el `#FF2D55` del desafío recién
 aceptado (que no es un rojo de error: es «hay un partido nuevo que
-coordinar»). Viven dentro de `reservas` como tokens propios.
+coordinar»). Viven dentro de `paleta` como tokens propios.
 
 `clubTonos` y `clubSuperficies` tampoco: sus valores están **medidos**
 —`clubThemes.test.js` exige distancia de color entre el peligro y el tema rojo
@@ -64,7 +64,7 @@ rojo») sería una regla sorprendente. No es deuda pendiente.
 - `src/components/player/`: héroe, biografía, estadísticas, reputación, participación, acciones públicas, tarjetas de cuenta/soporte, galería, reporte y skeleton de perfil.
 - `src/components/partidos/`: hojas, filtros, selectores, tarjeta de partido, vistas de estado y primitivas `ui`.
 - `src/components/BrandMark.js`: única fuente del logo "fut**finder**" (pin + wordmark) para el header de las pantallas ya logueadas. Sin props de tamaño ni color — usa siempre los tokens de `tactical` (`neon` y `text`), sea cual sea la pantalla que lo aloja. Se usa en Home, Partidos y Chat; el onboarding (`Logo.js`, el ícono de balón) es una marca distinta y no lo usa. `src/screens/SplashScreen.js` tampoco renderiza `<BrandMark />`: reconstruye a mano el mismo ícono `MapPin`/`tactical.neon` y el mismo wordmark (mismo tamaño, mismo estilo) como dos piezas independientes, porque necesita animar el pin y el texto en momentos distintos (el pin se asienta, después el texto se desliza a su derecha) y `BrandMark` no expone sus partes por separado. Fondo del splash: `clubsExplorer.bg`, no `tactical.bg` ni la paleta global.
-- `src/components/NotificationBell.js`: campana de avisos global, con el mismo criterio de tokens fijos (`reservas`) que `BrandMark`. Vive arriba a la derecha en las 6 pantallas raíz de pestaña (Home, Partidos, Clubes cuando no hay club propio, Reservas, Chat, Perfil propio) y en varias pantallas internas que ya la traían. Nunca aparece en "Mi club" (`ClubHeaderBar`) ni al ver el perfil de otro jugador.
+- `src/components/NotificationBell.js`: campana de avisos global, con el mismo criterio de tokens fijos (`paleta`) que `BrandMark`. Vive arriba a la derecha en las 6 pantallas raíz de pestaña (Home, Partidos, Clubes cuando no hay club propio, Reservas, Chat, Perfil propio) y en varias pantallas internas que ya la traían. Nunca aparece en "Mi club" (`ClubHeaderBar`) ni al ver el perfil de otro jugador.
 
 El copy visible se mantiene en español. Los componentes reciben labels ya resueltos desde sus utilidades de dominio cuando corresponde: por ejemplo, `TagBadge` no decide modalidad, posición ni nivel, y sólo representa el label recibido.
 

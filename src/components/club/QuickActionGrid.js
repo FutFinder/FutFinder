@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Rows3, Swords, Search, CalendarDays, Users, Settings } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { reservas as C, clubSuperficies, reservasFonts as F } from '../../theme/colors';
+import { paleta as C, clubSuperficies, fuentes as F } from '../../theme/colors';
 
 /**
  * Los accesos rápidos del club, en grilla de tres.

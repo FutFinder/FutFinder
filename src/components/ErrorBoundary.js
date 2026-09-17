@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { TriangleAlert, RotateCcw, ArrowLeft } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F, alfa } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
 
 /**
  * Red de seguridad para una excepción durante el render.

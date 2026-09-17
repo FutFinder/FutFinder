@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import StatusPill from './StatusPill';
 import {
-  reservas as C,
+  paleta as C,
 } from '../../theme/colors';
 
 function formatHora(iso) {

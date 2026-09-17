@@ -2,9 +2,9 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
 import {
-  reservas as C,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  medidas as S,
+  fuentes as F,
 } from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 

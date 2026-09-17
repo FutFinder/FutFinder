@@ -2,9 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet } from 'react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasSizes as S,
+  paleta as C,
+  radios as R,
+  medidas as S,
   alfa,
 } from '../../theme/colors';
 

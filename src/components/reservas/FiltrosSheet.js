@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 
 import { Sheet, Chip, Button } from './ui';
-import { reservas as C, reservasFonts as F } from '../../theme/colors';
+import { paleta as C, fuentes as F } from '../../theme/colors';
 
 const COMUNAS = ['Cerca de mí', 'Ñuñoa', 'Providencia', 'Maipú', 'Santiago Centro'];
 const TIPOS = ['Todas', 'Fútbol 5', 'Fútbol 7', 'Fútbol 11'];

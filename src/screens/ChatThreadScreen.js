@@ -46,8 +46,8 @@ import IncomparecenciaYRevisionBar from '../components/clubes/IncomparecenciaYRe
 import Banner from '../components/Banner';
 
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
   alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';

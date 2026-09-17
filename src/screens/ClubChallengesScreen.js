@@ -29,7 +29,7 @@ import {
 
 import Banner from '../components/Banner';
 import PickerSheet from '../components/partidos/PickerSheet';
-import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, medidas as S, fuentes as F } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { getMisClubesAdmin, getClubById } from '../services/clubs';

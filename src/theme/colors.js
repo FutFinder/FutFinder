@@ -8,7 +8,7 @@
 // nació de un handoff distinto y ninguna estaba mal por su cuenta; el problema
 // era verlas juntas.
 //
-// Ahora hay una sola paleta de verdad, `reservas`, y lo que queda de las
+// Ahora hay una sola paleta de verdad, `paleta`, y lo que queda de las
 // otras se DERIVA de ella: son vistas de la misma paleta con el vocabulario
 // que cada módulo aprendió, sin valores propios. Cada una se BORRA cuando su
 // módulo migra a los nombres nuevos, y cuando no quede ninguna, una regla de
@@ -78,9 +78,9 @@ export function alfa(color, opacidad) {
  * para la paleta de toda la app y hay que renombrarla, pero eso toca los 43
  * archivos que ya la importan y no se mezcla con esta migración.
  *
- * Tipografía: Manrope, cargada en App.js. Ver `reservasFonts`.
+ * Tipografía: Manrope, cargada en App.js. Ver `fuentes`.
  */
-export const reservas = {
+export const paleta = {
   // ── Fondos y superficies ──────────────────────────────────
   bg: '#0A0C0A',
   bgDeep: '#070907',
@@ -158,7 +158,7 @@ export const reservas = {
   // ── Semánticos: significado, no estética ──────────────────
   // Rojo, uno solo. Antes eran cinco: `colors.error` #E5484D,
   // `clubColors.loss` #E8737B, `partidos.coral` #E8737B,
-  // `chatColors.danger` #FF7A6B y `reservas.red` #ED6B76.
+  // `chatColors.danger` #FF7A6B y `paleta.red` #ED6B76.
   red: '#ED6B76',
   redSoft: 'rgba(237, 107, 118, 0.14)',
   redBorder: 'rgba(237, 107, 118, 0.40)',
@@ -217,7 +217,7 @@ export const reservas = {
  * geometría de cada esquina de la app y eso se revisa módulo por módulo, no de
  * un golpe. Las escalas viejas siguen más abajo.
  */
-export const reservasRadius = {
+export const radios = {
   hero: 24,
   card: 22,
   cardSm: 20,
@@ -229,7 +229,7 @@ export const reservasRadius = {
   pill: 999,
 };
 
-export const reservasSizes = {
+export const medidas = {
   screenPadding: 20,
   cardGap: 11,
   rowGap: 9,
@@ -252,7 +252,7 @@ export const reservasSizes = {
  * eso hay un nombre por peso y no una escala numérica. Los módulos que todavía
  * usan `fontWeight` están a medio migrar, no son una excepción de diseño.
  */
-export const reservasFonts = {
+export const fuentes = {
   medium: 'Manrope_500Medium',
   semiBold: 'Manrope_600SemiBold',
   bold: 'Manrope_700Bold',
@@ -264,7 +264,7 @@ export const reservasFonts = {
 // =============================================================
 //
 // Cada una es la misma paleta con el vocabulario que su módulo aprendió. Se
-// borran cuando su módulo migre a los nombres de `reservas`.
+// borran cuando su módulo migre a los nombres de `paleta`.
 
 /**
  * Tonos semánticos del módulo Clubes que NO se tematizan.

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { CheckCircle2, AlertCircle, X, Info } from 'lucide-react-native';
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 
 /**
  * Banner inline para mostrar feedback al usuario.

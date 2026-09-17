@@ -5,7 +5,7 @@ import {
   RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone, CalendarX, ShieldAlert, Scale,
 } from 'lucide-react-native';
 
-import { reservas as C, alfa } from '../../theme/colors';
+import { paleta as C, alfa } from '../../theme/colors';
 
 /** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
 export const CATEGORY = {

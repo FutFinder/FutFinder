@@ -2,10 +2,10 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  medidas as S,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 

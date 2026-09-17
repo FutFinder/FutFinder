@@ -12,7 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { reservas as C, clubTonos, clubSuperficies, reservasFonts as F, alfa } from '../../theme/colors';
+import { paleta as C, clubTonos, clubSuperficies, fuentes as F, alfa } from '../../theme/colors';
 
 /**
  * Una tarea de «Pendiente para ti».

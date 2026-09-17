@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import FutfinderMark from '../components/FutfinderMark';
 import BannerBackdrop from '../components/ds/BannerBackdrop';
 import { Card, SectionLabel, Button } from '../components/reservas/ui';
-import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { paleta as C, fuentes as F } from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
 
 const TERMS_URL = 'https://futfinder.cl/terminos';

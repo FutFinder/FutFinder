@@ -11,7 +11,7 @@ import { CheckCircle2 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { APP_VERSION } from '../utils/appVersion';
 
 export default function SuccessScreen({ navigation }) {

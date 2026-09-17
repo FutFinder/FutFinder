@@ -25,7 +25,7 @@ import {
   Trophy,
 } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import MatchMap from './MatchMap';
 import { getMatchById, getMatchAttendees } from '../services/matches';
 

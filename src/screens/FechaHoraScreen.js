@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Clock } from 'lucide-react-native';
 
-import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { paleta as C, fuentes as F } from '../theme/colors';
 import { IconButton, StickyFooter, SlotHora, NoticeCard } from '../components/reservas/ui';
 import { getComplejoById, getDisponibilidad } from '../services/reservas';
 import { formatCLP, buildFechaOptions, fechaLabel, addMinutesToHora } from '../services/reservasRules';

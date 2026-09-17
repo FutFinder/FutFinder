@@ -14,7 +14,7 @@ import {
   FileText,
 } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { Card, IconButton, Button, StickyFooter, NoticeCard } from '../components/reservas/ui';
 import Banner from '../components/Banner';
 import { pickImage } from '../services/storage';

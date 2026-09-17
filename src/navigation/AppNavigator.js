@@ -92,7 +92,7 @@ import withAuthGuard from './withAuthGuard';
 import withErrorBoundary from './withErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 
-import { reservas as C } from '../theme/colors';
+import { paleta as C } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
 

@@ -3,7 +3,7 @@ import { View, Image, StyleSheet } from 'react-native';
 import { Shield } from 'lucide-react-native';
 
 import {
-  reservas as C,
+  paleta as C,
 } from '../../theme/colors';
 
 /**

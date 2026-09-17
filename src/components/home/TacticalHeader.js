@@ -7,7 +7,7 @@ import BrandMark from '../BrandMark';
 import NotificationBell from '../NotificationBell';
 import WalletButton from '../WalletButton';
 import {
-  reservas as C,
+  paleta as C,
 } from '../../theme/colors';
 
 export default function TacticalHeader({

@@ -7,7 +7,7 @@ import {
   ArrowLeft, AlertTriangle, Clock, CalendarClock, Tag, Lock, ImagePlus, Trash2, Check,
 } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, medidas as S, fuentes as F } from '../theme/colors';
 import { Card, IconButton, Button, ListRow, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { Skeleton, FieldLabel, TextField, Switch } from '../components/reservas/recintoUi';
 import {

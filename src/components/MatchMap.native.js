@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { Search as SearchIcon } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F, alfa } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
 
 function fmtHora(iso) {
   try {

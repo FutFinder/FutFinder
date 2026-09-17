@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertTriangle, MapPin, ShieldCheck } from 'lucide-react-native';
 
-import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { paleta as C, medidas as S, fuentes as F } from '../theme/colors';
 import { Card, IconButton, Button, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { FieldLabel, TextField } from '../components/reservas/recintoUi';
 import LocationAutocomplete from '../components/LocationAutocomplete';

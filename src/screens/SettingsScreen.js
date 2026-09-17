@@ -40,7 +40,7 @@ import {
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F, alfa } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
 import { Card, SectionLabel, Sheet, Button, IconButton } from '../components/reservas/ui';
 import NotificationBell from '../components/NotificationBell';
 import Banner from '../components/Banner';

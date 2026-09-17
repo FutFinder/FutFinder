@@ -13,7 +13,7 @@ import Banner from '../components/Banner';
 import MatchPreviewSheet from '../components/MatchPreviewSheet';
 
 import {
-  reservas as C,
+  paleta as C,
 } from '../theme/colors';
 import { notify } from '../utils/notify';
 import {

@@ -10,8 +10,8 @@ const tema = require('../colors.js');
  *
  * POR QUÉ EXISTE ESTA PRUEBA. `src/theme/colors.js` llegó a exportar siete
  * familias de tokens —`colors`, `dsColors`, `clubColors`, `chatColors`,
- * `tactical`, `partidos` y `reservas`— con cuatro verdes y tres fondos
- * distintos. La decisión del 2026-09-16 es dejar una sola: `reservas`
+ * `tactical`, `partidos` y `paleta`— con cuatro verdes y tres fondos
+ * distintos. La decisión del 2026-09-16 es dejar una sola: `paleta`
  * (`#55DF69` + Manrope). Las demás pasan a derivarse de ella.
  *
  * EL PELIGRO DE ESE CAMBIO NO ES EL COLOR, ES EL HUECO. En React Native un
@@ -39,7 +39,7 @@ const RAIZ = path.resolve(__dirname, '../..');
  * La paleta. Era una lista de siete y hoy es una: las otras seis se borraron
  * a medida que su módulo migró.
  */
-const FAMILIAS = ['reservas'];
+const FAMILIAS = ['paleta'];
 
 function archivosDeFuente(dir = RAIZ, acc = []) {
   for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -59,7 +59,7 @@ function archivosDeFuente(dir = RAIZ, acc = []) {
  * Las claves que el código usa de cada familia.
  *
  * Hay que seguir el nombre LOCAL y no el exportado: casi todo el repositorio
- * importa `reservas as C`, así que buscar `reservas.` no encontraría nada.
+ * importa `paleta as C`, así que buscar `paleta.` no encontraría nada.
  */
 function clavesUsadas() {
   const usadas = new Map(FAMILIAS.map((f) => [f, new Set()]));
@@ -131,11 +131,11 @@ test('el theme exporta UNA sola paleta de color', () => {
   // sentido comprobar que coincidían; desde que no queda ninguna, lo único que
   // puede volver atrás es que alguien agregue una paleta nueva al lado.
   //
-  // Lo que sí puede crecer son los tokens DENTRO de `reservas`: agregar un
+  // Lo que sí puede crecer son los tokens DENTRO de `paleta`: agregar un
   // tono es normal, agregar una paleta es la deuda que costó siete handoffs
   // deshacer.
   const permitidos = new Set([
-    'reservas', 'reservasRadius', 'reservasSizes', 'reservasFonts',
+    'paleta', 'radios', 'medidas', 'fuentes',
     // No son paletas: son tonos semánticos y superficies con valores medidos,
     // que el tema de club no puede repintar. Ver `clubThemes.test.js`.
     'clubTonos', 'clubSuperficies',
@@ -155,14 +155,14 @@ test('el texto principal no es el color de acción', () => {
   // La garantía que se le dio a Vicente cuando se unificó: el verde cambia de
   // tono, no se expande. Si el texto principal terminara en el verde de
   // acción, el mapeo por rol se hizo mal.
-  assert.notEqual(tema.reservas.textPrimary, tema.reservas.green);
+  assert.notEqual(tema.paleta.textPrimary, tema.paleta.green);
 });
 
 test('los cinco rojos de la app son uno solo', () => {
   // Existían con cinco valores distintos en cinco familias: `colors.error`
   // (#E5484D), `clubColors.loss` y `partidos.coral` (#E8737B),
-  // `chatColors.danger` (#FF7A6B) y `reservas.red` (#ED6B76). Hoy el rojo de
+  // `chatColors.danger` (#FF7A6B) y `paleta.red` (#ED6B76). Hoy el rojo de
   // error, el de derrota y el destructivo son el mismo token.
-  assert.equal(tema.reservas.loss, tema.reservas.red);
-  assert.equal(tema.reservas.lossSoft, tema.reservas.redSoft);
+  assert.equal(tema.paleta.loss, tema.paleta.red);
+  assert.equal(tema.paleta.lossSoft, tema.paleta.redSoft);
 });

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, Search, Users } from 'lucide-react-native';
 
-import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { paleta as C, fuentes as F } from '../theme/colors';
 import { IconButton, Card, NoticeCard, StickyFooter, Button, Foto, Chip } from '../components/reservas/ui';
 import { TextField } from '../components/reservas/recintoUi';
 import { listMyFriends } from '../services/friends';

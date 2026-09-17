@@ -4,9 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AlertTriangle, Check, Info } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
 } from '../theme/colors';
 import {
   duracionDeAviso, quitarAviso, suscribirseAAvisos,

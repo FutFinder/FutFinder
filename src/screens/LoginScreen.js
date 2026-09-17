@@ -15,7 +15,7 @@ import { ArrowLeft, Eye, EyeOff, Check } from 'lucide-react-native';
 import FutfinderMark from '../components/FutfinderMark';
 import Banner from '../components/Banner';
 import { Card, IconButton, Button } from '../components/reservas/ui';
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { loginWithEmail, requestPasswordResetForEmail, getCurrentProfile } from '../services/auth';
 import { decideAuthDestination, isValidEmail, MENSAJES } from '../services/authPolicy';
 import { getOnboardingState } from '../services/profile';

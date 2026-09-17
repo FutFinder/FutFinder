@@ -3,9 +3,9 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Check } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
 } from '../../theme/colors';
 import { TEMAS_CLUB, temaClub } from '../../theme/clubThemes';
 

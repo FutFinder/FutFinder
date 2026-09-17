@@ -1,5 +1,5 @@
 import React from 'react';
-import { reservas as C } from '../theme/colors';
+import { paleta as C } from '../theme/colors';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 /**

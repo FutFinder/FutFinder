@@ -116,10 +116,23 @@ de manera masiva»*.
 - El chequeo de que todo `styles.X` usado existe
 - La prueba de cobertura de tokens de la fase 1
 
-## Pendiente decidir
+## Fase 4 — el renombre (hecho el 2026-09-17)
 
-El nombre `reservas` para la paleta de toda la app es confuso: nació de un
-handoff de un vertical. Renombrarla toca 43 archivos que ya la importan, casi
-todos como `reservas as C`, así que es un cambio de una línea por archivo. **No
-entra en estas tres fases**: se decide cuando ya no queden familias viejas, para
-no mezclar un renombre con una migración.
+El nombre `reservas` para la paleta de toda la app venía del handoff de un
+vertical. Se esperó a que no quedara ninguna familia vieja para no mezclar un
+renombre con una migración:
+
+| Antes | Ahora |
+|---|---|
+| `reservas` | `paleta` |
+| `reservasRadius` | `radios` |
+| `reservasSizes` | `medidas` |
+| `reservasFonts` | `fuentes` |
+
+Los 168 archivos que la importan lo hacen con alias (`paleta as C`, `radios as
+R`…), así que fue una línea por archivo. `tema` se descartó: ya son las escalas
+de identidad de club (`temaDeClub`, prop `tema`), 309 usos.
+
+**Lo que NO se renombró**: la tabla `reservas` de la base, el módulo de
+producto (`services/reservas.js`, `components/reservas/`, las pantallas) y los
+textos. El renombre era del token, no de la palabra.

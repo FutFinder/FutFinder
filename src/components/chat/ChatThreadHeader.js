@@ -5,9 +5,9 @@ import { ArrowLeft, ChevronRight, EllipsisVertical, BellOff } from 'lucide-react
 
 import ThreadAvatar from './ThreadAvatar';
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 

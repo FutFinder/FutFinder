@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, MapPin, AlertTriangle } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { Badge, IconButton, NoticeCard, StickyFooter, Button, Foto } from '../components/reservas/ui';
 import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';

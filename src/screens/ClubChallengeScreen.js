@@ -16,7 +16,7 @@ import { X, Shield, Swords, Check } from 'lucide-react-native';
 
 import Banner from '../components/Banner';
 import { Button, IconButton, Chip } from '../components/reservas/ui';
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import { getMyClubs } from '../services/clubs';
 import { createChallenge } from '../services/clubChallenges';

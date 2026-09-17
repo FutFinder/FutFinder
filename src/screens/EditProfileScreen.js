@@ -24,7 +24,7 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { Card, SectionLabel, Button, IconButton } from '../components/reservas/ui';
 import NotificationBell from '../components/NotificationBell';
 import BannerBackdrop from '../components/ds/BannerBackdrop';

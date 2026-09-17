@@ -14,9 +14,9 @@ import { ArrowLeft, Bell, BellOff, Info } from 'lucide-react-native';
 import ThreadAvatar from '../components/chat/ThreadAvatar';
 import PersonRow from '../components/chat/PersonRow';
 import {
-  reservas as C,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  medidas as S,
+  fuentes as F,
   alfa,
 } from '../theme/colors';
 import {

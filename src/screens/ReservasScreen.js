@@ -20,7 +20,7 @@ import NotificationBell from '../components/NotificationBell';
 import WalletButton from '../components/WalletButton';
 import FiltrosSheet from '../components/reservas/FiltrosSheet';
 import { Card, Button, Chip, Badge, NoticeCard, Foto } from '../components/reservas/ui';
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { listComplejosCerca, listHorasLibresHoy } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { misRecintos, agendaDelDia, miAutorizacionRecinto } from '../services/recinto';

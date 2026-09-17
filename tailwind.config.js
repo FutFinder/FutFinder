@@ -15,7 +15,7 @@
  *
  * El `require` de un módulo ES funciona: lo resuelve Node, no Metro.
  */
-const { reservas } = require('./src/theme/colors.js');
+const { paleta } = require('./src/theme/colors.js');
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -31,19 +31,19 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        verde: reservas.green,
-        'verde-hover': reservas.greenHover,
-        'verde-ink': reservas.greenInk,
-        fondo: reservas.bg,
-        superficie: reservas.surface,
-        'superficie-alta': reservas.surfaceAlt,
-        borde: reservas.border,
-        rojo: reservas.red,
-        ambar: reservas.amber,
-        oro: reservas.gold,
-        texto: reservas.textPrimary,
-        'texto-dim': reservas.textSecondary,
-        'texto-mute': reservas.textMuted,
+        verde: paleta.green,
+        'verde-hover': paleta.greenHover,
+        'verde-ink': paleta.greenInk,
+        fondo: paleta.bg,
+        superficie: paleta.surface,
+        'superficie-alta': paleta.surfaceAlt,
+        borde: paleta.border,
+        rojo: paleta.red,
+        ambar: paleta.amber,
+        oro: paleta.gold,
+        texto: paleta.textPrimary,
+        'texto-dim': paleta.textSecondary,
+        'texto-mute': paleta.textMuted,
       },
     },
   },

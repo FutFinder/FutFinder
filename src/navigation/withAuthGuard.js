@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { reservas as C } from '../theme/colors';
+import { paleta as C } from '../theme/colors';
 import { useAuth } from '../contexts/AuthContext';
 import withErrorBoundary from './withErrorBoundary';
 

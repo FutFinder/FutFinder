@@ -3,10 +3,10 @@ import { View, Text, Image, Pressable, StyleSheet, useWindowDimensions } from 'r
 import { Plus, Image as ImageIcon } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  medidas as S,
+  fuentes as F,
 } from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 

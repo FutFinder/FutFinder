@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, ChevronRight, AlertTriangle, Lock, Wrench, ExternalLink } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, medidas as S, fuentes as F } from '../theme/colors';
 import { Card, IconButton, Chip, Badge, NoticeCard } from '../components/reservas/ui';
 import { Skeleton, ContactActions, WeekStrip } from '../components/reservas/recintoUi';
 import NotificationBell from '../components/NotificationBell';

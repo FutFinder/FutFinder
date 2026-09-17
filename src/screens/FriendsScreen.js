@@ -13,9 +13,9 @@ import { ArrowLeft, Check, UserPlus, RotateCw, Search } from 'lucide-react-nativ
 
 import PersonRow from '../components/chat/PersonRow';
 import {
-  reservas as C,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  medidas as S,
+  fuentes as F,
   alfa,
 } from '../theme/colors';
 import {

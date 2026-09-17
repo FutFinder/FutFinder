@@ -27,7 +27,7 @@
  * que además exige distancia de color contra derrota, empate y Premium.
  */
 
-import { reservas as C } from './colors.js';
+import { paleta as C } from './colors.js';
 
 /** Clave que se guarda para un club que nunca eligió tema. */
 export const TEMA_CLUB_POR_DEFECTO = 'green';

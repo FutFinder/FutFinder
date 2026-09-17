@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle2, Clock, AlertTriangle, CreditCard } from 'lucide-react-native';
 
-import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { paleta as C, fuentes as F } from '../theme/colors';
 import { IconButton, Card, Button, StickyFooter, NoticeCard } from '../components/reservas/ui';
 import { iniciarPagoReserva, estadoDePago } from '../services/pagos';
 import {

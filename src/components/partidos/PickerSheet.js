@@ -5,9 +5,9 @@ import { Check, Search } from 'lucide-react-native';
 import Sheet from './Sheet';
 import { GhostButton, PrimaryButton } from './ui';
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 

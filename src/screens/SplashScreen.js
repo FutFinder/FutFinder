@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MapPin } from 'lucide-react-native';
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
 } from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
 import { getInitialRouteName } from '../utils/routing';

@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ShieldCheck, TrendingUp, TrendingDown } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F, alfa } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
 import { getTrustScoreHistory } from '../services/settings';
 import { getMyProfile } from '../services/profile';
 

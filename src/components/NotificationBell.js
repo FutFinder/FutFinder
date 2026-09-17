@@ -3,7 +3,7 @@ import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Bell } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, medidas as S, fuentes as F } from '../theme/colors';
 import useUnreadNotifications from '../utils/useUnreadNotifications';
 
 /**

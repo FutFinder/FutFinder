@@ -2,9 +2,9 @@ import React from 'react';
 import { ScrollView, Pressable, Text, StyleSheet } from 'react-native';
 
 import {
-  reservas as C,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  medidas as S,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 import { CHAT_FILTERS } from '../../utils/chatMeta';

@@ -19,7 +19,7 @@ import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchFootballIcon from '../components/SearchFootballIcon';
 import {
-  reservas as C,
+  paleta as C,
 } from '../theme/colors';
 import { countUnreadTotal, subscribeToMessages } from '../services/messages';
 

@@ -11,8 +11,8 @@ import {
 } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 import { hourLabel, initialOf } from '../../utils/chatMeta';

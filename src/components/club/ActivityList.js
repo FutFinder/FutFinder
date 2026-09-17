@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Swords, CalendarClock, UserPlus, AlertTriangle, Bell } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { reservas as C, clubTonos, clubSuperficies, reservasFonts as F } from '../../theme/colors';
+import { paleta as C, clubTonos, clubSuperficies, fuentes as F } from '../../theme/colors';
 import { haceCuanto } from '../../utils/tiempoRelativo.js';
 
 /**

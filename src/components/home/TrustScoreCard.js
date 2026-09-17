@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  reservas as C,
+  paleta as C,
 } from '../../theme/colors';
 
 export default function TrustScoreCard({

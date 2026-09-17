@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, ChevronRight, Shield } from 'lucide-react-native';
 import StatusPill from './StatusPill';
 import {
-  reservas as C,
+  paleta as C,
 } from '../../theme/colors';
 
 const MODALIDAD_LABEL = { futbol7: 'Fútbol 7', futbol11: 'Fútbol 11', ambos: 'Fútbol 7 y 11' };

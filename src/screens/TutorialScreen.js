@@ -5,7 +5,7 @@ import { Check } from 'lucide-react-native';
 
 import FutfinderMark from '../components/FutfinderMark';
 import { Button } from '../components/reservas/ui';
-import { reservas as C, reservasFonts as F, alfa } from '../theme/colors';
+import { paleta as C, fuentes as F, alfa } from '../theme/colors';
 
 
 /**

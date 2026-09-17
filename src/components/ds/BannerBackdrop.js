@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 import {
-  reservas as C,
+  paleta as C,
   alfa,
 } from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';

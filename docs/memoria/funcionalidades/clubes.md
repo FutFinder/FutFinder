@@ -137,7 +137,7 @@ el escudo de respaldo sigue siendo el ícono `Shield` genérico (igual que
 en el resto de Clubes), no las iniciales con color por club del mockup —
 reintroducir eso habría fragmentado visualmente lo que la unificación de
 estética de toda la app recién había resuelto. `ClubChallengesScreen` usa
-los tokens `reservas`/`reservasRadius`/`reservasSizes`/`reservasFonts`
+los tokens `reservas`/`radios`/`medidas`/`fuentes`
 (la paleta única de toda la app) más `temaDeClub(clubActual)` para el
 acento de color del club, igual que el resto de Clubes ya rediseñado.
 Publicar, editar, ver respuestas y aceptar/rechazar exigen
@@ -304,8 +304,8 @@ Se llega desde el acceso rápido «Alineación» de la portada de Clubes
 El 2026-09-15 `ClubProposalScreen`, `ClubResultScreen`, `ClubMatchChangeScreen`,
 `CreateClubScreen`, `ClubInviteScreen`, `ClubPlansScreen` y `ClubGalleryScreen`
 pasaron de `colors`/`radius` (la paleta legada: fondo `#201F1D`, verde oliva
-`#71B533`, tipografía del sistema) a `reservas`/`reservasRadius`/`reservasSizes`/
-`reservasFonts` y a las primitivas de `src/components/reservas/`. Es la misma
+`#71B533`, tipografía del sistema) a `reservas`/`radios`/`medidas`/
+`fuentes` y a las primitivas de `src/components/reservas/`. Es la misma
 familia que ya usaban «Desafiar club» y la bandeja de desafíos, así que el
 recorrido Desafiar → Propuesta → Resultado dejó de mostrar dos verdes y dos
 tipografías distintas. **Cambio sólo visual**: ningún servicio, RPC, validación

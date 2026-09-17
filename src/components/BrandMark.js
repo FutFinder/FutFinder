@@ -3,8 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
 } from '../theme/colors';
 
 /**

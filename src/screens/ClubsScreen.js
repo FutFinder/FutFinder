@@ -13,8 +13,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { AlertTriangle, Check, X, Clock } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
   clubTonos,
   clubSuperficies,
   alfa,

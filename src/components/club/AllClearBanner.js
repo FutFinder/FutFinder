@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Check } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { reservas as C, reservasFonts as F } from '../../theme/colors';
+import { paleta as C, fuentes as F } from '../../theme/colors';
 
 /**
  * Lo que ocupa el lugar de «Pendiente para ti» cuando no hay nada pendiente.

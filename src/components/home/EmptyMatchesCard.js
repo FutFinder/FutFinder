@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import {
-  reservas as C,
+  paleta as C,
 } from '../../theme/colors';
 
 export default function EmptyMatchesCard({ comuna, onCreate }) {

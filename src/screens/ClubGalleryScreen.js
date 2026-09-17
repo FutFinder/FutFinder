@@ -23,10 +23,10 @@ import {
 } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  medidas as S,
+  fuentes as F,
   alfa,
 } from '../theme/colors';
 import Banner from '../components/Banner';

@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Shield, Video, Swords } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 import { initialOf } from '../../utils/chatMeta';

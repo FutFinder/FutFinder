@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Wallet, Info } from 'lucide-react-native';
 
-import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { paleta as C, fuentes as F } from '../theme/colors';
 import { IconButton, Card, NoticeCard, Button, SectionLabel } from '../components/reservas/ui';
 import { getMiBalance } from '../services/reservas';
 import { MOTIVO_SIN_CARGA } from '../utils/saldo';

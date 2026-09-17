@@ -12,9 +12,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Check, Minus, Plus, AlertCircle, Info } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 

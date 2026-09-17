@@ -37,7 +37,7 @@ test('usa la paleta única, no ninguna de las familias viejas', () => {
   // (2026-09-16) la comprobación es la misma idea con una sola respuesta: la
   // primera pantalla que se ve no puede ser la que se quede atrás.
   const src = readSplashSrc();
-  assert.match(src, /reservas as C/, 'debe importar la paleta única');
+  assert.match(src, /paleta as C/, 'debe importar la paleta única');
   for (const vieja of ['colors', 'dsColors', 'clubColors', 'chatColors', 'tactical', 'partidos']) {
     assert.doesNotMatch(
       src,

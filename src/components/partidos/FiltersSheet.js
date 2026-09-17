@@ -6,9 +6,9 @@ import Sheet from './Sheet';
 import PickerSheet from './PickerSheet';
 import { GhostButton, PrimaryButton, OptionChip, SectionLabel, Note, ErrorHint, SelectField } from './ui';
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 import { DIST_OPTS, EDAD_PRESETS, MODALIDADES, NIVELES } from '../../services/matchRules';

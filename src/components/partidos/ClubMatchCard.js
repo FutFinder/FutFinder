@@ -4,9 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Users, Swords, Wallet } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
 } from '../../theme/colors';
 import { temaDeClub, temaClub } from '../../theme/clubThemes';
 import { cuotaLabel } from '../../services/matchRules';

@@ -3,9 +3,9 @@ import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from 
 import { CalendarX, TriangleAlert, ShieldAlert } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 import {

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Info, Check, Lock } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import {
   IconButton, Card, NoticeCard, StickyFooter, Button, Foto, Stepper,
 } from '../components/reservas/ui';

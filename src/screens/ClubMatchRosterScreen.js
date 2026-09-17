@@ -11,8 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, UserX, Shield, Clock } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
 } from '../theme/colors';
 import Banner from '../components/Banner';
 import {

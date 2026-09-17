@@ -3,8 +3,8 @@ import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-na
 import { Send, Smile, Lock, WifiOff } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 import { canSendDraft } from '../../utils/chatMeta';

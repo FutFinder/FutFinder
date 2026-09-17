@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Check, Trash2, BellOff, ServerCrash } from 'lucide-react-native';
 
 import {
-  reservas as C,
+  paleta as C,
 } from '../theme/colors';
 import Banner from '../components/Banner';
 import NotificationCard, { CATEGORY } from '../components/notifications/NotificationCard';

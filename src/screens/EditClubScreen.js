@@ -15,10 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, ChevronDown, Shield, Camera, Lock, Check } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  medidas as S,
+  fuentes as F,
 } from '../theme/colors';
 import { temaClub, TEMA_CLUB_POR_DEFECTO } from '../theme/clubThemes';
 import Banner from '../components/Banner';

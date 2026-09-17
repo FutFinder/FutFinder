@@ -33,7 +33,7 @@ const path = require('node:path');
  * escrito como tripleta decimal es el mismo color.
  *
  * SI FALLA, no hay que agregar el color a la lista de permitidos: hay que
- * sacarlo del archivo y usar el token (`reservas.*`) o, en NativeWind, la
+ * sacarlo del archivo y usar el token (`paleta.*`) o, en NativeWind, la
  * clase con nombre que define `tailwind.config.js`.
  *
  * Y DESDE QUE EXISTE `alfa()` TAMPOCO SE ESCRIBE LA PALETA ACTUAL A MANO.
@@ -107,7 +107,7 @@ test('ningún color de las paletas borradas está escrito a mano en src/', () =>
     hallazgos,
     [],
     'Hay colores de las paletas borradas escritos a mano. Usa el token de '
-      + '`reservas`, o la clase con nombre de `tailwind.config.js` si es '
+      + '`paleta`, o la clase con nombre de `tailwind.config.js` si es '
       + `NativeWind:\n  ${hallazgos.join('\n  ')}`
   );
 });
@@ -152,10 +152,10 @@ test('tailwind expone la paleta con nombre, para que nadie escriba un hex', () =
   // `bg-[#...]`, que es exactamente lo que se nos escapó.
   const config = require(path.resolve(RAIZ, '..', 'tailwind.config.js'));
   const colores = config.theme?.extend?.colors || {};
-  const { reservas } = require('../colors.js');
+  const { paleta } = require('../colors.js');
 
-  assert.equal(colores.verde, reservas.green, 'la clase `verde` debe salir del theme');
-  assert.equal(colores.fondo, reservas.bg, 'la clase `fondo` debe salir del theme');
+  assert.equal(colores.verde, paleta.green, 'la clase `verde` debe salir del theme');
+  assert.equal(colores.fondo, paleta.bg, 'la clase `fondo` debe salir del theme');
   assert.ok(
     Object.keys(colores).length >= 6,
     'tailwind tiene que exponer la paleta, no un par de colores sueltos'

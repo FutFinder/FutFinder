@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { CalendarDays, MapPin } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { reservas as C, clubSuperficies, reservasFonts as F, alfa } from '../../theme/colors';
+import { paleta as C, clubSuperficies, fuentes as F, alfa } from '../../theme/colors';
 import { clubesDelPartido } from '../../services/clubMatchRules';
 import ClubLogo from './ClubLogo';
 

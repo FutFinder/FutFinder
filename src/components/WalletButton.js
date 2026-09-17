@@ -3,7 +3,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Wallet } from 'lucide-react-native';
 
-import { reservas as C, reservasRadius as R, reservasSizes as S } from '../theme/colors';
+import { paleta as C, radios as R, medidas as S } from '../theme/colors';
 
 /**
  * Acceso al saldo, arriba a la derecha, a la izquierda de la campana.

@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 
 import {
-  reservas as C,
-  reservasFonts as F,
+  paleta as C,
+  fuentes as F,
   alfa,
 } from '../../theme/colors';
 

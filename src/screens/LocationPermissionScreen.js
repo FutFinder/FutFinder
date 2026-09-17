@@ -17,7 +17,7 @@ import {
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { getCurrentLocation } from '../services/location';
 import { saveMyLocation } from '../services/profile';
 import { APP_VERSION } from '../utils/appVersion';

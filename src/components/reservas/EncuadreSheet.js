@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, Image, StyleSheet, Pressable, PanResponder } from 'react-native';
 
-import { reservas as C, reservasRadius as R, reservasFonts as F } from '../../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../../theme/colors';
 import { Sheet, Button } from './ui';
 import {
   POSICIONES, PROPORCION_PORTADA, encuadreEnCaja, nombreDePosicion,

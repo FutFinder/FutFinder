@@ -15,10 +15,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Shield } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  medidas as S,
+  fuentes as F,
   alfa,
 } from '../theme/colors';
 import { etiquetaPosiciones } from '../utils/playerMeta';

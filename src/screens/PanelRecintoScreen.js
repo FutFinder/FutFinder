@@ -8,7 +8,7 @@ import {
   FileText, Users, Globe, EyeOff,
 } from 'lucide-react-native';
 
-import { reservas as C, reservasSizes as S, reservasFonts as F } from '../theme/colors';
+import { paleta as C, medidas as S, fuentes as F } from '../theme/colors';
 import { Card, IconButton, Button, Badge, ListRow, SectionLabel, Sheet, NoticeCard } from '../components/reservas/ui';
 import { Skeleton, StatTrio, StatusBanner, HojaBienvenida } from '../components/reservas/recintoUi';
 import NotificationBell from '../components/NotificationBell';

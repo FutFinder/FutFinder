@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, AlertTriangle } from 'lucide-react-native';
 
-import { reservas as C, reservasFonts as F } from '../theme/colors';
+import { paleta as C, fuentes as F } from '../theme/colors';
 import { Card, IconButton, Button, StickyFooter, NoticeCard, Foto } from '../components/reservas/ui';
 import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';

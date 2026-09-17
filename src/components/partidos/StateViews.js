@@ -10,9 +10,9 @@ import {
 
 import { GhostButton, PrimaryButton, SurfaceButton, Note } from './ui';
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  fuentes as F,
 } from '../../theme/colors';
 import { cacheAgeLabel } from '../../services/connectivity';
 

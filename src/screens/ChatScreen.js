@@ -15,9 +15,9 @@ import {
 } from '../components/chat/ChatStates';
 
 import {
-  reservas as C,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  medidas as S,
+  fuentes as F,
 } from '../theme/colors';
 import { listMyThreads, subscribeToMessages } from '../services/messages';
 import { listIncomingRequests, subscribeToFriendships } from '../services/friends';

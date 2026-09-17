@@ -13,10 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Shield, ChevronDown, Camera } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  medidas as S,
+  fuentes as F,
 } from '../theme/colors';
 import Banner from '../components/Banner';
 import { Button, IconButton, Chip } from '../components/reservas/ui';

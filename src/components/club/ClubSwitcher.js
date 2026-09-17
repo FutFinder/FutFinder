@@ -4,7 +4,7 @@ import { Shield, Plus } from 'lucide-react-native';
 
 import { temaClub, temaDeClub } from '../../theme/clubThemes';
 import VerifiedBadge from './VerifiedBadge';
-import { reservas as C, reservasFonts as F, alfa } from '../../theme/colors';
+import { paleta as C, fuentes as F, alfa } from '../../theme/colors';
 
 /**
  * Selector horizontal del club activo.

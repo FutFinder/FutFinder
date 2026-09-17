@@ -3,10 +3,10 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { UserPlus } from 'lucide-react-native';
 
 import {
-  reservas as C,
-  reservasRadius as R,
-  reservasSizes as S,
-  reservasFonts as F,
+  paleta as C,
+  radios as R,
+  medidas as S,
+  fuentes as F,
 } from '../../theme/colors';
 import BrandMark from '../BrandMark';
 import NotificationBell from '../NotificationBell';
