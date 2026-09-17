@@ -1,9 +1,9 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { esModalidadValida } from '../utils/clubMeta';
 import { buildClubPatch, slugClub } from '../utils/clubEdit';
+import { esTemaClubValido } from '../theme/clubThemes.js';
 import {
   crearRegistroDeColumnas,
-  esColumnaInexistente,
   leerTolerandoColumnas,
   escribirTolerandoColumnas,
 } from '../utils/columnasOpcionales';
@@ -50,7 +50,7 @@ async function getMe() {
 /**
  * Crea un club y deja al creador como admin.
  */
-export async function createClub({ nombre, descripcion, region, comuna, modalidad }) {
+export async function createClub({ nombre, descripcion, region, comuna, modalidad, tema }) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   const me = await getMe();
   if (!me) return { error: { message: 'No autenticado' } };
@@ -72,6 +72,11 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
   if (!comuna) {
     return { error: { message: 'Elige una comuna' } };
   }
+  // El tema sí puede venir vacío: la columna es NOT NULL con default
+  // 'green' (migración 53), así que «sin elegir» ya tiene un color válido.
+  if (tema != null && !esTemaClubValido(tema)) {
+    return { error: { message: 'Tema del club no válido' } };
+  }
 
   // Máximo 3 clubes por jugador
   const { count: myClubCount } = await supabase
@@ -89,25 +94,20 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
     region: region || null,
     comuna: comuna || null,
     created_by: me,
+    modalidad: modalidad || null,
+    // Sin `tema` explícito nunca se manda `null`: violaría el NOT NULL. La
+    // columna toma su propio default ('green') en ese caso.
+    ...(tema ? { tema } : {}),
   };
 
-  const insertar = (row) =>
-    supabase.from('clubs').insert(row).select().single();
-
-  // El club nace sin `tema`: el default 'green' de la migración 53 lo pone
-  // la base de datos, no el cliente.
-  let { data: club, error } = await insertar(
-    columnasClub.esDisponible('modalidad')
-      ? { ...baseRow, modalidad: modalidad || null }
-      : baseRow
-  );
-
-  // Migración 29 sin aplicar: reintentamos sin `modalidad`.
-  if (error && esColumnaInexistente(error, 'modalidad')) {
-    console.warn('[FutFinder] clubs.modalidad no existe: aplica la migración 29.');
-    columnasClub.marcarAusente('modalidad');
-    ({ data: club, error } = await insertar(baseRow));
-  }
+  // Mismo mecanismo que `updateClub()`: si `modalidad` (migración 29) o
+  // `tema` (migración 53) no existen todavía en este entorno, reintenta sin
+  // esa columna en vez de que el club entero no se pueda crear.
+  const { data: club, error } = await escribirTolerandoColumnas({
+    registro: columnasClub,
+    patch: baseRow,
+    escribir: (row) => supabase.from('clubs').insert(row).select().single(),
+  });
 
   if (error) {
     console.error('[FutFinder] createClub:', error);

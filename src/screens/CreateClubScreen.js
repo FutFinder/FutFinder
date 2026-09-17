@@ -18,11 +18,13 @@ import {
   medidas as S,
   fuentes as F,
 } from '../theme/colors';
+import { TEMA_CLUB_POR_DEFECTO } from '../theme/clubThemes';
 import Banner from '../components/Banner';
+import ClubThemePicker from '../components/club/ClubThemePicker';
 import { Button, IconButton, Chip } from '../components/reservas/ui';
 import { FieldLabel, TextField } from '../components/reservas/recintoUi';
 import { createClub } from '../services/clubs';
-import { pickImage, uploadClubLogo } from '../services/storage';
+import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD } from '../utils/clubMeta';
 
@@ -36,11 +38,13 @@ export default function CreateClubScreen({ navigation }) {
   const [region, setRegion] = useState(null);
   const [comuna, setComuna] = useState(null);
   const [modalidad, setModalidad] = useState(null);
+  const [tema, setTema] = useState(TEMA_CLUB_POR_DEFECTO);
   const [showRegiones, setShowRegiones] = useState(false);
   const [showComunas, setShowComunas] = useState(false);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
   const [logoAsset, setLogoAsset] = useState(null);
+  const [bannerAsset, setBannerAsset] = useState(null);
 
   const comunas = region ? getComunasOfRegion(region) : [];
   const listo = nombre.trim().length >= 3 && !!modalidad && !!region && !!comuna;
@@ -54,13 +58,22 @@ export default function CreateClubScreen({ navigation }) {
     }
   };
 
+  const handlePickBanner = async () => {
+    const result = await pickImage({ aspect: [16, 9], quality: 0.8 });
+    if (result.ok) {
+      setBannerAsset(result.asset);
+    } else if (result.reason !== 'Cancelado') {
+      setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
+    }
+  };
+
   const handleCreate = async () => {
     // El botón ya queda deshabilitado sin estos cuatro datos (`listo`); esta
     // comprobación es sólo la segunda barrera, no la que informa al usuario
     // qué falta — para eso está el botón inactivo, no un cartel.
     if (!listo) return;
     setSaving(true);
-    const { data, error } = await createClub({ nombre, descripcion, region, comuna, modalidad });
+    const { data, error } = await createClub({ nombre, descripcion, region, comuna, modalidad, tema });
 
     if (error) {
       setSaving(false);
@@ -72,6 +85,16 @@ export default function CreateClubScreen({ navigation }) {
       const { error: logoErr } = await uploadClubLogo(data.id, logoAsset);
       if (logoErr) {
         setBanner({ type: 'error', title: 'Club creado, pero falló el logo', message: logoErr.message });
+        setSaving(false);
+        navigation.goBack();
+        return;
+      }
+    }
+
+    if (bannerAsset && data?.id) {
+      const { error: bannerErr } = await uploadClubBanner(data.id, bannerAsset);
+      if (bannerErr) {
+        setBanner({ type: 'error', title: 'Club creado, pero falló el banner', message: bannerErr.message });
         setSaving(false);
         navigation.goBack();
         return;
@@ -104,6 +127,28 @@ export default function CreateClubScreen({ navigation }) {
           {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
           <Pressable
+            onPress={handlePickBanner}
+            accessibilityRole="button"
+            accessibilityLabel={bannerAsset ? 'Cambiar el banner del club' : 'Subir el banner del club'}
+            style={({ pressed }) => [styles.bannerTap, pressed && { opacity: 0.85 }]}
+          >
+            {bannerAsset ? (
+              <Image source={{ uri: bannerAsset.uri }} style={styles.bannerImg} resizeMode="cover" />
+            ) : (
+              <View style={styles.bannerPlaceholder}>
+                <Camera color={C.textMuted} size={20} strokeWidth={2} />
+                <Text style={styles.bannerHint}>Subir banner</Text>
+              </View>
+            )}
+            {bannerAsset && (
+              <View style={styles.bannerEditChip}>
+                <Camera color={C.textPrimary} size={13} strokeWidth={2} />
+                <Text style={styles.bannerEditChipText}>Cambiar banner</Text>
+              </View>
+            )}
+          </Pressable>
+
+          <Pressable
             onPress={handlePickLogo}
             accessibilityRole="button"
             accessibilityLabel={logoAsset ? 'Cambiar el logo del club' : 'Subir el logo del club'}
@@ -119,7 +164,7 @@ export default function CreateClubScreen({ navigation }) {
             <View style={styles.logoHintRow}>
               <Camera color={C.textSecondary} size={14} strokeWidth={2} />
               <Text style={styles.logoHint}>
-                {logoAsset ? 'Cambiar logo' : 'Subir logo (opcional)'}
+                {logoAsset ? 'Cambiar logo' : 'Subir logo'}
               </Text>
             </View>
           </Pressable>
@@ -135,7 +180,7 @@ export default function CreateClubScreen({ navigation }) {
           </View>
 
           <View style={styles.grupo}>
-            <FieldLabel marca="opcional">Descripción</FieldLabel>
+            <FieldLabel>Descripción</FieldLabel>
             <TextField
               placeholder="Cuenta de qué se trata tu club, dónde juegan, qué buscan..."
               value={descripcion}
@@ -261,6 +306,15 @@ export default function CreateClubScreen({ navigation }) {
             </View>
           )}
 
+          <View style={styles.grupo}>
+            <FieldLabel>Tema del club</FieldLabel>
+            <Text style={styles.temaHelp}>
+              Pinta el escudo y los botones del club. Los resultados de los partidos y
+              los avisos conservan sus colores.
+            </Text>
+            <ClubThemePicker value={tema} onChange={setTema} disabled={saving} />
+          </View>
+
           <Button
             label="Crear club"
             onPress={handleCreate}
@@ -290,6 +344,39 @@ const styles = StyleSheet.create({
 
   content: { paddingHorizontal: S.screenPadding, paddingBottom: 40 },
   grupo: { marginTop: 16 },
+
+  bannerTap: { width: '100%', height: 132, borderRadius: R.row, overflow: 'hidden', marginBottom: 16 },
+  bannerImg: { width: '100%', height: '100%' },
+  // Neutro a propósito: la portada es una foto, no un acento del club — el
+  // color elegido en «Tema del club» se previsualiza en el escudo, no acá.
+  bannerPlaceholder: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: C.surface,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderStyle: 'dashed',
+    borderRadius: R.row,
+  },
+  bannerHint: { color: C.textSecondary, fontFamily: F.semiBold, fontSize: 13 },
+  bannerEditChip: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  bannerEditChipText: { color: C.textPrimary, fontFamily: F.semiBold, fontSize: 12 },
+
+  temaHelp: { color: C.textSecondary, fontSize: 12, lineHeight: 17, marginTop: -3, marginBottom: 12 },
 
   logoTap: { alignItems: 'center', marginBottom: 4 },
   logoPlaceholder: {
