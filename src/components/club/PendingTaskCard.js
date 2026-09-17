@@ -12,7 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubTonos, clubSuperficies, reservasFonts as F } from '../../theme/colors';
+import { reservas as C, clubTonos, clubSuperficies, reservasFonts as F, alfa } from '../../theme/colors';
 
 /**
  * Una tarea de «Pendiente para ti».
@@ -202,23 +202,23 @@ const styles = StyleSheet.create({
   },
   textos: { flex: 1, minWidth: 0, gap: 2 },
   titulo: { fontSize: 14, fontFamily: F.bold, color: '#FFFFFF' },
-  subtitulo: { fontSize: 12, color: 'rgba(255, 255, 255, 0.5)' },
+  subtitulo: { fontSize: 12, color: C.textSecondary },
   boton: {
     paddingVertical: 9,
     paddingHorizontal: 13,
     borderRadius: 12,
   },
   botonSecundario: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: alfa(C.tinta, 0.12),
   },
   botonTexto: { fontSize: 12.5, fontFamily: F.bold, color: '#FFFFFF' },
   chip: {
     paddingVertical: 7,
     paddingHorizontal: 11,
     borderRadius: 11,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
   },
-  chipTexto: { fontSize: 11.5, fontFamily: F.semiBold, color: 'rgba(255, 255, 255, 0.6)' },
+  chipTexto: { fontSize: 11.5, fontFamily: F.semiBold, color: C.textDim },
 });

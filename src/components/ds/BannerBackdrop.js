@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import {
   reservas as C,
+  alfa,
 } from '../../theme/colors';
 import { temaClub } from '../../theme/clubThemes';
 
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
     width: 2,
     height: '100%',
     marginRight: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: alfa(C.tinta, 0.05),
   },
   textureStripeEmpty: { width: 6, marginRight: 6 },
   // Halo del color del club en la esquina superior derecha. Alfa muy bajo y

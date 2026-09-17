@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     fontFamily: F.medium, lineHeight: 21, color: '#B4BAB5', maxWidth: 300, overflow: 'hidden',
   },
   hintWrap: { alignItems: 'center', gap: 9, paddingBottom: 26 },
-  hintText: { fontFamily: F.bold, fontSize: 12.5, letterSpacing: 2, color: 'rgba(255,255,255,0.5)' },
+  hintText: { fontFamily: F.bold, fontSize: 12.5, letterSpacing: 2, color: C.textSecondary },
 
   tickerWrap: {
     height: 38, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#1A1E1B',

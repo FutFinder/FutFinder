@@ -72,7 +72,7 @@ export default function ChatThreadHeader({
             </Text>
             {muted && (
               <BellOff
-                color="rgba(255,255,255,0.32)"
+                color={C.textMuted}
                 size={14}
                 strokeWidth={1.8}
                 accessibilityLabel="Conversación silenciada"
@@ -105,7 +105,7 @@ export default function ChatThreadHeader({
         accessibilityLabel="Opciones de la conversación"
         style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.7 }]}
       >
-        <EllipsisVertical color="rgba(255,255,255,0.75)" size={18} strokeWidth={2.2} />
+        <EllipsisVertical color={C.textSoft} size={18} strokeWidth={2.2} />
       </Pressable>
     </Bar>
   );

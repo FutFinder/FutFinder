@@ -5,6 +5,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasSizes as S,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -74,7 +75,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderSoft,
   },
-  banner: { height: 118, backgroundColor: 'rgba(255, 255, 255, 0.08)' },
+  banner: { height: 118, backgroundColor: alfa(C.tinta, 0.08) },
   heroBody: { backgroundColor: C.surface, paddingHorizontal: 14, paddingBottom: 14 },
   heroRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginTop: -30 },
   avatar: {
@@ -83,28 +84,28 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 2,
     borderColor: C.surface,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: alfa(C.tinta, 0.1),
   },
   heroTexts: { flex: 1, gap: 7, paddingBottom: 6 },
-  line: { height: 14, borderRadius: 7, backgroundColor: 'rgba(255, 255, 255, 0.08)' },
-  lineSm: { height: 10, borderRadius: 6, backgroundColor: 'rgba(255, 255, 255, 0.06)' },
+  line: { height: 14, borderRadius: 7, backgroundColor: alfa(C.tinta, 0.08) },
+  lineSm: { height: 10, borderRadius: 6, backgroundColor: alfa(C.tinta, 0.06) },
   chipsRow: { flexDirection: 'row', gap: 6, marginTop: 12 },
   chip: {
     flex: 1,
     height: 44,
     borderRadius: R.iconBtn,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
   },
   card: {
     marginHorizontal: S.screenPadding,
     height: 72,
     borderRadius: R.row,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: alfa(C.tinta, 0.05),
   },
   cardTall: {
     marginHorizontal: S.screenPadding,
     height: 150,
     borderRadius: R.cardSm,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: alfa(C.tinta, 0.05),
   },
 });

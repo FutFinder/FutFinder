@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   avatarImg: { width: '100%', height: '100%' },
   avatarInitial: {
-    color: 'rgba(255,255,255,0.7)',
+    color: C.textSoft,
     fontSize: 11,
     fontFamily: F.extraBold,
     includeFontPadding: false,
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   },
   metaRowStart: { justifyContent: 'flex-start' },
   time: {
-    color: 'rgba(255,255,255,0.35)',
+    color: C.textMuted,
     fontSize: 10,
     fontFamily: F.bold,
     flexShrink: 1,
@@ -318,5 +318,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  discardText: { color: 'rgba(255,255,255,0.7)', fontSize: 12.5, fontFamily: F.extraBold },
+  discardText: { color: C.textSoft, fontSize: 12.5, fontFamily: F.extraBold },
 });

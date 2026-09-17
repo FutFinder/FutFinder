@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Swords, CalendarClock, UserPlus, AlertTriangle, Bell } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubTonos, clubSuperficies, reservasFonts as F } from '../../theme/colors';
+import { reservas as C, clubTonos, clubSuperficies, reservasFonts as F } from '../../theme/colors';
 import { haceCuanto } from '../../utils/tiempoRelativo.js';
 
 /**
@@ -135,5 +135,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   titulo: { flex: 1, minWidth: 0, fontSize: 13, fontFamily: F.semiBold, color: '#FFFFFF' },
-  cuando: { fontSize: 11, color: 'rgba(255, 255, 255, 0.35)' },
+  cuando: { fontSize: 11, color: C.textMuted },
 });

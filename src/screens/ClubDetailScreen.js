@@ -26,6 +26,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import Banner from '../components/Banner';
@@ -730,7 +731,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   adminRowText: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: C.textStrong,
     fontSize: 13.5,
     fontFamily: F.semiBold,
   },
@@ -756,7 +757,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: alfa(C.tinta, 0.2),
     alignSelf: 'center',
     marginBottom: 14,
   },

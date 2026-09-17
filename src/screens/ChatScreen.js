@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   },
   demo: {
     marginTop: 18,
-    color: 'rgba(255,255,255,0.32)',
+    color: C.textMuted,
     fontSize: 11,
     lineHeight: 16,
     textAlign: 'center',

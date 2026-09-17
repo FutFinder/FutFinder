@@ -34,7 +34,7 @@ export default function TacticalHeader({
         <Text className="text-[11px] font-bold uppercase tracking-[0.22em] text-verde/75">{greeting}</Text>
         <Text className="mt-1 text-[30px] font-extrabold tracking-tight text-white">¡Hola, {userName}!</Text>
         <View className="mt-1.5 flex-row items-center gap-1.5">
-          <MapPin size={12} color="rgba(255,255,255,0.5)" />
+          <MapPin size={12} color={C.textSecondary} />
           <Text className="text-[14px] text-white/60">{comuna ? `${comuna} · ${summary}` : summary}</Text>
         </View>
       </View>

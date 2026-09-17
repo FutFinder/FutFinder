@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -35,14 +36,14 @@ export default function AuditSupportCard({ reportesRecibidos = 0 }) {
         style={({ pressed }) => [styles.header, pressed && styles.pressed]}
       >
         <View style={styles.icon}>
-          <FileText color="rgba(255, 255, 255, 0.6)" size={17} strokeWidth={1.9} />
+          <FileText color={C.textDim} size={17} strokeWidth={1.9} />
         </View>
         <View style={styles.texts}>
           <Text style={styles.title}>Auditoría y soporte</Text>
           <Text style={styles.sub}>Sin revisiones · próxima auditoría automática</Text>
         </View>
         <ChevronDown
-          color="rgba(255, 255, 255, 0.4)"
+          color={C.textGhost}
           size={15}
           strokeWidth={2.4}
           style={abierto ? styles.chevronUp : undefined}
@@ -78,7 +79,7 @@ function Row({ label, value, muted }) {
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={[styles.rowValue, muted && { color: 'rgba(255, 255, 255, 0.6)' }]}>{value}</Text>
+      <Text style={[styles.rowValue, muted && { color: C.textDim }]}>{value}</Text>
     </View>
   );
 }
@@ -100,7 +101,7 @@ const styles = StyleSheet.create({
     gap: 11,
     padding: 13,
   },
-  pressed: { backgroundColor: 'rgba(255, 255, 255, 0.03)' },
+  pressed: { backgroundColor: alfa(C.tinta, 0.03) },
   icon: {
     width: 36,
     height: 36,
@@ -111,7 +112,7 @@ const styles = StyleSheet.create({
   },
   texts: { flex: 1, minWidth: 0 },
   title: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.bold },
-  sub: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 11.5, marginTop: 2 },
+  sub: { color: C.textSecondary, fontSize: 11.5, marginTop: 2 },
   chevronUp: { transform: [{ rotate: '180deg' }] },
 
   detail: { paddingHorizontal: 13, paddingBottom: 13 },
@@ -124,7 +125,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.divider,
   },
-  rowLabel: { color: 'rgba(255, 255, 255, 0.72)', fontSize: 13, flexShrink: 1 },
+  rowLabel: { color: C.textSoft, fontSize: 13, flexShrink: 1 },
   rowValue: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold },
 
   disabledBtn: {
@@ -133,13 +134,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderSoft,
     borderRadius: R.iconBtn,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: alfa(C.tinta, 0.02),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  disabledText: { color: 'rgba(255, 255, 255, 0.3)', fontSize: 13, fontFamily: F.semiBold },
+  disabledText: { color: C.textPlaceholder, fontSize: 13, fontFamily: F.semiBold },
   disabledHint: {
-    color: 'rgba(255, 255, 255, 0.35)',
+    color: C.textMuted,
     fontSize: 11,
     marginTop: 6,
     textAlign: 'center',

@@ -41,7 +41,7 @@ export default function ProfileActionRow({
       <View style={[styles.icon, danger && styles.iconDanger]}>{icon}</View>
       <Text style={[styles.label, danger && styles.labelDanger]}>{label}</Text>
       <ChevronRight
-        color={danger ? alfa(C.red, 0.55) : 'rgba(255, 255, 255, 0.35)'}
+        color={danger ? alfa(C.red, 0.55) : C.textMuted}
         size={16}
         strokeWidth={2.2}
       />

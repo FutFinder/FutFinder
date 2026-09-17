@@ -8,6 +8,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -140,7 +141,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: C.chipAlt,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: alfa(C.tinta, 0.08),
     marginBottom: 10,
   },
   searchInput: {

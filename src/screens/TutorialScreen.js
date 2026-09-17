@@ -68,7 +68,7 @@ function Step2Crear() {
 function AsistenciaRow({ letter, handle, estado, tono }) {
   const paleta = {
     ok: { bg: alfa(C.green, 0.09), border: C.greenDeepBorder, avatarBg: C.shieldBg, avatarBorder: C.greenDeepBorder, text: C.green },
-    pendiente: { bg: 'rgba(255,255,255,.03)', border: C.border, avatarBg: C.surfaceAlt, avatarBorder: C.border, text: C.textSecondary },
+    pendiente: { bg: alfa(C.tinta, .03), border: C.border, avatarBg: C.surfaceAlt, avatarBorder: C.border, text: C.textSecondary },
     no: { bg: alfa(C.red, 0.08), border: alfa(C.red, 0.32), avatarBg: '#241618', avatarBorder: alfa(C.red, 0.22), text: C.red },
   }[tono];
   return (
@@ -144,7 +144,7 @@ function Step5Club() {
         </View>
       </View>
       <View style={[styles.matchCard, { flexDirection: 'row', alignItems: 'center', gap: 11 }]}>
-        <View style={styles.rivalIcon}><Check color="rgba(255,255,255,0.55)" size={16} strokeWidth={2.2} /></View>
+        <View style={styles.rivalIcon}><Check color={C.textSecondary} size={16} strokeWidth={2.2} /></View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={styles.rivalName}>Deportivo Ñuñoa</Text>
           <Text style={styles.rivalMeta}>2,4 km · Nivel B</Text>
@@ -378,5 +378,5 @@ const styles = StyleSheet.create({
   dotsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7 },
   dot: { height: 6, borderRadius: 99 },
   dotActive: { width: 22, backgroundColor: C.green },
-  dotInactive: { width: 6, backgroundColor: 'rgba(255,255,255,0.18)' },
+  dotInactive: { width: 6, backgroundColor: alfa(C.tinta, 0.18) },
 });

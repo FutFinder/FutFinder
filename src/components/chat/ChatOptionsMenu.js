@@ -4,6 +4,7 @@ import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import {
   reservas as C,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
   },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
+  divider: { height: 1, backgroundColor: alfa(C.tinta, 0.07) },
   label: { flex: 1, color: C.textPrimary, fontSize: 13.5, fontFamily: F.bold },
   labelDanger: { color: C.red },
 });

@@ -184,9 +184,9 @@ export default function ChatDetailsScreen({ route, navigation }) {
             <View style={styles.settingRow}>
               <View style={styles.settingLeft}>
                 {muted ? (
-                  <BellOff color="rgba(255,255,255,0.75)" size={19} strokeWidth={1.8} />
+                  <BellOff color={C.textSoft} size={19} strokeWidth={1.8} />
                 ) : (
-                  <Bell color="rgba(255,255,255,0.75)" size={19} strokeWidth={1.8} />
+                  <Bell color={C.textSoft} size={19} strokeWidth={1.8} />
                 )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.settingTitle}>Notificaciones</Text>
@@ -261,7 +261,7 @@ export default function ChatDetailsScreen({ route, navigation }) {
             {/* Regla del chat del club */}
             {t?.type === 'club' && (
               <View style={styles.note}>
-                <Info color="rgba(255,255,255,0.5)" size={17} strokeWidth={1.8} />
+                <Info color={C.textSecondary} size={17} strokeWidth={1.8} />
                 <Text style={styles.noteText}>
                   No puedes salir del chat del club sin abandonar el club. Puedes
                   silenciarlo: los avisos marcados con{' '}
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 30 },
   deniedTitle: { color: C.textPrimary, fontSize: 16, fontFamily: F.extraBold, textAlign: 'center' },
   deniedText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   identityTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold },
   identitySub: {
     marginTop: 3,
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 12.5,
     fontFamily: F.semiBold,
   },
@@ -351,13 +351,13 @@ const styles = StyleSheet.create({
     width: 19,
     height: 19,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: alfa(C.tinta, 0.35),
   },
   knobOn: { backgroundColor: C.green },
   settingTitle: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
   settingHint: {
     marginTop: 2,
-    color: 'rgba(255,255,255,0.45)',
+    color: C.textFaint,
     fontSize: 11.5,
     fontFamily: F.medium,
   },
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sectionTitle: {
-    color: 'rgba(255,255,255,0.4)',
+    color: C.textGhost,
     fontSize: 11,
     fontFamily: F.extraBold,
     letterSpacing: 0.8,
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   },
   noteText: {
     flex: 1,
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 11.5,
     lineHeight: 18,
     fontFamily: F.medium,

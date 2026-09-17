@@ -5,6 +5,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -39,7 +40,7 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderColor: alfa(C.tinta, 0.18),
     color: C.textMuted,
   },
 });

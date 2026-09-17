@@ -132,6 +132,12 @@ export const reservas = {
   textPlaceholder: '#565E57',
   // Párrafos con barra verde a la izquierda (citas, avisos obligatorios).
   textQuote: '#B4BAB5',
+  // Tinta neutra para SUPERFICIES y BORDES translúcidos: `alfa(C.tinta, 0.06)`.
+  // No es un color de texto —para eso está la rampa de arriba—; es el blanco
+  // con el que se aclara una superficie oscura sin taparla, que es distinto de
+  // pintarla de un gris sólido: sobre una foto o un degradado, lo de abajo
+  // tiene que seguir viéndose.
+  tinta: '#FFFFFF',
 
   // ── Líneas, divisores y superficies de control ────────────
   border: '#292E2A',

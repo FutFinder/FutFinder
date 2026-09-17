@@ -136,7 +136,7 @@ export function StatusButton({ label, icon: Icon, tone = 'muted', height = 52, s
 
 /** Botón cuadrado de la barra superior. */
 export function IconButton({ icon: Icon, onPress, tone = 'glass', size = 36, accessibilityLabel }) {
-  const bg = tone === 'glass' ? 'rgba(255,255,255,0.07)' : C.surface;
+  const bg = tone === 'glass' ? alfa(C.tinta, 0.07) : C.surface;
   return (
     <Pressable
       onPress={onPress}
@@ -241,7 +241,7 @@ export function Tag({ label, tone = 'neutral' }) {
     green: { bg: C.greenSoft, fg: C.green },
     gold: { bg: 'rgba(240,200,90,0.14)', fg: C.gold },
     danger: { bg: alfa(C.red, 0.13), fg: C.red },
-    solid: { bg: 'rgba(255,255,255,0.10)', fg: C.textPrimary },
+    solid: { bg: alfa(C.tinta, 0.10), fg: C.textPrimary },
   }[tone];
   return (
     <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: R.chip, backgroundColor: map.bg }}>

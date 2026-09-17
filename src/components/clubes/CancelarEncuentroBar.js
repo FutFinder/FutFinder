@@ -6,6 +6,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import {
   MOTIVO_MAX,
@@ -74,7 +75,7 @@ export default function CancelarEncuentroBar({
 
       {!acciones.puedeCancelar ? (
         <View style={styles.row}>
-          <CalendarX color="rgba(255,255,255,0.4)" size={15} strokeWidth={2.2} />
+          <CalendarX color={C.textGhost} size={15} strokeWidth={2.2} />
           <Text style={styles.hint} numberOfLines={2}>
             {acciones.bloqueo}
           </Text>
@@ -95,7 +96,7 @@ export default function CancelarEncuentroBar({
         <>
           <View style={[styles.avisoBox, aviso.sanciona && styles.avisoBoxGrave]}>
             <TriangleAlert
-              color={aviso.sanciona ? C.amber : 'rgba(255,255,255,0.55)'}
+              color={aviso.sanciona ? C.amber : C.textSecondary}
               size={13}
               strokeWidth={2.2}
             />
@@ -111,7 +112,7 @@ export default function CancelarEncuentroBar({
           <TextInput
             style={styles.input}
             placeholder="Ej: se nos inundó la cancha"
-            placeholderTextColor="rgba(255,255,255,0.35)"
+            placeholderTextColor={C.textMuted}
             value={motivo}
             onChangeText={setMotivo}
             multiline
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: C.composerBar,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
+    borderBottomColor: alfa(C.tinta, 0.07),
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tocable: { minHeight: 44 },
@@ -227,21 +228,21 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 8,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
   },
   avisoBoxGrave: { backgroundColor: C.amberSoft },
   avisoTexto: { flex: 1, gap: 2 },
   avisoTitulo: { color: C.textPrimary, fontSize: 12, fontFamily: F.extraBold },
   avisoTituloGrave: { color: C.amber },
-  avisoDetalle: { color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 16 },
+  avisoDetalle: { color: C.textDim, fontSize: 12, lineHeight: 16 },
 
-  label: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: F.bold },
+  label: { color: C.textDim, fontSize: 12, fontFamily: F.bold },
   input: {
     minHeight: 60,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: alfa(C.tinta, 0.12),
     paddingHorizontal: 10,
     paddingVertical: 8,
     color: C.textPrimary,
@@ -289,5 +290,5 @@ const styles = StyleSheet.create({
   },
   btnInactivo: { opacity: 0.45 },
 
-  hint: { flex: 1, color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16, fontFamily: F.medium },
+  hint: { flex: 1, color: C.textSecondary, fontSize: 12, lineHeight: 16, fontFamily: F.medium },
 });

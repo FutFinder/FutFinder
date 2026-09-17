@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   text: {
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: C.textSoft,
     fontSize: 13.5,
     lineHeight: 20,
   },

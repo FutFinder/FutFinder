@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
   },
   segment: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
   segmentActive: { backgroundColor: C.green },
-  segmentText: { color: 'rgba(255,255,255,0.6)', fontSize: 12.5, fontFamily: F.bold },
+  segmentText: { color: C.textDim, fontSize: 12.5, fontFamily: F.bold },
   segmentTextActive: { color: C.greenInk, fontFamily: F.extraBold },
 
   list: { paddingHorizontal: S.screenPadding, paddingBottom: 40, gap: 10 },
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rejectText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontFamily: F.extraBold },
+  rejectText: { color: C.textSoft, fontSize: 13, fontFamily: F.extraBold },
 
   doneAccepted: {
     flexDirection: 'row',
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  doneRejectedText: { color: 'rgba(255,255,255,0.45)', fontSize: 13, fontFamily: F.bold },
+  doneRejectedText: { color: C.textFaint, fontSize: 13, fontFamily: F.bold },
 
   cancelBtn: {
     minHeight: 38,
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  cancelText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontFamily: F.extraBold },
+  cancelText: { color: C.textSoft, fontSize: 12, fontFamily: F.extraBold },
 
   chatBtn: {
     minHeight: 38,
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: C.textPrimary, fontSize: 16, fontFamily: F.extraBold, textAlign: 'center' },
   emptyText: {
     marginTop: 7,
-    color: 'rgba(255,255,255,0.48)',
+    color: C.textSecondary,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',

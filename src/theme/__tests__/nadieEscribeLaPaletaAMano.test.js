@@ -114,6 +114,12 @@ test('ningún color de las paletas borradas está escrito a mano en src/', () =>
 
 /** Las tripletas de la paleta ACTUAL: correctas, pero no se escriben a mano. */
 const A_MANO = {
+  // El blanco translúcido también: como superficie o borde va
+  // `alfa(C.tinta, 0.06)`, y como TEXTO no va — para eso está la rampa
+  // (`textSoft`, `textDim`, `textSecondary`…). Un texto con opacidad se
+  // multiplica contra el fondo, así que el mismo «blanco al 50%» se lee
+  // distinto sobre la página, sobre una tarjeta y sobre un héroe.
+  '255,255,255': 'tinta',
   '85,223,105': 'green',
   '237,107,118': 'red',
   '232,179,75': 'amber',

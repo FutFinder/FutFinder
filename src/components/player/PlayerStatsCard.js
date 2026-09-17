@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: C.borderSoft,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: alfa(C.tinta, 0.05),
   },
   cellHighlight: {
     backgroundColor: alfa(C.green, 0.11),
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   cellValueHighlight: { color: C.green },
-  cellValueDim: { color: 'rgba(255, 255, 255, 0.45)' },
+  cellValueDim: { color: C.textFaint },
   cellLabel: {
     color: C.textMuted,
     fontSize: 10,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cellLabelHighlight: { color: alfa(C.green, 0.75) },
-  cellLabelDim: { color: 'rgba(255, 255, 255, 0.4)' },
+  cellLabelDim: { color: C.textGhost },
 
   attRow: {
     flexDirection: 'row',
@@ -135,13 +135,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 14,
   },
-  attLabel: { color: 'rgba(255, 255, 255, 0.7)', fontSize: 13, fontFamily: F.semiBold },
+  attLabel: { color: C.textSoft, fontSize: 13, fontFamily: F.semiBold },
   attValue: { color: C.green, fontSize: 15, fontFamily: F.extraBold },
-  attValueEmpty: { color: 'rgba(255, 255, 255, 0.5)' },
+  attValueEmpty: { color: C.textSecondary },
   track: {
     height: 8,
     borderRadius: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: alfa(C.tinta, 0.07),
     marginTop: 8,
     overflow: 'hidden',
   },

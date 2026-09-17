@@ -74,7 +74,7 @@ export function ThreadDenied({ title, message, onBack }) {
   return (
     <View style={styles.empty}>
       <View style={[styles.emptyIcon, styles.emptyIconMuted]}>
-        <MessageSquare color="rgba(255,255,255,0.45)" size={26} strokeWidth={1.6} />
+        <MessageSquare color={C.textFaint} size={26} strokeWidth={1.6} />
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       {!!message && <Text style={styles.emptyText}>{message}</Text>}
@@ -125,9 +125,9 @@ export function FriendRequestsCard({ requests, onPress }) {
 
 const styles = StyleSheet.create({
   day: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 10 },
-  dayLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
+  dayLine: { flex: 1, height: 1, backgroundColor: alfa(C.tinta, 0.07) },
   dayText: {
-    color: 'rgba(255,255,255,0.35)',
+    color: C.textMuted,
     fontSize: 10,
     fontFamily: F.extraBold,
     letterSpacing: 1.2,
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.hairline,
   },
-  pillText: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontFamily: F.bold },
+  pillText: { color: C.textSecondary, fontSize: 11, fontFamily: F.bold },
 
   earlier: {
     alignSelf: 'center',
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 7,
-    color: 'rgba(255,255,255,0.48)',
+    color: C.textSecondary,
     fontSize: 13,
     lineHeight: 21,
     textAlign: 'center',
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   reqTitle: { color: C.textPrimary, fontSize: 14, fontFamily: F.extraBold },
   reqNames: {
     marginTop: 2,
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 12,
     fontFamily: F.medium,
   },

@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   rival: {
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: C.textSoft,
     fontSize: 13.5,
     fontFamily: F.bold,
     flexShrink: 1,

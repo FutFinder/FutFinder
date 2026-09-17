@@ -99,7 +99,7 @@ function CustomTabBar({ state, navigation }) {
   const renderTab = (route) => {
     const index = state.routes.indexOf(route);
     const isFocused = state.index === index;
-    const color = isFocused ? C.green : 'rgba(255,255,255,0.42)';
+    const color = isFocused ? C.green : C.textFaint;
     const Icon = iconFor(route.name);
     const badge =
       route.name === 'ChatTab'

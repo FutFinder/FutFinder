@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.chip,
   },
   chipText: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: C.textStrong,
     fontSize: 11.5,
     fontFamily: F.bold,
   },

@@ -4,7 +4,7 @@ import { Shield, Plus } from 'lucide-react-native';
 
 import { temaClub, temaDeClub } from '../../theme/clubThemes';
 import VerifiedBadge from './VerifiedBadge';
-import { reservasFonts as F } from '../../theme/colors';
+import { reservas as C, reservasFonts as F, alfa } from '../../theme/colors';
 
 /**
  * Selector horizontal del club activo.
@@ -80,7 +80,7 @@ export default function ClubSwitcher({ clubs, activeClubId, tema, onSelect, onEx
         accessibilityLabel="Explorar clubes"
         style={({ pressed }) => [styles.chip, styles.chipExplorar, pressed && { opacity: 0.75 }]}
       >
-        <Plus size={15} color="rgba(255, 255, 255, 0.6)" strokeWidth={2.2} />
+        <Plus size={15} color={C.textDim} strokeWidth={2.2} />
         <Text style={[styles.nombre, styles.nombreInactivo]}>Explorar</Text>
       </Pressable>
     </ScrollView>
@@ -101,12 +101,12 @@ const styles = StyleSheet.create({
   },
   chipInactivo: {
     backgroundColor: '#141416',
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: alfa(C.tinta, 0.09),
   },
   chipExplorar: {
     backgroundColor: 'transparent',
     borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: alfa(C.tinta, 0.16),
   },
   nombre: {
     flexShrink: 1,
@@ -114,5 +114,5 @@ const styles = StyleSheet.create({
     fontFamily: F.bold,
     color: '#FFFFFF',
   },
-  nombreInactivo: { fontFamily: F.semiBold, color: 'rgba(255, 255, 255, 0.6)' },
+  nombreInactivo: { fontFamily: F.semiBold, color: C.textDim },
 });

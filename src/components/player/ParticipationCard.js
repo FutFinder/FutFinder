@@ -14,7 +14,7 @@ const TONOS = {
   green: { color: C.green, chipBg: alfa(C.green, 0.14) },
   yellow: { color: C.draw, chipBg: 'rgba(224, 194, 90, 0.14)' },
   coral: { color: C.loss, chipBg: alfa(C.red, 0.14) },
-  muted: { color: 'rgba(255, 255, 255, 0.45)', chipBg: 'rgba(255, 255, 255, 0.07)' },
+  muted: { color: C.textFaint, chipBg: alfa(C.tinta, 0.07) },
 };
 
 /**
@@ -60,7 +60,7 @@ export default function ParticipationCard({ titulo, meta, estado, esMvp, onPress
         <Text style={[styles.chipText, { color: tono.color }]}>{estado.label}</Text>
       </View>
 
-      <ChevronRight color="rgba(255, 255, 255, 0.35)" size={16} strokeWidth={2.2} />
+      <ChevronRight color={C.textMuted} size={16} strokeWidth={2.2} />
     </Pressable>
   );
 }

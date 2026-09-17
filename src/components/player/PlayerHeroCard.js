@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import BannerBackdrop from '../ds/BannerBackdrop';
 import TagBadge from '../ds/TagBadge';
@@ -124,7 +125,7 @@ export default function PlayerHeroCard({
           <Chip
             icon={
               <Shield
-                color={clubNombre ? C.green : 'rgba(255,255,255,0.35)'}
+                color={clubNombre ? C.green : C.textMuted}
                 size={15}
                 strokeWidth={1.8}
               />
@@ -137,7 +138,7 @@ export default function PlayerHeroCard({
           <Chip
             icon={
               <Star
-                color={rating.hasRatings ? C.gold : 'rgba(255,255,255,0.35)'}
+                color={rating.hasRatings ? C.gold : C.textMuted}
                 size={15}
                 strokeWidth={1.8}
                 fill={rating.hasRatings ? C.gold : 'none'}
@@ -247,7 +248,7 @@ const styles = StyleSheet.create({
   avatarInitial: {
     fontSize: 24,
     fontFamily: F.extraBold,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: C.textGhost,
   },
   verifiedDot: {
     position: 'absolute',
@@ -283,12 +284,12 @@ const styles = StyleSheet.create({
     borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: C.borderSoft,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: alfa(C.tinta, 0.05),
   },
   chipEmpty: {
     borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: alfa(C.tinta, 0.14),
+    backgroundColor: alfa(C.tinta, 0.04),
   },
   chipGold: {
     borderColor: 'rgba(240, 200, 90, 0.22)',
@@ -304,5 +305,5 @@ const styles = StyleSheet.create({
   },
   chipLabelGold: { color: 'rgba(240, 200, 90, 0.7)' },
   chipValue: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold },
-  chipDim: { color: 'rgba(255, 255, 255, 0.5)' },
+  chipDim: { color: C.textSecondary },
 });

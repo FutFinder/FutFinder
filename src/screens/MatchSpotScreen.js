@@ -460,8 +460,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bigIconMuted: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: alfa(C.tinta, 0.05),
+    borderColor: alfa(C.tinta, 0.10),
   },
   bigTitle: { fontSize: 22, fontFamily: F.extraBold, color: C.textPrimary, letterSpacing: -0.4 },
   bigText: { fontSize: 13, lineHeight: 20, color: C.textSecondary, textAlign: 'center' },

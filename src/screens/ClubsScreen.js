@@ -17,6 +17,7 @@ import {
   reservasFonts as F,
   clubTonos,
   clubSuperficies,
+  alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import { respondToRequest, cancelRequest } from '../services/clubs';
@@ -667,7 +668,7 @@ function Invitaciones({ lista, onResponder }) {
             accessibilityLabel={`Rechazar la invitación de ${inv.club?.nombre || 'el club'}`}
             style={({ pressed }) => [styles.iconoRechazar, pressed && { opacity: 0.75 }]}
           >
-            <X size={17} color="rgba(255,255,255,0.6)" strokeWidth={2.4} />
+            <X size={17} color={C.textDim} strokeWidth={2.4} />
           </Pressable>
         </View>
       ))}
@@ -775,10 +776,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: alfa(C.tinta, 0.16),
     alignItems: 'center',
   },
-  verMasTexto: { fontSize: 12.5, fontFamily: F.bold, color: 'rgba(255, 255, 255, 0.6)' },
+  verMasTexto: { fontSize: 12.5, fontFamily: F.bold, color: C.textDim },
   carrusel: { paddingHorizontal: 16, gap: 10 },
   rival: { width: 172 },
 
@@ -796,7 +797,7 @@ const styles = StyleSheet.create({
   textoVacio: {
     fontSize: 13,
     lineHeight: 19,
-    color: 'rgba(255, 255, 255, 0.45)',
+    color: C.textFaint,
     textAlign: 'center',
   },
   botonPrimario: {
@@ -816,9 +817,9 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: alfa(C.tinta, 0.12),
   },
   botonSecundarioTexto: { fontSize: 13.5, fontFamily: F.bold, color: '#FFFFFF' },
   crece: { flex: 1 },
@@ -843,7 +844,7 @@ const styles = StyleSheet.create({
   esperaAcciones: { flexDirection: 'row', gap: 9 },
   textos: { flex: 1, minWidth: 0, gap: 2 },
   tituloTarjeta: { fontSize: 14, fontFamily: F.bold, color: '#FFFFFF' },
-  subtituloTarjeta: { fontSize: 12, color: 'rgba(255, 255, 255, 0.5)' },
+  subtituloTarjeta: { fontSize: 12, color: C.textSecondary },
 
   invitacion: {
     flexDirection: 'row',
@@ -869,8 +870,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: alfa(C.tinta, 0.12),
   },
 });

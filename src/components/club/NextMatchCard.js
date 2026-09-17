@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { CalendarDays, MapPin } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubSuperficies, reservasFonts as F } from '../../theme/colors';
+import { reservas as C, clubSuperficies, reservasFonts as F, alfa } from '../../theme/colors';
 import { clubesDelPartido } from '../../services/clubMatchRules';
 import ClubLogo from './ClubLogo';
 
@@ -72,7 +72,7 @@ export default function NextMatchCard({
               accessibilityLabel="Ver calendario de partidos"
               style={({ pressed }) => [styles.calendarioBtn, pressed && { opacity: 0.7 }]}
             >
-              <CalendarDays size={15} color="rgba(255, 255, 255, 0.55)" strokeWidth={2.2} />
+              <CalendarDays size={15} color={C.textSecondary} strokeWidth={2.2} />
             </Pressable>
           ) : null}
         </View>
@@ -163,7 +163,7 @@ function Tile({ Icono, rotulo, valor }) {
   return (
     <View style={styles.tile}>
       <View style={styles.tileCabecera}>
-        <Icono size={12} color="rgba(255, 255, 255, 0.35)" strokeWidth={2.2} />
+        <Icono size={12} color={C.textMuted} strokeWidth={2.2} />
         <Text style={styles.tileRotulo}>{rotulo}</Text>
       </View>
       <Text style={styles.tileValor} numberOfLines={2}>
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontFamily: F.bold,
     letterSpacing: 0.4,
-    color: 'rgba(255, 255, 255, 0.35)',
+    color: C.textMuted,
   },
   cabeceraDerecha: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   calendarioBtn: {
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
   },
   enfrentamiento: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   lado: { flex: 1, alignItems: 'center', gap: 8 },
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   vs: {
     fontSize: 15,
     fontFamily: F.extraBold,
-    color: 'rgba(255, 255, 255, 0.35)',
+    color: C.textMuted,
     marginTop: 18,
   },
   tiles: { flexDirection: 'row', gap: 9 },
@@ -230,25 +230,25 @@ const styles = StyleSheet.create({
     gap: 5,
     padding: 11,
     borderRadius: 13,
-    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    backgroundColor: alfa(C.tinta, 0.045),
   },
   tileCabecera: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   tileRotulo: {
     fontSize: 9.5,
     fontFamily: F.bold,
     letterSpacing: 0.5,
-    color: 'rgba(255, 255, 255, 0.35)',
+    color: C.textMuted,
   },
   tileValor: { fontSize: 12.5, fontFamily: F.semiBold, color: '#FFFFFF' },
   cupos: { gap: 7 },
   cuposFila: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cuposRotulo: { fontSize: 11.5, color: 'rgba(255, 255, 255, 0.45)' },
+  cuposRotulo: { fontSize: 11.5, color: C.textFaint },
   cuposValor: { fontSize: 12.5, fontFamily: F.bold, color: '#FFFFFF' },
   pista: {
     height: 6,
     borderRadius: 99,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: alfa(C.tinta, 0.09),
   },
   relleno: { height: 6, borderRadius: 99 },
   acciones: { flexDirection: 'row', gap: 9 },
@@ -261,9 +261,9 @@ const styles = StyleSheet.create({
   accionPrimaria: { flex: 1 },
   accionSecundaria: {
     paddingHorizontal: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: alfa(C.tinta, 0.12),
   },
   accionTexto: { fontSize: 14, fontFamily: F.bold, color: '#FFFFFF' },
 });

@@ -139,7 +139,7 @@ export default function ConversationCard({ thread, now, onPress }) {
             <View style={styles.kindRow}>
               {thread.type === 'match' && (
                 <Video
-                  color={hasUnread ? C.green : 'rgba(255,255,255,0.4)'}
+                  color={hasUnread ? C.green : C.textGhost}
                   size={12}
                   strokeWidth={2}
                 />
@@ -153,7 +153,7 @@ export default function ConversationCard({ thread, now, onPress }) {
           <View style={styles.badges}>
             {thread.muted && (
               <BellOff
-                color="rgba(255,255,255,0.32)"
+                color={C.textMuted}
                 size={15}
                 strokeWidth={1.8}
                 accessibilityLabel="Conversación silenciada"
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   },
   titleUnread: { fontFamily: F.extraBold },
   time: {
-    color: 'rgba(255,255,255,0.4)',
+    color: C.textGhost,
     fontSize: 11,
     fontFamily: F.semiBold,
     includeFontPadding: false,
@@ -232,15 +232,15 @@ const styles = StyleSheet.create({
 
   preview: {
     marginTop: 3,
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 13,
     fontFamily: F.medium,
     lineHeight: 18,
   },
-  previewUnread: { color: 'rgba(255,255,255,0.68)' },
+  previewUnread: { color: C.textSoft },
   previewAviso: { color: C.amber, fontFamily: F.extraBold },
-  prefix: { color: 'rgba(255,255,255,0.72)' },
-  prefixUnread: { color: 'rgba(255,255,255,0.85)' },
+  prefix: { color: C.textSoft },
+  prefixUnread: { color: C.textPrimary },
 
   bottomRow: {
     marginTop: 7,
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   kindRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, minWidth: 0 },
   kindText: {
-    color: 'rgba(255,255,255,0.4)',
+    color: C.textGhost,
     fontSize: 10.5,
     fontFamily: F.bold,
     letterSpacing: 0.2,

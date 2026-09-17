@@ -6,6 +6,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
 import { filasDeComparacion, mensajeDeEspera } from '../../utils/cambioPartido';
@@ -73,7 +74,7 @@ export default function CambioPartidoCard({
               <Text style={styles.antes} numberOfLines={2}>
                 {f.antes}
               </Text>
-              <ArrowRight color="rgba(255,255,255,0.45)" size={13} strokeWidth={2.4} />
+              <ArrowRight color={C.textFaint} size={13} strokeWidth={2.4} />
               <Text style={styles.despues} numberOfLines={2}>
                 {f.despues}
               </Text>
@@ -101,7 +102,7 @@ export default function CambioPartidoCard({
             <TextInput
               style={styles.input}
               placeholder="Ej: ese día no tenemos arquero"
-              placeholderTextColor="rgba(255,255,255,0.35)"
+              placeholderTextColor={C.textMuted}
               value={motivo}
               onChangeText={setMotivo}
               multiline
@@ -210,12 +211,12 @@ const styles = StyleSheet.create({
     fontFamily: F.extraBold,
     includeFontPadding: false,
   },
-  aviso: { color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 16 },
+  aviso: { color: C.textDim, fontSize: 12, lineHeight: 16 },
 
   filas: { gap: 6, marginTop: 2 },
   fila: { gap: 3 },
   etiqueta: {
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 11,
     fontFamily: F.bold,
     textTransform: 'uppercase',
@@ -225,7 +226,7 @@ const styles = StyleSheet.create({
   // justamente lo que hay que poder leer entero antes de aceptar.
   valores: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   antes: {
-    color: 'rgba(255,255,255,0.55)',
+    color: C.textSecondary,
     fontSize: 13,
     fontFamily: F.semiBold,
     textDecorationLine: 'line-through',
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
   cargando: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 
   label: {
-    color: 'rgba(255,255,255,0.6)',
+    color: C.textDim,
     fontSize: 12,
     fontFamily: F.bold,
     marginTop: 2,
@@ -254,9 +255,9 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 60,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: alfa(C.tinta, 0.12),
     paddingHorizontal: 10,
     paddingVertical: 8,
     color: C.textPrimary,
@@ -293,5 +294,5 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.85 },
 
-  hint: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16, fontFamily: F.medium },
+  hint: { color: C.textSecondary, fontSize: 12, lineHeight: 16, fontFamily: F.medium },
 });

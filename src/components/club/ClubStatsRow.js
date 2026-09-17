@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: C.borderSoft,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: alfa(C.tinta, 0.05),
   },
   cellWin: {
     backgroundColor: alfa(C.green, 0.11),

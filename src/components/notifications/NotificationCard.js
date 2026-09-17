@@ -5,7 +5,7 @@ import {
   RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone, CalendarX, ShieldAlert, Scale,
 } from 'lucide-react-native';
 
-import { reservas as C } from '../../theme/colors';
+import { reservas as C, alfa } from '../../theme/colors';
 
 /** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
 export const CATEGORY = {
@@ -145,7 +145,7 @@ const TAG = {
   club_revision_resuelta: { label: 'REVISIÓN RESUELTA', ...AMBAR },
 };
 
-const FALLBACK_TAG = { label: 'AVISO', color: 'rgba(255,255,255,0.6)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)' };
+const FALLBACK_TAG = { label: 'AVISO', color: C.textDim, bg: alfa(C.tinta, 0.06), border: alfa(C.tinta, 0.12) };
 
 /**
  * Avisos que ofrecen un atajo visible además de la tarjeta entera.
@@ -213,8 +213,8 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
       onPress={() => !busy && onPress(n)}
       className="flex-row items-start gap-3 overflow-hidden rounded-[18px] border p-3.5 active:opacity-80"
       style={{
-        borderColor: unread ? tag.border : 'rgba(255,255,255,0.07)',
-        backgroundColor: unread ? tag.bg : 'rgba(255,255,255,0.03)',
+        borderColor: unread ? tag.border : alfa(C.tinta, 0.07),
+        backgroundColor: unread ? tag.bg : alfa(C.tinta, 0.03),
         opacity: busy ? 0.6 : 1,
       }}
     >
@@ -223,11 +223,11 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
       <View
         className="h-[38px] w-[38px] items-center justify-center rounded-[13px] border"
         style={{
-          borderColor: unread ? tag.border : 'rgba(255,255,255,0.10)',
-          backgroundColor: unread ? tag.bg : 'rgba(255,255,255,0.05)',
+          borderColor: unread ? tag.border : alfa(C.tinta, 0.10),
+          backgroundColor: unread ? tag.bg : alfa(C.tinta, 0.05),
         }}
       >
-        <Icon size={18} color={unread ? tag.color : 'rgba(255,255,255,0.55)'} strokeWidth={1.9} />
+        <Icon size={18} color={unread ? tag.color : C.textSecondary} strokeWidth={1.9} />
       </View>
 
       <View className="flex-1">
@@ -296,7 +296,7 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
         hitSlop={8}
         className="h-[30px] w-[30px] items-center justify-center rounded-[10px] active:bg-rojo/14"
       >
-        <Trash2 size={14} color="rgba(255,255,255,0.32)" strokeWidth={1.9} />
+        <Trash2 size={14} color={C.textMuted} strokeWidth={1.9} />
       </Pressable>
     </Pressable>
   );

@@ -144,14 +144,14 @@ const styles = StyleSheet.create({
   },
   text: {
     flexShrink: 1,
-    color: 'rgba(255,255,255,0.72)',
+    color: C.textSoft,
     fontSize: 12,
     lineHeight: 16,
     fontFamily: F.semiBold,
     textAlign: 'center',
   },
   hora: {
-    color: 'rgba(255,255,255,0.35)',
+    color: C.textMuted,
     fontSize: 10,
     fontFamily: F.bold,
     includeFontPadding: false,

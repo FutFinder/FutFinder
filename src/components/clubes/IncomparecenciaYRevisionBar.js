@@ -6,6 +6,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import {
   MOTIVO_INCOMPARECENCIA_MAX,
@@ -105,7 +106,7 @@ export default function IncomparecenciaYRevisionBar({
               </Pressable>
             ) : (
               <View style={styles.row}>
-                <UserX color="rgba(255,255,255,0.4)" size={15} strokeWidth={2.2} />
+                <UserX color={C.textGhost} size={15} strokeWidth={2.2} />
                 <Text style={styles.hint} numberOfLines={3}>
                   {miReporte?.motivo
                     ? `Informaste una incomparecencia: «${miReporte.motivo}».`
@@ -129,7 +130,7 @@ export default function IncomparecenciaYRevisionBar({
               </Pressable>
             ) : (
               <View style={styles.row}>
-                <Scale color="rgba(255,255,255,0.4)" size={15} strokeWidth={2.2} />
+                <Scale color={C.textGhost} size={15} strokeWidth={2.2} />
                 <Text style={styles.hint} numberOfLines={4}>
                   {textoEstadoRevision(revisionEnCurso) || revision?.bloqueo}
                 </Text>
@@ -158,7 +159,7 @@ export default function IncomparecenciaYRevisionBar({
             placeholder={esRevision
               ? 'Ej: sí llegamos, el club rival fue a otra cancha'
               : 'Ej: esperamos media hora y no llegó nadie'}
-            placeholderTextColor="rgba(255,255,255,0.35)"
+            placeholderTextColor={C.textMuted}
             value={texto}
             onChangeText={setTexto}
             multiline
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: C.composerBar,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
+    borderBottomColor: alfa(C.tinta, 0.07),
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tocable: { minHeight: 44 },
@@ -248,7 +249,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     flex: 1,
-    color: 'rgba(255,255,255,0.55)',
+    color: C.textSecondary,
     fontSize: 11.5,
     lineHeight: 15,
     fontFamily: F.semiBold,
@@ -265,7 +266,7 @@ const styles = StyleSheet.create({
   },
   avisoTexto: { flex: 1, gap: 2 },
   avisoTitulo: { color: C.amber, fontSize: 12, fontFamily: F.extraBold },
-  avisoDetalle: { color: 'rgba(255,255,255,0.7)', fontSize: 11.5, lineHeight: 15, fontFamily: F.semiBold },
+  avisoDetalle: { color: C.textSoft, fontSize: 11.5, lineHeight: 15, fontFamily: F.semiBold },
 
   input: {
     minHeight: 64,
@@ -273,9 +274,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: alfa(C.tinta, 0.05),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: alfa(C.tinta, 0.12),
     color: C.textPrimary,
     fontSize: 13,
     textAlignVertical: 'top',
@@ -293,9 +294,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 14,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: alfa(C.tinta, 0.07),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: alfa(C.tinta, 0.12),
   },
   btnMitad: { flex: 1 },
   btnGrave: {

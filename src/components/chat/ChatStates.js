@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     borderRadius: R.cardSm,
     backgroundColor: '#0F110F',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: alfa(C.tinta, 0.05),
   },
   skelAvatar: { width: 46, height: 46, borderRadius: 15, backgroundColor: '#161916' },
   skelLine: { borderRadius: 7, backgroundColor: '#191C19' },
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     gap: 9,
     marginTop: 22,
   },
-  skelFooterText: { color: 'rgba(255,255,255,0.4)', fontSize: 12.5, fontFamily: F.bold },
+  skelFooterText: { color: C.textGhost, fontSize: 12.5, fontFamily: F.bold },
 
   // Estados grandes centrados
   centered: {
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   },
   bigText: {
     marginTop: 8,
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 13.5,
     lineHeight: 21,
     textAlign: 'center',
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   ctaOutlineText: { color: C.green, fontSize: 14, fontFamily: F.extraBold },
   errorCode: {
     marginTop: 16,
-    color: 'rgba(255,255,255,0.32)',
+    color: C.textMuted,
     fontSize: 11.5,
     fontFamily: F.semiBold,
   },
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   offlineTitle: { color: C.amber, fontSize: 12.5, fontFamily: F.extraBold },
   offlineText: {
     marginTop: 2,
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 11.5,
     fontFamily: F.medium,
   },
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   },
   dashedText: {
     marginTop: 5,
-    color: 'rgba(255,255,255,0.45)',
+    color: C.textFaint,
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',

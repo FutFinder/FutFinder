@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 
+import { reservas as C, alfa } from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
 import { cuposDelPlan } from '../../utils/clubsHomeTasks.js';
 import { ratingLabel as formatearRating } from '../../utils/clubMeta';
@@ -141,7 +142,7 @@ export default function ClubSummaryCarousel({ clubs, activeClubId, tema, onSelec
               styles.dot,
               {
                 width: i === indiceMostrado ? 16 : 5,
-                backgroundColor: i === indiceMostrado ? tema.main : 'rgba(255,255,255,0.2)',
+                backgroundColor: i === indiceMostrado ? tema.main : alfa(C.tinta, 0.2),
               },
             ]}
           />

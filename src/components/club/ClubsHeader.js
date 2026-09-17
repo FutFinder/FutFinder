@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Search, Bell } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubSuperficies, reservasFonts as F } from '../../theme/colors';
+import { reservas as C, clubSuperficies, reservasFonts as F, alfa } from '../../theme/colors';
 import BrandMark from '../BrandMark';
 
 /**
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   subtitulo: {
     marginTop: 2,
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.55)',
+    color: C.textSecondary,
   },
   acciones: { flexDirection: 'row', gap: 9 },
   boton: {
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: FONDO_BOTON,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderColor: alfa(C.tinta, 0.09),
   },
   botonPress: { opacity: 0.7 },
   punto: {

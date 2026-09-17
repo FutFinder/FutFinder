@@ -134,7 +134,7 @@ function Row({ label, value, danger, muted }) {
         style={[
           styles.rowValue,
           danger && { color: C.loss },
-          muted && { color: 'rgba(255, 255, 255, 0.6)' },
+          muted && { color: C.textDim },
         ]}
       >
         {value}
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   iconSanction: { backgroundColor: alfa(C.red, 0.14) },
   headerTexts: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 13.5, fontFamily: F.bold },
-  headerSub: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 11.5, marginTop: 2 },
+  headerSub: { color: C.textSecondary, fontSize: 11.5, marginTop: 2 },
 
   counters: { flexDirection: 'row', gap: 6, paddingHorizontal: 13, paddingTop: 12 },
   counter: {
@@ -194,13 +194,13 @@ const styles = StyleSheet.create({
     borderRadius: R.iconBtn,
     borderWidth: 1,
     borderColor: C.borderSoft,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: alfa(C.tinta, 0.05),
     paddingHorizontal: 10,
     paddingVertical: 9,
   },
   counterValue: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, lineHeight: 20 },
-  dim: { color: 'rgba(255, 255, 255, 0.5)' },
-  counterLabel: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 10.5, marginTop: 4 },
+  dim: { color: C.textSecondary },
+  counterLabel: { color: C.textSecondary, fontSize: 10.5, marginTop: 4 },
 
   detail: { paddingHorizontal: 13, paddingTop: 10 },
   row: {
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.divider,
   },
-  rowLabel: { color: 'rgba(255, 255, 255, 0.72)', fontSize: 13, flexShrink: 1 },
+  rowLabel: { color: C.textSoft, fontSize: 13, flexShrink: 1 },
   rowValue: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold },
 
   toggle: {
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  togglePressed: { backgroundColor: 'rgba(255, 255, 255, 0.03)' },
+  togglePressed: { backgroundColor: alfa(C.tinta, 0.03) },
   toggleText: { color: C.green, fontSize: 13, fontFamily: F.bold },
   chevronUp: { transform: [{ rotate: '180deg' }] },
 });

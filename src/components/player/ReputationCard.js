@@ -7,6 +7,7 @@ import {
   reservasRadius as R,
   reservasSizes as S,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 
 /**
@@ -48,7 +49,7 @@ export default function ReputationCard({ rating, trust }) {
                     ? llena
                       ? C.gold
                       : 'rgba(240, 200, 90, 0.28)'
-                    : 'rgba(255, 255, 255, 0.22)'
+                    : alfa(C.tinta, 0.22)
                 }
                 fill={llena ? C.gold : 'none'}
               />
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     letterSpacing: -0.8,
   },
-  dim: { color: 'rgba(255, 255, 255, 0.45)' },
+  dim: { color: C.textFaint },
   stars: { flexDirection: 'row', gap: 2, marginTop: 6 },
   leftHint: { color: C.textMuted, fontSize: 11.5, marginTop: 6 },
 
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   track: {
     height: 6,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: alfa(C.tinta, 0.07),
     marginTop: 8,
     overflow: 'hidden',
   },

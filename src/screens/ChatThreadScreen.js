@@ -1368,14 +1368,14 @@ export default function ChatThreadScreen({ route, navigation }) {
       items.push({
         key: 'profile',
         label: 'Ver perfil',
-        icon: <UserIcon color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />,
+        icon: <UserIcon color={C.textStrong} size={17} strokeWidth={1.8} />,
         onPress: () => navigation.navigate('UserProfile', { userId: t.id }),
       });
     } else {
       items.push({
         key: 'details',
         label: 'Detalles y jugadores',
-        icon: <Users color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />,
+        icon: <Users color={C.textStrong} size={17} strokeWidth={1.8} />,
         onPress: openIdentity,
       });
     }
@@ -1384,9 +1384,9 @@ export default function ChatThreadScreen({ route, navigation }) {
       key: 'mute',
       label: muted ? 'Activar notificaciones' : 'Silenciar conversación',
       icon: muted ? (
-        <Bell color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />
+        <Bell color={C.textStrong} size={17} strokeWidth={1.8} />
       ) : (
-        <BellOff color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />
+        <BellOff color={C.textStrong} size={17} strokeWidth={1.8} />
       ),
       onPress: handleToggleMute,
     });
@@ -1400,7 +1400,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       items.push({
         key: 'delete',
         label: 'Eliminar conversación',
-        icon: <Trash2 color="rgba(255,255,255,0.8)" size={17} strokeWidth={1.8} />,
+        icon: <Trash2 color={C.textStrong} size={17} strokeWidth={1.8} />,
         onPress: handleDeleteChat,
       });
     }
@@ -1842,7 +1842,7 @@ const styles = StyleSheet.create({
   cambioHint: {
     marginHorizontal: 14,
     marginBottom: 8,
-    color: 'rgba(255,255,255,0.45)',
+    color: C.textFaint,
     fontSize: 12,
     lineHeight: 16,
     textAlign: 'center',

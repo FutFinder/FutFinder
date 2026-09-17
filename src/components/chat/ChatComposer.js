@@ -43,7 +43,7 @@ export default function ChatComposer({
     return (
       <View style={styles.readOnlyBar}>
         <View style={styles.readOnlyCard} accessibilityRole="summary">
-          <Lock color="rgba(255,255,255,0.55)" size={19} strokeWidth={1.8} />
+          <Lock color={C.textSecondary} size={19} strokeWidth={1.8} />
           <View style={{ flex: 1 }}>
             <Text style={styles.readOnlyTitle}>{readOnlyTitle}</Text>
             {!!readOnlyMessage && <Text style={styles.readOnlyText}>{readOnlyMessage}</Text>}
@@ -101,7 +101,7 @@ export default function ChatComposer({
           accessibilityLabel="Abrir el selector de emoji"
           style={({ pressed }) => [styles.emojiBtn, pressed && { opacity: 0.6 }]}
         >
-          <Smile color="rgba(255,255,255,0.55)" size={23} strokeWidth={1.7} />
+          <Smile color={C.textSecondary} size={23} strokeWidth={1.7} />
         </Pressable>
 
         <TextInput
@@ -112,7 +112,7 @@ export default function ChatComposer({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={offline ? 'Sin conexión — no puedes enviar' : 'Escribe un mensaje…'}
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor={C.textMuted}
           multiline
           maxLength={MAX_MESSAGE_LENGTH}
           accessibilityLabel="Escribe un mensaje"
@@ -136,7 +136,7 @@ export default function ChatComposer({
           ]}
         >
           <Send
-            color={enabled ? C.greenInk : 'rgba(255,255,255,0.25)'}
+            color={enabled ? C.greenInk : C.textPlaceholder}
             size={20}
             strokeWidth={enabled ? 2.1 : 1.9}
           />
@@ -232,12 +232,12 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: alfa(C.tinta, 0.16),
   },
   readOnlyTitle: { color: C.textPrimary, fontSize: 13, fontFamily: F.extraBold },
   readOnlyText: {
     marginTop: 2,
-    color: 'rgba(255,255,255,0.48)',
+    color: C.textSecondary,
     fontSize: 11.5,
     lineHeight: 17,
     fontFamily: F.medium,
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 11,
     paddingBottom: 7,
-    color: 'rgba(255,255,255,0.4)',
+    color: C.textGhost,
     fontSize: 9.5,
     fontFamily: F.extraBold,
     letterSpacing: 1,
@@ -270,14 +270,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    borderTopColor: alfa(C.tinta, 0.06),
   },
   commandRowFirst: { backgroundColor: alfa(C.green, 0.08), borderTopWidth: 0 },
-  commandName: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontFamily: F.extraBold },
+  commandName: { color: C.textSoft, fontSize: 13, fontFamily: F.extraBold },
   commandNameAccent: { color: C.green },
   commandHint: {
     flex: 1,
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 11.5,
     lineHeight: 16,
     fontFamily: F.medium,

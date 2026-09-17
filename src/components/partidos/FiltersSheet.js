@@ -9,6 +9,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import { DIST_OPTS, EDAD_PRESETS, MODALIDADES, NIVELES } from '../../services/matchRules';
 import { REGIONES, getComunasOfRegion } from '../../data/regiones-chile';
@@ -363,7 +364,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: C.chipAlt,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: alfa(C.tinta, 0.10),
   },
   edadInput: {
     width: 34,

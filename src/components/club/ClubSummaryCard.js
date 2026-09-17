@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MapPin, ChevronRight, Crown } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
-import { clubTonos, clubSuperficies, reservasFonts as F } from '../../theme/colors';
+import { reservas as C, clubTonos, clubSuperficies, reservasFonts as F, alfa } from '../../theme/colors';
 import ClubLogo from './ClubLogo';
 import VerifiedBadge from './VerifiedBadge';
 
@@ -75,7 +75,7 @@ export default function ClubSummaryCard({
 
           {club.comuna ? (
             <View style={styles.comunaFila}>
-              <MapPin size={12} color="rgba(255, 255, 255, 0.4)" strokeWidth={2.2} />
+              <MapPin size={12} color={C.textGhost} strokeWidth={2.2} />
               <Text style={styles.comuna} numberOfLines={1}>
                 {club.comuna}
               </Text>
@@ -107,7 +107,7 @@ export default function ClubSummaryCard({
         style={({ pressed }) => [styles.verClub, pressed && { opacity: 0.75 }]}
       >
         <Text style={styles.verClubTexto}>Ver club</Text>
-        <ChevronRight size={17} color="rgba(255, 255, 255, 0.4)" strokeWidth={2.2} />
+        <ChevronRight size={17} color={C.textGhost} strokeWidth={2.2} />
       </Pressable>
     </View>
   );
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   nombreFila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   nombre: { flexShrink: 1, fontSize: 17, fontFamily: F.extraBold, color: '#FFFFFF' },
   comunaFila: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  comuna: { fontSize: 12, color: 'rgba(255, 255, 255, 0.4)' },
+  comuna: { fontSize: 12, color: C.textGhost },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
   chip: {
     flexDirection: 'row',
@@ -165,9 +165,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
   },
-  chipTexto: { fontSize: 11, fontFamily: F.bold, color: 'rgba(255, 255, 255, 0.7)' },
+  chipTexto: { fontSize: 11, fontFamily: F.bold, color: C.textSoft },
   stats: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 14 },
   statTile: {
     flex: 1,
@@ -175,15 +175,15 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingVertical: 10,
     borderRadius: 13,
-    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    backgroundColor: alfa(C.tinta, 0.045),
   },
   statValor: { fontSize: 17, fontFamily: F.extraBold, color: '#FFFFFF' },
-  statVacio: { fontSize: 13, color: 'rgba(255, 255, 255, 0.45)' },
+  statVacio: { fontSize: 13, color: C.textFaint },
   statRotulo: {
     fontSize: 10,
     fontFamily: F.bold,
     letterSpacing: 0.5,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: C.textGhost,
   },
   verClub: {
     flexDirection: 'row',
@@ -192,8 +192,8 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 13,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.07)',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderTopColor: alfa(C.tinta, 0.07),
+    backgroundColor: alfa(C.tinta, 0.03),
   },
   verClubTexto: { fontSize: 13.5, fontFamily: F.bold, color: '#FFFFFF' },
 });

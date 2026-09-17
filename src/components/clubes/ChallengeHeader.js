@@ -6,6 +6,7 @@ import {
   reservas as C,
   reservasRadius as R,
   reservasFonts as F,
+  alfa,
 } from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
 import { estadoLabel, esEstadoCerrado } from '../../services/clubChallengeRules';
@@ -70,7 +71,7 @@ export default function ChallengeHeader({
     <View style={[styles.bar, cerrado && styles.barCerrado]}>
       <View style={styles.row}>
         <Swords
-          color={cerrado ? 'rgba(255,255,255,0.4)' : C.neon}
+          color={cerrado ? C.textGhost : C.neon}
           size={16}
           strokeWidth={2.2}
         />
@@ -83,7 +84,7 @@ export default function ChallengeHeader({
             {cuenta.vencido ? (
               <TriangleAlert color={C.amber} size={12} strokeWidth={2.2} />
             ) : (
-              <Clock color="rgba(255,255,255,0.55)" size={12} strokeWidth={2} />
+              <Clock color={C.textSecondary} size={12} strokeWidth={2} />
             )}
             <Text style={[styles.plazoText, cuenta.vencido && styles.plazoTextVencido]}>
               {cuenta.prorroga ? `Prórroga · ${cuenta.label}` : cuenta.label}
@@ -169,7 +170,7 @@ const styles = StyleSheet.create({
   },
   barCerrado: {
     backgroundColor: C.composerBar,
-    borderTopColor: 'rgba(255,255,255,0.07)',
+    borderTopColor: alfa(C.tinta, 0.07),
   },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -188,11 +189,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 8,
     borderRadius: R.chip,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: alfa(C.tinta, 0.06),
   },
   plazoVencido: { backgroundColor: C.amberSoft },
   plazoText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: C.textDim,
     fontSize: 11,
     fontFamily: F.bold,
     includeFontPadding: false,
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   ctaTextNo: { color: C.textPrimary },
 
   hint: {
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 12,
     lineHeight: 16,
     fontFamily: F.medium,

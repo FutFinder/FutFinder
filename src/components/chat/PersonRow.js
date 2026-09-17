@@ -63,7 +63,7 @@ export default function PersonRow({
         </View>
 
         {!right && !!onPress && (
-          <ChevronRight color="rgba(255,255,255,0.35)" size={16} strokeWidth={2} />
+          <ChevronRight color={C.textMuted} size={16} strokeWidth={2} />
         )}
       </View>
     </>
@@ -131,7 +131,7 @@ export function FriendActionButton({ status, busy, onAdd, onCancel, onOpenReques
           pressed && { opacity: 0.75 },
         ]}
       >
-        <Text style={[styles.actionText, { color: 'rgba(255,255,255,0.45)' }]}>Enviada</Text>
+        <Text style={[styles.actionText, { color: C.textFaint }]}>Enviada</Text>
       </Pressable>
     );
   }
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     borderColor: alfa(C.green, 0.2),
   },
   avatarImg: { width: '100%', height: '100%' },
-  initial: { color: 'rgba(255,255,255,0.75)', fontSize: 16, fontFamily: F.extraBold },
+  initial: { color: C.textSoft, fontSize: 16, fontFamily: F.extraBold },
   initialGreen: { color: C.green },
 
   texts: { flex: 1, minWidth: 0 },
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   name: { color: C.textPrimary, fontSize: 14.5, fontFamily: F.extraBold, flexShrink: 1 },
   line: {
     marginTop: 2,
-    color: 'rgba(255,255,255,0.5)',
+    color: C.textSecondary,
     fontSize: 12,
     fontFamily: F.medium,
   },
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     borderColor: alfa(C.green, 0.32),
   },
   badgeText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: C.textDim,
     fontSize: 9,
     fontFamily: F.extraBold,
     letterSpacing: 0.5,

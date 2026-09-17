@@ -39,7 +39,7 @@ export default function ChatInboxHeader({ pendingRequests = 0, onPressFriends })
             }
             style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
           >
-            <UserPlus color="rgba(255,255,255,0.8)" size={18} strokeWidth={1.8} />
+            <UserPlus color={C.textStrong} size={18} strokeWidth={1.8} />
             {pendingRequests > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>

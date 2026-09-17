@@ -80,14 +80,14 @@ const styles = StyleSheet.create({
     borderColor: alfa(C.green, 0.45),
   },
   label: {
-    color: 'rgba(255,255,255,0.6)',
+    color: C.textDim,
     fontSize: 12.5,
     fontFamily: F.bold,
     includeFontPadding: false,
   },
   labelActive: { color: C.green, fontFamily: F.extraBold },
   count: {
-    color: 'rgba(255,255,255,0.4)',
+    color: C.textGhost,
     fontSize: 12.5,
     fontFamily: F.bold,
     includeFontPadding: false,
