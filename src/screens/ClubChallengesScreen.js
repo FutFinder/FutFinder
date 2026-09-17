@@ -754,7 +754,7 @@ function DirectosLista({ tema, recibidos, enviados, clubesAdmin, errorRol, worki
 
 function EstadoBadge({ estado }) {
   const tone = ESTADO_TONE[estado] || 'neutral';
-  const bg = tone === 'green' ? C.greenSoft : tone === 'red' ? 'rgba(232,115,123,0.14)' : C.chip;
+  const bg = tone === 'green' ? C.greenSoft : tone === 'red' ? C.redSoft : C.chip;
   const color = tone === 'green' ? C.green : tone === 'red' ? C.loss : C.textSecondary;
   return (
     <View style={[styles.estadoBadge, { backgroundColor: bg }]}>
@@ -1415,7 +1415,7 @@ const styles = StyleSheet.create({
 
   actionsRow: { flexDirection: 'row', gap: 8 },
   actBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  actReject: { backgroundColor: 'rgba(232,115,123,0.14)', borderWidth: 1, borderColor: 'rgba(232,115,123,0.4)' },
+  actReject: { backgroundColor: C.redSoft, borderWidth: 1, borderColor: C.redBorder },
   chatBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.chip, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: C.border },
   cancelText: { color: C.textSecondary, fontSize: 12, fontFamily: F.extraBold },
