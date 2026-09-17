@@ -46,9 +46,17 @@ Las políticas y pruebas versionadas no prueban que el proyecto Supabase despleg
 - `supabase/functions/send-push/`, `supabase/tests/35_privacy_test.sql` y `supabase/tests/51_usuarios_bloqueados_test.sql`
 - `src/services/blockedUsers.js`, `src/components/player/PlayerPublicActions.js` y `src/screens/BlockedUsersScreen.js`
 
-## Revocar EXECUTE en una RPC: `public`, no `anon`
+## Revocar EXECUTE en una RPC: `public` **y** `anon`, las dos
 
-PostgreSQL concede `EXECUTE` a `PUBLIC` en toda función nueva, y `anon` lo hereda por ahí. `revoke execute ... from anon` no quita nada: hay que revocar de `public` y volver a conceder a `authenticated`. Se detectó con el advisor de Supabase («Public Can Execute SECURITY DEFINER Function») sobre `aceptar_desafio()` y se corrigió en la migración 42b. Aplica a toda RPC `security definer` nueva.
+PostgreSQL concede `EXECUTE` a `PUBLIC` en toda función nueva y `anon` lo hereda por ahí; además Supabase se lo concede a `anon` de forma **directa**. Son dos vías distintas y quitar una no quita la otra: hay que revocar de `public, anon` y volver a conceder a `authenticated`. La nota decía antes «de `public`, no de `anon`» y estaba a medias — la migración 114 midió las dos vías repartidas sobre 146 permisos. El advisor de Supabase («Public Can Execute SECURITY DEFINER Function») solo caza la primera.
+
+## Los privilegios por defecto no cierran las funciones futuras (migración 115)
+
+`alter default privileges ... revoke execute on functions from public` **no funciona**: queda anotado en `pg_default_acl` sin `=X`, pero al crear el objeto el motor parte del valor de fábrica —que para las funciones incluye `EXECUTE` a `PUBLIC`— y encima le aplica lo guardado. Medido el 2026-09-17 con la línea de la 114 ya aplicada: una función nueva nace igual con `{=X/postgres, ...}`. Para las **tablas** sí funciona, porque ahí el valor de fábrica no concede nada a `PUBLIC`.
+
+Lo que sí cierra lo futuro es el disparador de eventos `anon_nace_sin_llaves` (migración 115), sobre `ddl_command_end`. **No lleva `security definer` a propósito**: así corre como quien lanzó el DDL, que es la única forma de retirar lo que concedieron los privilegios por defecto de `supabase_admin` —`postgres` no es miembro suyo y su `revoke` sobre lo ajeno falla en silencio, sin error y sin efecto—. Si alguien le pone `security definer` por costumbre, deja de servir.
+
+Dos cosas que el disparador **no** cubre: `create extension ... with schema public` (el motor no emite `ddl_command_end` para ese comando, comprobado) y cualquier objeto fuera de `public`. El arnés `supabase/tests/115_que_nazcan_cerrados_test.sql` audita el esquema entero en C7 y fija la limitación en L1.
 
 ## Notas relacionadas
 

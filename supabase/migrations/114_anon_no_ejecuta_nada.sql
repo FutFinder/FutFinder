@@ -37,6 +37,16 @@
 -- minutos y MANDAN PUSH. Cualquiera con la clave anónima —que viaja
 -- dentro del bundle de la app— podía invocarlas en bucle.
 --
+-- CORRECCIÓN, ANOTADA DESPUÉS (ver migración 115)
+--
+-- La sección 2 de abajo —`alter default privileges ... revoke execute on
+-- functions from public, anon`— NO protege a las funciones futuras. Se
+-- midió con la línea ya aplicada: una función nueva creada por `postgres`
+-- en `public` nace igual con EXECUTE para PUBLIC, porque al crear el objeto
+-- el motor parte del valor de fábrica —que incluye a PUBLIC— y encima le
+-- aplica lo guardado. Lo que esta migración cerró de verdad fue lo que YA
+-- existía. Lo futuro lo cierra el disparador de eventos de la 115.
+--
 -- ── Sección 2: el cron es del cron ───────────────────────────────
 --
 -- Por eso esta migración hace algo más que quitarle permisos a anon: a
