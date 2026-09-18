@@ -68,7 +68,7 @@ test('el mínimo de contraseña no se escribe a mano en ninguna parte', () => {
   );
 });
 
-test('MIN_PASSWORD es 8, y es el que usan el registro y el cambio de contraseña', () => {
+test('MIN_PASSWORD es 8, y las dos puertas validan con el mismo validador', () => {
   const { MIN_PASSWORD } = require('../passwordStrength');
   assert.equal(MIN_PASSWORD, 8);
 
@@ -76,11 +76,58 @@ test('MIN_PASSWORD es 8, y es el que usan el registro y el cambio de contraseña
   const ajustes = fs.readFileSync(path.join(RAIZ, 'screens', 'SettingsScreen.js'), 'utf8');
 
   assert.ok(
-    /password\.length\s*<\s*MIN_PASSWORD/.test(registro),
-    'RegisterScreen ya no valida contra MIN_PASSWORD',
+    /validarPassword\(password\)/.test(registro),
+    'RegisterScreen ya no valida con validarPassword',
   );
   assert.ok(
-    /passwordInput\.length\s*<\s*MIN_PASSWORD/.test(ajustes),
-    'SettingsScreen ya no valida contra MIN_PASSWORD',
+    /validarPassword\(passwordInput\)/.test(ajustes),
+    'SettingsScreen ya no valida con validarPassword',
+  );
+});
+
+/**
+ * Estas comprueban que el espejo de las reglas del panel es fiel. Los casos
+ * salen de probar el servidor de verdad el 2026-09-18: `Abcd3!xy` lo aceptó
+ * y `contrasenalarga` lo rechazó por «characters».
+ */
+test('validarPassword: exige largo y los cuatro tipos de carácter', () => {
+  const { validarPassword } = require('../passwordStrength');
+
+  assert.equal(validarPassword('Abcd3!xy').valid, true);
+  assert.equal(validarPassword('corta').valid, false);
+  assert.equal(validarPassword('').valid, false);
+  assert.equal(validarPassword(null).valid, false);
+
+  // Lo que el servidor rechaza por tipos de carácter, no por largo.
+  for (const floja of ['contrasenalarga', 'Contrasenalarga', 'Contrasena1', 'CONTRASENA1!']) {
+    assert.equal(validarPassword(floja).valid, false, `deberia rechazar ${floja}`);
+  }
+});
+
+test('validarPassword: el mensaje dice QUÉ falta, no sólo que está mal', () => {
+  const { validarPassword } = require('../passwordStrength');
+
+  assert.match(validarPassword('corta').message, /8 caracteres/);
+  assert.match(validarPassword('Contrasena1').message, /símbolo/);
+  assert.match(validarPassword('contrasenalarga').message, /mayúscula/);
+  assert.match(validarPassword('contrasenalarga').message, /número/);
+});
+
+test('describeAuthError traduce el motivo REAL de una contraseña débil', async () => {
+  const { describeAuthError } = await import('../../services/authPolicy.js');
+
+  // Es el error que devolvió el servidor al activar los tipos de carácter.
+  assert.match(
+    describeAuthError({ code: 'weak_password', reasons: ['characters'] }),
+    /minúscula.*mayúscula.*número.*símbolo/,
+  );
+  assert.match(
+    describeAuthError({ code: 'weak_password', reasons: ['length'] }),
+    /8 caracteres/,
+  );
+  // Y por la forma en que viene en la respuesta REST, no sólo desde el SDK.
+  assert.match(
+    describeAuthError({ code: 'weak_password', weak_password: { reasons: ['characters'] } }),
+    /símbolo/,
   );
 });

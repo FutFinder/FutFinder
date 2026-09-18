@@ -33,7 +33,12 @@ export const MENSAJES = {
   yaRegistrado: 'Ya existe una cuenta con este correo. Inicia sesión.',
   correoNoRecibeMensajes:
     'Ese correo no existe o no puede recibir mensajes. Revisa que esté bien escrito.',
-  passwordDebil: `Tu contraseña es muy débil: usa al menos ${MIN_PASSWORD} caracteres.`,
+  passwordDebil:
+    `Tu contraseña es muy débil: usa al menos ${MIN_PASSWORD} caracteres, ` +
+    'con minúscula, mayúscula, número y símbolo.',
+  passwordCorta: `Tu contraseña es muy corta: usa al menos ${MIN_PASSWORD} caracteres.`,
+  passwordSinVariedad:
+    'Tu contraseña necesita al menos una minúscula, una mayúscula, un número y un símbolo.',
   demasiadosIntentos: 'Demasiados intentos. Espera un momento y vuelve a intentar.',
   codigoInvalido: 'El código no es correcto o ya venció. Pide uno nuevo.',
   sinConexion: 'Sin conexión. Revisa tu internet e intenta de nuevo.',
@@ -100,6 +105,20 @@ export function validateCredentials({ email, password, mode = 'login' } = {}) {
  */
 export function describeAuthError(error) {
   if (!error) return null;
+
+  // `weak_password` se trata aparte porque el servidor DICE por qué, y decirlo
+  // mal es peor que no decir nada: cuando se activaron los tipos de carácter
+  // en el panel, el mensaje fijo hablaba del largo mientras lo que faltaba era
+  // un símbolo. Los motivos vienen en `reasons` ('length', 'characters').
+  if (error.code === 'weak_password' || error.error_code === 'weak_password') {
+    const motivos = error.reasons || error.weak_password?.reasons || [];
+    const porLargo = motivos.includes('length');
+    const porVariedad = motivos.includes('characters');
+    if (porLargo && !porVariedad) return MENSAJES.passwordCorta;
+    if (porVariedad && !porLargo) return MENSAJES.passwordSinVariedad;
+    return MENSAJES.passwordDebil;
+  }
+
   const porCodigo = POR_CODIGO[error.code];
   if (porCodigo) return porCodigo;
 

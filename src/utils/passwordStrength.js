@@ -18,6 +18,56 @@
 export const MIN_PASSWORD = 8;
 
 /**
+ * Los tipos de carácter que exige Supabase Auth, ESPEJADOS ACÁ A MANO.
+ *
+ * El 2026-09-18 se activó «Letters, digits and symbols» en el panel y el
+ * registro se rompió de la peor forma posible: la app aceptaba la
+ * contraseña, creaba la cuenta, mandaba el código, la persona verificaba su
+ * correo… y RECIÉN AHÍ el servidor rechazaba la contraseña, dejando una
+ * cuenta confirmada y sin contraseña usable, sin forma de reintentar. La
+ * validación tiene que ocurrir ANTES de crear nada.
+ *
+ * Esta lista es una copia manual de lo que dice el panel, y no hay forma de
+ * leerla desde la app. SI SE CAMBIA ALLÁ, HAY QUE CAMBIARLA ACÁ. Lo que sí
+ * está cubierto es equivocarse: `describeAuthError` traduce el motivo real
+ * que devuelve el servidor (`length` o `characters`) en vez de inventar uno,
+ * así que un desajuste se ve en el mensaje en lugar de mentir.
+ *
+ * El juego de símbolos es el que Supabase acepta, copiado de su respuesta:
+ * !@#$%^&*()_+-=[]{};'\:"|<>?,./`~
+ */
+const SIMBOLOS = /[!@#$%^&*()_+\-=[\]{};'\\:"|<>?,./`~]/;
+
+function enumerar(cosas) {
+  if (cosas.length === 1) return cosas[0];
+  return `${cosas.slice(0, -1).join(', ')} y ${cosas[cosas.length - 1]}`;
+}
+
+/**
+ * ¿Sirve esta contraseña? Devuelve `{ valid, message }` con el mensaje ya
+ * escrito para mostrar, diciendo QUÉ falta y no sólo que está mal.
+ */
+export function validarPassword(password) {
+  const p = typeof password === 'string' ? password : '';
+
+  if (p.length < MIN_PASSWORD) {
+    return { valid: false, message: `Usa al menos ${MIN_PASSWORD} caracteres.` };
+  }
+
+  const faltan = [];
+  if (!/[a-z]/.test(p)) faltan.push('una minúscula');
+  if (!/[A-Z]/.test(p)) faltan.push('una mayúscula');
+  if (!/[0-9]/.test(p)) faltan.push('un número');
+  if (!SIMBOLOS.test(p)) faltan.push('un símbolo (por ejemplo ! @ # $)');
+
+  if (faltan.length > 0) {
+    return { valid: false, message: `Te falta ${enumerar(faltan)}.` };
+  }
+
+  return { valid: true, message: null };
+}
+
+/**
  * Fuerza de contraseña para el medidor de 3 barras de "Crear cuenta"
  * (pantalla 2B de `Bienvenida.dc.html`). El mockup dibuja el medidor
  * siempre en 2 de 3 barras fijas — acá se calcula de verdad a partir de lo

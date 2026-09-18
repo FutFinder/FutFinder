@@ -42,7 +42,13 @@ Login valida correo/contraseña, traduce los errores de Auth a mensajes propios 
 
 Hasta el 2026-09-18 el número estaba escrito dos veces y en desacuerdo: el registro exigía 8 y Ajustes exigía 6, así que alguien se registraba con ocho caracteres y se la bajaba a seis por la otra puerta. `src/utils/__tests__/unSoloMinimoDeContrasena.test.js` falla si el número vuelve a aparecer escrito a mano en cualquier pantalla.
 
-Dos cosas que conviene tener claras. **Esto es sólo el cliente**: el mínimo que manda de verdad lo aplica Supabase Auth (panel → Authentication → Providers → Email) y hay que subirlo ahí también. Y el login **no** valida largo, a propósito: quien ya tenga una contraseña de seis creada por la puerta vieja sigue pudiendo entrar; lo que no puede es volver a ponerse una corta.
+El servidor exige lo mismo desde el 2026-09-18: **mínimo 8 y los cuatro tipos de carácter** (minúscula, mayúscula, número y símbolo), configurado en el panel. `validarPassword()` espeja esas reglas **a mano** —la app no puede leer la configuración del panel—, así que **si se cambian allá hay que cambiarlas acá**. Lo que cubre el desajuste es `describeAuthError`, que traduce el motivo REAL que devuelve el servidor (`length` o `characters`) en vez de uno fijo.
+
+Por qué la validación tiene que pasar ANTES de crear nada: la contraseña se fija con `updateUser` **después** de verificar el código, así que un rechazo del servidor llega cuando la cuenta ya existe y está confirmada, la contraseña pendiente ya se consumió y no hay reintento. Queda una cuenta sin contraseña usable. Pasó de verdad al activar los tipos de carácter en el panel antes de que la app los validara.
+
+Y el login **no** valida largo, a propósito: quien ya tenga una contraseña corta creada por la puerta vieja sigue pudiendo entrar; lo que no puede es volver a ponerse una corta.
+
+**No hay actualizaciones por aire**: `expo-updates` no está instalado. Cualquier cambio de estas reglas en el panel sólo queda cubierto por la app cuando se distribuye un build nuevo — endurecer el panel antes de eso rompe el registro de quien tenga la versión anterior.
 
 La protección de contraseñas filtradas (HaveIBeenPwned) que recomienda el advisor de Supabase **no se puede activar**: es de plan Pro o superior y la organización está en `free`. Comprobado el 2026-09-18.
 

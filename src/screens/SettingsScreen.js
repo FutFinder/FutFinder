@@ -58,7 +58,8 @@ import {
 } from '../services/settings';
 import { getProfileLoadStatus } from '../utils/profileEdit';
 import { APP_VERSION } from '../utils/appVersion';
-import { MIN_PASSWORD } from '../utils/passwordStrength';
+import { validarPassword } from '../utils/passwordStrength';
+import { describeAuthError } from '../services/authPolicy';
 import { buildMyDataExport } from '../services/dataExport';
 import useConfirmacion from '../components/useConfirmacion';
 
@@ -489,8 +490,9 @@ export default function SettingsScreen({ navigation }) {
       showBanner('error', 'Falta la contraseña actual', 'Ingrésala para continuar.');
       return;
     }
-    if (passwordInput.length < MIN_PASSWORD) {
-      showBanner('error', 'Contraseña muy corta', `Mínimo ${MIN_PASSWORD} caracteres.`);
+    const reglas = validarPassword(passwordInput);
+    if (!reglas.valid) {
+      showBanner('error', 'Revisa tu contraseña', reglas.message);
       return;
     }
     if (passwordInput !== password2Input) {
@@ -506,7 +508,9 @@ export default function SettingsScreen({ navigation }) {
     }
     const { error } = await changePassword(passwordInput);
     setSaving(false);
-    if (error) { showBanner('error', 'No se pudo cambiar', error.message); return; }
+    // Traducido, nunca el texto crudo del proveedor: Supabase responde en
+    // inglés y con la lista entera de símbolos permitidos.
+    if (error) { showBanner('error', 'No se pudo cambiar', describeAuthError(error)); return; }
     setModal(null);
     setCurrentPwdInput('');
     setPasswordInput('');

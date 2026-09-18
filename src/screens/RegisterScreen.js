@@ -20,7 +20,7 @@ import { Card, IconButton, Button } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { registerWithEmail } from '../services/auth';
 import { validarFechaNacimiento, usernameDesdeNombre } from '../utils/fechaNacimiento';
-import { passwordStrength, MIN_PASSWORD } from '../utils/passwordStrength';
+import { passwordStrength, MIN_PASSWORD, validarPassword } from '../utils/passwordStrength';
 import { saveRememberedAccount } from '../utils/rememberedAccount';
 import { isSupabaseConfigured } from '../services/supabase';
 
@@ -96,8 +96,12 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    if (password.length < MIN_PASSWORD) {
-      showBanner('error', 'Contraseña muy corta', `Usa al menos ${MIN_PASSWORD} caracteres.`);
+    // Antes de crear nada: si el servidor la va a rechazar, se rechaza acá.
+    // Más adelante ya no hay vuelta atrás — la contraseña se fija DESPUÉS de
+    // verificar el correo, y para entonces la cuenta ya existe.
+    const reglas = validarPassword(password);
+    if (!reglas.valid) {
+      showBanner('error', 'Revisa tu contraseña', reglas.message);
       return;
     }
 
@@ -243,7 +247,7 @@ export default function RegisterScreen({ navigation }) {
             <View style={styles.passwordRow}>
               <TextInput
                 style={styles.passwordInput}
-                placeholder={`Mínimo ${MIN_PASSWORD} caracteres`}
+                placeholder={`${MIN_PASSWORD}+ con mayúscula, número y símbolo`}
                 placeholderTextColor={C.textMuted}
                 value={password}
                 onChangeText={setPassword}
