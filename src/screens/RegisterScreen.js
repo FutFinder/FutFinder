@@ -20,7 +20,7 @@ import { Card, IconButton, Button } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { registerWithEmail } from '../services/auth';
 import { validarFechaNacimiento, usernameDesdeNombre } from '../utils/fechaNacimiento';
-import { passwordStrength } from '../utils/passwordStrength';
+import { passwordStrength, MIN_PASSWORD } from '../utils/passwordStrength';
 import { saveRememberedAccount } from '../utils/rememberedAccount';
 import { isSupabaseConfigured } from '../services/supabase';
 
@@ -96,8 +96,8 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    if (password.length < 8) {
-      showBanner('error', 'Contraseña muy corta', 'Usa al menos 8 caracteres.');
+    if (password.length < MIN_PASSWORD) {
+      showBanner('error', 'Contraseña muy corta', `Usa al menos ${MIN_PASSWORD} caracteres.`);
       return;
     }
 
@@ -243,7 +243,7 @@ export default function RegisterScreen({ navigation }) {
             <View style={styles.passwordRow}>
               <TextInput
                 style={styles.passwordInput}
-                placeholder="Mínimo 8 caracteres"
+                placeholder={`Mínimo ${MIN_PASSWORD} caracteres`}
                 placeholderTextColor={C.textMuted}
                 value={password}
                 onChangeText={setPassword}

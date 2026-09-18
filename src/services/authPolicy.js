@@ -17,8 +17,11 @@
  * usuarios; acá jamás se compara una contraseña.
  */
 
-/** Mínimo que exigimos al crear una cuenta. Supabase también valida su propio mínimo. */
-export const MIN_PASSWORD_SIGNUP = 8;
+// Con extensión: este módulo lo carga Node en `npm test` como ESM, y ahí la
+// resolución sin extensión falla. Metro acepta las dos formas.
+import { MIN_PASSWORD } from '../utils/passwordStrength.js';
+
+export { MIN_PASSWORD };
 
 export const MENSAJES = {
   correoRequerido: 'Ingresa tu correo electrónico',
@@ -30,7 +33,7 @@ export const MENSAJES = {
   yaRegistrado: 'Ya existe una cuenta con este correo. Inicia sesión.',
   correoNoRecibeMensajes:
     'Ese correo no existe o no puede recibir mensajes. Revisa que esté bien escrito.',
-  passwordDebil: `Tu contraseña es muy débil: usa al menos ${MIN_PASSWORD_SIGNUP} caracteres.`,
+  passwordDebil: `Tu contraseña es muy débil: usa al menos ${MIN_PASSWORD} caracteres.`,
   demasiadosIntentos: 'Demasiados intentos. Espera un momento y vuelve a intentar.',
   codigoInvalido: 'El código no es correcto o ya venció. Pide uno nuevo.',
   sinConexion: 'Sin conexión. Revisa tu internet e intenta de nuevo.',
@@ -83,7 +86,7 @@ export function validateCredentials({ email, password, mode = 'login' } = {}) {
 
   const clave = typeof password === 'string' ? password : '';
   if (!clave) return { valid: false, message: MENSAJES.passwordRequerida, field: 'password' };
-  if (mode === 'signup' && clave.length < MIN_PASSWORD_SIGNUP) {
+  if (mode === 'signup' && clave.length < MIN_PASSWORD) {
     return { valid: false, message: MENSAJES.passwordDebil, field: 'password' };
   }
   return { valid: true, email: correo, password: clave };

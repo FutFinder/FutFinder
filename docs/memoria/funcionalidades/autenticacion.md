@@ -36,6 +36,16 @@ La creación del perfil depende del trigger `handle_new_user`. La migración 59 
 
 Login valida correo/contraseña, traduce los errores de Auth a mensajes propios y ofrece reenvío de OTP. Un correo inexistente y una contraseña incorrecta reciben el mismo mensaje, para no permitir averiguar qué correos están registrados. La guarda cubre `Main` y las pantallas operativas del stack; `LocationPermission`, `Terms` y `Success` quedan públicas a propósito (son el onboarding posterior al registro, no exponen datos y no están en la config de deep links), igual que la galería de QA `ReservasUiGallery`. El enlace «¿La olvidaste?» de `LoginScreen` sí llama a `requestPasswordResetForEmail` (real). Las opciones visuales de Google y Apple, en `RegisterScreen`, muestran un aviso «muy pronto» y no tienen acción implementada.
 
+## Un solo mínimo de contraseña: 8
+
+`MIN_PASSWORD` vive en `src/utils/passwordStrength.js` y lo leen los tres sitios que lo necesitan: el registro, el cambio de contraseña en Ajustes y el medidor de fuerza. Está en `utils/` y no en `services/authPolicy` porque acá los servicios importan utilidades, no al revés — y `authPolicy` lo importa **con extensión** (`'../utils/passwordStrength.js'`), porque en `npm test` lo carga Node como ESM y ahí la ruta sin extensión no resuelve.
+
+Hasta el 2026-09-18 el número estaba escrito dos veces y en desacuerdo: el registro exigía 8 y Ajustes exigía 6, así que alguien se registraba con ocho caracteres y se la bajaba a seis por la otra puerta. `src/utils/__tests__/unSoloMinimoDeContrasena.test.js` falla si el número vuelve a aparecer escrito a mano en cualquier pantalla.
+
+Dos cosas que conviene tener claras. **Esto es sólo el cliente**: el mínimo que manda de verdad lo aplica Supabase Auth (panel → Authentication → Providers → Email) y hay que subirlo ahí también. Y el login **no** valida largo, a propósito: quien ya tenga una contraseña de seis creada por la puerta vieja sigue pudiendo entrar; lo que no puede es volver a ponerse una corta.
+
+La protección de contraseñas filtradas (HaveIBeenPwned) que recomienda el advisor de Supabase **no se puede activar**: es de plan Pro o superior y la organización está en `free`. Comprobado el 2026-09-18.
+
 La confirmación de correo está **desactivada** en el proyecto de Supabase: `signUp` autoconfirma y emite sesión al instante, y una cuenta creada así queda confirmada para siempre, así que después sirve para iniciar sesión con su contraseña. Por eso el registro dejó de usar `signUp`: ninguna validación en el cliente puede tapar eso. El camino OTP no depende de ese ajuste.
 
 Dependencia real de configuración: el **envío de correos**. Con el servicio incorporado de Supabase el envío está muy limitado y puede no llegar a direcciones fuera del equipo, así que el registro no funciona de verdad para usuarios reales hasta que haya un SMTP propio y la plantilla del código incluya `{{ .Token }}`.

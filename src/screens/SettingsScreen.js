@@ -58,6 +58,7 @@ import {
 } from '../services/settings';
 import { getProfileLoadStatus } from '../utils/profileEdit';
 import { APP_VERSION } from '../utils/appVersion';
+import { MIN_PASSWORD } from '../utils/passwordStrength';
 import { buildMyDataExport } from '../services/dataExport';
 import useConfirmacion from '../components/useConfirmacion';
 
@@ -488,8 +489,8 @@ export default function SettingsScreen({ navigation }) {
       showBanner('error', 'Falta la contraseña actual', 'Ingrésala para continuar.');
       return;
     }
-    if (passwordInput.length < 6) {
-      showBanner('error', 'Contraseña muy corta', 'Mínimo 6 caracteres.');
+    if (passwordInput.length < MIN_PASSWORD) {
+      showBanner('error', 'Contraseña muy corta', `Mínimo ${MIN_PASSWORD} caracteres.`);
       return;
     }
     if (passwordInput !== password2Input) {
