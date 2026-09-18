@@ -32,8 +32,6 @@ import {
   SlidersHorizontal,
   FileLock,
   AlertTriangle,
-  Globe,
-  Moon,
   ShieldOff,
   Download,
 } from 'lucide-react-native';
@@ -205,15 +203,6 @@ function Toggle({ value, onToggle }) {
     >
       <View style={[styles.toggleKnob, value ? styles.toggleKnobOn : styles.toggleKnobOff]} />
     </Pressable>
-  );
-}
-
-/** Pastilla no interactiva: refleja el valor fijo actual (idioma/tema). */
-function StaticPill({ label, active }) {
-  return (
-    <View style={[styles.pill, active ? styles.pillActive : styles.pillIdle]}>
-      <Text style={[styles.pillText, active && styles.pillTextActive]} numberOfLines={1}>{label}</Text>
-    </View>
   );
 }
 
@@ -725,38 +714,6 @@ export default function SettingsScreen({ navigation }) {
           />
         </Card>
 
-        {/* ── APARIENCIA ───────────────────────────────────── */}
-        <SectionLabel>Apariencia</SectionLabel>
-        <Card padded={false} style={styles.card}>
-          <View style={[styles.row, styles.rowDivider, { flexDirection: 'column', alignItems: 'stretch' }]}>
-            <View style={styles.rowTop}>
-              <IconBubble icon={Globe} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>Idioma</Text>
-                <Text style={styles.rowSubtitle}>Idioma de la aplicación</Text>
-              </View>
-            </View>
-            <View style={styles.pillRow}>
-              <StaticPill label="Español" active />
-              <StaticPill label="English" />
-            </View>
-          </View>
-          <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch' }]}>
-            <View style={styles.rowTop}>
-              <IconBubble icon={Moon} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>Tema</Text>
-                <Text style={styles.rowSubtitle}>Siempre oscuro</Text>
-              </View>
-            </View>
-            <View style={styles.pillRow}>
-              <StaticPill label="Oscuro" active />
-              <StaticPill label="Claro" />
-              <StaticPill label="Automático" />
-            </View>
-          </View>
-        </Card>
-
         {/* ── NOTIFICACIONES ──────────────────────────────── */}
         <SectionLabel>Notificaciones</SectionLabel>
         <Card padded={false} style={styles.card}>
@@ -1133,16 +1090,6 @@ const styles = StyleSheet.create({
   toggleKnob: { width: 20, height: 20, borderRadius: 999 },
   toggleKnobOn: { backgroundColor: C.textOnGreen },
   toggleKnobOff: { backgroundColor: '#3A4139' },
-
-  pillRow: { flexDirection: 'row', gap: 8, marginTop: 12, paddingBottom: 14 },
-  pill: {
-    flex: 1, height: 38, borderRadius: 13, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
-  },
-  pillActive: { backgroundColor: C.shieldBg, borderColor: C.green },
-  pillIdle: { backgroundColor: C.surfaceAlt, borderColor: C.border },
-  pillText: { fontFamily: F.extraBold, color: C.textSecondary, fontSize: 12.5 },
-  pillTextActive: { color: C.green },
 
   radiusBadge: {
     height: 28, paddingHorizontal: 11, borderRadius: 999,

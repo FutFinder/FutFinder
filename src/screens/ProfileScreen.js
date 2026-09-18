@@ -12,8 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  Pencil,
-  LogOut,
   Clock,
   AlertCircle,
   UserX,
@@ -41,12 +39,10 @@ import PlayerPhotoGallery from '../components/player/PlayerPhotoGallery';
 import ReputationCard from '../components/player/ReputationCard';
 import AccountStatusCard from '../components/player/AccountStatusCard';
 import AuditSupportCard from '../components/player/AuditSupportCard';
-import ProfileActionRow from '../components/player/ProfileActionRow';
 import PlayerPublicActions from '../components/player/PlayerPublicActions';
 import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
 import ProfileSkeleton from '../components/player/ProfileSkeleton';
 
-import { signOut } from '../services/auth';
 import { useAuth } from '../contexts/AuthContext';
 import {
   getMyProfile,
@@ -141,7 +137,6 @@ export default function ProfileScreen({ navigation, route }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [avatarViewer, setAvatarViewer] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(null);
-  const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [blockConfirm, setBlockConfirm] = useState(false);
 
   // Contexto único: se compara por identificador, nunca por nombre.
@@ -267,13 +262,6 @@ export default function ProfileScreen({ navigation, route }) {
     } catch {
       showBanner('error', 'No se pudo compartir', 'Inténtalo de nuevo en unos segundos.');
     }
-  };
-
-  const handleLogout = async () => {
-    setLogoutConfirm(false);
-    await signOut();
-    const parent = navigation.getParent();
-    (parent || navigation).reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
 
   // ── Acciones sobre otro jugador ──
@@ -613,33 +601,11 @@ export default function ProfileScreen({ navigation, route }) {
           isOwnProfile={isOwnProfile}
         />
 
-        {/* ── Auditoría y acciones: solo el dueño de la cuenta ── */}
-        {isOwnProfile && (
-          <>
-            <AuditSupportCard reportesRecibidos={reportesRecibidos} />
-
-            {/* El saldo NO tiene fila acá: se entra por la billetera del
-                header, que está en Inicio, Partidos y Reservas. Una sola
-                puerta, y en el lugar que no depende de en qué pestaña
-                estés. */}
-            <ProfileActionRow
-              icon={<Pencil color={C.green} size={17} strokeWidth={2} />}
-              label="Editar mi perfil"
-              onPress={goEdit}
-              style={styles.actionSpaced}
-            />
-
-            <Pressable
-              onPress={() => setLogoutConfirm(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Cerrar sesión"
-              style={({ pressed }) => [styles.logout, pressed && { opacity: 0.8 }]}
-            >
-              <LogOut color={C.loss} size={17} strokeWidth={2} />
-              <Text style={styles.logoutText}>Cerrar sesión</Text>
-            </Pressable>
-          </>
-        )}
+        {/* ── Auditoría: solo el dueño de la cuenta ──
+            Editar perfil ya vive en cada campo editable de la propia ficha
+            (avatar, banner, bio, galería…) y cerrar sesión en Ajustes — la
+            fila y el botón de acá abajo eran una segunda puerta a lo mismo. */}
+        {isOwnProfile && <AuditSupportCard reportesRecibidos={reportesRecibidos} />}
 
         {!isSupabaseConfigured && (
           <Text style={styles.demoNote}>
@@ -655,40 +621,6 @@ export default function ProfileScreen({ navigation, route }) {
         onClose={() => setReportOpen(false)}
         onSubmit={handleSubmitReport}
       />
-
-      {/* Confirmación de cierre de sesión */}
-      <Modal
-        visible={logoutConfirm}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setLogoutConfirm(false)}
-      >
-        <Pressable style={styles.dialogBackdrop} onPress={() => setLogoutConfirm(false)}>
-          <Pressable style={styles.dialog} onPress={() => {}}>
-            <Text style={styles.dialogTitle}>¿Cerrar sesión?</Text>
-            <Text style={styles.dialogText}>
-              Tendrás que volver a iniciar sesión para entrar a tu cuenta.
-            </Text>
-            <Pressable
-              onPress={handleLogout}
-              accessibilityRole="button"
-              accessibilityLabel="Confirmar cerrar sesión"
-              style={({ pressed }) => [styles.dialogDanger, pressed && { opacity: 0.85 }]}
-            >
-              <Text style={styles.dialogDangerText}>Cerrar sesión</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setLogoutConfirm(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Cancelar"
-              style={({ pressed }) => [styles.dialogCancel, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.dialogCancelText}>Cancelar</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       {/* Confirmación de bloqueo */}
       <Modal
@@ -816,21 +748,6 @@ const styles = StyleSheet.create({
   publicActions: { marginTop: 14 },
   participaciones: { paddingHorizontal: S.screenPadding, gap: 8 },
 
-  actionSpaced: { marginTop: 10 },
-  logout: {
-    minHeight: 50,
-    marginHorizontal: S.screenPadding,
-    marginTop: 8,
-    borderRadius: R.iconBtn,
-    borderWidth: 1,
-    borderColor: alfa(C.red, 0.35),
-    backgroundColor: alfa(C.red, 0.07),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  logoutText: { color: C.loss, fontSize: 14, fontFamily: F.bold },
   demoNote: {
     color: C.textMuted,
     fontSize: 11.5,
