@@ -24,6 +24,7 @@ import {
 import { countUnreadTotal, subscribeToMessages } from '../services/messages';
 
 import { ClubsHomeProvider, useClubsHome } from '../contexts/ClubsHomeContext';
+import { SaldoProvider } from '../contexts/SaldoContext';
 import { etiquetaBadge } from '../utils/clubsHomeTasks.js';
 
 const Tab = createBottomTabNavigator();
@@ -225,18 +226,20 @@ function labelFor(name) {
 export default function MainTabs() {
   return (
     <ClubsHomeProvider>
-      <Tab.Navigator
-        screenOptions={{ headerShown: false }}
-        tabBar={(props) => <CustomTabBar {...props} />}
-      >
-        <Tab.Screen name="HomeTab" component={HomeScreen} />
-        <Tab.Screen name="SearchTab" component={PartidosScreen} />
-        <Tab.Screen name="ClubsTab" component={ClubsScreen} />
-        <Tab.Screen name="CreateTab" component={PlaceholderTab} />
-        <Tab.Screen name="ReservasTab" component={ReservasScreen} />
-        <Tab.Screen name="ChatTab" component={ChatScreen} />
-        <Tab.Screen name="ProfileTab" component={ProfileScreen} />
-      </Tab.Navigator>
+      <SaldoProvider>
+        <Tab.Navigator
+          screenOptions={{ headerShown: false }}
+          tabBar={(props) => <CustomTabBar {...props} />}
+        >
+          <Tab.Screen name="HomeTab" component={HomeScreen} />
+          <Tab.Screen name="SearchTab" component={PartidosScreen} />
+          <Tab.Screen name="ClubsTab" component={ClubsScreen} />
+          <Tab.Screen name="CreateTab" component={PlaceholderTab} />
+          <Tab.Screen name="ReservasTab" component={ReservasScreen} />
+          <Tab.Screen name="ChatTab" component={ChatScreen} />
+          <Tab.Screen name="ProfileTab" component={ProfileScreen} />
+        </Tab.Navigator>
+      </SaldoProvider>
     </ClubsHomeProvider>
   );
 }
