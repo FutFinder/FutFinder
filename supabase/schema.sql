@@ -6,7 +6,13 @@
 -- =============================================================
 
 -- 1. EXTENSIONS -------------------------------------------------
-create extension if not exists "uuid-ossp";
+-- `with schema extensions` NO es decorativo. Sin él la extensión cae en el
+-- primer esquema del `search_path`, que para `postgres` es `public`, y ahí
+-- nace con sus funciones ejecutables por `anon` —supautils las instala como
+-- `supabase_admin`, así que ni siquiera se pueden revocar después—. En
+-- producción ya vive en `extensions`; esto es para que una base nueva nazca
+-- igual. Ver la migración 116.
+create extension if not exists "uuid-ossp" with schema extensions;
 
 -- 2. TABLE: profiles -------------------------------------------
 -- 1:1 con auth.users (id mismo). Se crea automáticamente con trigger.

@@ -46,6 +46,10 @@
 --       por casualidad. Si L1 falla, la buena noticia es que el hueco se
 --       cerró solo y esta prueba sobra.
 --
+--       El hueco EN SÍ ya está cerrado por la migración 116, que no usa un
+--       disparador —no hay ninguno posible— sino un barrido periódico. L1
+--       sigue midiendo lo de siempre: que el disparador no llega ahí.
+--
 -- Se ejecuta entero dentro de begin/rollback: no deja nada.
 -- =============================================================
 

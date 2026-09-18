@@ -84,6 +84,10 @@
 -- pero sí lo sería si alguien corriera `create extension ... with schema
 -- public` desde el editor. El arnés lo vigila en C7 y lo fija en L1.
 --
+-- CERRADO POR LA 116, por otra vía: no hay disparador posible —supautils
+-- los aparta a propósito— así que el barrido es periódico y devuelve la
+-- extensión a `extensions`, que es donde ya viven las otras cuatro.
+--
 -- Idempotente: seguro de re-ejecutar.
 -- =============================================================
 

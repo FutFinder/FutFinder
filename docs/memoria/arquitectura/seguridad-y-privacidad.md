@@ -56,7 +56,17 @@ PostgreSQL concede `EXECUTE` a `PUBLIC` en toda función nueva y `anon` lo hered
 
 Lo que sí cierra lo futuro es el disparador de eventos `anon_nace_sin_llaves` (migración 115), sobre `ddl_command_end`. **No lleva `security definer` a propósito**: así corre como quien lanzó el DDL, que es la única forma de retirar lo que concedieron los privilegios por defecto de `supabase_admin` —`postgres` no es miembro suyo y su `revoke` sobre lo ajeno falla en silencio, sin error y sin efecto—. Si alguien le pone `security definer` por costumbre, deja de servir.
 
-Dos cosas que el disparador **no** cubre: `create extension ... with schema public` (el motor no emite `ddl_command_end` para ese comando, comprobado) y cualquier objeto fuera de `public`. El arnés `supabase/tests/115_que_nazcan_cerrados_test.sql` audita el esquema entero en C7 y fija la limitación en L1.
+Lo que el disparador **no** cubre: `create extension` y cualquier objeto fuera de `public`. El arnés `supabase/tests/115_que_nazcan_cerrados_test.sql` audita el esquema entero en C7 y fija la limitación en L1.
+
+## Las extensiones se instalan en `extensions`, nunca en `public` (migración 116)
+
+`create extension foo;` sin `with schema` cae en el primer esquema del `search_path`, que para `postgres` es `public`. Ahí sus funciones nacen **ejecutables por anon** y quedan expuestas por REST. Y no se pueden arreglar después: supautils instala las 78 extensiones de su lista **como `supabase_admin`**, así que el otorgante es supabase_admin y el `revoke` de `postgres` corre sin error y sin efecto.
+
+Tampoco hay disparador que lo cace: **supautils se salta los disparadores de eventos a propósito** —tiene una opción llamada `supautils.log_skipped_evtrigs`—. Medido con un espía sobre los dos eventos: `create extension unaccent with schema public` no produjo ni un disparo, mientras `create table` produjo `ddl_command_start` y `ddl_command_end`.
+
+La palanca que sí funciona es `alter extension ... set schema extensions`, porque supautils también intercepta ese comando y lo corre como superusuario. El trabajo del cron `futfinder-extensiones-fuera-de-public` lo hace cada 5 minutos. Mover no es un apaño: es devolverla a donde ya viven las otras cuatro (`pgcrypto`, `uuid-ossp`, `pg_stat_statements`, `pg_net`).
+
+**Lo que no cubre, con números: 22 de las 78 extensiones no son reubicables**, y entre ellas está `postgis`. A ésas `alter extension ... set schema` responde `0A000: does not support SET SCHEMA`, y sacarlas exigiría `drop extension`, que arrastra en cascada. El barrido las avisa en el registro y las deja. La forma de no llegar ahí es escribir siempre `with schema extensions`.
 
 ## Notas relacionadas
 
