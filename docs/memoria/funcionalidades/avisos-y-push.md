@@ -24,16 +24,16 @@ Las preferencias de partidos, clubes, chat y amistades sólo cancelan el push ex
 
 La bandeja no presenta vacío si falta sesión o falla la carga. No hay push nativo en web/simulador y la entrega final depende de permisos, Expo y los recibos. El cron remoto no se puede confirmar desde el repositorio; las pruebas de lógica y SQL cubren decisiones, no entregas reales.
 
-## Quién dispara `send-push`, y de dónde sale su clave (migración 117)
+## Quién dispara `send-push`, y de dónde sale su clave (migraciones 117 y 118)
 
 Hasta el 2026-09-18 lo disparaba un **Database Webhook creado desde el panel**, que no estaba en el repositorio y que guardaba su cabecera `Authorization: Bearer <service_role>` en claro dentro de `pg_trigger.tgargs`. Desde la 117 lo dispara `public.notificar_push()`, un disparador normal `AFTER INSERT` sobre `notifications` que saca el token de `vault.decrypted_secrets` en el momento de usarlo y llama a `net.http_post`. El esquema `vault` no le da USAGE ni a `anon` ni a `authenticated`.
 
 Dos cosas que hay que saber para no romperlo:
 
-- **El secreto `send_push_authorization` NO está en el repositorio**, porque es una credencial. En una base nueva hay que crearlo a mano con `vault.create_secret(<service key>, 'send_push_authorization', …)`. Sin él la app sigue funcionando: la notificación se guarda y sólo se pierde el push, con un aviso en el registro.
+- **El secreto `send_push_authorization` NO está en el repositorio.** En una base nueva hay que crearlo a mano con `vault.create_secret(<clave publicable>, 'send_push_authorization', …)`. Desde la 118 guarda la clave **publicable** (rol `anon`), no la service key: `send-push` no lee esa cabecera —usa su propia service key del entorno— y el portero `verify_jwt` acepta cualquier JWT del proyecto. Comprobado contra la función desplegada: con la publicable responde 200; sin cabecera, 401. Sin él la app sigue funcionando: la notificación se guarda y sólo se pierde el push, con un aviso en el registro.
 - **El disparador nunca lanza excepción.** Si fallara, la transacción que insertó la notificación se abortaría y el usuario perdería también el aviso dentro de la app, no sólo el push.
 
-El token **sigue pasando** por `net.http_request_queue` mientras `pg_net` procesa la petición, y esa tabla es legible por PUBLIC sin que se pueda revocar. Lo que la 117 quita es la copia estática del catálogo. Hoy nada de `net` es alcanzable desde fuera: PostgREST expone sólo `public` y `graphql_public` —comprobado pidiéndoselo— y la publicación de Realtime no lleva ninguna tabla de `net`.
+El token **sigue pasando** por `net.http_request_queue` mientras `pg_net` procesa la petición, y esa tabla es legible por PUBLIC sin que se pueda revocar. Lo que la 117 quita es la copia estática del catálogo, y lo que la 118 quita es el premio: lo que viaja ahí es la misma clave que va dentro del bundle de la app. Hoy nada de `net` es alcanzable desde fuera: PostgREST expone sólo `public` y `graphql_public` —comprobado pidiéndoselo— y la publicación de Realtime no lleva ninguna tabla de `net`.
 
 ## Notas relacionadas
 

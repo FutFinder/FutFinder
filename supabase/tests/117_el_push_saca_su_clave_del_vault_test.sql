@@ -1,5 +1,9 @@
 -- =============================================================
--- FutFinder — pruebas de la migración 117.
+-- FutFinder — pruebas de las migraciones 117 y 118.
+--
+-- Van juntas porque son una sola cosa: de dónde saca su credencial el
+-- push. La 117 la movió del catálogo a Vault; la 118 cambió la service
+-- key por la publicable. C5 vigila lo segundo.
 --
 -- La prueba que importa es R1 y hace el camino entero: inserta una
 -- notificación de verdad y comprueba que quedó encolada UNA petición a
@@ -15,6 +19,11 @@
 --   C3. El secreto vive en Vault, y ni `anon` ni `authenticated` tienen
 --       siquiera USAGE sobre el esquema `vault`.
 --   C4. La función no la ejecutan anon, PUBLIC ni `authenticated`.
+--   C5. EL TOKEN GUARDADO NO ES LA LLAVE MAESTRA. Su claim `role` es
+--       `anon`, no `service_role`. Importa porque el token sigue pasando
+--       por `net.http_request_queue`, que PUBLIC puede leer y no se puede
+--       revocar: si alguien vuelve a poner ahí la service key, lo que se
+--       filtraría sería la base entera. Esta prueba lo dice.
 --
 --   Lo que sigue igual
 --   R1. Insertar una notificación encola exactamente una petición a
@@ -65,6 +74,17 @@ begin
       and not has_schema_privilege('anon','vault','USAGE')
       and not has_schema_privilege('authenticated','vault','USAGE'),
     v_n || ' secreto(s); anon usage=' || has_schema_privilege('anon','vault','USAGE')::text);
+
+  -- ── C5: el token guardado no es la llave maestra ─────────────
+  -- Se decodifica SÓLO el claim `role` del JWT; el valor no se imprime ni
+  -- se compara contra nada escrito acá.
+  insert into r117 values ('C5 el token de Vault es la clave publicable, NO la service key',
+    (select (convert_from(decode(rpad(translate(split_part(s.decrypted_secret,'.',2),'-_','+/'),
+        (length(split_part(s.decrypted_secret,'.',2))+3)/4*4,'='),'base64'),'UTF8')::jsonb) ->> 'role'
+       from vault.decrypted_secrets s where s.name = 'send_push_authorization') = 'anon',
+    'rol=' || coalesce((select (convert_from(decode(rpad(translate(split_part(s.decrypted_secret,'.',2),'-_','+/'),
+        (length(split_part(s.decrypted_secret,'.',2))+3)/4*4,'='),'base64'),'UTF8')::jsonb) ->> 'role'
+       from vault.decrypted_secrets s where s.name = 'send_push_authorization'), '(sin secreto)'));
 
   -- ── C4 ───────────────────────────────────────────────────────
   insert into r117 values ('C4 la funcion solo la dispara el disparador',
