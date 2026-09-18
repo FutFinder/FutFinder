@@ -58,6 +58,12 @@ Lo que sí cierra lo futuro es el disparador de eventos `anon_nace_sin_llaves` (
 
 Lo que el disparador **no** cubre: `create extension` y cualquier objeto fuera de `public`. El arnés `supabase/tests/115_que_nazcan_cerrados_test.sql` audita el esquema entero en C7 y fija la limitación en L1.
 
+## Ningún secreto vive en el catálogo (migraciones 117 y 118)
+
+El push lo disparaba un Database Webhook del panel que guardaba su `Authorization: Bearer <service_role>` **en claro dentro de `pg_trigger.tgargs`**. Ahora lo dispara `public.notificar_push()`, que saca el token de `vault.decrypted_secrets` al usarlo, y el token es la clave **publicable**, no la maestra. El detalle completo está en [Avisos y push](../funcionalidades/avisos-y-push.md).
+
+Lo que hay que llevarse de acá: **antes de crear un webhook desde el panel, recordar que sus cabeceras quedan legibles en el catálogo**. Si hace falta una credencial, va en Vault y la lee una función nuestra.
+
 ## Las extensiones se instalan en `extensions`, nunca en `public` (migración 116)
 
 `create extension foo;` sin `with schema` cae en el primer esquema del `search_path`, que para `postgres` es `public`. Ahí sus funciones nacen **ejecutables por anon** y quedan expuestas por REST. Y no se pueden arreglar después: supautils instala las 78 extensiones de su lista **como `supabase_admin`**, así que el otorgante es supabase_admin y el `revoke` de `postgres` corre sin error y sin efecto.

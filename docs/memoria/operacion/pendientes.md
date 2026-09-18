@@ -1,6 +1,6 @@
 # Pendientes
 
-Última revisión: 2026-08-17
+Última revisión: 2026-09-18
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
@@ -28,13 +28,14 @@ Las migraciones 39 (`/todos`) y 40 (bandeja por RPC) estaban versionadas pero **
 
 Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `matches` (`using (true)`) y `tg_register_cancha` copiaba además la dirección a la tabla pública `canchas`. La migración 44b separó la exacta a `club_match_locations` con RLS y dejó en `matches` un punto aproximado de ~1 km marcado con `ubicacion_aproximada`, para que el partido se siga descubriendo. Verificado contra producción: integrantes de los dos clubes —con y sin rol administrativo— leen la exacta; un externo autenticado y un anónimo sólo la aproximada, sin calle; `search_canchas` no la devuelve; el GPS usa exclusivamente la exacta. **La distancia pública puede errar hasta ~0,73 km**, y el nombre de la cancha sigue siendo información pública a propósito.
 
-## P2 — Funciones de trigger ejecutables como RPC por `anon`
+## Resuelto el 2026-09-17 — funciones de trigger ejecutables como RPC por `anon`
 
 - **Dominio afectado:** superficie de la API.
 - **Evidencia (comprobada el 2026-08-12):** el advisor de seguridad marca 54 funciones `SECURITY DEFINER` ejecutables por `anon`, entre ellas funciones de trigger que nunca deberían ser un endpoint: `add_organizer_as_attendee`, `matches_guard_cupos`, `tg_notify_match_join`, `tg_register_cancha`, `check_club_limits` y `handle_new_user`. Todas tienen `=X/postgres` en su ACL, es decir el `EXECUTE` que PostgreSQL concede a `PUBLIC` por defecto y que nunca se revocó.
 - **Por qué importa:** PostgreSQL **no** comprueba `EXECUTE` cuando un trigger dispara su función, así que revocarlas de `public`, `anon` y `authenticated` no rompe ningún trigger y quita esos endpoints de PostgREST.
 - **Acción:** una migración de limpieza que revoque `EXECUTE` de `public` en todas las funciones de trigger. Se mantiene SEPARADA a propósito: no se metió en la 44, ni en la 44b, ni en la 44c, para no mezclar una limpieza transversal con correcciones acotadas. Ninguna de esas funciones filtra la ubicación; las dos que sí lo hacían (`tg_register_cancha` y `search_canchas` a través de `canchas`) ya están cerradas por la 44b.
-- **Verificación necesaria:** el advisor deja de marcarlas y las pruebas SQL existentes siguen pasando.
+- **Resolución:** la migración **114** revocó `execute` sobre TODAS las rutinas de `public` a `public` y a `anon` —a los dos, que es la parte que las migraciones anteriores erraban— y la **115** puso un disparador de eventos para que lo que se cree mañana nazca igual de cerrado.
+- **Verificación de cierre (2026-09-18, contra `jvfoendzblkoxvwvommz`):** de 43 funciones de trigger en `public`, `anon` puede ejecutar **0** y ninguna conserva `EXECUTE` para `PUBLIC`. El advisor ya no devuelve ni un `anon_security_definer_function_executable`. Las 91 RPC que el cliente llama de verdad siguen accesibles (arnés de la 114, sacado de `grep .rpc(` sobre `src/`).
 
 ## P1 — Validar el envío push de extremo a extremo en dispositivo físico
 
@@ -144,12 +145,22 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Acción:** repetir el arnés de dos sesiones simultáneas que se usó en U3 (`FOR UPDATE NOWAIT`) para dos aceptaciones a la vez y para dos solicitudes a la vez.
 - **Verificación necesaria:** con dos sesiones, sólo una aceptación aplica el cambio y sólo una solicitud queda pendiente; la otra recibe el rechazo esperado y no deja fila.
 
-## P4 — 17 funciones de trigger heredadas siguen ejecutables por los roles del cliente
+## P4 — 41 funciones de trigger siguen ejecutables por `authenticated`
 
 - **Dominio afectado:** todo el esquema; son funciones anteriores al ciclo de desafíos.
-- **Evidencia:** el advisor de seguridad de Supabase marca 71 funciones `security definer` alcanzables desde `/rest/v1/rpc/`. La mayoría son RPC del cliente y están así a propósito. Pero 17 son funciones de TRIGGER —`club_challenges_valida_rival`, `notify_*`, `tg_*`, `attendees_solo_rpc_de_clubes`, `matches_guard_cupos`…— que nadie debería poder invocar. Llamarlas directamente falla con `0A000 — trigger functions can only be called as triggers`, así que hoy no se les puede sacar nada; es superficie expuesta, no un agujero.
-- **Acción:** una migración que revoque `execute` de `public, anon, authenticated` sobre esas 17, en un cambio propio y revisado. La 47b ya lo hizo con `club_challenges_valida_sancion()` y sirve de plantilla, incluido su arnés.
+- **Evidencia (revisada el 2026-09-18):** la mitad de `anon` YA ESTÁ CERRADA por la migración 114 — de 43 funciones de trigger en `public`, `anon` ejecuta 0. Lo que queda es `authenticated`: **41 de esas 43** siguen siendo ejecutables por el rol con sesión. El advisor lo refleja como 146 `authenticated_security_definer_function_executable`, donde la mayoría son RPC del cliente a propósito. Las que sobran son funciones de TRIGGER —`club_challenges_valida_rival`, `notify_*`, `tg_*`, `attendees_solo_rpc_de_clubes`, `matches_guard_cupos`…— que nadie debería poder invocar. Llamarlas directamente falla con `0A000 — trigger functions can only be called as triggers`, así que hoy no se les puede sacar nada; es superficie expuesta, no un agujero.
+- **Acción:** una migración que revoque `execute` de `authenticated` sobre esas 41 —`public` y `anon` ya están hechos—, en un cambio propio y revisado. **Ojo con el disparador de la 115**: cierra lo nuevo a `public` y `anon`, NO a `authenticated`, así que esta lista vuelve a crecer sola con cada función de trigger que se añada. La 47b ya lo hizo con `club_challenges_valida_sancion()` y sirve de plantilla, incluido su arnés.
 - **Verificación necesaria:** además de comprobar los privilegios, cada trigger tiene que seguir disparando. Revocar el `EXECUTE` no lo desactiva —PostgreSQL comprueba ese privilegio al crear el trigger, no en cada disparo—, pero si alguna vez dejara de aplicarse una regla el fallo sería SILENCIOSO: ninguna pantalla se rompe, sólo se pierde la validación. `47b_valida_sancion_sin_execute_test.sql` muestra la forma de probarlo.
+
+## P2 — Los tipos de carácter de la contraseña esperan a un build nuevo
+
+- **Dominio afectado:** registro y cambio de contraseña.
+- **Evidencia (2026-09-18, contra el servidor):** el panel exige **mínimo 8**, activo y verificado (`Ab3!xyz` → `422 weak_password {reasons:["length"]}`). Los **tipos de carácter** se activaron ese día y se volvieron a apagar el mismo día: con ellos puestos, `contrasenalarga` daba `422 {reasons:["characters"]}`.
+- **Por qué se apagaron:** la app que está en los teléfonos sólo valida el largo. Con los tipos puestos, alguien escribe `contrasena123`, la app la acepta, se crea la cuenta, se manda el código, la persona verifica su correo y **recién ahí** `updateUser` falla. La contraseña pendiente es de un solo uso: no hay reintento y queda una cuenta confirmada sin contraseña usable. **No hay actualizaciones por aire** (`expo-updates` no está instalado), así que el arreglo del cliente no llega hasta que se distribuye un build.
+- **Estado del cliente:** ya listo. `validarPassword()` espeja las reglas y corre antes de crear nada; `describeAuthError` traduce el motivo real (`length` / `characters`) en vez de uno fijo.
+- **Acción:** distribuir un build con ese cambio y **después** volver a activar «Letters, digits and symbols» en Authentication → Sign In / Providers → Email.
+- **Verificación necesaria:** contra el servidor, que `contrasenalarga` vuelva a dar 422 por `characters` y que una válida siga dando 200; y que la app muestre qué falta, no un mensaje genérico.
+- **Relacionado:** la protección de contraseñas filtradas (HaveIBeenPwned) del advisor **no se puede activar**: es de plan Pro o superior y la organización está en `free`. Cuando se suba de plan no necesita ningún cambio en la app.
 
 ## Notas relacionadas
 
