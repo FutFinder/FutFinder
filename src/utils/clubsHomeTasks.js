@@ -520,15 +520,24 @@ export function cuposDelPlan({ plan, miembrosActivos = 0, admins = 0 } = {}) {
 /**
  * Qué puede hacer el usuario en este club. Un solo lugar decide.
  *
- * No hay rol de capitán: la migración 11 solo admite 'admin' y 'jugador'.
- * Cualquier otra cosa se trata como jugador — errar hacia «no puede» es el
- * lado seguro.
+ * Esto es sólo lo ADMINISTRATIVO — aprobar solicitudes, eliminar el club,
+ * ceder la administración — que nunca se delega: son acciones fuera de los
+ * nueve permisos de la migración 119 y siguen atadas a `rol === 'admin'` sin
+ * excepción. `gestionarPermisos` es la misma regla, para decidir si se
+ * muestra la entrada a la pantalla de Permisos.
+ *
+ * Lo que SÍ se puede delegar (responder desafíos, invitar, editar el club…)
+ * ya no se resuelve acá con sólo el rol: hace falta el permiso resuelto de
+ * `services/clubPermissions.js`, que consulta rol + excepción propia. Un
+ * capitán o jugador con el permiso concedido sigue viendo `false` en los
+ * campos de abajo — es la mitad conservadora, no la autoridad.
  */
 export function permisosDeClub(rol) {
   const admin = rol === 'admin';
   return Object.freeze({
     responderDesafios: admin,
     gestionarMiembros: admin,
+    gestionarPermisos: admin,
     editarClub: admin,
     eliminarClub: admin,
     cederAdmin: admin,

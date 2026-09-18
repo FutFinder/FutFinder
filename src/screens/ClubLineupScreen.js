@@ -34,6 +34,7 @@ import {
 import { getCurrentUser } from '../services/auth';
 import { getClubById, listMembers } from '../services/clubs';
 import { getClubLineup, saveClubLineup } from '../services/clubLineup';
+import { getMisPermisosEnClub } from '../services/clubPermissions';
 
 function clamp(v, min, max) {
   return Math.min(max, Math.max(min, v));
@@ -72,6 +73,7 @@ export default function ClubLineupScreen({ navigation, route }) {
   const [picked, setPicked] = useState(null);
   const [custom, setCustom] = useState({}); // puesto → {left, top, label} arrastrado a mano
   const [personalizado, setPersonalizado] = useState(false);
+  const [misPermisos, setMisPermisos] = useState(null);
 
   const flash = useCallback((msg) => {
     clearTimeout(toastTimer.current);
@@ -93,6 +95,13 @@ export default function ClubLineupScreen({ navigation, route }) {
     setClub(c);
     setMembers(ms || []);
     setLineup(lu);
+
+    if ((ms || []).some((m) => m.user_id === myId)) {
+      const { data: permisos } = await getMisPermisosEnClub(clubId);
+      setMisPermisos(permisos?.permisos || null);
+    } else {
+      setMisPermisos(null);
+    }
 
     if (lu) {
       setModo(lu.modo);
@@ -119,7 +128,9 @@ export default function ClubLineupScreen({ navigation, route }) {
   );
 
   const miMembresia = members.find((m) => m.user_id === me);
-  const canEdit = miMembresia?.rol === 'admin' || miMembresia?.rol === 'capitan';
+  // Delegable (migración 119): el default sigue siendo sólo capitán, pero
+  // el admin puede conceder o quitar `lineup` a cualquier rol o integrante.
+  const canEdit = miMembresia?.rol === 'admin' || !!misPermisos?.lineup;
 
   const membersById = useMemo(() => new Map(members.map((m) => [m.member_id, m])), [members]);
   const baseSlots = useMemo(() => layoutSlots(formacion), [formacion]);

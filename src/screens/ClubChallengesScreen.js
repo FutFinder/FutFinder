@@ -32,7 +32,8 @@ import PickerSheet from '../components/partidos/PickerSheet';
 import { paleta as C, radios as R, medidas as S, fuentes as F } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
-import { getMisClubesAdmin, getClubById } from '../services/clubs';
+import { getClubById } from '../services/clubs';
+import { getMisClubesConPermiso } from '../services/clubPermissions';
 import { puedeResponderDesafio, puedeCancelarDesafio } from '../utils/permisosDesafio';
 import {
   listChallengesForClub,
@@ -162,12 +163,16 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [picker, setPicker] = useState(null); // 'region' | 'comuna' (del filtro)
   const [mineIndex, setMineIndex] = useState(0);
 
+  // `clubesAdmin` ya no es literalmente «clubes que administro»: incluye
+  // también los clubes donde tengo `pubChallenge` o `answerChallenge`
+  // concedidos como capitán o jugador (migración 119) — cualquiera de los
+  // dos alcanza para publicar, responder o cancelar un desafío directo.
   const soyAdminDeEsteClub = Array.isArray(clubesAdmin) && clubesAdmin.includes(clubId);
 
   const load = useCallback(async () => {
     const [{ data }, { data: clubesAdminData, error: eRol }, { data: miClub }] = await Promise.all([
       listChallengesForClub(clubId),
-      getMisClubesAdmin(),
+      getMisClubesConPermiso(['pubChallenge', 'answerChallenge']),
       getClubById(clubId),
     ]);
     setRecibidos(data.recibidos || []);

@@ -133,7 +133,7 @@ export default function ClubsScreen({ navigation, route }) {
         // rápido («desafios»), así que no se pierde ningún destino.
         partido: ['ClubMatchCalendar', { clubId: activeClubId, clubNombre: club?.nombre }],
         integrantes: ['ClubMembers', { clubId: activeClubId }],
-        ajustes: ['EditClub', { club }],
+        permisos: ['PermisosClub', { clubId: activeClubId, club }],
       };
       const destino = destinos[clave];
       if (destino) irA(destino[0], destino[1]);

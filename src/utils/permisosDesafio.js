@@ -1,6 +1,13 @@
 /**
  * Quién puede aceptar o rechazar un desafío recibido.
  *
+ * `clubesAdmin` ya no es literalmente «clubes que administro»: desde la
+ * migración 119, las pantallas le pasan `getMisClubesConPermiso([...])`, que
+ * también suma los clubes donde tengo `pubChallenge` o `answerChallenge`
+ * concedidos como capitán o jugador — el nombre quedó por no repartir el
+ * cambio a cada archivo que lo usa, pero la RLS acepta cualquiera de los
+ * dos permisos indistintamente para responder o cancelar.
+ *
  * UNA SOLA REGLA PARA LAS DOS PANTALLAS. «Avisos» y «Desafíos» decidían lo
  * mismo por caminos distintos y las dos fallaban con una cuenta que
  * administra varios clubes:

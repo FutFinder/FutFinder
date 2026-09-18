@@ -1,6 +1,6 @@
 # Clubes
 
-Última revisión: 2026-09-02
+Última revisión: 2026-09-18
 
 ## Propósito
 
@@ -12,7 +12,7 @@ La pestaña Clubes abre una PORTADA propia, no el detalle de un club: `ClubsScre
 
 ## Reglas y permisos
 
-Una persona puede integrar hasta tres clubes y una sola vez cada club. Estándar admite 15 integrantes/1 administrador y Premium 26/3; triggers validan topes. Sólo administradores pueden gestionar club, miembros, fotos, desafíos o mensajes importantes; miembros leen y escriben el chat. Un desafío pendiente por par de clubes y la expiración a siete días se controlan en base de datos.
+Una persona puede integrar hasta tres clubes y una sola vez cada club. Estándar admite 15 integrantes/1 administrador y Premium 26/3; triggers validan topes. El administrador siempre puede gestionar club, miembros, fotos, desafíos y mensajes importantes; miembros leen y escriben el chat del club. Desde la migración 119, nueve de esas acciones (ver [Permisos del club](#permisos-del-club-migración-119)) son DELEGABLES por rol (capitán/jugador) o por integrante — el default con el que nace un club sigue siendo el mismo de siempre (sólo el admin, salvo capitán con la alineación), así que nada cambia hasta que un administrador entra a «Permisos de club» y lo cambia a propósito. Un desafío pendiente por par de clubes y la expiración a siete días se controlan en base de datos.
 
 ## Ciclo formal de desafíos (en construcción)
 
@@ -394,11 +394,137 @@ en un partido de clubes. No por una guarda propia sino por el trigger
 `tg_enforce_join_rules` sobre `attendees`, que cubre todas las puertas de
 inscripción de una vez.
 
+## Permisos del club (migración 119)
+
+**Corresponde a un pedido explícito del usuario**: en la fila de admin de
+Clubes, «Ajustes del club» se reemplaza por «Permisos de club» — pedido
+literal, cambiando también la funcionalidad detrás, con el mockup
+«FutFinder Permisos» como referencia. Editar los datos del club (nombre,
+escudo, comuna, tema) **no desapareció**: sigue disponible sólo para el
+administrador, ahora exclusivamente desde el lápiz de `ClubHeaderBar` en
+`ClubDetailScreen` — la fila de la lista de admin y el acceso rápido de la
+portada, que antes llevaban los dos a `EditClub`, ahora llevan los dos a
+`PermisosClubScreen`.
+
+Antes de esto, quince sitios distintos repetían `rol = 'admin'` (o, en
+alineación, `rol in ('admin','capitan')`) para decidir quién puede publicar
+un desafío, invitar, expulsar, editar apodos ajenos, armar la alineación,
+subir un resultado o editar el club. La migración 119 junta esa decisión en
+una sola función, `tiene_permiso_de_club(club_id, user_id, permiso)
+returns boolean` (`security definer`, `stable`), con la lógica
+`coalesce(admin siempre true, excepción propia del integrante, default del
+rol, false)`, y **quince políticas RLS y RPC** —`clubs_update`,
+`club_members_delete`, `club_join_requests_insert`, `set_apodo_club()`,
+`club_lineups_insert`/`_update`, `club_challenges_insert`/`_update`,
+`club_open_challenges_insert`/`_update`,
+`club_open_challenge_responses_insert`/`_update_mine`/`_update_owner`,
+`aceptar_desafio()`, `aceptar_respuesta_desafio_abierto()`,
+`chat_puede_ver_desafio()`/`chat_puede_escribir_desafio()`,
+`chat_valid_club_challenge_dm()`, `proponer_resultado()` y
+`confirmar_resultado()`— se reescribieron para llamarla en vez de repetir
+la condición, conservando el resto de cada cuerpo tal cual estaba.
+
+**El mockup trae once permisos; sólo nueve entraron.** El usuario, tras ver
+que dos no correspondían a nada real, lo dijo explícito: «lo que no exista
+como función en la app, o que haya duda, no lo hagas — sólo lo que esté
+disponible por hacer en Clubes». Quedaron afuera:
+
+- `attendance` («Confirmar asistencia de otros») no es una acción propia:
+  viaja DENTRO del parámetro `p_asistencia` de `proponer_resultado()`
+  (migración 48), así que ya es parte del permiso `results` — separarlo
+  habría sido inventar una puerta donde sólo hay un parámetro.
+- `seeStats` («Ver estadísticas privadas») no corresponde a ninguna
+  pantalla ni dato real: no existe reputación interna ni asistencia
+  histórica que mostrar, y `clubMeta.js` ya documentaba que "nivel" y
+  "rating" tampoco existen. Agregarle un candado habría sido fabricar una
+  puerta para un cuarto que no está construido.
+
+Los **nueve permisos reales**, agrupados igual que el mockup (Desafíos:
+`pubChallenge`, `answerChallenge`, `chatClubs`; Plantel: `invite`,
+`removeMembers`, `editNicks`; Partidos: `lineup`, `results`; Club:
+`editClub`), se guardan en dos tablas nuevas: `club_role_permissions`
+(`club_id, rol, permiso, activo` — capitán y jugador, 9 filas cada uno) y
+`club_member_permission_overrides` (`club_id, user_id, permiso, activo` —
+la excepción de un integrante puntual, que le gana al default de su rol en
+cualquiera de los dos sentidos). Las dos son de sólo lectura para el
+cliente (`revoke insert, update, delete … from anon, authenticated`);
+se escriben únicamente por cuatro RPC (`club_guardar_permisos_rol`,
+`club_guardar_permiso_integrante`, `club_quitar_excepciones_integrante`,
+`club_restaurar_permisos_default`), todas exigiendo admin.
+
+**El default con el que nace un permiso no es el sugerido del mockup, es
+la regla de HOY.** Un `do $$ … $$` de backfill (todos los clubes
+existentes) y un trigger `after insert on clubs` (los nuevos) siembran las
+18 filas de cada club con capitán en `lineup = true` y todo lo demás
+`false` para los dos roles — exactamente el comportamiento que ya tenía la
+app antes de esta migración. **Ningún club cambia de comportamiento sin
+que un administrador lo pida.** Los valores más generosos del mockup
+(capitán con casi todo activo, jugador con `invite`) viven sólo dentro de
+la RPC `club_restaurar_permisos_default()`, como un literal `jsonb`
+hardcodeado — se aplican únicamente si un admin toca «Restaurar» en la
+pantalla, nunca solos.
+
+**Una desviación deliberada del mockup, encontrada en la revisión propia:**
+`removeMembers` concedido a un jugador o capitán nunca alcanza para
+expulsar al administrador del club. El mockup modela los permisos como
+interruptores planos, sin distinguir quién es el OBJETIVO de la acción;
+una traducción literal habría dejado a cualquiera con `removeMembers`
+deponer al admin. `club_members_delete` quedó con tres ramas: salir uno
+mismo (sin cambios), el admin REAL actuando contra cualquiera menos él
+mismo (sin cambios, incluso contra otro admin en un club Premium con
+varios), y alguien sin ser admin con el permiso concedido actuando contra
+cualquiera **que no sea admin**. La misma guarda no se aplicó a
+`editNicks` (cosmético, sin escalamiento de privilegio posible) ni a los
+permisos de desafío (apuntan hacia afuera, no hacia el propio admin).
+
+El rol de **capitán en el "sheet" de excepciones sólo alterna hacia
+jugador y viceversa**, reutilizando `setCaptain()` tal cual — el mockup
+ofrece un tercer botón "Admin" en esa misma hoja, deliberadamente omitido:
+ceder la administración ya es un flujo propio y separado
+(`transferAdmin()` → RPC `transfer_club_admin`), y mezclarlo con el
+interruptor de rol de esta pantalla habría duplicado ese camino.
+
+**Gates del cliente, actualizados en ocho pantallas/servicios** — la
+autoridad real sigue siendo el servidor, esto es sólo para no ofrecer un
+botón que el servidor rechazaría: `ClubHeaderBar` (editClub, vía
+`getMisPermisosEnClub`), `ClubMembersScreen` (invite/removeMembers/
+editNicks, con la misma guarda de no apuntar a un admin), `ClubLineupScreen`
+(`canEdit`), `ClubDetailScreen` (crear/publicar desafío), `ClubChallengesScreen`
+y `permisosDesafio.js` (`clubesAdmin` ahora sale de
+`getMisClubesConPermiso(['pubChallenge','answerChallenge'])`, no sólo de
+clubes administrados), `ClubResultScreen` (`getMisClubesConPermiso('results')`
+alimenta `accionesDeResultado`), y `services/messages.js`
+(`getThreadAccess`/`getThreadParticipants` del hilo `challenge:<id>` — ya
+no es sólo un grupo de administradores, también entra quien tenga
+`chatClubs`; `isClubAdmin` en el resultado sigue significando admin real,
+para lo que de verdad es exclusivo de admin dentro del chat, como los
+comandos del compositor).
+
+El servicio `src/services/clubPermissions.js` reúne las lecturas
+(`getRolePermissions`, `getAllMemberOverrides`, `getMemberOverrides`,
+`getMisPermisosEnClub`, `getMisClubesConPermiso`) y las cuatro RPC de
+escritura; `resolvePermisos()` es el mismo cálculo de
+`tiene_permiso_de_club()`, en JavaScript puro, para que el cliente pueda
+resolverlo sin ida y vuelta cuando ya tiene rol+defaults+excepciones a
+mano. `PermisosClubScreen` sigue el mockup: pestañas de rol (capitán/
+jugador/admin, el tab admin sólo informativo — «tiene todos los permisos y
+no se puede limitar»), los cuatro grupos con interruptor "Activar/Quitar
+todos", «Excepciones por integrante» con hoja propia por integrante
+(cambio de rol inmediato, interruptores de excepción en borrador local),
+y «Guardar permisos»/«Todo guardado» abajo con seguimiento de cambios sin
+guardar — a diferencia del rol y de «Usar los del rol» (RPC dedicada,
+`club_quitar_excepciones_integrante`), que se escriben al toque, igual que
+en el resto de Integrantes.
+
+**Escrita y probada, pendiente de aplicar**: `119_permisos_del_club.sql`
+(arnés `119_permisos_del_club_test.sql`, ~20 casos) todavía no se corrió
+contra la base en producción.
+
 ## Pantallas y dependencias
 
-- Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, alineación, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen` y `ClubMatchCalendarScreen`.
-- Código: `src/services/clubs.js`, `clubLineup.js`, `clubGallery.js`, `clubChallenges.js`, `clubOpenChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/utils/formacionClub.js`, `src/utils/openChallengeBoard.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
-- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`), 92 (`club_lineups`) y 93 (`club_lineups.puestos_personalizados`) están **aplicadas el 2026-09-15**. La **111** (permisos de `club_members`/`clubs` y puerta única para salirse de un partido de clubes) está **aplicada el 2026-09-15**, arnés 14/14. La **112** (`club_open_challenges`/`club_open_challenge_responses`, el tablero abierto) está escrita y probada, **pendiente de aplicar** — renumerada desde el borrador original (94), que la 94 real (`armar_la_reserva_dividida`) ya ocupaba al traer esta rama al día.
+- Pantallas: `ClubsScreen`, `ClubDetailScreen`, `ExploreClubsScreen`, creación/edición, miembros, alineación, galería, invitación, planes, desafíos, `ClubProposalScreen`, `ClubMatchRosterScreen`, `ClubResultScreen`, `ClubHistoryScreen`, `ClubMatchCalendarScreen` y `PermisosClubScreen`.
+- Código: `src/services/clubs.js`, `clubPermissions.js`, `clubLineup.js`, `clubGallery.js`, `clubChallenges.js`, `clubOpenChallenges.js`, `clubProposals.js`, `clubRoster.js`, `clubMatches.js`, `clubResults.js`, `clubChallengeRules.js`, `clubMatchRules.js`, `src/utils/rivalClubsQuery.js`, `src/utils/clubEdit.js`, `src/utils/clubModalidad.js`, `src/utils/columnasOpcionales.js`, `src/utils/formacionClub.js`, `src/utils/openChallengeBoard.js`, `src/utils/permisosDesafio.js`, `src/theme/clubThemes.js`, `src/utils/nominaQuery.js`, `src/utils/challengeThread.js`, `src/utils/resultadoRpc.js`, `src/utils/historialClub.js`, `src/utils/calendarioClub.js`, `src/components/club/` y `src/components/clubes/`.
+- Backend: tablas de clubes, fotos, desafíos, partidos y notificaciones de migraciones 11, 24 a 29 y 41 a 50b; 44e/45/47/47c/48/48b/49/50/50b están aplicadas. La 53 (`clubs.tema`) está **aplicada el 2026-08-21**; los 12 clubes existentes quedaron en `green`. Las 90 (`capitan` + corrección de RLS en `club_members_update`), 91 (`club_member_apodos`), 92 (`club_lineups`) y 93 (`club_lineups.puestos_personalizados`) están **aplicadas el 2026-09-15**. La **111** (permisos de `club_members`/`clubs` y puerta única para salirse de un partido de clubes) está **aplicada el 2026-09-15**, arnés 14/14. La **112** (`club_open_challenges`/`club_open_challenge_responses`, el tablero abierto) está escrita y probada, **pendiente de aplicar** — renumerada desde el borrador original (94), que la 94 real (`armar_la_reserva_dividida`) ya ocupaba al traer esta rama al día. La **119** (`club_role_permissions`/`club_member_permission_overrides`, `tiene_permiso_de_club()` y los nueve permisos delegables) está escrita y probada, **pendiente de aplicar** — ver [Permisos del club](#permisos-del-club-migración-119).
 
 ## Estados, errores y problemas conocidos
 

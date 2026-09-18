@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { getMisPermisosEnClub, getRolePermissions, getAllMemberOverrides, resolvePermisos } from './clubPermissions';
 
 /**
  * Servicio de mensajería en tiempo real.
@@ -10,13 +11,17 @@ import { supabase, isSupabaseConfigured } from './supabase';
  *  - Club:          threadKey = 'club:<clubId>'  target = { club_id }
  *  - Desafío:       threadKey = 'challenge:<challengeId>' target = { challenge_id }
  *
- * EL HILO DE DESAFÍO (migración 42)
- * ---------------------------------
- * Es un grupo con TODOS los administradores de ambos clubes, no un DM
- * ampliado: convive con el mensaje privado que dos de esos administradores
- * puedan tener entre ellos sin mezclarse con él. Se lee mientras se sea
- * administrador vigente (aunque el desafío ya esté cerrado, para no perder
- * el historial) y solo se escribe mientras el desafío siga activo.
+ * EL HILO DE DESAFÍO (migración 42, permiso `chatClubs` desde la 119)
+ * --------------------------------------------------------------------
+ * Es un grupo con los administradores de ambos clubes MÁS quien tenga
+ * `chatClubs` concedido como capitán o jugador — no un DM ampliado: convive
+ * con el mensaje privado que dos personas puedan tener entre ellas sin
+ * mezclarse con él. Se lee mientras se conserve el acceso (aunque el
+ * desafío ya esté cerrado, para no perder el historial) y solo se escribe
+ * mientras el desafío siga activo. `isClubAdmin` en el resultado de
+ * `getThreadAccess` sigue significando administrador REAL — gobierna cosas
+ * ajenas al permiso, como los comandos del compositor — no «puede escribir
+ * acá», que ahora es una pregunta más ancha.
  *
  * ESTADO DE LECTURA Y SILENCIO (migración 32)
  * -------------------------------------------
@@ -500,9 +505,12 @@ export async function getThreadAccess(threadKeyStr, { challengeId = null } = {})
       };
     }
 
-    // Administrador VIGENTE de cualquiera de los dos clubes. Es la misma
-    // definición que aplica la RLS (`chat_puede_ver_desafio`), derivada de
-    // `club_members` en vivo: si te degradan, dejas de tener acceso.
+    // Administrador VIGENTE de cualquiera de los dos clubes, O alguien con
+    // `chatClubs` concedido en cualquiera de los dos (migración 119). Es el
+    // mismo criterio que aplica la RLS (`chat_puede_ver_desafio` /
+    // `chat_puede_escribir_desafio`, vía `tiene_permiso_de_club`), derivada
+    // de `club_members` en vivo: si te degradan o te quitan el permiso,
+    // dejas de tener acceso.
     const { data: membresias } = await supabase
       .from('club_members')
       .select('club_id, rol')
@@ -510,14 +518,22 @@ export async function getThreadAccess(threadKeyStr, { challengeId = null } = {})
       .in('club_id', [challenge.club_retador_id, challenge.club_retado_id]);
 
     const miAdmin = (membresias || []).find((m) => m.rol === 'admin');
-    if (!miAdmin) {
+    let tengoAcceso = !!miAdmin;
+    if (!tengoAcceso && membresias?.length) {
+      const resultados = await Promise.all(
+        membresias.map((m) => getMisPermisosEnClub(m.club_id))
+      );
+      tengoAcceso = resultados.some((r) => r?.data?.permisos?.chatClubs);
+    }
+
+    if (!tengoAcceso) {
       return {
         ...ok,
         canRead: false,
         canWrite: false,
         reason: 'not_challenge_admin',
-        title: 'Este chat es solo para los administradores',
-        message: 'La negociación del desafío la llevan los administradores de ambos clubes.',
+        title: 'Este chat es solo para quienes negocian el desafío',
+        message: 'La negociación del desafío la lleva el administrador de cada club, o quien tenga el permiso para chatear con otros clubes.',
       };
     }
 
@@ -529,11 +545,11 @@ export async function getThreadAccess(threadKeyStr, { challengeId = null } = {})
         reason: 'challenge_closed',
         title: 'Desafío cerrado',
         message: `Este desafío está en «${estadoLabel(challenge.estado)}». Puedes leer la conversación, pero ya no admite mensajes.`,
-        isClubAdmin: true,
+        isClubAdmin: !!miAdmin,
       };
     }
 
-    return { ...ok, isClubAdmin: true };
+    return { ...ok, isClubAdmin: !!miAdmin };
   }
 
   if (t.type === 'dm') {
@@ -927,9 +943,10 @@ export async function getThreadParticipants(threadKeyStr) {
   }
 
   if (t.type === 'challenge') {
-    // Los participantes son los administradores VIGENTES de los dos
-    // clubes: la misma lista que autoriza la RLS, no una copia guardada
-    // que habría que mantener cuando cambia un administrador.
+    // Los participantes son los administradores VIGENTES de los dos clubes
+    // MÁS quien tenga `chatClubs` concedido (migración 119): la misma
+    // definición que autoriza la RLS, no una copia guardada que habría que
+    // mantener cuando cambia un administrador o un permiso.
     const { data: challenge, error: chErr } = await supabase
       .from('club_challenges')
       .select('club_retador_id, club_retado_id')
@@ -940,20 +957,45 @@ export async function getThreadParticipants(threadKeyStr) {
       return { data: [], error: chErr || null };
     }
 
+    const clubIds = [challenge.club_retador_id, challenge.club_retado_id];
     const { data: members, error } = await supabase
       .from('club_members')
       .select('user_id, club_id, rol')
-      .in('club_id', [challenge.club_retador_id, challenge.club_retado_id])
-      .eq('rol', 'admin');
+      .in('club_id', clubIds);
     if (error) {
       console.error('[FutFinder] getThreadParticipants(challenge):', error);
       return { data: [], error };
     }
 
-    const rows = await hydrateProfiles((members || []).map((m) => m.user_id));
-    const clubById = new Map((members || []).map((m) => [m.user_id, m.club_id]));
+    const permisosPorClub = await Promise.all(
+      clubIds.map(async (clubId) => {
+        const [{ data: rolePermissions }, { data: overrides }] = await Promise.all([
+          getRolePermissions(clubId),
+          getAllMemberOverrides(clubId),
+        ]);
+        return [clubId, { rolePermissions, overrides }];
+      })
+    );
+    const permisosPorClubMap = new Map(permisosPorClub);
+
+    const conAcceso = (members || []).filter((m) => {
+      if (m.rol === 'admin') return true;
+      const ctx = permisosPorClubMap.get(m.club_id);
+      if (!ctx) return false;
+      const propio = ctx.overrides[m.user_id] || {};
+      return resolvePermisos({
+        rol: m.rol,
+        isAdmin: false,
+        rolePermissions: ctx.rolePermissions,
+        overrides: propio,
+      }).chatClubs;
+    });
+
+    const rows = await hydrateProfiles(conAcceso.map((m) => m.user_id));
+    const clubById = new Map(conAcceso.map((m) => [m.user_id, m.club_id]));
+    const rolById = new Map(conAcceso.map((m) => [m.user_id, m.rol]));
     return {
-      data: decorate(rows, () => 'admin').map((r) => ({
+      data: decorate(rows, (r) => (rolById.get(r.user_id) === 'admin' ? 'admin' : 'invitado')).map((r) => ({
         ...r,
         club_id: clubById.get(r.user_id) || null,
       })),

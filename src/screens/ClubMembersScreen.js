@@ -66,6 +66,7 @@ import {
   CLUB_LIMITS,
 } from '../services/clubs';
 import useConfirmacion from '../components/useConfirmacion';
+import { getMisPermisosEnClub } from '../services/clubPermissions';
 
 /**
  * Integrantes de un club: lista de miembros con reputación, apodo y rol, y
@@ -96,6 +97,7 @@ export default function ClubMembersScreen({ navigation, route }) {
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState('miembros'); // 'miembros' | 'solicitudes'
   const [actionSheet, setActionSheet] = useState(null); // miembro seleccionado en el menú ⋮
+  const [misPermisos, setMisPermisos] = useState(null);
   const [apodoEdit, setApodoEdit] = useState(null); // { member, value }
 
   const miMembresia = members.find((m) => m.user_id === me);
@@ -103,6 +105,12 @@ export default function ClubMembersScreen({ navigation, route }) {
   const soyAdmin = miMembresia?.rol === 'admin';
   // Usuario con 3 clubes no puede unirse a otro (sin importar cuáles sean)
   const tengoMaxClubs = myClubs.length >= 3;
+
+  // Tres de los nueve permisos delegables (migración 119) viven en esta
+  // pantalla: invitar, editar apodos ajenos y quitar integrantes.
+  const puedeInvitar = soyAdmin || !!misPermisos?.invite;
+  const puedeEditarApodos = soyAdmin || !!misPermisos?.editNicks;
+  const puedeExpulsar = soyAdmin || !!misPermisos?.removeMembers;
 
   const load = useCallback(async () => {
     const user = await getCurrentUser();
@@ -136,6 +144,12 @@ export default function ClubMembersScreen({ navigation, route }) {
     } else {
       setRequests([]);
       setTab('miembros');
+    }
+    if (amMember) {
+      const { data: permisos } = await getMisPermisosEnClub(clubId);
+      setMisPermisos(permisos?.permisos || null);
+    } else {
+      setMisPermisos(null);
     }
     if (!amMember && myId) {
       const { data: mr } = await getMyRequestTo(clubId);
@@ -524,8 +538,8 @@ export default function ClubMembersScreen({ navigation, route }) {
               />
             )}
 
-            {/* Invitar jugadores (solo admin) */}
-            {soyAdmin && (
+            {/* Invitar jugadores (admin, o quien tenga el permiso concedido) */}
+            {puedeInvitar && (
               <Pressable
                 onPress={() =>
                   navigation.navigate('ClubInvite', {
@@ -723,7 +737,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                   }}
                 />
 
-                {(actionSheet.user_id === me || soyAdmin) && (
+                {(actionSheet.user_id === me || puedeEditarApodos) && (
                   <SheetAction
                     icon={<Pencil color={C.textPrimary} size={18} strokeWidth={2} />}
                     label="Editar apodo"
@@ -778,7 +792,8 @@ export default function ClubMembersScreen({ navigation, route }) {
                   </>
                 )}
 
-                {soyAdmin && actionSheet.user_id !== me && (
+                {(soyAdmin || (puedeExpulsar && actionSheet.rol !== 'admin')) &&
+                  actionSheet.user_id !== me && (
                   <SheetAction
                     icon={<UserMinus color={C.loss} size={18} strokeWidth={2} />}
                     label="Quitar del club"

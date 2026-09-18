@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Rows3, Swords, Search, CalendarDays, Users, Settings } from 'lucide-react-native';
+import { Rows3, Swords, Search, CalendarDays, Users, ShieldCheck } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
 import { paleta as C, clubSuperficies, fuentes as F } from '../../theme/colors';
@@ -14,8 +14,9 @@ import { paleta as C, clubSuperficies, fuentes as F } from '../../theme/colors';
  *
  * INTEGRANTES LO VEN TODOS. Un jugador tiene derecho a saber quiénes son sus
  * compañeros; lo que no puede es gestionarlos, y de eso se ocupa la pantalla
- * de destino. Solo «Ajustes del club» desaparece sin `can.editarClub`,
- * porque ahí no hay nada que un jugador pueda siquiera mirar.
+ * de destino. Solo «Permisos de club» desaparece sin `can.gestionarPermisos`,
+ * porque repartir permisos es del administrador y no se delega — ni siquiera
+ * a quien tenga otros permisos concedidos.
  *
  * LA NOTA DEL JUGADOR NO ES UNA DISCULPA, ES UNA EXPLICACIÓN. Sin ella, un
  * jugador ve tareas que no puede resolver y no entiende por qué. Con ella
@@ -29,7 +30,7 @@ import { paleta as C, clubSuperficies, fuentes as F } from '../../theme/colors';
 export default function QuickActionGrid({ tema, can, badges, onPress }) {
   const escala = tema || temaClub('green');
   const permisos = can || {};
-  const esJugador = !permisos.editarClub;
+  const esJugador = !permisos.gestionarPermisos;
 
   const tiles = ACCIONES.filter((a) => !a.requiere || permisos[a.requiere]);
 
@@ -78,7 +79,7 @@ const ACCIONES = [
   { clave: 'rivales', etiqueta: 'Buscar rivales', Icono: Search },
   { clave: 'partido', etiqueta: 'Próximo partido', Icono: CalendarDays },
   { clave: 'integrantes', etiqueta: 'Integrantes', Icono: Users },
-  { clave: 'ajustes', etiqueta: 'Ajustes del club', Icono: Settings, requiere: 'editarClub' },
+  { clave: 'permisos', etiqueta: 'Permisos de club', Icono: ShieldCheck, requiere: 'gestionarPermisos' },
 ];
 
 const styles = StyleSheet.create({

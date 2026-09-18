@@ -51,6 +51,7 @@ import {
 } from '../services/clubs';
 import { getClubPhotos } from '../services/clubGallery';
 import { countPendingForClub } from '../services/clubChallenges';
+import { getMisPermisosEnClub } from '../services/clubPermissions';
 import {
   getClubMatchHistory,
   getClubEstadisticas,
@@ -111,6 +112,7 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [historialError, setHistorialError] = useState(null);
   const [estadisticas, setEstadisticas] = useState(ESTADISTICAS_VACIAS);
   const [pendingChallenges, setPendingChallenges] = useState(0);
+  const [misPermisos, setMisPermisos] = useState(null);
   const [banner, setBanner] = useState(initialBanner || null);
   const [working, setWorking] = useState(false);
   const [challengeSheetOpen, setChallengeSheetOpen] = useState(false);
@@ -121,6 +123,11 @@ export default function ClubDetailScreen({ navigation, route }) {
 
   const soyMiembro = members.some((m) => m.user_id === me);
   const soyAdmin = members.some((m) => m.user_id === me && m.rol === 'admin');
+  // Editar el club es delegable (migración 119): un capitán o jugador con
+  // el permiso concedido también ve el lápiz del encabezado.
+  const puedeEditarClub = soyAdmin || !!misPermisos?.editClub;
+  // Publicar/crear desafíos también es delegable (permiso `pubChallenge`).
+  const puedePublicarDesafios = soyAdmin || !!misPermisos?.pubChallenge;
   const tengoMaxClubs = myClubs.length >= 3;
   // Puedo desafiar a este club si soy admin de OTRO club distinto.
   const puedoDesafiar =
@@ -158,6 +165,14 @@ export default function ClubDetailScreen({ navigation, route }) {
     setMyClubs(mine || []);
     setPhotos(ph || []);
     setPendingChallenges(pending || 0);
+
+    const amMemberNow = (ms || []).some((m) => m.user_id === myId);
+    if (amMemberNow) {
+      const { data: permisos } = await getMisPermisosEnClub(clubId);
+      setMisPermisos(permisos?.permisos || null);
+    } else {
+      setMisPermisos(null);
+    }
 
     // Historial y estadísticas: lo que hay en la base de datos y nada más. Un
     // club sin encuentros confirmados muestra el estado vacío, no un ejemplo.
@@ -205,11 +220,11 @@ export default function ClubDetailScreen({ navigation, route }) {
   // en Inicio) abre directo la hoja "Crear desafío" — se limpia el param
   // para que no se reabra sola si el usuario vuelve a esta pantalla.
   useEffect(() => {
-    if (openChallenge && !loading && soyAdmin) {
+    if (openChallenge && !loading && puedePublicarDesafios) {
       setChallengeSheetOpen(true);
       navigation.setParams({ openChallenge: undefined });
     }
-  }, [openChallenge, loading, soyAdmin, navigation]);
+  }, [openChallenge, loading, puedePublicarDesafios, navigation]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -280,7 +295,7 @@ export default function ClubDetailScreen({ navigation, route }) {
   const goToElegirRival = () =>
     navigation.navigate('ExploreClubs', {
       modoRival: true,
-      retadorClubId: soyAdmin ? clubId : null,
+      retadorClubId: puedePublicarDesafios ? clubId : null,
     });
 
   if (loading || !club) {
@@ -324,7 +339,7 @@ export default function ClubDetailScreen({ navigation, route }) {
       <ClubHeaderBar
         title={soyMiembro ? 'Mi club' : club.nombre}
         esPremium={esPremium}
-        puedeEditar={soyAdmin}
+        puedeEditar={puedeEditarClub}
         onBack={() => navigation.goBack()}
         onShare={handleShare}
         onEdit={() => navigation.navigate('EditClub', { club })}
@@ -369,7 +384,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             jugador). Ahora, mientras se pueda pedir entrar (no soy miembro,
             no llegué al tope de 3 clubes), esa es la acción principal, y
             «Desafiar» se ofrece además, como acción secundaria, si aplica. */}
-        {soyAdmin ? (
+        {puedePublicarDesafios ? (
           <CreateChallengeButton
             label="Crear desafío"
             onPress={() => setChallengeSheetOpen(true)}
@@ -526,8 +541,8 @@ export default function ClubDetailScreen({ navigation, route }) {
             icon={<Trophy color={C.textSecondary} size={18} strokeWidth={2} />}
             title="Aún no hay partidos en el historial"
             subtitle="Los partidos aparecerán acá cuando tengan un resultado confirmado"
-            actionLabel={soyAdmin ? 'Buscar un rival' : null}
-            onAction={soyAdmin ? goToExplore : null}
+            actionLabel={puedePublicarDesafios ? 'Buscar un rival' : null}
+            onAction={puedePublicarDesafios ? goToExplore : null}
             variant="solid"
             tema={tema}
           />
@@ -598,12 +613,12 @@ export default function ClubDetailScreen({ navigation, route }) {
             </Pressable>
             <View style={styles.adminDivider} />
             <Pressable
-              onPress={() => navigation.navigate('EditClub', { club })}
+              onPress={() => navigation.navigate('PermisosClub', { clubId: club.id, club })}
               accessibilityRole="button"
-              accessibilityLabel="Ajustes del club"
+              accessibilityLabel="Permisos de club"
               style={({ pressed }) => [styles.adminRow, pressed && styles.rowPressed]}
             >
-              <Text style={styles.adminRowText}>Ajustes del club</Text>
+              <Text style={styles.adminRowText}>Permisos de club</Text>
               <ChevronRight color={C.textMuted} size={18} strokeWidth={2.2} />
             </Pressable>
           </View>

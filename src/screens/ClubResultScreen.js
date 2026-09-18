@@ -23,7 +23,7 @@ import Banner from '../components/Banner';
 import { Card, Button, IconButton, SectionLabel } from '../components/reservas/ui';
 import { supabase } from '../services/supabase';
 import { getMatchById, withClubs } from '../services/matches';
-import { getMyClubs } from '../services/clubs';
+import { getMisClubesConPermiso } from '../services/clubPermissions';
 import { getNominaPartido } from '../services/clubRoster';
 import { clubesDelPartido, iniciales } from '../services/clubMatchRules';
 import { refreshChallenge } from '../services/clubChallenges';
@@ -60,7 +60,7 @@ export default function ClubResultScreen({ navigation, route }) {
   const [challenge, setChallenge] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [nomina, setNomina] = useState([]);
-  const [misClubes, setMisClubes] = useState([]);
+  const [misClubIdsAdmin, setMisClubIdsAdmin] = useState([]);
   const [me, setMe] = useState(null);
   const [banner, setBanner] = useState(null);
   const [enviando, setEnviando] = useState(false);
@@ -73,13 +73,17 @@ export default function ClubResultScreen({ navigation, route }) {
   const vivo = useRef(true);
 
   const cargar = useCallback(async () => {
-    const [{ data: m }, { data: ch }, { data: res }, { data: filas }, { data: clubes }, { data: sesion }] =
+    const [{ data: m }, { data: ch }, { data: res }, { data: filas }, { data: clubesConResults }, { data: sesion }] =
       await Promise.all([
         getMatchById(matchId),
         refreshChallenge(challengeId),
         getResultadoActivo(challengeId),
         getNominaPartido(matchId),
-        getMyClubs(),
+        // Admin del club, o capitán/jugador con `results` concedido
+        // (migración 119): cualquiera de las dos alcanza para proponer o
+        // confirmar el marcador. `accionesDeResultado` es puro y no sabe de
+        // permisos — sólo mira si el club está en esta lista.
+        getMisClubesConPermiso('results'),
         supabase.auth.getUser(),
       ]);
     const [mConClubes] = await withClubs(m ? [m] : []);
@@ -88,7 +92,7 @@ export default function ClubResultScreen({ navigation, route }) {
     setChallenge(ch || null);
     setResultado(res || null);
     setNomina(filas || []);
-    setMisClubes(clubes || []);
+    setMisClubIdsAdmin(clubesConResults || []);
     setMe(sesion?.user?.id || null);
     setLoading(false);
   }, [matchId, challengeId]);
@@ -100,11 +104,6 @@ export default function ClubResultScreen({ navigation, route }) {
       vivo.current = false;
     };
   }, [cargar]);
-
-  const misClubIdsAdmin = useMemo(
-    () => misClubes.filter((c) => c.miRol === 'admin').map((c) => c.club?.id).filter(Boolean),
-    [misClubes]
-  );
 
   const acciones = useMemo(
     () =>
