@@ -23,7 +23,8 @@ import {
 import { temaClub, TEMA_CLUB_POR_DEFECTO } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import ClubThemePicker from '../components/club/ClubThemePicker';
-import { updateClub, getMisClubesAdmin } from '../services/clubs';
+import { updateClub } from '../services/clubs';
+import { getMisClubesConPermiso } from '../services/clubPermissions';
 import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD } from '../utils/clubMeta';
@@ -37,12 +38,13 @@ import { getEditClubStatus, NOMBRE_MIN } from '../utils/clubEdit';
  * de la paleta global antigua: entrar a editar no debería sentirse como
  * cambiar de aplicación.
  *
- * SOLO ADMINISTRADORES, Y SE COMPRUEBA. El botón de entrada vive en
- * ClubDetail y solo lo ven los administradores, pero la pantalla vuelve a
- * preguntar por su cuenta (`getMisClubesAdmin`) para que llegar acá por otro
- * camino no muestre un formulario que el servidor va a rechazar. La garantía
- * de verdad es la policy `clubs_update` (migración 20): sin ella, esconder
- * el formulario no protegería nada.
+ * ADMIN, O QUIEN TENGA `editClub` CONCEDIDO — Y SE COMPRUEBA. El botón de
+ * entrada vive en el lápiz de `ClubHeaderBar` y sólo lo ven quienes califican,
+ * pero la pantalla vuelve a preguntar por su cuenta
+ * (`getMisClubesConPermiso('editClub')`, migración 119) para que llegar acá
+ * por otro camino no muestre un formulario que el servidor va a rechazar. La
+ * garantía de verdad es la policy `clubs_update`: sin ella, esconder el
+ * formulario no protegería nada.
  *
  * EL TEMA SE PREVISUALIZA, PERO SE APLICA AL GUARDAR. Elegir un color
  * repinta los estados seleccionados y el botón de esta pantalla; el club no
@@ -83,7 +85,7 @@ export default function EditClubScreen({ navigation, route }) {
 
   const comprobarPermiso = useCallback(async () => {
     setCheckingPermiso(true);
-    const { data } = await getMisClubesAdmin();
+    const { data } = await getMisClubesConPermiso('editClub');
     setClubesAdmin(data);
     setCheckingPermiso(false);
   }, []);
@@ -209,12 +211,12 @@ export default function EditClubScreen({ navigation, route }) {
               <Text style={styles.centerTitle}>
                 {status === 'error'
                   ? 'No se pudo comprobar tu permiso'
-                  : 'Solo los administradores pueden editar el club'}
+                  : 'No tienes permiso para editar este club'}
               </Text>
               <Text style={styles.centerSub}>
                 {status === 'error'
                   ? 'Revisa tu conexión y vuelve a intentarlo.'
-                  : 'Pídele a un administrador que haga el cambio.'}
+                  : 'Pídele a un administrador que haga el cambio, o que te dé el permiso desde Permisos de club.'}
               </Text>
               <Pressable
                 onPress={status === 'error' ? comprobarPermiso : cerrar}

@@ -18,7 +18,8 @@ import Banner from '../components/Banner';
 import NotificationCard, { CATEGORY } from '../components/notifications/NotificationCard';
 import FilterChips from '../components/notifications/FilterChips';
 import { getCurrentUser } from '../services/auth';
-import { getMisClubesAdmin, respondToRequest, getClubById } from '../services/clubs';
+import { respondToRequest, getClubById } from '../services/clubs';
+import { getMisClubesConPermiso } from '../services/clubPermissions';
 import { getMatchById } from '../services/matches';
 import { respondChallenge } from '../services/clubChallenges';
 import { acceptFriendRequest, rejectFriendRequest } from '../services/friends';
@@ -120,10 +121,13 @@ const CLEAR_ALL_ID = '__clearAll__';
 /**
  * Acciones inline disponibles para este aviso, o null si solo navega al tocar.
  *
- * `clubesAdmin` son TODOS los clubes que administra el usuario. Antes se
- * comparaba contra `getMyClub()`, que devuelve el PRIMERO por `joined_at`:
- * quien administra varios sólo veía botones en los retos dirigidos al club
- * más antiguo, y los demás llegaban sin acciones y sin explicación.
+ * `clubesAdmin` son los clubes donde el usuario puede responder un desafío:
+ * los que administra, MÁS los que le concedieron `answerChallenge` o
+ * `pubChallenge` (migración 119) — el servidor acepta cualquiera de los
+ * dos. Antes se comparaba contra `getMyClub()`, que devuelve el PRIMERO por
+ * `joined_at`: quien administra varios sólo veía botones en los retos
+ * dirigidos al club más antiguo, y los demás llegaban sin acciones y sin
+ * explicación.
  */
 function actionsFor(n, clubesAdmin) {
   const data = n?.data || {};
@@ -147,8 +151,11 @@ export default function NotificationsScreen({ navigation }) {
   // `window.confirm` no abre nada en web: diálogo propio de la app.
   const { confirmar, dialogo } = useConfirmacion();
   const [items, setItems] = useState([]);
-  // TODOS los clubes que administro. `null` es «no se pudo averiguar» y no
-  // se confunde con «no administro ninguno» ([]).
+  // Clubes donde puedo aceptar/rechazar un desafío: los que administro MÁS
+  // los que tengo `answerChallenge`/`pubChallenge` concedidos como capitán
+  // o jugador (migración 119) — el servidor acepta cualquiera de los dos
+  // para responder. `null` es «no se pudo averiguar» y no se confunde con
+  // «ninguno califica» ([]).
   const [clubesAdmin, setClubesAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -171,7 +178,7 @@ export default function NotificationsScreen({ navigation }) {
   const load = useCallback(async () => {
     const [{ data, error }, clubResult] = await Promise.all([
       listNotifications({ limit: 50 }),
-      getMisClubesAdmin(),
+      getMisClubesConPermiso(['pubChallenge', 'answerChallenge']),
     ]);
     if (error) {
       // No pisamos `items`: si ya había una lista cargada, se queda ahí

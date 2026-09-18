@@ -101,13 +101,14 @@ export function buildClubPatch({
 /**
  * ¿Puedo editar este club?
  *
- * `clubesAdmin` son TODOS los clubes que administro (ver
- * `getMisClubesAdmin()`), no el primero: comparar contra el primero es el
- * fallo que ya se corrigió en la bandeja de desafíos.
+ * `clubesAdmin` son los clubes donde puedo editar: los que administro MÁS
+ * los que me concedieron `editClub` (migración 119) — ver
+ * `getMisClubesConPermiso('editClub')`. No el primero: comparar contra el
+ * primero es el fallo que ya se corrigió en la bandeja de desafíos.
  *
- * `null` no es `[]`: una lista vacía es «no administro ninguno» y `null` es
- * «no se pudo averiguar». Los dos niegan el permiso —negarlo es lo seguro—
- * pero la pantalla los cuenta distinto, ver `getEditClubStatus()`.
+ * `null` no es `[]`: una lista vacía es «no calificar en ninguno» y `null`
+ * es «no se pudo averiguar». Los dos niegan el permiso —negarlo es lo
+ * seguro— pero la pantalla los cuenta distinto, ver `getEditClubStatus()`.
  */
 export function puedeEditarClub({ clubesAdmin, clubId } = {}) {
   if (!Array.isArray(clubesAdmin)) return false;
