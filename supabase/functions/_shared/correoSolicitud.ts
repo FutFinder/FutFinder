@@ -7,9 +7,11 @@
 // cuerpo y la lectura de secretos sin mandar un solo correo.
 //
 // SECRETS (Supabase → Edge Functions → Secrets):
-//   RESEND_API_KEY         · del proveedor
-//   SOLICITUDES_EMAIL_TO   · a dónde llegan las solicitudes (uno o varios,
-//                            separados por coma)
+//   RESEND_API_KEY         · del proveedor — sin esto no se manda nada, es
+//                            lo único que este archivo no puede suplir solo
+//   SOLICITUDES_EMAIL_TO   · opcional, a dónde llegan las solicitudes (uno o
+//                            varios, separados por coma) — sin este secreto
+//                            cae en DESTINO_POR_OMISION
 //   SOLICITUDES_EMAIL_FROM · opcional, el remitente verificado
 //
 // SIN SECRETOS NO FALLA: `leerConfigCorreo` devuelve null y quien llama sigue
@@ -49,22 +51,30 @@ export type Solicitud = {
 // comprobar el circuito antes de verificar un dominio propio.
 const DESDE_POR_OMISION = "FutFinder <onboarding@resend.dev>";
 
+// A dónde llegan las solicitudes si nadie fijó `SOLICITUDES_EMAIL_TO` —
+// pedido explícito: todas las solicitudes de «suma tu recinto» van a esta
+// casilla por defecto, sin depender de que alguien cargue el secreto a mano.
+// `SOLICITUDES_EMAIL_TO` sigue existiendo para el día que haga falta mandarlas
+// a otra parte (o sumar un segundo destinatario) sin tocar código.
+const DESTINO_POR_OMISION = "futfindercl@gmail.com";
+
 /**
  * Los secretos, o `null` si todavía no están cargados.
  *
- * Hacen falta los dos: una clave sin destinatario manda el correo a ninguna
- * parte, y un destinatario sin clave no manda nada.
+ * Sólo la clave del proveedor es obligatoria: sin ella no hay a quién
+ * pedirle que mande el correo, y no hay forma de suplirla desde acá. El
+ * destinatario, si no se fija, cae en `DESTINO_POR_OMISION`.
  */
 export function leerConfigCorreo(env: (k: string) => string | undefined): ConfigCorreo | null {
   const apiKey = (env("RESEND_API_KEY") ?? "").trim();
+  if (!apiKey) return null;
   const para = (env("SOLICITUDES_EMAIL_TO") ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!apiKey || para.length === 0) return null;
   return {
     apiKey,
-    para,
+    para: para.length > 0 ? para : [DESTINO_POR_OMISION],
     desde: (env("SOLICITUDES_EMAIL_FROM") ?? "").trim() || DESDE_POR_OMISION,
   };
 }

@@ -37,19 +37,21 @@ import { pickImages, uploadFotoSolicitud, removeFotoSolicitudFile } from '../ser
  * mencione. Se borran al desmontar la pantalla, salvo que la solicitud se haya
  * mandado — ahí son justamente lo que el equipo va a mirar.
  */
+const FORM_VACIO = {
+  nombreRecinto: '',
+  direccion: '',
+  comuna: '',
+  nCanchas: '',
+  nombreDueno: '',
+  telefono: '',
+  correo: '',
+  mensaje: '',
+  fotos: [],      // { path, uri }: la ruta viaja, la uri es la copia local
+  servicios: [],  // claves del catálogo de la 75
+};
+
 export default function SolicitudRecintoScreen({ navigation }) {
-  const [form, setForm] = useState({
-    nombreRecinto: '',
-    direccion: '',
-    comuna: '',
-    nCanchas: '',
-    nombreDueno: '',
-    telefono: '',
-    correo: '',
-    mensaje: '',
-    fotos: [],      // { path, uri }: la ruta viaja, la uri es la copia local
-    servicios: [],  // claves del catálogo de la 75
-  });
+  const [form, setForm] = useState(FORM_VACIO);
   const [intentado, setIntentado] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
@@ -139,6 +141,20 @@ export default function SolicitudRecintoScreen({ navigation }) {
     setEnviada(data);
   };
 
+  /**
+   * Vuelve al formulario en blanco para mandar otra solicitud — un dueño con
+   * más de un recinto no tiene por qué salir de la pantalla y volver a
+   * entrar. Las fotos de la solicitud recién enviada NO se tocan: son las
+   * que el equipo va a mirar, y el efecto de limpieza al desmontar sólo
+   * borra las que quedaron sueltas sin ninguna solicitud mandada.
+   */
+  const otraSolicitud = () => {
+    setForm(FORM_VACIO);
+    setIntentado(false);
+    setError(null);
+    setEnviada(null);
+  };
+
   if (enviada) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
@@ -163,7 +179,10 @@ export default function SolicitudRecintoScreen({ navigation }) {
           </Card>
         </ScrollView>
         <StickyFooter>
-          <Button label="Volver a Reservas" onPress={() => navigation.goBack()} />
+          <View style={{ gap: 10 }}>
+            <Button label="Enviar otra solicitud" variant="secondary" onPress={otraSolicitud} />
+            <Button label="Volver a Reservas" onPress={() => navigation.goBack()} />
+          </View>
         </StickyFooter>
       </SafeAreaView>
     );

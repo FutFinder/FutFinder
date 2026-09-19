@@ -1,6 +1,6 @@
 # Despliegue y entornos
 
-Última revisión: 2026-08-13
+Última revisión: 2026-09-18
 
 ## Propósito
 
@@ -93,11 +93,11 @@ Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cre
 
 **Secretos del aviso de solicitudes de recinto** (los lee `_shared/correoSolicitud.ts`; tampoco van en el repo):
 
-- `RESEND_API_KEY` — del proveedor de correo. **No hay cuenta todavía**, igual que con Flow.
-- `SOLICITUDES_EMAIL_TO` — a dónde llegan las solicitudes. Admite varias direcciones separadas por coma.
+- `RESEND_API_KEY` — del proveedor de correo. **No hay cuenta todavía**, igual que con Flow. Es el único de los tres sin el que la función no manda nada: no hay forma de suplirlo desde el código.
+- `SOLICITUDES_EMAIL_TO` — opcional. Pedido explícito: si no está, cae en `futfindercl@gmail.com` (`DESTINO_POR_OMISION` en `correoSolicitud.ts`). Sigue existiendo para el día que haga falta mandarlas a otra parte, o sumar un segundo destinatario, sin tocar código. Admite varias direcciones separadas por coma.
 - `SOLICITUDES_EMAIL_FROM` — opcional; el remitente verificado. Por omisión el de prueba del proveedor.
 
-**Sin esos dos primeros nada explota**: la solicitud igual queda escrita en `solicitudes_recinto` y la función contesta `ok: true` con `avisada: false`. El correo es el aviso, no el registro, así que encender los secretos después no pierde ninguna solicitud anterior — se leen de la tabla.
+**Sin `RESEND_API_KEY` nada explota**: la solicitud igual queda escrita en `solicitudes_recinto` y la función contesta `ok: true` con `avisada: false`. El correo es el aviso, no el registro, así que encender el secreto después no pierde ninguna solicitud anterior — se leen de la tabla. Ese es el ÚNICO paso que falta hoy para que `futfindercl@gmail.com` empiece a recibirlas de verdad: crear la cuenta en el proveedor (Resend) y cargar la clave como secreto de la función.
 
 **`verify_jwt: true` NO garantiza que haya sesión**, y esto se descubrió probando `solicitud-recinto` en el navegador sin cuenta: la clave anónima es un JWT válido, así que la función corre igual y choca con el `grant ... to authenticated` de la RPC que llama. Vale para cualquier función futura: si necesita una sesión de verdad, tiene que comprobarla ella —o traducir el 42501 a un mensaje honesto, que es lo que hace esta— en vez de confiar en `verify_jwt`.
 

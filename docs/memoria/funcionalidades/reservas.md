@@ -1,6 +1,6 @@
 # Reservas
 
-Última revisión: 2026-09-10
+Última revisión: 2026-09-18
 
 ## Propósito
 
@@ -99,7 +99,9 @@ Construido hasta ahora (pantallas 1 a 8 del handoff):
 
 **El servidor acepta null en los tres.** Las solicitudes anteriores a la 110 no los tienen y una app vieja no los manda: perder un recinto de verdad por un campo que su versión no conocía sería el peor cambio posible. El correo al equipo lo dice con palabras («no lo dijo», «no marcó ninguno») en vez de dejar un hueco que se lea como un cero.
 
-**La solicitud se guarda siempre y el correo es aparte.** La migración 80 crea `solicitudes_recinto` y `crear_solicitud_recinto`; la Edge Function `solicitud-recinto` la llama con el token de quien manda el formulario y después avisa al equipo por correo. **Sin proveedor de correo configurado —que es el estado de hoy— la función contesta `ok: true` con `avisada: false`** y la fila igual quedó escrita: el equipo la lee en Supabase. Y `src/services/solicitudRecinto.js` cae a la RPC directo si la función no responde, porque los dos caminos son el mismo y ninguno puede perder una solicitud. Decirle «no se pudo» a alguien cuya solicitud SÍ se guardó lo haría mandarla de nuevo para nada.
+**La solicitud se guarda siempre y el correo es aparte.** La migración 80 crea `solicitudes_recinto` y `crear_solicitud_recinto`; la Edge Function `solicitud-recinto` la llama con el token de quien manda el formulario y después avisa al equipo por correo. **Sin `RESEND_API_KEY` configurada —que es el estado de hoy— la función contesta `ok: true` con `avisada: false`** y la fila igual quedó escrita: el equipo la lee en Supabase. Y `src/services/solicitudRecinto.js` cae a la RPC directo si la función no responde, porque los dos caminos son el mismo y ninguno puede perder una solicitud. Decirle «no se pudo» a alguien cuya solicitud SÍ se guardó lo haría mandarla de nuevo para nada. **El destinatario por omisión es `futfindercl@gmail.com`** (pedido explícito, `DESTINO_POR_OMISION` en `_shared/correoSolicitud.ts`): en cuanto se cargue `RESEND_API_KEY`, las solicitudes empiezan a llegar ahí solas, sin necesitar además el secreto `SOLICITUDES_EMAIL_TO`. Ver [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md).
+
+**Después de mandarla, «Enviar otra solicitud» reinicia el formulario** en vez de sólo ofrecer volver a Reservas — pedido explícito, para un dueño con más de un recinto. Vacía todos los campos y fotos del borrador; la solicitud que sí se mandó ya quedó guardada y sus fotos ya están referenciadas por esa fila, así que no se tocan.
 
 **`verify_jwt: true` no garantiza sesión.** Apareció probando esta función sin cuenta: la clave anónima es un JWT válido, la función corre igual y choca con el `grant ... to authenticated` de la RPC. Se traduce ese 42501 a «Inicia sesión para mandarnos tu recinto» en vez de reportarlo como error del servidor.
 

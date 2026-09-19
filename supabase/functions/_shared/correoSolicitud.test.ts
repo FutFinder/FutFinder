@@ -26,10 +26,16 @@ const SOLICITUD: Solicitud = {
   mensaje: null,
 };
 
-Deno.test("sin secretos no hay configuración, y eso no es un error", () => {
+Deno.test("sin la clave del proveedor no hay configuración, y eso no es un error", () => {
   assertEquals(leerConfigCorreo(env({})), null);
-  assertEquals(leerConfigCorreo(env({ RESEND_API_KEY: "llave" })), null, "una clave sin destinatario no manda a nadie");
   assertEquals(leerConfigCorreo(env({ SOLICITUDES_EMAIL_TO: "a@b.cl" })), null, "un destinatario sin clave no manda nada");
+});
+
+Deno.test("con la clave y sin SOLICITUDES_EMAIL_TO, cae en el destino por omisión", () => {
+  // Pedido explícito: todas las solicitudes de «suma tu recinto» llegan acá
+  // por defecto, sin depender de que alguien cargue el secreto a mano.
+  const c = leerConfigCorreo(env({ RESEND_API_KEY: "llave" }));
+  assertEquals(c?.para, ["futfindercl@gmail.com"]);
 });
 
 Deno.test("con los dos secretos hay configuración, y el remitente tiene omisión", () => {
