@@ -28,6 +28,7 @@ declare
   v_jugador_a  uuid := gen_random_uuid();
   v_jugador_a2 uuid := gen_random_uuid();
   v_admin_b    uuid := gen_random_uuid();
+  v_jugador_b  uuid := gen_random_uuid();
   v_ajeno      uuid := gen_random_uuid();
 
   v_club_a uuid := gen_random_uuid();
@@ -57,6 +58,7 @@ begin
     ('00000000-0000-0000-0000-000000000000', v_jugador_a,  'authenticated', 'authenticated', 'permisos-jugador-a-'  || v_jugador_a  || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_jugador_a2, 'authenticated', 'authenticated', 'permisos-jugador-a2-' || v_jugador_a2 || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_admin_b,    'authenticated', 'authenticated', 'permisos-admin-b-'    || v_admin_b    || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_jugador_b,  'authenticated', 'authenticated', 'permisos-jugador-b-'  || v_jugador_b  || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_ajeno,      'authenticated', 'authenticated', 'permisos-ajeno-'      || v_ajeno      || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', '');
 
   insert into public.clubs (id, nombre, slug, created_by) values
@@ -68,7 +70,8 @@ begin
     (v_club_a, v_capitan_a,  'capitan'),
     (v_club_a, v_jugador_a,  'jugador'),
     (v_club_a, v_jugador_a2, 'jugador'),
-    (v_club_b, v_admin_b,    'admin')
+    (v_club_b, v_admin_b,    'admin'),
+    (v_club_b, v_jugador_b,  'jugador')
   returning id into v_member_jugador_a; -- se pisa, se recupera abajo
 
   select id into v_member_jugador_a  from public.club_members where club_id = v_club_a and user_id = v_jugador_a;
@@ -205,8 +208,23 @@ begin
 
   -- Vuelve a la regla de hoy para el resto de las pruebas: sólo
   -- capitán con lineup, todo lo demás apagado.
-  update public.club_role_permissions set activo = (rol = 'capitan' and permiso = 'lineup')
-   where club_id = v_club_a;
+  --
+  -- POR LA PUERTA BUENA, y no con un `update` directo. La migración
+  -- revoca insert/update/delete de `club_role_permissions` a
+  -- `authenticated`, y en este punto el arnés YA está suplantando a
+  -- `authenticated` desde el caso 5: el update crudo moría con
+  -- `42501 permission denied for table club_role_permissions`. Que la
+  -- propia prueba no pueda escribir a mano es, de hecho, la migración
+  -- funcionando.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin_a, 'role', 'authenticated')::text);
+  perform public.club_guardar_permisos_rol(v_club_a, 'capitan', jsonb_build_object(
+      'pubChallenge', false, 'answerChallenge', false, 'chatClubs', false,
+      'invite', false, 'removeMembers', false, 'editNicks', false,
+      'lineup', true, 'results', false, 'editClub', false));
+  perform public.club_guardar_permisos_rol(v_club_a, 'jugador', jsonb_build_object(
+      'pubChallenge', false, 'answerChallenge', false, 'chatClubs', false,
+      'invite', false, 'removeMembers', false, 'editNicks', false,
+      'lineup', false, 'results', false, 'editClub', false));
 
   -- ═══════════════════════════════════════════════════════════
   -- Los nueve permisos aplicados de verdad
@@ -316,8 +334,10 @@ begin
 
   -- ── Caso 16: lineup — capitán sí por default (regla de hoy), jugador no ─
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_capitan_a, 'role', 'authenticated')::text);
-  insert into public.club_lineups (club_id, updated_by, asignaciones)
-  values (v_club_a, v_capitan_a, '{}'::jsonb);
+  -- `modo` (7 u 11) y `formacion` son NOT NULL con CHECK: sin ellas el
+  -- insert muere por restricción antes de llegar a probar el permiso.
+  insert into public.club_lineups (club_id, updated_by, modo, formacion, asignaciones)
+  values (v_club_a, v_capitan_a, 7, '3-2-1', '{}'::jsonb);
   raise notice 'OK (caso 16a): capitán mantiene lineup por default (regla de hoy)';
 
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_a, 'role', 'authenticated')::text);
@@ -400,6 +420,10 @@ begin
     raise exception 'FALLÓ (caso 18): un jugador sin answerChallenge no debería poder elegir una respuesta';
   end if;
 
+  -- El desafío directo lo acepta el club RETADO, que acá es el B: pedirle
+  -- al club retador que acepte su propio desafío no prueba el permiso, sólo
+  -- que no perteneces al otro club. Por eso el club B tiene un jugador.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_b, 'role', 'authenticated')::text);
   begin
     perform public.aceptar_desafio(v_challenge_id);
     v_rechazado := false;
@@ -410,10 +434,10 @@ begin
     raise exception 'FALLÓ (caso 18): un jugador sin answerChallenge no debería poder aceptar un desafío directo';
   end if;
 
-  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin_a, 'role', 'authenticated')::text);
-  perform public.club_guardar_permisos_rol(v_club_a, 'jugador', jsonb_build_object('answerChallenge', true));
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin_b, 'role', 'authenticated')::text);
+  perform public.club_guardar_permisos_rol(v_club_b, 'jugador', jsonb_build_object('answerChallenge', true));
 
-  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_a, 'role', 'authenticated')::text);
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_b, 'role', 'authenticated')::text);
   perform public.aceptar_desafio(v_challenge_id);
   if not exists (select 1 from public.club_challenges where id = v_challenge_id and estado = 'negociacion') then
     raise exception 'FALLÓ (caso 18): al conceder answerChallenge, el jugador debería poder aceptar el desafío directo';
@@ -442,15 +466,19 @@ begin
   -- en vez de recorrer todo el ciclo de propuesta oficial.
   perform public.club_guardar_permisos_rol(v_club_a, 'jugador', jsonb_build_object('chatClubs', false));
 
-  insert into public.matches (
-      id, creado_por, tipo, titulo, hora, direccion, comuna, region,
-      duracion_min, cupos_por_club, estado, club_local_id, club_visitante_id
-  ) values (
-      gen_random_uuid(), v_admin_a, 'club', 'Permisos test match', now() - interval '1 hour',
-      'Cancha de prueba', 'Comuna Test', 'Región Test',
-      90, 10, 'finalizado', v_club_a, v_club_b
-  )
+  -- Las columnas reales de `matches` son otras (`id_organizador`, y no
+  -- existe `tipo` ni `creado_por`), y `tg_match_future_only` rechaza
+  -- insertar un partido con hora pasada: se crea a futuro y se mueve al
+  -- pasado con un update, que es lo que el disparador sí permite.
+  insert into public.matches (id, id_organizador, titulo, comuna, cancha_nombre,
+      latitud, longitud, hora, cupos_totales, cupos_disponibles,
+      duracion_min, cupos_por_club, club_local_id, club_visitante_id)
+  values (gen_random_uuid(), v_admin_a, 'Permisos test match', 'Comuna Test',
+      'Cancha de prueba', -33.45, -70.66, now() + interval '2 days', 20, 20,
+      90, 10, v_club_a, v_club_b)
   returning id into v_match_id;
+  update public.matches set hora = now() - interval '1 hour', estado = 'finalizado'
+   where id = v_match_id;
 
   update public.club_challenges
      set estado = 'esperando_resultado', match_id = v_match_id
