@@ -1,6 +1,6 @@
 # Pruebas
 
-Última revisión: 2026-08-17
+Última revisión: 2026-09-18
 
 ## Comprobaciones locales del proyecto
 
@@ -49,6 +49,15 @@ U4.4 lo repitió y subió la apuesta: `46_cambios_de_partido_test.sql` estuvo en
 U5.1 volvió a dar la razón a esa regla y añadió una vuelta más. El arnés SQL estuvo en 25/25 desde el primer día y la comprobación manual encontró igual un fallo de cliente: el hilo de un encuentro cancelado mostraba, como motivo, el de una sanción anterior del club por OTRO encuentro. La regresión que lo fija (`cancelacionEncuentro.test.js`) usa las fuentes reales del cargador —`sancionVigente()` sobre filas con la forma de `club_sanctions` y `challengeCtaContext()`, que es lo que arma `ChatThreadScreen`— y no un contexto escrito a mano. La vuelta de tuerca: escrita así, esa prueba **pasó en verde antes de existir el arreglo**, porque el `inicio_at` del fixture era posterior al «ahora» de la prueba y `sancionVigente()` devolvía null: no había ninguna sanción que mezclar. Verde por la razón equivocada es peor que rojo, y sólo se detectó porque se exigió ver el rojo antes de tocar el código. Cuando una prueba nueva pasa a la primera, la pregunta no es si el código está bien: es si la prueba está midiendo algo.
 
 Una prueba SQL en verde no dice que la pantalla funcione. El arnés de la 45 llevaba 14/14 desde el despliegue mientras la nómina se veía vacía en las dos cuentas: el servidor estaba bien y quien mentía era el `select` del cliente. Por eso ninguna fase se cierra sólo con SQL.
+
+**Un arnés no cuenta como escrito hasta que corre de punta a punta.** La migración 119 llegó al repositorio con el commit diciendo «escrita y probada»; al aplicarla el 2026-09-18, su arnés **falló cuatro veces seguidas**, cada una más adelante que la anterior, o sea que nunca se había ejecutado entero. Los cuatro fallos eran del arnés, no de la migración:
+
+1. Un `update` directo sobre `club_role_permissions` mientras el arnés ya suplantaba a `authenticated` — y la propia 119 le revoca esa escritura. Moría con `42501`. Que la prueba no pudiera escribir a mano **era la migración funcionando**; la salida es pasar por la RPC, que es la puerta que la migración deja abierta.
+2. Un `insert` en `club_lineups` sin `modo` ni `formacion`, las dos NOT NULL con CHECK.
+3. Un `insert` en `matches` con columnas inventadas (`creado_por`, `tipo`); las reales son otras, y `tg_match_future_only` rechaza una hora pasada, así que el partido se crea a futuro y se mueve con un update.
+4. Y el importante: **el caso 18 no probaba lo que decía.** Pedía que un jugador del club RETADOR aceptara su propio desafío, cuando eso lo acepta el retado. Fallaba por no pertenecer al otro club, no por faltarle `answerChallenge` — y sus sub-casos previos **pasaban vacíos**: habrían pasado igual sin la migración. Es la misma lección de U5.1 escrita otra vez: verde por la razón equivocada.
+
+De ahí la regla, que vale tanto para una migración propia como para una que llegue de la otra Mac: **antes de aplicar, correr el arnés en la misma transacción que la migración y terminar en `rollback`**; y si ya está aplicada, correrlo contra el esquema aplicado. Hasta que el arnés llegue a su última línea sin excepción, «probada» significa «compila». Los cuatro fallos de la 119 estaban detrás unos de otros: cada arreglo destapaba el siguiente, y sólo llegar al final los sacó todos.
 
 ## Pruebas de Edge Function
 
