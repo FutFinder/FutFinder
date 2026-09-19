@@ -10,7 +10,7 @@ import {
   Share,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Clock,
   AlertCircle,
@@ -115,6 +115,7 @@ const HISTORIAL_LIMITE = 20;
 export default function ProfileScreen({ navigation, route }) {
   const viewUserId = route?.params?.userId || null;
   const { isAuthenticated, user: authUser } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [myId, setMyId] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -455,7 +456,7 @@ export default function ProfileScreen({ navigation, route }) {
       />
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 110 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -741,7 +742,7 @@ export default function ProfileScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  scroll: { paddingBottom: 36 },
+  scroll: {},
   bannerWrap: { paddingHorizontal: S.screenPadding, paddingBottom: 12 },
   errorWrap: { paddingTop: 8 },
 

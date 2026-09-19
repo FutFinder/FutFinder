@@ -33,6 +33,7 @@ import {
 } from '../services/notifications';
 import { navigateToNotification } from '../utils/notificationTargets';
 import { puedeResponderDesafio } from '../utils/permisosDesafio';
+import { avisoDelClub } from '../utils/clubsHomeSources';
 import {
   getInboxStatus,
   createRequestGuard,
@@ -50,6 +51,13 @@ import useConfirmacion from '../components/useConfirmacion';
  * - Realtime: INSERT/UPDATE del usuario se refleja en caliente.
  * - Acciones inline (Aceptar/Rechazar) para desafíos de club, solicitudes de
  *   club y solicitudes de amistad — el resto solo navega al tocar, igual que antes.
+ *
+ * params opcionales: { filter, clubId }. «Actividad reciente» de la portada
+ * de Clubes llega con `filter: 'clubes'` y el club activo, y acá se aplica
+ * una segunda pasada con `avisoDelClub` (la misma regla de
+ * `utils/clubsHomeSources.js`) para no mezclar avisos de otro club que
+ * también se administre — sin `clubId`, el filtro de categoría solo
+ * («Todos»/«Clubes»/«Partidos»/«Social») se comporta como siempre.
  */
 
 const FILTERS = [
@@ -147,7 +155,12 @@ function actionsFor(n, clubesAdmin) {
   return null;
 }
 
-export default function NotificationsScreen({ navigation }) {
+export default function NotificationsScreen({ navigation, route }) {
+  // Llegar desde «Actividad reciente» de la portada de Clubes trae
+  // `filter: 'clubes'` y el club activo: la vista completa debe seguir
+  // mostrando SÓLO ese club, no todos los que administro, para no
+  // contradecir el resumen de tres avisos que la llevó hasta acá.
+  const { filter: filterInicial, clubId: clubIdActivo } = route?.params || {};
   // `window.confirm` no abre nada en web: diálogo propio de la app.
   const { confirmar, dialogo } = useConfirmacion();
   const [items, setItems] = useState([]);
@@ -160,7 +173,7 @@ export default function NotificationsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState('todos');
+  const [filter, setFilter] = useState(filterInicial || 'todos');
   const [banner, setBanner] = useState(null);
   const [busyIds, setBusyIds] = useState(() => new Set());
   const navigatingIds = useRef(new Set());
@@ -358,20 +371,18 @@ export default function NotificationsScreen({ navigation }) {
     }
   };
 
-  const chips = useMemo(
-    () =>
-      FILTERS.map((f) => ({
-        ...f,
-        count:
-          f.key === 'todos'
-            ? items.length
-            : items.filter((n) => CATEGORY[n.type] === f.key).length,
-      })),
-    [items]
-  );
+  const chips = useMemo(() => {
+    const base = clubIdActivo ? items.filter((n) => avisoDelClub(n, clubIdActivo)) : items;
+    return FILTERS.map((f) => ({
+      ...f,
+      count: f.key === 'todos' ? base.length : base.filter((n) => CATEGORY[n.type] === f.key).length,
+    }));
+  }, [items, clubIdActivo]);
 
   const sections = useMemo(() => {
-    const visible = items.filter((n) => filter === 'todos' || CATEGORY[n.type] === filter);
+    const visible = items
+      .filter((n) => filter === 'todos' || CATEGORY[n.type] === filter)
+      .filter((n) => !clubIdActivo || avisoDelClub(n, clubIdActivo));
     const buckets = new Map();
     visible.forEach((n) => {
       const g = groupFor(n.created_at);
@@ -385,7 +396,7 @@ export default function NotificationsScreen({ navigation }) {
         actions: n._actionsResolved ? null : actionsFor(n, clubesAdmin),
       })),
     }));
-  }, [items, filter, clubesAdmin]);
+  }, [items, filter, clubesAdmin, clubIdActivo]);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>

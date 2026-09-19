@@ -478,8 +478,8 @@ function Portada({
           <ActivityList
             items={activity}
             tema={tema}
-            onVerToda={() => irA('Notifications')}
-            onPressItem={() => irA('Notifications')}
+            onVerToda={() => irA('Notifications', { filter: 'clubes', clubId: activeClubId })}
+            onPressItem={() => irA('Notifications', { filter: 'clubes', clubId: activeClubId })}
           />
         </View>
       ) : null}

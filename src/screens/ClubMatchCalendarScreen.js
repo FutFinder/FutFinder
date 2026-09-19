@@ -282,10 +282,14 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                   onPress={() => navigation.navigate('ClubChallenges', { clubId, prefillFecha: fechaSeleccionada })}
                   accessibilityRole="button"
                   accessibilityLabel="Publicar un desafío para este día"
-                  style={({ pressed }) => [styles.accionBtn, styles.accionBtnGhost, pressed && { opacity: 0.8 }]}
+                  style={({ pressed }) => [
+                    styles.accionBtn,
+                    { backgroundColor: 'transparent', borderColor: tema.border },
+                    pressed && { backgroundColor: tema.soft },
+                  ]}
                 >
-                  <Swords color={C.textSecondary} size={16} strokeWidth={2.2} />
-                  <Text style={[styles.accionTexto, { color: C.textSecondary }]}>Publicar un desafío</Text>
+                  <Swords color={tema.main} size={16} strokeWidth={2.2} />
+                  <Text style={[styles.accionTexto, { color: tema.main }]}>Publicar un desafío</Text>
                 </Pressable>
               </View>
             </View>
@@ -431,6 +435,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     height: 44, borderRadius: R.iconBtn, borderWidth: 1,
   },
-  accionBtnGhost: { backgroundColor: C.surfaceAlt, borderColor: C.borderSoft },
   accionTexto: { fontSize: 13.5, fontFamily: F.bold },
 });

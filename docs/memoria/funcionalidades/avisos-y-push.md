@@ -1,6 +1,6 @@
 # Avisos y push
 
-Última revisión: 2026-08-13
+Última revisión: 2026-09-18
 
 ## Propósito
 
@@ -9,6 +9,8 @@ Entregar bandeja persistente dentro de la app y push externo por categoría, dis
 ## Flujos actuales
 
 La bandeja lee, marca, borra y se suscribe a `notifications`; usa actualizaciones optimistas con reversión ante error y evita repetir la misma acción. Al tocar un aviso, `notificationTargets` resuelve su ruta; `App.js` espera que navegación y Splash estén listos y deduplica respuestas de arranque frío. En login se registra el token del dispositivo y en logout se elimina el token actual.
+
+**«Actividad reciente» de la portada de Clubes abre `NotificationsScreen` con `{ filter: 'clubes', clubId }`.** El resumen de tres avisos ya estaba filtrado por el club activo (`avisoDelClub`, en `utils/clubsHomeSources.js`), pero «Ver toda» y tocar un ítem llevaban a la bandeja completa sin ningún filtro — mostraba avisos de partidos, sociales y de OTROS clubes que se administren, contradiciendo el resumen que llevó hasta ahí. `NotificationsScreen` ahora acepta esos dos parámetros: `filter` fija el chip inicial (sigue pudiéndose cambiar a mano) y `clubId`, si viene, aplica una segunda pasada con la misma `avisoDelClub` sobre la lista visible y sobre los contadores de cada chip. Sin `clubId` en los params (entrar desde la campana normal) el comportamiento es el de siempre.
 
 ## Reglas y permisos
 
