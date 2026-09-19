@@ -266,21 +266,28 @@ test('sin saber qué clubes administro tampoco se ofrece cancelar', () => {
 // Que no vuelvan a ser dos reglas distintas
 // ---------------------------------------------------------------------------
 
-test('Avisos y Desafíos usan la misma regla y ninguna mira un solo club', () => {
+test('Avisos usa la regla compartida y no mira un solo club', () => {
   const avisos = soloCodigo('src/screens/NotificationsScreen.js');
+  assert.match(avisos, /puedeResponderDesafio/, 'NotificationsScreen debería usar la regla compartida');
+  assert.doesNotMatch(
+    avisos,
+    /getMyClub\s*\(/,
+    'NotificationsScreen no debe volver a comparar contra el PRIMER club del usuario'
+  );
+});
+
+// «Desafíos abiertos» ya NO decide quién responde un desafío 1 a 1: su
+// «Directos» (recibidos/enviados tras el ícono del header) se quitó porque
+// esos avisos ya aparecen en Actividad reciente y se responden desde
+// Avisos — una sola puerta en vez de dos. Por eso no exige
+// `puedeResponderDesafio` acá; sí sigue vigilando que la pantalla no
+// reintroduzca las dos formas viejas de adivinar el rol.
+test('Desafíos abiertos no vuelve a adivinar el rol por su cuenta', () => {
   const desafios = soloCodigo('src/screens/ClubChallengesScreen.js');
-
-  for (const [nombre, fuente] of [['NotificationsScreen', avisos], ['ClubChallengesScreen', desafios]]) {
-    assert.match(fuente, /puedeResponderDesafio/, `${nombre} debería usar la regla compartida`);
-    assert.doesNotMatch(
-      fuente,
-      /getMyClub\s*\(/,
-      `${nombre} no debe volver a comparar contra el PRIMER club del usuario`
-    );
-  }
-
-  // La bandeja tampoco debe volver a deducir el rol de la lista de
-  // integrantes de un club suelto: ahí es donde un fallo de carga se
-  // disfrazaba de «no eres admin».
+  assert.doesNotMatch(
+    desafios,
+    /getMyClub\s*\(/,
+    'ClubChallengesScreen no debe volver a comparar contra el PRIMER club del usuario'
+  );
   assert.doesNotMatch(desafios, /listMembers\s*\(/);
 });

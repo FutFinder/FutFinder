@@ -49,10 +49,9 @@ import {
  * pudo jugar un partido antes de fundarse.
  *
  * TODO DÍA DEL MES SE PUEDE TOCAR, tenga o no partido: uno sin partido
- * ofrece «Buscar rival» (real, abre el explorador de clubes) y «Publicar un
- * desafío» (todavía no implementado — no existe hoy un desafío "abierto"
- * sin rival elegido, así que el botón avisa «muy pronto» en vez de fingir
- * que hace algo).
+ * ofrece «Buscar rival» (abre el explorador de clubes) y «Publicar un
+ * desafío», que lleva al tablero abierto (migración 112) con el día ya
+ * elegido cargado en el borrador de publicar.
  */
 export default function ClubMatchCalendarScreen({ navigation, route }) {
   const { clubId, clubNombre } = route.params || {};
@@ -65,7 +64,6 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
   const [anio, setAnio] = useState(hoy.getFullYear());
   const [mes, setMes] = useState(hoy.getMonth() + 1);
   const [fechaSeleccionada, setFechaSeleccionada] = useState(null);
-  const [avisoPublicar, setAvisoPublicar] = useState(false);
 
   const load = useCallback(async () => {
     const [{ data: c }, { data: calendario, error: err }] = await Promise.all([
@@ -103,7 +101,6 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
 
   const cambiarMes = (delta) => {
     setFechaSeleccionada(null);
-    setAvisoPublicar(false);
     let siguienteMes = mes + delta;
     let siguienteAnio = anio;
     if (siguienteMes > 12) { siguienteMes = 1; siguienteAnio += 1; }
@@ -114,7 +111,6 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
   };
 
   const seleccionarDia = (fecha) => {
-    setAvisoPublicar(false);
     setFechaSeleccionada((actual) => (actual === fecha ? null : fecha));
   };
 
@@ -283,7 +279,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                   <Text style={[styles.accionTexto, { color: tema.main }]}>Buscar rival</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => setAvisoPublicar(true)}
+                  onPress={() => navigation.navigate('ClubChallenges', { clubId, prefillFecha: fechaSeleccionada })}
                   accessibilityRole="button"
                   accessibilityLabel="Publicar un desafío para este día"
                   style={({ pressed }) => [styles.accionBtn, styles.accionBtnGhost, pressed && { opacity: 0.8 }]}
@@ -291,11 +287,6 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                   <Swords color={C.textSecondary} size={16} strokeWidth={2.2} />
                   <Text style={[styles.accionTexto, { color: C.textSecondary }]}>Publicar un desafío</Text>
                 </Pressable>
-                {avisoPublicar ? (
-                  <Text style={styles.avisoPublicar}>
-                    Muy pronto: hoy un desafío siempre se manda a un rival elegido, no se publica abierto.
-                  </Text>
-                ) : null}
               </View>
             </View>
           ) : entradas.length === 0 ? (
@@ -442,7 +433,4 @@ const styles = StyleSheet.create({
   },
   accionBtnGhost: { backgroundColor: C.surfaceAlt, borderColor: C.borderSoft },
   accionTexto: { fontSize: 13.5, fontFamily: F.bold },
-  avisoPublicar: {
-    color: C.textFaint, fontSize: 11.5, lineHeight: 16, textAlign: 'center', marginTop: 2,
-  },
 });

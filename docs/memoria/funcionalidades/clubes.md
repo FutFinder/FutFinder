@@ -125,11 +125,21 @@ de datos (Formato/Cuándo/Zona/Cierra) y ahí mismo el mensaje + responder —
 ya no un botón «Responder» aparte en la tarjeta. Los filtros (modalidad +
 orden) también pasaron a una hoja propia en vez de chips en línea, igual
 que en el mockup. **Directos** (recibidos/enviados de siempre, misma
-lógica intacta) dejó de ser pestaña: ahora vive tras un ícono pequeño en
-el header (con el contador de pendientes como insignia) que empuja una
+lógica intacta) dejó de ser pestaña: pasó a vivir tras un ícono pequeño en
+el header (con el contador de pendientes como insignia) que empujaba una
 pantalla propia con su propio header — el mockup de referencia no modela
-«Directos» en absoluto, así que ese ícono y esa pantalla son un agregado
+«Directos» en absoluto, así que ese ícono y esa pantalla fueron un agregado
 nuestro para no perder el flujo 1 a 1 al sacarlo de las pestañas.
+
+**«Directos» se quitó del todo, pedido explícito.** Los mismos avisos
+(desafío recibido, aceptado, rechazado…) ya aparecen en «Actividad
+reciente» de la portada de Clubes y se aceptan o rechazan desde Avisos
+(`NotificationsScreen`), así que mantener una segunda puerta acá —el ícono,
+el contador de pendientes y la pantalla `DirectosScreen`/`DirectosLista`—
+era redundante. El ciclo formal 1 a 1 no cambió en nada: sigue viviendo en
+`services/clubChallenges.js`, sólo se dejó de ofrecer un atajo duplicado
+desde el tablero abierto.
+
 `cierraEnLabel`/`esCerca`/`cierraPronto` (`openChallengeBoard.js`) calculan
 esos tres datos de verdad a partir de `created_at`/`distanciaKm` — nunca
 inventados. Una diferencia deliberada que se mantiene frente al mockup:
@@ -141,8 +151,9 @@ los tokens `reservas`/`radios`/`medidas`/`fuentes`
 (la paleta única de toda la app) más `temaDeClub(clubActual)` para el
 acento de color del club, igual que el resto de Clubes ya rediseñado.
 Publicar, editar, ver respuestas y aceptar/rechazar exigen
-`soyAdminDeEsteClub` (`clubesAdmin.includes(clubId)`, la misma fuente que ya
-usa «Directos» vía `puedeResponderDesafio`/`puedeCancelarDesafio`); un
+`soyAdminDeEsteClub` (`clubesAdmin.includes(clubId)`, la misma fuente que
+`getMisClubesConPermiso(['pubChallenge','answerChallenge'])` llena desde la
+migración 119); un
 Tercera corrección, sobre filtros y el formulario de publicar: el usuario
 marcó que ninguno de los dos calzaba con lo entregado. La hoja de filtros
 ganó Región y Comuna (mismo `PickerSheet` que ya usa Partidos, con
@@ -215,7 +226,7 @@ La página que NO es la activa no trae estadísticas (V/E/D): `club_estadisticas
 
 La fecha de un partido programado se deriva de `hora` (timestamptz) en la hora LOCAL del dispositivo, nunca con `toISOString()`: Chile cambia de huso horario en el año y una conversión a UTC corre el día. La grilla del mes (`diasDelMes()`) tiene el mismo cuidado por un motivo distinto: recorrer los días con aritmética de milisegundos puede perder o duplicar una hora justo el día del cambio de horario, así que el recorrido usa `setDate()` anclado al mediodía (nunca medianoche, que es donde cae el cambio) para no arrastrar el corrimiento. Las 23 pruebas de `calendarioClub.test.js` recorren los doce meses del año exigiendo semanas completas de lunes a domingo, precisamente para que un cambio de horario no vuelva a correr la grilla en silencio.
 
-Todo día del mes se puede tocar, tenga o no partido — no sólo los marcados. Uno con partido muestra rival, hora y lugar (`lugarLabel()`/`formatHora()`, ya con las mismas reglas de privacidad del resto del vertical: la dirección exacta sólo la ven los integrantes) y, si ya se jugó, el resultado. Uno sin partido ofrece «Buscar rival» (real, abre `ExploreClubs` en modo rival) y «Publicar un desafío» — este último es un botón **deliberadamente no funcional todavía**: hoy un desafío siempre nace apuntando a un rival elegido (`club_challenges.club_retado_id` es `not null` desde la migración 26), no existe un desafío "abierto" sin rival, así que el botón avisa «muy pronto» en vez de fingir una función que no existe. Los días PASADOS del mes se pintan en un tono apagado (no sólo los de relleno de meses vecinos), y no se puede retroceder antes del mes de `clubs.created_at` (`mesDeFundacion()`/`esMesAnteriorAFundacion()`): un club no pudo jugar antes de fundarse.
+Todo día del mes se puede tocar, tenga o no partido — no sólo los marcados. Uno con partido muestra rival, hora y lugar (`lugarLabel()`/`formatHora()`, ya con las mismas reglas de privacidad del resto del vertical: la dirección exacta sólo la ven los integrantes) y, si ya se jugó, el resultado. Uno sin partido ofrece «Buscar rival» (real, abre `ExploreClubs` en modo rival) y «Publicar un desafío». Este último **dejó de ser un botón sin función**: cuando no existía el tablero abierto (migración 112) avisaba «muy pronto», porque un desafío sólo podía nacer apuntando a un rival ya elegido. Con el tablero abierto ya construido, el botón navega a `ClubChallenges` con `{ clubId, prefillFecha }` — la fecha del día tocado, en `YYYY-MM-DD` — y `ClubChallengesScreen` abre directo el borrador de publicar con esa fecha ya puesta (convertida a `DD/MM/AAAA`, el formato que usa el borrador). Los días PASADOS del mes se pintan en un tono apagado (no sólo los de relleno de meses vecinos), y no se puede retroceder antes del mes de `clubs.created_at` (`mesDeFundacion()`/`esMesAnteriorAFundacion()`): un club no pudo jugar antes de fundarse.
 
 `supabase/datos-de-prueba-calendario-club.sql` siembra desafíos de prueba (2 jugados y confirmados, 2 programados) contra un club rival ficticio, para probar el calendario contra datos reales sin tocar ningún club existente salvo leer su id. No es una migración ni una prueba automatizada — queda fuera de `migrations/` y `tests/` a propósito, y lo corre la persona a cargo del proyecto, nunca Claude directamente contra la base en producción.
 

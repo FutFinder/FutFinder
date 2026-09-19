@@ -18,11 +18,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
   Shield,
-  Swords,
-  Check,
-  X,
-  Clock,
-  MessageCircle,
   SlidersHorizontal,
   ArrowUpDown,
 } from 'lucide-react-native';
@@ -34,13 +29,7 @@ import { temaDeClub } from '../theme/clubThemes';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { getClubById } from '../services/clubs';
 import { getMisClubesConPermiso } from '../services/clubPermissions';
-import { puedeResponderDesafio, puedeCancelarDesafio } from '../utils/permisosDesafio';
-import {
-  listChallengesForClub,
-  respondChallenge,
-  cancelChallenge,
-} from '../services/clubChallenges';
-import { esEstadoActivo, estadoLabel } from '../services/clubChallengeRules';
+import { estadoLabel } from '../services/clubChallengeRules';
 import { challengeThreadKey, challengeThreadTitle } from '../utils/challengeThread';
 import {
   publishOpenChallenge,
@@ -74,6 +63,14 @@ import {
 
 const BLANK_DRAFT = { modalidad: 'futbol7', fechaStr: '', horaStr: '', zona: '', mensaje: '' };
 const CARRUSEL_GAP = 11;
+
+/** 'YYYY-MM-DD' (como llega del calendario) a 'DD/MM/AAAA' (como pide el borrador). */
+function isoADDMMAAAA(iso) {
+  const partes = (iso || '').split('-');
+  if (partes.length !== 3) return '';
+  const [yyyy, mm, dd] = partes;
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 function draftDesdeFecha(iso) {
   const d = iso ? new Date(iso) : null;
@@ -109,13 +106,18 @@ function fmtFecha(iso) {
 }
 
 /**
- * Desafíos de un club: «Directos» (1 a 1, recibidos/enviados, de siempre —
- * detrás del pequeño ícono del header, no una pestaña) y el «tablero
- * abierto» (migración 112, pantalla principal): publicar que se busca
- * rival sin elegir a nadie todavía, otros clubes responden, y el que
- * publicó elige una respuesta y entra al mismo ciclo formal de «Directos»
- * — mismo hilo, misma propuesta oficial, mismo partido. No son dos
- * sistemas: el tablero es una puerta de entrada más al ciclo de siempre.
+ * El «tablero abierto» de desafíos de un club (migración 112): publicar
+ * que se busca rival sin elegir a nadie todavía, otros clubes responden, y
+ * el que publicó elige una respuesta y entra al ciclo formal de siempre
+ * (1 a 1) — mismo hilo, misma propuesta oficial, mismo partido. El tablero
+ * es una puerta de entrada más a ese ciclo, no un sistema aparte.
+ *
+ * YA NO TIENE «DIRECTOS» PROPIO. El ícono del header que abría
+ * recibidos/enviados 1 a 1 se quitó: esos avisos ya aparecen en «Actividad
+ * reciente» de la portada de Clubes y se responden desde Avisos, así que
+ * mantener una segunda puerta acá era redundante. Nada del ciclo formal
+ * cambió — sigue viviendo en `services/clubChallenges.js` y
+ * `NotificationsScreen`.
  *
  * A diferencia del mockup de referencia («FutFinder Desafíos»), NO hay
  * nivel del rival, valoración, ni etiquetas «Revancha»/«Invicto»: ninguno
@@ -125,7 +127,7 @@ function fmtFecha(iso) {
  * cierre calculados de verdad (`openChallengeBoard.js`).
  */
 export default function ClubChallengesScreen({ navigation, route }) {
-  const { clubId } = route.params || {};
+  const { clubId, prefillFecha } = route.params || {};
   const { width } = useWindowDimensions();
 
   const [loading, setLoading] = useState(true);
@@ -133,11 +135,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
 
-  // ── Directos (sin cambios de lógica; ahora vive tras el ícono del header) ──
-  const [recibidos, setRecibidos] = useState([]);
-  const [enviados, setEnviados] = useState([]);
   const [clubesAdmin, setClubesAdmin] = useState(null);
-  const [errorRol, setErrorRol] = useState(null);
   const [nombreDeMiClub, setNombreDeMiClub] = useState('Mi club');
   const [clubActual, setClubActual] = useState(null);
 
@@ -151,10 +149,15 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [filtroFromHour, setFiltroFromHour] = useState(0);
   const [filtroToHour, setFiltroToHour] = useState(23);
   const [sort, setSort] = useState('cerca');
-  const [subScreen, setSubScreen] = useState('lista'); // 'lista' | 'publicar' | 'editar' | 'respuestas' | 'directos'
+  // `prefillFecha` llega del calendario del club («Publicar un desafío
+  // para este día»): abre directo el borrador de publicar con esa fecha
+  // ya puesta, en vez de la lista.
+  const [subScreen, setSubScreen] = useState(prefillFecha ? 'publicar' : 'lista'); // 'lista' | 'publicar' | 'editar' | 'respuestas'
   const [editId, setEditId] = useState(null);
   const [editingPub, setEditingPub] = useState(null);
-  const [draft, setDraft] = useState(BLANK_DRAFT);
+  const [draft, setDraft] = useState(
+    prefillFecha ? { ...BLANK_DRAFT, fechaStr: isoADDMMAAAA(prefillFecha) } : BLANK_DRAFT
+  );
   const [respuestasDe, setRespuestasDe] = useState(null);
   const [respuestas, setRespuestas] = useState([]);
   const [detalle, setDetalle] = useState(null);
@@ -166,19 +169,15 @@ export default function ClubChallengesScreen({ navigation, route }) {
   // `clubesAdmin` ya no es literalmente «clubes que administro»: incluye
   // también los clubes donde tengo `pubChallenge` o `answerChallenge`
   // concedidos como capitán o jugador (migración 119) — cualquiera de los
-  // dos alcanza para publicar, responder o cancelar un desafío directo.
+  // dos alcanza para publicar en el tablero abierto o aceptar una respuesta.
   const soyAdminDeEsteClub = Array.isArray(clubesAdmin) && clubesAdmin.includes(clubId);
 
   const load = useCallback(async () => {
-    const [{ data }, { data: clubesAdminData, error: eRol }, { data: miClub }] = await Promise.all([
-      listChallengesForClub(clubId),
+    const [{ data: clubesAdminData }, { data: miClub }] = await Promise.all([
       getMisClubesConPermiso(['pubChallenge', 'answerChallenge']),
       getClubById(clubId),
     ]);
-    setRecibidos(data.recibidos || []);
-    setEnviados(data.enviados || []);
     setClubesAdmin(clubesAdminData ?? null);
-    setErrorRol(clubesAdminData ? null : eRol?.message || 'No se pudo comprobar tu rol en el club.');
     if (miClub?.nombre) setNombreDeMiClub(miClub.nombre);
     setClubActual(miClub || null);
 
@@ -215,16 +214,6 @@ export default function ClubChallengesScreen({ navigation, route }) {
     setRefreshing(false);
   };
 
-  const abrirChatLegado = (userId, titulo, challengeId) => {
-    if (!userId) return;
-    navigation.navigate('ChatThread', {
-      threadKey: `dm:${userId}`,
-      title: titulo || 'Coordinar partido',
-      subtitle: 'Coordinar partido de clubes',
-      challengeId,
-    });
-  };
-
   const abrirNegociacion = (challenge) => {
     const threadKey = challengeThreadKey(challenge?.id);
     if (!threadKey) return;
@@ -239,36 +228,6 @@ export default function ClubChallengesScreen({ navigation, route }) {
       subtitle: estadoLabel(challenge.estado),
       challengeId: challenge.id,
     });
-  };
-
-  const handleRespond = async (challenge, accept) => {
-    setWorking(true);
-    const { error, threadKey } = await respondChallenge(challenge.id, accept);
-    setWorking(false);
-    if (error) {
-      setBanner({ type: 'error', title: 'No se pudo responder', message: error.message });
-      return;
-    }
-    await load();
-    if (accept && threadKey) {
-      setBanner({
-        type: 'success',
-        title: 'Desafío aceptado',
-        message: 'Se abrió el chat de negociación con los administradores de ambos clubes.',
-      });
-      abrirNegociacion({ ...challenge, estado: 'negociacion' });
-    }
-  };
-
-  const handleCancel = async (challenge) => {
-    setWorking(true);
-    const { error } = await cancelChallenge(challenge.id);
-    setWorking(false);
-    if (error) {
-      setBanner({ type: 'error', title: 'No se pudo cancelar', message: error.message });
-      return;
-    }
-    await load();
   };
 
   // ── Tablero abierto: acciones ─────────────────────────────────
@@ -428,7 +387,6 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const filtros = { modalidad: filtroModalidad, region: filtroRegion, comuna: filtroComuna, fromHour: filtroFromHour, toHour: filtroToHour };
   const listaOrdenada = ordenarPublicaciones(browsing, { ...filtros, sort });
   const filtrosActivos = contarFiltrosActivos(filtros);
-  const pendientesDirectos = recibidos.filter((c) => c.estado === 'pendiente').length;
   const cardWidth = Math.max(0, width - S.screenPadding * 2);
 
   const limpiarFiltros = () => {
@@ -453,26 +411,6 @@ export default function ClubChallengesScreen({ navigation, route }) {
           <ActivityIndicator color={tema.main} />
         </View>
       </SafeAreaView>
-    );
-  }
-
-  if (subScreen === 'directos') {
-    return (
-      <DirectosScreen
-        tema={tema}
-        banner={banner}
-        onCloseBanner={() => setBanner(null)}
-        onBack={() => setSubScreen('lista')}
-        recibidos={recibidos}
-        enviados={enviados}
-        clubesAdmin={clubesAdmin}
-        errorRol={errorRol}
-        working={working}
-        onRespond={handleRespond}
-        onCancel={handleCancel}
-        abrirNegociacion={abrirNegociacion}
-        abrirChatLegado={abrirChatLegado}
-      />
     );
   }
 
@@ -512,8 +450,6 @@ export default function ClubChallengesScreen({ navigation, route }) {
         navigation={navigation}
         tema={tema}
         openCount={browsing.length}
-        directosPendientes={pendientesDirectos}
-        onAbrirDirectos={() => setSubScreen('directos')}
         onPublicar={abrirPublicar}
         soyAdmin={soyAdminDeEsteClub}
       />
@@ -627,7 +563,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
   );
 }
 
-function Header({ navigation, tema, openCount, directosPendientes, onAbrirDirectos, onPublicar, soyAdmin }) {
+function Header({ navigation, tema, openCount, onPublicar, soyAdmin }) {
   return (
     <View style={styles.header}>
       <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
@@ -639,121 +575,12 @@ function Header({ navigation, tema, openCount, directosPendientes, onAbrirDirect
           {openCount} {openCount === 1 ? 'club buscando' : 'clubes buscando'} rival
         </Text>
       </View>
-      <Pressable onPress={onAbrirDirectos} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
-        <Swords color={C.textPrimary} size={17} strokeWidth={2.1} />
-        {directosPendientes > 0 && (
-          <View style={styles.iconBtnBadge}>
-            <Text style={styles.iconBtnBadgeText}>{directosPendientes}</Text>
-          </View>
-        )}
-      </Pressable>
       {soyAdmin && (
         <Pressable onPress={onPublicar} style={({ pressed }) => [styles.publishBtnSmall, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
           <Text style={[styles.publishBtnSmallText, { color: tema.ink }]}>Publicar</Text>
         </Pressable>
       )}
     </View>
-  );
-}
-
-/* ── Directos: pantalla propia, ya no una pestaña ───────────────── */
-
-function DirectosScreen({ tema, banner, onCloseBanner, onBack, recibidos, enviados, clubesAdmin, errorRol, working, onRespond, onCancel, abrirNegociacion, abrirChatLegado }) {
-  return (
-    <SafeAreaView edges={['top']} style={styles.root}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
-          <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Directos</Text>
-        <View style={{ width: S.iconBtn }} />
-      </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {banner && <Banner {...banner} onClose={onCloseBanner} />}
-        <DirectosLista
-          tema={tema}
-          recibidos={recibidos}
-          enviados={enviados}
-          clubesAdmin={clubesAdmin}
-          errorRol={errorRol}
-          working={working}
-          onRespond={onRespond}
-          onCancel={onCancel}
-          abrirNegociacion={abrirNegociacion}
-          abrirChatLegado={abrirChatLegado}
-        />
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function DirectosLista({ tema, recibidos, enviados, clubesAdmin, errorRol, working, onRespond, onCancel, abrirNegociacion, abrirChatLegado }) {
-  const sinNada = recibidos.length === 0 && enviados.length === 0;
-  return (
-    <>
-      {!!errorRol && (
-        <Banner type="error" title="No pudimos comprobar tu rol" message={`${errorRol} Desliza para reintentar: mientras tanto no se muestran aceptar ni rechazar.`} />
-      )}
-      {sinNada && (
-        <View style={styles.emptyBox}>
-          <Swords color={C.textMuted} size={32} strokeWidth={1.6} />
-          <Text style={styles.emptyText}>Aún no hay desafíos directos. Reta a un club desde su perfil, o usa el tablero abierto.</Text>
-        </View>
-      )}
-      {recibidos.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Recibidos</Text>
-          {recibidos.map((c) => (
-            <ChallengeRow key={c.id} challenge={c} tema={tema}>
-              {puedeResponderDesafio({ clubesAdmin, clubRetadoId: c.club_retado_id, estado: c.estado }) ? (
-                <View style={styles.actionsRow}>
-                  <Pressable disabled={working} onPress={() => onRespond(c, true)} hitSlop={6} style={({ pressed }) => [styles.actBtn, { backgroundColor: tema.main }, pressed && { opacity: 0.7 }]}>
-                    <Check color={tema.ink} size={16} strokeWidth={2.6} />
-                  </Pressable>
-                  <Pressable disabled={working} onPress={() => onRespond(c, false)} hitSlop={6} style={({ pressed }) => [styles.actBtn, styles.actReject, pressed && { opacity: 0.7 }]}>
-                    <X color={C.loss} size={16} strokeWidth={2.6} />
-                  </Pressable>
-                </View>
-              ) : esEstadoActivo(c.estado) ? (
-                <Pressable onPress={() => abrirNegociacion(c)} hitSlop={6} style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}>
-                  <Swords color={tema.main} size={16} />
-                </Pressable>
-              ) : c.estado === 'aceptado' ? (
-                <Pressable onPress={() => abrirChatLegado(c.creado_por, c.otroClub?.nombre, c.id)} hitSlop={6} style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}>
-                  <MessageCircle color={tema.main} size={16} />
-                </Pressable>
-              ) : (
-                <EstadoBadge estado={c.estado} />
-              )}
-            </ChallengeRow>
-          ))}
-        </>
-      )}
-      {enviados.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Enviados</Text>
-          {enviados.map((c) => (
-            <ChallengeRow key={c.id} challenge={c} tema={tema}>
-              {puedeCancelarDesafio({ clubesAdmin, clubRetadorId: c.club_retador_id, estado: c.estado }) ? (
-                <Pressable disabled={working} onPress={() => onCancel(c)} hitSlop={6} style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}>
-                  <Text style={styles.cancelText}>Cancelar</Text>
-                </Pressable>
-              ) : esEstadoActivo(c.estado) ? (
-                <Pressable onPress={() => abrirNegociacion(c)} hitSlop={6} style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}>
-                  <Swords color={tema.main} size={16} />
-                </Pressable>
-              ) : c.estado === 'aceptado' ? (
-                <Pressable onPress={() => abrirChatLegado(c.respondido_por, c.otroClub?.nombre, c.id)} hitSlop={6} style={({ pressed }) => [styles.chatBtn, pressed && { opacity: 0.7 }]}>
-                  <MessageCircle color={tema.main} size={16} />
-                </Pressable>
-              ) : (
-                <EstadoBadge estado={c.estado} />
-              )}
-            </ChallengeRow>
-          ))}
-        </>
-      )}
-    </>
   );
 }
 
@@ -764,31 +591,6 @@ function EstadoBadge({ estado }) {
   return (
     <View style={[styles.estadoBadge, { backgroundColor: bg }]}>
       <Text style={[styles.estadoBadgeText, { color }]}>{estadoLabel(estado)}</Text>
-    </View>
-  );
-}
-
-function ChallengeRow({ challenge, tema, children }) {
-  const club = challenge.otroClub;
-  return (
-    <View style={styles.row}>
-      {club?.foto_url ? (
-        <Image source={{ uri: club.foto_url }} style={styles.logo} />
-      ) : (
-        <View style={[styles.logo, styles.logoFallback]}>
-          <Shield color={C.textMuted} size={18} strokeWidth={1.7} />
-        </View>
-      )}
-      <View style={{ flex: 1 }}>
-        <Text style={styles.clubName} numberOfLines={1}>{club?.nombre || 'Club'}</Text>
-        <View style={styles.metaRow}>
-          <Clock color={C.textMuted} size={12} strokeWidth={2} />
-          <Text style={styles.metaText}>{fmtFecha(challenge.fecha_propuesta)}</Text>
-          {challenge.zona ? <Text style={styles.metaText} numberOfLines={1}> · {challenge.zona}</Text> : null}
-        </View>
-        {challenge.mensaje ? <Text style={styles.mensaje} numberOfLines={2}>&quot;{challenge.mensaje}&quot;</Text> : null}
-      </View>
-      {children}
     </View>
   );
 }
@@ -1365,19 +1167,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconBtnPressed: { backgroundColor: C.chipStrong },
-  iconBtnBadge: {
-    position: 'absolute',
-    top: -3,
-    right: -3,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: C.loss,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconBtnBadgeText: { color: '#2A0C0F', fontSize: 9.5, fontFamily: F.extraBold },
   headerTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3 },
   headerSubtitle: { color: C.textMuted, fontSize: 11.5, fontFamily: F.semiBold, marginTop: 2 },
   publishBtnSmall: { borderRadius: R.iconBtn, paddingHorizontal: 14, height: S.iconBtn, alignItems: 'center', justifyContent: 'center' },
@@ -1399,31 +1188,11 @@ const styles = StyleSheet.create({
 
   sectionTitle: { color: C.textSecondary, fontSize: 10.5, fontFamily: F.extraBold, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10, marginTop: 6 },
 
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: C.surface,
-    borderRadius: R.row,
-    borderWidth: 1,
-    borderColor: C.borderSoft,
-    padding: 14,
-    marginBottom: 9,
-  },
   logo: { width: 44, height: 44, borderRadius: 13 },
   logoLg: { width: 46, height: 46, borderRadius: 13 },
   logoFallback: { backgroundColor: C.chip, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderSoft },
   clubName: { color: C.textPrimary, fontSize: 15, fontFamily: F.extraBold },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   metaText: { color: C.textMuted, fontSize: 12, fontFamily: F.semiBold },
-  mensaje: { color: C.textSecondary, fontSize: 12, fontStyle: 'italic', marginTop: 4 },
-
-  actionsRow: { flexDirection: 'row', gap: 8 },
-  actBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  actReject: { backgroundColor: C.redSoft, borderWidth: 1, borderColor: C.redBorder },
-  chatBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.chip, alignItems: 'center', justifyContent: 'center' },
-  cancelBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: C.border },
-  cancelText: { color: C.textSecondary, fontSize: 12, fontFamily: F.extraBold },
   estadoBadge: { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4 },
   estadoBadgeText: { fontSize: 9.5, fontFamily: F.extraBold, letterSpacing: 0.4, textTransform: 'uppercase' },
 
