@@ -473,9 +473,11 @@ export default function ReservasScreen({ navigation }) {
  * muestra arriba el acceso a su panel; invitarlo a sumarlo otra vez sería
  * ofrecerle algo que ya hizo.
  *
- * Y SI YA NOS ESCRIBIÓ, LO DICE. Una solicitud sin atender cambia el texto y
- * saca el botón: volver a invitar a alguien que está esperando respuesta se
- * lee como que su solicitud se perdió.
+ * CON UNA SOLICITUD PENDIENTE, EL BOTÓN SE QUEDA — pedido explícito: alguien
+ * puede tener más de un recinto, o simplemente querer corregir datos con una
+ * segunda solicitud. El texto sigue avisando que la primera ya está en
+ * revisión, para que mandar otra sea una decisión informada y no se lea como
+ * que la primera se perdió.
  */
 function InvitacionRecinto({ solicitud, navigation }) {
   const pendiente = !!solicitud;
@@ -492,19 +494,17 @@ function InvitacionRecinto({ solicitud, navigation }) {
       <Text style={styles.invitacionTexto}>
         {pendiente
           ? `Recibimos ${solicitud.nombre_recinto} y la estamos revisando. Te vamos a llamar al número que `
-            + 'dejaste para ver horarios, precios y canchas.'
+            + 'dejaste para ver horarios, precios y canchas. ¿Es otro recinto, o corriges algo? Puedes mandarnos otra solicitud.'
           : 'Súmalo a FutFinder y aparece en este buscador. Recibes las reservas pagadas por la app, con '
             + 'tu agenda, tus horarios y tus precios en un panel propio. La comisión la pagamos desde cada '
             + 'reserva: publicar tu recinto no te cuesta nada.'}
       </Text>
-      {pendiente ? null : (
-        <Button
-          label="Quiero sumar mi recinto"
-          variant="secondary"
-          style={{ marginTop: 14 }}
-          onPress={() => navigation.navigate('SolicitudRecinto')}
-        />
-      )}
+      <Button
+        label={pendiente ? 'Mandar otra solicitud' : 'Quiero sumar mi recinto'}
+        variant="secondary"
+        style={{ marginTop: 14 }}
+        onPress={() => navigation.navigate('SolicitudRecinto')}
+      />
     </Card>
   );
 }
