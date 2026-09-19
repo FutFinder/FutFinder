@@ -63,7 +63,7 @@
         "npm:expo-location@~19.0.8",
         "npm:expo-notifications@~0.32.17",
         "npm:expo-status-bar@~3.0.9",
-        "npm:expo@~54.0.36",
+        "npm:expo@~54.0.37",
         "npm:globals@^17.10.0",
         "npm:lucide-react-native@0.469",
         "npm:nativewind@^4.2.6",
