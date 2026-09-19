@@ -53,11 +53,15 @@ import useConfirmacion from '../components/useConfirmacion';
  *   club y solicitudes de amistad — el resto solo navega al tocar, igual que antes.
  *
  * params opcionales: { filter, clubId }. «Actividad reciente» de la portada
- * de Clubes llega con `filter: 'clubes'` y el club activo, y acá se aplica
- * una segunda pasada con `avisoDelClub` (la misma regla de
- * `utils/clubsHomeSources.js`) para no mezclar avisos de otro club que
- * también se administre — sin `clubId`, el filtro de categoría solo
- * («Todos»/«Clubes»/«Partidos»/«Social») se comporta como siempre.
+ * de Clubes llega con `filter: 'clubes'` y el club activo. Con `clubId`
+ * presente, la categoría queda FIJA en «clubes» y los chips de filtro
+ * («Todos»/«Partidos»/«Social») ni se muestran — pedido explícito: quien
+ * entra desde la portada de un club sólo debe ver avisos de ESE club, sin
+ * la opción de mezclar partidos o social. Además se aplica una segunda
+ * pasada con `avisoDelClub` (la misma regla de `utils/clubsHomeSources.js`)
+ * para no mezclar avisos de otro club que también se administre. Sin
+ * `clubId` (entrar desde la campana normal), el filtro de categoría se
+ * comporta como siempre, con los cuatro chips visibles.
  */
 
 const FILTERS = [
@@ -379,9 +383,13 @@ export default function NotificationsScreen({ navigation, route }) {
     }));
   }, [items, clubIdActivo]);
 
+  // Con club activo la categoría queda fija en «clubes»: no se ofrece
+  // cambiar a partidos ni social, para no contradecir «Actividad reciente».
+  const filtroEfectivo = clubIdActivo ? 'clubes' : filter;
+
   const sections = useMemo(() => {
     const visible = items
-      .filter((n) => filter === 'todos' || CATEGORY[n.type] === filter)
+      .filter((n) => filtroEfectivo === 'todos' || CATEGORY[n.type] === filtroEfectivo)
       .filter((n) => !clubIdActivo || avisoDelClub(n, clubIdActivo));
     const buckets = new Map();
     visible.forEach((n) => {
@@ -396,7 +404,7 @@ export default function NotificationsScreen({ navigation, route }) {
         actions: n._actionsResolved ? null : actionsFor(n, clubesAdmin),
       })),
     }));
-  }, [items, filter, clubesAdmin, clubIdActivo]);
+  }, [items, filtroEfectivo, clubesAdmin, clubIdActivo]);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -452,9 +460,11 @@ export default function NotificationsScreen({ navigation, route }) {
             </View>
           </View>
 
-          <View className="mt-4">
-            <FilterChips chips={chips} active={filter} onChange={setFilter} />
-          </View>
+          {clubIdActivo ? null : (
+            <View className="mt-4">
+              <FilterChips chips={chips} active={filter} onChange={setFilter} />
+            </View>
+          )}
         </LinearGradient>
 
         {banner && (

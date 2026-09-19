@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
-  Modal,
   Share,
   RefreshControl,
   ActivityIndicator,
@@ -26,7 +25,6 @@ import {
   radios as R,
   medidas as S,
   fuentes as F,
-  alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import Banner from '../components/Banner';
@@ -50,7 +48,6 @@ import {
   listRivalCandidates,
 } from '../services/clubs';
 import { getClubPhotos } from '../services/clubGallery';
-import { countPendingForClub } from '../services/clubChallenges';
 import { getMisPermisosEnClub } from '../services/clubPermissions';
 import {
   getClubMatchHistory,
@@ -75,9 +72,19 @@ const MAX_HISTORIAL = 3;
 /**
  * Detalle del club ("Mi club").
  *
- * TODO LO QUE MUESTRA ES REAL: club, miembros, fotos, desafíos pendientes,
- * rivales sugeridos (con distancia calculada desde la comuna), el historial de
- * encuentros disputados y las estadísticas del club.
+ * TODO LO QUE MUESTRA ES REAL: club, miembros, fotos, rivales sugeridos (con
+ * distancia calculada desde la comuna), el historial de encuentros disputados
+ * y las estadísticas del club.
+ *
+ * YA NO CREA DESAFÍOS DESDE ACÁ — pedido explícito. «Crear desafío» y la
+ * bandeja «Desafíos» se sacaron de esta pantalla: crear un partido de club
+ * ahora se pide desde Inicio («Crear partido de club», que ofrece «Buscar
+ * rival» o «Desafío abierto» y no pasa por acá), y la bandeja de recibidos/
+ * enviados vive en Avisos. Lo que queda es SOLO para ver el club: su ficha,
+ * sus rivales sugeridos, su historial y sus fotos. Desafiar a un rival
+ * puntual (`club.id` visto desde OTRO club, o «Buscar rivales» para un
+ * integrante sin nada especial que hacer) sigue existiendo, porque no es
+ * «crear un desafío para mi club» sino mirar/retar a este club en particular.
  *
  * SIN FIXTURES. Hasta la Tarea 6.1 no había marcadores en la base de datos, y
  * esta pantalla dibujaba tres partidos de ejemplo con su récord 1-1-1 cuando
@@ -89,15 +96,15 @@ const MAX_HISTORIAL = 3;
  *  - nivel del club        → "NIVEL N.A."
  *  - valoración del club   → "N.A." con estrella
  *
- * COLOR: los acentos de identidad —banner, escudo, «Crear desafío», iconos
- * de acción, enlaces «Ver todos», «Añadir foto» y los botones atados al
- * club— salen de `temaDeClub(club)` y de ningún otro lado. Lo que NO cambia
+ * COLOR: los acentos de identidad —banner, escudo, iconos de acción, enlaces
+ * «Ver todos», «Añadir foto» y los botones atados al club— salen de
+ * `temaDeClub(club)` y de ningún otro lado. Lo que NO cambia
  * de color: el fondo, los textos, la navegación, el dorado de Premium y el
  * récord V/E/D, que es semántico. Las tarjetas de rival usan el tema DEL
  * RIVAL, no el de esta pantalla.
  */
 export default function ClubDetailScreen({ navigation, route }) {
-  const { clubId, initialBanner, openChallenge } = route.params || {};
+  const { clubId, initialBanner } = route.params || {};
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -111,11 +118,9 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [historial, setHistorial] = useState([]);
   const [historialError, setHistorialError] = useState(null);
   const [estadisticas, setEstadisticas] = useState(ESTADISTICAS_VACIAS);
-  const [pendingChallenges, setPendingChallenges] = useState(0);
   const [misPermisos, setMisPermisos] = useState(null);
   const [banner, setBanner] = useState(initialBanner || null);
   const [working, setWorking] = useState(false);
-  const [challengeSheetOpen, setChallengeSheetOpen] = useState(false);
 
   // Un club que todavía no cargó —o uno anterior a la migración 53— resuelve
   // a verde, así la pantalla nunca se queda sin color.
@@ -148,7 +153,6 @@ export default function ClubDetailScreen({ navigation, route }) {
       { data: candidatos },
       { data: partidos, error: errHistorial },
       { data: stats },
-      pending,
     ] = await Promise.all([
       getClubById(clubId),
       listMembers(clubId),
@@ -157,14 +161,12 @@ export default function ClubDetailScreen({ navigation, route }) {
       listRivalCandidates({ retadorClubId: clubId }),
       getClubMatchHistory(clubId),
       getClubEstadisticas(clubId),
-      countPendingForClub(clubId),
     ]);
 
     setClub(c);
     setMembers(ms || []);
     setMyClubs(mine || []);
     setPhotos(ph || []);
-    setPendingChallenges(pending || 0);
 
     const amMemberNow = (ms || []).some((m) => m.user_id === myId);
     if (amMemberNow) {
@@ -215,16 +217,6 @@ export default function ClubDetailScreen({ navigation, route }) {
       load();
     }, [load])
   );
-
-  // Llegar con { openChallenge: true } (p.ej. desde "Crear partido de club"
-  // en Inicio) abre directo la hoja "Crear desafío" — se limpia el param
-  // para que no se reabra sola si el usuario vuelve a esta pantalla.
-  useEffect(() => {
-    if (openChallenge && !loading && puedePublicarDesafios) {
-      setChallengeSheetOpen(true);
-      navigation.setParams({ openChallenge: undefined });
-    }
-  }, [openChallenge, loading, puedePublicarDesafios, navigation]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -384,14 +376,7 @@ export default function ClubDetailScreen({ navigation, route }) {
             jugador). Ahora, mientras se pueda pedir entrar (no soy miembro,
             no llegué al tope de 3 clubes), esa es la acción principal, y
             «Desafiar» se ofrece además, como acción secundaria, si aplica. */}
-        {puedePublicarDesafios ? (
-          <CreateChallengeButton
-            label="Crear desafío"
-            onPress={() => setChallengeSheetOpen(true)}
-            onSearch={goToElegirRival}
-            tema={tema}
-          />
-        ) : !soyMiembro && !tengoMaxClubs ? (
+        {!soyMiembro && !tengoMaxClubs ? (
           <>
             <CreateChallengeButton
               label={myRequest ? 'Cancelar solicitud' : 'Solicitar unirme'}
@@ -440,31 +425,6 @@ export default function ClubDetailScreen({ navigation, route }) {
             tema={tema}
           />
         ) : null}
-
-        {/* Bandeja de desafíos (miembros del club) */}
-        {soyMiembro && (
-          <Pressable
-            onPress={() => navigation.navigate('ClubChallenges', { clubId: club.id })}
-            accessibilityRole="button"
-            accessibilityLabel={
-              pendingChallenges > 0
-                ? `Desafíos. ${pendingChallenges} pendientes`
-                : 'Desafíos del club'
-            }
-            style={({ pressed }) => [styles.rowItem, pressed && styles.rowPressed]}
-          >
-            <View style={[styles.rowIcon, { backgroundColor: tema.soft }]}>
-              <Swords color={tema.main} size={17} strokeWidth={2} />
-            </View>
-            <Text style={styles.rowLabel}>Desafíos</Text>
-            {pendingChallenges > 0 && (
-              <View style={styles.rowBadge}>
-                <Text style={styles.rowBadgeText}>{pendingChallenges}</Text>
-              </View>
-            )}
-            <ChevronRight color={C.textMuted} size={18} strokeWidth={2.2} />
-          </Pressable>
-        )}
 
         {/* ── Buscar rivales (solo integrantes del club) ── */}
         {soyMiembro && (
@@ -624,56 +584,6 @@ export default function ClubDetailScreen({ navigation, route }) {
           </View>
         )}
       </ScrollView>
-
-      {/* Hoja: crear desafío */}
-      <Modal
-        visible={challengeSheetOpen}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setChallengeSheetOpen(false)}
-      >
-        <Pressable style={styles.sheetBackdrop} onPress={() => setChallengeSheetOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Crear desafío</Text>
-            <Text style={styles.sheetSubtitle}>Elige cómo quieres encontrar rival</Text>
-
-            <Pressable
-              onPress={() => {
-                setChallengeSheetOpen(false);
-                goToElegirRival();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Elegir un club para desafiar"
-              style={({ pressed }) => [
-                styles.sheetPrimary,
-                { backgroundColor: tema.main },
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Elegir un club</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                setChallengeSheetOpen(false);
-                setBanner({
-                  type: 'info',
-                  title: 'Próximamente',
-                  message: 'El desafío abierto a cualquier club todavía no está disponible.',
-                });
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Desafío abierto. Próximamente"
-              style={({ pressed }) => [styles.sheetSecondary, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.sheetSecondaryText}>Desafío abierto</Text>
-              <Text style={styles.sheetSecondaryHint}>Próximamente</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -712,44 +622,7 @@ const styles = StyleSheet.create({
   },
   desafiarSecundarioText: { fontSize: 14, fontFamily: F.bold },
 
-  // Fila genérica (Desafíos)
-  rowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: S.screenPadding,
-    marginTop: 10,
-    backgroundColor: C.surface,
-    borderRadius: R.row,
-    borderWidth: 1,
-    borderColor: C.borderSoft,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
   rowPressed: { backgroundColor: C.surfaceHover },
-  rowIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: R.iconBtn,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowLabel: {
-    flex: 1,
-    color: C.textPrimary,
-    fontSize: 14,
-    fontFamily: F.bold,
-  },
-  rowBadge: {
-    minWidth: 20,
-    height: 20,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-    backgroundColor: C.loss,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowBadgeText: { color: '#2A0C0F', fontSize: 11, fontFamily: F.extraBold },
 
   // Rivales
   rivalsRow: {
@@ -792,71 +665,4 @@ const styles = StyleSheet.create({
     fontFamily: F.semiBold,
   },
   adminDivider: { height: 1, backgroundColor: C.divider },
-
-  // Hoja "Crear desafío"
-  sheetBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: C.surface,
-    borderTopLeftRadius: R.hero,
-    borderTopRightRadius: R.hero,
-    borderTopWidth: 1,
-    borderColor: C.border,
-    paddingHorizontal: S.screenPadding,
-    paddingTop: 14,
-    paddingBottom: 30,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 3,
-    backgroundColor: alfa(C.tinta, 0.2),
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
-  sheetTitle: {
-    color: C.textPrimary,
-    fontSize: 18,
-    fontFamily: F.extraBold,
-    letterSpacing: -0.3,
-  },
-  sheetSubtitle: {
-    color: C.textSecondary,
-    fontSize: 12.5,
-    marginTop: 4,
-  },
-  sheetPrimary: {
-    height: 52,
-    marginTop: 14,
-    borderRadius: R.iconBtn,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetPrimaryText: {
-    fontSize: 15,
-    fontFamily: F.extraBold,
-  },
-  sheetSecondary: {
-    height: 52,
-    marginTop: 8,
-    borderRadius: R.iconBtn,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.chip,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetSecondaryText: {
-    color: C.textPrimary,
-    fontSize: 15,
-    fontFamily: F.bold,
-  },
-  sheetSecondaryHint: {
-    color: C.textMuted,
-    fontSize: 11,
-    marginTop: 2,
-  },
 });

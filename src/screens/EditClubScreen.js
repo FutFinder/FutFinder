@@ -10,6 +10,7 @@ import {
   Platform,
   Image,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, ChevronDown, Shield, Camera, Lock, Check } from 'lucide-react-native';
@@ -50,9 +51,19 @@ import { getEditClubStatus, NOMBRE_MIN } from '../utils/clubEdit';
  * repinta los estados seleccionados y el botón de esta pantalla; el club no
  * cambia hasta que la base de datos confirma. Si el guardado falla, no queda
  * ningún color aplicado «solo acá».
+ *
+ * DOS COLUMNAS EN PANTALLAS ANCHAS (≥860px, `useWindowDimensions`): en vez de
+ * estirar un formulario angosto hasta verse absurdo, imágenes+datos van a la
+ * izquierda y modalidad+ubicación+tema a la derecha, y el ancho máximo del
+ * conjunto crece con el ancho de columna. Por debajo del umbral se apila
+ * igual que en el celular.
  */
 export default function EditClubScreen({ navigation, route }) {
   const { club } = route.params || {};
+  const { width: anchoVentana } = useWindowDimensions();
+  // A partir de acá sobra espacio para dos columnas; más abajo se apila.
+  const esAncho = anchoVentana >= 860;
+  const anchoMaximo = esAncho ? 1120 : ANCHO_FORMULARIO;
 
   const [nombre, setNombre] = useState(club?.nombre || '');
   const [descripcion, setDescripcion] = useState(club?.descripcion || '');
@@ -178,7 +189,7 @@ export default function EditClubScreen({ navigation, route }) {
   const cerrar = () => navigation.goBack();
 
   const cabecera = (
-    <View style={styles.header}>
+    <View style={[styles.header, { maxWidth: anchoMaximo }]}>
       <View style={styles.headerCenter}>
         <Text style={styles.headerTitle}>Editar club</Text>
         <Text style={styles.headerSubtitle}>Solo administradores</Text>
@@ -249,13 +260,15 @@ export default function EditClubScreen({ navigation, route }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { maxWidth: anchoMaximo }]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
           {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
+          <View style={esAncho ? styles.grid : styles.stack}>
+          <View style={esAncho ? styles.col : styles.stack}>
           {/* ── Imágenes ── */}
           <View style={styles.card}>
             <Pressable
@@ -348,7 +361,9 @@ export default function EditClubScreen({ navigation, route }) {
             />
             <Text style={styles.counter}>{descripcion.length}/500</Text>
           </View>
+          </View>
 
+          <View style={esAncho ? styles.col : styles.stack}>
           {/* ── Modalidad ── */}
           <View style={styles.card}>
             <Text style={styles.label}>Modalidad (opcional)</Text>
@@ -492,6 +507,8 @@ export default function EditClubScreen({ navigation, route }) {
             </Text>
             <ClubThemePicker value={tema} onChange={setTema} disabled={saving} />
           </View>
+          </View>
+          </View>
 
           {/* ── Guardar ── */}
           <Pressable
@@ -622,6 +639,11 @@ const styles = StyleSheet.create({
     borderColor: C.borderSoft,
     padding: 14,
   },
+
+  // ── Dos columnas en pantallas anchas ──
+  stack: { gap: 12 },
+  grid: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+  col: { flex: 1, gap: 12 },
 
   // ── Imágenes ──
   bannerTap: {

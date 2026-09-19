@@ -140,6 +140,28 @@ era redundante. El ciclo formal 1 a 1 no cambió en nada: sigue viviendo en
 `services/clubChallenges.js`, sólo se dejó de ofrecer un atajo duplicado
 desde el tablero abierto.
 
+**Avisos, dentro de un club, queda fijo en «clubes» — pedido explícito.**
+Al entrar a `NotificationsScreen` desde «Actividad reciente» (con `clubId`
+en la ruta), los chips de categoría («Todos»/«Clubes»/«Partidos»/«Social»)
+se ocultan y el filtro queda forzado a `clubes`, filtrado además por
+`avisoDelClub()` para que sólo aparezcan los avisos de ESE club: entrar
+desde la portada de un club y encontrar ahí un aviso de un partido casual o
+de una amistad contradecía lo que «Actividad reciente» ya prometía mostrar.
+Sin `clubId` (entrando por el ícono de campana de cualquier otra pestaña)
+los chips y las cuatro categorías siguen enteros.
+
+**Crear un partido de club se pide desde Inicio, no desde `ClubDetailScreen`.**
+El botón «Crear partido de club» de `MyClubCard` (Inicio) abre una hoja
+propia con dos opciones —«Buscar rival» (va a `ExploreClubs` en modo rival)
+y «Desafío abierto» (va a `ClubChallenges` con `abrirPublicar: true`, el
+borrador en blanco del tablero)— que reemplaza la hoja que antes vivía en
+`ClubDetailScreen`. Esa pantalla («Ver club») dejó de ofrecer «Crear
+desafío» y la bandeja «Desafíos» por completo: es sólo para ver el club,
+no para crear nada nuevo. Retar a UN rival puntual sigue existiendo ahí
+(«Desafiar a este club» mirando otro club, «Buscar rivales» para un
+integrante del propio) porque es distinto de «crear un partido para mi
+club» — no compite con las dos opciones de Inicio.
+
 `cierraEnLabel`/`esCerca`/`cierraPronto` (`openChallengeBoard.js`) calculan
 esos tres datos de verdad a partir de `created_at`/`distanciaKm` — nunca
 inventados. Una diferencia deliberada que se mantiene frente al mockup:
@@ -208,6 +230,8 @@ El **tope de 3 clubes no se comprueba en el cliente**: lo aplica el trigger `che
 
 **Crear club exige nombre, modalidad, región y comuna** — dejaron de ser opcionales. Antes sólo el nombre bloqueaba el botón (`nombre.trim().length < 3`); modalidad/región/comuna eran opcionales tanto en la pantalla como en `createClub()`, así que nacía un club sin comuna conocida —inutilizable para calcular distancia a rivales— sin que nada lo impidiera. Ahora el botón se deshabilita sin los cuatro datos (`listo`, en `CreateClubScreen.js`) y `createClub()` repite la misma exigencia del lado del servicio, por si alguna vez se llama sin pasar por esa pantalla. **A propósito no se marcan como «(obligatorio)» en la interfaz** — pedido explícito: que el botón simplemente no se pueda tocar sin todo completo, sin tener que explicarlo con una etiqueta. Por la misma razón, **tampoco Descripción ni el logo dicen «(opcional)»** ya: siguen sin ser obligatorios —uno es una reseña libre y el otro una foto, ninguno es un dato que la app necesite para ubicar al club o calcular nada— pero dejar de mencionarlo hace que la interfaz no distinga con etiquetas lo que ya distingue con el botón. `EditClubScreen` (edición posterior) no se tocó — región/comuna ahí siguen opcionales, y sí dicen «(opcional)» — así que hoy es posible crear un club con los cuatro datos y luego, al editar, dejar región/comuna en blanco; si eso importa, es un cambio aparte.
 
+**`EditClubScreen` usa dos columnas en pantallas anchas (`useWindowDimensions`, ≥860px)** — pedido explícito, porque el formulario de una sola columna con ancho máximo de 600px se veía como una pantalla de celular angosta en el centro de una pantalla de escritorio. Imágenes+datos van a la izquierda y modalidad+ubicación+tema a la derecha, y el ancho máximo del conjunto crece a 1120px; por debajo del umbral se apila exactamente igual que antes. No se ensanchó la columna única porque un campo de texto de más de 600px de ancho se ve absurdo — el comentario original de `ANCHO_FORMULARIO` sigue siendo cierto, sólo que ahora hay dos.
+
 **Crear club también pide banner y tema**, los dos campos que hasta ahora sólo se podían fijar editando el club después de creado. El banner reutiliza `uploadClubBanner()` tal cual —sube a `club-logos/<clubId>/banner.<ext>` y escribe `clubs.banner_url`—, así que igual que el logo necesita el `id` del club, y por eso el mismo patrón de "crear primero, subir después": `createClub()` resuelve, y sólo entonces se sube banner y logo si se eligieron; si la subida falla, el club queda creado igual y el banner del error lo dice («Club creado, pero falló el banner»), nunca al revés. El tema usa `ClubThemePicker` sin cambios —es un componente controlado puro, sin llamada a red ni necesidad de un `id` de club— y viaja directo en el `insert` de `createClub()`, con el mismo mecanismo de `escribirTolerandoColumnas()` que ya usaba `updateClub()`: si la migración 53 no está aplicada en un entorno, el club nace igual y sólo pierde el color explícito (queda en el default `'green'` de la columna). El tema elegido en el formulario **no repinta el resto de la pantalla** (el escudo provisional y el botón "Crear club" se quedan verdes) — a diferencia de `EditClubScreen`, que sí previsualiza el color elegido en vivo; ampliar `CreateClubScreen` para hacer lo mismo es una mejora visual aparte, no pedida.
 
 El badge se cuenta y se ROTULA en un solo sitio. `contarConAccion()` da el número y `etiquetaBadge()` el texto —«9+» por encima de nueve—, y los usan tanto la barra inferior como «Pendiente para ti»; antes cada una escribía el rótulo por su cuenta y con diez o más pendientes decían cosas distintas. El tope es del rótulo, no del conteo: el número exacto sigue viajando en `badgeCount` y es el que oye un lector de pantalla.
@@ -232,7 +256,7 @@ Todo día del mes se puede tocar, tenga o no partido — no sólo los marcados. 
 
 ## Tema de color del club
 
-Cada club elige uno de cuatro temas —`green`, `blue`, `red`, `yellow`— y ese color reemplaza los acentos verdes que son su identidad: banner del héroe, escudo provisional, «Crear desafío», el icono de la fila «Desafíos», los enlaces «Ver todos», la celda «Añadir foto» y los botones secundarios atados al club. **No cambian** el fondo, los textos, la navegación, el botón flotante global, el dorado de Premium ni los colores de victoria / empate / derrota, que son semánticos y valen lo mismo para todos: un club rojo no puede hacer que una victoria parezca una derrota. Las tarjetas del carrusel «Buscar rivales» usan el tema **del rival**, no el de quien mira, y por eso `tema` viaja en `RIVAL_CLUB_COLUMNS`.
+Cada club elige uno de cuatro temas —`green`, `blue`, `red`, `yellow`— y ese color reemplaza los acentos verdes que son su identidad: banner del héroe, escudo provisional, el icono de la fila «Desafíos» de la portada, los enlaces «Ver todos», la celda «Añadir foto» y los botones secundarios atados al club (`ClubDetailScreen` ya no tiene un botón «Crear desafío» propio — ver más abajo). **No cambian** el fondo, los textos, la navegación, el botón flotante global, el dorado de Premium ni los colores de victoria / empate / derrota, que son semánticos y valen lo mismo para todos: un club rojo no puede hacer que una victoria parezca una derrota. Las tarjetas del carrusel «Buscar rivales» usan el tema **del rival**, no el de quien mira, y por eso `tema` viaja en `RIVAL_CLUB_COLUMNS`.
 
 Lo que se guarda es una CLAVE, nunca un HEX: un color libre no se puede validar en el servidor ni garantiza contraste. La escala de tonos —principal, presionado, fondo suave normal y presionado, borde, resplandor y la tinta de contraste— la construye `src/theme/clubThemes.js`, y los componentes reciben esa escala ya resuelta por prop `tema`; ninguno pregunta por una clave concreta. Sus pruebas miden el contraste WCAG (4,5:1 de la tinta sobre el color y del color sobre el fondo) y exigen distancia de color contra derrota, empate y el dorado de Premium.
 

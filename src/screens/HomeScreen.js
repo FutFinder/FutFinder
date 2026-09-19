@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, Text, Pressable } from 'react-native';
+import { View, ScrollView, RefreshControl, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Plus, Star, TrendingUp } from 'lucide-react-native';
 
@@ -14,6 +14,9 @@ import MatchPreviewSheet from '../components/MatchPreviewSheet';
 
 import {
   paleta as C,
+  radios as R,
+  fuentes as F,
+  alfa,
 } from '../theme/colors';
 import { notify } from '../utils/notify';
 import {
@@ -56,6 +59,9 @@ export default function HomeScreen({ navigation }) {
   const [allMatches, setAllMatches] = useState([]);
   const [misClubIds, setMisClubIds] = useState([]);
   const [banner, setBanner] = useState(null);
+  // Id del club para el que se está por crear un partido — abre la hoja
+  // «Buscar rival» / «Desafío abierto»; `null` la mantiene cerrada.
+  const [crearPartidoClubId, setCrearPartidoClubId] = useState(null);
 
   const showBanner = useCallback((type, title, message = '') => {
     setBanner({ type, title, message });
@@ -320,7 +326,7 @@ export default function HomeScreen({ navigation }) {
                 <MyClubCard
                   club={club}
                   onPressClub={() => navigation.navigate('ClubDetail', { clubId: club.id })}
-                  onCreateMatch={(id) => navigation.navigate('ClubDetail', { clubId: id, openChallenge: true })}
+                  onCreateMatch={(id) => setCrearPartidoClubId(id)}
                 />
               </View>
             ) : null}
@@ -390,7 +396,99 @@ export default function HomeScreen({ navigation }) {
         onNavigateToDetail={(id) => navigation.navigate('MatchDetail', { matchId: id })}
       />
 
+      {/* Hoja: crear partido de club — «Buscar rival» (1 a 1) o «Desafío
+          abierto» (tablero, migración 112). Vivía en ClubDetailScreen; se
+          movió acá porque «Ver club» dejó de ofrecer crear un desafío. */}
+      <Modal
+        visible={!!crearPartidoClubId}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setCrearPartidoClubId(null)}
+      >
+        <Pressable style={sheetStyles.backdrop} onPress={() => setCrearPartidoClubId(null)}>
+          <Pressable style={sheetStyles.sheet} onPress={() => {}}>
+            <View style={sheetStyles.handle} />
+            <Text style={sheetStyles.title}>Crear partido de club</Text>
+            <Text style={sheetStyles.subtitle}>Elige cómo quieres encontrar rival</Text>
+
+            <Pressable
+              onPress={() => {
+                const id = crearPartidoClubId;
+                setCrearPartidoClubId(null);
+                navigation.navigate('ExploreClubs', { modoRival: true, retadorClubId: id });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Buscar rival"
+              style={({ pressed }) => [sheetStyles.primary, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={sheetStyles.primaryText}>Buscar rival</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                const id = crearPartidoClubId;
+                setCrearPartidoClubId(null);
+                navigation.navigate('ClubChallenges', { clubId: id, abrirPublicar: true });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Desafío abierto"
+              style={({ pressed }) => [sheetStyles.secondary, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={sheetStyles.secondaryText}>Desafío abierto</Text>
+              <Text style={sheetStyles.secondaryHint}>Publícalo en el tablero, sin elegir rival todavía</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {dialogo}
     </View>
   );
 }
+
+const sheetStyles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: R.hero,
+    borderTopRightRadius: R.hero,
+    borderTopWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 30,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 3,
+    backgroundColor: alfa(C.tinta, 0.2),
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  title: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3 },
+  subtitle: { color: C.textSecondary, fontSize: 12.5, marginTop: 4 },
+  primary: {
+    height: 52,
+    marginTop: 14,
+    borderRadius: R.iconBtn,
+    backgroundColor: C.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryText: { color: C.greenInk, fontSize: 15, fontFamily: F.extraBold },
+  secondary: {
+    height: 'auto',
+    paddingVertical: 12,
+    marginTop: 8,
+    borderRadius: R.iconBtn,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryText: { color: C.textPrimary, fontSize: 15, fontFamily: F.bold },
+  secondaryHint: { color: C.textMuted, fontSize: 11, marginTop: 3, textAlign: 'center' },
+});

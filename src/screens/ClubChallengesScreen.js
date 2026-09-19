@@ -127,7 +127,7 @@ function fmtFecha(iso) {
  * cierre calculados de verdad (`openChallengeBoard.js`).
  */
 export default function ClubChallengesScreen({ navigation, route }) {
-  const { clubId, prefillFecha } = route.params || {};
+  const { clubId, prefillFecha, abrirPublicar: abrirPublicarInicial } = route.params || {};
   const { width } = useWindowDimensions();
 
   const [loading, setLoading] = useState(true);
@@ -150,9 +150,10 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [filtroToHour, setFiltroToHour] = useState(23);
   const [sort, setSort] = useState('cerca');
   // `prefillFecha` llega del calendario del club («Publicar un desafío
-  // para este día»): abre directo el borrador de publicar con esa fecha
-  // ya puesta, en vez de la lista.
-  const [subScreen, setSubScreen] = useState(prefillFecha ? 'publicar' : 'lista'); // 'lista' | 'publicar' | 'editar' | 'respuestas'
+  // para este día»): abre directo el borrador de publicar con esa fecha ya
+  // puesta. `abrirPublicar` llega de «Crear partido de club» en Inicio,
+  // eligiendo «Desafío abierto»: abre el mismo borrador, en blanco.
+  const [subScreen, setSubScreen] = useState(prefillFecha || abrirPublicarInicial ? 'publicar' : 'lista'); // 'lista' | 'publicar' | 'editar' | 'respuestas'
   const [editId, setEditId] = useState(null);
   const [editingPub, setEditingPub] = useState(null);
   const [draft, setDraft] = useState(
