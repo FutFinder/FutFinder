@@ -21,6 +21,18 @@ La configuración del repositorio define exportación web con Vercel, builds nat
 - `eas.json` requiere EAS CLI `>= 12.0.0` y toma la versión de aplicación desde la configuración local.
 - Los perfiles versionados son `development` (cliente de desarrollo y distribución interna), `preview` (distribución interna) y `production` (incremento automático de versión).
 - `app.config.js` declara el identificador de paquete `com.futfinder.app` para Android e iOS, permisos de ubicación y plugins de ubicación, selector de imágenes y notificaciones.
+- **`eas-cli` NO va como dependencia del proyecto.** Se probó el 2026-09-18 y `expo-doctor` lo rechaza: «EAS CLI should not be installed in your project. Instead, install it globally or use npx». La instalación global tampoco salió: en esta máquina el prefijo de npm es `/usr/local`, que es de root, y pedía `sudo`. La vía que queda —y que Expo sanciona— es `npx eas-cli@latest`, que no instala nada de forma permanente.
+- Atajos versionados, ya con esa forma: `npm run build:android` y `build:ios` usan el perfil **`preview`**, que es el de distribución interna — el que sirve para llevarle un arreglo a quien ya tiene la app, sin pasar por tienda. `npm run build:store` usa `production` para las dos plataformas. La primera ejecución descarga la CLI y tarda un poco más.
+
+### Lo que falta para que un build salga (2026-09-18)
+
+Ninguna de estas tres cosas está en el repositorio, y las tres necesitan las cuentas:
+
+1. **Sesión de Expo** en la cuenta `futfinder` (`npx eas-cli@latest login`). Comprobado: `npx eas whoami` responde `Not logged in`, y sin sesión ni siquiera `eas config` resuelve el perfil.
+2. **El secreto de archivo `GOOGLE_SERVICES_JSON`** en el proyecto EAS, que sigue sin crearse. El aviso se ve en cada exportación: `Could not parse Expo config: android.googleServicesFile: "./google-services.json"`. El archivo tampoco está en local.
+3. **Credenciales de Apple** para el build de iOS.
+
+**Posible tropiezo con la versión, sin comprobar.** El perfil `production` combina `appVersionSource: "local"` con `autoIncrement: true`, pero la configuración es dinámica (`app.config.js`, no `app.json`): no hay un campo estático donde EAS pueda dejar escrito el número incrementado. La documentación de Expo no dice qué hace exactamente en ese caso —sólo que con versión local «hay que commitear el cambio en cada build»— y sin sesión no se pudo probar. Si el build se queja, las dos salidas son poner `autoIncrement: false` y subir la versión a mano, o cambiar a `appVersionSource: "remote"`, que es **lo que Expo recomienda desde la CLI 12.0.0**. Es una decisión sobre cómo se numeran todos los builds futuros, así que no se tomó por adelantado.
 
 ## Configuración de Supabase y modo de demostración
 
@@ -40,7 +52,7 @@ Flujo requerido para builds:
 
 No incorpores una copia ficticia, el contenido del archivo ni credenciales en esta memoria. El repositorio no permite confirmar si el secreto ya existe en EAS.
 
-El cierre de U3 del 2026-08-13 no ejecutó ningún build nativo. La exportación web pasa, pero sigue avisando que no puede resolver `./google-services.json`; antes de un futuro build Android hay que confirmar que EAS tenga configurado el secreto de archivo `GOOGLE_SERVICES_JSON`.
+Al 2026-09-18 sigue sin ejecutarse ningún build nativo; el cierre de U3 del 2026-08-13 tampoco lo hizo. La exportación web pasa, pero sigue avisando que no puede resolver `./google-services.json`; antes de un futuro build Android hay que confirmar que EAS tenga configurado el secreto de archivo `GOOGLE_SERVICES_JSON`.
 
 ## Rutas de código relacionadas
 
