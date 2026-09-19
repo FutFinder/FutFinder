@@ -20,8 +20,7 @@
 // escrita y se lee desde Supabase. Decirle a alguien «no se pudo» cuando su
 // solicitud SÍ se guardó lo haría mandarla de nuevo para nada.
 //
-// SECRETS: los de `_shared/correoSolicitud.ts`. Hoy no están cargados —no hay
-// cuenta de proveedor de correo todavía— y esta función ya funciona igual.
+// SECRETS: los de `_shared/correoSolicitud.ts`.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
