@@ -1,0 +1,28 @@
+-- 126. La función de reprogramación no se llama a mano.
+--
+-- La 123 creó `tg_reprogramar_mira_la_agenda()` y el advisor de Supabase la
+-- marcó, como marca a las otras diecisiete funciones de trigger heredadas:
+-- `authenticated` puede llamarla por `/rest/v1/rpc/`. Los privilegios por
+-- defecto se la conceden y el disparador de la 115 sólo cierra `public` y
+-- `anon` — lo mismo que encontró el arnés de la 120.
+--
+-- NO ES EXPLOTABLE: llamar una función de trigger por REST falla con
+-- `0A000 — trigger functions can only be called as triggers`, que es
+-- PostgreSQL negándose antes de ejecutar una línea del cuerpo. Se cierra
+-- igual, por la misma razón que la 47b: para no sumar una entrada nueva a una
+-- lista de deuda que ya existe, y en migración aparte porque la 123 está
+-- aplicada.
+--
+-- Y SE COMPRUEBA QUE EL TRIGGER SIGUE DISPARANDO, que es la lección de la
+-- 47b: PostgreSQL verifica el `EXECUTE` al CREAR el trigger, no en cada
+-- disparo, así que revocarlo no lo desactiva. Si alguna vez dejara de valer,
+-- el fallo sería silencioso: ninguna pantalla se rompe, sólo se pierde la
+-- validación. Por eso el arnés vuelve a mover una hora conflictiva y exige
+-- que se siga rechazando.
+--
+-- Las diecisiete heredadas siguen como estaban: son el P4 de pendientes y no
+-- se tocan desde acá.
+--
+-- Regresión: supabase/tests/126_la_reprogramacion_no_se_llama_a_mano_test.sql
+
+revoke all on function public.tg_reprogramar_mira_la_agenda() from public, anon, authenticated;

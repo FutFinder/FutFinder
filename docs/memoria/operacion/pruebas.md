@@ -40,6 +40,8 @@ Del lado del cliente, la Tarea 6.3 añadió pruebas para lo que corrigió: las t
 
 `124_no_se_califica_un_partido_que_no_se_jugo_test.sql` (3/3) prueba una POLÍTICA y no una función, y por eso necesita sus dos direcciones: que un partido jugado se siga pudiendo calificar (si no, la corrección sería un candado) y que uno cancelado ya no. La revisión que lo pidió decía explícitamente que no había comprobado si el servidor aceptaba esas evaluaciones; leer `pg_policy` antes de escribir nada mostró que sí las aceptaba, y el arnés lo deja fijado.
 
+`126_la_reprogramacion_no_se_llama_a_mano_test.sql` (3/3) repite la lección de la 47b sobre la función de trigger nueva: revocarle el `EXECUTE` a `authenticated` no la desactiva, y el arnés vuelve a mover una hora conflictiva para demostrarlo en vez de suponerlo. Sin ese caso, el privilegio revocado se vería igual de bien con la validación apagada, y el fallo sería silencioso.
+
 Dos trampas al escribir estas pruebas. `set local role anon` **no borra** `request.jwt.claims`: sin poner unas claims sin `sub`, `auth.uid()` sigue devolviendo el usuario del bloque anterior y la comprobación de acceso anónimo pasa midiendo otra cosa. Y para provocar un vencimiento se envejece la fila, nunca el reloj, de modo que lo que se prueba es la comparación contra `now()` que hace el servidor.
 
 Cada archivo se abre con `begin;` y termina en `rollback;`, así que ejecutarlo no deja filas guardadas ni siquiera si se corre contra el proyecto real — que hoy es el único que existe, porque no hay un Supabase de desarrollo separado. Lo que sí exige autorización explícita es **aplicar** una migración, no correr una prueba.
