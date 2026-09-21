@@ -1,0 +1,268 @@
+FUTFINDER — REVISIÓN DEL APARTADO DE CLUBES
+Fecha: 21 de septiembre de 2026
+Código revisado: 3b88699 (main)
+
+RESULTADO: 9 hallazgos, identificados C01–C09.
+Se revisaron permisos, membresías, invitaciones, límites, administración,
+desafíos, resultados y alineación. Se excluyeron los doce problemas tratados
+en b1969a4 y se conservó el trabajo simultáneo del repositorio.
+
+EVIDENCIA Y ALCANCE
+- C01–C06: reproducidos en PostgreSQL local con cuentas ficticias, RLS y
+  funciones extraídas de las migraciones vigentes. C04–C06 utilizan dos
+  conexiones reales con transacciones superpuestas.
+- El esquema de prueba es reducido y parte de los permisos habituales de
+  Supabase para authenticated; aplica las restricciones de columnas versionadas.
+  No se consultaron las ACL ni las definiciones actuales de producción.
+  Por tanto, se confirman defectos de la configuración versionada y deben
+  contrastarse con el despliegue antes de afirmar que son explotables allí.
+  Esta distinción es especialmente importante en C02 y C03, que dependen
+  de que siga concedida la actualización de las columnas indicadas.
+- C07–C09: lógica real del cliente y comparación con el contrato SQL;
+  dependencias de consulta simuladas. No se realizó una sesión visual completa.
+- npm test: 1.465 pruebas aprobadas. No cubren los casos nuevos de este archivo.
+- No se modificó código funcional, cuentas ni datos de producción.
+
+PRIORIDADES
+P1: acceso indebido, configuración sensible o pérdida de administración.
+P2: incumplimiento funcional de límites, permisos o presentación.
+
+======================================================================
+C01 — P1 — UN EXPULSADO CONSERVA PERMISOS INDIVIDUALES SOBRE EL CLUB
+======================================================================
+Pasos:
+1. El administrador concede editClub individualmente a X.
+2. X es expulsado y desaparece de club_members.
+3. X intenta modificar la descripción del club con su sesión autenticada.
+
+Resultado local: la actualización afecta una fila y se guarda. La expulsión
+no revoca el permiso individual.
+
+Esperado: quien dejó de pertenecer al club no debe mantener sus permisos de
+miembro, independientemente de las excepciones que tuviera antes.
+
+Causa: tiene_permiso_de_club consulta la excepción individual sin exigir
+membresía. club_member_permission_overrides depende del club y de auth.users,
+no de club_members, así que eliminar la membresía deja la excepción intacta.
+La política de UPDATE de clubs confía en ese helper.
+
+Qué cambiar: exigir membresía vigente antes de resolver cualquier permiso y
+eliminar o invalidar excepciones al salir/ser expulsado. Probar también la
+reincorporación y los otros permisos que usan el mismo helper.
+
+Fuente: supabase/migrations/119_permisos_del_club.sql:61–74, 139–145 y 412–418.
+
+======================================================================
+C02 — P1 — UNA INVITACIÓN A UN CLUB SE PUEDE CONVERTIR EN ENTRADA A OTRO
+======================================================================
+Pasos:
+1. X recibe una invitación pendiente del club A.
+2. En una actualización autenticada de esa invitación, cambia club_id al
+   club B y status a approved, conservando tipo=invitacion y user_id=X.
+3. No existe invitación ni aprobación del administrador de B.
+
+Resultado local: la actualización se acepta y el trigger crea la membresía
+de X en B. El invitado usa una autorización de A para ingresar a otro club.
+
+Esperado: responder una invitación solo puede aceptar/rechazar la invitación
+original; no puede cambiar el club, la persona ni el tipo de solicitud.
+
+Causa: la política permite actualizar una invitación si user_id coincide con
+quien llama. No inmoviliza club_id ni tipo. El trigger de aprobación utiliza
+los valores NEW para crear la membresía. No se encontró una restricción de
+columnas versionada para club_join_requests que cierre ese cambio.
+
+Qué cambiar: limitar la escritura directa a status/responded_at o responder
+mediante una RPC que conserve los identificadores originales. Añadir una
+guarda de inmutabilidad y pruebas de cambio de club, usuario y tipo.
+
+Fuentes: supabase/migrations/20_fix_rls_clubs.sql:105–117;
+supabase/migrations/11_clubes.sql:276–290.
+
+======================================================================
+C03 — P1 — EL PERMISO DE EDITAR EL CLUB TAMBIÉN PERMITE CAMBIAR SU PLAN
+======================================================================
+Pasos:
+1. Un administrador tiene autorización para editar su club Estándar.
+2. Envía un UPDATE autenticado con plan=premium y verificado=true.
+
+Resultado local: ambos valores se guardan. No interviene una operación
+administrativa de plataforma ni una validación de pago o verificación.
+
+Esperado: editar nombre, descripción o fotos no debe autorizar la modificación
+del plan ni de la marca de verificación.
+
+Causa: clubs_update autoriza la fila mediante editClub, pero no limita columnas.
+No se encontró una revocación versionada de UPDATE para plan/verificado.
+El esquema declara expresamente que se gestionan fuera del cliente.
+
+Qué cambiar: restringir INSERT/UPDATE de campos sensibles y definir las
+operaciones autorizadas de plataforma. Comprobar los grants reales antes de
+aplicar el cambio. El caso demostrado es UPDATE; revisar también la creación.
+
+Fuentes: supabase/migrations/11_clubes.sql:24–25 y 147–149;
+supabase/migrations/119_permisos_del_club.sql:412–418.
+
+======================================================================
+C04 — P1 — DOS ADMINISTRADORES PUEDEN SALIR A LA VEZ Y DEJAR EL CLUB HUÉRFANO
+======================================================================
+Pasos:
+1. Un club Premium tiene dos administradores y al menos un jugador.
+2. Los dos administradores salen desde sesiones distintas simultáneamente.
+3. Cada transacción comprueba la existencia del otro antes de su COMMIT.
+
+Resultado local: las dos bajas se aceptan; queda un jugador y cero admins.
+
+Esperado: al menos una baja debe impedirse si deja integrantes sin quien
+pueda administrar el club.
+
+Causa: el trigger de la migración 111 comprueba que exista otro admin, pero
+no serializa las bajas del mismo club. Resuelve la salida secuencial del
+último administrador, no dos salidas superpuestas.
+
+Qué cambiar: serializar por club antes de comprobar la administración restante
+y cubrir todas las transiciones que pueden quitar un administrador. Probar
+salidas, expulsiones y transferencias concurrentes.
+
+Fuente: supabase/migrations/111_el_club_tiene_dueno_y_puerta_unica.sql:129–151.
+
+======================================================================
+C05 — P2 — DOS ACEPTACIONES SIMULTÁNEAS SUPERAN EL LÍMITE DE INTEGRANTES
+======================================================================
+Pasos:
+1. Un club Estándar tiene 14 integrantes y dos invitaciones pendientes.
+2. Los dos invitados aceptan simultáneamente.
+3. Ambas transacciones cuentan 14 miembros antes de confirmar la otra alta.
+
+Resultado local: ambas invitaciones quedan aprobadas y el club alcanza 16
+integrantes, por encima del máximo de 15.
+
+Esperado: solo una aceptación ocupa la última plaza; la otra recibe un error
+sin cambiar su estado ni crear la membresía.
+
+Causa: check_club_limits cuenta miembros y administradores sin bloquear una
+referencia compartida del club; las nuevas filas de membresía son distintas.
+
+Qué cambiar: comprobar y consumir capacidad dentro de una operación
+serializada por club. Incluir también el tope de administradores en las
+pruebas, aunque la reproducción de este informe corresponde a integrantes.
+
+Fuentes: supabase/migrations/11_clubes.sql:102–116 y 276–290.
+
+======================================================================
+C06 — P2 — UN JUGADOR PUEDE TERMINAR EN CUATRO CLUBES
+======================================================================
+Pasos:
+1. X ya pertenece a dos clubes.
+2. Recibe invitaciones de dos clubes más, ambos con espacio.
+3. Acepta las dos desde sesiones simultáneas.
+
+Resultado local: ambas aceptaciones se guardan y X termina con cuatro
+membresías, aunque el máximo permitido es tres.
+
+Esperado: aceptar una invitación debe impedir que la otra sobrepase el máximo.
+
+Causa: check_user_club_limit cuenta membresías sin serializar por usuario.
+Bloquear solo el club tampoco solucionaría este caso: son dos clubes distintos.
+
+Qué cambiar: serializar por jugador la comprobación y creación de membresía,
+coordinando el orden de bloqueos con el límite por club para evitar bloqueos
+cruzados. Mantener la unicidad club_id/user_id.
+
+Fuente: supabase/migrations/24_multi_club_membership.sql:18–40.
+
+======================================================================
+C07 — P2 — DELEGAR RESULTADOS NO DA ACCESO A REGISTRARLOS NI CONFIRMARLOS
+======================================================================
+Pasos:
+1. Conceder results=true y chatClubs=true a un jugador que no sea admin.
+2. Tener un desafío en esperando_resultado.
+3. El jugador abre el chat del desafío para registrar el resultado, o para
+   confirmar el resultado que ya propuso el rival.
+
+Resultado en la lógica del cliente: la acción es «Solo lectura» y no aparece
+la entrada a registrar/confirmar. La pantalla de resultados y las RPC sí
+reconocen el permiso delegado si se llega a ellas.
+
+Esperado: el permiso results debe habilitar el acceso normal a esas acciones.
+
+Causa: el chat construye su contexto con clubes donde el usuario es admin.
+getChallengeCta devuelve solo_lectura antes de evaluar la rama de resultados.
+La navegación a ClubResult depende de esas acciones del chat.
+
+Qué cambiar: resolver permisos por acción al construir las acciones del
+chat; no usar una lista exclusiva de administradores como sustituto de la
+autorización para resultados.
+
+Fuentes: src/screens/ChatThreadScreen.js:401, 750 y 1268;
+src/utils/challengeThread.js:150;
+src/services/clubChallengeRules.js:564;
+src/screens/ClubResultScreen.js:86;
+supabase/migrations/119_permisos_del_club.sql:979 y 1139.
+
+======================================================================
+C08 — P2 — EL TABLERO CONFUNDE PUBLICAR DESAFÍOS CON RESPONDERLOS
+======================================================================
+Pasos, caso A:
+1. Conceder únicamente answerChallenge a un jugador.
+2. Abrir el tablero de desafíos.
+3. Se ofrece Publicar y se puede completar el formulario; el servidor exige
+   pubChallenge para guardarlo.
+
+Caso B:
+1. Conceder únicamente pubChallenge.
+2. El tablero ofrece responder o aceptar respuestas, operaciones que requieren
+   answerChallenge en el servidor.
+
+Resultado: aparecen acciones y formularios que el usuario no puede completar.
+No se demuestra un aumento de permisos: el servidor mantiene la restricción.
+
+Causa: la pantalla reúne ambos permisos y los convierte en un solo booleano,
+soyAdmin, que luego habilita acciones diferentes.
+
+Qué cambiar: conservar booleanos independientes para publicar/editar y para
+responder/gestionar respuestas. Probar cada permiso por separado y revocado.
+
+Fuentes: src/screens/ClubChallengesScreen.js:174–178, 438–522, 593, 809 y 1141;
+supabase/migrations/119_permisos_del_club.sql:555, 562, 596, 621 y 803.
+
+======================================================================
+C09 — P2 — LA ALINEACIÓN SIGUE CONTANDO A UN INTEGRANTE EXPULSADO
+======================================================================
+Pasos:
+1. Completar una alineación de siete jugadores y dejar otro miembro en banca.
+2. Expulsar al arquero del club.
+3. Recargar la alineación y pulsar Autocompletar.
+
+Resultado en la lógica del cliente: aparece 7/7, pero el puesto del arquero
+se dibuja vacío. Autocompletar dice «No queda banca disponible», aunque hay
+un integrante disponible para ocuparlo.
+
+Esperado: mostrar seis puestos ocupados y permitir completar el séptimo.
+
+Causa: el render comprueba si el ID sigue existiendo entre los miembros, pero
+el conteo y la búsqueda de puestos libres solo miran si hay una clave en
+asignaciones. Los IDs antiguos permanecen dentro del JSON guardado.
+
+Qué cambiar: depurar asignaciones contra la membresía actual al cargar y
+antes de guardar, o derivar ocupación y puestos libres con la misma regla
+que usa el render. Revisar también integrantes que salen voluntariamente.
+
+Fuentes: src/screens/ClubLineupScreen.js:146, 275–277 y 464–466;
+supabase/migrations/92_alineacion_del_club.sql:15–20.
+
+======================================================================
+ORDEN SUGERIDO
+======================================================================
+1. C01 y C02: cerrar autorizaciones que sobreviven o cambian de destinatario.
+2. C03 y C04: proteger configuración sensible y continuidad administrativa.
+3. C05 y C06: asegurar capacidad y máximo de membresías bajo concurrencia.
+4. C07 y C08: alinear las acciones visibles con los permisos delegados.
+5. C09: mantener coherencia entre integrantes reales y alineación.
+
+LIMITACIÓN CONOCIDA, NO CONTADA COMO NOVEDAD
+La comprobación de updated_at de saveClubLineup y su escritura siguen siendo
+dos operaciones separadas. Dos guardados exactamente simultáneos pueden
+sobrescribirse. Se reprodujo, pero el comentario de clubLineup.js:39–43 acepta
+expresamente esa ventana en el arreglo anterior; por eso no se presenta como
+un décimo hallazgo nuevo.
