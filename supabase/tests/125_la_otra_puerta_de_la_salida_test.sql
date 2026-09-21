@@ -10,7 +10,8 @@
 --       misma rama por la que cae la sesión perdedora de una carrera).
 --   S5  «Cancelar y cambiarme» sobre un partido ya cancelado se rechaza…
 --   S6  …sin volver a cobrar los 25 del anfitrión.
---   S7  Y el legítimo sí los cobra, una vez.
+--   S7  Y el legítimo sí los cobra, una vez, cancelando el partido (la 127
+--       cambió ese borrado por una cancelación).
 --   S8  El partido de origen queda bloqueado aunque la operación se rechace.
 --
 -- La carrera con dos conexiones vive en partidos_salida_concurrente_test.cjs.
@@ -129,8 +130,10 @@ begin
     (v_res->>'ok') = 'true', v_res::text);
   select trust_score into v_t from public.profiles where id = v_jug;
   insert into r125 values ('S7 y cobra los 25 una vez (77 a 52)', v_t = 52, v_t::text);
-  select count(*) into v_n from public.matches where id = v_mio_vivo;
-  insert into r125 values ('S7 el partido viejo se borro', v_n = 0, v_n::text);
+  -- Desde la 127 el partido viejo se CANCELA, no se borra: su gente lo
+  -- conserva en el historial y el aviso que reciben apunta a algo que existe.
+  select count(*) into v_n from public.matches where id = v_mio_vivo and estado = 'cancelado';
+  insert into r125 values ('S7 el partido viejo queda cancelado, no borrado', v_n = 1, v_n::text);
 
   reset role;
 end $$;

@@ -338,7 +338,18 @@ ADEMÁS, FUERA DEL INFORME: al revisar que no quedara nada se encontró que
   Corregido con el mismo patrón en
   supabase/migrations/125_la_otra_puerta_de_la_salida.sql (aplicada).
 
-Pruebas: los arneses 122 (19/19), 123 (10/10), 124 (3/3) y 125 (16/16)
+Y de la misma revisión salió una tercera: `cancel_match_and_join` BORRABA el
+  partido del anfitrión en vez de cancelarlo, así que el aviso «se canceló tu
+  partido» apuntaba a un partido inexistente, el partido se iba del historial
+  de todos y el chat se perdía; y ni esa función ni `swap_match` tenían la
+  guarda de la migración 50, de modo que por ahí se podía sacar a un jugador
+  de un partido ENTRE CLUBES o borrar el encuentro entero sin sanción de club
+  ni aviso al rival (las dos cosas reproducidas contra producción). Corregido
+  en supabase/migrations/127_cancelar_para_cambiarse_no_borra_el_partido.sql
+  (aplicada).
+
+Pruebas: los arneses 122 (19/19), 123 (10/10), 124 (3/3), 125 (16/16),
+  126 (3/3) y 127 (16/16)
 corrieron contra el esquema real, primero con su migración en la misma
 transacción y después contra el esquema aplicado. El de la 125 se corrió
 también como control negativo contra las funciones viejas, y reprodujo el
