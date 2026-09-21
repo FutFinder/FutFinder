@@ -58,6 +58,11 @@ import {
   filterMatches,
   listMatchesInBounds,
 } from '../services/matches';
+import {
+  crearSecuencia,
+  cursorDePagina,
+  resultadoDeCargarMas,
+} from '../utils/paginacionPartidos';
 import { getCurrentLocation, requestLocationPermission } from '../services/location';
 import { getCurrentUser } from '../services/auth';
 import { getMyClubIds } from '../services/clubs';
@@ -130,6 +135,13 @@ export default function PartidosScreen({ navigation, route }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [hayMas, setHayMas] = useState(false);
   const [cargandoMas, setCargandoMas] = useState(false);
+  // Un fallo al pedir la página siguiente NO es «se acabaron los partidos»:
+  // se conserva el botón y se muestra el error con su reintento.
+  const [errorMas, setErrorMas] = useState(null);
+  // Sólo la búsqueda vigente puede escribir el listado, la caché y la
+  // paginación. Sin esto, una respuesta lenta de los filtros anteriores
+  // llegaba después y pisaba los resultados de los filtros actuales.
+  const secuencia = useRef(crearSecuencia()).current;
   // `load` no depende de los filtros para no reconstruirse en cada tecla: lee
   // el valor vigente por referencia.
   const filtrosRef = useRef(filters);
@@ -176,6 +188,7 @@ export default function PartidosScreen({ navigation, route }) {
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoadError(null);
+    const turno = secuencia.abrir();
     const [res, loc, user, status, misClubes] = await Promise.all([
       // Los filtros que la base sabe resolver van EN la consulta: antes se
       // traían los N partidos más próximos y se filtraba después, así que uno
@@ -190,6 +203,17 @@ export default function PartidosScreen({ navigation, route }) {
       getMyAccountStatus().catch(() => null),
       getMyClubIds().catch(() => ({ data: [] })),
     ]);
+
+    // Llegó tarde: entremedio se cambió un filtro (o se pidió otra página) y
+    // esta respuesta ya no corresponde a lo que la pantalla está mostrando.
+    // Se descarta entera, incluida la escritura de la caché. Los indicadores
+    // sí se sueltan: la búsqueda vigente es la que manda en el contenido, pero
+    // nadie más va a apagar estos dos.
+    if (!secuencia.vigente(turno)) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     setMyUserId(user?.id || null);
     setMisClubIds(misClubes?.data || []);
@@ -238,32 +262,43 @@ export default function PartidosScreen({ navigation, route }) {
       setHayMas(!!res.hayMas);
       setFromCache(null);
       setLoadError(null);
+      setErrorMas(null);
       cacheWrite(CACHE_KEY, res.data || []);
     }
 
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [secuencia]);
 
   /** La página siguiente, sin perder lo que ya está en pantalla. */
   const cargarMas = useCallback(async () => {
     if (cargandoMas || !hayMas) return;
     setCargandoMas(true);
-    const ultimo = matches[matches.length - 1];
+    setErrorMas(null);
+    const turno = secuencia.abrir();
+    // El cursor es el par (hora, id) del último partido: con sólo la hora, un
+    // partido que empataba con él en el corte entre páginas se perdía.
     const res = await buscarPartidos({
       filtros: filtrosRef.current,
       texto: textoRef.current,
       limite: PAGINA,
-      despuesDe: ultimo ? { hora: ultimo.hora } : null,
-    }).catch(() => ({ data: [], hayMas: false }));
-    // Por id: dos páginas pueden solaparse si alguien publica entremedio.
-    setMatches((prev) => {
-      const vistos = new Set(prev.map((m) => m.id));
-      return [...prev, ...(res.data || []).filter((m) => !vistos.has(m.id))];
-    });
-    setHayMas(!!res.hayMas);
+      despuesDe: cursorDePagina(matches),
+    }).catch((e) => ({ data: [], hayMas: false, error: e }));
+
+    if (!secuencia.vigente(turno)) {
+      setCargandoMas(false);
+      return;
+    }
+
+    // Por id: dos páginas pueden solaparse si alguien publica entremedio. Y un
+    // error conserva la lista, el cursor y el botón, en vez de disfrazarse de
+    // «no hay más partidos».
+    const siguiente = resultadoDeCargarMas({ previos: matches, hayMasPrevio: hayMas, res });
+    setMatches(siguiente.matches);
+    setHayMas(siguiente.hayMas);
+    setErrorMas(siguiente.error);
     setCargandoMas(false);
-  }, [cargandoMas, hayMas, matches]);
+  }, [cargandoMas, hayMas, matches, secuencia]);
 
   // Cambiar un filtro o el texto vuelve a preguntarle a la base. El texto se
   // deja reposar: si no, cada letra sería una consulta. La primera vuelta se
@@ -760,13 +795,30 @@ export default function PartidosScreen({ navigation, route }) {
                     )}
                   </View>
                   {hayMas ? (
-                    <SurfaceButton
-                      label={cargandoMas ? 'Buscando más…' : 'Ver más partidos'}
-                      onPress={cargarMas}
-                      height={48}
-                      disabled={cargandoMas}
-                      style={{ marginTop: 12 }}
-                    />
+                    <>
+                      {/* Un fallo de la página siguiente no borra el botón: lo
+                          que ya está en pantalla se conserva y se puede volver
+                          a pedir la MISMA página, sin recargar la búsqueda. */}
+                      {errorMas ? (
+                        <Text style={styles.errorMas}>
+                          No pudimos cargar más partidos. Los {matches.length} de arriba siguen
+                          acá; vuelve a intentarlo.
+                        </Text>
+                      ) : null}
+                      <SurfaceButton
+                        label={
+                          cargandoMas
+                            ? 'Buscando más…'
+                            : errorMas
+                              ? 'Reintentar'
+                              : 'Ver más partidos'
+                        }
+                        onPress={cargarMas}
+                        height={48}
+                        disabled={cargandoMas}
+                        style={{ marginTop: 12 }}
+                      />
+                    </>
                   ) : null}
                   <PrimaryButton
                     label="Publicar un partido"
@@ -1140,5 +1192,13 @@ const styles = StyleSheet.create({
     color: C.textGhost,
     textAlign: 'center',
     marginTop: 18,
+  },
+  errorMas: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: F.medium,
+    color: C.textMuted,
+    textAlign: 'center',
+    marginTop: 14,
   },
 });

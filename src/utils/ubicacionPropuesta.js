@@ -140,3 +140,31 @@ export function ubicacionDraft(estado) {
     longitud: fijada ? base.coords.lng : null,
   };
 }
+
+/**
+ * ¿La edición mueve el LUGAR donde hay que llegar?
+ *
+ * EL FALLO QUE LA TRAJO: el organizador editaba la dirección, elegía otro
+ * punto del buscador dentro de la misma comuna y dejaba escrito el mismo
+ * nombre de cancha. Cambiaban la dirección y las coordenadas, y no se
+ * generaba ningún aviso: ni la confirmación del formulario lo contaba, ni el
+ * trigger del servidor lo vigilaba. El inscrito llegaba a la cancha vieja.
+ *
+ * Se miran las DOS cosas. La dirección, porque es lo que el jugador lee; y el
+ * punto, porque el buscador puede devolver dos lugares distintos con el mismo
+ * texto escrito y es el punto el que decide dónde valida el GPS.
+ *
+ * `f` es el formulario (`direccion`, `coords`) y `partido` la fila guardada
+ * (`direccion`, `latitud`, `longitud`), que llega con las coordenadas como
+ * texto desde PostgREST: por eso la comparación es numérica.
+ */
+export function cambioDeLugar(f = {}, partido = {}) {
+  if ((f.direccion || '').trim() !== (partido.direccion || '').trim()) return true;
+
+  const lat = f.coords?.lat;
+  const lng = f.coords?.lng;
+  // Sin punto nuevo no se guarda uno distinto: la pantalla conserva el viejo.
+  if (!coordenadasValidas(lat, lng)) return false;
+
+  return Number(lat) !== Number(partido.latitud) || Number(lng) !== Number(partido.longitud);
+}

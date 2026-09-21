@@ -49,7 +49,9 @@ import Sheet from '../components/partidos/Sheet';
 import { DateSheet, TimeSheet, formatFechaLarga, startOfDay } from '../components/partidos/DateTimeSheets';
 import { LoadingList, ErrorState } from '../components/partidos/StateViews';
 import LocationAutocomplete, { reverseGeocode } from '../components/LocationAutocomplete';
+import { traducirChoqueDeAgenda } from '../utils/erroresDeAgenda';
 import {
+  cambioDeLugar,
   escribirDireccion,
   formularioConUbicacion,
   seleccionarLugar,
@@ -183,7 +185,16 @@ export default function EditMatchScreen({ route, navigation }) {
     return JSON.stringify(form) !== JSON.stringify(toForm(original));
   }, [form, original]);
 
-  /** Cambios que obligan a avisar a los confirmados. */
+  /**
+   * Cambios que obligan a avisar a los confirmados.
+   *
+   * EL LUGAR CUENTA, y antes no contaba. Elegir otra sugerencia dentro de la
+   * misma comuna, dejando escrito el mismo nombre de cancha, movía la
+   * dirección y el punto sin que esta lista ni el aviso del servidor dijeran
+   * nada: el inscrito llegaba a la cancha vieja. Se mira la dirección Y las
+   * coordenadas porque el buscador puede devolver dos puntos distintos con el
+   * mismo texto. Es la misma regla que aplica el trigger de la migración 123.
+   */
   const notifyChanges = useMemo(() => {
     if (!form || !original) return [];
     const out = [];
@@ -194,6 +205,7 @@ export default function EditMatchScreen({ route, navigation }) {
     }
     if (form.cancha.trim() !== (original.cancha_nombre || '')) out.push('la cancha');
     if (form.comuna !== (original.comuna || '')) out.push('la comuna');
+    if (cambioDeLugar(form, original)) out.push('la dirección');
     if (Number(form.cuota || 0) !== Number(original.precio_cuota || 0)) out.push('la cuota');
     return out;
   }, [form, original]);
@@ -311,7 +323,10 @@ export default function EditMatchScreen({ route, navigation }) {
         title: 'No pudimos guardar los cambios',
         text: isNetworkError(error)
           ? 'Se cortó la conexión. Vuelve a intentarlo.'
-          : translateSchemaError(error) || error.message || 'Intenta de nuevo.',
+          : traducirChoqueDeAgenda(error) ||
+            translateSchemaError(error) ||
+            error.message ||
+            'Intenta de nuevo.',
       });
       return;
     }

@@ -302,3 +302,37 @@ ORDEN SUGERIDO PARA RESOLVER
 Al corregir cada caso, conservar una prueba de regresión con sus pasos. En
 N02–N04 es indispensable usar conexiones concurrentes: repetir llamadas una
 después de otra no reproduce el fallo observado.
+
+======================================================================
+ESTADO DE LA CORRECCIÓN — 21 de septiembre de 2026
+======================================================================
+Los once hallazgos quedaron corregidos. Dónde quedó cada uno:
+
+N01, N02, N03, N04 → supabase/migrations/122_una_salida_y_una_asistencia_
+  se_cobran_una_sola_vez.sql (aplicada). Orden único de bloqueos (partido y
+  después inscripción), reclamación atómica por DELETE/UPDATE … RETURNING, y
+  validación del estado y la vigencia del partido antes de tocar nada.
+N05, N06 → supabase/migrations/123_mover_el_partido_avisa_y_mira_la_agenda.sql
+  (aplicada) + src/screens/EditMatchScreen.js y src/utils/ubicacionPropuesta.js.
+  La dirección y las coordenadas entran en la detección de cambios y en el
+  aviso; reprogramar comprueba la agenda de los inscritos bajo los mismos
+  bloqueos de la 109 y rechaza el cambio conflictivo.
+N07, N08, N09 → src/utils/paginacionPartidos.js, src/services/matches.js y
+  src/screens/PartidosScreen.js. Cursor compuesto (hora, id), el error de «Ver
+  más» conserva lista, cursor y botón con reintento, y sólo la búsqueda
+  vigente puede escribir el listado y la caché.
+N10 → supabase/migrations/124_no_se_califica_un_partido_que_no_se_jugo.sql
+  (aplicada) + matchRules.puedeCalificar() y RateMatchScreen. El límite que
+  este informe dejaba abierto se comprobó: la política ratings_insert_eligible
+  SÍ aceptaba guardar esas evaluaciones. Ahora exige que el partido no esté
+  cancelado.
+N11 → src/screens/RateMatchScreen.js. El error de carga se consume junto con
+  los datos y tiene su propio estado con reintento.
+
+Pruebas: los arneses 122 (19/19), 123 (10/10) y 124 (3/3) corrieron contra el
+esquema real, primero con su migración en la misma transacción y después
+contra el esquema aplicado. npm run verify: lint sin errores y 1.465 pruebas.
+
+Pendiente de ejecutar: supabase/tests/partidos_salida_concurrente_test.cjs,
+la carrera con DOS conexiones de N02–N04. Está escrito pero necesita un
+PostgreSQL local, que este equipo no tiene instalado.

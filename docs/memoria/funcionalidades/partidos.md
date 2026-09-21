@@ -1,6 +1,7 @@
 # Partidos
 
 Última revisión de cupos, ubicación y aprobación: 2026-09-15
+Última revisión de salida, asistencia, búsqueda y evaluaciones: 2026-09-21
 
 ## Propósito
 
@@ -12,13 +13,19 @@ Descubrir, publicar, administrar y completar partidos, incluyendo cupos, solicit
 
 ## Reglas y permisos
 
-`matchRules.js` es la fuente de UI: 2 horas sin penalización, cupos 1–30, 200 m para GPS y 72 horas para asistencia final. PostgreSQL replica las reglas críticas: estado, cupos, elegibilidad, Trust Score, choques de horario, cola y una sola aplicación de asistencia. Sólo organizador actualiza/cancela/gestiona; asistentes autorizados participan en chat de partido.
+`matchRules.js` es la fuente de UI: 2 horas sin penalización, cupos 1–30, 200 m para GPS y 72 horas para asistencia final. PostgreSQL replica las reglas críticas: estado, cupos, elegibilidad, Trust Score, choques de horario, cola y una sola aplicación de asistencia. Desde la migración 122, salir, confirmar el GPS y guardar la asistencia reclaman su fila bajo bloqueo —partido primero, inscripción después— y aplican su efecto una sola vez aunque lleguen dos peticiones a la vez. Sólo organizador actualiza/cancela/gestiona; asistentes autorizados participan en chat de partido.
 
 En partidos normales, los cupos representan jugadores adicionales al organizador: «falta 1 jugador» admite al organizador y a un jugador más. `matches_guard_cupos` calcula la disponibilidad desde la nómina vigente, excluyendo al organizador (migraciones 104 y 105). Los partidos de clubes conservan su conteo propio. La regresión `supabase/tests/partidos_cupo_unico_test.sql` cubre ingreso inmediato, rechazo de un segundo jugador y aprobación manual para ese único cupo.
 
 La ubicación del teléfono solo ordena sugerencias al publicar. El punto de la cancha se fija al elegir una sugerencia o pulsar «Usar mi ubicación»; `ubicacionPropuesta` lo vincula a la dirección y lo invalida si cambia el texto, también al editar. Sin punto válido no se publica ni se guarda la edición. Las pruebas están en `src/utils/__tests__/ubicacionPropuesta.test.js`.
 
 En partidos de aprobación manual, `join_match` rechaza el ingreso directo incluso si el jugador tiene una solicitud pendiente (migraciones 103 y 105). `request_join` mantiene el cupo disponible y solo el organizador puede aprobar con `approve_join`. La regresión `supabase/tests/partidos_aprobacion_manual_test.sql` comprueba esa separación y el ingreso inmediato legítimo.
+
+Editar un partido no es sólo guardar campos. Cambiar la dirección o el punto de la cancha cuenta como cambio de lugar y avisa a los inscritos —lo comprueban `cambioDeLugar()` en la confirmación del formulario y `notify_match_updated` en el servidor—, y mover la hora o la duración encima de otro partido de un inscrito lo rechaza el trigger `tg_matches_reprogramar` con `CHOQUE_AGENDA_INSCRITOS`; `EditMatchScreen` lo traduce con `traducirChoqueDeAgenda()` (migración 123).
+
+El buscador pagina por el par `(hora, id)`, no sólo por la hora: dos partidos con la misma hora exacta en el corte entre dos páginas hacían desaparecer al segundo. Un fallo al pedir la página siguiente conserva la lista, el cursor y el botón —ahora dice «Reintentar»— en vez de parecerse a «no hay más partidos», y sólo la búsqueda vigente puede escribir el listado y la caché, para que una respuesta lenta de los filtros anteriores no pise a la actual. Las tres reglas viven en `src/utils/paginacionPartidos.js`, probadas en `src/utils/__tests__/paginacionPartidos.test.js`.
+
+«Calificar a los jugadores» no se ofrece en un partido cancelado (`puedeCalificar`), y `RateMatchScreen` distingue tres estados que antes eran uno solo: no se pudo cargar (con reintento), el partido no se jugó, y no hay compañeros elegibles.
 
 ## Pantallas y dependencias
 

@@ -13,6 +13,8 @@
  * nombre contra la firma real de la migración 46.
  */
 
+import { traducirChoqueDeAgenda } from './erroresDeAgenda.js';
+
 /** `true` si el error significa "esa función/columna todavía no existe". */
 export function esFaltaDeEsquema(error) {
   if (!error) return false;
@@ -63,12 +65,16 @@ export function argumentosResponder(changeId, aceptar, motivo = null) {
  * Las RPC de la 46 devuelven `{ ok, reason }` en vez de lanzar: estar fuera de
  * plazo o no ser el club que responde no son errores del sistema, son
  * respuestas, y la pantalla las muestra tal cual. Lo que sí se traduce es la
- * migración ausente, porque «function does not exist» no le dice nada a nadie.
+ * migración ausente, porque «function does not exist» no le dice nada a nadie;
+ * y el choque de agenda de la 123, que sí viaja como excepción porque lo
+ * levanta un trigger sobre `matches` y no la RPC.
  */
 export function comoResultadoCambio(data, error, etiqueta = 'cambioPartido') {
   if (error) {
     console.error(`[FutFinder] ${etiqueta}:`, error);
     if (esFaltaDeEsquema(error)) return { data: null, error: FALTA_MIGRACION };
+    const choque = traducirChoqueDeAgenda(error);
+    if (choque) return { data: null, error: { message: choque } };
     return { data: null, error: { message: error.message || 'No se pudo completar la acción.' } };
   }
   const row = Array.isArray(data) ? data[0] : data;

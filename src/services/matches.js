@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
 import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
+import { aplicarOrdenYCursor } from '../utils/paginacionPartidos.js';
 import { aceptaACualquiera, rangoDeFecha } from './matchRules';
 
 /**
@@ -301,10 +302,14 @@ function consultaDePartidos({ filtros = {}, texto = '', estados = ['abierto', 'l
  * para llegar a lo mismo que el cursor obtiene sin ningún duplicado. No es
  * «partidos invisibles hasta un refresh»: es paginación que se vuelve lenta
  * y repetitiva justo cuando más gente está publicando a la vez. El cursor
- * evita el problema de raíz, sin duplicados en ningún escenario. Queda una
- * grieta aceptada: más partidos que un tamaño de página con la MISMA `hora`
- * exacta al segundo, un empate que el desempate compuesto resolvería pero
- * que no vale la complejidad frente a lo raro que es.
+ * evita el problema de raíz, sin duplicados en ningún escenario.
+ *
+ * EL CURSOR ES COMPUESTO, `(hora, id)`. Con sólo `hora` y `hora > últimaHora`
+ * se perdía un partido cada vez que dos empataban la hora justo en el corte
+ * entre dos páginas: el segundo quedaba excluido por igualdad. El comentario
+ * de antes decía que hacía falta más de una página de empatados; es falso,
+ * bastan DOS. El par y su condición viven en `utils/paginacionPartidos.js`,
+ * donde están probados.
  */
 export async function buscarPartidos({
   filtros = {},
@@ -315,8 +320,7 @@ export async function buscarPartidos({
 } = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), hayMas: false, error: null };
 
-  let q = consultaDePartidos({ filtros, texto, estados }).order('hora', { ascending: true });
-  if (despuesDe?.hora) q = q.gt('hora', despuesDe.hora);
+  const q = aplicarOrdenYCursor(consultaDePartidos({ filtros, texto, estados }), despuesDe);
 
   const { data, error } = await q.limit(limite + 1);
 
