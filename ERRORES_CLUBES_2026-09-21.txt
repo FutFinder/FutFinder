@@ -266,3 +266,57 @@ dos operaciones separadas. Dos guardados exactamente simultáneos pueden
 sobrescribirse. Se reprodujo, pero el comentario de clubLineup.js:39–43 acepta
 expresamente esa ventana en el arreglo anterior; por eso no se presenta como
 un décimo hallazgo nuevo.
+
+======================================================================
+ESTADO DE LA CORRECCIÓN — 21 de septiembre de 2026
+======================================================================
+Los nueve hallazgos quedaron corregidos.
+
+LO PRIMERO FUE CONTRASTAR CON EL DESPLIEGUE, como pedía el propio informe.
+Las ACL de producción confirmaron lo que C02 y C03 no podían afirmar:
+`authenticated` tenía UPDATE sobre TODAS las columnas de `clubs` y de
+`club_join_requests`. Los tres P1 se reprodujeron en producción dentro de una
+transacción revertida antes de escribir ningún arreglo:
+  · C01 → el expulsado editó la descripción del club (1 fila).
+  · C02 → la invitación del club A creó la membresía en el club B.
+  · C03 → un `editClub` dejó plan=premium y verificado=true.
+
+C01, C02, C03 → supabase/migrations/129_el_permiso_muere_con_la_membresia.sql
+  (aplicada). `tiene_permiso_de_club` exige membresía antes de resolver
+  cualquier fuente de permisos, un trigger borra las excepciones al terminar
+  la membresía, y las dos tablas pasan a tener privilegios POR COLUMNA: en
+  `clubs` sólo lo que escribe el formulario, el logo y el banner; en
+  `club_join_requests`, `status` y `responded_at` al responder.
+
+C04, C05, C06 → supabase/migrations/130_las_membresias_del_club_se_serializan.sql
+  (aplicada). Un solo trigger `aa_club_members_serializa` toma un bloqueo por
+  club y otro por jugador —siempre en ese orden— antes de que corran las tres
+  funciones que cuentan. Ninguna de ellas cambió: lo que faltaba no era la
+  comprobación, sino que nadie más pudiera estar contando lo mismo.
+
+C07 → src/utils/challengeThread.js y src/services/clubChallengeRules.js. El
+  hilo recibe los clubes donde tengo `results` y la puerta del CTA se resuelve
+  por acción: administrador habilita todo el ciclo, `results` habilita los
+  estados del resultado. `ChatThreadScreen` consulta ese permiso por club.
+
+C08 → src/screens/ClubChallengesScreen.js. Dos booleanos independientes,
+  `puedoPublicar` (pubChallenge) y `puedoResponder` (answerChallenge), cada
+  acción colgada del permiso que la autoriza en el servidor.
+
+C09 → src/utils/formacionClub.js (`asignacionesVigentes`) y
+  src/screens/ClubLineupScreen.js. Una sola regla de ocupación: un puesto está
+  ocupado si su integrante sigue en el club, y se aplica al contar, al repartir
+  la banca, al autocompletar, al dibujar y al guardar.
+
+Pruebas: arneses 129 (14/14) y 130 (4/4) contra el esquema real, primero con
+su migración en la misma transacción y después contra el esquema aplicado, y
+los dos juntos (18/18). npm run verify: lint sin errores y 1.480 pruebas, 15
+nuevas para C07, C08 y C09.
+
+Pendiente de ejecutar: supabase/tests/clubes_membresia_concurrente_test.cjs,
+las tres carreras de C04–C06 con dos conexiones. Está escrito pero necesita un
+PostgreSQL local, que este equipo no tiene instalado.
+
+La limitación conocida del final del informe (los dos guardados simultáneos de
+la alineación) se deja como estaba, por la misma razón que la acepta
+clubLineup.js:39-43.

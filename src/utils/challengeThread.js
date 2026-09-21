@@ -123,6 +123,11 @@ export function challengeCtaContext({
   // NO pertenecer al club proponente ni siquiera como jugador, así que sin
   // este dato la interfaz ofrecería un botón que el servidor va a rechazar.
   misClubIdsTodos = null,
+  // Los clubes del desafío donde tengo el permiso `results`, sea por ser
+  // administrador o porque me lo delegaron (migración 119). Registrar y
+  // confirmar el resultado los autoriza ESE permiso en el servidor, no el
+  // rol: sin este dato el hilo le decía «Solo lectura» a quien sí podía.
+  misClubIdsResultados = null,
   online = true,
   sancion = null,
   propuesta = null,
@@ -131,7 +136,14 @@ export function challengeCtaContext({
 } = {}) {
   const clubes = Array.isArray(misClubIds) ? misClubIds.filter(Boolean) : [];
   const delDesafio = [challenge?.club_retador_id, challenge?.club_retado_id].filter(Boolean);
-  const myClubId = clubes.find((id) => delDesafio.includes(id)) || null;
+  const conResultados = (Array.isArray(misClubIdsResultados) ? misClubIdsResultados : [])
+    .filter(Boolean)
+    .filter((id) => delDesafio.includes(id));
+  // Mi club en este desafío es mi club, lo administre o no: si no, el delegado
+  // de resultados no podría distinguir «esperando al rival» de «te toca
+  // confirmar», que es exactamente lo que diferencia esos dos estados.
+  const myClubId =
+    clubes.find((id) => delDesafio.includes(id)) || conResultados[0] || null;
 
   // Unión y no reemplazo: ser administrador implica ser integrante, así que
   // omitir `misClubIdsTodos` nunca puede dar menos pertenencias de las que ya
@@ -148,6 +160,7 @@ export function challengeCtaContext({
     challenge: challenge || {},
     myClubId,
     soyAdmin: clubes.length > 0,
+    puedeResultados: conResultados.length > 0,
     pertenezcoAlProponente: !!proponente && todos.includes(proponente),
     online,
     sancion,

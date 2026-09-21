@@ -140,3 +140,29 @@ export function autocompletarAsignaciones(puestosLibres, banca) {
   });
   return asignaciones;
 }
+
+/**
+ * Las asignaciones que todavía corresponden a integrantes del club.
+ *
+ * EL FALLO QUE LA TRAJO (C09). El JSON guardado en `club_lineups.asignaciones`
+ * es `{ puesto: member_id }` y sobrevive a la nómina: expulsar al arquero deja
+ * su `member_id` dentro. El tablero lo dibujaba VACÍO —el render busca al
+ * integrante y no lo encuentra— pero lo seguía contando como ocupado, porque
+ * el contador y la búsqueda de puestos libres sólo miraban si existía la
+ * clave. Resultado: «7/7» con un puesto vacío en pantalla, y «No queda banca
+ * disponible» con gente en la banca.
+ *
+ * La regla tiene que ser UNA: un puesto está ocupado si su integrante sigue
+ * en el club. Acá se aplica una vez y la pantalla la usa para contar, para
+ * repartir la banca, para autocompletar y para guardar.
+ *
+ * No modifica el objeto recibido: devuelve uno nuevo, y el mismo si no hay
+ * nada que depurar, para no disparar renders de más.
+ */
+export function asignacionesVigentes(asignaciones = {}, members = []) {
+  const vivos = new Set((members || []).map((m) => m && m.member_id).filter(Boolean));
+  const entradas = Object.entries(asignaciones || {});
+  const limpias = entradas.filter(([, memberId]) => vivos.has(memberId));
+  if (limpias.length === entradas.length) return asignaciones || {};
+  return Object.fromEntries(limpias);
+}

@@ -12,7 +12,7 @@ La pestaña Clubes abre una PORTADA propia, no el detalle de un club: `ClubsScre
 
 ## Reglas y permisos
 
-Una persona puede integrar hasta tres clubes y una sola vez cada club. Estándar admite 15 integrantes/1 administrador y Premium 26/3; triggers validan topes. El administrador siempre puede gestionar club, miembros, fotos, desafíos y mensajes importantes; miembros leen y escriben el chat del club. Desde la migración 119, nueve de esas acciones (ver [Permisos del club](#permisos-del-club-migración-119)) son DELEGABLES por rol (capitán/jugador) o por integrante — el default con el que nace un club sigue siendo el mismo de siempre (sólo el admin, salvo capitán con la alineación), así que nada cambia hasta que un administrador entra a «Permisos de club» y lo cambia a propósito. Un desafío pendiente por par de clubes y la expiración a siete días se controlan en base de datos.
+Una persona puede integrar hasta tres clubes y una sola vez cada club. Estándar admite 15 integrantes/1 administrador y Premium 26/3; triggers validan topes, y desde la migración 130 toda escritura de la nómina se serializa por club y por jugador —en ese orden— antes de contar: sin eso, dos aceptaciones simultáneas pasaban el tope del club, dos altas del mismo jugador pasaban el máximo de tres clubes y dos administradores podían salir a la vez dejando el club sin ninguno. El administrador siempre puede gestionar club, miembros, fotos, desafíos y mensajes importantes; miembros leen y escriben el chat del club. Desde la migración 119, nueve de esas acciones (ver [Permisos del club](#permisos-del-club-migración-119)) son DELEGABLES por rol (capitán/jugador) o por integrante — el default con el que nace un club sigue siendo el mismo de siempre (sólo el admin, salvo capitán con la alineación), así que nada cambia hasta que un administrador entra a «Permisos de club» y lo cambia a propósito. Un desafío pendiente por par de clubes y la expiración a siete días se controlan en base de datos.
 
 ## Ciclo formal de desafíos (en construcción)
 
@@ -554,6 +554,14 @@ en el resto de Integrantes.
 **Escrita y probada, pendiente de aplicar**: `119_permisos_del_club.sql`
 (arnés `119_permisos_del_club_test.sql`, ~20 casos) todavía no se corrió
 contra la base en producción.
+
+## La revisión del 21 de septiembre (migraciones 129 y 130)
+
+Nueve hallazgos, todos corregidos el mismo día. Los tres P1 eran de autorización y están en [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md): el permiso que sobrevivía a la expulsión, la invitación que servía para entrar a otro club y el `editClub` que alcanzaba para cambiarse de plan. Los tres se reprodujeron **contra producción** antes de tocar nada, porque el informe había mirado sólo el código versionado y advertía que dependían de privilegios que no había podido consultar.
+
+Los tres de concurrencia (topes de integrantes, máximo de tres clubes por jugador y las dos salidas de administrador a la vez) se cierran con un solo trigger, `aa_club_members_serializa`, que toma un bloqueo por club y otro por jugador —siempre en ese orden— antes de que corran las tres funciones que cuentan. Ninguna de ellas cambió: lo que faltaba no era la comprobación sino que nadie más pudiera estar contando lo mismo.
+
+Del lado del cliente quedaron tres reglas escritas donde se pueden probar. **El permiso de resultados se resuelve por acción y no por rol**: el hilo del desafío preguntaba «¿soy administrador?» y devolvía «Solo lectura» antes de mirar el estado, así que al delegado de `results` no le aparecía ni registrar ni confirmar, que es justo lo que el servidor sí le autoriza; ahora `challengeCtaContext` recibe los clubes donde tengo ese permiso y `getChallengeCta` lo mira sólo en los estados del resultado. **El tablero de desafíos conserva dos booleanos**, uno por `pubChallenge` y otro por `answerChallenge`, en vez de juntarlos en uno que habilitaba acciones distintas. Y **la alineación cuenta con la nómina de ahora**: `asignacionesVigentes()` depura los `member_id` que ya no están en el club, así que un expulsado deja de contar como puesto ocupado y su lugar vuelve a estar libre para autocompletar.
 
 ## Pantallas y dependencias
 

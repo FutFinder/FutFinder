@@ -98,6 +98,7 @@ import {
   clubPropioDelDesafio,
 } from '../utils/challengeThread';
 import { reportUser } from '../services/reports';
+import { getMisPermisosEnClub } from '../services/clubPermissions';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
 import {
@@ -171,6 +172,11 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [challengeBusy, setChallengeBusy] = useState(false);
   const [myClubIds, setMyClubIds] = useState([]);
   const [myClubIdsTodos, setMyClubIdsTodos] = useState([]);
+  // Los clubes del desafío donde puedo tocar el RESULTADO. No es lo mismo que
+  // ser administrador: la 119 permite delegar `results`, y el servidor lo
+  // autoriza por permiso. Sin esto, al delegado el hilo le decía «Solo
+  // lectura» y no le daba la entrada a registrar ni a confirmar.
+  const [myClubIdsResultados, setMyClubIdsResultados] = useState([]);
   // El club propio del desafío (con su `tema`), para pintar la cabecera y la
   // tarjeta de cambio con el acento de MI club, no el del rival.
   const [miClub, setMiClub] = useState(null);
@@ -403,6 +409,18 @@ export default function ChatThreadScreen({ route, navigation }) {
         // exige NO pertenecer al club proponente ni siquiera como jugador.
         setMyClubIdsTodos(filas.map((m) => m.club_id));
       }
+
+      // El permiso de resultados se pregunta por club, porque puede venir
+      // delegado a un jugador. Un fallo de esta consulta deja la lista vacía:
+      // se pierde el atajo, no el hilo.
+      const permisos = await Promise.all(
+        (membresias || []).map((m) =>
+          getMisPermisosEnClub(m.club_id)
+            .then((r) => (r?.data?.permisos?.results ? m.club_id : null))
+            .catch(() => null)
+        )
+      );
+      if (alive) setMyClubIdsResultados(permisos.filter(Boolean));
     })();
     return () => {
       alive = false;
@@ -749,6 +767,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         challenge: clubChallenge,
         misClubIds: myClubIds,
         misClubIdsTodos: myClubIdsTodos,
+        misClubIdsResultados: myClubIdsResultados,
         online: connection !== 'offline',
         propuesta: challengeProposal,
         respuestasProrroga: prorrogaReplies,
@@ -763,6 +782,7 @@ export default function ChatThreadScreen({ route, navigation }) {
     clubChallenge,
     myClubIds,
     myClubIdsTodos,
+    myClubIdsResultados,
     connection,
     challengeProposal,
     prorrogaReplies,
