@@ -185,3 +185,10 @@ test('addMinutesToHora: 90 minutos suma hora y media', () => {
 test('addMinutesToHora: cruza la medianoche', () => {
   assert.equal(addMinutesToHora('23:00', 90), '00:30');
 });
+
+test('addMinutesToHora: conserva los minutos de la hora de inicio, no sólo la hora', () => {
+  // HALLAZGO: descartaba los minutos de `horaInicio` (sólo tomaba la hora),
+  // así que '14:30' + 60 daba '15:00' en vez de '15:30'.
+  assert.equal(addMinutesToHora('14:30', 60), '15:30');
+  assert.equal(addMinutesToHora('14:45', 90), '16:15');
+});

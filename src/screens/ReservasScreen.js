@@ -7,7 +7,6 @@ import {
   MapPin,
   Star,
   SlidersHorizontal,
-  Calendar,
   CalendarDays,
   ShieldCheck,
   Building2,
@@ -430,14 +429,6 @@ export default function ReservasScreen({ navigation }) {
               )}
             </View>
 
-            <Pressable
-              onPress={() => proximamente('Muy pronto vas a poder ver todas tus reservas desde aquí.')}
-              style={styles.misReservasRow}
-            >
-              <Calendar color={C.green} size={17} strokeWidth={2} />
-              <Text style={styles.misReservasText}>3 próximas · 1 desafío de club</Text>
-            </Pressable>
-
             {recintos.length === 0 ? <InvitacionRecinto solicitud={solicitud} navigation={navigation} /> : null}
           </>
         )}
@@ -740,15 +731,6 @@ const styles = StyleSheet.create({
   complejoSector: { fontFamily: F.medium, fontSize: 12.5, color: C.textSecondary, marginTop: 2 },
   tiposRow: { flexDirection: 'row', gap: 6, marginTop: 10 },
   proximaHora: { fontFamily: F.semiBold, fontSize: 12, color: C.textMuted, marginTop: 10 },
-
-  misReservasRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 22,
-    paddingVertical: 6,
-  },
-  misReservasText: { fontFamily: F.bold, fontSize: 13.5, color: C.textPrimary },
 
   invitacionCard: { marginTop: 18 },
   invitacionFila: { flexDirection: 'row', alignItems: 'center', gap: 10 },

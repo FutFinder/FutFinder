@@ -90,9 +90,16 @@ export default function SolicitudRecintoScreen({ navigation }) {
    * después de llenar todo el formulario sería la peor forma de enterarse.
    */
   const agregarFotos = async () => {
+    // Sin este guardia, dos toques rápidos sobre "Agregar fotos" —antes de
+    // que el picker nativo alcance a abrirse, que es donde `subiendo` recién
+    // se ponía en `true`— calculaban `restantes` los dos sobre el mismo
+    // `form.fotos.length` inicial, y el resultado final podía superar
+    // `MAX_FOTOS`.
+    if (subiendo) return;
     const restantes = MAX_FOTOS - form.fotos.length;
     if (restantes <= 0) return;
 
+    setSubiendo(true);
     const { ok, assets, reason } = await pickImages({
       quality: 0.8,
       selectionLimit: restantes,
@@ -101,10 +108,10 @@ export default function SolicitudRecintoScreen({ navigation }) {
     if (!ok) {
       // Cancelar no es un error que mostrar: es alguien que se arrepintió.
       if (reason && reason !== 'Cancelado') setError(reason);
+      setSubiendo(false);
       return;
     }
 
-    setSubiendo(true);
     setError(null);
     // De a una y en orden: una falla corta el resto en vez de dejar huecos, y
     // las que ya subieron se conservan — no hay que volver a elegirlas.

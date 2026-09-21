@@ -72,7 +72,7 @@ export default function PanelRecintoScreen({ navigation, route }) {
     setResumen(resumenDelPanel(agenda.data?.resumen));
     setProximas(prox.data || null);
     setCanchas(ks.data || []);
-    setError(lista.error?.message || agenda.error?.message || prox.error?.message || null);
+    setError(lista.error?.message || agenda.error?.message || prox.error?.message || ks.error?.message || null);
     setCargando(false);
   }, [complejoId]);
 

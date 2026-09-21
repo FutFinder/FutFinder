@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Clock } from 'lucide-react-native';
@@ -26,12 +26,20 @@ export default function FechaHoraScreen({ navigation, route }) {
   // La disponibilidad se vuelve a pedir CADA VEZ que cambia la fecha. Con los
   // datos de ejemplo daba lo mismo —la grilla era siempre la misma— pero
   // contra la base cada día tiene sus reservas y sus bloqueos.
+  //
+  // Token de la carga vigente: tocar varios días seguido rápido dispara
+  // varios `load()` a la vez, y sin esto la respuesta de un día más lento
+  // podía llegar DESPUÉS que la del día elegido después y pisar la grilla
+  // con la disponibilidad de un día que ya no es el seleccionado.
+  const loadTokenRef = useRef(0);
   const load = useCallback(async () => {
+    const token = ++loadTokenRef.current;
     setLoading(true);
     const [{ data: c }, { data: disp }] = await Promise.all([
       getComplejoById(complejoId),
       getDisponibilidad(canchaId, fechas[fechaIdx].iso),
     ]);
+    if (token !== loadTokenRef.current) return;
     setComplejo(c);
     // LAS HORAS QUE YA PASARON NO SE MUESTRAN. Mostrarlas tachadas sería
     // media pantalla de ruido sobre algo que nadie puede elegir, y con la

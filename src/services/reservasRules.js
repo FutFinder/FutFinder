@@ -125,13 +125,13 @@ export function fechaLabel(option) {
 }
 
 /**
- * Hora de término dada una hora de inicio "HH:00" y una duración en minutos
+ * Hora de término dada una hora de inicio "HH:MM" y una duración en minutos
  * (60 o 90) — a diferencia del prototipo, que siempre suma 1 hora sin mirar
  * la duración elegida.
  */
 export function addMinutesToHora(horaInicio, minutos) {
-  const [h] = horaInicio.split(':').map(Number);
-  const totalMin = h * 60 + minutos;
+  const [h, m] = horaInicio.split(':').map(Number);
+  const totalMin = h * 60 + (m || 0) + minutos;
   const hh = Math.floor(totalMin / 60) % 24;
   const mm = totalMin % 60;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;

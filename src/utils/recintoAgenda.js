@@ -274,7 +274,11 @@ export function bloquesDeTarifa({ horaDesde, horaHasta, horaApertura, horaCierre
   for (let inicio = abre; inicio + paso <= cierra; inicio += paso) {
     if (inicio >= desde && inicio < hasta) {
       dentro.push(minutosAHora(inicio));
-    } else if (inicio === hasta && elDelBorde === null) {
+    } else if (inicio >= hasta && elDelBorde === null) {
+      // `>=`, no `===`: una tarifa puede terminar en un minuto que no
+      // coincide con el inicio de ningún bloque (`16:30` con bloques de 60
+      // que empiezan en horas en punto). El primer bloque que arranca EN o
+      // DESPUÉS del fin de la tarifa es el del borde, coincida o no exacto.
       elDelBorde = minutosAHora(inicio);
     }
   }

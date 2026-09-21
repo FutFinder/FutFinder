@@ -5,6 +5,7 @@ import {
   consumirPasswordPendiente,
   olvidarPasswordPendiente,
 } from './pendingSignUp';
+import { olvidarIntencion } from '../utils/intencionDeReserva';
 
 /**
  * Servicio de autenticación de FutFinder.
@@ -132,6 +133,12 @@ export async function requestPasswordResetForEmail(email) {
 }
 
 export async function signOut() {
+  // «Vengo a reservar la cancha de este partido» vive en una variable de
+  // módulo, no de sesión (ver utils/intencionDeReserva.js): sin soltarla
+  // acá, quedaba viva hasta 30 minutos después de cerrar sesión, y en un
+  // dispositivo compartido la siguiente persona que entrara a reservar
+  // podía ver el aviso con el partido y el club rival de la cuenta anterior.
+  olvidarIntencion();
   if (!isSupabaseConfigured) return { error: null };
   const { error } = await supabase.auth.signOut();
   return { error };

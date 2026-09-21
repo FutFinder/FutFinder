@@ -97,7 +97,13 @@ export default function ArmarReservaScreen({ navigation, route }) {
           text: 'Sacar',
           style: 'destructive',
           onPress: async () => {
+            // Mismo guardia que `poneMiParte`: sin esto, un doble toque
+            // sobre el botón de "Sacar" (a diferencia del diálogo, que sólo
+            // protege UN toque) podía mandar dos llamadas seguidas.
+            if (ocupado) return;
+            setOcupado(true);
             const { data, error: e } = await quitarJugador(reservaId, p.userId);
+            setOcupado(false);
             if (e || !data?.ok) setAviso({ tono: 'warning', texto: data?.reason || e?.message });
             load();
           },
@@ -107,7 +113,10 @@ export default function ArmarReservaScreen({ navigation, route }) {
   };
 
   const empujar = async () => {
+    if (ocupado) return;
+    setOcupado(true);
     const { data, error: e } = await recordarPago(reservaId);
+    setOcupado(false);
     setAviso(data?.ok
       ? { tono: 'success', texto: `Les avisamos a ${data.avisados}.` }
       : { tono: 'warning', texto: data?.reason || e?.message || 'No se pudo avisar.' });
@@ -262,7 +271,7 @@ export default function ArmarReservaScreen({ navigation, route }) {
               />
             ) : null}
             {puedeRecordar(detalle) ? (
-              <Button variant="secondary" icon={BellRing} label="Recordarles a los que faltan" onPress={empujar} />
+              <Button variant="secondary" icon={BellRing} label="Recordarles a los que faltan" onPress={empujar} disabled={ocupado} />
             ) : null}
           </View>
         ) : null}

@@ -333,7 +333,27 @@ test('bloquesDeTarifa: con bloques de 90 min cambian qué bloques caen en cada t
     horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 90,
   });
   assert.deepEqual(r.dentro, ['11:00', '12:30', '14:00', '15:30']);
-  assert.equal(r.elDelBorde, null, 'ningún bloque empieza exactamente a las 16:00');
+  // HALLAZGO corregido: ningún bloque empieza EXACTO a las 16:00, pero el
+  // de las 17:00 es el primero que queda afuera — antes, con el borde
+  // exigiendo coincidencia exacta, esto se leía como «no hay borde», y la
+  // previsualización se quedaba sin mostrar ningún bloque en punteado
+  // aunque sí exista uno justo después del corte de la tarifa.
+  assert.equal(r.elDelBorde, '17:00', 'el primer bloque que arranca en o después del fin de la tarifa');
+});
+
+test('bloquesDeTarifa: una tarifa que no termina alineada a la grilla de bloques igual marca el borde', () => {
+  // HALLAZGO: `horaHasta` no tiene por qué coincidir con el inicio de un
+  // bloque (una tarifa se puede fijar cada 30 min, y las canchas pueden
+  // tener bloques de 60). Con 16:30 y bloques de 60 desde las 11:00
+  // (11,12,13,14,15,16,17...), ningún bloque empieza EXACTO a las 16:30, y
+  // el borde exigiendo `===` lo dejaba sin marcar. El de las 17:00 —el
+  // primero que arranca en o después del corte— es el correcto.
+  const r = bloquesDeTarifa({
+    horaDesde: '11:00', horaHasta: '16:30',
+    horaApertura: '11:00', horaCierre: '22:00', duracionSlotMin: 60,
+  });
+  assert.deepEqual(r.dentro, ['11:00', '12:00', '13:00', '14:00', '15:00', '16:00']);
+  assert.equal(r.elDelBorde, '17:00');
 });
 
 test('bloquesDeTarifa: el último bloque tiene que TERMINAR antes del cierre', () => {
