@@ -348,8 +348,19 @@ Y de la misma revisión salió una tercera: `cancel_match_and_join` BORRABA el
   en supabase/migrations/127_cancelar_para_cambiarse_no_borra_el_partido.sql
   (aplicada).
 
+Y un barrido final de las 25 funciones que escriben partidos, inscripciones o
+  lista de espera encontró tres fallas vivas más de la misma familia, ninguna
+  del informe: el recordatorio de 1 hora NO le llegaba a los partidos llenos
+  (filtraba sólo `abierto`), el recordatorio de calificar se mandaba en
+  partidos cancelados —N10 otra vez, por la puerta del cron— y salirse de un
+  encuentro de clubes cancelado le sumaba un cupo. Las tres reproducidas
+  contra producción y corregidas en
+  supabase/migrations/128_los_avisos_automaticos_miran_el_estado.sql
+  (aplicada), junto con dos endurecimientos de carrera en `reject_join` y
+  `approve_join`.
+
 Pruebas: los arneses 122 (19/19), 123 (10/10), 124 (3/3), 125 (16/16),
-  126 (3/3) y 127 (16/16)
+  126 (3/3), 127 (16/16) y 128 (12/12)
 corrieron contra el esquema real, primero con su migración en la misma
 transacción y después contra el esquema aplicado. El de la 125 se corrió
 también como control negativo contra las funciones viejas, y reprodujo el
