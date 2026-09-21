@@ -288,11 +288,20 @@ function consultaDePartidos({ filtros = {}, texto = '', estados = ['abierto', 'l
  * PAGINA POR CURSOR (`despuesDe`), NO POR OFFSET NUMÉRICO. Un `range(desde,
  * desde+limite)` cuenta POSICIONES, y la app publica partidos todo el
  * tiempo: si alguien publica uno con una hora más temprana que la ya
- * mostrada, cada fila de ahí en adelante se corre un lugar, así que «la
- * página siguiente» por offset puede repetir una fila ya vista o saltarse
- * una entera, sin que nada lo avise. Con el cursor, «la página siguiente» es
- * siempre «lo que viene después de la hora del último partido que ya viste»
- * — no importa qué se insertó antes de ese punto mientras tanto. Queda una
+ * mostrada, cada fila de ahí en adelante se corre un lugar.
+ *
+ * COMPROBADO CONTRA LA BASE REAL (no sólo razonado): con el offset, `desde`
+ * se pide como `matches.length` —el tamaño ya DEDUPLICADO en el cliente—,
+ * así que una sola publicación intercalada no pierde nada para siempre: el
+ * duplicado que aparece se descarta y `desde` se autocorrige solo en la
+ * página siguiente. El problema real, medido con una ráfaga de publicaciones
+ * mayor a `limite` entre dos páginas, es que cada página siguiente vuelve a
+ * traer sobre todo duplicados —2 partidos nuevos de 5 por página en vez de
+ * 5 de 5— y `cargarMas()` necesita muchas más vueltas de «Ver más partidos»
+ * para llegar a lo mismo que el cursor obtiene sin ningún duplicado. No es
+ * «partidos invisibles hasta un refresh»: es paginación que se vuelve lenta
+ * y repetitiva justo cuando más gente está publicando a la vez. El cursor
+ * evita el problema de raíz, sin duplicados en ningún escenario. Queda una
  * grieta aceptada: más partidos que un tamaño de página con la MISMA `hora`
  * exacta al segundo, un empate que el desempate compuesto resolvería pero
  * que no vale la complejidad frente a lo raro que es.
