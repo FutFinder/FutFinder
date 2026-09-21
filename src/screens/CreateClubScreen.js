@@ -81,27 +81,29 @@ export default function CreateClubScreen({ navigation }) {
       return;
     }
 
+    // Los dos se intentan siempre, aunque el primero falle: antes, si sólo
+    // el logo fallaba, se volvía atrás sin ni probar el banner —aunque el
+    // usuario hubiera elegido los dos y el banner no tuviera ningún
+    // problema— y el aviso sólo mencionaba el logo, dejando creer que el
+    // banner sí había quedado.
+    const fallos = [];
     if (logoAsset && data?.id) {
       const { error: logoErr } = await uploadClubLogo(data.id, logoAsset);
-      if (logoErr) {
-        setBanner({ type: 'error', title: 'Club creado, pero falló el logo', message: logoErr.message });
-        setSaving(false);
-        navigation.goBack();
-        return;
-      }
+      if (logoErr) fallos.push('el logo');
     }
-
     if (bannerAsset && data?.id) {
       const { error: bannerErr } = await uploadClubBanner(data.id, bannerAsset);
-      if (bannerErr) {
-        setBanner({ type: 'error', title: 'Club creado, pero falló el banner', message: bannerErr.message });
-        setSaving(false);
-        navigation.goBack();
-        return;
-      }
+      if (bannerErr) fallos.push('el banner');
     }
 
     setSaving(false);
+    if (fallos.length > 0) {
+      setBanner({
+        type: 'error',
+        title: 'Club creado, pero algo falló',
+        message: `El club quedó creado, pero falló subir ${fallos.join(' y ')}. Puedes volver a subirlo desde «Editar club».`,
+      });
+    }
     // Volvemos al tab Clubes: el useFocusEffect recarga y muestra el club nuevo
     navigation.goBack();
   };

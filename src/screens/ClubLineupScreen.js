@@ -296,9 +296,16 @@ export default function ClubLineupScreen({ navigation, route }) {
       personalizado,
       asignaciones,
       puestosPersonalizados: custom,
+      expectedUpdatedAt: lineup?.updated_at ?? null,
     });
     setSaving(false);
     if (error) {
+      if (error.conflict) {
+        // No se guardó nada: recargamos para que la pantalla muestre la
+        // alineación real antes de que el admin decida qué hacer, en vez de
+        // dejarlo mirando su versión vieja con el error encima.
+        await load();
+      }
       flash(error.message || 'No se pudo guardar');
       return;
     }

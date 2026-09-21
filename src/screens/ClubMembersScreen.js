@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -112,9 +112,16 @@ export default function ClubMembersScreen({ navigation, route }) {
   const puedeEditarApodos = soyAdmin || !!misPermisos?.editNicks;
   const puedeExpulsar = soyAdmin || !!misPermisos?.removeMembers;
 
+  // Token de la carga vigente: navegar adentro/afuera rápido puede disparar
+  // varios `load()` seguidos vía `useFocusEffect`, y sin esto la respuesta
+  // de uno viejo podía llegar DESPUÉS que la de uno nuevo y pisar el estado.
+  const loadTokenRef = useRef(0);
+
   const load = useCallback(async () => {
+    const token = ++loadTokenRef.current;
     const user = await getCurrentUser();
     const myId = user?.id || null;
+    if (token !== loadTokenRef.current) return;
     setMe(myId);
 
     const [{ data: c }, { data: ms }, { data: mine }] = await Promise.all([
@@ -122,6 +129,7 @@ export default function ClubMembersScreen({ navigation, route }) {
       listMembers(clubId),
       getMyClubs(),
     ]);
+    if (token !== loadTokenRef.current) return;
     setClub(c);
     setMembers(ms || []);
     setMyClubs(mine || []);
@@ -253,9 +261,14 @@ export default function ClubMembersScreen({ navigation, route }) {
     );
   };
 
-  const handlePromote = (member) => {
+  const handlePromote = async (member) => {
     const limites = CLUB_LIMITS[club?.plan] || CLUB_LIMITS.estandar;
-    const adminCount = members.filter((m) => m.rol === 'admin').length;
+    // Cuenta fresca, no la del último `load()`: si otro admin cambió el
+    // plantel entremedio, decidir con el número viejo podía ofrecer «se
+    // suma sin que dejes de ser admin» con el cupo ya lleno (o al revés), y
+    // el diálogo prometía algo que el servidor iba a rechazar al confirmar.
+    const { data: miembrosFrescos, error: errFrescos } = await listMembers(clubId);
+    const adminCount = (errFrescos ? members : miembrosFrescos).filter((m) => m.rol === 'admin').length;
 
     if (adminCount < limites.admins) {
       // hay cupo: se suma como admin sin que yo deje de serlo

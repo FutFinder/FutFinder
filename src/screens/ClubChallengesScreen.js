@@ -321,7 +321,12 @@ export default function ClubChallengesScreen({ navigation, route }) {
       abrirNegociacion({
         id: data.id,
         estado: 'negociacion',
-        club_retado_id: clubId,
+        // El lado real lo decide el servidor, no se asume: `club_retado_id`
+        // viene de la fila que devolvió `aceptar_respuesta_desafio_abierto`.
+        // Asumir «mi club siempre es el retado» dejaba el título del chat
+        // («{retador} vs {retado}») al revés cuando la convención real era
+        // la otra.
+        club_retado_id: data.club_retado_id,
         otroClub: resp.club,
       });
     }
@@ -342,7 +347,10 @@ export default function ClubChallengesScreen({ navigation, route }) {
     setWorking(true);
     const { error } = await reconsiderResponse(resp.id);
     setWorking(false);
-    if (error) return;
+    if (error) {
+      setBanner({ type: 'error', title: 'No se pudo reconsiderar', message: error.message });
+      return;
+    }
     await recargarRespuestas();
   };
 
@@ -372,7 +380,10 @@ export default function ClubChallengesScreen({ navigation, route }) {
     setWorking(true);
     const { error } = await withdrawResponse(resp.id);
     setWorking(false);
-    if (error) return;
+    if (error) {
+      setBanner({ type: 'error', title: 'No se pudo retirar la respuesta', message: error.message });
+      return;
+    }
     await load();
   };
 
@@ -380,7 +391,10 @@ export default function ClubChallengesScreen({ navigation, route }) {
     setWorking(true);
     const { error } = await reconsiderMyResponse(resp.id);
     setWorking(false);
-    if (error) return;
+    if (error) {
+      setBanner({ type: 'error', title: 'No se pudo reconsiderar', message: error.message });
+      return;
+    }
     await load();
   };
 

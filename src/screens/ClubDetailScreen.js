@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -140,9 +140,17 @@ export default function ClubDetailScreen({ navigation, route }) {
   // Soy admin de algún club → puedo desafiar a los rivales del carrusel.
   const puedoDesafiarRivales = (myClubs || []).some((c) => c.miRol === 'admin');
 
+  // Token de la carga vigente: si el usuario navega adentro/afuera rápido,
+  // `useFocusEffect` dispara varios `load()` seguidos, y sin esto la
+  // respuesta de uno viejo podía llegar DESPUÉS que la de uno nuevo y pisar
+  // el estado con datos que ya no corresponden.
+  const loadTokenRef = useRef(0);
+
   const load = useCallback(async () => {
+    const token = ++loadTokenRef.current;
     const user = await getCurrentUser();
     const myId = user?.id || null;
+    if (token !== loadTokenRef.current) return;
     setMe(myId);
 
     const [
@@ -162,6 +170,7 @@ export default function ClubDetailScreen({ navigation, route }) {
       getClubMatchHistory(clubId),
       getClubEstadisticas(clubId),
     ]);
+    if (token !== loadTokenRef.current) return;
 
     setClub(c);
     setMembers(ms || []);

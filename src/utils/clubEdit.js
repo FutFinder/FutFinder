@@ -69,6 +69,18 @@ export function buildClubPatch({
     // El slug acompaña siempre al nombre: si no, la URL pública futura
     // seguiría apuntando al nombre viejo.
     patch.slug = slugClub(limpio);
+    // Un nombre de sólo símbolos/emoji (pasa el mínimo de 3 caracteres,
+    // pero `slugClub` sólo deja `a-z0-9\s-`) produce un slug vacío. Como
+    // `clubs.slug` tiene un índice único, el SEGUNDO club así choca contra
+    // el primero y el servidor devuelve 23505 — un «ya existe un club con
+    // ese nombre» que no es cierto: lo que choca es el slug vacío, no el
+    // nombre. Se corta acá, con un mensaje que sí explica qué pasa.
+    if (!patch.slug) {
+      return {
+        patch: null,
+        error: { message: 'El nombre necesita al menos una letra o un número' },
+      };
+    }
   }
 
   if (descripcion !== undefined) {

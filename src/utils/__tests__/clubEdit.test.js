@@ -73,6 +73,12 @@ test('un nombre de solo espacios se rechaza', () => {
   assert.match(error.message, /entre 3 y 40/);
 });
 
+test('un nombre de solo símbolos/emoji se rechaza con un mensaje propio, no llega a mandar un slug vacío', () => {
+  const { patch, error } = E.buildClubPatch({ nombre: '⚽⚽⚽' });
+  assert.equal(patch, null);
+  assert.match(error.message, /letra o un número/);
+});
+
 test('una descripción vacía se guarda como nula, no como cadena vacía', () => {
   assert.deepEqual(E.buildClubPatch({ descripcion: '   ' }).patch, { descripcion: null });
 });

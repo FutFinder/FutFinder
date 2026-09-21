@@ -30,15 +30,42 @@ export async function getClubLineup(clubId) {
  * Guarda (crea o sobrescribe) la alineación del club. La RLS de la 92 es
  * quien de verdad decide si puede: sólo admin/capitán del club, y sólo con
  * `updated_by` igual a quien llama.
+ *
+ * `expectedUpdatedAt` es el `updated_at` que la pantalla tenía cargado
+ * cuando empezó a editar (o `null` si nunca se había guardado una). Sin
+ * esto, el `upsert` de más abajo pisaba entera la fila sin comparar nada:
+ * dos admins editando a la vez, el segundo en guardar borraba el trabajo
+ * del primero sin ningún aviso, ni para el que pisó ni para el que perdió
+ * su trabajo. Se compara justo antes de escribir — queda una ventana breve
+ * entre la comprobación y el guardado real, aceptada a propósito: cerrarla
+ * del todo pide una transacción o una función en la base, y el objetivo acá
+ * es que dos ediciones EN PARALELO (minutos aparte) no se pisen en
+ * silencio, no blindar los dos guardados que caen en el mismo segundo.
  */
 export async function saveClubLineup(
   clubId,
-  { modo, formacion, personalizado, asignaciones, puestosPersonalizados }
+  { modo, formacion, personalizado, asignaciones, puestosPersonalizados, expectedUpdatedAt = null }
 ) {
   if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth?.user?.id;
   if (!uid) return { data: null, error: { message: 'No autenticado' } };
+
+  const { data: actual } = await supabase
+    .from('club_lineups')
+    .select('updated_at')
+    .eq('club_id', clubId)
+    .maybeSingle();
+  const actualUpdatedAt = actual?.updated_at || null;
+  if (actualUpdatedAt !== expectedUpdatedAt) {
+    return {
+      data: null,
+      error: {
+        message: 'Alguien más guardó una alineación distinta mientras editabas. Recarga para ver los cambios y vuelve a intentarlo.',
+        conflict: true,
+      },
+    };
+  }
 
   const { data, error } = await supabase
     .from('club_lineups')

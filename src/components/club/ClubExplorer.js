@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -89,21 +89,58 @@ export default function ClubExplorer({
   const [regionSel, setRegionSel] = useState('');
   const [comunaSel, setComunaSel] = useState('');
   const [picker, setPicker] = useState(null); // null | 'region' | 'comuna'
+  // Si alguna vez, SIN filtros, hubo al menos un club — para distinguir «no
+  // hay ningún club en FutFinder» de «no hay resultados para esta búsqueda».
+  const [hasAnyClub, setHasAnyClub] = useState(true);
+
+  // `fetchClubs` lee el texto/región/comuna vigentes por referencia, igual
+  // que `PartidosScreen`: así no se reconstruye (ni dispara el efecto de
+  // abajo) en cada tecla, y el buscador puede leer el valor MÁS RECIENTE sin
+  // esperar a que el estado se propague.
+  const queryRef = useRef(query);
+  const regionRef = useRef(regionSel);
+  const comunaRef = useRef(comunaSel);
+  queryRef.current = query;
+  regionRef.current = regionSel;
+  comunaRef.current = comunaSel;
+
+  /**
+   * Sólo el listado de clubes — con la búsqueda y los filtros YA dentro de
+   * la consulta al servidor, no aplicados después sobre una foto vieja de
+   * 30 clubes. Antes `ClubExplorer` pedía el catálogo una sola vez y
+   * filtraba nombre/región/comuna en el cliente sobre esa misma página: con
+   * más de 30 clubes en la base, uno real y bien escrito podía no aparecer
+   * nunca al buscarlo, porque ni siquiera había llegado al teléfono.
+   */
+  const fetchClubs = useCallback(async () => {
+    const filtros = {
+      query: queryRef.current,
+      region: regionRef.current || null,
+      comuna: comunaRef.current || null,
+    };
+    const { data: found, error: err } = modoRival
+      ? // En modo rival la exclusión viaja dentro de la consulta, no como un
+        // filtro posterior: un club propio no debe llegar ni a la respuesta.
+        await listRivalCandidates({ retadorClubId, ...filtros })
+      : await searchClubs(filtros);
+    setError(Boolean(err));
+    setClubs(found || []);
+    if (!filtros.query.trim() && !filtros.region && !filtros.comuna) {
+      setHasAnyClub((found || []).length > 0);
+    }
+    return found || [];
+  }, [modoRival, retadorClubId]);
 
   const load = useCallback(async () => {
-    const [{ data: found, error: err }, { data: mine }, { data: pendientes }] = await Promise.all([
-      // En modo rival la exclusión viaja dentro de la consulta, no como un
-      // filtro posterior: un club propio no debe llegar ni a la respuesta.
-      modoRival ? listRivalCandidates({ retadorClubId }) : searchClubs(''),
+    const [, { data: mine }, { data: pendientes }] = await Promise.all([
+      fetchClubs(),
       getMyClubs(),
       // Los que ya tienen un desafío mío sin responder. Se pide siempre que
       // haya un club que reta, incluso fuera de `modoRival`: el botón
       // «Desafiar» también sale en el catálogo completo.
       idsConDesafioPendiente(retadorClubId),
     ]);
-    setError(Boolean(err));
     setYaDesafiados(new Set(pendientes || []));
-    setClubs(found || []);
     const misIds = new Set((mine || []).map((m) => m.club?.id).filter(Boolean));
     setMisClubIds(misIds);
     setSoyAdminDeAlgo((mine || []).some((m) => m.miRol === 'admin'));
@@ -116,13 +153,26 @@ export default function ClubExplorer({
       setInvitations([]);
     }
     setLoading(false);
-  }, [modoRival, retadorClubId]);
+  }, [fetchClubs, modoRival, retadorClubId]);
 
   useFocusEffect(
     useCallback(() => {
       load();
     }, [load])
   );
+
+  // Cambiar el texto o los filtros vuelve a preguntarle al servidor. La
+  // primera vuelta se salta: `load()` en el foco inicial ya pidió lo mismo,
+  // y sin esto entrar a la pantalla disparaba dos consultas idénticas.
+  const yaPregunto = useRef(false);
+  useEffect(() => {
+    if (!yaPregunto.current) {
+      yaPregunto.current = true;
+      return undefined;
+    }
+    const t = setTimeout(() => fetchClubs(), query.trim() ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [query, regionSel, comunaSel, fetchClubs]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -169,18 +219,14 @@ export default function ClubExplorer({
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'es-CL'));
   }, [clubs, regionSel]);
 
-  const filteredClubs = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = q ? clubs.filter((c) => c.nombre.toLowerCase().includes(q)) : clubs;
-    if (regionSel) list = list.filter((c) => c.region === regionSel);
-    if (comunaSel) list = list.filter((c) => c.comuna === comunaSel);
-    return list;
-  }, [clubs, query, regionSel, comunaSel]);
+  // `clubs` ya viene filtrado por el servidor (texto + región + comuna): no
+  // hace falta volver a filtrarlo acá encima.
+  const filteredClubs = clubs;
 
   const filtersActive = Boolean(regionSel || comunaSel);
   const hasQuery = query.length > 0;
-  const showEmptyNoClubs = !loading && !error && clubs.length === 0;
-  const showEmptyNoResults = !loading && !error && clubs.length > 0 && filteredClubs.length === 0;
+  const showEmptyNoClubs = !loading && !error && clubs.length === 0 && !hasQuery && !filtersActive && !hasAnyClub;
+  const showEmptyNoResults = !loading && !error && clubs.length === 0 && (hasQuery || filtersActive || hasAnyClub);
 
   const clearFilters = () => {
     setRegionSel('');

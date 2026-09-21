@@ -30,6 +30,7 @@ import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { getMyClub, getMyClubIds } from '../services/clubs';
+import { getMisPermisosEnClub } from '../services/clubPermissions';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { seleccionInicio } from '../services/clubMatchRules';
 import useConfirmacion from '../components/useConfirmacion';
@@ -53,6 +54,11 @@ export default function HomeScreen({ navigation }) {
   const [busyMatchId, setBusyMatchId] = useState(null);
   const [previewMatchId, setPreviewMatchId] = useState(null);
   const [myClubData, setMyClubData] = useState(undefined);
+  // «Crear partido de club» con el permiso `pubChallenge`/`answerChallenge`
+  // delegado (migración 119, Permisos de club), no sólo con `rol === 'admin'`
+  // — antes un jugador con el permiso concedido no veía el botón acá, aunque
+  // ClubDetailScreen/ClubChallengesScreen ya lo dejaran desafiar igual.
+  const [puedeCrearPartidoDelegado, setPuedeCrearPartidoDelegado] = useState(false);
   const [nextMatch, setNextMatch] = useState(null);
   // Los partidos SIN filtrar por distancia, y mis clubes. El partido de mi
   // club puede jugarse lejos y aun así tengo que verlo: es de mi club.
@@ -120,6 +126,15 @@ export default function HomeScreen({ navigation }) {
     setProfile(prof);
     setMyUserId(userId);
     setMyClubData(clubResult?.data ?? null);
+
+    const miClub = clubResult?.data;
+    if (miClub && miClub.miRol !== 'admin' && miClub.club?.id) {
+      const { data: permisos } = await getMisPermisosEnClub(miClub.club.id).catch(() => ({ data: null }));
+      setPuedeCrearPartidoDelegado(!!(permisos?.permisos?.pubChallenge || permisos?.permisos?.answerChallenge));
+    } else {
+      setPuedeCrearPartidoDelegado(false);
+    }
+
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -206,6 +221,7 @@ export default function HomeScreen({ navigation }) {
         role: myClubData.miRol,           // 'admin' | 'member'
         totalMiembros: myClubData.totalMiembros,
         modalidad: myClubData.club.modalidad,
+        puedeCrearPartido: myClubData.miRol === 'admin' || puedeCrearPartidoDelegado,
       }
     : null;
 

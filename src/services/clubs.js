@@ -59,6 +59,15 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
   if (nombreClean.length < 3 || nombreClean.length > 40) {
     return { error: { message: 'El nombre debe tener entre 3 y 40 caracteres' } };
   }
+  // Un nombre de sólo símbolos/emoji pasa el mínimo de caracteres pero
+  // `slugClub` sólo deja `a-z0-9\s-`, así que produce un slug vacío. Con el
+  // índice único de `clubs.slug`, el SEGUNDO club así chocaría contra el
+  // primero con un 23505 que dice «ya existe un club con ese nombre» —
+  // falso: lo que choca es el slug vacío. Se corta antes, con un mensaje
+  // que sí explica qué pasa.
+  if (!slugClub(nombreClean)) {
+    return { error: { message: 'El nombre necesita al menos una letra o un número' } };
+  }
   // Modalidad, región y comuna dejaron de ser opcionales: un club sin ellas
   // no se puede ubicar ni saber a qué juega. La pantalla ya deshabilita el
   // botón sin los cuatro datos; esto es la misma regla del lado del
@@ -261,9 +270,20 @@ export async function getClubById(clubId) {
 
 /**
  * Busca clubes por nombre (para descubrir y solicitar entrar).
+ *
+ * `region`/`comuna` viajan EN la consulta, no como un filtro posterior en el
+ * cliente. Antes `ClubExplorer` pedía sólo `searchClubs('')` una vez —30
+ * clubes como mucho— y filtraba nombre/región/comuna sobre esa misma
+ * fotografía: con más de 30 clubes en la base, uno real y bien escrito podía
+ * no aparecer nunca por buscarlo, porque ni siquiera había llegado al
+ * teléfono. Acepta tanto `searchClubs('texto')` (forma antigua) como
+ * `searchClubs({ query, region, comuna })`.
  */
-export async function searchClubs(query = '') {
+export async function searchClubs(args = '') {
   if (!isSupabaseConfigured) return { data: [], error: null };
+
+  const { query = '', region = null, comuna = null } =
+    typeof args === 'string' ? { query: args } : args || {};
 
   const BASE_COLS =
     'id, nombre, slug, descripcion, foto_url, region, comuna, plan, verificado, modalidad, tema';
@@ -277,6 +297,8 @@ export async function searchClubs(query = '') {
       .order('created_at', { ascending: false })
       .limit(30);
     if (query.trim()) q = q.ilike('nombre', `%${query.trim()}%`);
+    if (region) q = q.eq('region', region);
+    if (comuna) q = q.eq('comuna', comuna);
     return q;
   };
 
@@ -326,6 +348,8 @@ export async function searchClubs(query = '') {
 export async function listRivalCandidates({
   retadorClubId = null,
   query = '',
+  region = null,
+  comuna = null,
   limit = 30,
 } = {}) {
   if (!isSupabaseConfigured) return { data: [], error: null };
@@ -341,7 +365,7 @@ export async function listRivalCandidates({
   const { data, error } = await leerTolerandoColumnas({
     registro: columnasClub,
     columnas: RIVAL_CLUB_COLUMNS,
-    leer: (columns) => buildRivalClubsQuery(supabase, { excludeIds, query, limit, columns }),
+    leer: (columns) => buildRivalClubsQuery(supabase, { excludeIds, query, region, comuna, limit, columns }),
   });
 
   if (error) {

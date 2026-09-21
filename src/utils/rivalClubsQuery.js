@@ -32,12 +32,14 @@ export const RIVAL_CLUB_COLUMNS =
  * @param excludeIds    ids de clubes que nunca deben aparecer: el club que
  *                      reta y todos los clubes del usuario
  * @param query         término de búsqueda por nombre
+ * @param region        región exacta (opcional)
+ * @param comuna        comuna exacta (opcional)
  * @param limit         tope de filas
  * @param columns       columnas a traer
  */
 export function buildRivalClubsQuery(
   client,
-  { excludeIds = [], query = '', limit = 30, columns = RIVAL_CLUB_COLUMNS } = {}
+  { excludeIds = [], query = '', region = null, comuna = null, limit = 30, columns = RIVAL_CLUB_COLUMNS } = {}
 ) {
   let q = client.from('clubs').select(columns);
 
@@ -52,6 +54,8 @@ export function buildRivalClubsQuery(
   if (term.length > 0) {
     q = q.ilike('nombre', `%${term}%`);
   }
+  if (region) q = q.eq('region', region);
+  if (comuna) q = q.eq('comuna', comuna);
 
   // Mismo orden que searchClubs(): los verificados primero.
   return q

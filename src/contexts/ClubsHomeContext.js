@@ -12,6 +12,7 @@ import {
 import { getClubEstadisticas } from '../services/clubMatches';
 import { listChallengesForClub } from '../services/clubChallenges';
 import { getPropuestaVigente } from '../services/clubProposals';
+import { getMisPermisosEnClub } from '../services/clubPermissions';
 import { getCambiosDelPartido } from '../services/clubMatchChanges';
 import { getNominaPartido } from '../services/clubRoster';
 import { getSancionVigente } from '../services/clubSanctions';
@@ -282,7 +283,7 @@ export function ClubsHomeProvider({ children }) {
 
         const membresiaActiva = misClubes.find((m) => m.club?.id === activeId);
         const role = membresiaActiva?.miRol || 'jugador';
-        const can = permisosDeClub(role);
+        let can = permisosDeClub(role);
 
         // ── Primera ronda: nada depende de nada acá ──────────────
         const [
@@ -294,6 +295,7 @@ export function ClubsHomeProvider({ children }) {
           rivalesData,
           notifsData,
           partidosData,
+          permisosDelegados,
         ] = await Promise.all([
           segura(
             listChallengesForClub(activeId),
@@ -313,8 +315,20 @@ export function ClubsHomeProvider({ children }) {
           ),
           segura(listNotifications({ limit: 50 }).then((r) => r.data || []), [], 'listNotifications'),
           segura(listPartidosDeClub(activeId).then((r) => r.data || []), [], 'listPartidosDeClub'),
+          // Quien no es admin puede tener `pubChallenge`/`answerChallenge`
+          // delegado (migración 119, Permisos de club) — `can.responderDesafios`
+          // de más arriba sólo mira el rol, y sin esto la portada le escondía
+          // «Desafiar» a alguien que SÍ puede, aunque ClubDetailScreen y
+          // ClubChallengesScreen ya lo dejaran hacerlo por su cuenta.
+          role === 'admin'
+            ? Promise.resolve(null)
+            : segura(getMisPermisosEnClub(activeId).then((r) => r.data?.permisos || null), null, 'getMisPermisosEnClub'),
         ]);
         if (!vivo) return;
+
+        if (permisosDelegados?.pubChallenge || permisosDelegados?.answerChallenge) {
+          can = { ...can, responderDesafios: true };
+        }
 
         // Un solo reloj: elige el partido, redacta su plazo y mide la ventana
         // de los desenlaces. Con dos, un desafío cerrado justo en el borde

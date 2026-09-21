@@ -90,6 +90,11 @@ export async function uploadClubPhoto(asset, clubId) {
 
   if (error) {
     console.error('[FutFinder] uploadClubPhoto db:', error);
+    // El archivo ya quedó en el storage antes de este fallo (RLS, red): sin
+    // esto se quedaba huérfano ahí para siempre, sin fila que lo referencie
+    // y sin que nadie lo vea ni lo borre. Best-effort: si el borrado
+    // también falla, no tapa el error real de la subida.
+    await supabase.storage.from('club-gallery').remove([path]).catch(() => {});
     return { data: null, error };
   }
   return { data, error: null };

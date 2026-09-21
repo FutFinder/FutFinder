@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -44,8 +44,16 @@ export default function ClubInviteScreen({ navigation, route }) {
   const [sendingId, setSendingId] = useState(null);
   const [banner, setBanner] = useState(null);
 
+  // Ignora una respuesta vieja que llegue después que una más nueva: sin
+  // esto, buscar "j" y de inmediato "juan" podía mostrar los resultados de
+  // "j" si esa consulta (más resultados) tardaba más en volver que la de
+  // "juan", sin que el cuadro de texto lo reflejara.
+  const searchTokenRef = useRef(0);
+
   const search = useCallback(async (text) => {
+    const token = ++searchTokenRef.current;
     const { data } = await searchPlayers(text, { limit: 30 });
+    if (token !== searchTokenRef.current) return;
     setPlayers(data || []);
     setLoading(false);
   }, []);
@@ -58,10 +66,20 @@ export default function ClubInviteScreen({ navigation, route }) {
     })();
   }, [clubId, search]);
 
-  const onSearch = (text) => {
-    setQuery(text);
-    search(text);
-  };
+  // El texto se deja reposar antes de preguntar: si no, cada tecla sería
+  // una consulta. La primera vuelta se salta: el efecto de arriba ya pidió
+  // la lista inicial con texto vacío.
+  const yaPregunto = useRef(false);
+  useEffect(() => {
+    if (!yaPregunto.current) {
+      yaPregunto.current = true;
+      return undefined;
+    }
+    const t = setTimeout(() => search(query), query.trim() ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [query, search]);
+
+  const onSearch = (text) => setQuery(text);
 
   const handleInvite = async (player) => {
     setSendingId(player.id);

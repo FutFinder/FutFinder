@@ -212,14 +212,35 @@ export async function getMyResponseTo(openChallengeId, clubId) {
   return { data, error: null };
 }
 
+/**
+ * `.update().eq(...).eq('estado', X)` sin `.select()` NO informa si la fila
+ * de verdad cambió: con la condición de estado sin matchear —la respuesta
+ * ya la gestionó otra persona, o cambió de estado mientras tanto—
+ * PostgREST devuelve éxito con cero filas, `error: null`, y quien llamó no
+ * tiene forma de distinguirlo de un guardado real. Este helper sí lo
+ * distingue: pide de vuelta la fila tocada y, si no viene ninguna, arma un
+ * error legible en su lugar.
+ */
+async function actualizarRespuestaSiEstado(responseId, { hacia, siEstaEn, quePasoSiNo }) {
+  const { data, error } = await supabase
+    .from('club_open_challenge_responses')
+    .update({ estado: hacia })
+    .eq('id', responseId)
+    .eq('estado', siEstaEn)
+    .select('id');
+  if (error) return { error };
+  if (!data || data.length === 0) return { error: { message: quePasoSiNo } };
+  return { error: null };
+}
+
 /** Retira mi respuesta pendiente. */
 export async function withdrawResponse(responseId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
-  const { error } = await supabase
-    .from('club_open_challenge_responses')
-    .update({ estado: 'retirada' })
-    .eq('id', responseId)
-    .eq('estado', 'pendiente');
+  const { error } = await actualizarRespuestaSiEstado(responseId, {
+    hacia: 'retirada',
+    siEstaEn: 'pendiente',
+    quePasoSiNo: 'Esta respuesta ya no está pendiente — puede que ya la hayan gestionado. Actualiza para ver el estado real.',
+  });
   if (error) console.error('[FutFinder] withdrawResponse:', error);
   return { error };
 }
@@ -227,11 +248,11 @@ export async function withdrawResponse(responseId) {
 /** Vuelvo a intentar tras haberla retirado. */
 export async function reconsiderMyResponse(responseId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
-  const { error } = await supabase
-    .from('club_open_challenge_responses')
-    .update({ estado: 'pendiente' })
-    .eq('id', responseId)
-    .eq('estado', 'retirada');
+  const { error } = await actualizarRespuestaSiEstado(responseId, {
+    hacia: 'pendiente',
+    siEstaEn: 'retirada',
+    quePasoSiNo: 'Esta respuesta ya no está retirada — puede que haya cambiado mientras tanto. Actualiza para ver el estado real.',
+  });
   if (error) console.error('[FutFinder] reconsiderMyResponse:', error);
   return { error };
 }
@@ -265,11 +286,11 @@ export async function listResponsesForOpenChallenge(openChallengeId) {
 /** El club que publicó rechaza una respuesta pendiente. */
 export async function rejectResponse(responseId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
-  const { error } = await supabase
-    .from('club_open_challenge_responses')
-    .update({ estado: 'rechazada' })
-    .eq('id', responseId)
-    .eq('estado', 'pendiente');
+  const { error } = await actualizarRespuestaSiEstado(responseId, {
+    hacia: 'rechazada',
+    siEstaEn: 'pendiente',
+    quePasoSiNo: 'Esta respuesta ya no está pendiente — puede que ya la hayan gestionado. Actualiza para ver el estado real.',
+  });
   if (error) console.error('[FutFinder] rejectResponse:', error);
   return { error };
 }
@@ -277,11 +298,11 @@ export async function rejectResponse(responseId) {
 /** El club que publicó reconsidera una respuesta que había rechazado. */
 export async function reconsiderResponse(responseId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
-  const { error } = await supabase
-    .from('club_open_challenge_responses')
-    .update({ estado: 'pendiente' })
-    .eq('id', responseId)
-    .eq('estado', 'rechazada');
+  const { error } = await actualizarRespuestaSiEstado(responseId, {
+    hacia: 'pendiente',
+    siEstaEn: 'rechazada',
+    quePasoSiNo: 'Esta respuesta ya no está rechazada — puede que haya cambiado mientras tanto. Actualiza para ver el estado real.',
+  });
   if (error) console.error('[FutFinder] reconsiderResponse:', error);
   return { error };
 }

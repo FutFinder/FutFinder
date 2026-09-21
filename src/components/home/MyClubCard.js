@@ -37,7 +37,7 @@ export default function MyClubCard({ club, onPressClub, onCreateMatch }) {
         <ChevronRight color={C.textSoft} size={18} />
       </Pressable>
 
-      {club.role === 'admin' ? (
+      {club.role === 'admin' || club.puedeCrearPartido ? (
         <View className="px-4 pb-4 pt-1">
           <Pressable
             onPress={() => onCreateMatch(club.id)}

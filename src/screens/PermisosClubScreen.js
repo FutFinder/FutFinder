@@ -293,10 +293,21 @@ export default function PermisosClubScreen({ navigation, route }) {
       setBanner({ type: 'error', title: 'No se pudieron quitar las excepciones', message: error.message });
       return;
     }
-    setOverrides((prev) => ({ ...prev, [sheetUserId]: {} }));
-    setOverridesOriginal((prev) => ({ ...prev, [sheetUserId]: {} }));
+    const nuevosOverrides = { ...overrides, [sheetUserId]: {} };
+    const nuevosOverridesOriginal = { ...overridesOriginal, [sheetUserId]: {} };
+    setOverrides(nuevosOverrides);
+    setOverridesOriginal(nuevosOverridesOriginal);
+    // Esta acción se guarda al toque, no al tocar «Guardar permisos» — sin
+    // recalcular acá, `dirty` seguía en `true` por un cambio que ya no
+    // existe (el diff real de overrides quedó en cero), y el botón se
+    // mostraba activo sin nada pendiente que guardar.
+    const quedanCambiosDeRol = ['capitan', 'jugador'].some(
+      (rol) => Object.keys(diffRol(rolesOriginal[rol], roles[rol])).length > 0
+    );
+    const quedanCambiosDeOverride = diffOverrides(nuevosOverridesOriginal, nuevosOverrides).length > 0;
+    setDirty(quedanCambiosDeRol || quedanCambiosDeOverride);
     flash('Vuelve a los permisos de su rol');
-  }, [clubId, sheetUserId, sheetIsAdmin, flash]);
+  }, [clubId, sheetUserId, sheetIsAdmin, flash, overrides, overridesOriginal, roles, rolesOriginal]);
 
   if (loading) {
     return (

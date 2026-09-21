@@ -37,6 +37,11 @@ function createFakeQuery(rows) {
       result = result.filter((r) => String(r[col] || '').toLowerCase().includes(needle));
       return q;
     },
+    eq(col, val) {
+      calls.push(['eq', col, val]);
+      result = result.filter((r) => r[col] === val);
+      return q;
+    },
     order(col, { ascending } = {}) {
       calls.push(['order', col, ascending]);
       return q;
@@ -60,9 +65,9 @@ function createFakeClient(rows) {
 const CLUBES = [
   { id: 'mio-1', nombre: 'Club Propio Uno', verificado: false },
   { id: 'mio-2', nombre: 'Club Propio Dos', verificado: false },
-  { id: 'rival-1', nombre: 'Deportivo Ñuñoa', verificado: true },
-  { id: 'rival-2', nombre: 'Atlético Maipú', verificado: false },
-  { id: 'rival-3', nombre: 'Los Cóndores', verificado: false },
+  { id: 'rival-1', nombre: 'Deportivo Ñuñoa', verificado: true, region: 'Metropolitana de Santiago', comuna: 'Ñuñoa' },
+  { id: 'rival-2', nombre: 'Atlético Maipú', verificado: false, region: 'Metropolitana de Santiago', comuna: 'Maipú' },
+  { id: 'rival-3', nombre: 'Los Cóndores', verificado: false, region: 'Valparaíso', comuna: 'Viña del Mar' },
 ];
 
 test('los clubes propios y el retador no aparecen entre los candidatos', async () => {
@@ -132,6 +137,22 @@ test('un término vacío no agrega un ilike que no filtra nada', () => {
     const q = buildRivalClubsQuery(client, { query: vacio });
     assert.equal(q.calls.find(([metodo]) => metodo === 'ilike'), undefined);
   }
+});
+
+test('región y comuna viajan en la consulta (.eq), no en un filtro posterior', async () => {
+  const client = createFakeClient(CLUBES);
+  const { data } = await buildRivalClubsQuery(client, { region: 'Metropolitana de Santiago' });
+  assert.deepEqual(data.map((c) => c.id).sort(), ['rival-1', 'rival-2']);
+
+  const client2 = createFakeClient(CLUBES);
+  const { data: data2 } = await buildRivalClubsQuery(client2, { comuna: 'Ñuñoa' });
+  assert.deepEqual(data2.map((c) => c.id), ['rival-1']);
+});
+
+test('sin región ni comuna no se agrega ningún .eq', () => {
+  const client = { from: () => createFakeQuery(CLUBES) };
+  const q = buildRivalClubsQuery(client, {});
+  assert.equal(q.calls.find(([metodo]) => metodo === 'eq'), undefined);
 });
 
 test('el límite viaja a la consulta y los verificados van primero', () => {
