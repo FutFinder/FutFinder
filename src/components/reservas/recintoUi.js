@@ -715,8 +715,19 @@ export function HojaBienvenida({ visible, nombre, pasos = [], onCerrar, onCargar
         Publicar pasa por nosotros: miramos los datos antes de que tu recinto salga en el buscador.
       </Text>
 
-      <Button label="Cargar mi primera cancha" style={{ marginTop: 16 }} onPress={onCargarCanchas} />
-      <Button label="Después" variant="secondary" style={{ marginTop: 9 }} onPress={onCerrar} />
+      {/* Sin `onCargarCanchas` no hay botón: se lo pasa vacío un
+          administrador al que el dueño no le dio el permiso de canchas, y
+          ofrecerle el atajo lo mandaría a un error. Los pasos de arriba sí
+          los ve — saber qué le falta al recinto no es un permiso. */}
+      {onCargarCanchas ? (
+        <Button label="Cargar mi primera cancha" style={{ marginTop: 16 }} onPress={onCargarCanchas} />
+      ) : null}
+      <Button
+        label={onCargarCanchas ? 'Después' : 'Entendido'}
+        variant="secondary"
+        style={{ marginTop: onCargarCanchas ? 9 : 16 }}
+        onPress={onCerrar}
+      />
     </Sheet>
   );
 }

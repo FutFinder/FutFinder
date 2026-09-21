@@ -41,6 +41,35 @@ export const SIEMPRE_PUEDE = [
   'Cancelar una reserva y ver a quién llamar',
 ];
 
+/**
+ * ¿Puede quien mira el panel hacer algo de esta área en ESTE recinto?
+ *
+ * Responde lo mismo que `puede_en_complejo()` en el servidor, y ésa es toda
+ * su razón de existir: sirve para NO OFRECER lo que el servidor va a
+ * rechazar, nunca para autorizar nada. Quien decide sigue siendo la base —
+ * siete disparadores sobre las tablas, migración 83.
+ *
+ * El recinto viene de `admin_mis_complejos()`, que desde la migración 121
+ * devuelve las tres banderas ya resueltas (el dueño llega con las tres en
+ * `true`). Igual se mira el rol acá: es la misma regla escrita dos veces a
+ * propósito, porque un dueño al que se le esconda media pantalla por una
+ * bandera ausente es un fallo mudo y difícil de encontrar.
+ *
+ * SIN EL DATO, NO. Un recinto sin banderas —una respuesta vieja, un objeto a
+ * medias— devuelve `false` para un administrador. Esconder de más deja una
+ * fila sin usar; mostrar de más manda a alguien a chocar con un error.
+ */
+export function puedeEn(recinto, clave) {
+  if (!recinto) return false;
+  if (recinto.rol === 'dueño') return true;
+  const campo = PERMISOS.find((p) => p.clave === clave);
+  if (!campo) return false;
+  // Se acepta `puede_canchas` (como llega de la RPC) y `puedeCanchas` (como
+  // lo nombra el formulario de administradores), para que la misma función
+  // sirva en las dos pantallas.
+  return recinto[`puede_${clave}`] === true || recinto[campo.campo] === true;
+}
+
 /** `{ puedeCanchas, puedeCobros, puedeFicha }` → resumen de una línea. */
 export function resumenDePermisos(admin) {
   if (admin?.rol === 'dueño') return 'Puede todo';
