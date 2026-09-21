@@ -249,11 +249,12 @@ export default function PartidosScreen({ navigation, route }) {
   const cargarMas = useCallback(async () => {
     if (cargandoMas || !hayMas) return;
     setCargandoMas(true);
+    const ultimo = matches[matches.length - 1];
     const res = await buscarPartidos({
       filtros: filtrosRef.current,
       texto: textoRef.current,
       limite: PAGINA,
-      desde: matches.length,
+      despuesDe: ultimo ? { hora: ultimo.hora } : null,
     }).catch(() => ({ data: [], hayMas: false }));
     // Por id: dos páginas pueden solaparse si alguien publica entremedio.
     setMatches((prev) => {
@@ -262,7 +263,7 @@ export default function PartidosScreen({ navigation, route }) {
     });
     setHayMas(!!res.hayMas);
     setCargandoMas(false);
-  }, [cargandoMas, hayMas, matches.length]);
+  }, [cargandoMas, hayMas, matches]);
 
   // Cambiar un filtro o el texto vuelve a preguntarle a la base. El texto se
   // deja reposar: si no, cada letra sería una consulta. La primera vuelta se
@@ -311,6 +312,11 @@ export default function PartidosScreen({ navigation, route }) {
     });
     if (!error) {
       setMatches(data || []);
+      // Este resultado es por zona del mapa, no por la búsqueda general
+      // paginada: sin esto, «Ver más partidos» seguía ofreciendo la página
+      // siguiente de la búsqueda anterior con un offset que ya no
+      // correspondía a nada, mezclando partidos de acá con los de allá.
+      setHayMas(false);
       setMapRegion(r);
       setShowSearchHere(false);
       setSelectedMarkerId(null);

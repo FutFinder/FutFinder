@@ -143,8 +143,11 @@ export async function getRatableAttendees(matchId) {
  *               rated_id, puntualidad, fairplay, nivel, comentario?
  *             }
  *
- * Cada rating se inserta como una fila. Si alguna falla por RLS o constraint
- * (por ejemplo el usuario ya estaba calificado) el resto sigue intentando.
+ * Todas las filas van en un solo INSERT — no una por vuelta — así que si
+ * alguna viola una restricción (por ejemplo el usuario ya estaba calificado)
+ * el lote ENTERO falla y nada queda guardado; no hay una mitad que se cuela
+ * y otra que se rechaza. La pantalla filtra antes los ya calificados
+ * (`locked`) para que este caso no se dé en el uso normal.
  * Devolvemos { inserted: number, skipped: number, errors: [] }.
  */
 export async function submitRatings(matchId, ratings) {
@@ -166,11 +169,15 @@ export async function submitRatings(matchId, ratings) {
     comentario:  (r.comentario || '').trim() || null,
   }));
 
-  // Insertamos todos a la vez. Si alguno ya existía, lo capturamos.
-  const { data, error } = await supabase
-    .from('ratings')
-    .insert(rows)
-    .select('id');
+  // Es un solo INSERT con varias filas, no una fila por vuelta: si alguna
+  // viola una restricción (duplicado, RLS) Postgres deshace el lote ENTERO y
+  // cae en `error` — no hay «éxito parcial» posible por este camino. Sin
+  // `.select()` de vuelta a propósito: pedirla sometía el RETURNING del
+  // INSERT a la política RLS de SELECT, más estricta que la de escritura, y
+  // eso podía traer de vuelta menos filas (o ninguna) aunque ya hubieran
+  // quedado guardadas — contando por ahí, quien calificaba se quedaba sin
+  // ningún aviso, ni de éxito ni de error.
+  const { error } = await supabase.from('ratings').insert(rows);
 
   if (error) {
     // Posibles causas: duplicado (unique), RLS (no elegible), etc.
@@ -182,8 +189,8 @@ export async function submitRatings(matchId, ratings) {
   }
 
   return {
-    inserted: data?.length ?? 0,
-    skipped: rows.length - (data?.length ?? 0),
+    inserted: rows.length,
+    skipped: 0,
     errors: [],
   };
 }

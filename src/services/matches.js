@@ -284,19 +284,32 @@ function consultaDePartidos({ filtros = {}, texto = '', estados = ['abierto', 'l
  *
  * Devuelve `{ data, hayMas, error }`. `hayMas` dice si vale la pena pedir la
  * página siguiente: se pide un elemento de más y se descarta.
+ *
+ * PAGINA POR CURSOR (`despuesDe`), NO POR OFFSET NUMÉRICO. Un `range(desde,
+ * desde+limite)` cuenta POSICIONES, y la app publica partidos todo el
+ * tiempo: si alguien publica uno con una hora más temprana que la ya
+ * mostrada, cada fila de ahí en adelante se corre un lugar, así que «la
+ * página siguiente» por offset puede repetir una fila ya vista o saltarse
+ * una entera, sin que nada lo avise. Con el cursor, «la página siguiente» es
+ * siempre «lo que viene después de la hora del último partido que ya viste»
+ * — no importa qué se insertó antes de ese punto mientras tanto. Queda una
+ * grieta aceptada: más partidos que un tamaño de página con la MISMA `hora`
+ * exacta al segundo, un empate que el desempate compuesto resolvería pero
+ * que no vale la complejidad frente a lo raro que es.
  */
 export async function buscarPartidos({
   filtros = {},
   texto = '',
   limite = 50,
-  desde = 0,
+  despuesDe = null,
   estados = ['abierto', 'lleno'],
 } = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), hayMas: false, error: null };
 
-  const { data, error } = await consultaDePartidos({ filtros, texto, estados })
-    .order('hora', { ascending: true })
-    .range(desde, desde + limite);
+  let q = consultaDePartidos({ filtros, texto, estados }).order('hora', { ascending: true });
+  if (despuesDe?.hora) q = q.gt('hora', despuesDe.hora);
+
+  const { data, error } = await q.limit(limite + 1);
 
   if (error) {
     console.error('[FutFinder] buscarPartidos:', error);

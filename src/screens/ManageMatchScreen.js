@@ -181,13 +181,19 @@ export default function ManageMatchScreen({ route, navigation }) {
     }
     setBusyId(playerId);
     const res = await approveJoinRequest(matchId, playerId);
-    setBusyId(null);
     if (!res?.ok) {
+      setBusyId(null);
       say('error', 'No pudimos aceptar la solicitud', res?.reason || res?.error?.message || '');
       return;
     }
     say('success', 'Jugador aceptado', 'Se sumó al plantel, se descontó el cupo y le avisamos.');
+    // `busyId` sigue puesto hasta que `load()` trae los cupos reales: si se
+    // soltara antes, con exactamente 1 cupo libre y dos solicitudes
+    // pendientes, «Aceptar» en la OTRA solicitud quedaba habilitado durante
+    // ese instante — leyendo el cupo viejo — y el organizador veía un
+    // «no pudimos aceptar» confuso justo después de un éxito.
     await load();
+    setBusyId(null);
   };
 
   const reject = async (playerId) => {
