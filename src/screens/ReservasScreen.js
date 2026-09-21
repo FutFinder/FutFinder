@@ -473,11 +473,16 @@ export default function ReservasScreen({ navigation }) {
  * muestra arriba el acceso a su panel; invitarlo a sumarlo otra vez sería
  * ofrecerle algo que ya hizo.
  *
- * CON UNA SOLICITUD PENDIENTE, EL BOTÓN SE QUEDA — pedido explícito: alguien
- * puede tener más de un recinto, o simplemente querer corregir datos con una
- * segunda solicitud. El texto sigue avisando que la primera ya está en
- * revisión, para que mandar otra sea una decisión informada y no se lea como
- * que la primera se perdió.
+ * CON UNA SOLICITUD PENDIENTE HAY DOS BOTONES, NO UNO. Antes había uno solo
+ * que decía «mandar otra solicitud» para las dos cosas, y eran cosas
+ * distintas: CORREGIR la que ya mandó y SUMAR otro recinto. Peor, sólo una de
+ * las dos funcionaba — volver a mandar el mismo recinto devolvía la solicitud
+ * vieja sin pisar ningún dato, así que la corrección se perdía en silencio
+ * después de llenar el formulario entero. La migración 120 abrió la puerta
+ * que faltaba; acá se separan para que nadie tenga que adivinar cuál es cuál.
+ *
+ * «Corregir» va PRIMERO porque es lo que quiere casi todo el mundo que está
+ * esperando respuesta: tener dos recintos es la excepción.
  */
 function InvitacionRecinto({ solicitud, navigation }) {
   const pendiente = !!solicitud;
@@ -494,17 +499,38 @@ function InvitacionRecinto({ solicitud, navigation }) {
       <Text style={styles.invitacionTexto}>
         {pendiente
           ? `Recibimos ${solicitud.nombre_recinto} y la estamos revisando. Te vamos a llamar al número que `
-            + 'dejaste para ver horarios, precios y canchas. ¿Es otro recinto, o corriges algo? Puedes mandarnos otra solicitud.'
+            + 'dejaste para ver horarios, precios y canchas.'
           : 'Súmalo a FutFinder y aparece en este buscador. Recibes las reservas pagadas por la app, con '
             + 'tu agenda, tus horarios y tus precios en un panel propio. La comisión la pagamos desde cada '
             + 'reserva: publicar tu recinto no te cuesta nada.'}
       </Text>
-      <Button
-        label={pendiente ? 'Mandar otra solicitud' : 'Quiero sumar mi recinto'}
-        variant="secondary"
-        style={{ marginTop: 14 }}
-        onPress={() => navigation.navigate('SolicitudRecinto')}
-      />
+      {pendiente ? (
+        <View style={{ gap: 10, marginTop: 14 }}>
+          {/* Cada botón dice qué hace con la solicitud que YA está esperando:
+              uno la cambia, el otro no la toca. */}
+          <Button
+            label="Corregir mi solicitud"
+            variant="secondary"
+            onPress={() => navigation.navigate('SolicitudRecinto', { corregir: solicitud })}
+          />
+          <Button
+            label="Sumar otro recinto"
+            variant="secondary"
+            onPress={() => navigation.navigate('SolicitudRecinto')}
+          />
+          <Text style={styles.invitacionAyuda}>
+            Corregir cambia los datos de {solicitud.nombre_recinto}. Sumar otro deja esa solicitud
+            como está y empieza una nueva.
+          </Text>
+        </View>
+      ) : (
+        <Button
+          label="Quiero sumar mi recinto"
+          variant="secondary"
+          style={{ marginTop: 14 }}
+          onPress={() => navigation.navigate('SolicitudRecinto')}
+        />
+      )}
     </Card>
   );
 }
@@ -761,5 +787,11 @@ const styles = StyleSheet.create({
   invitacionTexto: {
     fontFamily: F.medium, fontSize: 12.5, color: C.textSecondary,
     lineHeight: 18.5, marginTop: 11,
+  },
+  // Debajo de los dos botones y más chica: explica la diferencia a quien
+  // dudó, sin repetírsela a quien ya sabe cuál quiere.
+  invitacionAyuda: {
+    fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary,
+    lineHeight: 16.5, marginTop: 2,
   },
 });

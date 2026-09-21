@@ -115,3 +115,38 @@ Deno.test("sin mensaje lo dice, en vez de dejar un hueco", () => {
     true,
   );
 });
+
+// ── Una corrección no se lee como un recinto nuevo (migración 120) ──
+//
+// El modo de fallo que estas tres pruebas existen para impedir: el equipo ya
+// recibió un correo por este recinto. Si el segundo llegara igual que el
+// primero, se leería como DOS recintos y alguien llamaría dos veces — una de
+// ellas al teléfono equivocado, que es justo el dato que se vino a corregir.
+
+Deno.test("una corrección lo dice desde el asunto, no adentro", () => {
+  assertEquals(
+    asuntoDeSolicitud(SOLICITUD, true),
+    "Recinto CORREGIDO: FutCenter Maipú (Maipú)",
+  );
+});
+
+Deno.test("sin corregir, el asunto es exactamente el de siempre", () => {
+  assertEquals(asuntoDeSolicitud(SOLICITUD, false), asuntoDeSolicitud(SOLICITUD));
+  assertEquals(asuntoDeSolicitud(SOLICITUD), "Nuevo recinto: FutCenter Maipú (Maipú)");
+});
+
+Deno.test("el aviso de corrección va ARRIBA, antes de los datos", () => {
+  const cuerpo = cuerpoDeSolicitud(SOLICITUD, [], true);
+  const aviso = cuerpo.indexOf("CORRECCIÓN");
+  assertEquals(aviso >= 0, true);
+  // Antes del primer dato: leerlo después de haber copiado el teléfono no
+  // sirve de nada.
+  assertEquals(aviso < cuerpo.indexOf("Recinto:"), true);
+  // Y el cuerpo sigue trayendo todo lo de siempre.
+  assertEquals(cuerpo.includes("+56987654321"), true);
+});
+
+Deno.test("un correo que no es corrección no menciona ninguna corrección", () => {
+  assertEquals(cuerpoDeSolicitud(SOLICITUD).includes("CORRECCIÓN"), false);
+  assertEquals(cuerpoDeSolicitud(SOLICITUD, [], false).includes("CORRECCIÓN"), false);
+});
