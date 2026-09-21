@@ -59,6 +59,8 @@ Una prueba SQL en verde no dice que la pantalla funcione. El arnés de la 45 lle
 
 De ahí la regla, que vale tanto para una migración propia como para una que llegue de la otra Mac: **antes de aplicar, correr el arnés en la misma transacción que la migración y terminar en `rollback`**; y si ya está aplicada, correrlo contra el esquema aplicado. Hasta que el arnés llegue a su última línea sin excepción, «probada» significa «compila». Los cuatro fallos de la 119 estaban detrás unos de otros: cada arreglo destapaba el siguiente, y sólo llegar al final los sacó todos.
 
+**Y el ensayo paga aunque la migración esté bien.** El de la 120 (2026-09-21) terminó en 22/24 y ninguno de los dos fallos era el que se esperaba: uno destapó que `authenticated` seguía pudiendo ejecutar la función validadora nueva —los privilegios por defecto de `supabase_admin` se la conceden y el disparador de la 115 sólo cierra a `public` y `anon`—, y el otro era un caso de prueba mal escrito, con un nombre de un carácter que la validación frenaba antes de llegar a lo que la prueba quería medir. El primero se arregló en la migración, el segundo en el arnés, y recién entonces 24/24. Un arnés que sale verde a la primera casi siempre está midiendo menos de lo que dice.
+
 ## Pruebas de Edge Function
 
 La lógica pura de la función `send-push` se prueba aparte:

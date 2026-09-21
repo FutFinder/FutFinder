@@ -21,6 +21,7 @@ const {
   camposFaltantes,
   solicitudLista,
   comoSolicitud,
+  formDeSolicitud,
   MAX_FOTOS,
 } = require('../solicitudRecinto.js');
 
@@ -180,4 +181,88 @@ test('comoSolicitud devuelve null si la solicitud no está lista', () => {
   // validar antes.
   assert.equal(comoSolicitud({ ...COMPLETA, telefono: '221234567' }), null);
   assert.equal(comoSolicitud(null), null);
+});
+
+// ── Corregir una solicitud ya mandada (migración 120) ──────────────
+//
+// El riesgo de esta función no es que se vea mal en pantalla: es que la
+// corrección manda el formulario ENTERO, así que cualquier dato que
+// `formDeSolicitud` pierda al cargar se BORRA del servidor al guardar. Alguien
+// que entra a arreglar una letra del nombre se quedaría sin servicios, sin
+// fotos o sin mensaje, y nadie se enteraría hasta que el equipo llame.
+//
+// Por eso lo que se prueba es la ida y vuelta completa, no cada campo suelto.
+
+const GUARDADA = {
+  id: '11111111-1111-1111-1111-111111111111',
+  nombre_recinto: 'FutCenter Maipú',
+  direccion: 'Av. El Rosal 6281',
+  comuna: 'Maipú',
+  nombre_dueno: 'Vicente Bastías',
+  telefono: '+56987654321',
+  correo: 'contacto@futcenter.cl',
+  mensaje: 'Seis canchas de fútbol 7',
+  n_canchas: 6,
+  fotos: ['uid/a.jpg', 'uid/b.jpg'],
+  servicios: ['camarines', 'duchas'],
+};
+
+test('cargar una solicitud guardada y volver a mandarla no cambia NADA', () => {
+  const form = formDeSolicitud(GUARDADA);
+  assert.ok(solicitudLista(form), 'una solicitud guardada siempre está completa');
+
+  const payload = comoSolicitud(form);
+  assert.deepEqual(payload, {
+    nombreRecinto: 'FutCenter Maipú',
+    direccion: 'Av. El Rosal 6281',
+    comuna: 'Maipú',
+    nombreDueno: 'Vicente Bastías',
+    telefono: '+56987654321',
+    correo: 'contacto@futcenter.cl',
+    mensaje: 'Seis canchas de fútbol 7',
+    nCanchas: 6,
+    fotos: ['uid/a.jpg', 'uid/b.jpg'],
+    servicios: ['camarines', 'duchas'],
+  });
+});
+
+test('el teléfono se muestra sin el +56 y se manda con él', () => {
+  // Se escribe con nueve dígitos; el prefijo lo pone el normalizador al
+  // mandar. Si se mostrara con prefijo, cada corrección lo duplicaría.
+  assert.equal(formDeSolicitud(GUARDADA).telefono, '987654321');
+  assert.equal(comoSolicitud(formDeSolicitud(GUARDADA)).telefono, '+56987654321');
+});
+
+test('las fotos guardadas llegan como rutas sin copia local que mostrar', () => {
+  // El bucket es privado: el enlace para verlas se firma aparte, y hasta que
+  // llegue la foto se dibuja un hueco. Lo que NO puede pasar es perder la ruta.
+  assert.deepEqual(formDeSolicitud(GUARDADA).fotos, [
+    { path: 'uid/a.jpg', uri: null },
+    { path: 'uid/b.jpg', uri: null },
+  ]);
+  assert.deepEqual(comoSolicitud(formDeSolicitud(GUARDADA)).fotos, ['uid/a.jpg', 'uid/b.jpg']);
+});
+
+test('lo que el servidor deja vacío no se inventa', () => {
+  // Las solicitudes anteriores a la 110 no traen canchas, fotos ni servicios;
+  // `n_canchas` null tiene que quedar en blanco y NO en '0' o 'null', que
+  // pasarían como una cantidad escrita a mano.
+  const vieja = formDeSolicitud({
+    ...GUARDADA, mensaje: null, n_canchas: null, fotos: null, servicios: null,
+  });
+  assert.equal(vieja.nCanchas, '');
+  assert.equal(vieja.mensaje, '');
+  assert.deepEqual(vieja.fotos, []);
+  assert.deepEqual(vieja.servicios, []);
+  // Y sin canchas la solicitud NO está lista: el formulario lo va a pedir,
+  // que es exactamente lo que queremos de una solicitud vieja que se corrige.
+  assert.equal(solicitudLista(vieja), false);
+  assert.deepEqual(camposFaltantes(vieja), ['nCanchas']);
+});
+
+test('formDeSolicitud no revienta sin solicitud', () => {
+  const vacio = formDeSolicitud(null);
+  assert.equal(vacio.nombreRecinto, '');
+  assert.deepEqual(vacio.fotos, []);
+  assert.equal(comoSolicitud(vacio), null);
 });

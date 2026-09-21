@@ -16,6 +16,13 @@ import { comoSolicitud } from '../utils/solicitudRecinto';
  * dos veces no crea dos filas: la RPC devuelve la solicitud pendiente que ya
  * existía.
  *
+ * DOS PUERTAS, Y LA DIFERENCIA ES UN `id` (migración 120). Sin `id` se crea
+ * una solicitud; con `id` se CORRIGE una que ya existe. No es un detalle de
+ * implementación: `crear_solicitud_recinto` dedupea por nombre de recinto y
+ * devuelve la vieja SIN pisar nada, así que mandar una corrección por esa
+ * puerta la perdería en silencio. Quién es dueño de esa solicitud lo decide
+ * la base con el token, nunca esto.
+ *
  * NO HAY MODO DEMO. Sin Supabase configurado esto no finge que se mandó: una
  * solicitud que nadie recibió es peor que un error.
  *
@@ -29,26 +36,35 @@ const SIN_CONFIG = { data: null, error: { message: 'Sin conexión a la base' } }
 const INCOMPLETA = { data: null, error: { message: 'Faltan datos del formulario.' } };
 
 /**
- * Manda la solicitud. Devuelve `{ id, reusada, avisada }`.
+ * Manda la solicitud. Devuelve `{ id, reusada, corregida, avisada }`.
+ *
+ * `corregir` es el id de una solicitud propia todavía sin atender: si viene,
+ * esto CORRIGE esa solicitud en vez de crear una nueva.
  *
  * `avisada` dice si el correo al equipo llegó a salir. La pantalla NO lo usa
  * para decidir si hubo éxito —la solicitud está guardada de todas formas— sino
- * como dato del estado real mientras no haya proveedor de correo configurado.
+ * como dato del estado real.
  */
-export async function enviarSolicitudRecinto(form) {
+export async function enviarSolicitudRecinto(form, corregir = null) {
   if (!isSupabaseConfigured) return SIN_CONFIG;
 
   const payload = comoSolicitud(form);
   if (!payload) return INCOMPLETA;
+  const cuerpo = corregir ? { ...payload, id: corregir } : payload;
 
   try {
-    const { data, error } = await supabase.functions.invoke('solicitud-recinto', { body: payload });
+    const { data, error } = await supabase.functions.invoke('solicitud-recinto', { body: cuerpo });
     if (error) throw error;
     if (!data?.ok) {
       return { data: null, error: { message: data?.reason || 'No pudimos mandar tu solicitud.' } };
     }
     return {
-      data: { id: data.id, reusada: !!data.reusada, avisada: !!data.avisada },
+      data: {
+        id: data.id,
+        reusada: !!data.reusada,
+        corregida: !!data.corregida,
+        avisada: !!data.avisada,
+      },
       error: null,
     };
   } catch (e) {
@@ -56,18 +72,22 @@ export async function enviarSolicitudRecinto(form) {
     console.error('[FutFinder] enviarSolicitudRecinto (función):', e);
   }
 
-  const { data, error } = await supabase.rpc('crear_solicitud_recinto', {
-    p_nombre_recinto: payload.nombreRecinto,
-    p_direccion: payload.direccion,
-    p_comuna: payload.comuna,
-    p_nombre_dueno: payload.nombreDueno,
-    p_telefono: payload.telefono,
-    p_correo: payload.correo,
-    p_mensaje: payload.mensaje,
-    p_n_canchas: payload.nCanchas,
-    p_fotos: payload.fotos,
-    p_servicios: payload.servicios,
-  });
+  const { data, error } = await supabase.rpc(
+    corregir ? 'actualizar_solicitud_recinto' : 'crear_solicitud_recinto',
+    {
+      ...(corregir ? { p_id: corregir } : {}),
+      p_nombre_recinto: payload.nombreRecinto,
+      p_direccion: payload.direccion,
+      p_comuna: payload.comuna,
+      p_nombre_dueno: payload.nombreDueno,
+      p_telefono: payload.telefono,
+      p_correo: payload.correo,
+      p_mensaje: payload.mensaje,
+      p_n_canchas: payload.nCanchas,
+      p_fotos: payload.fotos,
+      p_servicios: payload.servicios,
+    },
+  );
 
   if (error) {
     console.error('[FutFinder] enviarSolicitudRecinto (rpc):', error);
@@ -82,7 +102,15 @@ export async function enviarSolicitudRecinto(form) {
   if (!data?.ok) {
     return { data: null, error: { message: data?.reason || 'Revisa los datos del formulario.' } };
   }
-  return { data: { id: data.id, reusada: !!data.reusada, avisada: false }, error: null };
+  return {
+    data: {
+      id: data.id,
+      reusada: !!data.reusada,
+      corregida: !!data.corregida,
+      avisada: false,
+    },
+    error: null,
+  };
 }
 
 /**
@@ -97,7 +125,11 @@ export async function miSolicitudPendiente() {
   if (!isSupabaseConfigured) return { data: null, error: null };
   const { data, error } = await supabase
     .from('solicitudes_recinto')
-    .select('id, nombre_recinto, created_at')
+    // Se traen todos los campos, no sólo el nombre: con ellos se precarga la
+    // pantalla de corrección. Es la misma fila que la RLS ya deja ver (la
+    // policy filtra por `auth.uid()`), así que no se abre nada nuevo.
+    .select('id, nombre_recinto, direccion, comuna, nombre_dueno, telefono, correo, '
+      + 'mensaje, n_canchas, fotos, servicios, created_at')
     .eq('estado', 'nueva')
     .order('created_at', { ascending: false })
     .limit(1);

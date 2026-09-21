@@ -554,3 +554,32 @@ export async function uploadFotoSolicitud(asset) {
 
 /** Borra una foto de una solicitud por su ruta. */
 export const removeFotoSolicitudFile = (path) => removeFromBucket('solicitud-fotos', path);
+
+/**
+ * Enlaces para MIRAR las fotos ya guardadas de una solicitud (migración 120).
+ *
+ * Hace falta al corregir una solicitud: la fila guarda rutas y el bucket es
+ * privado, así que sin firmar no hay nada que mostrar. Los enlaces duran una
+ * hora, que es más que de sobra para rellenar un formulario.
+ *
+ * NO FALLA NUNCA: si no se pudo firmar, devuelve la foto con `uri: null` y la
+ * pantalla dibuja un hueco. Una foto que no se ve es un detalle; una pantalla
+ * de corrección que no abre por eso perdería la corrección entera.
+ */
+export async function urlsDeFotosSolicitud(paths) {
+  const rutas = (paths || []).filter((p) => typeof p === 'string' && p.length > 0);
+  if (!rutas.length || !isSupabaseConfigured) return rutas.map((path) => ({ path, uri: null }));
+
+  const { data, error } = await supabase.storage
+    .from('solicitud-fotos')
+    .createSignedUrls(rutas, 60 * 60);
+  if (error) {
+    console.error('[FutFinder] urlsDeFotosSolicitud:', error);
+    return rutas.map((path) => ({ path, uri: null }));
+  }
+  // El orden que devuelve el proveedor es el mismo que se pidió, pero se
+  // reconstruye por ruta igual: si algún día no lo fuera, las fotos se verían
+  // barajadas y nadie se daría cuenta.
+  const porRuta = new Map((data || []).map((f) => [f.path, f.signedUrl]));
+  return rutas.map((path) => ({ path, uri: porRuta.get(path) || null }));
+}

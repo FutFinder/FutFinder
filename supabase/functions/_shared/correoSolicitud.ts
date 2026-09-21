@@ -79,9 +79,18 @@ export function leerConfigCorreo(env: (k: string) => string | undefined): Config
   };
 }
 
-/** El asunto lleva el recinto y la comuna: es lo que se lee en la bandeja. */
-export function asuntoDeSolicitud(s: Solicitud): string {
-  return `Nuevo recinto: ${s.nombre_recinto} (${s.comuna})`;
+/**
+ * El asunto lleva el recinto y la comuna: es lo que se lee en la bandeja.
+ *
+ * Una CORRECCIÓN lo dice desde el asunto (migración 120). Es la única
+ * defensa contra el modo de fallo que importa acá: el equipo ya recibió un
+ * correo por este mismo recinto, y si el segundo dijera «Nuevo recinto» se
+ * leería como dos recintos distintos y alguien llamaría dos veces —una de
+ * ellas al teléfono equivocado, que es justo el dato que se corrigió.
+ */
+export function asuntoDeSolicitud(s: Solicitud, corregida = false): string {
+  const que = corregida ? "Recinto CORREGIDO" : "Nuevo recinto";
+  return `${que}: ${s.nombre_recinto} (${s.comuna})`;
 }
 
 // Los servicios se escriben con la clave del catálogo y solo se le sacan los
@@ -101,9 +110,18 @@ const legible = (clave: string) => clave.replace(/_/g, " ");
  * Un correo que va a una bandeja del equipo no necesita HTML: lo que importa
  * es poder copiar el teléfono y la dirección de un tirón.
  */
-export function cuerpoDeSolicitud(s: Solicitud, enlaces: string[] = []): string {
+export function cuerpoDeSolicitud(
+  s: Solicitud,
+  enlaces: string[] = [],
+  corregida = false,
+): string {
   const servicios = (s.servicios ?? []).map(legible);
   return [
+    // Arriba del todo, no al final: quien abre el correo tiene que saber
+    // ANTES de leer los datos que estos reemplazan a los de antes.
+    ...(corregida
+      ? ["** CORRECCIÓN: estos datos reemplazan a los del correo anterior. **", ""]
+      : []),
     `Recinto:   ${s.nombre_recinto}`,
     `Dirección: ${s.direccion}, ${s.comuna}`,
     `Canchas:   ${s.n_canchas ?? "no lo dijo"}`,
@@ -132,6 +150,7 @@ export async function enviarCorreo(
   config: ConfigCorreo,
   s: Solicitud,
   enlaces: string[] = [],
+  corregida = false,
 ): Promise<boolean> {
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -144,8 +163,8 @@ export async function enviarCorreo(
         from: config.desde,
         to: config.para,
         reply_to: s.correo,
-        subject: asuntoDeSolicitud(s),
-        text: cuerpoDeSolicitud(s, enlaces),
+        subject: asuntoDeSolicitud(s, corregida),
+        text: cuerpoDeSolicitud(s, enlaces, corregida),
       }),
     });
     if (!res.ok) {

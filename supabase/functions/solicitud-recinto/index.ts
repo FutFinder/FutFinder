@@ -15,6 +15,13 @@
 // deja verla al dueño, pero acá hace falta el teléfono y el correo completos—
 // y para anotar `avisada_at`, que el solicitante no puede escribir.
 //
+// DOS PUERTAS, NO UNA (migración 120). Si el cuerpo trae `id`, esto es una
+// CORRECCIÓN de una solicitud que ya existe y se llama
+// `actualizar_solicitud_recinto`; sin `id` es una solicitud nueva y se llama
+// `crear_solicitud_recinto`. No se adivina: mandar el mismo recinto otra vez
+// sin `id` sigue devolviendo la vieja con `reusada: true` y sin pisar nada,
+// que es exactamente lo que tiene que pasar con un doble clic.
+//
 // EL CORREO NO PUEDE VOLTEAR LA SOLICITUD. Si los secretos no están o el
 // proveedor falla, se contesta `ok: true` con `avisada: false`: la fila quedó
 // escrita y se lee desde Supabase. Decirle a alguien «no se pudo» cuando su
@@ -56,18 +63,27 @@ Deno.serve(async (req) => {
   // están bien, con las mismas reglas que si la app llamara sola.
   const comoUsuario = createClient(url, anon, { global: { headers: { Authorization: auth } } });
 
-  const { data, error } = await comoUsuario.rpc("crear_solicitud_recinto", {
-    p_nombre_recinto: cuerpo?.nombreRecinto ?? null,
-    p_direccion: cuerpo?.direccion ?? null,
-    p_comuna: cuerpo?.comuna ?? null,
-    p_nombre_dueno: cuerpo?.nombreDueno ?? null,
-    p_telefono: cuerpo?.telefono ?? null,
-    p_correo: cuerpo?.correo ?? null,
-    p_mensaje: cuerpo?.mensaje ?? null,
-    p_n_canchas: cuerpo?.nCanchas ?? null,
-    p_fotos: cuerpo?.fotos ?? null,
-    p_servicios: cuerpo?.servicios ?? null,
-  });
+  // `id` sólo puede venir de la pantalla de corrección. Quién es dueño de esa
+  // solicitud lo decide la base, no esto: `actualizar_solicitud_recinto`
+  // comprueba `auth.uid()` contra `solicitante_id` con el token de acá.
+  const idACorregir: string | null = typeof cuerpo?.id === "string" && cuerpo.id ? cuerpo.id : null;
+
+  const { data, error } = await comoUsuario.rpc(
+    idACorregir ? "actualizar_solicitud_recinto" : "crear_solicitud_recinto",
+    {
+      ...(idACorregir ? { p_id: idACorregir } : {}),
+      p_nombre_recinto: cuerpo?.nombreRecinto ?? null,
+      p_direccion: cuerpo?.direccion ?? null,
+      p_comuna: cuerpo?.comuna ?? null,
+      p_nombre_dueno: cuerpo?.nombreDueno ?? null,
+      p_telefono: cuerpo?.telefono ?? null,
+      p_correo: cuerpo?.correo ?? null,
+      p_mensaje: cuerpo?.mensaje ?? null,
+      p_n_canchas: cuerpo?.nCanchas ?? null,
+      p_fotos: cuerpo?.fotos ?? null,
+      p_servicios: cuerpo?.servicios ?? null,
+    },
+  );
 
   if (error) {
     // `verify_jwt` NO garantiza que haya sesión: la clave anónima es un JWT
@@ -87,11 +103,12 @@ Deno.serve(async (req) => {
 
   const id: string = data.id;
   const reusada: boolean = !!data.reusada;
+  const corregida: boolean = !!data.corregida;
 
   const config = leerConfigCorreo((k) => Deno.env.get(k));
   if (!config) {
     console.log(`[solicitud-recinto] solicitud ${id} guardada; sin proveedor de correo configurado.`);
-    return json({ ok: true, id, reusada, avisada: false });
+    return json({ ok: true, id, reusada, corregida, avisada: false });
   }
 
   const admin = createClient(url, servicio);
@@ -106,12 +123,14 @@ Deno.serve(async (req) => {
 
   if (eFila || !fila) {
     console.error("[solicitud-recinto] guardada pero no se pudo leer para avisar:", eFila);
-    return json({ ok: true, id, reusada, avisada: false });
+    return json({ ok: true, id, reusada, corregida, avisada: false });
   }
 
   // Una solicitud reusada ya avisada no se avisa dos veces: apretar el botón
-  // de nuevo no puede llenar la bandeja del equipo.
-  if (fila.avisada_at) return json({ ok: true, id, reusada, avisada: true });
+  // de nuevo no puede llenar la bandeja del equipo. Una CORRECCIÓN sí vuelve
+  // a avisar, y no es una excepción escrita acá: la 120 deja `avisada_at` en
+  // null al corregir, así que esta misma línea la deja pasar sola.
+  if (fila.avisada_at) return json({ ok: true, id, reusada, corregida, avisada: true });
 
   // Un enlace que no se pudo firmar no puede voltear el aviso: se manda el
   // correo con las fotos que sí se pudieron firmar —o con ninguna— y el equipo
@@ -128,7 +147,7 @@ Deno.serve(async (req) => {
       .filter((u): u is string => typeof u === "string" && u.length > 0);
   }
 
-  const salio = await enviarCorreo(config, fila as Solicitud, enlaces);
+  const salio = await enviarCorreo(config, fila as Solicitud, enlaces, corregida);
   if (salio) {
     const { error: eSello } = await admin
       .from("solicitudes_recinto")
@@ -137,5 +156,5 @@ Deno.serve(async (req) => {
     if (eSello) console.error("[solicitud-recinto] correo enviado pero no se pudo anotar:", eSello);
   }
 
-  return json({ ok: true, id, reusada, avisada: salio });
+  return json({ ok: true, id, reusada, corregida, avisada: salio });
 });

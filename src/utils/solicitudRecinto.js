@@ -125,6 +125,34 @@ export function solicitudLista(form) {
 }
 
 /**
+ * El camino de vuelta: una solicitud YA GUARDADA con la forma del formulario,
+ * para poder corregirla (migración 120).
+ *
+ * Es la inversa de `comoSolicitud` y tiene que serlo de verdad: si perdiera o
+ * cambiara un dato, corregir el teléfono borraría los servicios sin que nadie
+ * lo note, porque la corrección manda el formulario ENTERO.
+ *
+ * El teléfono llega como `+569XXXXXXXX` —así lo guarda el servidor— y se
+ * muestra sin el prefijo, que es como se escribe; `normalizaTelefonoCl` lo
+ * vuelve a poner al mandar. Las fotos quedan con `uri: null` porque el bucket
+ * es privado: el enlace para verlas se firma aparte.
+ */
+export function formDeSolicitud(sol) {
+  return {
+    nombreRecinto: texto(sol?.nombre_recinto),
+    direccion: texto(sol?.direccion),
+    comuna: texto(sol?.comuna),
+    nCanchas: sol?.n_canchas == null ? '' : String(sol.n_canchas),
+    nombreDueno: texto(sol?.nombre_dueno),
+    telefono: texto(sol?.telefono).replace(/^\+56/, ''),
+    correo: texto(sol?.correo),
+    mensaje: texto(sol?.mensaje),
+    fotos: (sol?.fotos || []).map((path) => ({ path, uri: null })),
+    servicios: sol?.servicios || [],
+  };
+}
+
+/**
  * El formulario tal como lo recibe el servidor, o `null` si todavía no está
  * listo.
  *

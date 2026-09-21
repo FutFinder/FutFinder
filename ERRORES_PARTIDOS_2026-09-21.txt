@@ -1,0 +1,304 @@
+FUTFINDER — NUEVA REVISIÓN DEL APARTADO DE PARTIDOS
+Fecha: 21 de septiembre de 2026
+Código revisado: 1a01244 (main)
+
+RESULTADO: 11 hallazgos nuevos. No se incluyen como pendientes los 19 del
+informe anterior ni la carrera de inscripción corregida en la migración 109.
+Los identificadores N01–N11 pertenecen exclusivamente a este listado.
+
+ALCANCE Y EVIDENCIA
+- Revisión de búsqueda, edición, ingreso/salida, asistencia y calificaciones.
+- N01–N06: reproducciones en PostgreSQL 18 local, con funciones extraídas de
+  las migraciones vigentes, datos ficticios y los triggers pertinentes. Para
+  las carreras se usaron DOS conexiones y transacciones reales, no llamadas
+  secuenciales ni una simulación de concurrencia.
+- El esquema local es reducido: no replica todo Supabase ni acredita por sí
+  solo que cada definición desplegada sea idéntica. Estos resultados prueban
+  fallas en las implementaciones versionadas; conviene verificar el despliegue
+  al aplicar cada corrección.
+- N07–N11: ejecución de lógica extraída del cliente actual con dependencias
+  simuladas y revisión de sus pantallas. No es una prueba visual end-to-end.
+- Pasaron las 1.431 pruebas existentes de npm test. Los casos nuevos de abajo
+  no están cubiertos por esa suite.
+- Esta revisión no modificó funciones de producción, cuentas ni datos remotos.
+  Se entrega el listado para decidir y ejecutar las correcciones.
+
+PRIORIDADES
+P1: afecta integridad de partidos, sanciones o reputación.
+P2: inconsistencia funcional que pierde resultados, avisos o acciones válidas.
+
+======================================================================
+N01 — P1 — SALIR DE UN PARTIDO CANCELADO LO REABRE Y CASTIGA AL JUGADOR
+======================================================================
+Pasos:
+1. X se inscribe en un partido futuro.
+2. El organizador lo cancela; X conserva su inscripción en el historial.
+3. X ejecuta leave_match_penalized desde una sesión desactualizada o mediante
+   la RPC autenticada, aunque el partido ya esté cancelado.
+
+Resultado comprobado:
+- La RPC devuelve éxito y penalty: 3.
+- El partido pasa de cancelado a abierto.
+- X pierde su inscripción y su Trust Score baja de 80 a 77.
+
+Esperado: una salida no debe revivir un partido cancelado ni sancionar al
+jugador por una cancelación del organizador.
+
+Causa: la función no valida el estado del partido y escribe estado='abierto'
+sin distinguir un partido lleno de uno cerrado.
+
+Qué cambiar: validar estado y vigencia bajo bloqueo antes de borrar la
+inscripción; definir una salida sin sanción para cancelados o rechazarla sin
+alteraciones. Reabrir únicamente cuando corresponda a un partido lleno.
+
+Fuente: supabase/migrations/111_el_club_tiene_dueno_y_puerta_unica.sql:184–215.
+
+======================================================================
+N02 — P1 — DOS SALIDAS SIMULTÁNEAS COBRAN DOS VECES LA MISMA SANCIÓN
+======================================================================
+Pasos:
+1. X está inscrito, con Trust Score 80 y más de dos horas de anticipación.
+2. Dos sesiones envían leave_match_penalized para esa misma inscripción.
+3. La segunda lee la inscripción antes del COMMIT de la primera.
+
+Resultado comprobado: ambas devuelven éxito y penalty: 3; X termina con 74,
+aunque solo abandonó un partido. Solo se borra una fila.
+
+Esperado: una sola baja y una sola sanción; el reintento no vuelve a cobrar.
+
+Causa: se lee la inscripción sin bloquearla. La segunda eliminación puede
+borrar cero filas, pero igualmente se liberan cupos, se avisa y se descuenta.
+
+Qué cambiar: hacer atómica la reclamación de la inscripción —por ejemplo,
+DELETE ... RETURNING y aplicar efectos únicamente si se borró la fila—,
+coordinando el bloqueo con las demás operaciones del partido.
+
+Fuente: supabase/migrations/111_el_club_tiene_dueno_y_puerta_unica.sql:200–215.
+
+======================================================================
+N03 — P1 — DOS CONFIRMACIONES GPS SIMULTÁNEAS DUPLICAN ASISTENCIA Y PUNTOS
+======================================================================
+Pasos:
+1. X está inscrito, cerca de la cancha y dentro de la ventana GPS.
+2. Dos sesiones llaman confirm_attendance_gps simultáneamente.
+3. Ambas leen estado='inscrito' antes de que la primera confirme su cambio.
+
+Resultado comprobado: ambas responden éxito; un solo partido deja dos
+asistencias confirmadas y sube el Trust Score de 80 a 82, con dos movimientos
+en el historial.
+
+Esperado: una asistencia y un punto, aunque se repita la petición.
+
+Causa: el chequeo de «ya confirmado» se hace antes de obtener un bloqueo;
+el UPDATE posterior no exige que el estado siga siendo 'inscrito'.
+
+Qué cambiar: bloquear y releer la inscripción o usar una transición
+condicional con RETURNING; premiar únicamente la transición efectiva.
+
+Fuente: supabase/migrations/107_corregir_una_marca_no_cuesta_puntos.sql:
+218–232 y 276–286.
+
+======================================================================
+N04 — P1 — GUARDAR ASISTENCIA A LA VEZ DUPLICA EL PREMIO Y EL CONTADOR
+======================================================================
+Pasos:
+1. Termina el partido; X aún figura inscrito y tiene Trust Score 80.
+2. El organizador guarda «presente» para X desde dos sesiones simultáneas.
+3. Ambas leen el estado y el historial previos antes del primer COMMIT.
+
+Resultado comprobado: ambas responden éxito. X termina con 84 y dos
+asistencias confirmadas; el historial suma +4 en ese partido.
+
+Esperado: 82 y una asistencia, como al guardar una sola vez.
+
+Causa: save_match_attendance lee v_prev y v_aplicado sin serializar la
+operación. La corrección de la migración 107 resuelve los cambios secuenciales
+de marca, pero no dos guardados que calculan desde el mismo estado anterior.
+
+Qué cambiar: bloquear antes de leer estado e historial, establecer un orden
+consistente de bloqueos y volver a calcular la diferencia dentro de esa
+operación. Añadir pruebas con dos sesiones y marcas iguales y distintas.
+
+Fuente: supabase/migrations/107_corregir_una_marca_no_cuesta_puntos.sql:
+101–115, 123–133 y 161–172.
+
+======================================================================
+N05 — P2 — MOVER LA UBICACIÓN NO AVISA SI CANCHA Y COMUNA CONSERVAN EL NOMBRE
+======================================================================
+Pasos:
+1. Publicar un partido y tener jugadores inscritos.
+2. Editar su dirección y elegir otro punto dentro de la misma comuna,
+   manteniendo el nombre de la cancha, la hora y la cuota.
+3. Guardar la edición.
+
+Resultado comprobado: cambian dirección y coordenadas, pero se generan cero
+avisos match_updated para el inscrito. Como control, cambiar después la cuota
+sí genera el aviso. La confirmación de cambios del formulario tampoco cuenta
+la dirección ni las coordenadas.
+
+Esperado: comunicar a los inscritos que cambió el lugar donde deben llegar.
+
+Causa: cliente y trigger solo vigilan hora, nombre de cancha, comuna y cuota.
+La selección de otra sugerencia puede conservar el nombre escrito de cancha.
+
+Qué cambiar: incluir dirección y coordenadas en la detección del cambio de
+ubicación, en la confirmación del formulario y en la notificación del servidor.
+
+Fuentes: src/screens/EditMatchScreen.js:187–198;
+supabase/migrations/44c_notify_match_updated_texto.sql:59–73;
+src/utils/ubicacionPropuesta.js:seleccionarLugar.
+
+======================================================================
+N06 — P2 — EDITAR LA HORA PUEDE DEJAR A UN INSCRITO EN DOS PARTIDOS A LA VEZ
+======================================================================
+Pasos:
+1. X se inscribe en A y B, inicialmente en horarios que no se superponen.
+2. El organizador de B cambia su hora para coincidir con A.
+3. Se guarda la edición con ambas inscripciones vigentes.
+
+Resultado comprobado: la edición se acepta. X conserva las dos inscripciones;
+get_schedule_conflict detecta el choque DESPUÉS de que ya quedó guardado.
+
+Esperado: resolver explícitamente los conflictos de los inscritos al cambiar
+hora o duración: impedir el cambio conflictivo o pedir reconfirmación y ofrecer
+una salida acorde al cambio realizado por el organizador.
+
+Causa: la protección de agenda de la migración 109 se ejecuta al insertar o
+actualizar attendees. Cambiar matches.hora no vuelve a validar esa agenda.
+
+Qué cambiar: crear una operación de reprogramación que compruebe a los
+inscritos y defina cómo resolver sus conflictos, también ante concurrencia.
+No basta con consultar el horario al momento de unirse.
+
+Fuentes: src/screens/EditMatchScreen.js:save (aprox. 256–299);
+supabase/migrations/109_serializar_la_agenda_del_jugador.sql:tg_enforce_join_rules;
+supabase/migrations/104_los_cupos_los_cuenta_la_nomina.sql:get_schedule_conflict.
+
+======================================================================
+N07 — P2 — DOS PARTIDOS EMPATADOS AL FINAL DE UNA PÁGINA HACEN PERDER UNO
+======================================================================
+Pasos:
+1. La búsqueda devuelve 51 partidos: 49 con horas anteriores distintas y
+   dos partidos más a exactamente la misma hora.
+2. Cargar la primera página de 50.
+3. Pulsar «Ver más partidos».
+
+Resultado comprobado: primera página con 50 y hayMas=true; segunda página
+vacía y hayMas=false. El partido 51 no aparece.
+
+Esperado: recuperar los 51, sin perder los que empatan en hora.
+
+Causa: el cursor contiene solo hora y la siguiente consulta exige hora >
+últimaHora. El compañero del último partido queda excluido por igualdad.
+El comentario del código reconoce una limitación, pero la describe como
+necesitar más de una página completa de empatados: aquí bastan SOLO DOS
+empatados si caen en el límite entre páginas.
+
+Qué cambiar: ordenar y paginar por un cursor compuesto estable, por ejemplo
+(hora, id), usando el mismo desempate en la consulta y en el cursor.
+
+Fuentes: src/services/matches.js:304–327;
+src/screens/PartidosScreen.js:252–257.
+
+======================================================================
+N08 — P2 — UN ERROR EN «VER MÁS» SE CONFUNDE CON EL FIN DE LOS RESULTADOS
+======================================================================
+Pasos:
+1. Tener una primera página de 50 partidos y más resultados disponibles.
+2. Hacer que falle la consulta de la página siguiente (por ejemplo, la red).
+3. Pulsar «Ver más partidos».
+
+Resultado comprobado: se conservan los 50, pero hayMas queda false y
+desaparece el botón. No se presenta el error ni un reintento de esa página.
+
+Esperado: conservar la opción de continuar y mostrar un error recuperable.
+
+Causa: cargarMas ignora res.error; su catch también convierte excepciones en
+una respuesta vacía con hayMas=false.
+
+Qué cambiar: separar «consulta fallida» de «última página», conservar cursor
+y hayMas en el error y ofrecer reintento sin recargar toda la búsqueda.
+
+Fuentes: src/screens/PartidosScreen.js:249–265 y 762–770;
+src/services/matches.js:323–325.
+
+======================================================================
+N09 — P2 — UNA RESPUESTA ANTIGUA PISA LOS RESULTADOS DE LOS FILTROS ACTUALES
+======================================================================
+Pasos:
+1. Iniciar una búsqueda para comuna A.
+2. Antes de que termine, cambiar a comuna B e iniciar la nueva búsqueda.
+3. La respuesta B llega primero y la de A después.
+
+Resultado comprobado: el filtro sigue indicando B, pero matches queda con
+los partidos de A. El filtrado local deja cero tarjetas aunque B tenía
+resultados; la respuesta antigua también puede sobrescribir la caché.
+
+Esperado: que solo la búsqueda vigente pueda reemplazar el listado.
+
+Causa: load no identifica ni descarta respuestas obsoletas. El cleanup del
+efecto cancela el temporizador, pero no una solicitud que ya empezó.
+
+Qué cambiar: asociar un identificador a cada búsqueda y aceptar únicamente
+su última respuesta; proteger también caché, estados de carga y paginación.
+
+Fuente: src/screens/PartidosScreen.js:177–185, 235–241 y 273–280.
+
+======================================================================
+N10 — P2 — UN PARTIDO CANCELADO OFRECE «CALIFICAR A LOS JUGADORES»
+======================================================================
+Pasos:
+1. Dos jugadores confirman GPS antes del inicio, dentro de la ventana válida.
+2. El organizador cancela el partido.
+3. Pasa la hora de término originalmente programada.
+4. Un jugador abre el detalle del partido cancelado.
+
+Resultado comprobado en la lógica del cliente: canRate=true; se ofrece el
+acceso para calificar a los jugadores. La cancelación conserva los asistentes
+con estado confirmado_gps, y la pantalla de evaluación no valida cancelado.
+
+Esperado: no ofrecer evaluaciones de un partido cancelado.
+
+Qué cambiar: excluir estados incompatibles tanto en el detalle como al entrar
+a la pantalla de evaluación. Verificar también la regla en el servidor.
+
+Límite de la comprobación: se demuestra la acción incorrecta de interfaz,
+NO que Supabase permita guardar esas evaluaciones; la política de ratings
+no está versionada en el esquema revisado.
+
+Fuentes: src/screens/MatchDetailScreen.js:448 y 1316;
+src/services/matchRules.js:252;
+supabase/migrations/50_partido_de_clubes_una_sola_puerta.sql:cancel_match.
+
+======================================================================
+N11 — P2 — FALLAR LA CARGA DE EVALUACIONES MUESTRA «NADA POR CALIFICAR»
+======================================================================
+Pasos:
+1. Abrir «Calificar a los jugadores» en un partido elegible.
+2. Hacer que falle la consulta de asistentes, perfiles o evaluaciones previas.
+
+Resultado comprobado: el servicio devuelve data=[] y error; la pantalla
+ignora el error y muestra «Nada por calificar», atribuyéndolo a que nadie más
+confirmó GPS. No ofrece reintento dentro de esa pantalla.
+
+Esperado: informar el fallo de carga y permitir reintentar; el estado vacío
+solo corresponde a una consulta exitosa sin compañeros elegibles.
+
+Qué cambiar: consumir error junto con data, mostrar el estado de fallo y
+mantener una acción de recarga.
+
+Fuentes: src/screens/RateMatchScreen.js:87–93 y 203–212;
+src/services/ratings.js:99, 109 y 118.
+
+======================================================================
+ORDEN SUGERIDO PARA RESOLVER
+======================================================================
+1. N01 y N02: proteger la salida, el estado del partido y la sanción única.
+2. N03 y N04: hacer idempotentes las confirmaciones y la asistencia concurrente.
+3. N05 y N06: proteger los cambios de lugar y agenda de jugadores inscritos.
+4. N07, N08 y N09: asegurar que la búsqueda no pierda ni mezcle resultados.
+5. N10 y N11: corregir disponibilidad y errores del flujo de calificaciones.
+
+Al corregir cada caso, conservar una prueba de regresión con sus pasos. En
+N02–N04 es indispensable usar conexiones concurrentes: repetir llamadas una
+después de otra no reproduce el fallo observado.

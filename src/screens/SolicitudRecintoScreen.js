@@ -8,10 +8,14 @@ import { ArrowLeft, AlertTriangle, CheckCircle2, Lock, ImagePlus, X } from 'luci
 import { paleta as C, radios as R, medidas as S, fuentes as F } from '../theme/colors';
 import { Card, IconButton, Button, NoticeCard, StickyFooter, Chip } from '../components/reservas/ui';
 import { FieldLabel, TextField } from '../components/reservas/recintoUi';
-import { camposFaltantes, MAX_FOTOS, MAX_CANCHAS } from '../utils/solicitudRecinto';
+import {
+  camposFaltantes, formDeSolicitud, MAX_FOTOS, MAX_CANCHAS,
+} from '../utils/solicitudRecinto';
 import { SERVICIOS } from '../utils/serviciosRecinto';
 import { enviarSolicitudRecinto } from '../services/solicitudRecinto';
-import { pickImages, uploadFotoSolicitud, removeFotoSolicitudFile } from '../services/storage';
+import {
+  pickImages, uploadFotoSolicitud, removeFotoSolicitudFile, urlsDeFotosSolicitud,
+} from '../services/storage';
 
 /**
  * «Suma tu recinto»: el formulario con que el dueño de un complejo pide
@@ -36,6 +40,21 @@ import { pickImages, uploadFotoSolicitud, removeFotoSolicitudFile } from '../ser
  * archivos no pueden quedar en el bucket sin ninguna solicitud que los
  * mencione. Se borran al desmontar la pantalla, salvo que la solicitud se haya
  * mandado — ahí son justamente lo que el equipo va a mirar.
+ *
+ * DOS INTENCIONES, DOS MODOS (migración 120). La misma pantalla sirve para
+ * MANDAR una solicitud nueva y para CORREGIR una que ya está esperando
+ * respuesta; la diferencia es el parámetro `corregir`, que trae la solicitud
+ * a arreglar. Son cosas distintas y el servidor las trata distinto —crear
+ * dedupea por nombre y NO pisa nada; corregir sí—, así que la pantalla no
+ * adivina: lo dice el título, lo dice el botón, y quien entró a corregir ve
+ * sus datos ya escritos.
+ *
+ * LAS FOTOS QUE YA ESTABAN NO SE BORRAN AL QUITARLAS. En modo corrección, una
+ * foto que venía de la solicitud guardada sale de la lista pero su archivo se
+ * queda: mientras la corrección no se mande, la fila SIGUE apuntando a esa
+ * ruta, y borrar el archivo dejaría la solicitud del equipo con una foto rota.
+ * Al mandarla, la fila deja de mencionarla y el archivo queda huérfano — que
+ * es bastante menos malo que un enlace roto en el correo.
  */
 const FORM_VACIO = {
   nombreRecinto: '',
@@ -50,13 +69,40 @@ const FORM_VACIO = {
   servicios: [],  // claves del catálogo de la 75
 };
 
-export default function SolicitudRecintoScreen({ navigation }) {
-  const [form, setForm] = useState(FORM_VACIO);
+export default function SolicitudRecintoScreen({ navigation, route }) {
+  // La solicitud a corregir viene entera desde Reservas, que ya la tenía: así
+  // la pantalla abre con los datos puestos y no con un formulario vacío que
+  // haga dudar de si se está corrigiendo o empezando de cero.
+  const aCorregir = route?.params?.corregir || null;
+  const [form, setForm] = useState(() => (aCorregir ? formDeSolicitud(aCorregir) : FORM_VACIO));
+  const [corrigiendo, setCorrigiendo] = useState(aCorregir?.id || null);
   const [intentado, setIntentado] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState(null);
   const [enviada, setEnviada] = useState(null);
+
+  // Las rutas que YA estaban guardadas cuando se abrió la corrección. Nunca se
+  // borran del bucket desde acá: la fila las sigue mencionando hasta que la
+  // corrección se mande. Ver la cabecera.
+  const yaGuardadas = useRef(new Set((aCorregir?.fotos || [])));
+
+  // Los enlaces firmados para poder VER las fotos que ya estaban. Si no se
+  // pudieron firmar, quedan con `uri: null` y se dibuja un hueco; corregir el
+  // teléfono no puede depender de que se vea una foto.
+  useEffect(() => {
+    if (!aCorregir?.fotos?.length) return undefined;
+    let vivo = true;
+    urlsDeFotosSolicitud(aCorregir.fotos).then((conUrl) => {
+      if (!vivo) return;
+      const porRuta = new Map(conUrl.map((f) => [f.path, f.uri]));
+      setForm((f) => ({
+        ...f,
+        fotos: f.fotos.map((x) => (x.uri ? x : { ...x, uri: porRuta.get(x.path) || null })),
+      }));
+    });
+    return () => { vivo = false; };
+  }, [aCorregir]);
 
   const campo = (clave) => (valor) => {
     setForm((f) => ({ ...f, [clave]: valor }));
@@ -72,7 +118,11 @@ export default function SolicitudRecintoScreen({ navigation }) {
   useEffect(() => { enviadaRef.current = !!enviada; }, [enviada]);
   useEffect(() => () => {
     if (enviadaRef.current) return;
-    fotosRef.current.forEach((f) => removeFotoSolicitudFile(f.path));
+    // Sólo las que se subieron en esta pantalla: una foto que ya venía con la
+    // solicitud sigue siendo suya mientras la corrección no se mande.
+    fotosRef.current
+      .filter((f) => !yaGuardadas.current.has(f.path))
+      .forEach((f) => removeFotoSolicitudFile(f.path));
   }, []);
 
   const alternarServicio = (clave) => {
@@ -127,10 +177,16 @@ export default function SolicitudRecintoScreen({ navigation }) {
     setSubiendo(false);
   };
 
-  /** Quitarla la borra del bucket: si no, quedaría un archivo que nadie mira. */
+  /**
+   * Quitarla la borra del bucket: si no, quedaría un archivo que nadie mira.
+   *
+   * SALVO que venga de la solicitud guardada: esa foto la sigue mencionando la
+   * fila hasta que la corrección se mande, y borrar el archivo antes dejaría
+   * al equipo mirando un enlace roto de algo que todavía no se corrigió.
+   */
   const quitarFoto = (foto) => {
     setForm((f) => ({ ...f, fotos: f.fotos.filter((x) => x.path !== foto.path) }));
-    removeFotoSolicitudFile(foto.path);
+    if (!yaGuardadas.current.has(foto.path)) removeFotoSolicitudFile(foto.path);
   };
 
   const faltantes = useMemo(() => camposFaltantes(form), [form]);
@@ -142,21 +198,27 @@ export default function SolicitudRecintoScreen({ navigation }) {
 
     setEnviando(true);
     setError(null);
-    const { data, error: err } = await enviarSolicitudRecinto(form);
+    const { data, error: err } = await enviarSolicitudRecinto(form, corrigiendo);
     setEnviando(false);
     if (err) { setError(err.message); return; }
     setEnviada(data);
   };
 
   /**
-   * Vuelve al formulario en blanco para mandar otra solicitud — un dueño con
-   * más de un recinto no tiene por qué salir de la pantalla y volver a
-   * entrar. Las fotos de la solicitud recién enviada NO se tocan: son las
-   * que el equipo va a mirar, y el efecto de limpieza al desmontar sólo
-   * borra las que quedaron sueltas sin ninguna solicitud mandada.
+   * Vuelve al formulario en blanco para sumar OTRO recinto — un dueño con más
+   * de uno no tiene por qué salir de la pantalla y volver a entrar. Las fotos
+   * de la solicitud recién mandada NO se tocan: son las que el equipo va a
+   * mirar, y el efecto de limpieza al desmontar sólo borra las que quedaron
+   * sueltas sin ninguna solicitud mandada.
+   *
+   * Y SE SALE DEL MODO CORRECCIÓN, que es lo que lo hace seguro: sin esto, el
+   * recinto nuevo se mandaría con el `id` de la solicitud anterior y la
+   * PISARÍA en vez de crear una segunda.
    */
-  const otraSolicitud = () => {
+  const otroRecinto = () => {
     setForm(FORM_VACIO);
+    setCorrigiendo(null);
+    yaGuardadas.current = new Set();
     setIntentado(false);
     setError(null);
     setEnviada(null);
@@ -167,7 +229,9 @@ export default function SolicitudRecintoScreen({ navigation }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <View style={styles.header}>
           <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
-          <Text style={styles.headerTitle}>Solicitud enviada</Text>
+          <Text style={styles.headerTitle}>
+            {enviada.corregida ? 'Solicitud corregida' : 'Solicitud enviada'}
+          </Text>
         </View>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <Card style={styles.listaCard}>
@@ -175,19 +239,29 @@ export default function SolicitudRecintoScreen({ navigation }) {
               <CheckCircle2 color={C.green} size={26} strokeWidth={2} />
             </View>
             <Text style={styles.exitoTitulo}>
-              {enviada.reusada ? 'Ya teníamos tu solicitud' : `Recibimos ${form.nombreRecinto}`}
+              {enviada.corregida ? 'Listo, quedó corregida' : null}
+              {!enviada.corregida && enviada.reusada ? 'Ya teníamos tu solicitud' : null}
+              {!enviada.corregida && !enviada.reusada ? `Recibimos ${form.nombreRecinto}` : null}
             </Text>
             <Text style={styles.exitoTexto}>
-              {enviada.reusada
-                ? 'Tu recinto ya estaba en la lista, así que no mandamos una segunda solicitud. Seguimos con la primera.'
-                : 'Alguien del equipo la va a revisar y te va a llamar al número que dejaste para ver los horarios, '
-                  + 'los precios y las canchas. Si todo calza, cargamos tu recinto y quedas como dueño.'}
+              {enviada.corregida
+                ? `Guardamos los datos nuevos de ${form.nombreRecinto} y avisamos al equipo de que cambiaron, `
+                  + 'así que van a llamarte con lo corregido y no con lo de antes.'
+                : null}
+              {!enviada.corregida && enviada.reusada
+                ? 'Tu recinto ya estaba en la lista, así que no mandamos una segunda solicitud. Si querías '
+                  + 'arreglar algún dato, vuelve a Reservas y usa «Corregir mi solicitud».'
+                : null}
+              {!enviada.corregida && !enviada.reusada
+                ? 'Alguien del equipo la va a revisar y te va a llamar al número que dejaste para ver los horarios, '
+                  + 'los precios y las canchas. Si todo calza, cargamos tu recinto y quedas como dueño.'
+                : null}
             </Text>
           </Card>
         </ScrollView>
         <StickyFooter>
           <View style={{ gap: 10 }}>
-            <Button label="Enviar otra solicitud" variant="secondary" onPress={otraSolicitud} />
+            <Button label="Sumar otro recinto" variant="secondary" onPress={otroRecinto} />
             <Button label="Volver a Reservas" onPress={() => navigation.goBack()} />
           </View>
         </StickyFooter>
@@ -200,8 +274,12 @@ export default function SolicitudRecintoScreen({ navigation }) {
       <View style={styles.header}>
         <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Suma tu recinto</Text>
-          <Text style={styles.headerSub}>Para que aparezca en FutFinder</Text>
+          <Text style={styles.headerTitle}>
+            {corrigiendo ? 'Corrige tu solicitud' : 'Suma tu recinto'}
+          </Text>
+          <Text style={styles.headerSub}>
+            {corrigiendo ? 'Cambia lo que esté mal y vuelve a mandarla' : 'Para que aparezca en FutFinder'}
+          </Text>
         </View>
       </View>
 
@@ -212,8 +290,11 @@ export default function SolicitudRecintoScreen({ navigation }) {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={{ gap: 16 }}>
             <NoticeCard tone="info">
-              Esto no publica tu recinto al instante: lo revisamos, te llamamos y lo cargamos contigo.
-              Déjanos los datos y te contactamos.
+              {corrigiendo
+                ? 'Estos son los datos que nos mandaste. Cambia lo que haga falta y avisamos al equipo '
+                  + 'de que cambiaron, para que te llamen con lo corregido.'
+                : 'Esto no publica tu recinto al instante: lo revisamos, te llamamos y lo cargamos contigo. '
+                  + 'Déjanos los datos y te contactamos.'}
             </NoticeCard>
 
             <Card>
@@ -405,7 +486,11 @@ export default function SolicitudRecintoScreen({ navigation }) {
       </KeyboardAvoidingView>
 
       <StickyFooter>
-        <Button label="Mandar mi solicitud" loading={enviando} onPress={enviar} />
+        <Button
+          label={corrigiendo ? 'Guardar los cambios' : 'Mandar mi solicitud'}
+          loading={enviando}
+          onPress={enviar}
+        />
       </StickyFooter>
     </SafeAreaView>
   );

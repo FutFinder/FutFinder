@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,21 +23,45 @@ import { bienvenidaVista, marcarBienvenidaVista } from '../utils/avisoPanelRecin
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO, fechaRelativa, pluraliza } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
+import { puedeEn } from '../utils/permisosAdmin';
 
 /**
  * Panel del recinto (artboards 1f, 1h, 4g y 4i).
  *
- * NO HAY PERMISOS PARCIALES. El panel de un `admin` es idéntico al del dueño
- * salvo la sección de Administradores: las funciones del servidor validan que
- * quien llama administre esa cancha, sin mirar si es dueño o admin. Esconderle
- * secciones a un admin sería mentir sobre lo que puede hacer.
+ * EL PANEL NO MIRA LOS PERMISOS, PERO EL SERVIDOR SÍ. Este comentario decía
+ * que no había permisos parciales y que las funciones del servidor no miraban
+ * si quien llama es dueño o admin; **es falso desde la migración 83**. Medido
+ * el 2026-09-21 contra producción: siete disparadores sobre las tablas
+ * (`tg_permiso_canchas`, `tg_permiso_tarifas`, `tg_permiso_horarios`,
+ * `tg_permiso_cobros`, `tg_permiso_fotos`, `tg_permiso_servicios` y
+ * `tg_permiso_ficha`) llaman a `puede_en_complejo()` y rechazan con «No
+ * tienes permiso para esto en este recinto». El dueño puede todo siempre; un
+ * admin sólo lo que el dueño le encendió.
+ *
+ * ASÍ QUE EL PANEL NO OFRECE LO QUE EL SERVIDOR VA A RECHAZAR (migración
+ * 121, que es la que le pasa las tres banderas junto al recinto). Un
+ * administrador ve las filas de Canchas, Horarios y tarifas, Cobros y Ficha
+ * sólo si tiene el permiso de esa área, y lo mismo vale para los atajos que
+ * llevan ahí: el botón «Activar» de la franja roja, el de «Crear la primera
+ * cancha» y el de la hoja de bienvenida. Los AVISOS se quedan —quien
+ * administra tiene que saber que el recinto no está recibiendo reservas—; lo
+ * que se va es el botón que terminaría en un error.
+ *
+ * EL DÍA A DÍA NUNCA SE ESCONDE. Agenda y calendario no son permisos y no se
+ * pueden apagar: es para lo que se suma a alguien. Un administrador sin
+ * ningún permiso encendido ve esas dos filas y nada más, que es exactamente
+ * lo que puede hacer — no un panel vacío.
+ *
+ * Y lo del dueño sigue siendo del dueño: Administradores, publicar y
+ * despublicar.
  *
  * EL ESTADO «NO PUBLICADO» VA EN UNA FRANJA FIJA, no en un badge más: es la
  * diferencia entre estar recibiendo reservas y no, y tiene que notarse antes
  * de leer nada.
  *
- * Todavía faltan por construir las secciones de configuración (canchas,
- * horarios, tarifas, cobros adicionales, ficha, administradores e ingresos).
+ * De las secciones de configuración ya están todas menos una: canchas,
+ * horarios, tarifas, cobros adicionales, ficha y administradores. **Falta
+ * ingresos**, que es la única fila que este comentario sigue debiendo.
  * Se listan solo las que existen: una fila que no lleva a ninguna parte es
  * peor que una fila que todavía no está.
  */
@@ -80,6 +104,77 @@ export default function PanelRecintoScreen({ navigation, route }) {
 
   const publicado = recinto?.publicado;
   const esDueno = recinto?.rol === 'dueño';
+  // Lo que este administrador puede tocar. Mismas tres áreas que reparte el
+  // dueño y que hacen cumplir los disparadores de la 83; el dueño las tiene
+  // todas. Ver `puedeEn` para por qué se pregunta y no se deduce del rol.
+  const puedeCanchas = puedeEn(recinto, 'canchas');
+  const puedeCobros = puedeEn(recinto, 'cobros');
+  const puedeFicha = puedeEn(recinto, 'ficha');
+
+  /**
+   * Las filas de configuración que esta persona SÍ puede usar.
+   *
+   * El día a día —agenda y calendario— no es un permiso y nunca se esconde:
+   * es justamente para lo que se suma a alguien. Las demás se muestran solo
+   * si el servidor las va a dejar pasar.
+   */
+  const configurables = useMemo(() => {
+    if (!recinto) return [];
+    const filas = [
+      {
+        key: 'canchas',
+        puede: puedeCanchas,
+        icon: LayoutGrid,
+        title: 'Canchas',
+        subtitle: resumen
+          ? `${pluraliza(resumen.canchasTotal, 'cancha', 'canchas')} · nombre, tipo, precio y foto`
+          : 'Crear, editar y apagar canchas',
+        onPress: () => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre }),
+      },
+      {
+        // Misma lista que «Canchas» pero en otro modo: de acá se entra
+        // DIRECTO al horario o a las tarifas de una cancha, sin pasar por su
+        // edición. Va con el permiso `canchas` porque es lo que miran
+        // `tg_permiso_horarios` y `tg_permiso_tarifas` — comprobado en el
+        // catálogo, los dos disparadores pasan 'canchas'.
+        key: 'horarios',
+        puede: puedeCanchas,
+        icon: Clock,
+        title: 'Horarios y tarifas',
+        subtitle: 'Cuándo abre cada cancha y cuánto cobra',
+        onPress: () => navigation.navigate('Canchas', {
+          complejoId, nombre: recinto.nombre, modo: 'horarios',
+        }),
+      },
+      {
+        key: 'cobros',
+        puede: puedeCobros,
+        icon: ShoppingBag,
+        title: 'Cobros adicionales',
+        subtitle: 'Balón, petos, árbitro · opcionales para el jugador',
+        onPress: () => navigation.navigate('Cobros', { complejoId, nombre: recinto.nombre }),
+      },
+      {
+        key: 'ficha',
+        puede: puedeFicha,
+        icon: FileText,
+        title: 'Ficha del recinto',
+        subtitle: 'Nombre, descripción, dirección y foto',
+        onPress: () => navigation.navigate('FichaRecinto', { complejoId }),
+      },
+      {
+        // La lista de administradores no es un permiso que se pueda repartir:
+        // es del dueño y sólo de él (`admin_agregar_admin` lo exige).
+        key: 'administradores',
+        puede: esDueno,
+        icon: Users,
+        title: 'Administradores',
+        subtitle: 'Solo tú puedes cambiar esta lista',
+        onPress: () => navigation.navigate('Administradores', { complejoId, nombre: recinto.nombre }),
+      },
+    ];
+    return filas.filter((f) => f.puede);
+  }, [recinto, resumen, complejoId, navigation, puedeCanchas, puedeCobros, puedeFicha, esDueno]);
 
   // El camino a publicar tiene cinco estados desde la 82 —falta cancha,
   // falta horario, listo para revisión, en revisión, aprobado— y la pantalla
@@ -138,11 +233,17 @@ export default function PanelRecintoScreen({ navigation, route }) {
       {!cargando && recinto && !publicado ? (
         <StatusBanner texto="No estás publicado · nadie puede reservarte" tono="amber" />
       ) : !cargando && publicadoSinCanchas ? (
+        /* El aviso se muestra siempre —quien administra tiene que saber que
+           el recinto no está recibiendo reservas— pero el atajo «Activar»
+           sólo a quien puede activar. Para el resto, el aviso sin botón dice
+           la verdad; con botón sería una promesa que termina en un error. */
         <StatusBanner
           texto="Apareces, pero sin ninguna hora para reservar: todas tus canchas están inactivas"
           tono="red"
-          accion="Activar"
-          onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto?.nombre })}
+          accion={puedeCanchas ? 'Activar' : undefined}
+          onPress={puedeCanchas
+            ? () => navigation.navigate('Canchas', { complejoId, nombre: recinto?.nombre })
+            : undefined}
         />
       ) : null}
 
@@ -233,57 +334,26 @@ export default function PanelRecintoScreen({ navigation, route }) {
                   title="Calendario y bloqueos"
                   subtitle={resumen?.bloqueos ? `${pluraliza(resumen.bloqueos, 'hora ocupada', 'horas ocupadas')} hoy` : 'Ocupar horas cancha por cancha'}
                   right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
+                  {...(configurables.length === 0 ? { last: true } : {})}
                   onPress={() => navigation.navigate('CalendarioCancha', { complejoId, nombre: recinto.nombre })}
                 />
-                <ListRow
-                  icon={LayoutGrid}
-                  title="Canchas"
-                  subtitle={
-                    resumen
-                      ? `${pluraliza(resumen.canchasTotal, 'cancha', 'canchas')} · nombre, tipo, precio y foto`
-                      : 'Crear, editar y apagar canchas'
-                  }
-                  right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
-                  onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
-                />
-                {/* Misma lista que «Canchas» pero en otro modo: de acá se
-                    entra DIRECTO al horario o a las tarifas de una cancha,
-                    sin pasar por su edición. Antes estas dos filas navegaban
-                    exactamente a lo mismo, con los mismos parámetros. */}
-                <ListRow
-                  icon={Clock}
-                  title="Horarios y tarifas"
-                  subtitle="Cuándo abre cada cancha y cuánto cobra"
-                  right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
-                  onPress={() => navigation.navigate('Canchas', {
-                    complejoId, nombre: recinto.nombre, modo: 'horarios',
-                  })}
-                />
-                <ListRow
-                  icon={ShoppingBag}
-                  title="Cobros adicionales"
-                  subtitle="Balón, petos, árbitro · opcionales para el jugador"
-                  right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
-                  onPress={() => navigation.navigate('Cobros', { complejoId, nombre: recinto.nombre })}
-                />
-                <ListRow
-                  icon={FileText}
-                  title="Ficha del recinto"
-                  subtitle="Nombre, descripción, dirección y foto"
-                  right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
-                  last={!esDueno}
-                  onPress={() => navigation.navigate('FichaRecinto', { complejoId })}
-                />
-                {esDueno ? (
+                {/* Las filas de configuración se arman como lista y se
+                    filtran por permiso, en vez de escribir un `?:` en cada
+                    una: así `last` —la que no lleva separador abajo— la
+                    calcula el índice y no queda escrito a mano un «la última
+                    es la ficha» que deja de ser verdad en cuanto se esconde
+                    una. */}
+                {configurables.map((fila, i) => (
                   <ListRow
-                    icon={Users}
-                    title="Administradores"
-                    subtitle="Solo tú puedes cambiar esta lista"
+                    key={fila.key}
+                    icon={fila.icon}
+                    title={fila.title}
+                    subtitle={fila.subtitle}
                     right={<ChevronRight color={C.textSecondary} size={17} strokeWidth={2.2} />}
-                    last
-                    onPress={() => navigation.navigate('Administradores', { complejoId, nombre: recinto.nombre })}
+                    last={i === configurables.length - 1}
+                    onPress={fila.onPress}
                   />
-                ) : null}
+                ))}
               </Card>
             </View>
 
@@ -300,11 +370,15 @@ export default function PanelRecintoScreen({ navigation, route }) {
                       ? 'Todavía no tienes canchas.'
                       : `${canchas.filter((k) => k.activa).length} de ${canchas.length} canchas activas, y ninguna con horario cargado.`}
                   </Text>
-                  <Button
-                    label={canchas.length === 0 ? 'Crear la primera cancha' : 'Cargar horarios'}
-                    variant="secondary"
-                    onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
-                  />
+                  {/* El texto de arriba dice qué falta y lo lee cualquiera;
+                      el botón para arreglarlo es de quien puede arreglarlo. */}
+                  {puedeCanchas ? (
+                    <Button
+                      label={canchas.length === 0 ? 'Crear la primera cancha' : 'Cargar horarios'}
+                      variant="secondary"
+                      onPress={() => navigation.navigate('Canchas', { complejoId, nombre: recinto.nombre })}
+                    />
+                  ) : null}
                 </View>
               ) : null}
 
@@ -379,10 +453,10 @@ export default function PanelRecintoScreen({ navigation, route }) {
         nombre={recinto?.nombre}
         pasos={pasos}
         onCerrar={cerrarBienvenida}
-        onCargarCanchas={() => {
+        onCargarCanchas={puedeCanchas ? () => {
           cerrarBienvenida();
           navigation.navigate('Canchas', { complejoId, nombre: recinto?.nombre });
-        }}
+        } : undefined}
       />
 
       <HojaDespublicar
