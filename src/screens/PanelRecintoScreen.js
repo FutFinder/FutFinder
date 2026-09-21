@@ -27,17 +27,29 @@ import { formatCLP } from '../services/reservasRules';
 /**
  * Panel del recinto (artboards 1f, 1h, 4g y 4i).
  *
- * NO HAY PERMISOS PARCIALES. El panel de un `admin` es idéntico al del dueño
- * salvo la sección de Administradores: las funciones del servidor validan que
- * quien llama administre esa cancha, sin mirar si es dueño o admin. Esconderle
- * secciones a un admin sería mentir sobre lo que puede hacer.
+ * EL PANEL NO MIRA LOS PERMISOS, PERO EL SERVIDOR SÍ. Este comentario decía
+ * que no había permisos parciales y que las funciones del servidor no miraban
+ * si quien llama es dueño o admin; **es falso desde la migración 83**. Medido
+ * el 2026-09-21 contra producción: siete disparadores sobre las tablas
+ * (`tg_permiso_canchas`, `tg_permiso_tarifas`, `tg_permiso_horarios`,
+ * `tg_permiso_cobros`, `tg_permiso_fotos`, `tg_permiso_servicios` y
+ * `tg_permiso_ficha`) llaman a `puede_en_complejo()` y rechazan con «No
+ * tienes permiso para esto en este recinto». El dueño puede todo siempre; un
+ * admin sólo lo que el dueño le encendió.
+ *
+ * La consecuencia, que queda abierta a propósito: un admin sin permisos ve
+ * igual las filas de Canchas, Tarifas, Cobros y Ficha, y se entera recién al
+ * intentar guardar. Esconderlas es una decisión de producto —un panel vacío
+ * tampoco explica nada— y no se toma desde acá. Lo único que el panel sí
+ * esconde es lo que es del dueño: Administradores, publicar y despublicar.
  *
  * EL ESTADO «NO PUBLICADO» VA EN UNA FRANJA FIJA, no en un badge más: es la
  * diferencia entre estar recibiendo reservas y no, y tiene que notarse antes
  * de leer nada.
  *
- * Todavía faltan por construir las secciones de configuración (canchas,
- * horarios, tarifas, cobros adicionales, ficha, administradores e ingresos).
+ * De las secciones de configuración ya están todas menos una: canchas,
+ * horarios, tarifas, cobros adicionales, ficha y administradores. **Falta
+ * ingresos**, que es la única fila que este comentario sigue debiendo.
  * Se listan solo las que existen: una fila que no lleva a ninguna parte es
  * peor que una fila que todavía no está.
  */
