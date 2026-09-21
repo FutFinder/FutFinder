@@ -329,10 +329,22 @@ N10 → supabase/migrations/124_no_se_califica_un_partido_que_no_se_jugo.sql
 N11 → src/screens/RateMatchScreen.js. El error de carga se consume junto con
   los datos y tiene su propio estado con reintento.
 
-Pruebas: los arneses 122 (19/19), 123 (10/10) y 124 (3/3) corrieron contra el
-esquema real, primero con su migración en la misma transacción y después
-contra el esquema aplicado. npm run verify: lint sin errores y 1.465 pruebas.
+ADEMÁS, FUERA DEL INFORME: al revisar que no quedara nada se encontró que
+  N01 y N02 estaban intactos en la OTRA puerta de la salida, `swap_match`
+  («cambiarme a otro partido») y su variante de anfitrión
+  `cancel_match_and_join`. Cambiarse desde un partido cancelado lo revivía y
+  cobraba 3 puntos —reproducido contra producción: ok=true, penalty=3,
+  estado=abierto, 80 → 77— y dos cambios simultáneos cobraban dos veces.
+  Corregido con el mismo patrón en
+  supabase/migrations/125_la_otra_puerta_de_la_salida.sql (aplicada).
+
+Pruebas: los arneses 122 (19/19), 123 (10/10), 124 (3/3) y 125 (16/16)
+corrieron contra el esquema real, primero con su migración en la misma
+transacción y después contra el esquema aplicado. El de la 125 se corrió
+también como control negativo contra las funciones viejas, y reprodujo el
+fallo. npm run verify: lint sin errores y 1.465 pruebas.
 
 Pendiente de ejecutar: supabase/tests/partidos_salida_concurrente_test.cjs,
-la carrera con DOS conexiones de N02–N04. Está escrito pero necesita un
-PostgreSQL local, que este equipo no tiene instalado.
+la carrera con DOS conexiones de N02–N04, incluido el caso de marcas
+distintas que pide N04. Está escrito pero necesita un PostgreSQL local, que
+este equipo no tiene instalado.

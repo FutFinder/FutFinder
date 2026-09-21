@@ -188,6 +188,9 @@ export default function PartidosScreen({ navigation, route }) {
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoadError(null);
+    // Una búsqueda nueva reemplaza el listado entero, así que el error de la
+    // página siguiente deja de tener a qué referirse.
+    setErrorMas(null);
     const turno = secuencia.abrir();
     const [res, loc, user, status, misClubes] = await Promise.all([
       // Los filtros que la base sabe resolver van EN la consulta: antes se
@@ -262,7 +265,6 @@ export default function PartidosScreen({ navigation, route }) {
       setHayMas(!!res.hayMas);
       setFromCache(null);
       setLoadError(null);
-      setErrorMas(null);
       cacheWrite(CACHE_KEY, res.data || []);
     }
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ import {
   submitRatings,
 } from '../services/ratings';
 import { notify } from '../utils/notify';
+import { crearSecuencia } from '../utils/paginacionPartidos';
 import { PrimaryButton } from '../components/partidos/ui';
 
 /**
@@ -93,13 +94,21 @@ export default function RateMatchScreen({ route, navigation }) {
   // { [userId]: { puntualidad, fairplay, nivel, comentario } }
   const [ratings, setRatings] = useState({});
 
+  // Dos cargas pueden solaparse —el botón de reintentar sobre una que todavía
+  // viene, o un cambio de partido—, y la que llegue tarde no puede escribir:
+  // es el mismo turno que usa el buscador para no pisar sus propios filtros.
+  const secuencia = useRef(crearSecuencia()).current;
+
   const cargar = useCallback(async () => {
     setLoading(true);
     setBloqueo(null);
+    const turno = secuencia.abrir();
     const [partido, compas] = await Promise.all([
       getMatchById(matchId).catch((e) => ({ data: null, error: e })),
       getRatableAttendees(matchId).catch((e) => ({ data: [], error: e })),
     ]);
+
+    if (!secuencia.vigente(turno)) return;
 
     // El error se consume junto con los datos: `data: []` con `error` no es
     // una lista vacía, es una lista que no se pudo leer.
@@ -149,7 +158,7 @@ export default function RateMatchScreen({ route, navigation }) {
     }
     setRatings(initial);
     setLoading(false);
-  }, [matchId]);
+  }, [matchId, secuencia]);
 
   useEffect(() => {
     cargar();

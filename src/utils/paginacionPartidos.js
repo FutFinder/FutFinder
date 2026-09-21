@@ -101,6 +101,10 @@ export function resultadoDeCargarMas({ previos = [], hayMasPrevio = true, res } 
  *
  * Cada búsqueda pide su turno antes de salir y sólo escribe si al volver
  * sigue siendo la última.
+ *
+ * No es sólo del buscador: cualquier pantalla que pueda tener dos cargas en
+ * el aire a la vez —«reintentar» sobre una que todavía viene, por ejemplo—
+ * necesita lo mismo, y la usa también `RateMatchScreen`.
  */
 export function crearSecuencia() {
   let ultimo = 0;

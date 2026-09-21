@@ -161,6 +161,39 @@ async function asistenciaSimultanea() {
   console.log('OK: N04 — dos guardados simultáneos premian una sola vez');
 }
 
+async function asistenciaSimultaneaConMarcasDistintas() {
+  // El informe pide explícitamente este caso además del anterior: dos
+  // sesiones que guardan marcas DISTINTAS del mismo jugador. Con el partido
+  // bloqueado dejan de ser simultáneas, así que la segunda lee lo que la
+  // primera aplicó y mueve sólo la diferencia — que es la promesa de la 107:
+  // el puntaje depende de la marca FINAL y no del camino.
+  const p = await fixture({ horas: -6 });
+  await admin.query(
+    'update public.profiles set trust_score = 80, asistencias_confirmadas = 0 where id=$1', [jugador]);
+
+  const { primera, segunda, espero } = await carrera({
+    sqlA: 'select save_match_attendance($1,$2::jsonb) as r',
+    paramsA: [p, JSON.stringify({ [jugador]: 'presente' })],
+    sqlB: 'select save_match_attendance($1,$2::jsonb) as r',
+    paramsB: [p, JSON.stringify({ [jugador]: 'ausente' })],
+    actorA: org, actorB: org,
+  });
+
+  assert(espero, 'el segundo guardado no esperó: el partido no quedó bloqueado');
+  assert.equal(primera.ok, true);
+  assert.equal(segunda.data?.ok, true, JSON.stringify(segunda));
+  // 80 +2 (presente) −17 (corrección a ausente) = 65, que es exactamente lo
+  // que dan las dos marcas una después de otra. Sin el bloqueo, la segunda
+  // partía del historial previo y dejaba 65 o 67 según quién ganara.
+  const { trust_score, asistencias_confirmadas } = await puntaje();
+  assert.equal(Number(trust_score), 65, 'la corrección no partió del estado real');
+  assert.equal(Number(asistencias_confirmadas), 0, 'la ausencia tiene que devolver el contador');
+  const estado = await admin.query(
+    'select estado from public.attendees where id_partido=$1 and id_jugador=$2', [p, jugador]);
+  assert.equal(estado.rows[0].estado, 'no_asistio', 'gana la marca que se guardó al final');
+  console.log('OK: N04 — dos guardados simultáneos con marcas distintas dejan la marca final');
+}
+
 (async () => {
   try {
     await Promise.all([admin.connect(), a.connect(), b.connect()]);
@@ -174,6 +207,7 @@ async function asistenciaSimultanea() {
     await salidaSimultanea();
     await gpsSimultaneo();
     await asistenciaSimultanea();
+    await asistenciaSimultaneaConMarcasDistintas();
     console.log('Todo OK');
   } finally {
     try {
