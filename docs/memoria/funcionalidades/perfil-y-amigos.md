@@ -1,6 +1,6 @@
 # Perfil y amigos
 
-Última revisión: 2026-08-20 (rediseño visual de Editar perfil)
+Última revisión: 2026-09-22
 
 ## Propósito
 
@@ -9,6 +9,10 @@ Mantener identidad, historial y reputación del jugador, además de relaciones d
 ## Flujos actuales
 
 Perfil muestra datos propios o públicos, participación, Trust Score, club y acciones de amistad. Editar valida imágenes, mantiene avatar/portada como cambios locales y sólo reemplaza lo visible tras guardar perfil. Primero sube los archivos nuevos, compensa si falla la fila de perfil y sólo luego elimina archivos anteriores; galería limpia huérfanos y prioriza borrar la fila antes del archivo. Amigos lista recibidas, enviadas y aceptadas con actualización Realtime.
+
+**Un rechazo no es para siempre, y un bloqueo sí.** `sendFriendRequest()` cortaba ante CUALQUIER fila existente y devolvía `existed: true` sin error, así que —como la interfaz trata 'rejected' y 'blocked' como «sin relación» y sigue ofreciendo «Agregar amigo»— el jugador leía «Solicitud enviada» de una solicitud que nunca salió, y podía repetirlo indefinidamente. Ahora sólo 'pending' y 'accepted' cuentan como «ya existe». Una fila 'rejected' se BORRA y se inserta de nuevo: `friendships_unique_pair` es direccional y sólo el addressee puede hacer UPDATE (migración 06), así que borrar es lo único que la RLS le permite a quien envía. Una fila 'blocked' no se toca ni se intenta reenviar, y devuelve EXACTAMENTE el mismo texto que el bloqueo por privacidad — dos mensajes distintos dejarían distinguir «me bloqueó» de «no acepta solicitudes». Aceptar y rechazar además exigen `status = 'pending'`, para que una tarjeta vieja no reviva algo ya resuelto.
+
+**Un fallo de red no es una lista vacía.** `listMyFriends`, `listIncomingRequests` y `listOutgoingRequests` devuelven `{ data, error }` como el resto de los servicios; antes devolvían un arreglo pelado y se tragaban el error, y por eso el `catch` de `FriendsScreen` era inalcanzable y la pantalla afirmaba «no tienes amigos» con la red caída. **Y lo que se acaba de responder no desaparece:** la recarga sólo trae las pendientes, así que la solicitud recién aceptada —y su atajo «Abrir chat»— se borraba de un parpadeo; ahora la fila resuelta se conserva hasta salir de la pantalla.
 
 `EditProfileScreen` se rediseñó visualmente (handoff `Editar perfil.dc.html`, mismo proyecto de Claude Design que Ajustes/Reservas) migrando a los tokens `reservas`. Es un rediseño solo visual, sin tocar `commitProfileSave`, la validación ni el guardado local de avatar/portada. La portada vacía reutiliza `BannerBackdrop` (`components/ds/BannerBackdrop.js`, ya usado en `PlayerHeroCard`) en vez de fabricar la textura a rayas del mockup con una librería nueva. La pastilla de "Modalidad" del mockup mostraba 3 opciones cortas ("Fútbol 5/7/11"), pero `OPCIONES_MODALIDAD` real solo tiene Fútbol 7 / Fútbol 11 / Fútbol 7 y Fútbol 11 — se usó el dato real (no el del mockup) y se cambió el layout de esa fila de pills iguales a pills de ancho libre para no truncar la opción combinada.
 

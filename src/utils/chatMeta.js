@@ -200,9 +200,35 @@ export function mapThreadRow(row, myId) {
     other_username: p.other_username || 'jugador',
     other_foto: p.other_foto_url || null,
     foto_url: p.other_foto_url || null,
+    friend_status: p.friend_status || null,
     title: '@' + (p.other_username || 'jugador'),
-    subtitle: 'Amigos',
+    subtitle: subtituloDeDm(p.friend_status),
   };
+}
+
+/**
+ * El subtítulo de un mensaje directo, según cómo esté hoy la amistad.
+ *
+ * ANTES DECÍA «Amigos» SIEMPRE. El hilo de un DM no se borra cuando la
+ * amistad se deshace —`get_my_threads` lo lista mientras exista un mensaje—,
+ * así que la bandeja llamaba «Amigos» a alguien que ya no lo era, y al abrir
+ * la conversación el hilo decía lo contrario. Los textos son EXACTAMENTE los
+ * que usa `getThreadAccess` para el mismo caso, para que la tarjeta y el hilo
+ * no puedan contradecirse.
+ *
+ * Con un bloqueo el texto es el neutro de los dos lados: quién bloqueó a
+ * quién lo distingue el hilo, que sí puede preguntarlo sin delatar nada
+ * (`isBlockedByMe` sólo mira mis propias filas).
+ *
+ * `null` es «el servidor todavía no manda este dato» —una app abierta contra
+ * una base sin la migración 131— y ahí se conserva el texto de siempre: es
+ * lo que era cierto para la enorme mayoría de los DM.
+ */
+function subtituloDeDm(estado) {
+  if (!estado) return 'Amigos';
+  if (estado === 'accepted') return 'Amigos';
+  if (estado === 'blocked') return 'Conversación no disponible';
+  return 'Solo lectura';
 }
 
 /** Filtros de la bandeja, en el orden del diseño. */

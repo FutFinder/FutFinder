@@ -172,15 +172,16 @@ estado ya resuelto.
 Cambiar: añadir la condición de estado a las dos consultas.
 Referencia: src/services/friends.js:56-88
 
-9. BAJA — BOTONES SIN NOMBRE ACCESIBLE EN EL CHAT
-Observado: los cuatro «Volver» de `ChatThreadScreen` y el de
-`BlockedUsersScreen` no tienen `accessibilityRole` ni `accessibilityLabel`.
-Es el mismo hallazgo que el informe de Clubes del 22-09 encontró en el icono
-de chat de Integrantes.
-Cambiar: etiquetarlos, como ya se hizo en Clubes.
-Referencias:
-  src/screens/ChatThreadScreen.js (4 `navigation.goBack()`)
-  src/screens/BlockedUsersScreen.js:86-92
+9. BAJA — UN BOTÓN SIN NOMBRE ACCESIBLE (corregido el alcance)
+Observado al revisar: el «Volver» de `BlockedUsersScreen` no tiene
+`accessibilityRole` ni `accessibilityLabel`.
+CORRECCIÓN DE ESTE INFORME: la versión original decía además que los cuatro
+«Volver» de `ChatThreadScreen` estaban sin etiquetar. Era un falso positivo
+del método: se contaron las llamadas a `navigation.goBack()` en la pantalla,
+pero esas son callbacks que se pasan a `ChatThreadHeader` y a `ThreadDenied`,
+y los dos componentes SÍ etiquetan su botón («Volver», con rol de botón).
+Queda un solo botón afectado, el de Bloqueados.
+Referencia: src/screens/BlockedUsersScreen.js:86-92
 
 10. BAJA — LA NOTA DE MEMORIA DEL CHAT CONTRADICE AL REPOSITORIO
 Actual: `docs/memoria/funcionalidades/chat.md` dice «No hay ESLint en el
@@ -230,3 +231,44 @@ ORDEN SUGERIDO
 Primero 1 y 3 (mentir sobre lo que pasó y confundir un fallo con un vacío),
 después 5 y 4 (silencios y atajos que se evaporan), luego 2 (migración, sin
 urgencia mientras no se delegue `chatClubs`), y por último 6, 7, 8, 9 y 10.
+
+
+ESTADO: TODO CORREGIDO (22-09-2026)
+Los diez hallazgos quedaron resueltos en la misma sesión que los encontró.
+
+  1  → `sendFriendRequest` sólo corta ante 'pending'/'accepted'; un rechazo
+        se borra y se reintenta, un bloqueo devuelve el mensaje neutro.
+  2  → migración 131: `my_challenges` mira `tiene_permiso_de_club(...,
+        'chatClubs')` en vez del rol. APLICADA en producción.
+  3  → las tres listas devuelven `{ data, error }` y `FriendsScreen` pinta
+        el error con reintento.
+  4  → la solicitud respondida se conserva en pantalla hasta salir.
+  5  → el fallo al desbloquear se avisa con `notify`.
+  6  → migración 131: el payload del DM trae `friend_status`, y
+        `mapThreadRow` lo traduce con los textos de `getThreadAccess`.
+  7  → el hilo distingue «Bloqueaste a esta persona» de «Conversación no
+        disponible» con `isBlockedByMe()`.
+  8  → aceptar y rechazar exigen `status = 'pending'`.
+  9  → etiquetado el «Volver» de Bloqueados (y corregido el alcance: los de
+        `ChatThreadScreen` ya estaban bien).
+  10 → corregida la nota de memoria del chat.
+
+CÓMO SE VERIFICÓ LA MIGRACIÓN 131
+  · Dry-run completo contra producción dentro de `begin; … rollback;`, con
+    las dos ediciones aplicadas sobre la función REALMENTE desplegada y un
+    arnés que exige: 0 conversaciones perdidas, 0 inventadas, `friend_status`
+    en todos los DM y al menos uno en 'accepted' (o sea, que la subconsulta
+    lee `friendships` de verdad). El arnés llegó al final y el `rollback`
+    dejó la función original intacta.
+  · Tres md5 normalizados coinciden: la función desplegada, el cuerpo de la
+    migración 42 y el archivo de la 131 con sus dos ediciones revertidas. Es
+    decir, la 131 es exactamente lo desplegado más esas dos ediciones — nada
+    más viajó con ella.
+  · Tras aplicarla, comprobación con dos usuarios reales: mismos hilos que
+    antes (11, de los cuales 6 de desafío) y el DM ya trae
+    `friend_status: accepted`.
+
+LÍMITE QUE SIGUE EN PIE
+Nada de esto se recorrió con sesión autenticada en la app. Las correcciones
+están cubiertas por pruebas de lógica y de cableado (1554 en total, todas en
+verde) y por el arnés de la migración, no por una prueba en pantalla.

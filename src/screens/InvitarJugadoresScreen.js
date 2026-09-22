@@ -49,7 +49,7 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
   const [aviso, setAviso] = useState(null);
 
   const cargarAmigos = useCallback(async () => {
-    const lista = await listMyFriends();
+    const { data: lista } = await listMyFriends();
     setAmigos((lista || []).filter((a) => !yaEstan.includes(a.user_id)));
     setLoading(false);
   }, [yaEstan]);

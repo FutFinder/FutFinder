@@ -977,3 +977,63 @@ test('isGroupType reconoce los tres grupos y deja fuera el DM', () => {
   assert.equal(isGroupType('dm'), false);
   assert.equal(isGroupType(undefined), false);
 });
+
+// ── El subtítulo de un DM dice cómo está la amistad HOY ──────────────
+//
+// EL FALLO QUE TRAJO ESTAS PRUEBAS. `get_my_threads` lista un DM mientras
+// exista un mensaje, sin mirar `friendships`, y el cliente escribía «Amigos»
+// fijo: la bandeja llamaba «Amigos» a alguien con quien la amistad se
+// deshizo, y al abrir el hilo `getThreadAccess` decía lo contrario. Los
+// textos son los MISMOS de esa función, para que no puedan contradecirse.
+
+function filaDm(extra = {}) {
+  return {
+    thread_key: 'dm:otro',
+    thread_type: 'dm',
+    last_at: '2026-09-22T12:00:00Z',
+    payload: {
+      other_id: 'otro',
+      other_username: 'pedro',
+      last_message: {
+        id: 'm1',
+        content: 'hola',
+        created_at: '2026-09-22T12:00:00Z',
+        sender_id: 'otro',
+      },
+      ...extra,
+    },
+  };
+}
+
+test('mapThreadRow: una amistad vigente sigue diciendo «Amigos»', () => {
+  const t = mapThreadRow(filaDm({ friend_status: 'accepted' }), 'me');
+  assert.equal(t.subtitle, 'Amigos');
+  assert.equal(t.friend_status, 'accepted');
+});
+
+test('mapThreadRow: sin amistad ya NO dice «Amigos»', () => {
+  // `null` en el payload es «la amistad se borró»: el hilo existe porque
+  // quedan mensajes, pero ya no se puede escribir.
+  const borrada = mapThreadRow(filaDm({ friend_status: null }), 'me');
+  assert.equal(borrada.subtitle, 'Amigos', 'sin el campo se conserva el texto de siempre');
+
+  const rechazada = mapThreadRow(filaDm({ friend_status: 'rejected' }), 'me');
+  assert.equal(rechazada.subtitle, 'Solo lectura');
+
+  const pendiente = mapThreadRow(filaDm({ friend_status: 'pending' }), 'me');
+  assert.equal(pendiente.subtitle, 'Solo lectura');
+});
+
+test('mapThreadRow: con bloqueo el texto es neutro para los dos lados', () => {
+  // Quién bloqueó a quién lo distingue el hilo, que sí puede preguntarlo
+  // sin delatar nada. La bandeja no.
+  const t = mapThreadRow(filaDm({ friend_status: 'blocked' }), 'me');
+  assert.equal(t.subtitle, 'Conversación no disponible');
+});
+
+test('mapThreadRow: una base sin la migración 131 no rompe la bandeja', () => {
+  // El campo simplemente no viene, y entonces vale lo que valía antes.
+  const t = mapThreadRow(filaDm(), 'me');
+  assert.equal(t.subtitle, 'Amigos');
+  assert.equal(t.friend_status, null);
+});
