@@ -454,6 +454,27 @@ test('el club retado responde el desafío; el retador espera', () => {
   assert.equal(R.getChallengeCta(ctx({ myClubId: 'club-a' })).kind, 'esperar_respuesta');
 });
 
+test('quien tiene `answerChallenge` delegado responde, aunque no sea admin', () => {
+  // `aceptar_desafio()` autoriza por PERMISO en el club retado (migración
+  // 119, línea 666) y `club_challenges_update` deja rechazar igual. La
+  // puerta de esta función era un único `soyAdmin` que devolvía «Solo
+  // lectura» antes de mirar el estado: el servidor decía que sí y la
+  // interfaz que no.
+  const delegado = ctx({ soyAdmin: false, puedeResponderDesafio: true });
+  assert.equal(R.getChallengeCta(delegado).kind, 'responder');
+});
+
+test('el permiso delegado NO abre el resto del ciclo', () => {
+  // Habilita el `pendiente` y nada más: en negociación sigue siendo lectura,
+  // porque crear la propuesta oficial no es lo que autoriza ese permiso.
+  const enNegociacion = ctx({
+    soyAdmin: false,
+    puedeResponderDesafio: true,
+    challenge: { estado: 'negociacion', club_retador_id: 'club-a', club_retado_id: 'club-b' },
+  });
+  assert.equal(R.getChallengeCta(enNegociacion).kind, 'solo_lectura');
+});
+
 test('en negociación cualquiera de los dos clubes puede crear la propuesta oficial', () => {
   const base = { challenge: { estado: 'negociacion', club_retador_id: 'club-a', club_retado_id: 'club-b' } };
   assert.equal(R.getChallengeCta(ctx({ ...base, myClubId: 'club-a' })).kind, 'crear_propuesta');

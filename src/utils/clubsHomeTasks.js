@@ -198,6 +198,24 @@ function accion(esAdmin, etiquetaAdmin) {
   return esAdmin ? etiquetaAdmin : 'Ver';
 }
 
+/** A dónde apunta un desafío recibido según lo que este usuario alcanza. */
+function destinoDesafio(threadKey, rivalClubId) {
+  if (threadKey) return 'ChatThread';
+  if (rivalClubId) return 'ClubDetail';
+  return 'ClubChallenges';
+}
+
+/**
+ * El botón dice a dónde va. «Ver» sobre una tarjeta que abre la ficha de otro
+ * club no describe nada; «Ver club» sí, y es lo único que ese usuario puede
+ * hacer con un desafío que responde un administrador.
+ */
+function etiquetaDesafio(esAdmin, threadKey, rivalClubId) {
+  if (esAdmin) return 'Responder';
+  if (!threadKey && rivalClubId) return 'Ver club';
+  return 'Ver';
+}
+
 /**
  * El jugador necesita saber por qué no puede accionar.
  *
@@ -287,8 +305,18 @@ export function etiquetaPlazo(plazo) {
  * de un objeto con identidad propia: la solicitud de ingreso y la sanción.
  * Cada una de las demás viaja con el identificador de su propio asunto, que
  * es lo que `destinoDeTarea()` necesita para abrir el sitio exacto.
+ *
+ * `puedeNegociar` es «este usuario puede ABRIR el hilo del desafío», que no
+ * es lo mismo que su rol: `chat_puede_ver_desafio` (migración 119, línea 844)
+ * lo decide por el permiso `chatClubs`. Sin él, el desafío y el cambio de
+ * partido no llevan `threadKey` y `destinoDeTarea()` los manda a un sitio que
+ * sí se puede leer — mandarlos al hilo sería cambiar un destino vacío por un
+ * muro. Por omisión vale lo conservador, `rol === 'admin'`.
  */
-export function normalizarTareas(fuentes, { rol, clubId = null, ahora = new Date() } = {}) {
+export function normalizarTareas(
+  fuentes,
+  { rol, clubId = null, puedeNegociar = rol === 'admin', ahora = new Date() } = {}
+) {
   const f = fuentes || {};
   const esAdmin = rol === 'admin';
   const tareas = [];
@@ -306,6 +334,9 @@ export function normalizarTareas(fuentes, { rol, clubId = null, ahora = new Date
    * SIN CLUB RESUELTO NO SE DIBUJA. `listMyInvitations()` ya descarta esas
    * filas, pero sin la guardia la tarjeta diría «Te invitó undefined».
    */
+  /** El hilo del desafío, o `null` si este usuario no puede abrirlo. */
+  const hiloDelDesafio = (d) => (puedeNegociar ? challengeThreadKey(d?.id) : null);
+
   const invitacionesVistas = new Set();
   for (const inv of f.invitaciones || []) {
     const id = inv?.request_id;
@@ -344,13 +375,21 @@ export function normalizarTareas(fuentes, { rol, clubId = null, ahora = new Date
       subtitle: cerrado
         ? d.otroClub?.nombre || cerrado.subtitle
         : coletilla(esAdmin, d.otroClub?.nombre || 'Un club te desafió', status),
-      cta: cerrado ? null : accion(esAdmin, 'Responder'),
+      cta: cerrado ? null : etiquetaDesafio(esAdmin, hiloDelDesafio(d), d.otroClub?.id),
       // EL HILO DEL DESAFÍO, NO EL TABLERO. `ClubChallenges` es el tablero de
       // publicaciones abiertas y ya no tiene bandeja de directos: «Responder»
       // llevaba a una pantalla que no contiene este desafío por ninguna parte.
-      target: 'ChatThread',
+      //
+      // Y EL HILO NO ES PARA TODOS. `chat_puede_ver_desafio` (119:844) exige
+      // `chatClubs`, así que a un jugador sin ese permiso el hilo le contesta
+      // «este chat es solo para quienes negocian el desafío»: cambiar un
+      // destino vacío por un muro no arregla nada. Quien no puede entrar va a
+      // la ficha del club que lo desafió, que responde lo único que puede
+      // preguntarse — quién nos desafió.
+      target: destinoDesafio(hiloDelDesafio(d), d.otroClub?.id),
       challengeId: d.id,
-      threadKey: challengeThreadKey(d.id),
+      threadKey: hiloDelDesafio(d),
+      rivalClubId: d.otroClub?.id || null,
       status,
     });
   }
@@ -394,9 +433,14 @@ export function normalizarTareas(fuentes, { rol, clubId = null, ahora = new Date
       // `CambioPartidoCard`, dentro del hilo del desafío. Y el partido es el
       // de ESTA solicitud, no el próximo del club: con dos encuentros
       // abiertos, `nextMatch.id` abría el equivocado.
-      target: 'ChatThread',
+      //
+      // Sin permiso para entrar al hilo queda el detalle del PARTIDO, que sí
+      // ve cualquier integrante: no se puede responder el cambio desde ahí
+      // —el subtítulo ya dice que responde un admin— pero al menos abre el
+      // encuentro del que se está hablando.
+      target: puedeNegociar && c.challenge_id ? 'ChatThread' : 'MatchDetail',
       challengeId: c.challenge_id || null,
-      threadKey: challengeThreadKey(c.challenge_id),
+      threadKey: puedeNegociar ? challengeThreadKey(c.challenge_id) : null,
       matchId: c.match_id || null,
       changeId: c.id,
       status,
@@ -510,11 +554,16 @@ export function destinoDeTarea(tarea, clubActivoId = null) {
       return { screen: 'ClubDetail', params: { clubId: tarea.clubId || clubActivoId } };
 
     case 'desafio':
-      return tarea.threadKey
-        ? {
-            screen: 'ChatThread',
-            params: { threadKey: tarea.threadKey, challengeId: tarea.challengeId },
-          }
+      if (tarea.threadKey) {
+        return {
+          screen: 'ChatThread',
+          params: { threadKey: tarea.threadKey, challengeId: tarea.challengeId },
+        };
+      }
+      // Sin acceso al hilo, la ficha del club que desafió: es contenido real
+      // y responde la única pregunta que le queda a quien no puede accionar.
+      return tarea.rivalClubId
+        ? { screen: 'ClubDetail', params: { clubId: tarea.rivalClubId } }
         : { screen: 'ClubChallenges', params: { clubId: delClub } };
 
     case 'propuesta':

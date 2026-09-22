@@ -171,12 +171,15 @@ test('un desafío recibido se vuelve la tarea principal, en tono acento', () => 
   assert.equal(t.status, 'abierta');
 });
 
-test('al jugador el mismo desafío le llega como «Ver» y dice quién responde', () => {
+test('al jugador el mismo desafío NO le promete responder, y dice quién lo hace', () => {
   const [t] = D.normalizarTareas(fuentes({ desafiosRecibidos: [DESAFIO] }), {
     rol: 'jugador',
     ahora: AHORA,
   });
-  assert.equal(t.cta, 'Ver');
+  assert.notEqual(t.cta, 'Responder');
+  // Sin `chatClubs` el hilo no se puede abrir, así que el botón nombra lo
+  // que de verdad va a pasar: se abre la ficha del club que desafió.
+  assert.equal(t.cta, 'Ver club');
   assert.match(t.subtitle, /responde un admin/);
 });
 
@@ -1090,4 +1093,84 @@ test('con un permiso delegado, la nota NO manda a pedírselo a otro', () => {
 
 test('el admin no lee ninguna nota', () => {
   assert.equal(D.notaDeAccesos({ esAdmin: true, permisos: null }), null);
+});
+
+// ── A dónde va quien NO puede entrar al hilo ────────────────────────
+//
+// Abrir el hilo del desafío exige el permiso `chatClubs`
+// (`chat_puede_ver_desafio`, migración 119 línea 844). Mandar ahí a un
+// jugador que no lo tiene cambia un destino vacío por un muro: el hilo le
+// contesta «este chat es solo para quienes negocian el desafío».
+
+test('sin acceso al hilo, el desafío abre la ficha del club que desafió', () => {
+  const [t] = D.normalizarTareas(fuentes({ desafiosRecibidos: [DESAFIO] }), {
+    rol: 'jugador',
+    clubId: 'club-1',
+    puedeNegociar: false,
+    ahora: AHORA,
+  });
+  assert.equal(t.threadKey, null);
+  assert.equal(t.cta, 'Ver club');
+  assert.deepEqual(D.destinoDeTarea(t, 'club-1'), {
+    screen: 'ClubDetail',
+    params: { clubId: DESAFIO.otroClub.id },
+  });
+});
+
+test('con `chatClubs` delegado, el mismo jugador sí va al hilo', () => {
+  const [t] = D.normalizarTareas(fuentes({ desafiosRecibidos: [DESAFIO] }), {
+    rol: 'jugador',
+    clubId: 'club-1',
+    puedeNegociar: true,
+    ahora: AHORA,
+  });
+  assert.equal(t.cta, 'Ver');
+  assert.deepEqual(D.destinoDeTarea(t, 'club-1'), {
+    screen: 'ChatThread',
+    params: { threadKey: `challenge:${DESAFIO.id}`, challengeId: DESAFIO.id },
+  });
+});
+
+test('sin acceso al hilo, el cambio abre el partido del que se habla', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({
+      cambiosDePartido: [
+        { id: 'cb1', estado: 'pendiente', challenge_id: 'des-9', match_id: 'm-9' },
+      ],
+    }),
+    { rol: 'jugador', clubId: 'club-1', puedeNegociar: false, ahora: AHORA }
+  );
+  assert.equal(t.threadKey, null);
+  assert.deepEqual(D.destinoDeTarea(t, 'club-1'), {
+    screen: 'MatchDetail',
+    params: { matchId: 'm-9' },
+  });
+});
+
+test('por omisión sólo el admin negocia: lo conservador', () => {
+  // Quien llame sin decidirlo no puede terminar mandando a un jugador contra
+  // el muro del hilo por descuido.
+  const [comoJugador] = D.normalizarTareas(fuentes({ desafiosRecibidos: [DESAFIO] }), {
+    rol: 'jugador',
+    ahora: AHORA,
+  });
+  assert.equal(comoJugador.threadKey, null);
+
+  const [comoAdmin] = D.normalizarTareas(fuentes({ desafiosRecibidos: [DESAFIO] }), {
+    rol: 'admin',
+    ahora: AHORA,
+  });
+  assert.equal(comoAdmin.threadKey, `challenge:${DESAFIO.id}`);
+});
+
+test('sin club rival conocido queda el tablero, nunca una pantalla muda', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({ desafiosRecibidos: [{ ...DESAFIO, otroClub: null }] }),
+    { rol: 'jugador', clubId: 'club-1', puedeNegociar: false, ahora: AHORA }
+  );
+  assert.equal(t.cta, 'Ver');
+  assert.deepEqual(D.destinoDeTarea(t, 'club-1'), {
+    screen: 'ClubChallenges',
+    params: { clubId: 'club-1' },
+  });
 });

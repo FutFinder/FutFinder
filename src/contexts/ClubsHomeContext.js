@@ -466,7 +466,17 @@ export function ClubsHomeProvider({ children }) {
           // `clubId` es sólo el respaldo de las tareas que son del club y no
           // de un asunto propio (solicitud de ingreso, sanción): el resto ya
           // viaja con su challengeId, proposalId o matchId.
-          { rol: role, clubId: activeId, ahora }
+          //
+          // `puedeNegociar` decide si el desafío y el cambio pueden abrir el
+          // hilo. Es el permiso `chatClubs`, no el rol: es lo que exige
+          // `chat_puede_ver_desafio` (119:844), y sin él el hilo responde
+          // «este chat es solo para quienes negocian el desafío».
+          {
+            rol: role,
+            clubId: activeId,
+            puedeNegociar: role === 'admin' || !!permisosDelegados?.chatClubs,
+            ahora,
+          }
         );
 
         setState({
