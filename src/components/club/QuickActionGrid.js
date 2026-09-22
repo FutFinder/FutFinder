@@ -1,9 +1,18 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Rows3, Swords, Search, CalendarDays, Users, ShieldCheck } from 'lucide-react-native';
+import {
+  Rows3,
+  Swords,
+  Search,
+  CalendarDays,
+  Users,
+  MessageCircle,
+  ShieldCheck,
+} from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
 import { paleta as C, clubSuperficies, fuentes as F } from '../../theme/colors';
+import { notaDeAccesos } from '../../utils/clubsHomeTasks.js';
 
 /**
  * Los accesos rápidos del club, en grilla de tres.
@@ -18,19 +27,25 @@ import { paleta as C, clubSuperficies, fuentes as F } from '../../theme/colors';
  * porque repartir permisos es del administrador y no se delega — ni siquiera
  * a quien tenga otros permisos concedidos.
  *
- * LA NOTA DEL JUGADOR NO ES UNA DISCULPA, ES UNA EXPLICACIÓN. Sin ella, un
- * jugador ve tareas que no puede resolver y no entiende por qué. Con ella
- * sabe que está informado a propósito y quién actúa.
+ * LA NOTA NO ES UNA DISCULPA, ES UNA EXPLICACIÓN. Sin ella, un jugador ve
+ * tareas que no puede resolver y no entiende por qué. Con ella sabe que está
+ * informado a propósito y quién actúa. Qué dice lo decide `notaDeAccesos()`
+ * con los permisos EFECTIVOS: desde la migración 119 casi todo se delega, y
+ * una nota fija mandaba a pedirle a otro lo que uno mismo podía hacer.
  *
  * @param {object} [tema]   Escala de `theme/clubThemes.js`.
  * @param {object} [can]    Permisos de `permisosDeClub()`.
+ * @param {object} [misPermisos] Permisos delegados de `getMisPermisosEnClub()`.
  * @param {object} [badges] `{ desafios: n }` — contadores por clave.
  * @param {Function} onPress Recibe la clave del tile.
  */
-export default function QuickActionGrid({ tema, can, badges, onPress }) {
+export default function QuickActionGrid({ tema, can, misPermisos, badges, onPress }) {
   const escala = tema || temaClub('green');
   const permisos = can || {};
-  const esJugador = !permisos.gestionarPermisos;
+  const nota = notaDeAccesos({
+    esAdmin: !!permisos.gestionarPermisos,
+    permisos: misPermisos,
+  });
 
   const tiles = ACCIONES.filter((a) => !a.requiere || permisos[a.requiere]);
 
@@ -63,22 +78,28 @@ export default function QuickActionGrid({ tema, can, badges, onPress }) {
         })}
       </View>
 
-      {esJugador ? (
-        <Text style={styles.nota}>
-          Ves los integrantes y todo lo pendiente; responder desafíos, cambios y ajustes
-          queda en manos de un administrador.
-        </Text>
-      ) : null}
+      {nota ? <Text style={styles.nota}>{nota}</Text> : null}
     </View>
   );
 }
 
+/**
+ * «CALENDARIO» Y NO «PRÓXIMO PARTIDO». El tile abre `ClubMatchCalendar`, que
+ * lista los encuentros pasados y los que vienen, y seguía llamándose «Próximo
+ * partido» incluso en un club sin ninguno. El nombre queda reservado para la
+ * tarjeta que sí abre un encuentro concreto.
+ *
+ * «CHAT DEL CLUB» ES NUEVO ACÁ. Existía sólo como un icono de globo sin texto
+ * dentro de Integrantes: había que adivinar que la conversación del club vive
+ * dentro de la nómina.
+ */
 const ACCIONES = [
   { clave: 'alineacion', etiqueta: 'Alineación', Icono: Rows3 },
   { clave: 'desafios', etiqueta: 'Desafíos', Icono: Swords },
   { clave: 'rivales', etiqueta: 'Buscar rivales', Icono: Search },
-  { clave: 'partido', etiqueta: 'Próximo partido', Icono: CalendarDays },
+  { clave: 'partido', etiqueta: 'Calendario', Icono: CalendarDays },
   { clave: 'integrantes', etiqueta: 'Integrantes', Icono: Users },
+  { clave: 'chat', etiqueta: 'Chat del club', Icono: MessageCircle },
   { clave: 'permisos', etiqueta: 'Permisos de club', Icono: ShieldCheck, requiere: 'gestionarPermisos' },
 ];
 

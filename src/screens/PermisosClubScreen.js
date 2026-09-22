@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ShieldCheck, Shield, Check } from 'lucide-react-native';
@@ -59,7 +59,10 @@ const GRUPOS = [
   {
     titulo: 'Partidos',
     permisos: [
-      { key: 'lineup', label: 'Armar alineación', hint: 'Editar la formación del próximo partido' },
+      // NO ES LA DEL PRÓXIMO PARTIDO. `club_lineups` no tiene `match_id`: es el
+      // once base del club, y decía lo contrario justo donde se decide quién
+      // puede tocarlo.
+      { key: 'lineup', label: 'Armar alineación', hint: 'Editar la alineación general del club' },
       { key: 'results', label: 'Subir resultados', hint: 'Registrar marcador y estadísticas' },
     ],
   },
@@ -198,6 +201,12 @@ export default function PermisosClubScreen({ navigation, route }) {
     [role, roles]
   );
 
+  /**
+   * Escribe el borrador y devuelve si lo consiguió.
+   *
+   * El booleano lo usa «Guardar y salir» del aviso de cambios sin guardar: un
+   * error del servidor tiene que dejar los cambios en pantalla, no llevárselos.
+   */
   const guardar = useCallback(async () => {
     setSaving(true);
     const tareas = [];
@@ -212,7 +221,7 @@ export default function PermisosClubScreen({ navigation, route }) {
     if (tareas.length === 0) {
       setSaving(false);
       setDirty(false);
-      return;
+      return true;
     }
 
     const resultados = await Promise.all(tareas);
@@ -220,12 +229,13 @@ export default function PermisosClubScreen({ navigation, route }) {
     const conError = resultados.find((r) => r?.error);
     if (conError) {
       setBanner({ type: 'error', title: 'No se pudo guardar todo', message: conError.error.message });
-      return;
+      return false;
     }
     setRolesOriginal(clonarRoles(roles));
     setOverridesOriginal(clonarOverrides(overrides));
     setDirty(false);
     flash('Permisos actualizados para el club');
+    return true;
   }, [clubId, roles, rolesOriginal, overrides, overridesOriginal, flash]);
 
   const handleRestaurar = useCallback(() => {
@@ -309,6 +319,52 @@ export default function PermisosClubScreen({ navigation, route }) {
     flash('Vuelve a los permisos de su rol');
   }, [clubId, sheetUserId, sheetIsAdmin, flash, overrides, overridesOriginal, roles, rolesOriginal]);
 
+  /**
+   * Salir con permisos sin guardar pregunta antes.
+   *
+   * La pantalla ya distinguía el borrador de lo escrito —`dirty` y un botón
+   * «Guardar permisos» aparte— pero los dos botones de volver salían directo,
+   * así que el reparto que alguien acababa de armar se perdía sin un aviso.
+   *
+   * `beforeRemove` cubre el botón de la pantalla, el gesto del sistema y el
+   * botón físico de Android de una sola vez. El valor viaja por ref para no
+   * volver a suscribir el oyente con cada interruptor que se toca.
+   */
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const guardarRef = useRef(guardar);
+  guardarRef.current = guardar;
+  const saliendoRef = useRef(false);
+
+  useEffect(() => {
+    const quitar = navigation.addListener('beforeRemove', (e) => {
+      if (!dirtyRef.current || saliendoRef.current) return;
+      e.preventDefault();
+      const salir = () => {
+        saliendoRef.current = true;
+        navigation.dispatch(e.data.action);
+      };
+      confirmar(
+        'Tienes permisos sin guardar',
+        'Si sales ahora, el reparto vuelve a como estaba.',
+        salir,
+        {
+          confirmar: 'Salir sin guardar',
+          alternativa: {
+            label: 'Guardar y salir',
+            // Sólo sale si se guardó: un error del servidor tiene que dejar
+            // los cambios delante, no llevárselos.
+            onPress: async () => {
+              if (await guardarRef.current()) salir();
+            },
+          },
+          cancelar: 'Seguir editando',
+        }
+      );
+    });
+    return quitar;
+  }, [navigation, confirmar]);
+
   if (loading) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
@@ -345,6 +401,8 @@ export default function PermisosClubScreen({ navigation, route }) {
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
           style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
         >
           <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />

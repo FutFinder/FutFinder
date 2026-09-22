@@ -69,7 +69,12 @@ import {
 import { getMatchById, getMatchAttendees, withClubs } from '../services/matches';
 import { getClubById, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
-import { getChallenge, listChallengeEvents, refreshChallenge } from '../services/clubChallenges';
+import {
+  getChallenge,
+  listChallengeEvents,
+  refreshChallenge,
+  respondChallenge,
+} from '../services/clubChallenges';
 import {
   responderProrroga,
   listRespuestasProrroga,
@@ -1346,6 +1351,59 @@ export default function ChatThreadScreen({ route, navigation }) {
     [enviarRespuestaProrroga]
   );
 
+  /**
+   * Aceptar o rechazar el desafío recibido, desde el propio hilo.
+   *
+   * ESTE ERA EL CALLEJÓN SIN SALIDA. `getChallengeCta` ofrecía «Responder
+   * desafío» en `pendiente` y la barra no tenía con qué ejecutarlo: la única
+   * puerta real era la tarjeta de Avisos. Ahora que «Pendiente para ti» abre
+   * el hilo del desafío —y no un tablero que no lo contiene—, la respuesta
+   * tiene que poder darse acá.
+   *
+   * El rechazo se confirma: cierra el desafío para los dos clubes y no tiene
+   * vuelta atrás, igual que el «No» de la prórroga. Aceptar no la necesita.
+   *
+   * `respondChallenge` es la misma función que usa `NotificationsScreen`, así
+   * que la transición, el evento y los avisos son los de siempre.
+   */
+  const enviarRespuestaDesafio = useCallback(
+    async (aceptar) => {
+      if (challengeBusy || !challengeId) return;
+      setChallengeBusy(true);
+      const { error } = await respondChallenge(challengeId, aceptar);
+      if (error) {
+        setChallengeBusy(false);
+        Alert.alert('No se pudo responder', error.message || '');
+        return;
+      }
+      await refrescarDesafio();
+      setChallengeBusy(false);
+    },
+    [challengeBusy, challengeId, refrescarDesafio]
+  );
+
+  const handleResponderDesafio = useCallback(
+    (aceptar) => {
+      if (aceptar) {
+        enviarRespuestaDesafio(true);
+        return;
+      }
+      Alert.alert(
+        '¿Rechazar el desafío?',
+        'El desafío queda cerrado y el club rival recibe el aviso. No se puede deshacer.',
+        [
+          { text: 'Volver', style: 'cancel' },
+          {
+            text: 'Sí, rechazar',
+            style: 'destructive',
+            onPress: () => enviarRespuestaDesafio(false),
+          },
+        ]
+      );
+    },
+    [enviarRespuestaDesafio]
+  );
+
   const headerSubtitle = useMemo(() => {
     if (t?.type === 'challenge') {
       // El estado del ciclo es lo que de verdad orienta acá: el título ya
@@ -1699,6 +1757,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                 cta={challengeCta}
                 onPressCta={ctaAccionable ? handleChallengeCta : null}
                 onResponderProrroga={handleResponderProrroga}
+                onResponderDesafio={handleResponderDesafio}
                 ocupado={challengeBusy}
                 tema={temaDesafio}
               />

@@ -24,6 +24,7 @@
  */
 
 import { ESTADOS_CERRADOS } from '../services/clubChallengeRules.js';
+import { challengeThreadKey } from './challengeThread.js';
 import { CLUB_LIMITS } from './clubPlanLimits.js';
 
 /**
@@ -281,8 +282,13 @@ export function etiquetaPlazo(plazo) {
  * `rol` decide dos cosas: la etiqueta del botón y si la tarea se muestra —las
  * solicitudes de ingreso solo existen para un admin, porque un jugador no
  * tiene nada que hacer con ellas.
+ *
+ * `clubId` es el club activo, y solo lo usan las tareas que son DEL CLUB y no
+ * de un objeto con identidad propia: la solicitud de ingreso y la sanción.
+ * Cada una de las demás viaja con el identificador de su propio asunto, que
+ * es lo que `destinoDeTarea()` necesita para abrir el sitio exacto.
  */
-export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
+export function normalizarTareas(fuentes, { rol, clubId = null, ahora = new Date() } = {}) {
   const f = fuentes || {};
   const esAdmin = rol === 'admin';
   const tareas = [];
@@ -339,7 +345,12 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
         ? d.otroClub?.nombre || cerrado.subtitle
         : coletilla(esAdmin, d.otroClub?.nombre || 'Un club te desafió', status),
       cta: cerrado ? null : accion(esAdmin, 'Responder'),
-      target: 'ClubChallenges',
+      // EL HILO DEL DESAFÍO, NO EL TABLERO. `ClubChallenges` es el tablero de
+      // publicaciones abiertas y ya no tiene bandeja de directos: «Responder»
+      // llevaba a una pantalla que no contiene este desafío por ninguna parte.
+      target: 'ChatThread',
+      challengeId: d.id,
+      threadKey: challengeThreadKey(d.id),
       status,
     });
   }
@@ -356,7 +367,12 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
         ? cerrada.subtitle
         : coletilla(esAdmin, 'Fecha, lugar y modalidad por confirmar', status),
       cta: cerrada ? null : accion(esAdmin, 'Revisar'),
-      target: 'ClubChallenges',
+      // «Revisar» abre ESA propuesta, no una bandeja: con dos propuestas de
+      // rivales distintos en la lista, un destino común obliga a adivinar
+      // cuál de las dos se pulsó.
+      target: 'ClubProposal',
+      challengeId: p.challenge_id || null,
+      proposalId: p.id,
       status,
     });
   }
@@ -373,7 +389,16 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
         ? cerrado.subtitle
         : coletilla(esAdmin, 'El rival propuso mover el encuentro', status),
       cta: cerrado ? null : accion(esAdmin, 'Responder'),
-      target: 'ClubMatchChange',
+      // RESPONDER NO ES PEDIR OTRO CAMBIO. `ClubMatchChange` es el formulario
+      // para PROPONER uno; aceptar o rechazar el recibido se hace en
+      // `CambioPartidoCard`, dentro del hilo del desafío. Y el partido es el
+      // de ESTA solicitud, no el próximo del club: con dos encuentros
+      // abiertos, `nextMatch.id` abría el equivocado.
+      target: 'ChatThread',
+      challengeId: c.challenge_id || null,
+      threadKey: challengeThreadKey(c.challenge_id),
+      matchId: c.match_id || null,
+      changeId: c.id,
       status,
     });
   }
@@ -392,6 +417,7 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
       subtitle: `${f.nomina.confirmados} de ${f.nomina.cupos} cupos tomados`,
       cta: 'Ver nómina',
       target: 'ClubMatchRoster',
+      matchId: f.nomina.matchId,
       status: 'abierta',
     });
   }
@@ -406,6 +432,8 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
         subtitle: `${s.username || 'Un jugador'} quiere entrar al club`,
         cta: 'Revisar',
         target: 'ClubMembers',
+        clubId,
+        requestId: s.request_id,
         status: 'abierta',
       });
     }
@@ -420,6 +448,7 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
       subtitle: coletilla(esAdmin, 'Afecta a los próximos desafíos del club'),
       cta: accion(esAdmin, 'Revisar'),
       target: 'ClubDetail',
+      clubId,
       status: 'abierta',
     });
   }
@@ -437,6 +466,7 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
         subtitle: 'Revisa la nómina y confirma tu asistencia',
         cta: 'Ir ahora',
         target: 'ClubMatchRoster',
+        matchId: f.proximoPartido.id,
         status: 'abierta',
       });
     }
@@ -452,6 +482,81 @@ export function normalizarTareas(fuentes, { rol, ahora = new Date() } = {}) {
   // amable, pero con el tope de cuatro visibles escondería tareas
   // accionables detrás de avisos muertos.
   return tareas.sort((a, b) => ORDEN.indexOf(a.type) - ORDEN.indexOf(b.type));
+}
+
+/**
+ * A dónde lleva una tarea: `{ screen, params }`.
+ *
+ * POR QUÉ NO LO ARMA LA PANTALLA. `ClubsScreen` tenía una tabla de params por
+ * nombre de ruta, así que TODAS las tareas de un mismo destino viajaban con
+ * los mismos datos: el cambio de partido y la nómina se abrían con
+ * `nextMatch.id` aunque la solicitud fuera de otro encuentro, y el desafío y
+ * la propuesta llegaban sin su identificador. Acá cada tarea lleva el suyo
+ * desde que nace, y la traducción a ruta se prueba.
+ *
+ * `clubActivoId` es el respaldo de las tareas que son del club y no de un
+ * objeto propio (solicitudes, sanción); una invitación NUNCA lo usa, porque
+ * es de otro club.
+ *
+ * Sin el identificador que su destino necesita, la tarea cae al tablero de
+ * desafíos o a la ficha del club en vez de abrir una pantalla vacía.
+ */
+export function destinoDeTarea(tarea, clubActivoId = null) {
+  if (!tarea) return null;
+  const delClub = tarea.clubId || clubActivoId || null;
+
+  switch (tarea.type) {
+    case 'invitacion':
+      return { screen: 'ClubDetail', params: { clubId: tarea.clubId || clubActivoId } };
+
+    case 'desafio':
+      return tarea.threadKey
+        ? {
+            screen: 'ChatThread',
+            params: { threadKey: tarea.threadKey, challengeId: tarea.challengeId },
+          }
+        : { screen: 'ClubChallenges', params: { clubId: delClub } };
+
+    case 'propuesta':
+      return tarea.challengeId
+        ? {
+            screen: 'ClubProposal',
+            params: {
+              challengeId: tarea.challengeId,
+              proposalId: tarea.proposalId || null,
+              modo: 'revisar',
+            },
+          }
+        : { screen: 'ClubChallenges', params: { clubId: delClub } };
+
+    case 'cambio':
+      // El hilo es donde se responde; sin él, el detalle del partido al menos
+      // muestra de qué encuentro se habla.
+      if (tarea.threadKey) {
+        return {
+          screen: 'ChatThread',
+          params: { threadKey: tarea.threadKey, challengeId: tarea.challengeId },
+        };
+      }
+      return tarea.matchId
+        ? { screen: 'MatchDetail', params: { matchId: tarea.matchId } }
+        : { screen: 'ClubDetail', params: { clubId: delClub } };
+
+    case 'nomina':
+    case 'partido':
+      return tarea.matchId
+        ? { screen: 'ClubMatchRoster', params: { matchId: tarea.matchId } }
+        : { screen: 'ClubDetail', params: { clubId: delClub } };
+
+    case 'solicitud':
+      return { screen: 'ClubMembers', params: { clubId: delClub } };
+
+    case 'sancion':
+      return { screen: 'ClubDetail', params: { clubId: delClub } };
+
+    default:
+      return { screen: tarea.target, params: { clubId: delClub } };
+  }
 }
 
 /**
@@ -515,6 +620,65 @@ export function cuposDelPlan({ plan, miembrosActivos = 0, admins = 0 } = {}) {
     members: { used: miembrosActivos, max: limites.miembros },
     admins: { used: admins, max: limites.admins },
   };
+}
+
+/**
+ * Lo que cada permiso delegado HABILITA, dicho como lo diría el usuario.
+ *
+ * Son los nueve de la migración 119, que es exactamente lo que un admin
+ * puede conceder desde «Permisos de club». Responder un cambio de partido no
+ * está —la 46 lo ata a `rol = 'admin'` (líneas 415 y 654)— y repartir
+ * permisos tampoco: ésas son las dos que la nota tiene que nombrar como
+ * exclusivas, porque son las únicas que de verdad lo son.
+ */
+const LO_QUE_HABILITA = {
+  answerChallenge: 'responder desafíos',
+  pubChallenge: 'publicar desafíos',
+  chatClubs: 'chatear con otros clubes',
+  lineup: 'armar la alineación',
+  results: 'subir resultados',
+  invite: 'invitar jugadores',
+  removeMembers: 'quitar integrantes',
+  editNicks: 'editar apodos',
+  editClub: 'editar los datos del club',
+};
+
+/** 'a', 'a y b', 'a, b y c'. */
+function enumerar(partes) {
+  if (partes.length <= 1) return partes[0] || '';
+  return `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}`;
+}
+
+/**
+ * La nota bajo los accesos rápidos, o `null` si no hace falta.
+ *
+ * QUÉ ARREGLA. La nota trataba de jugador a cualquiera que no repartiera
+ * permisos y le decía que responder desafíos, cambios y ajustes «queda en
+ * manos de un administrador». Desde la migración 119 seis de esas nueve
+ * facultades SE DELEGAN, así que alguien con el permiso concedido leía una
+ * instrucción para pedirle a otro que hiciera lo que él mismo podía hacer.
+ *
+ * Ahora la nota sale de los permisos EFECTIVOS: primero lo que sí se puede,
+ * después lo que de verdad necesita un administrador. Sin nada concedido
+ * dice lo mismo de antes, que en ese caso era cierto.
+ *
+ * `permisos` es el mapa que devuelve `getMisPermisosEnClub()`; ausente se
+ * trata como «ninguno concedido», que es la lectura conservadora.
+ */
+export function notaDeAccesos({ esAdmin = false, permisos = null } = {}) {
+  if (esAdmin) return null;
+
+  const habilitadas = Object.keys(LO_QUE_HABILITA)
+    .filter((clave) => permisos?.[clave])
+    .map((clave) => LO_QUE_HABILITA[clave]);
+
+  const exclusivo =
+    'Responder los cambios de partido y repartir permisos los resuelve un administrador.';
+
+  if (habilitadas.length === 0) {
+    return `Ves los integrantes y todo lo pendiente. ${exclusivo}`;
+  }
+  return `Tienes habilitado ${enumerar(habilitadas)}. ${exclusivo}`;
 }
 
 /**

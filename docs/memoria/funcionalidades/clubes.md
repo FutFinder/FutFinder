@@ -1,6 +1,6 @@
 # Clubes
 
-Última revisión: 2026-09-18
+Última revisión: 2026-09-22
 
 ## Propósito
 
@@ -218,7 +218,11 @@ De las propuestas entra la `pendiente` y la `rechazada` **que propuso el club pr
 
 **`caducada` no se cablea, y es una desviación deliberada.** Las tres únicas escrituras de ese estado —`44:329`, `44b:438` y `45:855`— son la misma sentencia dentro del RPC de aprobación: las demás propuestas del desafío quedan caducadas cuando una se aprueba. No hay cron ni plazo que lo produzca, de modo que una propuesta `caducada` implica que otra se APROBÓ y el partido se publicó. Mostrarla como vencida diría que la negociación falló justo cuando terminó bien. Su texto sí está escrito y probado, por si una reparación manual en la base deja una suelta, que es el caso que el comentario de la migración 44 dice estar cubriendo.
 
-Los **rivales sugeridos** viajan con su distancia y ordenados de más cerca a más lejos. `listRivalCandidates()` no calcula distancia y ordena por «verificados primero, luego los más nuevos», así que la portada los pasa por `rivalesPorCercania()`, que añade `distanciaKm` con `distanciaEntreClubesKm()` —inyectado, porque `clubMeta.js` arrastra `services/matches` y con él `./supabase`— y deja al final los clubes sin comuna conocida, conservando entre ellos el orden del servicio. Sin eso la tarjeta leía un campo que nadie escribía y decía «Distancia N.A.» siempre. Lo que la tarjeta **sigue** sin poder decir es la modalidad, la valoración y el nivel: `RIVAL_CLUB_COLUMNS` no los pide, y `rating` y `nivel` no existen en el esquema.
+**Los accesos rápidos son siete, y dicen a dónde van.** `QuickActionGrid`: Alineación, Desafíos, Buscar rivales, **Calendario**, Integrantes, **Chat del club** y Permisos de club (este último sólo con `can.gestionarPermisos`). El tile del calendario se llamaba «Próximo partido» y abre `ClubMatchCalendar`, que lista los encuentros pasados y los que vienen; seguía diciéndolo incluso en un club sin ninguno, así que ese nombre quedó reservado para la tarjeta que sí abre un encuentro concreto. «Chat del club» es nuevo en la grilla: el hilo `club:<id>` existía sólo detrás de un icono de globo sin texto dentro de Integrantes —había que adivinar que la conversación del club vive dentro de la nómina—, y ese icono además no tenía nombre ni rol en el árbol de accesibilidad.
+
+**La nota bajo los accesos rápidos sale de los permisos EFECTIVOS**, no del rol. Decía que responder desafíos, cambios y ajustes «queda en manos de un administrador» a cualquiera que no repartiera permisos, pero desde la migración 119 seis de esas facultades se delegan: alguien con el permiso concedido leía una instrucción para pedirle a otro lo que él mismo podía hacer. `notaDeAccesos()` (`clubsHomeTasks.js`, puro y probado) nombra primero lo que sí tiene habilitado —de `getMisPermisosEnClub()`, que el contexto expone como `misPermisos`— y deja para el final las DOS que de verdad son exclusivas del administrador: responder los cambios de partido (la 46 los ata a `rol = 'admin'` en sus líneas 415 y 654) y repartir permisos. Sin nada concedido dice lo mismo de antes, que en ese caso era cierto.
+
+Los **rivales sugeridos** viajan con su distancia y ordenados de más cerca a más lejos. `listRivalCandidates()` no calcula distancia y ordena por «verificados primero, luego los más nuevos», así que la portada los pasa por `rivalesPorCercania()`, que añade `distanciaKm` con `distanciaEntreClubesKm()` —inyectado, porque `clubMeta.js` arrastra `services/matches` y con él `./supabase`— y deja al final los clubes sin comuna conocida, conservando entre ellos el orden del servicio. Sin eso la tarjeta leía un campo que nadie escribía y decía «Distancia N.A.» siempre. Lo que la tarjeta **sigue** sin poder decir es la modalidad, la valoración y el nivel: `RIVAL_CLUB_COLUMNS` no los pide, y `rating` y `nivel` no existen en el esquema. **Lo que no se sabe ya no ocupa sitio ni se escribe en siglas:** `nivelInline()`/`nivelBadge()` devuelven `null` y quien llama esconde el chip, `modalidadInline()`/`modalidadBadges()` hacen lo mismo, y `metaRival()` arma la línea sólo con los datos reales —antes componía siempre los dos huecos y la tarjeta de un club nuevo decía «Distancia N.A. · Fútbol N.A.» y «Nivel N.A.», tres siglas que se leen como un error de la app—. La valoración es la excepción: `ratingLabel()` conserva el centinela `'N.A.'` porque varias tarjetas lo miran para decidir cómo dibujar la ausencia, y cada una lo traduce a español («Sin valorar», con la estrella apagada). En la misma línea, los rótulos del récord se escriben enteros —«Victorias», «Empates», «Derrotas», «Valoración» en vez de «V», «E», «D» y «RATING»— en `ClubSummaryCard` y en `ClubStatsRow`, y un club sin partidos jugados ya no muestra cuatro casillas vacías sino una sola frase.
 
 El **estado sin club** no ofrece «clubes sugeridos» con botón «Unirse», ni tampoco durante `pending`. No es una limitación técnica —`listRivalCandidates` acepta `retadorClubId: null`, `searchClubs('')` no necesita ningún club y `requestToJoin()` está completo—: es que la consulta ordena por verificado y antigüedad, sin geografía ni afinidad, así que rotular eso «sugeridos» prometería un criterio inexistente. En su lugar, «Explorar clubes» abre el explorador con buscador y filtros de región y comuna.
 
@@ -234,6 +238,12 @@ El **tope de 3 clubes no se comprueba en el cliente**: lo aplica el trigger `che
 
 **Crear club también pide banner y tema**, los dos campos que hasta ahora sólo se podían fijar editando el club después de creado. El banner reutiliza `uploadClubBanner()` tal cual —sube a `club-logos/<clubId>/banner.<ext>` y escribe `clubs.banner_url`—, así que igual que el logo necesita el `id` del club, y por eso el mismo patrón de "crear primero, subir después": `createClub()` resuelve, y sólo entonces se sube banner y logo si se eligieron; si la subida falla, el club queda creado igual y el banner del error lo dice («Club creado, pero falló el banner»), nunca al revés. El tema usa `ClubThemePicker` sin cambios —es un componente controlado puro, sin llamada a red ni necesidad de un `id` de club— y viaja directo en el `insert` de `createClub()`, con el mismo mecanismo de `escribirTolerandoColumnas()` que ya usaba `updateClub()`: si la migración 53 no está aplicada en un entorno, el club nace igual y sólo pierde el color explícito (queda en el default `'green'` de la columna). El tema elegido en el formulario **no repinta el resto de la pantalla** (el escudo provisional y el botón "Crear club" se quedan verdes) — a diferencia de `EditClubScreen`, que sí previsualiza el color elegido en vivo; ampliar `CreateClubScreen` para hacer lo mismo es una mejora visual aparte, no pedida.
 
+**Cada tarea de «Pendiente para ti» abre SU asunto, no una bandeja.** El destino lo resuelve `destinoDeTarea()` (`src/utils/clubsHomeTasks.js`, puro y probado) con los identificadores que la propia tarea trae desde que nace: `challengeId`, `proposalId`, `matchId`, `changeId`. Antes la pantalla tenía una tabla de parámetros por NOMBRE DE RUTA, así que todas las tareas del mismo destino viajaban con los mismos datos, y eso producía tres errores a la vez: «Responder» y «Revisar» de un desafío o una propuesta abrían `ClubChallenges`, que desde el tablero abierto (migración 112) sólo contiene publicaciones y ya no tiene bandeja de directos; «Responder» un cambio de partido abría `ClubMatchChange`, que es el formulario para PEDIR otro cambio; y la nómina y el cambio se abrían con `nextMatch.id` aunque la solicitud fuera de otro encuentro. Ahora el desafío y el cambio abren el HILO del desafío (`ChatThread`, `challenge:<id>`) —donde están la negociación, `CambioPartidoCard` y sus botones de respuesta—, la propuesta abre `ClubProposal` en modo revisar con su `proposalId`, y la nómina y el próximo partido abren cada uno el partido que les corresponde. Sin el identificador que su destino necesita, la tarea cae al tablero o a la ficha del club en vez de abrir una pantalla vacía.
+
+**Responder un desafío recibido se hace en el hilo.** `getChallengeCta` devolvía «Responder desafío» en estado `pendiente` desde la migración 42, pero `ChatThreadScreen` no sabía ejecutarlo: la barra dibujaba un rótulo muerto y la única puerta real era la tarjeta de Avisos. `ChallengeHeader` dibuja ahora ese caso con el MISMO par de botones que ya usaba la prórroga —dos respuestas y ninguna principal—, con «Aceptar» y «Rechazar», y el rechazo se confirma porque cierra el desafío para los dos clubes. Llama a `respondChallenge()`, la misma función que usa `NotificationsScreen`, así que la transición, el evento y los avisos son los de siempre.
+
+**Tocar una fila de «Actividad reciente» abre ese aviso.** `ActivityList` siempre entregó el elemento pulsado, pero la pantalla lo ignoraba y abría la bandeja filtrada por el club — lo mismo que «Ver toda», así que tocar una noticia concreta obligaba a buscarla de nuevo en una lista. Ahora pasa por `navigateToNotification()` (`src/utils/notificationTargets.js`), el mismo punto de verdad que usan la bandeja de Avisos y el toque sobre un push, de modo que un destino nuevo o corregido vale en la portada sin tocarla. Cuando el aviso no trae el dato necesario o el recurso ya no existe, se cae a la bandeja filtrada, que es lo que se hacía siempre.
+
 El badge se cuenta y se ROTULA en un solo sitio. `contarConAccion()` da el número y `etiquetaBadge()` el texto —«9+» por encima de nueve—, y los usan tanto la barra inferior como «Pendiente para ti»; antes cada una escribía el rótulo por su cuenta y con diez o más pendientes decían cosas distintas. El tope es del rótulo, no del conteo: el número exacto sigue viajando en `badgeCount` y es el que oye un lector de pantalla.
 
 La **ficha del club activo es deslizable, siempre** (`ClubSummaryCarousel`, sobre `ClubSummaryCard`) — incluso con un solo club, que es la mayoría: la última página ya no es «no hay a dónde ir», es «sumar otro club» (ver abajo), así que dejó de ser un caso especial sin gesto. Arrastrar la tarjeta a la página de otro club llama a `setActiveClub(id)` —la misma función que ya usaba `ClubSwitcher`— así que el resto de la portada (tema, tareas, próximo partido, accesos rápidos, permisos) se actualiza solo con la recarga que ese cambio ya disparaba; el carrusel no le avisa a nadie más que existe un gesto. Los dos selectores quedan sincronizados en los dos sentidos porque leen y escriben el mismo `activeClubId` del contexto: deslizar mueve el chip activo de `ClubSwitcher`, y tocar un chip mueve la página del carrusel.
@@ -248,7 +258,7 @@ La parada de página se detecta con `onScroll` + un silencio de ~150 ms, no con 
 
 **La última página del carrusel es «sumar otro club».** Con menos de 3 (`TOPE_CLUBES`, el mismo número que exige el trigger `check_user_club_limit` de la migración 24) ofrece «Crear club» y «Unirse a un club» —los mismos dos destinos y el mismo texto que ya usa `SinClub` para quien no tiene ningún club—; con 3 muestra sólo el aviso «Llegaste al tope de 3 clubes», sin botones. No es una comprobación que bloquee nada —el trigger ya lo hace del lado del servidor, y `createClub()` devuelve su mismo mensaje si igual se fuerza la llamada—, es no ofrecer en el carrusel un botón que el servidor va a rechazar seguro. Esa página no le pide nada nuevo al servicio: `getMyClubs()` ya trae `plan` por club, y `TOPE_CLUBES` sólo cuenta cuántas filas hay.
 
-La página que NO es la activa no trae estadísticas (V/E/D): `club_estadisticas()` sólo se pide para el club activo, y pedirla para los hasta tres clubes en cada recarga por un dato que se ve un instante no vale el viaje de red extra. Esa tarjeta muestra «N.A.» hasta que la recarga trae sus números reales — el mismo estado honesto que ya usa toda la portada, nunca un número inventado ni el de otro club. El resto de los datos por página (nombre, escudo, comuna, rol, cupo de integrantes, plan, rating) ya venían completos en `getMyClubs()` por cada membresía, así que no hizo falta ningún pedido nuevo para mostrarlos.
+La página que NO es la activa no trae estadísticas: `club_estadisticas()` sólo se pide para el club activo, y pedirla para los hasta tres clubes en cada recarga por un dato que se ve un instante no vale el viaje de red extra. Esa tarjeta dice «Este club todavía no juega partidos» hasta que la recarga trae sus números reales — el mismo estado honesto que ya usa toda la portada, nunca un número inventado ni el de otro club. El resto de los datos por página (nombre, escudo, comuna, rol, cupo de integrantes, plan, rating) ya venían completos en `getMyClubs()` por cada membresía, así que no hizo falta ningún pedido nuevo para mostrarlos.
 
 ## Calendario de partidos del club
 
@@ -317,10 +327,21 @@ posición NUEVA. La formación pasa a mostrarse como «Personalizado · base
 X» y el aviso «Alineación personalizada» sale UNA sola vez — al momento en
 que una formación establecida deja de serlo, no en cada arrastre
 siguiente—, controlado comparando el estado `personalizado` de ANTES de
-soltar contra el de después. Cambiar de formación o de modo sigue limpiando
-las asignaciones y los puestos personalizados: las claves de puesto son
+soltar contra el de después.
+
+**Cambiar de formación ya no vacía el tablero.** Las claves de puesto son
 posicionales por línea (`l0p0`, `l1p2`…) y sólo tienen sentido para la
-formación con la que se calcularon.
+formación con la que se calcularon, así que el traspaso se hace por PUESTO y
+no por clave: `conservarAsignaciones()` (`formacionClub.js`, puro y probado)
+lleva a cada jugador al puesto del mismo nombre en la formación nueva —un DFC
+del 3-2-1 sigue siendo DFC en el 2-3-1, aunque esté en otro sitio de la
+cancha— y quien se queda sin puesto equivalente vuelve a la banca, que es
+donde de verdad queda, con un aviso que dice cuántos son. Reparte en el orden
+del tablero anterior, así que ir y volver entre dos formaciones no baraja el
+equipo. Los puestos arrastrados a mano sí se sueltan: son coordenadas de otra
+disposición y conservarlas dejaría la formación nueva dibujada con la silueta
+de la anterior. Antes tocar un chip para ver cómo quedaría otra formación
+borraba las asignaciones enteras sin preguntar.
 
 El resaltado al elegir a alguien de la banca es de UN SOLO nivel: un puesto
 calza o no calza con `fitsForMember()`, sin una distinción visual entre
@@ -342,6 +363,41 @@ camino —se veía como si el arrastre sólo avanzara unos pocos píxeles y se
 detuviera—, porque algo más en el árbol acepta la solicitud de terminación
 por defecto. Cualquier otro `PanResponder` de arrastre libre en esta app
 debería llevar la misma línea.
+
+**La pantalla dice qué es y cómo se usa.** Es el once base DEL CLUB y no
+inscribe a nadie en ninguna nómina —`club_lineups` no tiene `match_id`—, pero
+se abría sin nombrar el club ni el alcance, así que se leía como la nómina de
+un partido: una línea fija lo dice ahora, y el nombre del club viaja siempre
+en el subtítulo (quien administra dos no tenía cómo saber cuál estaba
+editando). La única instrucción visible explicaba ARRASTRAR un puesto, que es
+el gesto avanzado; cómo ubicar a alguien —tocar la banca y después el puesto,
+y tocar un puesto ocupado para devolverlo— no estaba escrito en ninguna
+parte, y es lo primero que hay que descubrir. La misma confusión estaba en
+«Permisos de club», donde el permiso `lineup` se describía como «Editar la
+formación del próximo partido».
+
+**«Autocompletar» dice lo que pasó, no lo que se pretendía.**
+`resumenAutocompletar()` (`formacionClub.js`, puro y probado) calcula las tres
+cuentas reales: con un integrante y siete puestos el mensaje decía «Alineación
+completada» y el contador quedaba en 1/7, y la cancha llena y la banca vacía
+—dos situaciones opuestas— compartían el texto «No queda banca disponible».
+
+**Salir con cambios sin guardar pregunta antes.** Autocompletar dejaba el
+contador en 1/7, un gesto de volver atrás lo devolvía a 0/7 y nadie
+preguntaba nada. El aviso ofrece las tres respuestas —Guardar y salir, Salir
+sin guardar, Seguir editando— y se engancha a `beforeRemove` de React
+Navigation, que cubre el botón de la pantalla, el gesto del sistema y el
+botón físico de Android de una sola vez. Qué cuenta como cambio lo decide
+`hayCambiosSinGuardar()`, contra lo guardado ya depurado con
+`asignacionesVigentes()`: si no, un integrante expulsado hace meses bastaría
+para que el aviso saltara al abrir la pantalla, y una advertencia que salta
+siempre se aprende a ignorar. «Guardar y salir» sólo sale si el guardado salió
+bien — con un choque de ediciones hay que quedarse a mirar la alineación real.
+**«Limpiar» se puede deshacer** mientras el aviso está en pantalla: está al
+lado de «Autocompletar» y borra el tablero entero de un toque. La misma
+protección de salida se aplicó a `PermisosClubScreen`, que ya distinguía el
+borrador de lo escrito (`dirty` y un «Guardar permisos» aparte) pero cuyos
+botones de volver salían directo.
 
 Se llega desde el acceso rápido «Alineación» de la portada de Clubes
 (`QuickActionGrid`), en el lugar donde antes estaba «Mi club» — ese acceso a

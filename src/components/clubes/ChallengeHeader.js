@@ -37,9 +37,17 @@ import { challengeCountdown } from '../../utils/challengeThread';
  * Publicar un partido de un toque, sin haber leído lo que se publica, sería
  * un botón demasiado fácil de pulsar por accidente.
  *
- * La prórroga es la única acción con DOS salidas, y por eso no cabe en el
- * botón único: se responde «Sí» o «No», y el «No» cierra el desafío en el
- * acto. Por lo mismo lleva confirmación aparte en la pantalla.
+ * DOS ACCIONES CON DOS SALIDAS, no una. La prórroga se responde «Sí» o «No»,
+ * y aceptar o rechazar un desafío recibido es exactamente la misma forma: dos
+ * respuestas y ninguna principal. No caben en el botón único, así que las dos
+ * comparten el mismo par de botones.
+ *
+ * RESPONDER EL DESAFÍO SE HACE ACÁ DESDE QUE LA PORTADA TRAE A ESTE HILO.
+ * `getChallengeCta` devolvía «Responder desafío» en `pendiente` desde
+ * siempre, pero la pantalla no sabía ejecutarlo: la barra dibujaba un rótulo
+ * muerto y la única forma de aceptar era la tarjeta de Avisos. Con la tarea
+ * de «Pendiente para ti» abriendo el hilo, este era el callejón sin salida al
+ * final del camino corregido.
  */
 export default function ChallengeHeader({
   challenge,
@@ -47,6 +55,7 @@ export default function ChallengeHeader({
   ahora = new Date(),
   onPressCta,
   onResponderProrroga,
+  onResponderDesafio,
   ocupado = false,
   // Sin club propio resuelto todavía (o un caso sin membresía reconocible),
   // `temaDeClub()` cae sola al verde de siempre.
@@ -64,8 +73,8 @@ export default function ChallengeHeader({
   );
 
   const cerrado = esEstadoCerrado(challenge.estado);
-  const esProrroga = cta?.kind === 'responder_prorroga' && !!onResponderProrroga;
-  const accionable = !esProrroga && !!onPressCta && !!cta && !cta.disabled;
+  const dobles = dosSalidas(cta, { onResponderProrroga, onResponderDesafio });
+  const accionable = !dobles && !!onPressCta && !!cta && !cta.disabled;
 
   return (
     <View style={[styles.bar, cerrado && styles.barCerrado]}>
@@ -93,15 +102,15 @@ export default function ChallengeHeader({
         )}
       </View>
 
-      {esProrroga ? (
+      {dobles ? (
         <>
           <Text style={styles.pregunta}>{cta.label}</Text>
           <View style={styles.dosBotones}>
             <Pressable
-              onPress={() => onResponderProrroga(true)}
+              onPress={() => dobles.onElegir(true)}
               disabled={ocupado}
               accessibilityRole="button"
-              accessibilityLabel="Sí, el partido se disputará"
+              accessibilityLabel={dobles.etiquetaSi}
               style={({ pressed }) => [
                 styles.cta,
                 { backgroundColor: tema.main },
@@ -110,13 +119,13 @@ export default function ChallengeHeader({
                 ocupado && styles.ctaOcupado,
               ]}
             >
-              <Text style={[styles.ctaText, { color: tema.ink }]}>Sí, se juega</Text>
+              <Text style={[styles.ctaText, { color: tema.ink }]}>{dobles.si}</Text>
             </Pressable>
             <Pressable
-              onPress={() => onResponderProrroga(false)}
+              onPress={() => dobles.onElegir(false)}
               disabled={ocupado}
               accessibilityRole="button"
-              accessibilityLabel="No, el partido no se disputará"
+              accessibilityLabel={dobles.etiquetaNo}
               style={({ pressed }) => [
                 styles.cta,
                 { backgroundColor: tema.main },
@@ -126,7 +135,7 @@ export default function ChallengeHeader({
                 ocupado && styles.ctaOcupado,
               ]}
             >
-              <Text style={[styles.ctaText, { color: tema.ink }, styles.ctaTextNo]}>No se juega</Text>
+              <Text style={[styles.ctaText, { color: tema.ink }, styles.ctaTextNo]}>{dobles.no}</Text>
             </Pressable>
           </View>
           {!!cta.hint && (
@@ -157,6 +166,36 @@ export default function ChallengeHeader({
       ) : null}
     </View>
   );
+}
+
+/**
+ * Las dos salidas de la acción actual, o `null` si la acción tiene una sola.
+ *
+ * Se devuelve el par ya rotulado —y con su etiqueta de accesibilidad— para
+ * que el render no tenga que preguntar de qué acción se trata en cada botón.
+ * El handler ausente cuenta como «la app todavía no sabe hacerlo»: en ese
+ * caso no hay botones, igual que con el CTA único.
+ */
+function dosSalidas(cta, { onResponderProrroga, onResponderDesafio }) {
+  if (cta?.kind === 'responder_prorroga' && onResponderProrroga) {
+    return {
+      onElegir: onResponderProrroga,
+      si: 'Sí, se juega',
+      no: 'No se juega',
+      etiquetaSi: 'Sí, el partido se disputará',
+      etiquetaNo: 'No, el partido no se disputará',
+    };
+  }
+  if (cta?.kind === 'responder' && onResponderDesafio) {
+    return {
+      onElegir: onResponderDesafio,
+      si: 'Aceptar',
+      no: 'Rechazar',
+      etiquetaSi: 'Aceptar el desafío',
+      etiquetaNo: 'Rechazar el desafío',
+    };
+  }
+  return null;
 }
 
 const styles = StyleSheet.create({

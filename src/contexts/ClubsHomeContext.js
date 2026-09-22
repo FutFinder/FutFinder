@@ -155,6 +155,11 @@ const ESTADO_INICIAL = {
   club: null,
   role: null,
   can: permisosDeClub(null),
+  // Los nueve permisos delegables de la migración 119, tal como los devuelve
+  // `getMisPermisosEnClub()`. `can` es la mitad conservadora —sólo el rol—;
+  // esto es lo que de verdad tiene concedido quien mira, y de ello sale la
+  // nota de los accesos rápidos.
+  misPermisos: null,
   limits: cuposDelPlan({}),
   tasks: [],
   // `true` desde que se toca otro club hasta que llegan SUS datos. No es lo
@@ -238,6 +243,7 @@ export function ClubsHomeProvider({ children }) {
         club: nueva?.club ? { ...nueva.club, estadisticas: null } : s.club,
         role: rol,
         can: permisosDeClub(rol),
+        misPermisos: null,
         limits: ESTADO_INICIAL.limits,
         // Y LO DERIVADO SE VACÍA. Son del club anterior; dejarlos bajo el
         // nombre del nuevo es lo único peor que hacer esperar.
@@ -444,7 +450,10 @@ export function ClubsHomeProvider({ children }) {
             sancion: sancionData,
             proximoPartido,
           },
-          { rol: role, ahora }
+          // `clubId` es sólo el respaldo de las tareas que son del club y no
+          // de un asunto propio (solicitud de ingreso, sanción): el resto ya
+          // viaja con su challengeId, proposalId o matchId.
+          { rol: role, clubId: activeId, ahora }
         );
 
         setState({
@@ -461,6 +470,7 @@ export function ClubsHomeProvider({ children }) {
             : null,
           role,
           can,
+          misPermisos: permisosDelegados,
           limits: cuposDelPlan({
             plan: membresiaActiva?.club?.plan,
             miembrosActivos: miembrosData.length,

@@ -27,6 +27,13 @@ import {
  *
  * LA ACCIÓN DESTRUCTIVA NUNCA ES LA QUE SE APRIETA SIN QUERER: «Cancelar»
  * está abajo y sin color, y tocar fuera del cuadro cierra sin hacer nada.
+ *
+ * LA TERCERA SALIDA ES OPCIONAL. Salir de una pantalla con cambios sin
+ * guardar tiene TRES respuestas —guardar, descartar y seguir editando— y con
+ * sólo dos botones una de las tres se pierde: o no se puede guardar desde el
+ * aviso, o descartar queda escondido detrás de «Cancelar». `alternativa` es
+ * esa tercera, entre la destructiva y el cierre; quien no la pasa ve el
+ * diálogo de siempre, con dos botones.
  */
 export default function useConfirmacion() {
   const [pendiente, setPendiente] = useState(null);
@@ -41,6 +48,12 @@ export default function useConfirmacion() {
     const accion = pendiente?.alConfirmar;
     // Se cierra ANTES de ejecutar: si la acción navega a otra pantalla —como
     // cerrar sesión— el diálogo se quedaría montado encima de la nueva.
+    setPendiente(null);
+    if (accion) accion();
+  }, [pendiente]);
+
+  const elegirAlternativa = useCallback(() => {
+    const accion = pendiente?.alternativa?.onPress;
     setPendiente(null);
     if (accion) accion();
   }, [pendiente]);
@@ -67,13 +80,24 @@ export default function useConfirmacion() {
             <Text style={styles.confirmarTexto}>{pendiente?.confirmar || 'Confirmar'}</Text>
           </Pressable>
 
+          {pendiente?.alternativa ? (
+            <Pressable
+              onPress={elegirAlternativa}
+              accessibilityRole="button"
+              accessibilityLabel={pendiente.alternativa.label}
+              style={({ pressed }) => [styles.alternativa, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.alternativaTexto}>{pendiente.alternativa.label}</Text>
+            </Pressable>
+          ) : null}
+
           <Pressable
             onPress={cerrar}
             accessibilityRole="button"
-            accessibilityLabel="Cancelar"
+            accessibilityLabel={pendiente?.cancelar || 'Cancelar'}
             style={({ pressed }) => [styles.cancelar, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.cancelarTexto}>Cancelar</Text>
+            <Text style={styles.cancelarTexto}>{pendiente?.cancelar || 'Cancelar'}</Text>
           </Pressable>
         </Pressable>
       </Pressable>
@@ -111,6 +135,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmarTexto: { color: '#FFFFFF', fontSize: 15, fontFamily: F.extraBold },
+  alternativa: {
+    marginTop: 10,
+    height: 46,
+    borderRadius: R.row,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alternativaTexto: { color: C.textPrimary, fontSize: 15, fontFamily: F.bold },
   cancelar: { marginTop: 10, height: 44, alignItems: 'center', justifyContent: 'center' },
   cancelarTexto: { color: C.textSecondary, fontSize: 14, fontFamily: F.bold },
 });

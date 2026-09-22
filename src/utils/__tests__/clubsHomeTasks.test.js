@@ -164,7 +164,10 @@ test('un desafío recibido se vuelve la tarea principal, en tono acento', () => 
   assert.equal(t.type, 'desafio');
   assert.equal(t.tone, 'accent');
   assert.equal(t.cta, 'Responder');
-  assert.equal(t.target, 'ClubChallenges');
+  // El tablero de `ClubChallenges` son publicaciones abiertas y ya no tiene
+  // bandeja de directos: «Responder» llevaba donde este desafío no está.
+  assert.equal(t.target, 'ChatThread');
+  assert.equal(t.challengeId, DESAFIO.id);
   assert.equal(t.status, 'abierta');
 });
 
@@ -948,4 +951,143 @@ test('con el máximo de clubes la invitación NO se esconde', () => {
   );
   assert.equal(tareas.length, 1);
   assert.equal(tareas[0].status, 'abierta');
+});
+
+// ── A dónde lleva cada tarea ────────────────────────────────────────
+//
+// EL FALLO QUE TRAJO ESTAS PRUEBAS. La pantalla tenía una tabla de parámetros
+// por NOMBRE DE RUTA, así que todas las tareas del mismo destino viajaban con
+// los mismos datos: el cambio de partido y la nómina se abrían con el próximo
+// partido del club aunque la solicitud fuera de otro, y el desafío y la
+// propuesta llegaban sin identificador a un tablero que no los contiene.
+
+test('«Responder» un desafío abre SU hilo, con el identificador', () => {
+  const [t] = D.normalizarTareas(fuentes({ desafiosRecibidos: [DESAFIO] }), {
+    rol: 'admin',
+    clubId: 'club-1',
+    ahora: AHORA,
+  });
+  assert.deepEqual(D.destinoDeTarea(t, 'club-1'), {
+    screen: 'ChatThread',
+    params: { threadKey: `challenge:${DESAFIO.id}`, challengeId: DESAFIO.id },
+  });
+});
+
+test('«Revisar» abre ESA propuesta, y dos rivales no se confunden', () => {
+  const tareas = D.normalizarTareas(
+    fuentes({
+      propuestas: [
+        { id: 'p1', challenge_id: 'des-1', estado: 'pendiente' },
+        { id: 'p2', challenge_id: 'des-2', estado: 'pendiente' },
+      ],
+    }),
+    { rol: 'admin', clubId: 'club-1', ahora: AHORA }
+  );
+  const destinos = tareas.map((t) => D.destinoDeTarea(t, 'club-1'));
+  assert.deepEqual(destinos, [
+    { screen: 'ClubProposal', params: { challengeId: 'des-1', proposalId: 'p1', modo: 'revisar' } },
+    { screen: 'ClubProposal', params: { challengeId: 'des-2', proposalId: 'p2', modo: 'revisar' } },
+  ]);
+});
+
+test('«Responder» un cambio abre el hilo donde se responde, no el formulario', () => {
+  // `ClubMatchChange` es el formulario para PEDIR otro cambio; aceptar o
+  // rechazar el recibido vive en `CambioPartidoCard`, dentro del hilo.
+  const [t] = D.normalizarTareas(
+    fuentes({
+      cambiosDePartido: [
+        { id: 'cb1', estado: 'pendiente', challenge_id: 'des-9', match_id: 'm-9' },
+      ],
+    }),
+    { rol: 'admin', clubId: 'club-1', ahora: AHORA }
+  );
+  assert.notEqual(t.target, 'ClubMatchChange');
+  assert.deepEqual(D.destinoDeTarea(t, 'club-1'), {
+    screen: 'ChatThread',
+    params: { threadKey: 'challenge:des-9', challengeId: 'des-9' },
+  });
+});
+
+test('el cambio lleva el partido de SU solicitud, no el próximo del club', () => {
+  const [t] = D.normalizarTareas(
+    fuentes({
+      cambiosDePartido: [{ id: 'cb1', estado: 'pendiente', match_id: 'm-de-la-solicitud' }],
+      proximoPartido: { id: 'm-mas-proximo', hora: '2026-08-29T12:00:00Z' },
+    }),
+    { rol: 'admin', clubId: 'club-1', ahora: AHORA }
+  );
+  assert.equal(t.matchId, 'm-de-la-solicitud');
+  // Sin hilo que abrir queda el detalle del partido correcto, no el otro.
+  assert.deepEqual(D.destinoDeTarea(t, 'club-1'), {
+    screen: 'MatchDetail',
+    params: { matchId: 'm-de-la-solicitud' },
+  });
+});
+
+test('la nómina y el próximo partido abren cada uno su partido', () => {
+  const tareas = D.normalizarTareas(
+    fuentes({
+      nomina: { matchId: 'm-nomina', confirmados: 3, cupos: 7 },
+      proximoPartido: { id: 'm-proximo', hora: '2026-08-29T12:00:00Z' },
+    }),
+    { rol: 'admin', clubId: 'club-1', ahora: AHORA }
+  );
+  const porTipo = Object.fromEntries(tareas.map((t) => [t.type, D.destinoDeTarea(t, 'club-1')]));
+  assert.deepEqual(porTipo.nomina, {
+    screen: 'ClubMatchRoster',
+    params: { matchId: 'm-nomina' },
+  });
+  assert.deepEqual(porTipo.partido, {
+    screen: 'ClubMatchRoster',
+    params: { matchId: 'm-proximo' },
+  });
+});
+
+test('la solicitud de ingreso y la sanción sí son del club activo', () => {
+  const tareas = D.normalizarTareas(
+    fuentes({
+      solicitudes: [{ request_id: 'r1', username: 'pedro' }],
+      sancion: { id: 's1' },
+    }),
+    { rol: 'admin', clubId: 'club-1', ahora: AHORA }
+  );
+  const porTipo = Object.fromEntries(tareas.map((t) => [t.type, D.destinoDeTarea(t, 'club-1')]));
+  assert.deepEqual(porTipo.solicitud, { screen: 'ClubMembers', params: { clubId: 'club-1' } });
+  assert.deepEqual(porTipo.sancion, { screen: 'ClubDetail', params: { clubId: 'club-1' } });
+});
+
+test('sin el identificador que hace falta, el destino no abre una pantalla vacía', () => {
+  assert.deepEqual(D.destinoDeTarea({ type: 'propuesta', proposalId: 'p1' }, 'club-1'), {
+    screen: 'ClubChallenges',
+    params: { clubId: 'club-1' },
+  });
+  assert.deepEqual(D.destinoDeTarea({ type: 'desafio' }, 'club-1'), {
+    screen: 'ClubChallenges',
+    params: { clubId: 'club-1' },
+  });
+});
+
+// ── La nota de los accesos rápidos ──────────────────────────────────
+
+test('sin permisos concedidos, la nota dice lo de siempre', () => {
+  const nota = D.notaDeAccesos({ esAdmin: false, permisos: null });
+  assert.match(nota, /Ves los integrantes/);
+  assert.match(nota, /administrador/);
+});
+
+test('con un permiso delegado, la nota NO manda a pedírselo a otro', () => {
+  // Éste era el defecto: un capitán con `answerChallenge` concedido leía que
+  // responder desafíos «queda en manos de un administrador».
+  const nota = D.notaDeAccesos({
+    esAdmin: false,
+    permisos: { answerChallenge: true, lineup: true },
+  });
+  assert.match(nota, /responder desafíos/);
+  assert.match(nota, /armar la alineación/);
+  // Y lo que de verdad no se delega sigue nombrado.
+  assert.match(nota, /cambios de partido/);
+});
+
+test('el admin no lee ninguna nota', () => {
+  assert.equal(D.notaDeAccesos({ esAdmin: true, permisos: null }), null);
 });
