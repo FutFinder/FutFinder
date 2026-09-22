@@ -102,3 +102,54 @@ test('Inicio muestra el club ACTIVO, no la membresía más antigua', () => {
     'y se puede cambiar desde Inicio, sin ir a la pestaña Clubes y volver'
   );
 });
+
+/* ── El selector en la cabecera de todas las pestañas ──────────────── */
+
+const CABECERAS = {
+  Inicio: '../../components/home/TacticalHeader.js',
+  Partidos: '../../screens/PartidosScreen.js',
+  Clubes: '../../components/club/ClubsHeader.js',
+  Reservas: '../../screens/ReservasScreen.js',
+  Chat: '../../components/chat/ChatInboxHeader.js',
+  Perfil: '../../components/player/PlayerProfileTopBar.js',
+};
+
+test('las seis pestañas llevan el selector de club en su cabecera', () => {
+  for (const [pestana, ruta] of Object.entries(CABECERAS)) {
+    const src = leer(ruta);
+    assert.match(
+      src,
+      /<ClubHeaderButton/,
+      `la cabecera de ${pestana} se quedó sin selector: cambiar de club vuelve a depender de ir a la pestaña Clubes`
+    );
+    assert.match(src, /import ClubHeaderButton from/, `${pestana} lo usa sin importarlo`);
+  }
+});
+
+test('en el perfil de OTRO jugador no se dibuja: la barra es la misma para los dos', () => {
+  const src = leer('../../components/player/PlayerProfileTopBar.js');
+  assert.match(
+    src,
+    /isOwnProfile \? <ClubHeaderButton \/> : null/,
+    '«cambiar de club» no significa nada mirando el perfil ajeno'
+  );
+});
+
+test('con un solo club el botón no se dibuja, en ninguna cabecera', () => {
+  const src = leer('../../components/club/ClubHeaderButton.js');
+  assert.match(
+    src,
+    /lista\.length < 2\) return null/,
+    'sin un segundo club no hay nada que elegir, y son seis cabeceras a la vez'
+  );
+});
+
+test('el botón de la cabecera usa el MISMO setActiveClub que los chips y el carrusel', () => {
+  const src = leer('../../components/club/ClubHeaderButton.js');
+  assert.match(src, /useClubsHome\(\)/);
+  assert.match(
+    src,
+    /setActiveClub\(/,
+    'un tercer selector con su propio estado se desincroniza de los otros dos'
+  );
+});

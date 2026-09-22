@@ -17,6 +17,7 @@ import {
 import BrandMark from '../components/BrandMark';
 import NotificationBell from '../components/NotificationBell';
 import WalletButton from '../components/WalletButton';
+import ClubHeaderButton from '../components/club/ClubHeaderButton';
 import FiltrosSheet from '../components/reservas/FiltrosSheet';
 import { Card, Button, Chip, Badge, NoticeCard, Foto } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
@@ -179,6 +180,7 @@ export default function ReservasScreen({ navigation }) {
         <View style={styles.header}>
           <BrandMark />
           <View style={styles.headerAcciones}>
+            <ClubHeaderButton />
             <WalletButton />
             <NotificationBell />
           </View>
