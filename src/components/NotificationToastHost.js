@@ -75,20 +75,27 @@ export default function NotificationToastHost() {
         const Icon = ICON[n.type] || Bell;
         const tag = TAG[n.type] || FALLBACK_TAG;
         return (
-          <Pressable
-            key={n.id}
-            onPress={() => abrir(n)}
-            accessibilityRole="button"
-            accessibilityLabel={`${n.title}${n.body ? `. ${n.body}` : ''}. Toca para verlo`}
-            style={({ pressed }) => [styles.toast, { borderColor: tag.border }, pressed && { opacity: 0.85 }]}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: tag.bg, borderColor: tag.border }]}>
-              <Icon color={tag.color} size={18} strokeWidth={1.9} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text numberOfLines={2} style={styles.titulo}>{n.title}</Text>
-              {n.body ? <Text numberOfLines={2} style={styles.mensaje}>{n.body}</Text> : null}
-            </View>
+          // Dos `Pressable` HERMANOS y no uno anidado en otro: en web cada
+          // uno con accessibilityRole="button" se pinta como <button>, y un
+          // <button> dentro de otro <button> es HTML inválido — el navegador
+          // lo repara reestructurando el DOM y el toast entero terminaba sin
+          // pintarse (confirmado: React avisaba "cannot be a descendant of
+          // <button>" y la captura de pantalla mostraba la cola vacía).
+          <View key={n.id} style={[styles.toast, { borderColor: tag.border }]}>
+            <Pressable
+              onPress={() => abrir(n)}
+              accessibilityRole="button"
+              accessibilityLabel={`${n.title}${n.body ? `. ${n.body}` : ''}. Toca para verlo`}
+              style={({ pressed }) => [styles.contenido, pressed && { opacity: 0.85 }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: tag.bg, borderColor: tag.border }]}>
+                <Icon color={tag.color} size={18} strokeWidth={1.9} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text numberOfLines={2} style={styles.titulo}>{n.title}</Text>
+                {n.body ? <Text numberOfLines={2} style={styles.mensaje}>{n.body}</Text> : null}
+              </View>
+            </Pressable>
             <Pressable
               onPress={() => quitarToast(n.id)}
               hitSlop={10}
@@ -98,7 +105,7 @@ export default function NotificationToastHost() {
             >
               <X color={C.textMuted} size={14} strokeWidth={2.2} />
             </Pressable>
-          </Pressable>
+          </View>
         );
       })}
     </View>
@@ -119,7 +126,7 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 6,
     padding: 12,
     borderRadius: R.cardSm,
     backgroundColor: C.surface,
@@ -129,6 +136,12 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
+  },
+  contenido: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   iconWrap: {
     height: 34,
