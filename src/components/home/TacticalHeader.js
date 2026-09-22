@@ -6,6 +6,7 @@ import StatusPill from './StatusPill';
 import BrandMark from '../BrandMark';
 import NotificationBell from '../NotificationBell';
 import WalletButton from '../WalletButton';
+import ClubHeaderButton from '../club/ClubHeaderButton';
 import {
   paleta as C,
 } from '../../theme/colors';
@@ -25,6 +26,7 @@ export default function TacticalHeader({
         <BrandMark />
         <View className="flex-1" />
         <View className="flex-row items-center gap-2">
+          <ClubHeaderButton />
           <WalletButton />
           <NotificationBell />
         </View>

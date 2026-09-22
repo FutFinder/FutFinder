@@ -9,6 +9,7 @@ import {
   fuentes as F,
 } from '../../theme/colors';
 import NotificationBell from '../NotificationBell';
+import ClubHeaderButton from '../club/ClubHeaderButton';
 
 /**
  * Barra superior del perfil.
@@ -51,6 +52,10 @@ export default function PlayerProfileTopBar({
           </Text>
         </>
       )}
+
+      {/* Sólo en el perfil propio: en el de otro jugador, «cambiar de club»
+          no significa nada. Esta barra es la misma para los dos. */}
+      {isOwnProfile ? <ClubHeaderButton /> : null}
 
       <Pressable
         onPress={onShare}

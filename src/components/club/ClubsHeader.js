@@ -5,6 +5,7 @@ import { Search, Bell } from 'lucide-react-native';
 import { temaClub } from '../../theme/clubThemes';
 import { paleta as C, clubSuperficies, fuentes as F, alfa } from '../../theme/colors';
 import BrandMark from '../BrandMark';
+import ClubHeaderButton from './ClubHeaderButton';
 
 /**
  * Cabecera fija de la portada de Clubes.
@@ -46,6 +47,9 @@ export default function ClubsHeader({
       <View style={styles.marcaFila}>
         <BrandMark />
         <View style={styles.acciones}>
+          {/* También acá, aunque la portada tenga sus chips: la cabecera es
+              fija y los chips se van con el desplazamiento. */}
+          <ClubHeaderButton />
           <BotonIcono
             Icono={Search}
             etiqueta="Buscar clubes"

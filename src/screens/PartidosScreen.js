@@ -43,6 +43,7 @@ import PickerSheet from '../components/partidos/PickerSheet';
 import BrandMark from '../components/BrandMark';
 import NotificationBell from '../components/NotificationBell';
 import WalletButton from '../components/WalletButton';
+import ClubHeaderButton from '../components/club/ClubHeaderButton';
 import {
   EmptyByFilters,
   EmptyByRegion,
@@ -978,6 +979,7 @@ function Header({ onFilters, activeCount = 0, showFilters }) {
     <View style={styles.header}>
       <BrandMark />
       <View style={styles.headerActions}>
+        <ClubHeaderButton />
         <WalletButton />
         <NotificationBell />
         {showFilters ? (

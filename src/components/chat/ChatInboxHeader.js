@@ -10,6 +10,7 @@ import {
 } from '../../theme/colors';
 import BrandMark from '../BrandMark';
 import NotificationBell from '../NotificationBell';
+import ClubHeaderButton from '../club/ClubHeaderButton';
 
 /**
  * Cabecera de la bandeja: marca, bell de avisos, acceso a «Amigos y
@@ -26,6 +27,7 @@ export default function ChatInboxHeader({ pendingRequests = 0, onPressFriends })
         <BrandMark />
 
         <View style={styles.rightGroup}>
+          <ClubHeaderButton />
           <NotificationBell />
 
           <Pressable
