@@ -106,6 +106,86 @@ export const CLOSED_STATES = ['en_curso', 'finalizado', 'cancelado'];
 
 // ---------------------------------------------------------------- helpers
 
+/**
+ * Qué decirle a alguien que acaba de confirmar su asistencia por GPS.
+ *
+ * EL FALLO: las pantallas prometían el punto SIEMPRE. El hilo del chat decía
+ * «+1 a tu Trust Score» y el detalle del partido «Suma a tu Trust Score»
+ * mirando sólo que hubiera `distance`. Pero el servidor sube el puntaje con
+ * `LEAST(trust_score + 1, 100)`, y `profiles.trust_score` NACE en 100: al
+ * revisarlo, 32 de 34 perfiles estaban en el tope, así que el caso común era
+ * prometer un punto que no se daba.
+ *
+ * Desde la migración 132 la RPC devuelve `trust_delta` —lo que de verdad
+ * subió— y `already` cuando ya estaba confirmado. Acá se traduce a las tres
+ * frases posibles, en un solo lugar: eran cuatro copias distintas en cuatro
+ * pantallas, y cada una decía una cosa.
+ *
+ * Una base sin la migración 132 no manda `trust_delta`: en ese caso no se
+ * inventa el punto y sólo se confirma el hecho.
+ */
+export function textoConfirmacionGps(res) {
+  if (!res?.ok) return null;
+
+  const metros = Number.isFinite(Number(res.distance))
+    ? `Estás a ${Math.round(Number(res.distance))} m de la cancha.`
+    : null;
+
+  if (res.already) {
+    return { titulo: 'Tu asistencia ya estaba confirmada', detalle: metros || '' };
+  }
+
+  const delta = Number(res.trust_delta);
+  if (Number.isFinite(delta) && delta > 0) {
+    return {
+      titulo: 'Asistencia confirmada',
+      detalle: [metros, `+${delta} de Trust Score.`].filter(Boolean).join(' '),
+    };
+  }
+  if (Number.isFinite(delta) && delta === 0) {
+    // No es un error: el puntaje ya está en el máximo.
+    return {
+      titulo: 'Asistencia confirmada',
+      detalle: [metros, 'Tu Trust Score ya está al máximo.'].filter(Boolean).join(' '),
+    };
+  }
+
+  return { titulo: 'Asistencia confirmada', detalle: metros || 'Quedó registrada.' };
+}
+
+/** Límites de edad que admite `matches_edad_check`. */
+export const EDAD_LIMITS = { min: 12, max: 99 };
+
+/**
+ * Valida el rango de edad de un partido. Devuelve el mensaje de error, o
+ * `null` si está bien.
+ *
+ * VIVE ACÁ PORQUE SE VALIDABA EN DOS SITIOS Y UNO SE QUEDÓ CORTO. Publicar
+ * comprobaba los límites 12–99 y que el mínimo fuera menor que el máximo;
+ * `EditMatchScreen` tenía su propia copia y sólo comprobaba lo segundo, así
+ * que al editar se podía mandar `edad_min = 5` y estrellarse contra
+ * `matches_edad_check` con el error crudo de Postgres. Los dos números son
+ * los de esa restricción, y la comparación es ESTRICTA porque la base exige
+ * `edad_min < edad_max`.
+ */
+export function validarRangoEdad(edadMin, edadMax) {
+  const vacio = (v) => v == null || v === '';
+  const eMin = vacio(edadMin) ? null : Number(edadMin);
+  const eMax = vacio(edadMax) ? null : Number(edadMax);
+  const fuera = (v) => !Number.isFinite(v) || v < EDAD_LIMITS.min || v > EDAD_LIMITS.max;
+
+  if (eMin != null && fuera(eMin)) {
+    return `La edad mínima debe estar entre ${EDAD_LIMITS.min} y ${EDAD_LIMITS.max}`;
+  }
+  if (eMax != null && fuera(eMax)) {
+    return `La edad máxima debe estar entre ${EDAD_LIMITS.min} y ${EDAD_LIMITS.max}`;
+  }
+  if (eMin != null && eMax != null && eMin >= eMax) {
+    return 'La edad mínima debe ser menor que la máxima';
+  }
+  return null;
+}
+
 /** ¿Falta más que la ventana sin penalización para que empiece el partido? */
 export function isPenaltyFree(hora) {
   if (!hora) return true;
@@ -775,15 +855,8 @@ export function validateDraft(draft, step = null) {
       e.minTrust = 'Elige un Trust Score mínimo válido';
     }
 
-    const eMin = draft.edadMin == null || draft.edadMin === '' ? null : Number(draft.edadMin);
-    const eMax = draft.edadMax == null || draft.edadMax === '' ? null : Number(draft.edadMax);
-    if (eMin != null && (!Number.isFinite(eMin) || eMin < 12 || eMin > 99)) {
-      e.edad = 'La edad mínima debe estar entre 12 y 99';
-    } else if (eMax != null && (!Number.isFinite(eMax) || eMax < 12 || eMax > 99)) {
-      e.edad = 'La edad máxima debe estar entre 12 y 99';
-    } else if (eMin != null && eMax != null && eMin >= eMax) {
-      e.edad = 'La edad mínima debe ser menor que la máxima';
-    }
+    const errorEdad = validarRangoEdad(draft.edadMin, draft.edadMax);
+    if (errorEdad) e.edad = errorEdad;
 
     if ((draft.descripcion || '').length > DESC_MAX) {
       e.descripcion = `La descripción no puede pasar de ${DESC_MAX} caracteres`;

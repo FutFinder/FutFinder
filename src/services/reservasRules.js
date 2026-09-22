@@ -74,9 +74,23 @@ export function computeCuota(totalClp, jugadores) {
   return Math.ceil(totalClp / jugadores);
 }
 
-/** Cuánto paga cada capitán cuando se divide 50/50 — sin redondeo a $50, es exactamente la mitad. */
+/**
+ * Cuánto paga cada capitán cuando se divide 50/50.
+ *
+ * `Math.ceil`, POR EL MISMO MOTIVO QUE `computeCuota`. Esto devolvía
+ * `totalClp / 2` a secas, así que con un total impar daba medio peso
+ * ($14.250,5 sobre $28.501) mientras `monto_a_pagar_de` usa
+ * `ceil(precio_total / 2)` (migración 89, línea 90) y
+ * `autorizar_cobro_reserva` rechaza cualquier monto que no calce con
+ * «El monto no coincide con la cuota vigente». Es exactamente el fallo que
+ * el encabezado de este archivo cuenta para la cuota entre todos, repetido
+ * en la otra modalidad.
+ *
+ * Hacia arriba y no al más cercano para que la suma de los dos nunca quede
+ * bajo el total: el peso sobrante lo pone el sistema, no falta.
+ */
 export function computeMitad(totalClp) {
-  return totalClp / 2;
+  return Math.ceil(totalClp / 2);
 }
 
 /** `true` si el monto a cargar en Balance cumple la carga mínima. */

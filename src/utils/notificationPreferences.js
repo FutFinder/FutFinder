@@ -60,6 +60,41 @@ export const NOTIF_TYPE_TO_PREFERENCE = {
   friend_accept: 'notif_friends',
 };
 
+
+/**
+ * Tipos que SIEMPRE empujan, a propósito.
+ *
+ * `isPushAllowed` falla abierto, y eso está bien para un tipo desconocido.
+ * El problema era que tipos CONOCIDOS —los que la propia app crea— caían en
+ * esa misma rama por olvido: `complejo_admin_agregado` lleva avisos reales en
+ * producción y toda la familia `reserva_*`/`balance_cargado` mueve plata, y
+ * ninguno estaba mapeado. Se veían iguales que un tipo inventado.
+ *
+ * Listarlos acá no cambia lo que pasa —siguen empujando— pero lo vuelve una
+ * DECISIÓN en vez de un descuido: son avisos de plata y de administración,
+ * y las cuatro preferencias que existen (`notif_matches`, `notif_clubs`,
+ * `notif_chat`, `notif_friends`) no cubren ninguno de los dos temas. El día
+ * que se quiera poder silenciarlos hace falta una columna nueva y su
+ * interruptor en Ajustes; hasta entonces, esta lista es el inventario de lo
+ * que queda fuera.
+ */
+export const PUSH_SIEMPRE = [
+  'complejo_admin_agregado',
+  'balance_cargado',
+  'reserva_confirmada',
+  'reserva_cancelada',
+  'reserva_invitacion_capitan',
+  'reserva_invitacion_jugador',
+  'reserva_invitacion_rechazada',
+  'reserva_cuota_recalculada',
+  'reserva_saldo_insuficiente',
+  'reserva_recordatorio_pago',
+  'reserva_participante_quitado',
+  'reserva_cancelacion_solicitada',
+  'reserva_cancelacion_rechazada',
+  'waitlist_turno_vencido',
+];
+
 /** Devuelve la columna de preferencia para un tipo, o null si no está mapeado. */
 export function getPreferenceColumn(type) {
   return NOTIF_TYPE_TO_PREFERENCE[type] ?? null;

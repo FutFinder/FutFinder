@@ -81,6 +81,7 @@ import {
   TRUST_OPTS,
   combineDateTime,
   cuotaLabel,
+  validarRangoEdad,
 } from '../services/matchRules';
 
 /**
@@ -237,11 +238,11 @@ export default function EditMatchScreen({ route, navigation }) {
     if (!Number.isFinite(cuota) || cuota < 0) e.cuota = 'La cuota no puede ser negativa';
 
     if (form.edadPreset === -1) {
-      const min = form.edadMin === '' ? null : Number(form.edadMin);
-      const max = form.edadMax === '' ? null : Number(form.edadMax);
-      if (min != null && max != null && min >= max) {
-        e.edad = 'La edad mínima debe ser menor que la máxima';
-      }
+      // La MISMA regla que usa publicar. Esta pantalla tenía su propia copia
+      // y sólo comparaba mínimo contra máximo: sin los límites 12–99 se podía
+      // guardar `edad_min = 5` y chocar con `matches_edad_check`.
+      const errorEdad = validarRangoEdad(form.edadMin, form.edadMax);
+      if (errorEdad) e.edad = errorEdad;
     }
 
     if ((form.descripcion || '').length > DESC_MAX) {

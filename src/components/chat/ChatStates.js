@@ -138,11 +138,18 @@ export function FilterEmpty({ filter, onExploreClubs }) {
       title: 'Todavía no tienes chats con amigos',
       text: 'Agrega jugadores para hablar sin compartir tu número.',
     },
+    // «Todos» NO puede mandar a probar otra categoría: es todas. Este estado
+    // se alcanza de verdad —una solicitud de amistad y cero conversaciones
+    // deja la bandeja montada con la lista vacía—, y es justo el primer día
+    // de alguien, así que decir «prueba con otra» es un callejón sin salida.
     todos: {
-      title: 'Nada en este filtro',
-      text: 'Prueba con otra categoría.',
+      title: 'Todavía sin conversaciones',
+      text: 'Cuando te inscribas en un partido, entres a un club o aceptes a un amigo, su chat aparece acá.',
     },
-  }[filter] || { title: 'Nada en este filtro', text: 'Prueba con otra categoría.' };
+  }[filter] || {
+    title: 'Todavía sin conversaciones',
+    text: 'Cuando te inscribas en un partido, entres a un club o aceptes a un amigo, su chat aparece acá.',
+  };
 
   return (
     <View style={styles.dashed}>

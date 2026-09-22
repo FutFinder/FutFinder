@@ -108,6 +108,7 @@ import {
   modalidadLabel,
   nivelLabel,
   puedeCalificar,
+  textoConfirmacionGps,
   timeUntilLabel,
   trustLabel,
 } from '../services/matchRules';
@@ -589,13 +590,8 @@ export default function MatchDetailScreen({ route, navigation }) {
         say('error', 'No pudimos confirmar tu asistencia', res?.reason || '');
         return;
       }
-      say(
-        'success',
-        'Asistencia confirmada',
-        res.distance
-          ? `Estás a ${Math.round(res.distance)} m de la cancha. Suma a tu Trust Score.`
-          : 'Tu asistencia quedó registrada.'
-      );
+      const dicho = textoConfirmacionGps(res);
+      say('success', dicho.titulo, dicho.detalle);
       await load();
     });
 
