@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, ScrollView, RefreshControl, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Search, Plus, Star, TrendingUp } from 'lucide-react-native';
 
 import TacticalHeader from '../components/home/TacticalHeader';
@@ -25,6 +26,7 @@ import {
   requestJoinMatch,
   deleteMatch,
   applyFilters,
+  listPartidosDeMisClubes,
 } from '../services/matches';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
@@ -60,9 +62,13 @@ export default function HomeScreen({ navigation }) {
   // ClubDetailScreen/ClubChallengesScreen ya lo dejaran desafiar igual.
   const [puedeCrearPartidoDelegado, setPuedeCrearPartidoDelegado] = useState(false);
   const [nextMatch, setNextMatch] = useState(null);
-  // Los partidos SIN filtrar por distancia, y mis clubes. El partido de mi
-  // club puede jugarse lejos y aun así tengo que verlo: es de mi club.
-  const [allMatches, setAllMatches] = useState([]);
+  // Los partidos de MIS clubes, pedidos club por club a la base. No salen de
+  // la tanda general de `listOpenMatches()`: esa trae los N partidos abiertos
+  // más próximos de toda la app, así que con la app llena los partidos ajenos
+  // se comían la ventana y el de tu club desaparecía de Inicio sin decir por
+  // qué; y como pide sólo `'abierto'`, el partido se esfumaba también al
+  // llenarse la nómina, justo cuando el club terminaba de armarse.
+  const [partidosDeClub, setPartidosDeClub] = useState([]);
   const [misClubIds, setMisClubIds] = useState([]);
   const [banner, setBanner] = useState(null);
   // Id del club para el que se está por crear un partido — abre la hoja
@@ -120,8 +126,8 @@ export default function HomeScreen({ navigation }) {
       }
     }
 
-    setAllMatches(list || []);
-    setMisClubIds(misClubes?.data || []);
+    const clubIds = misClubes?.data || [];
+    setMisClubIds(clubIds);
     setMatches(filtered.map((m) => ({ ...m, _joined: joinedIds.has(m.id) })));
     setProfile(prof);
     setMyUserId(userId);
@@ -135,11 +141,20 @@ export default function HomeScreen({ navigation }) {
       setPuedeCrearPartidoDelegado(false);
     }
 
+    // Después del resto: necesita los ids de mis clubes, y nada de lo de
+    // arriba necesita esperarla.
+    const { data: deClub } = await listPartidosDeMisClubes(clubIds).catch(() => ({ data: [] }));
+    setPartidosDeClub(deClub || []);
+
     setLoading(false);
     setRefreshing(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Al volver a Inicio, no sólo al montarlo. El navegador de pestañas deja
+  // esta pantalla montada, así que un partido de club publicado durante la
+  // sesión no aparecía hasta recargar la app entera: se veía en Buscar y no
+  // en Inicio, que es exactamente lo que se reportó.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = () => { setRefreshing(true); load(); };
 
@@ -254,11 +269,11 @@ export default function HomeScreen({ navigation }) {
     { label: 'Explorar clubes', hint: 'Únete a un equipo', onPress: () => navigation.navigate('Main', { screen: 'ClubsTab' }) },
   ];
 
-  // El destacado y la lista se deciden a la vez: el partido que sube a
-  // «Próximo partido de tu club» es el que hay que quitar de «Partidos cerca
-  // de ti», o saldría dos veces en la misma pantalla.
-  const { destacado: partidoDeClub, resto: partidosCerca } = seleccionInicio(
-    allMatches,
+  // Los destacados y la lista se deciden a la vez: los partidos que suben a
+  // «Tu club juega» son los que hay que quitar de «Partidos cerca de ti», o
+  // saldrían dos veces en la misma pantalla.
+  const { destacados: partidosDeMiClub, resto: partidosCerca } = seleccionInicio(
+    partidosDeClub,
     matches,
     misClubIds
   );
@@ -316,19 +331,34 @@ export default function HomeScreen({ navigation }) {
 
           <View className="gap-5 px-[18px] pt-[18px]">
             {/* Va primero a propósito: si mi club juega, es lo más importante
-                que tengo en pantalla. Sin partido de club, la sección no se
-                dibuja — no hay estado vacío que ocupe sitio por nada. */}
-            {partidoDeClub ? (
+                que tengo en pantalla y quien abre la app tiene que enterarse
+                sin desplazarse. Sin partido de club, la sección no se dibuja
+                — no hay estado vacío que ocupe sitio por nada.
+
+                EL PRIMERO VA EN TARJETA COMPLETA. La compacta de antes lo
+                dejaba pesando menos que un partido cualquiera de la fila de
+                abajo, que es al revés de lo que tiene que pasar. Los
+                siguientes sí van compactos: son agenda, no la noticia. */}
+            {partidosDeMiClub.length ? (
               <View>
-                <SectionHeader title="Próximo partido de tu club" />
-                <ClubMatchCard
-                  match={partidoDeClub}
-                  misClubIds={misClubIds}
-                  variant="compacta"
-                  onPress={() =>
-                    navigation.navigate('MatchDetail', { matchId: partidoDeClub.id })
+                <SectionHeader
+                  title="Tu club juega"
+                  actionLabel={partidosDeMiClub.length > 1 ? 'Ver agenda' : undefined}
+                  onAction={() =>
+                    navigation.navigate('Main', { screen: 'ClubsTab' })
                   }
                 />
+                <View className="gap-2.5">
+                  {partidosDeMiClub.map((p, i) => (
+                    <ClubMatchCard
+                      key={p.id}
+                      match={p}
+                      misClubIds={misClubIds}
+                      variant={i === 0 ? 'completa' : 'compacta'}
+                      onPress={() => navigation.navigate('MatchDetail', { matchId: p.id })}
+                    />
+                  ))}
+                </View>
               </View>
             ) : null}
 

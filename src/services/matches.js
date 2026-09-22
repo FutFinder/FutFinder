@@ -104,6 +104,35 @@ export async function listPartidosDeClub(clubId, { limit = 10 } = {}) {
 }
 
 /**
+ * Los partidos que vienen de TODOS mis clubes, en una sola llamada.
+ *
+ * Una consulta por club y no una sola con `in`: `listPartidosDeClub()` ya
+ * resuelve el `or` sobre las dos columnas de club, el tope por club y la
+ * hidratación de escudos, y repetir eso acá sería mantener dos veces la misma
+ * regla. Son uno o dos clubes por persona, no cien.
+ *
+ * NO DEDUPLICA. Un partido entre dos clubes míos llega dos veces, y de eso se
+ * ocupa `seleccionInicio()`, que es donde se puede probar sin una base.
+ *
+ * Un club que falla no se lleva a los demás: su lista queda vacía y el resto
+ * de Inicio se dibuja igual.
+ */
+export async function listPartidosDeMisClubes(clubIds, { limitePorClub = 5 } = {}) {
+  const ids = [...new Set((Array.isArray(clubIds) ? clubIds : []).filter(Boolean))];
+  if (!isSupabaseConfigured || ids.length === 0) return { data: [], error: null };
+
+  const respuestas = await Promise.all(
+    ids.map((id) =>
+      listPartidosDeClub(id, { limit: limitePorClub }).catch((e) => {
+        console.error('[FutFinder] listPartidosDeMisClubes:', e);
+        return { data: [] };
+      })
+    )
+  );
+  return { data: respuestas.flatMap((r) => r?.data || []), error: null };
+}
+
+/**
  * Adjunta `organizador: { username, foto_url, trust_score }` a una lista de
  * partidos con una sola consulta. Las tarjetas del listado necesitan mostrar
  * quién organiza, y sin esto haría una consulta por tarjeta.

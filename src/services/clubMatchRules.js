@@ -282,18 +282,29 @@ export function clubesDelPartido(match) {
 }
 
 /**
- * El próximo partido de clubes de alguno de mis clubes, o `null`.
+ * Los partidos que vienen de MIS clubes, del más próximo al más lejano.
  *
- * Devolver `null` es un resultado normal —no todos los días hay partido de
- * club— y la pantalla tiene que saber no dibujar la sección.
+ * Es la base de la sección de Inicio y de «Próximo partido» de la portada de
+ * Clubes. Devuelve una lista y no un partido porque quien pertenece a dos
+ * clubes tiene dos calendarios, y ninguno de los dos es el secundario.
+ *
+ * NO FILTRA POR `'abierto'`. Un partido de club que llenó su nómina pasa a
+ * `'lleno'` y sigue siendo mi partido: esconderlo justo cuando el club
+ * terminó de armarse es el peor momento posible. Lo que sí sale son los
+ * cancelados y los finalizados, que dejaron de estar por venir.
+ *
+ * DEDUPLICA POR `id`. Los partidos llegan pedidos club por club, así que un
+ * partido entre dos clubes MÍOS llega dos veces; en pantalla tiene que salir
+ * una.
  */
-export function proximoPartidoDeClub(matches, misClubIds, { ahora = new Date() } = {}) {
+export function partidosDeMisClubes(matches, misClubIds, { ahora = new Date() } = {}) {
   const mios = Array.isArray(misClubIds) ? misClubIds.filter(Boolean) : [];
-  if (mios.length === 0) return null;
+  if (mios.length === 0) return [];
 
   const desde = (ahora instanceof Date ? ahora : new Date(ahora)).getTime();
+  const vistos = new Set();
 
-  const candidatos = (Array.isArray(matches) ? matches : [])
+  return (Array.isArray(matches) ? matches : [])
     .filter(Boolean)
     .filter((m) => esPartidoDeClubes(m) && soyDeAlgunClub(m, mios))
     .filter((m) => m.estado !== 'cancelado' && m.estado !== 'finalizado')
@@ -301,28 +312,56 @@ export function proximoPartidoDeClub(matches, misClubIds, { ahora = new Date() }
       const t = new Date(m.hora).getTime();
       return Number.isFinite(t) && t > desde;
     })
+    .filter((m) => {
+      if (!m.id) return true;
+      if (vistos.has(m.id)) return false;
+      vistos.add(m.id);
+      return true;
+    })
     .sort((a, b) => new Date(a.hora) - new Date(b.hora));
-
-  return candidatos[0] || null;
 }
 
 /**
- * Reparte los partidos de Inicio entre la sección destacada y el resto.
+ * El próximo partido de clubes de alguno de mis clubes, o `null`.
  *
- * Es UNA función y no dos porque el destacado y la lista tienen que decidirse
- * a la vez: el partido que sube a «Próximo partido de tu club» es exactamente
- * el que hay que quitar de «Partidos cerca de ti», o aparecería dos veces en
- * la misma pantalla.
- *
- * `cercanos` es la lista ya filtrada por distancia, y `todos` la lista sin
- * filtrar. La distinción importa: el partido de mi club puede jugarse lejos y
- * aun así tengo que verlo — es de mi club, no un partido cualquiera al que
- * podría llegar caminando.
+ * Devolver `null` es un resultado normal —no todos los días hay partido de
+ * club— y la pantalla tiene que saber no dibujar la sección.
  */
-export function seleccionInicio(todos, cercanos, misClubIds, { ahora = new Date() } = {}) {
-  const destacado = proximoPartidoDeClub(todos, misClubIds, { ahora });
-  const resto = (Array.isArray(cercanos) ? cercanos : []).filter(
-    (m) => m && (!destacado || m.id !== destacado.id)
+export function proximoPartidoDeClub(matches, misClubIds, { ahora = new Date() } = {}) {
+  return partidosDeMisClubes(matches, misClubIds, { ahora })[0] || null;
+}
+
+/**
+ * Cuántos partidos de club caben arriba de Inicio antes de tapar el resto.
+ *
+ * Tres. Con más, un club de agenda cargada empuja «Partidos cerca de ti» y la
+ * reputación fuera de la primera pantalla, que es justo lo contrario de lo
+ * que esta sección viene a hacer.
+ */
+const TOPE_DESTACADOS = 3;
+
+/**
+ * Reparte los partidos de Inicio entre la sección de arriba y el resto.
+ *
+ * Es UNA función y no dos porque los destacados y la lista tienen que
+ * decidirse a la vez: los partidos que suben arriba son exactamente los que
+ * hay que quitar de «Partidos cerca de ti», o aparecerían dos veces en la
+ * misma pantalla.
+ *
+ * LAS DOS LISTAS VIENEN DE CONSULTAS DISTINTAS, Y ESO ES LO IMPORTANTE.
+ * `partidosDeClub` se pide por club a la base (`listPartidosDeMisClubes()`),
+ * no se pesca de la tanda general de partidos abiertos: con la app llena, los
+ * partidos ajenos que empiezan antes que el tuyo se comían la ventana y el
+ * partido de tu club desaparecía de Inicio sin explicación. `cercanos` sí es
+ * la tanda general, ya filtrada por radio — y el partido de mi club no pasa
+ * por ese filtro, porque me importa aunque me quede lejos.
+ */
+export function seleccionInicio(partidosDeClub, cercanos, misClubIds, { ahora = new Date() } = {}) {
+  const destacados = partidosDeMisClubes(partidosDeClub, misClubIds, { ahora }).slice(
+    0,
+    TOPE_DESTACADOS
   );
-  return { destacado, resto };
+  const arriba = new Set(destacados.map((m) => m.id));
+  const resto = (Array.isArray(cercanos) ? cercanos : []).filter((m) => m && !arriba.has(m.id));
+  return { destacados, resto };
 }
