@@ -1,0 +1,191 @@
+FUTFINDER — REVISIÓN DE USABILIDAD DE CLUBES
+Fecha: 22-09-2026
+Base: e5562a7 y cambios locales presentes durante la revisión.
+
+OBJETIVO Y ALCANCE
+Evaluar si se encuentran las funciones y si se entiende qué ocurre al usarlas.
+Se revisaron rutas, textos y condiciones por rol en el código. Se recorrió la
+web local con una sesión autenticada: portada, calendario, integrantes,
+invitaciones, alineación, desafíos abiertos, permisos, ficha y planes.
+No se enviaron invitaciones, desafíos, mensajes ni cambios de permisos.
+La prueba de alineación modificó solamente un borrador local, sin guardarlo.
+
+RESULTADO
+10 hallazgos: 2 problemas de navegación prioritarios y 8 mejoras de claridad,
+orientación y protección del trabajo. No son los nueve errores técnicos del
+informe anterior. Este documento propone cambios; no los implementa.
+
+1. ALTA — «RESPONDER» Y «REVISAR» ABREN UN TABLERO QUE NO CONTIENE EL PENDIENTE
+Dónde: Clubes > Pendiente para ti > Desafío recibido / Propuesta pendiente.
+Actual: ambas tarjetas apuntan a ClubChallenges. Esa pantalla contiene
+publicaciones abiertas; se retiró la bandeja de desafíos directos recibidos
+y enviados. El destino tampoco recibe el identificador del desafío/propuesta.
+Efecto: la persona pulsa la acción correcta y debe buscar de nuevo por Avisos
+o Chat para llegar al asunto. Se puede perder una respuesta con plazo.
+Comprobación: ejecución de normalizarTareas con un desafío y una propuesta
+pendientes produce «Responder -> ClubChallenges» y «Revisar -> ClubChallenges».
+La navegación real mostró que ese destino abre «Desafíos abiertos».
+Cambiar: conservar challengeId/proposalId en cada tarea y abrir directamente
+el hilo del desafío o ClubProposal en modo revisar, según corresponda.
+Validar: dos propuestas simultáneas de distintos rivales abren cada una su
+detalle exacto, sin depender del club activo ni del próximo partido.
+Referencias:
+  src/utils/clubsHomeTasks.js:342,359
+  src/screens/ClubsScreen.js:180 (onTarea)
+  src/screens/ClubChallengesScreen.js:116,199
+
+2. ALTA — «RESPONDER» A UN CAMBIO LLEVA A PEDIR OTRO CAMBIO
+Dónde: Clubes > Pendiente para ti > Cambio de partido > Responder.
+Actual: la tarea apunta a ClubMatchChange, formulario para PROPONER un cambio.
+La respuesta al cambio existente vive en CambioPartidoCard dentro del chat.
+Además, onTarea usa nextMatch.id y no el partido de la solicitud; la tarea
+normalizada no conserva matchId ni challengeId.
+Efecto: se abre la función equivocada y, con varios encuentros, puede abrirse
+otro partido. El usuario no encuentra dónde aceptar o rechazar lo recibido.
+Comprobación: normalización ejecutada con un cambio pendiente, seguida de
+inspección de onTarea y del formulario de destino; no se envió una solicitud.
+Cambiar: abrir el hilo asociado a esa solicitud, mostrando la comparación y
+las acciones de respuesta. Transportar sus identificadores propios.
+Validar: solicitud del segundo partido cuando hay otro encuentro más próximo.
+Referencias:
+  src/utils/clubsHomeTasks.js:364-377
+  src/screens/ClubsScreen.js:185
+  src/screens/ClubMatchChangeScreen.js:37-57
+  src/components/clubes/CambioPartidoCard.js:55
+
+3. MEDIA — EL CHAT DEL CLUB ES DIFÍCIL DE ENCONTRAR DESDE CLUBES
+Dónde: Clubes > Integrantes > icono de globo en la esquina superior.
+Actual: la portada no tiene un acceso «Chat del club». Dentro de Integrantes
+se ofrece únicamente el icono, sin texto, accessibilityLabel ni rol de botón.
+Efecto: hay que adivinar que el chat está dentro de la nómina; el control no
+se identifica por nombre en el árbol de accesibilidad inspeccionado.
+Cambiar: añadir «Chat del club» como acceso reconocible en portada o ficha;
+etiquetar también el botón actual y revisar Volver/menús de Integrantes.
+Validar: localizar y abrir el chat con teclado y lector de pantalla.
+Referencias:
+  src/components/club/QuickActionGrid.js:76-83
+  src/screens/ClubMembersScreen.js:468-483
+
+4. BAJA — «PRÓXIMO PARTIDO» NO NOMBRA SU DESTINO
+Actual: abre «Calendario de partidos», con encuentros pasados y futuros.
+Se verificó también con un club sin partidos: el acceso sigue diciendo
+«Próximo partido», aunque no existe ninguno.
+Cambiar: llamarlo «Calendario» o «Partidos del club». Reservar «Próximo partido»
+para la tarjeta que sí abre un encuentro concreto.
+Referencias:
+  src/components/club/QuickActionGrid.js:80
+  src/screens/ClubsScreen.js:135
+
+5. MEDIA — LA AYUDA NIEGA FUNCIONES QUE PUEDEN ESTAR DELEGADAS
+Actual: QuickActionGrid considera jugador a cualquiera que no gestione
+permisos y dice que responder desafíos, cambios y ajustes queda en manos
+de un administrador. Sin embargo, ya se pueden delegar algunas de esas
+funciones a capitanes y jugadores.
+Efecto: alguien autorizado recibe una instrucción para pedirle a otro que
+haga lo que él mismo puede hacer.
+Cambiar: derivar la ayuda de permisos efectivos. Por ejemplo, indicar qué
+acciones tiene habilitadas y cuáles requieren un administrador, sin una
+frase general que mezcle facultades delegables y exclusivas.
+Comprobación por código; no se cambiaron roles ni permisos en la base.
+Referencias:
+  src/components/club/QuickActionGrid.js:33,66-70
+  src/screens/PermisosClubScreen.js:42-75
+
+6. MEDIA — NO SE EXPLICA BIEN QUÉ ALINEACIÓN SE EDITA NI CÓMO ASIGNAR JUGADORES
+Actual: Permisos describe Armar alineación como «Editar la formación del
+próximo partido», pero ClubLineup guarda un tablero por club, sin matchId.
+La pantalla muestra formación y puestos, pero no identifica siempre el club
+en su subtítulo. La única instrucción visible explica arrastrar posiciones;
+no explica seleccionar primero un integrante de la banca y después un puesto.
+Efecto: se puede creer que se está inscribiendo gente para un encuentro o
+modificando su nómina, y cuesta descubrir la asignación manual inicial.
+Cambiar: mostrar nombre del club y «Alineación general del club»; aclarar que
+no inscribe jugadores. Añadir instrucciones para seleccionar, ubicar y sacar
+un jugador; indicar aparte cómo personalizar posiciones arrastrándolas.
+Referencias:
+  src/screens/PermisosClubScreen.js:64
+  src/screens/ClubLineupScreen.js:44-55,193-200,369-379,534
+
+7. MEDIA — AUTOCOMPLETAR AFIRMA QUE TERMINÓ CON PUESTOS TODAVÍA VACÍOS
+Reproducción web: con un solo integrante y siete puestos, tocar Autocompletar.
+Resultado: contador 1/7 y mensaje «Alineación completada».
+Esperado: «1 jugador ubicado; faltan 6 puestos» o equivalente.
+También conviene distinguir «Todos los puestos están ocupados» de «No quedan
+jugadores en la banca»: hoy ambos casos muestran «No queda banca disponible».
+Cambiar: calcular el resultado real de la asignación para el mensaje final.
+Referencia: src/screens/ClubLineupScreen.js:290-301.
+
+8. MEDIA — SE PIERDE EL BORRADOR DE ALINEACIÓN SIN ADVERTENCIA
+Reproducción web: Autocompletar lleva el contador a 1/7; volver atrás y abrir
+Alineación nuevamente lo deja en 0/7, sin preguntar antes de salir.
+Además, cambiar formación o modalidad vacía las asignaciones inmediatamente.
+Efecto: un gesto de navegación o explorar una formación descarta trabajo.
+Cambiar: detectar cambios sin guardar y ofrecer Guardar, Descartar o Seguir
+editando al salir. Al cambiar formación, conservar asignaciones compatibles
+o advertir antes de vaciar el tablero; ofrecer deshacer para Limpiar.
+Revisar la misma protección en Permisos: tiene estado dirty y guardado
+explícito, pero sus botones Volver también salen directamente.
+Referencias:
+  src/screens/ClubLineupScreen.js:262-280,304-307,363
+  src/screens/PermisosClubScreen.js:133,346,478-485
+La pérdida de alineación se reprodujo; la de Permisos se revisó por código.
+
+9. MEDIA — TOCAR UNA ACTIVIDAD OBLIGA A BUSCARLA OTRA VEZ
+Dónde: Clubes > Actividad reciente > cualquier fila.
+Actual: ActivityList entrega el elemento pulsado, pero ClubsScreen ignora ese
+argumento y abre siempre Avisos filtrados por el club, igual que «Ver toda».
+Efecto: tocar una noticia concreta no abre su desafío, cambio o partido.
+Cambiar: reutilizar el destino del aviso para abrir su detalle; conservar
+«Ver toda» como acceso al listado filtrado y usarlo de respaldo si falta dato.
+Comprobación por código; la sección y sus filas se observaron en la web.
+Referencias:
+  src/components/club/ActivityList.js:56
+  src/screens/ClubsScreen.js (ActivityList, onPressItem)
+
+10. BAJA — ABREVIATURAS Y DATOS AUSENTES HACEN MÁS DIFÍCIL ENTENDER LAS TARJETAS
+Observado: «V», «E», «D», «RATING», «N.A.», «Fútbol N.A.» y «Nivel N.A.».
+En Invitar jugadores también aparece «Buscar jugadores por username... ».
+Efecto: un usuario nuevo debe interpretar abreviaturas, inglés y vacíos que
+parecen errores en lugar de información útil.
+Cambiar: «Victorias», «Empates», «Derrotas», «Valoración», «Sin valoraciones»
+y «nombre de usuario». Omitir metadatos opcionales ausentes o explicarlos
+en español; no reemplazar automáticamente un dato desconocido por cero.
+Referencias:
+  src/components/club/ClubSummaryCard.js:94-100,125-128
+  src/components/club/RivalClubCard.js:19,62-66
+  src/screens/ClubInviteScreen.js (placeholder del buscador)
+
+MAPA DE FUNCIONES Y COBERTURA
+- Elegir club, explorar, crear y solicitar ingreso: accesos rastreados en
+  portada/ficha; selector bajo modificación simultánea, no se certifica aquí.
+- Integrantes, invitar, solicitudes, roles, apodos, expulsar y salir:
+  pantallas recorridas y acciones revisadas por código; sin efectuar cambios.
+- Editar, compartir, fotos, historial y planes: accesos comprobados en ficha;
+  planes abierto; no se publicaron fotos ni se compartió contenido.
+- Alineación: recorrido web y prueba de borrador sin guardar.
+- Desafíos abiertos, directos y propuestas: destino abierto recorrido y
+  rutas de tareas contrastadas con el código del hilo y formularios.
+- Calendario, nómina, resultados, cambios, cancelación e incomparecencia:
+  calendario recorrido; accesos/formularios restantes revisados por código.
+  No se completó un partido real ni un ciclo de negociación en esta revisión.
+- Chat interno, chat rival y permisos: entradas y textos revisados; permisos
+  abierto; sin mensajes enviados ni autorizaciones alteradas.
+
+VALIDACIÓN Y LÍMITES
+- Navegación web local autenticada y captura visual de Integrantes.
+- Ejecución real de normalizarTareas con datos ficticios para los puntos 1/2.
+- npm test: 1489 pruebas, 1488 pasan y 1 falla durante la revisión.
+  Fallo: «Inicio muestra el club ACTIVO, no la membresía más antigua» en un
+  test local incorporado por el trabajo simultáneo. La aserción busca
+  getMyClub( en el texto completo de HomeScreen, incluido un comentario.
+  No se interpreta como prueba de fallo funcional ni se corrige en esta tarea.
+- No se certifica render nativo, pantallas pequeñas ni todos los estados de
+  permisos con sesiones distintas. Los puntos indicados como revisión de
+  código no se presentan como recorridos completos autenticados.
+- Se conservaron los cambios simultáneos en ClubsHomeContext, ClubsScreen,
+  HomeScreen y el test de club activo. Solo se añade este informe.
+
+ORDEN SUGERIDO
+Primero 1 y 2 (acciones que llevan al lugar equivocado); después 3, 5 y 8
+(encontrar funciones, entender permisos y conservar trabajo); finalmente
+4, 6, 7, 9 y 10 para completar la claridad del recorrido.
