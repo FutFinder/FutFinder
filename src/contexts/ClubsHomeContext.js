@@ -157,6 +157,10 @@ const ESTADO_INICIAL = {
   can: permisosDeClub(null),
   limits: cuposDelPlan({}),
   tasks: [],
+  // `true` desde que se toca otro club hasta que llegan SUS datos. No es lo
+  // mismo que `refreshing`: acá lo que hay en pantalla ya no corresponde al
+  // club que el selector marca, y enseñarlo sería mentir.
+  cambiandoClub: false,
   reparto: repartirTareas([]),
   badgeCount: 0,
   nextMatch: null,
@@ -203,7 +207,51 @@ export function ClubsHomeProvider({ children }) {
 
   const reload = useCallback(() => setReloadToken((n) => n + 1), []);
 
+  /**
+   * Cambiar de club activo.
+   *
+   * EL CHIP SE ENCIENDE YA. Recargar la portada son tres rondas y catorce
+   * consultas, y hasta ahora `activeClubId` sólo cambiaba al final de todas:
+   * tocar otro club no producía NADA visible durante uno o dos segundos, así
+   * que el selector parecía muerto y se tocaba de nuevo. Ahora el estado
+   * apunta al club nuevo en el mismo gesto.
+   *
+   * `cambiandoClub` es la otra mitad: con el nombre ya cambiado, seguir
+   * enseñando las tareas, el próximo partido y la actividad del club anterior
+   * sería mentir. La pantalla lo usa para esconder ese contenido —no los
+   * chips— mientras llegan los datos del club nuevo.
+   */
   const setActiveClub = useCallback(async (id) => {
+    if (!id) return;
+    setState((s) => {
+      if (s.activeClubId === id) return s;
+      const nueva = (s.clubs || []).find((m) => m?.club?.id === id);
+      const rol = nueva?.miRol || 'jugador';
+      return {
+        ...s,
+        activeClubId: id,
+        cambiandoClub: true,
+        // La IDENTIDAD del club nuevo ya la tenemos: nombre, escudo, comuna,
+        // rol y plan vienen todos de `getMyClubs()`, que es lo que llena
+        // `clubs`. Por eso el nombre, el tema y el carrusel cambian en el
+        // mismo gesto, sin esperar a nada.
+        club: nueva?.club ? { ...nueva.club, estadisticas: null } : s.club,
+        role: rol,
+        can: permisosDeClub(rol),
+        limits: ESTADO_INICIAL.limits,
+        // Y LO DERIVADO SE VACÍA. Son del club anterior; dejarlos bajo el
+        // nombre del nuevo es lo único peor que hacer esperar.
+        tasks: [],
+        reparto: repartirTareas([]),
+        badgeCount: 0,
+        nextMatch: null,
+        nextMatchCupos: null,
+        nextMatchPlazo: null,
+        activity: [],
+        suggestedRivals: [],
+        pendingRequests: [],
+      };
+    });
     await guardarClubActivo(id);
     setReloadToken((n) => n + 1);
   }, []);
@@ -231,7 +279,13 @@ export function ClubsHomeProvider({ children }) {
           console.error('[FutFinder] ClubsHome getMyClubs:', errClubes);
           // Se conserva lo que ya había: un corte de red al volver a la
           // pestaña no puede borrar una portada que estaba completa.
-          setState((s) => ({ ...s, loading: false, refreshing: false, error: true }));
+          setState((s) => ({
+            ...s,
+            loading: false,
+            refreshing: false,
+            cambiandoClub: false,
+            error: true,
+          }));
           return;
         }
 
@@ -396,6 +450,7 @@ export function ClubsHomeProvider({ children }) {
         setState({
           loading: false,
           refreshing: false,
+          cambiandoClub: false,
           cargado: true,
           error: false,
           membership,
@@ -434,7 +489,13 @@ export function ClubsHomeProvider({ children }) {
       } catch (e) {
         if (!vivo) return;
         console.error('[FutFinder] ClubsHome:', e);
-        setState((s) => ({ ...s, loading: false, refreshing: false, error: true }));
+        setState((s) => ({
+          ...s,
+          loading: false,
+          refreshing: false,
+          cambiandoClub: false,
+          error: true,
+        }));
       }
     })();
 

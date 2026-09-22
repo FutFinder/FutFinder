@@ -31,9 +31,11 @@ import {
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { getMyClub, getMyClubIds } from '../services/clubs';
-import { getMisPermisosEnClub } from '../services/clubPermissions';
+import { getMyClubIds } from '../services/clubs';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
+import ClubSwitcher from '../components/club/ClubSwitcher';
+import { temaDeClub } from '../theme/clubThemes';
+import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
 import useConfirmacion from '../components/useConfirmacion';
 
@@ -48,6 +50,24 @@ function greetingFor(d = new Date()) {
 export default function HomeScreen({ navigation }) {
   // `window.confirm` no abre nada en web: diálogo propio de la app.
   const { confirmar, dialogo } = useConfirmacion();
+  /**
+   * EL CLUB DE INICIO ES EL CLUB ACTIVO, el mismo que marca el selector de la
+   * pestaña Clubes. Antes salía de `getMyClub()`, que devuelve la membresía
+   * MÁS ANTIGUA y nada más: quien tenía tres clubes elegía uno en Clubes y en
+   * Inicio seguía viendo otro, sin manera de cambiarlo desde acá. El contexto
+   * ya está montado en `MainTabs` y lo comparten la portada de Clubes y el
+   * badge de la barra, así que leerlo no cuesta ninguna consulta nueva — y de
+   * paso se va la de permisos delegados, que `can.responderDesafios` ya
+   * resuelve.
+   */
+  const {
+    clubs: misMembresias,
+    activeClubId,
+    club: clubActivo,
+    role: rolEnClubActivo,
+    can,
+    setActiveClub,
+  } = useClubsHome();
   const [matches, setMatches] = useState([]);
   const [profile, setProfile] = useState(null);
   const [myUserId, setMyUserId] = useState(null);
@@ -55,12 +75,6 @@ export default function HomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState(null);
   const [previewMatchId, setPreviewMatchId] = useState(null);
-  const [myClubData, setMyClubData] = useState(undefined);
-  // «Crear partido de club» con el permiso `pubChallenge`/`answerChallenge`
-  // delegado (migración 119, Permisos de club), no sólo con `rol === 'admin'`
-  // — antes un jugador con el permiso concedido no veía el botón acá, aunque
-  // ClubDetailScreen/ClubChallengesScreen ya lo dejaran desafiar igual.
-  const [puedeCrearPartidoDelegado, setPuedeCrearPartidoDelegado] = useState(false);
   const [nextMatch, setNextMatch] = useState(null);
   // Los partidos de MIS clubes, pedidos club por club a la base. No salen de
   // la tanda general de `listOpenMatches()`: esa trae los N partidos abiertos
@@ -82,11 +96,10 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [{ data: list }, prof, user, clubResult, misClubes] = await Promise.all([
+    const [{ data: list }, prof, user, misClubes] = await Promise.all([
       listOpenMatches({ limit: 20 }),
       getCurrentProfile(),
       getCurrentUser(),
-      getMyClub(),
       getMyClubIds().catch(() => ({ data: [] })),
     ]);
     const userId = user?.id || null;
@@ -131,15 +144,6 @@ export default function HomeScreen({ navigation }) {
     setMatches(filtered.map((m) => ({ ...m, _joined: joinedIds.has(m.id) })));
     setProfile(prof);
     setMyUserId(userId);
-    setMyClubData(clubResult?.data ?? null);
-
-    const miClub = clubResult?.data;
-    if (miClub && miClub.miRol !== 'admin' && miClub.club?.id) {
-      const { data: permisos } = await getMisPermisosEnClub(miClub.club.id).catch(() => ({ data: null }));
-      setPuedeCrearPartidoDelegado(!!(permisos?.permisos?.pubChallenge || permisos?.permisos?.answerChallenge));
-    } else {
-      setPuedeCrearPartidoDelegado(false);
-    }
 
     // Después del resto: necesita los ids de mis clubes, y nada de lo de
     // arriba necesita esperarla.
@@ -227,18 +231,25 @@ export default function HomeScreen({ navigation }) {
   const username = profile?.username || 'jugador';
   const verified = trustScore >= 70;
 
-  // Mapea myClubData al shape que esperan los sub-componentes
-  const club = myClubData
+  // El club activo, en el shape que esperan los sub-componentes.
+  const membresiaActiva = (misMembresias || []).find((m) => m?.club?.id === activeClubId);
+  const club = clubActivo
     ? {
-        id: myClubData.club.id,
-        nombre: myClubData.club.nombre,
-        foto_url: myClubData.club.foto_url,
-        role: myClubData.miRol,           // 'admin' | 'member'
-        totalMiembros: myClubData.totalMiembros,
-        modalidad: myClubData.club.modalidad,
-        puedeCrearPartido: myClubData.miRol === 'admin' || puedeCrearPartidoDelegado,
+        id: clubActivo.id,
+        nombre: clubActivo.nombre,
+        foto_url: clubActivo.foto_url,
+        role: rolEnClubActivo === 'admin' ? 'admin' : 'member',
+        // `?? 1` sólo cubre el hueco imposible: `clubs` y `club` salen del
+        // mismo `setState`. Sin él, «undefined miembros».
+        totalMiembros: membresiaActiva?.totalMiembros ?? 1,
+        modalidad: clubActivo.modalidad,
+        // `can.responderDesafios` ya contempla el permiso `pubChallenge` /
+        // `answerChallenge` delegado (migración 119), no sólo el rol.
+        puedeCrearPartido: !!can?.responderDesafios,
       }
     : null;
+  const temaClubActivo = temaDeClub(clubActivo);
+  const variosClubes = (misMembresias || []).length > 1;
 
   /**
    * «ADMIN · 2 CLUBES». El número estuvo escrito a mano —siempre «1 CLUB»—
@@ -246,13 +257,14 @@ export default function HomeScreen({ navigation }) {
    * leía en su propia portada que administra uno. La cuenta real ya venía
    * cargada en `misClubIds`; lo único que faltaba era usarla.
    *
-   * El `|| 1` es para el instante entre que `getMyClub()` responde y
-   * `getMyClubIds()` todavía no: si administra un club, administra al menos
-   * uno, y «ADMIN · 0 CLUBES» sería peor que esperar.
+   * Las dos caídas son para el instante en que una de las dos fuentes todavía
+   * no respondió: si administra un club, administra al menos uno, y «ADMIN ·
+   * 0 CLUBES» sería peor que esperar.
    */
+  const cuantosClubes = (misMembresias || []).length || misClubIds.length || 1;
   const clubRoleLabel =
     club?.role === 'admin'
-      ? `ADMIN · ${misClubIds.length || 1} ${(misClubIds.length || 1) === 1 ? 'CLUB' : 'CLUBES'}`
+      ? `ADMIN · ${cuantosClubes} ${cuantosClubes === 1 ? 'CLUB' : 'CLUBES'}`
       : undefined;
 
   const summary = matches.length
@@ -369,6 +381,23 @@ export default function HomeScreen({ navigation }) {
                   actionLabel="Ver club"
                   onAction={() => navigation.navigate('ClubDetail', { clubId: club.id })}
                 />
+                {/* CAMBIAR DE CLUB TAMBIÉN SE PUEDE DESDE ACÁ. El selector
+                    vivía sólo en la pestaña Clubes, así que para ver en
+                    Inicio otro de tus clubes había que ir allá, cambiarlo y
+                    volver. Es el mismo componente y el mismo club activo: no
+                    hay un «club de Inicio» aparte. Con un club no se dibuja
+                    — no hay nada que elegir. */}
+                {variosClubes ? (
+                  <View className="-mx-[16px] mb-2.5">
+                    <ClubSwitcher
+                      clubs={misMembresias}
+                      activeClubId={activeClubId}
+                      tema={temaClubActivo}
+                      onSelect={setActiveClub}
+                      onExplorar={() => navigation.navigate('ExploreClubs')}
+                    />
+                  </View>
+                ) : null}
                 <MyClubCard
                   club={club}
                   onPressClub={() => navigation.navigate('ClubDetail', { clubId: club.id })}

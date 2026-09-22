@@ -64,6 +64,7 @@ export default function ClubsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const {
     loading,
+    cambiandoClub,
     cargado,
     error,
     membership,
@@ -231,6 +232,7 @@ export default function ClubsScreen({ navigation, route }) {
         {...{
           clubs,
           activeClubId,
+          cambiandoClub,
           club,
           can,
           tasks,
@@ -334,6 +336,7 @@ export default function ClubsScreen({ navigation, route }) {
 function Portada({
   clubs,
   activeClubId,
+  cambiandoClub,
   club,
   can,
   tasks,
@@ -403,7 +406,14 @@ function Portada({
           )}
         </View>
 
-        {sinTareas ? (
+        {/* CAMBIANDO DE CLUB NO ES «TODO AL DÍA». El nombre, el escudo y el
+            tema del club nuevo ya están en pantalla —los trae `getMyClubs()`,
+            no hacen falta consultas— pero sus tareas todavía no. Sin esta
+            rama, el club al que acabas de cambiar decía «Sin desafíos ni
+            cambios por responder» un segundo antes de enseñar tres. */}
+        {cambiandoClub ? (
+          <Text style={styles.cargandoTareas}>Cargando lo de este club…</Text>
+        ) : sinTareas ? (
           <AllClearBanner tema={tema} />
         ) : (
           <View style={styles.pila}>
@@ -794,6 +804,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: clubTonos.danger.soft,
     marginBottom: 4,
+  },
+  cargandoTareas: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: C.textFaint,
+    paddingVertical: 14,
   },
   tituloVacio: { fontSize: 17, fontFamily: F.extraBold, color: '#FFFFFF', textAlign: 'center' },
   textoVacio: {
