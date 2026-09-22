@@ -23,7 +23,7 @@ export default function BrandMark({ style }) {
     <View style={[styles.row, style]}>
       <MapPin size={26} color={C.green} strokeWidth={2.2} />
       <Text style={styles.word}>
-        fut<Text style={styles.wordAccent}>finder</Text>
+        Fut<Text style={styles.wordAccent}>Finder</Text>
       </Text>
     </View>
   );

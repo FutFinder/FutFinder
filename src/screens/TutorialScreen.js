@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check } from 'lucide-react-native';
 
-import FutfinderMark from '../components/FutfinderMark';
+import FutFinderMark from '../components/FutFinderMark';
 import { Button } from '../components/reservas/ui';
 import { paleta as C, fuentes as F, alfa } from '../theme/colors';
 
@@ -212,8 +212,8 @@ export default function TutorialScreen({ navigation }) {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={styles.header}>
           <View style={styles.brandRow}>
-            <FutfinderMark size={20} color={C.green} />
-            <Text style={styles.brandText}>fut<Text style={{ color: C.green }}>finder</Text></Text>
+            <FutFinderMark size={20} color={C.green} />
+            <Text style={styles.brandText}>Fut<Text style={{ color: C.green }}>Finder</Text></Text>
           </View>
           <Pressable onPress={skip} hitSlop={8}>
             <Text style={styles.skipText}>Saltar</Text>

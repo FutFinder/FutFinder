@@ -179,7 +179,7 @@ export default function SplashScreen({ navigation }) {
             }}
           >
             <Text style={styles.word}>
-              fut<Text style={styles.wordAccent}>finder</Text>
+              Fut<Text style={styles.wordAccent}>Finder</Text>
             </Text>
           </Animated.View>
         </View>

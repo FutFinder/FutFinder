@@ -780,7 +780,7 @@ export async function administradoresDelRecinto(complejoId) {
     puedeFicha: !!f.puede_ficha,
     username: f.profiles?.username || null,
     fotoUrl: f.profiles?.foto_url || null,
-    enFutfinderDesde: f.profiles?.created_at || null,
+    enFutFinderDesde: f.profiles?.created_at || null,
   }));
   // Los dueños primero: sus filas no traen acción y conviene verlas arriba.
   // No se ordena en Postgres porque `order by rol` compara texto y deja

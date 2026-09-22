@@ -249,7 +249,7 @@ export default function VerificationScreen({ navigation, route }) {
             )}
           </View>
 
-          <Text style={styles.footer}>FUTFINDER{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
+          <Text style={styles.footer}>FutFinder{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>

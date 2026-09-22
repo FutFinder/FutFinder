@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Eye, EyeOff, Check } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import FutfinderMark from '../components/FutfinderMark';
+import FutFinderMark from '../components/FutFinderMark';
 import Banner from '../components/Banner';
 import { Card, IconButton, Button } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
@@ -140,8 +140,8 @@ export default function RegisterScreen({ navigation }) {
           <View style={styles.header}>
             <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
             <View style={styles.brandRow}>
-              <FutfinderMark size={22} color={C.green} />
-              <Text style={styles.brandText}>fut<Text style={{ color: C.green }}>finder</Text></Text>
+              <FutFinderMark size={22} color={C.green} />
+              <Text style={styles.brandText}>Fut<Text style={{ color: C.green }}>Finder</Text></Text>
             </View>
             <View style={{ width: 40 }} />
           </View>
