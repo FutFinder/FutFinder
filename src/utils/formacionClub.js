@@ -142,6 +142,139 @@ export function autocompletarAsignaciones(puestosLibres, banca) {
 }
 
 /**
+ * Qué pasó de verdad al autocompletar, ya redactado.
+ *
+ * EL MENSAJE MENTÍA. «Alineación completada» salía siempre que se colocara a
+ * alguien: con un solo integrante y siete puestos, el contador quedaba en 1/7
+ * y el aviso decía que estaba completa. Y los dos motivos para no hacer nada
+ * —la cancha llena y la banca vacía— compartían el mismo texto, «No queda
+ * banca disponible», que sólo es cierto en uno de los dos.
+ *
+ * Se calcula con las tres cuentas reales y devuelve también los números, para
+ * que la pantalla no tenga que deducirlos del texto.
+ */
+export function resumenAutocompletar({ puestosLibres = 0, jugadoresEnBanca = 0, ubicados = 0 } = {}) {
+  const faltan = Math.max(0, puestosLibres - ubicados);
+  const resumen = { ubicados, faltan };
+
+  if (puestosLibres === 0) {
+    return { ...resumen, mensaje: 'Todos los puestos están ocupados' };
+  }
+  if (jugadoresEnBanca === 0) {
+    return { ...resumen, mensaje: 'No quedan jugadores en la banca' };
+  }
+  if (ubicados === 0) {
+    return { ...resumen, mensaje: 'No se pudo ubicar a nadie' };
+  }
+  if (faltan === 0) {
+    return { ...resumen, mensaje: 'Alineación completada' };
+  }
+  const gente = ubicados === 1 ? '1 jugador ubicado' : `${ubicados} jugadores ubicados`;
+  const huecos = faltan === 1 ? 'falta 1 puesto' : `faltan ${faltan} puestos`;
+  return { ...resumen, mensaje: `${gente}; ${huecos}` };
+}
+
+/**
+ * Traslada las asignaciones a otra formación, conservando lo que calza.
+ *
+ * CAMBIAR DE FORMACIÓN VACIABA EL TABLERO. Tocar un chip para ver cómo se
+ * vería un 3-2-1 borraba las siete asignaciones sin preguntar, así que
+ * explorar una alternativa costaba el trabajo entero.
+ *
+ * LA REGLA ES EL PUESTO, NO LA COORDENADA. Un DFC del 3-2-1 sigue siendo un
+ * DFC en el 2-3-1, aunque esté en otro sitio de la cancha; un puesto que la
+ * formación nueva no tiene deja a su jugador en la banca, que es donde de
+ * verdad queda. Los puestos de la formación nueva que nadie ocupaba se
+ * quedan libres: rellenarlos sería inventar una decisión.
+ *
+ * Reparte en el orden del tablero anterior, así que con dos DFC y un solo
+ * puesto de DFC se queda el primero — un desempate fijo, no al azar, para
+ * que ir y volver entre dos formaciones no baraje el equipo.
+ */
+export function conservarAsignaciones(asignaciones = {}, slotsAntes = [], slotsDespues = []) {
+  const porPuesto = new Map();
+  for (const slot of slotsAntes) {
+    const memberId = asignaciones?.[slot?.key];
+    if (!memberId) continue;
+    if (!porPuesto.has(slot.label)) porPuesto.set(slot.label, []);
+    porPuesto.get(slot.label).push(memberId);
+  }
+
+  const usados = new Set();
+  const nuevas = {};
+  for (const slot of slotsDespues) {
+    const cola = porPuesto.get(slot?.label);
+    while (cola && cola.length > 0) {
+      const memberId = cola.shift();
+      if (usados.has(memberId)) continue;
+      nuevas[slot.key] = memberId;
+      usados.add(memberId);
+      break;
+    }
+  }
+  return nuevas;
+}
+
+/**
+ * ¿El borrador dice algo distinto de lo guardado?
+ *
+ * DE ACÁ SALE LA ADVERTENCIA AL SALIR. Autocompletar dejaba el contador en
+ * 1/7, un gesto de volver atrás lo devolvía a 0/7 y nadie preguntaba nada:
+ * el trabajo se perdía sin un solo aviso.
+ *
+ * Los dos lados llegan con la MISMA forma —`{ modo, formacion, personalizado,
+ * asignaciones, custom }`— y la pantalla se encarga de que lo guardado venga
+ * ya depurado con `asignacionesVigentes()`. Si no, un integrante expulsado
+ * hace tiempo bastaría para declarar cambios en cuanto se abre la pantalla, y
+ * una advertencia que salta siempre se aprende a ignorar.
+ *
+ * `guardada` en `null` es «este club todavía no tiene alineación»: entonces
+ * sólo cuenta como cambio haber puesto o arrastrado algo. Haber mirado otra
+ * formación sin colocar a nadie no es trabajo que perder.
+ */
+export function hayCambiosSinGuardar(borrador, guardada) {
+  const b = borrador || {};
+  const puestos = b.asignaciones || {};
+  const arrastrados = b.custom || {};
+
+  if (!guardada) {
+    return Object.keys(puestos).length > 0 || Object.keys(arrastrados).length > 0;
+  }
+
+  if (b.modo !== guardada.modo) return true;
+  if (b.formacion !== guardada.formacion) return true;
+  if (!!b.personalizado !== !!guardada.personalizado) return true;
+  if (!mismasAsignaciones(puestos, guardada.asignaciones || {})) return true;
+  return !mismosPuestosPersonalizados(arrastrados, guardada.custom || {});
+}
+
+function mismasAsignaciones(a, b) {
+  const clavesA = Object.keys(a);
+  if (clavesA.length !== Object.keys(b).length) return false;
+  return clavesA.every((k) => a[k] === b[k]);
+}
+
+/**
+ * Las coordenadas se comparan redondeadas al entero: son porcentajes que
+ * nacen de un gesto, y el ida y vuelta por JSON puede devolver 41.99999 donde
+ * había 42. Un decimal de diferencia no es trabajo sin guardar.
+ */
+function mismosPuestosPersonalizados(a, b) {
+  const clavesA = Object.keys(a);
+  if (clavesA.length !== Object.keys(b).length) return false;
+  return clavesA.every((k) => {
+    const x = a[k];
+    const y = b[k];
+    if (!x || !y) return false;
+    return (
+      Math.round(x.left) === Math.round(y.left) &&
+      Math.round(x.top) === Math.round(y.top) &&
+      x.label === y.label
+    );
+  });
+}
+
+/**
  * Las asignaciones que todavía corresponden a integrantes del club.
  *
  * EL FALLO QUE LA TRAJO (C09). El JSON guardado en `club_lineups.asignaciones`

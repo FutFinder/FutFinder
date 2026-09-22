@@ -193,8 +193,8 @@ export default function AdministradoresScreen({ navigation, route }) {
                         <Text style={styles.usuario} numberOfLines={1}>
                           @{a.username}{soyYo ? ' · tú' : ''}
                         </Text>
-                        {a.enFutfinderDesde ? (
-                          <Text style={styles.desde}>En FutFinder desde {desdeCuando(a.enFutfinderDesde)}</Text>
+                        {a.enFutFinderDesde ? (
+                          <Text style={styles.desde}>En FutFinder desde {desdeCuando(a.enFutFinderDesde)}</Text>
                         ) : null}
                       </View>
                       <Badge label={esDueno ? 'Dueño' : 'Admin'} tone={esDueno ? 'green' : 'neutral'} />

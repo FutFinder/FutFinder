@@ -13,7 +13,7 @@ test('usa el mismo ícono y wordmark oficiales que BrandMark, no un ícono propi
   // El acento salía de `tactical.neon` (#00FF66) hasta que la app se unificó
   // en una sola estética el 2026-09-16; ahora es el verde único.
   assert.match(src, /C\.green/, 'el ícono y el acento del wordmark deben usar el verde de la paleta');
-  assert.match(src, /fut<Text/, 'el wordmark "fut...finder" debe estar presente');
+  assert.match(src, /Fut<Text/, 'el wordmark «FutFinder» debe estar presente');
   assert.doesNotMatch(
     src,
     /<Svg/,

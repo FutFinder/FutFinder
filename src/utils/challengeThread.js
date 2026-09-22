@@ -128,6 +128,11 @@ export function challengeCtaContext({
   // confirmar el resultado los autoriza ESE permiso en el servidor, no el
   // rol: sin este dato el hilo le decía «Solo lectura» a quien sí podía.
   misClubIdsResultados = null,
+  // Lo mismo con `answerChallenge`. Se filtra contra el club RETADO y no
+  // contra los dos: `aceptar_desafio()` exige el permiso en ese club en
+  // concreto (119:666), así que tenerlo en el club que retó no habilita
+  // nada — ofrecer el botón ahí sería mandar al usuario contra un 42501.
+  misClubIdsResponder = null,
   online = true,
   sancion = null,
   propuesta = null,
@@ -139,11 +144,19 @@ export function challengeCtaContext({
   const conResultados = (Array.isArray(misClubIdsResultados) ? misClubIdsResultados : [])
     .filter(Boolean)
     .filter((id) => delDesafio.includes(id));
+  const conRespuesta = (Array.isArray(misClubIdsResponder) ? misClubIdsResponder : [])
+    .filter(Boolean)
+    .filter((id) => id === challenge?.club_retado_id);
   // Mi club en este desafío es mi club, lo administre o no: si no, el delegado
   // de resultados no podría distinguir «esperando al rival» de «te toca
-  // confirmar», que es exactamente lo que diferencia esos dos estados.
+  // confirmar», que es exactamente lo que diferencia esos dos estados. Por lo
+  // mismo entra el delegado de respuestas: sin club propio resuelto,
+  // `soyRetador` sería falso por omisión y no por haber mirado el desafío.
   const myClubId =
-    clubes.find((id) => delDesafio.includes(id)) || conResultados[0] || null;
+    clubes.find((id) => delDesafio.includes(id)) ||
+    conResultados[0] ||
+    conRespuesta[0] ||
+    null;
 
   // Unión y no reemplazo: ser administrador implica ser integrante, así que
   // omitir `misClubIdsTodos` nunca puede dar menos pertenencias de las que ya
@@ -161,6 +174,7 @@ export function challengeCtaContext({
     myClubId,
     soyAdmin: clubes.length > 0,
     puedeResultados: conResultados.length > 0,
+    puedeResponderDesafio: conRespuesta.length > 0,
     pertenezcoAlProponente: !!proponente && todos.includes(proponente),
     online,
     sancion,

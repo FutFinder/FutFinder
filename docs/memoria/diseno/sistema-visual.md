@@ -1,6 +1,6 @@
 # Sistema visual
 
-Última revisión: 2026-09-02
+Última revisión: 2026-09-22
 
 ## Propósito
 
@@ -63,7 +63,11 @@ rojo») sería una regla sorprendente. No es deuda pendiente.
 - `src/components/club/`: explorador, tarjetas de club/rival/historial, héroe, logo, galería, insignia de plan, estadísticas y CTA de desafío.
 - `src/components/player/`: héroe, biografía, estadísticas, reputación, participación, acciones públicas, tarjetas de cuenta/soporte, galería, reporte y skeleton de perfil.
 - `src/components/partidos/`: hojas, filtros, selectores, tarjeta de partido, vistas de estado y primitivas `ui`.
-- `src/components/BrandMark.js`: única fuente del logo "fut**finder**" (pin + wordmark) para el header de las pantallas ya logueadas. Sin props de tamaño ni color — usa siempre los tokens de `tactical` (`neon` y `text`), sea cual sea la pantalla que lo aloja. Se usa en Home, Partidos y Chat; el onboarding (`Logo.js`, el ícono de balón) es una marca distinta y no lo usa. `src/screens/SplashScreen.js` tampoco renderiza `<BrandMark />`: reconstruye a mano el mismo ícono `MapPin`/`tactical.neon` y el mismo wordmark (mismo tamaño, mismo estilo) como dos piezas independientes, porque necesita animar el pin y el texto en momentos distintos (el pin se asienta, después el texto se desliza a su derecha) y `BrandMark` no expone sus partes por separado. Fondo del splash: `clubsExplorer.bg`, no `tactical.bg` ni la paleta global.
+- `src/components/BrandMark.js`: única fuente del logo «**Fut**Finder» (pin + wordmark) para el header de las pantallas ya logueadas. Sin props de tamaño ni color — usa siempre los tokens de `tactical` (`neon` y `text`), sea cual sea la pantalla que lo aloja. Se usa en Home, Partidos y Chat; el onboarding (`Logo.js`, el ícono de balón) es una marca distinta y no lo usa. `src/screens/SplashScreen.js` tampoco renderiza `<BrandMark />`: reconstruye a mano el mismo ícono `MapPin`/`tactical.neon` y el mismo wordmark (mismo tamaño, mismo estilo) como dos piezas independientes, porque necesita animar el pin y el texto en momentos distintos (el pin se asienta, después el texto se desliza a su derecha) y `BrandMark` no expone sus partes por separado. Fondo del splash: `clubsExplorer.bg`, no `tactical.bg` ni la paleta global.
+- **La marca se escribe «FutFinder», con las dos efes en mayúscula.** El wordmark se dibujaba `fut` + `finder` todo en minúsculas en los SIETE sitios que lo pintan (`BrandMark`, `Logo`, Splash, Portada, Tutorial, Iniciar sesión y Crear cuenta), y cuatro pies de página y el texto de Términos lo escribían `FUTFINDER` en mayúsculas literales. Decisión de Vicente el 22-09-2026: se ve más profesional con la capitalización de la marca. El color no cambia — «Fut» en el texto base y «Finder» en verde. Las pruebas `headerBrand.test.js` y `SplashScreen.test.js` fijan el wordmark buscando `Fut<Text`, así que una pantalla que vuelva a dibujarlo a mano en minúsculas se detecta.
+
+  Lo que NO se tocó, a propósito: las mayúsculas que pone `SectionLabel` con `textTransform` (ahí la marca ya lleva las dos efes), el nombre del paquete npm, el `slug`/`scheme`/`bundleIdentifier` (`futfinder`, `com.futfinder.app`), las claves de `AsyncStorage` (`futfinder:clubActivo`, `futfinder.rememberedAccount`), las columnas de la base (`aprobado_futfinder`, `verificado_futfinder`), los dominios y los correos. Son identificadores: cambiarlos rompe datos guardados, despliegues o direcciones reales, y ninguno se le enseña a nadie.
+
 - `src/components/NotificationBell.js`: campana de avisos global, con el mismo criterio de tokens fijos (`paleta`) que `BrandMark`. Vive arriba a la derecha en las 6 pantallas raíz de pestaña (Home, Partidos, Clubes cuando no hay club propio, Reservas, Chat, Perfil propio) y en varias pantallas internas que ya la traían. Nunca aparece en "Mi club" (`ClubHeaderBar`) ni al ver el perfil de otro jugador.
 
 El copy visible se mantiene en español. Los componentes reciben labels ya resueltos desde sus utilidades de dominio cuando corresponde: por ejemplo, `TagBadge` no decide modalidad, posición ni nivel, y sólo representa el label recibido.

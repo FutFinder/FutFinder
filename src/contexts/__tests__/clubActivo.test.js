@@ -96,10 +96,10 @@ test('Inicio muestra el club ACTIVO, no la membresía más antigua', () => {
     'getMyClub() devuelve la membresía más antigua: con tres clubes, Inicio enseñaba uno distinto del que marca el selector'
   );
   assert.match(src, /useClubsHome\(\)/, 'el club activo sale del contexto compartido');
-  assert.match(
+  assert.doesNotMatch(
     src,
     /<ClubSwitcher/,
-    'y se puede cambiar desde Inicio, sin ir a la pestaña Clubes y volver'
+    'la fila de chips salió de Inicio: cambiar de club es el botón de la cabecera, y tenerlo dos veces en la misma pantalla es repetir el mismo control a dos alturas'
   );
 });
 
@@ -111,10 +111,9 @@ const CABECERAS = {
   Clubes: '../../components/club/ClubsHeader.js',
   Reservas: '../../screens/ReservasScreen.js',
   Chat: '../../components/chat/ChatInboxHeader.js',
-  Perfil: '../../components/player/PlayerProfileTopBar.js',
 };
 
-test('las seis pestañas llevan el selector de club en su cabecera', () => {
+test('las cinco cabeceras de marca llevan el selector de club', () => {
   for (const [pestana, ruta] of Object.entries(CABECERAS)) {
     const src = leer(ruta);
     assert.match(
@@ -126,12 +125,16 @@ test('las seis pestañas llevan el selector de club en su cabecera', () => {
   }
 });
 
-test('en el perfil de OTRO jugador no se dibuja: la barra es la misma para los dos', () => {
+test('la barra del perfil NO lo lleva: medido, no estimado, no le cabe', () => {
+  // A 375 px sus cinco controles dejan 63 px de título y «Mi perfil» pide 66:
+  // ya estaba a tres píxeles de recortarse. Con un sexto control de 40 px el
+  // título quedaba en «M…». Además es la barra de un detalle, compartida con
+  // el perfil de otro jugador, donde «cambiar de club» no significa nada.
   const src = leer('../../components/player/PlayerProfileTopBar.js');
-  assert.match(
+  assert.doesNotMatch(
     src,
-    /isOwnProfile \? <ClubHeaderButton \/> : null/,
-    '«cambiar de club» no significa nada mirando el perfil ajeno'
+    /<ClubHeaderButton/,
+    'volver a meterlo acá deja el título en «M…»: antes hay que darle dos filas a esta barra'
   );
 });
 
@@ -152,4 +155,41 @@ test('el botón de la cabecera usa el MISMO setActiveClub que los chips y el car
     /setActiveClub\(/,
     'un tercer selector con su propio estado se desincroniza de los otros dos'
   );
+});
+
+/* ── El tope de tres clubes ────────────────────────────────────────── */
+
+test('la hoja no ofrece sumar un cuarto club a quien ya tiene tres', () => {
+  const src = leer('../../components/club/ClubHeaderButton.js');
+  assert.match(
+    src,
+    /enElTope \? \(/,
+    'ofrecer «Explorar clubes» sabiendo que el trigger lo va a rechazar es peor que no ofrecerlo'
+  );
+  assert.ok(
+    src.indexOf('enElTope ? (') < src.indexOf("navigation.navigate('ExploreClubs')"),
+    'el tope tiene que decidirse ANTES de dibujar el acceso a explorar'
+  );
+});
+
+test('la lista nunca enseña más de tres clubes', () => {
+  const src = leer('../../components/club/ClubHeaderButton.js');
+  assert.match(
+    src,
+    /\.slice\(0, MAX_CLUBES_POR_JUGADOR\)/,
+    'una cuarta membresía sólo puede venir de datos rotos, y la hoja no la presenta como algo entre lo que elegir'
+  );
+});
+
+test('el tope es UN número con nombre, no un 3 suelto en cada pantalla', () => {
+  const clubs = leer('../../services/clubs.js');
+  assert.match(clubs, /export const MAX_CLUBES_POR_JUGADOR = 3;/);
+  // Donde el propio servicio corta, ya no queda el literal: si el tope
+  // cambia, el mensaje al usuario cambia con él en vez de mentir.
+  assert.doesNotMatch(
+    clubs,
+    /\(myClubCount \|\| 0\) >= 3/,
+    'el chequeo tiene que usar la constante, no el literal'
+  );
+  assert.doesNotMatch(clubs, /'Ya perteneces al máximo de 3 clubes permitidos'/);
 });

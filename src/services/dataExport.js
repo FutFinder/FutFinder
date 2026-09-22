@@ -30,7 +30,7 @@ export async function buildMyDataExport() {
       generado_en: new Date().toISOString(),
       perfil: profile,
       historial_partidos: historial,
-      amigos,
+      amigos: amigos.data || [],
       clubes: clubes.data || [],
     },
     error: null,

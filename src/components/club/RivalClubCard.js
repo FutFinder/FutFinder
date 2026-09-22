@@ -16,8 +16,12 @@ import ClubLogo from './ClubLogo';
  * Muestra logo, nombre, "distancia · modalidad", valoración con estrella,
  * nivel y botón "Desafiar".
  *
- * Los textos con posibles N.A. (`meta`, `ratingLabel`, `nivelLabel`) llegan
- * ya resueltos desde clubMeta.js.
+ * LO QUE NO SE SABE NO OCUPA SITIO. `meta` y `nivelLabel` llegan resueltos de
+ * `clubMeta.js` y pueden venir vacíos; la valoración marca su ausencia con el
+ * centinela 'N.A.'. Antes las tres se dibujaban igual, así que la tarjeta de
+ * un club nuevo era tres siglas —«Distancia N.A. · Fútbol N.A.», «N.A.»,
+ * «Nivel N.A.»— que parecen un error de la app. Ahora la valoración ausente
+ * se dice en español y las otras dos se omiten.
  *
  * EL COLOR ES DEL RIVAL, NO DE QUIEN MIRA. Estas tarjetas viven dentro de
  * «Mi club», así que pintarlas con el tema de la pantalla las volvería
@@ -35,13 +39,16 @@ export default function RivalClubCard({
   puedeDesafiar = true,
 }) {
   const tema = temaDeClub(club);
+  const sinValoracion = !ratingLabel || ratingLabel === 'N.A.';
 
   return (
     <View style={styles.card}>
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`Ver el club ${club.nombre}. ${meta}`}
+        accessibilityLabel={
+          meta ? `Ver el club ${club.nombre}. ${meta}` : `Ver el club ${club.nombre}`
+        }
         style={({ pressed }) => [styles.top, pressed && { opacity: 0.7 }]}
       >
         <ClubLogo uri={club.foto_url} size={42} borderRadius={R.iconBtn} />
@@ -49,9 +56,11 @@ export default function RivalClubCard({
           <Text style={styles.name} numberOfLines={1}>
             {club.nombre}
           </Text>
-          <Text style={styles.meta} numberOfLines={1}>
-            {meta}
-          </Text>
+          {meta ? (
+            <Text style={styles.meta} numberOfLines={1}>
+              {meta}
+            </Text>
+          ) : null}
         </View>
       </Pressable>
 
@@ -59,17 +68,21 @@ export default function RivalClubCard({
         <View
           style={styles.chip}
           accessibilityLabel={
-            ratingLabel === 'N.A.' ? 'Valoración no disponible' : `Valoración ${ratingLabel}`
+            sinValoracion ? 'Todavía sin valoraciones' : `Valoración ${ratingLabel}`
           }
         >
-          <Star color={C.textPrimary} size={11} strokeWidth={2.4} />
-          <Text style={styles.chipText}>{ratingLabel}</Text>
-        </View>
-        <View style={styles.chip}>
-          <Text style={styles.chipText} numberOfLines={1}>
-            {nivelLabel}
+          <Star color={sinValoracion ? C.textMuted : C.textPrimary} size={11} strokeWidth={2.4} />
+          <Text style={[styles.chipText, sinValoracion && styles.chipTextVacio]} numberOfLines={1}>
+            {sinValoracion ? 'Sin valorar' : ratingLabel}
           </Text>
         </View>
+        {nivelLabel ? (
+          <View style={styles.chip}>
+            <Text style={styles.chipText} numberOfLines={1}>
+              {nivelLabel}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {puedeDesafiar ? (
@@ -140,6 +153,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontFamily: F.bold,
   },
+  chipTextVacio: { color: C.textMuted },
   challengeBtn: {
     height: 38,
     marginTop: 10,

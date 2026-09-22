@@ -58,10 +58,11 @@ export default function ChatScreen({ navigation }) {
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setError(null);
 
-    const [threadsRes, reqs] = await Promise.all([
+    const [threadsRes, reqsRes] = await Promise.all([
       listMyThreads(),
-      // La carga secundaria no puede tumbar la bandeja.
-      listIncomingRequests().catch(() => []),
+      // La carga secundaria no puede tumbar la bandeja: su error se ignora a
+      // propósito y sólo se pierde la tarjeta de solicitudes.
+      listIncomingRequests().catch(() => ({ data: [], error: null })),
     ]);
 
     if (!mountedRef.current) return;
@@ -82,7 +83,7 @@ export default function ChatScreen({ navigation }) {
       setThreads(sortThreadsByActivity(threadsRes.data || []));
     }
 
-    setRequests(reqs || []);
+    setRequests(reqsRes?.data || []);
     setNow(new Date());
     setLoading(false);
     setRefreshing(false);

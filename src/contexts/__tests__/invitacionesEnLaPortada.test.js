@@ -31,6 +31,8 @@ const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
  */
 const soloCodigo = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
+const TAREAS = require('../../utils/clubsHomeTasks.js');
+
 const CONTEXTO = leer('contexts/ClubsHomeContext.js');
 const PANTALLA = leer('screens/ClubsScreen.js');
 const SERVICIO = leer('services/clubs.js');
@@ -96,10 +98,20 @@ test('listMyInvitations cuenta los integrantes de cada club', () => {
 
 test('el destino de una tarea usa SU club, no el activo', () => {
   // Trampa latente: la tarea de invitación apunta a `ClubDetail`, y el mapa
-  // de parámetros mandaba siempre `clubId: activeClubId`. Hoy no se dispara
-  // —la tarjeta con acciones no navega— pero cualquiera que le devuelva el
-  // `onPress` llevaría al club equivocado, y en el estado sin club activo
-  // `activeClubId` es `null`.
-  assert.match(PANTALLA, /ClubDetail: \{ clubId: tarea\.clubId \|\| activeClubId \}/,
-    'onTarea sigue mandando siempre el club activo');
+  // de parámetros que tenía la pantalla mandaba siempre `clubId:
+  // activeClubId`. Hoy no se dispara —la tarjeta con acciones no navega— pero
+  // cualquiera que le devuelva el `onPress` llevaría al club equivocado, y en
+  // el estado sin club activo `activeClubId` es `null`.
+  //
+  // El mapa ya no existe: los destinos los resuelve `destinoDeTarea()`, así
+  // que esto se comprueba corriéndolo en vez de leyendo la pantalla.
+  const invitacion = { type: 'invitacion', clubId: 'club-que-invita' };
+  assert.deepEqual(TAREAS.destinoDeTarea(invitacion, 'club-activo'), {
+    screen: 'ClubDetail',
+    params: { clubId: 'club-que-invita' },
+  });
+
+  // Y la pantalla tiene que usar esa función, no volver a armar params.
+  assert.match(soloCodigo(PANTALLA), /destinoDeTarea\(tarea, activeClubId\)/,
+    'onTarea volvió a armar los parámetros por su cuenta');
 });

@@ -10,31 +10,34 @@ import {
 } from '../../theme/colors';
 
 /**
- * Fila de 4 estadísticas del club: V · E · D · RATING.
+ * Fila de 4 estadísticas del club: victorias, empates, derrotas y valoración.
  *
  * Colores según la referencia: victoria en verde, empate en blanco,
- * derrota en coral, rating en blanco.
+ * derrota en coral, valoración en blanco.
  *
- * El rating llega ya formateado ('4,6' o 'N.A.', ver clubMeta.ratingLabel).
- * Cuando es 'N.A.' se muestra una estrella junto al texto, para que se lea
- * como "sin valoración todavía" en vez de un 0.0 falso.
+ * LOS RÓTULOS SE ESCRIBEN. Eran «V», «E», «D» y «RATING»: tres abreviaturas y
+ * una palabra en inglés que quien recién llega tiene que interpretar.
+ *
+ * El rating llega ya formateado ('4,6' o el centinela 'N.A.', ver
+ * clubMeta.ratingLabel). Cuando no hay valoraciones se dice así, en español,
+ * con la estrella apagada — nunca un 0,0 falso.
  */
 export default function ClubStatsRow({ record, ratingLabel }) {
-  const sinRating = ratingLabel === 'N.A.';
+  const sinRating = !ratingLabel || ratingLabel === 'N.A.';
 
   return (
     <View style={styles.grid}>
       <Cell
         value={record.v}
-        label="V"
+        label="VICTORIAS"
         valueColor={C.win}
         labelColor={alfa(C.green, 0.75)}
         cellStyle={styles.cellWin}
       />
-      <Cell value={record.e} label="E" />
+      <Cell value={record.e} label="EMPATES" />
       <Cell
         value={record.d}
-        label="D"
+        label="DERROTAS"
         valueColor={C.loss}
         labelColor={alfa(C.red, 0.7)}
         cellStyle={styles.cellLoss}
@@ -42,14 +45,16 @@ export default function ClubStatsRow({ record, ratingLabel }) {
       <View
         style={styles.cell}
         accessibilityLabel={
-          sinRating ? 'Valoración no disponible' : `Valoración ${ratingLabel} de 5`
+          sinRating ? 'Todavía sin valoraciones' : `Valoración ${ratingLabel} de 5`
         }
       >
         <View style={styles.ratingRow}>
           {sinRating && <Star color={C.textMuted} size={13} strokeWidth={2.2} />}
-          <Text style={styles.value}>{ratingLabel}</Text>
+          <Text style={[styles.value, sinRating && styles.valueVacio]} numberOfLines={1}>
+            {sinRating ? 'Sin valorar' : ratingLabel}
+          </Text>
         </View>
-        <Text style={styles.label}>RATING</Text>
+        <Text style={styles.label}>VALORACIÓN</Text>
       </View>
     </View>
   );
@@ -92,11 +97,15 @@ const styles = StyleSheet.create({
     fontFamily: F.extraBold,
     lineHeight: 22,
   },
+  valueVacio: { fontSize: 12, lineHeight: 16, color: C.textMuted },
   label: {
     color: C.textMuted,
-    fontSize: 10,
+    // Con los rótulos escritos enteros («VICTORIAS», «VALORACIÓN») el
+    // espaciado de 1 punto ya no cabe en una casilla de cuatro.
+    fontSize: 9,
     fontFamily: F.bold,
-    letterSpacing: 1,
+    letterSpacing: 0.2,
     marginTop: 4,
+    textAlign: 'center',
   },
 });

@@ -20,11 +20,13 @@ import {
   alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
-import { respondToRequest, cancelRequest } from '../services/clubs';
+import { respondToRequest, cancelRequest, getClubById } from '../services/clubs';
+import { getMatchById } from '../services/matches';
 import { lugarLabel } from '../services/clubMatchRules';
 import { ratingLabel as formatearRating, metaRival, nivelInline } from '../utils/clubMeta';
 import { haceCuanto } from '../utils/tiempoRelativo.js';
-import { etiquetaBadge } from '../utils/clubsHomeTasks.js';
+import { destinoDeTarea, etiquetaBadge } from '../utils/clubsHomeTasks.js';
+import { navigateToNotification } from '../utils/notificationTargets';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 
 import ClubsHeader from '../components/club/ClubsHeader';
@@ -72,6 +74,7 @@ export default function ClubsScreen({ navigation, route }) {
     activeClubId,
     club,
     can,
+    misPermisos,
     tasks,
     reparto,
     badgeCount,
@@ -80,6 +83,7 @@ export default function ClubsScreen({ navigation, route }) {
     nextMatchPlazo,
     activity,
     suggestedRivals,
+    openChallengeReplies,
     invitations,
     sentRequests,
     retry,
@@ -134,6 +138,18 @@ export default function ClubsScreen({ navigation, route }) {
         // rápido («desafios»), así que no se pierde ningún destino.
         partido: ['ClubMatchCalendar', { clubId: activeClubId, clubNombre: club?.nombre }],
         integrantes: ['ClubMembers', { clubId: activeClubId }],
+        // El chat del club sólo se alcanzaba por un icono sin texto dentro de
+        // Integrantes: había que saber que la conversación vive dentro de la
+        // nómina. Es el mismo hilo `club:<id>` de siempre.
+        chat: [
+          'ChatThread',
+          {
+            threadKey: `club:${activeClubId}`,
+            title: club?.nombre,
+            subtitle: 'Chat del club',
+            fotoUrl: club?.foto_url || null,
+          },
+        ],
         permisos: ['PermisosClub', { clubId: activeClubId, club }],
       };
       const destino = destinos[clave];
@@ -177,21 +193,54 @@ export default function ClubsScreen({ navigation, route }) {
     [respondiendo, reload]
   );
 
+  /**
+   * El destino lo resuelve `destinoDeTarea()`, con los identificadores que la
+   * propia tarea trae.
+   *
+   * ANTES ERA UNA TABLA POR NOMBRE DE RUTA, y por eso dos tareas distintas
+   * del mismo destino se abrían con los mismos datos: la solicitud de cambio
+   * y la nómina viajaban con `nextMatch.id` aunque la solicitud fuera de otro
+   * encuentro, y el desafío y la propuesta llegaban sin identificador a un
+   * tablero que no las contiene. La regla se prueba en `clubsHomeTasks`.
+   */
   const onTarea = useCallback(
     (tarea) => {
-      // `target` lo decide `clubsHomeTasks.js` y son nombres de ruta reales.
-      const params = {
-        ClubChallenges: { clubId: activeClubId },
-        ClubMatchChange: nextMatch ? { matchId: nextMatch.id } : {},
-        ClubMatchRoster: nextMatch ? { matchId: nextMatch.id } : {},
-        ClubMembers: { clubId: activeClubId },
-        // El club de LA TAREA, no el activo: una invitación es de otro club,
-        // y en el estado sin club activo `activeClubId` es null.
-        ClubDetail: { clubId: tarea.clubId || activeClubId },
-      };
-      irA(tarea.target, params[tarea.target] || {});
+      const destino = destinoDeTarea(tarea, activeClubId);
+      if (destino?.screen) irA(destino.screen, destino.params || {});
     },
-    [activeClubId, nextMatch, irA]
+    [activeClubId, irA]
+  );
+
+  /**
+   * Tocar una fila de «Actividad reciente» abre SU asunto.
+   *
+   * Antes la pantalla ignoraba el aviso pulsado y abría la bandeja filtrada
+   * por el club —lo mismo que «Ver toda»—, así que tocar una noticia
+   * concreta obligaba a buscarla otra vez en una lista.
+   *
+   * El destino lo resuelve `navigateToNotification`, el mismo punto de
+   * verdad que usan la bandeja de Avisos y el toque sobre un push: un
+   * destino nuevo o corregido vale acá sin tocar esta pantalla. Cuando el
+   * aviso no trae el dato necesario, o el recurso ya no existe, se cae a la
+   * bandeja filtrada, que es lo que se hacía siempre.
+   */
+  const verActividad = useCallback(
+    (aviso) => {
+      const alListado = () =>
+        irA('Notifications', { filter: 'clubes', clubId: activeClubId });
+      if (!aviso) {
+        alListado();
+        return;
+      }
+      navigateToNotification(aviso, {
+        navigate: irA,
+        onMissing: alListado,
+        onUnresolved: alListado,
+        getMatchById,
+        getClubById,
+      });
+    },
+    [activeClubId, irA]
   );
 
   const cabecera = (
@@ -235,6 +284,7 @@ export default function ClubsScreen({ navigation, route }) {
           cambiandoClub,
           club,
           can,
+          misPermisos,
           tasks,
           reparto,
           badgeCount,
@@ -243,11 +293,13 @@ export default function ClubsScreen({ navigation, route }) {
           nextMatchPlazo,
           activity,
           suggestedRivals,
+          openChallengeReplies,
           tema,
           setActiveClub,
           onAccionRapida,
           onTarea,
           onAccionTarea,
+          verActividad,
           respondiendo,
           irA,
         }}
@@ -339,6 +391,7 @@ function Portada({
   cambiandoClub,
   club,
   can,
+  misPermisos,
   tasks,
   reparto,
   badgeCount,
@@ -347,11 +400,13 @@ function Portada({
   nextMatchPlazo,
   activity,
   suggestedRivals,
+  openChallengeReplies,
   tema,
   setActiveClub,
   onAccionRapida,
   onTarea,
   onAccionTarea,
+  verActividad,
   respondiendo,
   irA,
 }) {
@@ -464,7 +519,13 @@ function Portada({
         <QuickActionGrid
           tema={tema}
           can={can}
-          badges={{ desafios: contarPorTipo(tasks, 'desafio') }}
+          misPermisos={misPermisos}
+          // EL BADGE CUENTA LO QUE HAY EN EL DESTINO. Contaba los desafíos
+          // DIRECTOS recibidos, que ya tienen su tarjeta en «Pendiente para
+          // ti» y que desde el tablero abierto no están en la pantalla que
+          // este tile abre: prometía trabajo y llevaba a otro sitio. Lo que sí
+          // espera decisión ahí son las respuestas a las publicaciones.
+          badges={{ desafios: openChallengeReplies }}
           onPress={onAccionRapida}
         />
       </View>
@@ -489,7 +550,7 @@ function Portada({
             items={activity}
             tema={tema}
             onVerToda={() => irA('Notifications', { filter: 'clubes', clubId: activeClubId })}
-            onPressItem={() => irA('Notifications', { filter: 'clubes', clubId: activeClubId })}
+            onPressItem={verActividad}
           />
         </View>
       ) : null}
@@ -733,16 +794,6 @@ function subtituloDe({ membership, clubs, club, sentRequests, invitations }) {
   }
   if (membership !== 'member' || !club) return 'Aún sin club';
   return (clubs || []).length > 1 ? `Club activo · ${club.nombre}` : club.nombre;
-}
-
-/**
- * Cuántas tareas accionables hay de un tipo, para el badge de un tile.
- *
- * Esto sí se puede contar acá: lee `type` y `status`, que son campos del
- * contrato, no el texto que se le muestra a alguien.
- */
-function contarPorTipo(tasks, tipo) {
-  return (tasks || []).filter((t) => t.type === tipo && t.status === 'abierta').length;
 }
 
 function fechaLegible(iso) {

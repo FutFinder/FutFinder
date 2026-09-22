@@ -133,6 +133,59 @@ export async function listMyOpenChallenges(clubId) {
 }
 
 /**
+ * Cuántas respuestas esperan decisión en las publicaciones de este club.
+ *
+ * ES EL NÚMERO DEL BADGE DEL ACCESO RÁPIDO «DESAFÍOS», y existe porque ese
+ * badge contaba otra cosa: los desafíos DIRECTOS recibidos, que desde el
+ * tablero abierto (migración 112) ya no viven en la pantalla que el tile
+ * abre. El badge prometía trabajo pendiente y llevaba a un sitio donde no
+ * estaba — el mismo defecto de los hallazgos 1 y 2 del informe del 22-09.
+ *
+ * SÓLO `pendiente`, Y SÓLO DE PUBLICACIONES `abierto`. `respuestasCount` de
+ * `listMyOpenChallenges()` cuenta todo lo que no se retiró, aceptadas y
+ * rechazadas incluidas: sirve para rotular «Respuestas (3)» en la tarjeta,
+ * pero como badge diría que hay tres cosas que decidir cuando ya se
+ * decidieron las tres. Y una respuesta a una publicación cerrada o expirada
+ * tampoco se puede aceptar.
+ *
+ * DOS CONSULTAS PLANAS, SIN EMBED. Un `!inner` sobre `club_open_challenges`
+ * ahorraría un viaje, pero un embed mal nombrado no degrada: PostgREST
+ * rechaza la consulta entera con 400 y el badge se cae junto con la portada
+ * — el mismo argumento de `nominaQuery.js`. La RLS ya deja al club dueño de
+ * la publicación leer todas sus respuestas.
+ *
+ * Devuelve 0 ante cualquier problema, incluida la falta de la migración 112:
+ * un badge que no se dibuja es mejor que una portada que no carga.
+ */
+export async function countRespuestasPendientes(clubId) {
+  if (!isSupabaseConfigured || !clubId) return { data: 0, error: null };
+
+  const { data: publicaciones, error: errPubs } = await supabase
+    .from('club_open_challenges')
+    .select('id')
+    .eq('club_id', clubId)
+    .eq('estado', 'abierto');
+  if (errPubs) {
+    if (esFaltaDeEsquema(errPubs)) return { data: 0, error: null };
+    console.error('[FutFinder] countRespuestasPendientes(publicaciones):', errPubs);
+    return { data: 0, error: errPubs };
+  }
+  if (!publicaciones || publicaciones.length === 0) return { data: 0, error: null };
+
+  const { count, error } = await supabase
+    .from('club_open_challenge_responses')
+    .select('id', { count: 'exact', head: true })
+    .in('open_challenge_id', publicaciones.map((p) => p.id))
+    .eq('estado', 'pendiente');
+  if (error) {
+    if (esFaltaDeEsquema(error)) return { data: 0, error: null };
+    console.error('[FutFinder] countRespuestasPendientes:', error);
+    return { data: 0, error };
+  }
+  return { data: count || 0, error: null };
+}
+
+/**
  * Publicaciones abiertas de OTROS clubes, enriquecidas con la distancia real
  * (por comuna, igual que «Buscar rivales») y el historial real V/E/D del
  * club — nunca con nivel ni valoración, que no existen en la base.

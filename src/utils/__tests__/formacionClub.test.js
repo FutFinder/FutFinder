@@ -12,6 +12,11 @@
  *     suficiente, y prioriza el calce exacto sobre cualquiera.
  *   · `zoneLabel` recalcula el puesto según dónde se soltó, para que mover
  *     un mediocampista al fondo lo vuelva DFC de verdad, no un MC mal puesto.
+ *   · `resumenAutocompletar` cuenta lo que PASÓ: «Alineación completada»
+ *     salía con un jugador en siete puestos, y la cancha llena y la banca
+ *     vacía compartían el mismo texto.
+ *   · `conservarAsignaciones` no tira el tablero al cambiar de formación.
+ *   · `hayCambiosSinGuardar` es lo que decide si salir avisa.
  *
  * Se ejecutan con: npm test
  */
@@ -25,6 +30,9 @@ const {
   layoutSlots,
   fitsForMember,
   autocompletarAsignaciones,
+  conservarAsignaciones,
+  hayCambiosSinGuardar,
+  resumenAutocompletar,
   zoneLabel,
 } = require('../formacionClub.js');
 
@@ -172,4 +180,118 @@ test('zoneLabel: mover un mediocampista (MC) hacia el fondo lo vuelve DFC', () =
 test('zoneLabel: el centro de la cancha (ni izquierda ni derecha) no lleva lado', () => {
   assert.equal(zoneLabel(50, 55), 'MCD');
   assert.equal(zoneLabel(50, 25), 'MP');
+});
+
+// ── El mensaje de «Autocompletar» ───────────────────────────────────
+
+test('un jugador en siete puestos NO es una alineación completada', () => {
+  // El fallo reproducido en la web: contador 1/7 y el aviso diciendo que
+  // estaba completa.
+  const r = resumenAutocompletar({ puestosLibres: 7, jugadoresEnBanca: 1, ubicados: 1 });
+  assert.equal(r.ubicados, 1);
+  assert.equal(r.faltan, 6);
+  assert.equal(r.mensaje, '1 jugador ubicado; faltan 6 puestos');
+});
+
+test('cuando de verdad se llena, lo dice', () => {
+  const r = resumenAutocompletar({ puestosLibres: 7, jugadoresEnBanca: 9, ubicados: 7 });
+  assert.equal(r.faltan, 0);
+  assert.equal(r.mensaje, 'Alineación completada');
+});
+
+test('la cancha llena y la banca vacía no son la misma frase', () => {
+  assert.equal(
+    resumenAutocompletar({ puestosLibres: 0, jugadoresEnBanca: 4, ubicados: 0 }).mensaje,
+    'Todos los puestos están ocupados'
+  );
+  assert.equal(
+    resumenAutocompletar({ puestosLibres: 3, jugadoresEnBanca: 0, ubicados: 0 }).mensaje,
+    'No quedan jugadores en la banca'
+  );
+});
+
+test('el singular del hueco se respeta', () => {
+  assert.equal(
+    resumenAutocompletar({ puestosLibres: 2, jugadoresEnBanca: 1, ubicados: 1 }).mensaje,
+    '1 jugador ubicado; falta 1 puesto'
+  );
+});
+
+// ── Cambiar de formación sin perder el trabajo ──────────────────────
+
+test('al cambiar de formación, cada jugador conserva su puesto', () => {
+  const antes = layoutSlots('2-3-1');
+  const asignaciones = Object.fromEntries(antes.map((s, i) => [s.key, `m${i}`]));
+  const despues = layoutSlots('3-2-1');
+
+  const nuevas = conservarAsignaciones(asignaciones, antes, despues);
+
+  // El arquero siempre sigue siendo el arquero.
+  assert.equal(nuevas.gk, asignaciones.gk);
+  // Y nadie aparece dos veces en el tablero nuevo.
+  const ids = Object.values(nuevas);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test('quien se queda sin puesto equivalente vuelve a la banca, no desaparece', () => {
+  // 3-3 tiene tres DFC; 1-4-1 tiene uno solo: dos defensas sobran.
+  const antes = layoutSlots('3-3');
+  const asignaciones = Object.fromEntries(antes.map((s, i) => [s.key, `m${i}`]));
+  const despues = layoutSlots('1-4-1');
+
+  const nuevas = conservarAsignaciones(asignaciones, antes, despues);
+  const conservados = Object.values(nuevas);
+
+  assert.ok(conservados.length < Object.keys(asignaciones).length);
+  // Los que quedan son de los que había: no se inventa a nadie.
+  conservados.forEach((id) => assert.ok(Object.values(asignaciones).includes(id)));
+});
+
+test('ir y volver entre dos formaciones no baraja el equipo', () => {
+  const a = layoutSlots('2-3-1');
+  const b = layoutSlots('2-3-1');
+  const asignaciones = Object.fromEntries(a.map((s, i) => [s.key, `m${i}`]));
+  assert.deepEqual(conservarAsignaciones(asignaciones, a, b), asignaciones);
+});
+
+// ── Cambios sin guardar ─────────────────────────────────────────────
+
+const GUARDADA = {
+  modo: 7,
+  formacion: '2-3-1',
+  personalizado: false,
+  asignaciones: { gk: 'm1', l0p0: 'm2' },
+  custom: {},
+};
+
+test('sin tocar nada, salir no molesta', () => {
+  assert.equal(hayCambiosSinGuardar({ ...GUARDADA }, GUARDADA), false);
+});
+
+test('ubicar a alguien más cuenta como cambio', () => {
+  const borrador = { ...GUARDADA, asignaciones: { ...GUARDADA.asignaciones, l0p1: 'm3' } };
+  assert.equal(hayCambiosSinGuardar(borrador, GUARDADA), true);
+});
+
+test('cambiar de formación o de modalidad cuenta como cambio', () => {
+  assert.equal(hayCambiosSinGuardar({ ...GUARDADA, formacion: '3-2-1' }, GUARDADA), true);
+  assert.equal(hayCambiosSinGuardar({ ...GUARDADA, modo: 11 }, GUARDADA), true);
+});
+
+test('un decimal de diferencia en un puesto arrastrado no es trabajo sin guardar', () => {
+  // El ida y vuelta por JSON puede devolver 41.99999 donde había 42.
+  const guardada = { ...GUARDADA, personalizado: true, custom: { gk: { left: 42, top: 90, label: 'POR' } } };
+  const borrador = { ...guardada, custom: { gk: { left: 41.99999, top: 90.0001, label: 'POR' } } };
+  assert.equal(hayCambiosSinGuardar(borrador, guardada), false);
+});
+
+test('sin alineación guardada, mirar otra formación no es trabajo que perder', () => {
+  assert.equal(
+    hayCambiosSinGuardar({ modo: 7, formacion: '3-2-1', asignaciones: {}, custom: {} }, null),
+    false
+  );
+  assert.equal(
+    hayCambiosSinGuardar({ modo: 7, formacion: '3-2-1', asignaciones: { gk: 'm1' }, custom: {} }, null),
+    true
+  );
 });

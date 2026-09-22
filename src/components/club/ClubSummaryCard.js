@@ -12,9 +12,14 @@ import VerifiedBadge from './VerifiedBadge';
  *
  * Tres bandas: quién es el club, cómo le va, y el paso al detalle completo.
  *
- * «N.A.» ES EL CASO NORMAL. Un club recién creado no tiene partidos jugados
- * ni valoración, y esa es la mayoría de los clubes durante sus primeras
- * semanas. Un 0 en su lugar diría que jugó y perdió.
+ * SIN PARTIDOS NO HAY CUATRO CASILLAS VACÍAS. Un club recién creado no tiene
+ * partidos jugados ni valoración, y esa es la mayoría de los clubes durante
+ * sus primeras semanas. Un 0 en su lugar diría que jugó y perdió, y cuatro
+ * «N.A.» en fila parecen un error de la app: en vez de eso se dice en
+ * español, una sola vez, que todavía no hay nada que contar.
+ *
+ * Y LOS RÓTULOS SE ESCRIBEN ENTEROS. «V», «E», «D» y «RATING» obligan a
+ * interpretar tres abreviaturas y una palabra en inglés a quien recién llega.
  *
  * Y HAY QUE MIRAR `pj`, NO `v`. `club_estadisticas()` devuelve siempre un
  * objeto numérico —`ESTADISTICAS_VACIAS` es `{ pj: 0, v: 0, ... }` y es lo
@@ -54,6 +59,10 @@ export default function ClubSummaryCard({
   const esPremium = club.plan === 'premium';
   // Sin partidos jugados no hay récord que mostrar, ni siquiera un cero.
   const hayRecord = Number.isFinite(stats?.pj) && stats.pj > 0;
+  // `ratingLabel` llega de `clubMeta.ratingLabel()`, que marca «todavía no hay
+  // valoraciones» con el centinela 'N.A.'. Acá se traduce a español; el
+  // centinela no se enseña.
+  const sinValoracion = !ratingLabel || ratingLabel === 'N.A.';
 
   return (
     <View style={styles.tarjeta}>
@@ -93,12 +102,23 @@ export default function ClubSummaryCard({
         </View>
       </View>
 
-      <View style={styles.stats}>
-        <StatTile valor={hayRecord ? stats.v : null} rotulo="V" color={escala.main} />
-        <StatTile valor={hayRecord ? stats.e : null} rotulo="E" />
-        <StatTile valor={hayRecord ? stats.d : null} rotulo="D" color={clubTonos.danger.fg} />
-        <StatTile texto={ratingLabel} rotulo="RATING" />
-      </View>
+      {hayRecord ? (
+        <View style={styles.stats}>
+          <StatTile valor={stats.v} rotulo="Victorias" color={escala.main} />
+          <StatTile valor={stats.e} rotulo="Empates" />
+          <StatTile valor={stats.d} rotulo="Derrotas" color={clubTonos.danger.fg} />
+          <StatTile
+            texto={sinValoracion ? 'Sin valorar' : ratingLabel}
+            vacio={sinValoracion}
+            rotulo="Valoración"
+          />
+        </View>
+      ) : (
+        <Text style={styles.sinPartidos}>
+          Este club todavía no juega partidos.
+          {sinValoracion ? '' : ` Valoración ${ratingLabel}.`}
+        </Text>
+      )}
 
       <Pressable
         onPress={onVerClub}
@@ -122,10 +142,14 @@ function Chip({ texto, color, Icono }) {
   );
 }
 
-/** Sin dato es «N.A.», no 0: un club sin partidos no perdió ninguno. */
-function StatTile({ valor, texto, rotulo, color }) {
-  const contenido = texto ?? (Number.isFinite(valor) ? String(valor) : 'N.A.');
-  const sinDato = contenido === 'N.A.';
+/**
+ * Una casilla del récord. `vacio` la apaga cuando lo que muestra es la
+ * explicación de un dato ausente y no el dato: un texto que dice «Sin
+ * valorar» no puede pintarse como si fuera una cifra.
+ */
+function StatTile({ valor, texto, vacio = false, rotulo, color }) {
+  const contenido = texto ?? (Number.isFinite(valor) ? String(valor) : '—');
+  const sinDato = vacio || contenido === '—';
 
   return (
     <View style={styles.statTile}>
@@ -178,11 +202,19 @@ const styles = StyleSheet.create({
     backgroundColor: alfa(C.tinta, 0.045),
   },
   statValor: { fontSize: 17, fontFamily: F.extraBold, color: '#FFFFFF' },
-  statVacio: { fontSize: 13, color: C.textFaint },
+  statVacio: { fontSize: 11, fontFamily: F.bold, color: C.textFaint },
   statRotulo: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: F.bold,
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
+    color: C.textGhost,
+    textAlign: 'center',
+  },
+  sinPartidos: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    fontSize: 12,
+    lineHeight: 17,
     color: C.textGhost,
   },
   verClub: {

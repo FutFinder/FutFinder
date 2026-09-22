@@ -44,10 +44,13 @@ export default function ClubHeroCard({
           <BannerBackdrop tema={tema} />
         )}
         <View style={styles.badgeRow}>
+          {/* Un chip por dato REAL. `modalidadBadges` y `nivelBadge` devuelven
+              vacío cuando el club no declaró nada, y antes ese vacío salía
+              igual escrito «FÚTBOL N.A.» y «NIVEL N.A.». */}
           {badges.map((b) => (
             <TagBadge key={b} label={b} />
           ))}
-          <TagBadge label={nivelLabel} />
+          {nivelLabel ? <TagBadge label={nivelLabel} /> : null}
         </View>
       </View>
 

@@ -118,7 +118,7 @@ export default function ClubInviteScreen({ navigation, route }) {
         <SearchIcon color={C.textSecondary} size={18} strokeWidth={2} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar jugadores por username..."
+          placeholder="Buscar por nombre de usuario"
           placeholderTextColor={C.textSecondary}
           value={query}
           onChangeText={onSearch}
@@ -189,7 +189,7 @@ export default function ClubInviteScreen({ navigation, route }) {
                 {query.trim() ? 'Sin resultados' : 'Busca jugadores'}
               </Text>
               <Text style={styles.emptyText}>
-                Escribe el username del jugador que quieres sumar a tu club.
+                Escribe el nombre de usuario del jugador que quieres sumar a tu club.
               </Text>
             </View>
           }

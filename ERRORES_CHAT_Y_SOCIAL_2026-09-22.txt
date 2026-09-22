@@ -1,0 +1,274 @@
+FUTFINDER — REVISIÓN DE CHAT Y SOCIAL (AMIGOS, BLOQUEOS, PERFIL PÚBLICO)
+Fecha: 22-09-2026
+Base: ab11da5, árbol limpio.
+
+OBJETIVO Y ALCANCE
+Buscar errores de comportamiento en el chat (bandeja, hilo, detalles) y en lo
+social (amigos, solicitudes, bloqueos, acciones del perfil ajeno). Se leyó el
+código de pantallas, servicios y reglas puras, y se contrastó contra las
+migraciones versionadas y contra el esquema DESPLEGADO (consultas de solo
+lectura: definiciones de funciones, restricciones y conteos agregados).
+No se escribió nada en la base. No se envió ninguna solicitud, mensaje ni
+bloqueo.
+
+RESULTADO
+10 hallazgos: 3 altos, 4 medios y 3 bajos. Tres son del servidor o de una
+función de la base; el resto, del cliente. Dos de los altos están LATENTES
+hoy (los datos de producción todavía no llegan al estado que los dispara),
+pero son alcanzables por el flujo normal.
+
+ESTADO DE LOS DATOS AL REVISAR (producción, solo lectura)
+  friendships: 8 'accepted', 7 'pending', 0 'rejected', 0 'blocked'
+  blocked_users: 0 filas
+  club_challenges: 26
+  chatClubs delegado: 0 roles, 0 personas
+  answerChallenge delegado: 0 roles
+
+
+1. ALTA — «AGREGAR AMIGO» DICE QUE ENVIÓ LA SOLICITUD Y NO ENVÍA NADA
+Dónde: perfil de otro jugador > Agregar amigo, después de un rechazo previo
+o cuando la otra persona me bloqueó.
+Actual: `sendFriendRequest()` llama a `getFriendshipWith()`, que devuelve la
+fila SEA CUAL SEA su estado, y si existe algo devuelve
+`{ data: existing, error: null, existed: true }` sin insertar. La interfaz
+mapea 'rejected' y 'blocked' a 'none' (PlayerPublicActions:64), así que el
+botón «Agregar amigo» sigue ofreciéndose; `runFriendAction` sólo mira
+`error`, no ve ninguno, y muestra el banner de éxito «Solicitud enviada —
+@x decidirá si te acepta».
+Efecto: el jugador cree que mandó la solicitud. No se mandó, y puede
+repetirlo indefinidamente. Además tapa el mensaje correcto del servidor:
+`friendships_insert` (migración 51) ya rechaza con un motivo real cuando hay
+un bloqueo, y ese motivo nunca llega a la pantalla.
+Comprobación: lectura de `services/friends.js`, `PlayerPublicActions.js` y
+`ProfileScreen.runFriendAction`; restricciones de `friendships` leídas del
+esquema desplegado. Hoy hay 0 filas 'rejected', así que todavía no le pasó a
+nadie — el primer rechazo lo activa.
+Cambiar: que `sendFriendRequest` sólo trate como «ya existe» los estados
+'pending' y 'accepted'. Con 'rejected' debe reintentar de verdad; el
+constraint único es DIRECCIONAL (`unique (requester_id, addressee_id)`) y
+sólo el addressee puede hacer UPDATE (`friendships_update_addressee`), así
+que el camino disponible es borrar la fila propia y volver a insertar —
+ambos lados pueden borrar (`friendships_delete`). Con 'blocked' no se borra
+nada: hay que dejar que el INSERT falle y mostrar el motivo del servidor.
+Validar: A rechaza a B; B vuelve a enviar y la solicitud llega. A bloquea a
+B; B ve un mensaje real, no un éxito falso.
+Referencias:
+  src/services/friends.js:17-51 (sendFriendRequest), 119-141 (getFriendshipWith)
+  src/components/player/PlayerPublicActions.js:59-65
+  src/screens/ProfileScreen.js:269-288
+  supabase/migrations/06_friendships_y_chat_hides.sql:19,38-47
+  supabase/migrations/51_usuarios_bloqueados.sql:66-75
+
+2. ALTA — EL HILO DEL DESAFÍO NO APARECE EN LA BANDEJA DE QUIEN SÍ PUEDE LEERLO
+Dónde: Chats > filtro Clubes, con el permiso `chatClubs` delegado.
+Actual: la RPC `get_my_threads()` arma `my_challenges` con
+`join lateral (... where m.user_id = v_me and m.rol = 'admin' ...)`. Pero
+quién puede LEER ese hilo lo decide `chat_puede_ver_desafio()` (migración
+119), que pregunta por el permiso `chatClubs`, no por el rol — y
+`tiene_permiso_de_club()` devuelve true para un admin, de modo que el
+permiso ya cubre los dos casos.
+Efecto: un capitán o jugador con `chatClubs` concedido recibe el aviso,
+puede abrir el hilo desde Avisos y escribir en él, pero la conversación
+nunca sale en su bandeja: no tiene forma de volver a encontrarla.
+Comprobación: definición de `get_my_threads` leída del esquema DESPLEGADO y
+`chat_puede_ver_desafio` de la migración 119. El mismo concepto ya está
+resuelto BIEN en el cliente: `getThreadParticipants()` incluye a los
+delegados y lo documenta. Hoy hay 0 delegaciones de `chatClubs`, así que el
+fallo está latente: se activa el día que un administrador lo conceda.
+Cambiar: en la RPC, reemplazar `m.rol = 'admin'` por
+`public.tiene_permiso_de_club(m.club_id, v_me, 'chatClubs')`. Es una
+migración nueva; no cambia nada para los administradores.
+Validar: conceder `chatClubs` a un jugador y comprobar que el hilo aparece
+en su bandeja y desaparece al quitarle el permiso.
+Referencias:
+  supabase/migrations/40_bandeja_chat_rpc.sql (bloque `my_challenges`)
+  supabase/migrations/119_permisos_del_club.sql:844-862
+  src/services/messages.js:888+ (getThreadParticipants, ya correcto)
+
+3. ALTA — UN FALLO DE RED EN AMIGOS SE VE IGUAL QUE «NO TIENES AMIGOS»
+Dónde: Amigos > las tres pestañas.
+Actual: `listMyFriends()`, `listIncomingRequests()` y
+`listOutgoingRequests()` devuelven un arreglo pelado y se tragan el error
+(`if (error || !data) return []`). `FriendsScreen.load()` los envuelve en un
+try/catch, pero como nunca lanzan, su estado `error` es INALCANZABLE: la
+pantalla dibuja siempre el vacío feliz.
+Efecto: con la red caída o la sesión vencida, la pantalla afirma que no
+tienes amigos ni solicitudes. Es exactamente lo contrario de lo que hace la
+bandeja de chat, que sí distingue error de vacío (`InboxError`).
+Comprobación: por código; el `catch` de `load()` no tiene forma de
+ejecutarse con los servicios actuales.
+Cambiar: devolver `{ data, error }` en las tres, como el resto de los
+servicios del repo, y que `FriendsScreen` pinte error y «Reintentar».
+Referencias:
+  src/services/friends.js:143-190, 192-232, 234-268
+  src/screens/FriendsScreen.js:59-76
+
+4. MEDIA — ACEPTAR UNA SOLICITUD BORRA «ABRIR CHAT» ANTES DE PODER TOCARLO
+Dónde: Amigos > Recibidas > Aceptar.
+Actual: `respond()` marca la fila en `resolved` —que es lo que dibuja
+«Ahora son amigos · Abrir chat»— y acto seguido llama a `load()`. La recarga
+vuelve a pedir las solicitudes PENDIENTES, y la recién aceptada ya no lo
+está, así que desaparece de `incoming` y con ella la tarjeta entera.
+Efecto: el atajo al chat existe unos cientos de milisegundos. El estado
+«rechazada» que la pantalla dice conservar tampoco sobrevive. La lista salta
+al vacío «Sin solicitudes pendientes» justo después de aceptar.
+Cambiar: conservar la fila resuelta en pantalla hasta que el usuario salga
+de la pestaña (no rehidratarla desde el servidor), o llevar el atajo al
+banner de confirmación.
+Referencias:
+  src/screens/FriendsScreen.js:96-113, 138-205
+
+5. MEDIA — DESBLOQUEAR FALLA EN SILENCIO
+Dónde: Ajustes > Bloqueados > Desbloquear.
+Actual: `handleUnblock` hace `const { error: err } = await unblockUser(...)`
+y si hay error simplemente `return`. No hay banner, ni aviso, ni reintento.
+Efecto: la fila se queda, el botón deja de girar y no pasa nada. El caso más
+probable —la migración 51 no aplicada— tiene un mensaje escrito en el
+servicio («El bloqueo de usuarios no está disponible todavía») que nadie
+llega a leer.
+Cambiar: mostrar el error con el mismo patrón que ya usa la propia pantalla
+para el fallo de carga.
+Referencia: src/screens/BlockedUsersScreen.js:76-81
+
+6. MEDIA — LA BANDEJA ETIQUETA «AMIGOS» UNA CONVERSACIÓN CON QUIEN YA NO LO ES
+Dónde: Chats > cualquier DM con una amistad eliminada, rechazada o bloqueada.
+Actual: el bloque de DMs de `get_my_threads()` se basa sólo en que exista al
+menos un mensaje, sin mirar `friendships`; y `mapThreadRow()` escribe
+`subtitle: 'Amigos'` fijo para todo DM.
+Efecto: la tarjeta dice «Amigos» de alguien que ya no lo es. Al abrirla el
+hilo sí es honesto («Solo lectura · Tienen que ser amigos para escribirse», o
+«Conversación no disponible» si hay bloqueo), así que la bandeja contradice
+al hilo. Con un bloqueo además se sigue viendo la vista previa del último
+mensaje de esa persona en la lista, aunque el hilo ya no deje leerla.
+Cambiar: que el payload del DM traiga el estado de la amistad y que el
+subtítulo lo refleje; decidir aparte si un DM bloqueado debe seguir
+listándose con vista previa.
+Referencias:
+  supabase/migrations/40_bandeja_chat_rpc.sql:185-200
+  src/utils/chatMeta.js:198-208 (rama dm de mapThreadRow)
+  src/services/messages.js:555-597 (getThreadAccess, que sí acierta)
+
+7. MEDIA — AL QUE BLOQUEÓ NO SE LE DICE QUE FUE ÉL QUIEN BLOQUEÓ
+Dónde: chat con una persona bloqueada.
+Actual: `getThreadAccess` devuelve el mismo texto para los dos lados:
+«Conversación no disponible», sin mensaje.
+Efecto: para la persona bloqueada está bien —no debe poder deducir el
+bloqueo— pero al que bloqueó le falta el dato que sí puede tener, y que
+además es accionable («Bloqueaste a @x · Desbloquear»). `isBlockedByMe()` ya
+existe y responde justo esa pregunta.
+Cambiar: distinguir los dos casos usando `isBlockedByMe()` y ofrecer
+desbloquear desde ahí.
+Referencias:
+  src/services/messages.js:578-587
+  src/services/blockedUsers.js:71-92
+
+8. BAJA — ACEPTAR O RECHAZAR NO COMPRUEBA QUE LA SOLICITUD SIGA PENDIENTE
+Actual: `acceptFriendRequest`/`rejectFriendRequest` hacen UPDATE por `id` sin
+`.eq('status', 'pending')`.
+Efecto: una tarjeta vieja (dos dispositivos, un Realtime que llegó tarde)
+puede devolver a 'accepted' una amistad que ya se había rechazado, o al
+revés. La RLS impide que lo haga alguien ajeno, pero no impide revivir un
+estado ya resuelto.
+Cambiar: añadir la condición de estado a las dos consultas.
+Referencia: src/services/friends.js:56-88
+
+9. BAJA — UN BOTÓN SIN NOMBRE ACCESIBLE (corregido el alcance)
+Observado al revisar: el «Volver» de `BlockedUsersScreen` no tiene
+`accessibilityRole` ni `accessibilityLabel`.
+CORRECCIÓN DE ESTE INFORME: la versión original decía además que los cuatro
+«Volver» de `ChatThreadScreen` estaban sin etiquetar. Era un falso positivo
+del método: se contaron las llamadas a `navigation.goBack()` en la pantalla,
+pero esas son callbacks que se pasan a `ChatThreadHeader` y a `ThreadDenied`,
+y los dos componentes SÍ etiquetan su botón («Volver», con rol de botón).
+Queda un solo botón afectado, el de Bloqueados.
+Referencia: src/screens/BlockedUsersScreen.js:86-92
+
+10. BAJA — LA NOTA DE MEMORIA DEL CHAT CONTRADICE AL REPOSITORIO
+Actual: `docs/memoria/funcionalidades/chat.md` dice «No hay ESLint en el
+proyecto, así que `no-undef` no cubre nada» y recomienda correr
+`npx eslint --no-config-lookup` a mano.
+Efecto: hoy el repositorio TIENE ESLint y `CLAUDE.md` exige cero errores en
+`npm run lint`. La nota manda a hacer un trabajo que ya está resuelto.
+Cambiar: corregir sólo esa nota (política de memoria: una nota que
+contradice el código vigente se corrige).
+Referencia: docs/memoria/funcionalidades/chat.md, sección «Canales Realtime»
+
+MENORES, NO NUMERADOS
+- `subscribeToFriendships` no pasa por `createSharedChannel`: abre un canal
+  nuevo por suscriptor con un contador de módulo. Funciona y no choca, pero
+  la propia nota del chat dice que toda suscripción a un topic fijo debe ir
+  por ahí. Es divergencia, no fallo.
+- `ChatScreen` sólo refresca su reloj (`now`) al recargar, así que los
+  tiempos relativos de las tarjetas envejecen mientras la pestaña está
+  abierta. Se corrige solo al volver a la pestaña.
+- Cualquier cambio en `friendships` recarga la bandeja de chat entera; es una
+  consulta de más por cada solicitud ajena que se mueva.
+
+LO QUE SE REVISÓ Y ESTÁ BIEN
+- Largo máximo del mensaje: cliente y base coinciden en 1000, con el mismo
+  recorte de espacios (`messages_content_check`, leído del esquema desplegado).
+- Las sondas de esquema (migraciones 32/39/42) están memorizadas por módulo:
+  no cuestan consultas por envío.
+- El bloqueo NO se puede evadir borrando la fila de amistad:
+  `friendships_insert` exige `not is_blocked_pair(...)` desde la 51, y
+  `desbloquear_usuario()` limpia la fila 'blocked' en vez de dejarla colgada.
+- `getThreadParticipants()` para el hilo de desafío ya resuelve por permiso y
+  no por rol — es el contraste que hace evidente el hallazgo 2.
+- `getThreadAccess` distingue correctamente self / bloqueado / no amigos /
+  desafío cerrado, y el hilo de desafío queda en solo lectura en vez de
+  desaparecer.
+- Paginación, agrupación de burbujas y decisión de scroll (`chatMeta.js`)
+  están escritas como funciones puras y tienen pruebas.
+
+LÍMITES DE ESTA REVISIÓN
+- No se recorrió la app con sesión autenticada: todo es lectura de código,
+  de las migraciones versionadas y del esquema desplegado.
+- No se probó Realtime en vivo ni el comportamiento con dos sesiones.
+- No se revisaron a fondo `EditProfileScreen` ni la galería de fotos: quedan
+  fuera del «chat y amigos» que se pidió.
+
+ORDEN SUGERIDO
+Primero 1 y 3 (mentir sobre lo que pasó y confundir un fallo con un vacío),
+después 5 y 4 (silencios y atajos que se evaporan), luego 2 (migración, sin
+urgencia mientras no se delegue `chatClubs`), y por último 6, 7, 8, 9 y 10.
+
+
+ESTADO: TODO CORREGIDO (22-09-2026)
+Los diez hallazgos quedaron resueltos en la misma sesión que los encontró.
+
+  1  → `sendFriendRequest` sólo corta ante 'pending'/'accepted'; un rechazo
+        se borra y se reintenta, un bloqueo devuelve el mensaje neutro.
+  2  → migración 131: `my_challenges` mira `tiene_permiso_de_club(...,
+        'chatClubs')` en vez del rol. APLICADA en producción.
+  3  → las tres listas devuelven `{ data, error }` y `FriendsScreen` pinta
+        el error con reintento.
+  4  → la solicitud respondida se conserva en pantalla hasta salir.
+  5  → el fallo al desbloquear se avisa con `notify`.
+  6  → migración 131: el payload del DM trae `friend_status`, y
+        `mapThreadRow` lo traduce con los textos de `getThreadAccess`.
+  7  → el hilo distingue «Bloqueaste a esta persona» de «Conversación no
+        disponible» con `isBlockedByMe()`.
+  8  → aceptar y rechazar exigen `status = 'pending'`.
+  9  → etiquetado el «Volver» de Bloqueados (y corregido el alcance: los de
+        `ChatThreadScreen` ya estaban bien).
+  10 → corregida la nota de memoria del chat.
+
+CÓMO SE VERIFICÓ LA MIGRACIÓN 131
+  · Dry-run completo contra producción dentro de `begin; … rollback;`, con
+    las dos ediciones aplicadas sobre la función REALMENTE desplegada y un
+    arnés que exige: 0 conversaciones perdidas, 0 inventadas, `friend_status`
+    en todos los DM y al menos uno en 'accepted' (o sea, que la subconsulta
+    lee `friendships` de verdad). El arnés llegó al final y el `rollback`
+    dejó la función original intacta.
+  · Tres md5 normalizados coinciden: la función desplegada, el cuerpo de la
+    migración 42 y el archivo de la 131 con sus dos ediciones revertidas. Es
+    decir, la 131 es exactamente lo desplegado más esas dos ediciones — nada
+    más viajó con ella.
+  · Tras aplicarla, comprobación con dos usuarios reales: mismos hilos que
+    antes (11, de los cuales 6 de desafío) y el DM ya trae
+    `friend_status: accepted`.
+
+LÍMITE QUE SIGUE EN PIE
+Nada de esto se recorrió con sesión autenticada en la app. Las correcciones
+están cubiertas por pruebas de lógica y de cableado (1554 en total, todas en
+verde) y por el arnés de la migración, no por una prueba en pantalla.

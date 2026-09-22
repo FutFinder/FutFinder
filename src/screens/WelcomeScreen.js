@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CalendarCheck, Swords, UserPlus, Star, ChevronDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import FutfinderMark from '../components/FutfinderMark';
+import FutFinderMark from '../components/FutFinderMark';
 import BannerBackdrop from '../components/ds/BannerBackdrop';
 import { Card, SectionLabel, Button } from '../components/reservas/ui';
 import { paleta as C, fuentes as F } from '../theme/colors';
@@ -214,7 +214,7 @@ export default function WelcomeScreen({ navigation }) {
   if (checking) {
     return (
       <View style={[styles.root, styles.splashCenter]}>
-        <FutfinderMark size={44} color={C.green} />
+        <FutFinderMark size={44} color={C.green} />
         <View style={{ height: 20 }} />
         <ActivityIndicator color={C.green} />
       </View>
@@ -324,9 +324,9 @@ export default function WelcomeScreen({ navigation }) {
         <SafeAreaView edges={['top']} style={styles.heroContent} pointerEvents="none">
           <Animated.View style={{ paddingTop: heroPadTop, paddingBottom: heroPadBottom }}>
             <Animated.View style={[styles.brandRow, { transform: [{ scale: logoScale }] }]}>
-              <FutfinderMark size={34} color={C.green} bgColor="#070A07" />
+              <FutFinderMark size={34} color={C.green} bgColor="#070A07" />
               <Text style={styles.brandText}>
-                fut<Text style={{ color: C.green }}>finder</Text>
+                Fut<Text style={{ color: C.green }}>Finder</Text>
               </Text>
             </Animated.View>
 

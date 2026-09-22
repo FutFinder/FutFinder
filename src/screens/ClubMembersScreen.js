@@ -427,6 +427,8 @@ export default function ClubMembersScreen({ navigation, route }) {
           <Pressable
             onPress={() => navigation.goBack()}
             hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Volver"
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           >
             <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
@@ -453,6 +455,8 @@ export default function ClubMembersScreen({ navigation, route }) {
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
           style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
         >
           <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
@@ -476,6 +480,11 @@ export default function ClubMembersScreen({ navigation, route }) {
               })
             }
             hitSlop={8}
+            // El globo no decía nada: en el árbol de accesibilidad el control
+            // no tenía nombre ni rol, así que no se podía encontrar ni con
+            // teclado ni con lector de pantalla.
+            accessibilityRole="button"
+            accessibilityLabel="Chat del club"
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           >
             <MessageCircle color={C.green} size={18} strokeWidth={2.2} />
@@ -702,6 +711,8 @@ export default function ClubMembersScreen({ navigation, route }) {
                     <Pressable
                       onPress={() => setActionSheet(item)}
                       hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Opciones de ${item.apodo || item.username || 'este integrante'}`}
                       style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.6 }]}
                     >
                       <MoreVertical color={C.textMuted} size={18} />

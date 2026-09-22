@@ -63,6 +63,8 @@ export {
 import { canUseMentionAll, mapThreadRow, createSharedChannel, isGroupType } from '../utils/chatMeta';
 import { esEstadoActivo, estadoLabel } from './clubChallengeRules';
 import { accesoAlChatDelPartido } from './matchRules';
+// `blockedUsers` no importa nada de acá, así que no hay ciclo.
+import { isBlockedByMe } from './blockedUsers';
 
 // ============================================================
 // TOLERANCIA A MIGRACIONES SIN APLICAR
@@ -577,13 +579,28 @@ export async function getThreadAccess(threadKeyStr, { challengeId = null } = {})
       .limit(1);
     const status = data?.[0]?.status;
     if (status === 'blocked') {
+      /**
+       * LOS DOS LADOS NO SABEN LO MISMO, Y NO DEBEN SABERLO.
+       *
+       * A quien fue bloqueado se le dice lo mínimo: «Conversación no
+       * disponible», sin motivo. Deducir el bloqueo es justo lo que la RLS de
+       * `blocked_users` existe para impedir, y un texto distinto lo delataría.
+       *
+       * A quien bloqueó se le dice lo que él mismo hizo, y se le nombra la
+       * salida: si no, lee el mismo mensaje opaco que la otra persona y no
+       * recuerda por qué. `isBlockedByMe()` sólo mira MIS filas, así que
+       * responder esta pregunta no revela nada de la otra dirección.
+       */
+      const bloqueePorMi = await isBlockedByMe(t.id);
       return {
         ...ok,
         canRead: false,
         canWrite: false,
-        reason: 'blocked',
-        title: 'Conversación no disponible',
-        message: null,
+        reason: bloqueePorMi ? 'blocked_by_me' : 'blocked',
+        title: bloqueePorMi ? 'Bloqueaste a esta persona' : 'Conversación no disponible',
+        message: bloqueePorMi
+          ? 'Puedes desbloquearla desde Ajustes > Bloqueados.'
+          : null,
       };
     }
     if (status !== 'accepted') {

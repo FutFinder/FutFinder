@@ -20,7 +20,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
  * `bgColor` rellena el balón para que tape el trazo del pin que queda
  * detrás: tiene que ser el fondo sobre el que se dibuja la marca.
  */
-export default function FutfinderMark({ size = 24, color = C.green, bgColor = C.bg }) {
+export default function FutFinderMark({ size = 24, color = C.green, bgColor = C.bg }) {
   return (
     <Svg width={size} height={size * 1.2} viewBox="0 0 100 120" fill="none">
       <Path

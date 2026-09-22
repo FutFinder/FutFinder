@@ -50,12 +50,23 @@ export default function FriendsScreen({ navigation }) {
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
   const [friends, setFriends] = useState([]);
-  const [resolved, setResolved] = useState({}); // friendship_id → 'accepted' | 'rejected'
+  // friendship_id → { estado, solicitud }. Guarda la SOLICITUD entera, no
+  // sólo su estado: en cuanto se responde deja de ser «pendiente» y la
+  // siguiente carga ya no la trae, así que sin la copia la fila resuelta
+  // desaparecía de la pantalla junto con su atajo al chat.
+  const [resolved, setResolved] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
+  /**
+   * UN FALLO NO SE DIBUJA COMO UN VACÍO. Los tres servicios devolvían un
+   * arreglo pelado y se tragaban el error, así que este `catch` no podía
+   * ejecutarse nunca y la pantalla afirmaba «no tienes amigos» con la red
+   * caída. Ahora devuelven `{ data, error }` y basta con que uno falle para
+   * mostrar el estado de error, que además se puede reintentar.
+   */
   const load = useCallback(async () => {
     try {
       const [inc, out, frs] = await Promise.all([
@@ -63,10 +74,10 @@ export default function FriendsScreen({ navigation }) {
         listOutgoingRequests(),
         listMyFriends(),
       ]);
-      setIncoming(inc || []);
-      setOutgoing(out || []);
-      setFriends(frs || []);
-      setError(false);
+      setIncoming(inc.data || []);
+      setOutgoing(out.data || []);
+      setFriends(frs.data || []);
+      setError(Boolean(inc.error || out.error || frs.error));
     } catch (e) {
       console.error('[FutFinder] FriendsScreen.load:', e);
       setError(true);
@@ -89,12 +100,31 @@ export default function FriendsScreen({ navigation }) {
 
   const counts = useMemo(
     () => ({
+      // El contador cuenta lo ACCIONABLE; la lista de abajo además conserva
+      // lo que se acaba de responder, para no borrarlo de un parpadeo.
       recibidas: incoming.filter((r) => !resolved[r.friendship_id]).length,
       enviadas: outgoing.length,
       amigos: friends.length,
     }),
     [incoming, outgoing, friends, resolved]
   );
+
+  /**
+   * Las recibidas que se ven: las pendientes de verdad, más las que se
+   * respondieron en esta visita.
+   *
+   * Responder cambia el estado de la fila, así que la recarga que viene
+   * detrás ya no la devuelve. Sin esto, «Ahora son amigos · Abrir chat»
+   * vivía unos cientos de milisegundos y la lista saltaba al vacío justo
+   * después de aceptar. Se quedan hasta que se sale de la pantalla.
+   */
+  const recibidas = useMemo(() => {
+    const vivas = new Set(incoming.map((r) => r.friendship_id));
+    const respondidas = Object.values(resolved)
+      .map((r) => r.solicitud)
+      .filter((r) => r && !vivas.has(r.friendship_id));
+    return [...incoming, ...respondidas];
+  }, [incoming, resolved]);
 
   const respond = async (request, accept) => {
     if (busyId) return;
@@ -112,7 +142,10 @@ export default function FriendsScreen({ navigation }) {
       load();
       return;
     }
-    setResolved((prev) => ({ ...prev, [request.friendship_id]: accept ? 'accepted' : 'rejected' }));
+    setResolved((prev) => ({
+      ...prev,
+      [request.friendship_id]: { estado: accept ? 'accepted' : 'rejected', solicitud: request },
+    }));
     load();
   };
 
@@ -138,7 +171,7 @@ export default function FriendsScreen({ navigation }) {
     });
 
   const renderRecibidas = () => {
-    if (incoming.length === 0) {
+    if (recibidas.length === 0) {
       return (
         <Empty
           title="Sin solicitudes pendientes"
@@ -146,8 +179,8 @@ export default function FriendsScreen({ navigation }) {
         />
       );
     }
-    return incoming.map((r) => {
-      const state = resolved[r.friendship_id];
+    return recibidas.map((r) => {
+      const state = resolved[r.friendship_id]?.estado;
       return (
         <PersonRow
           key={r.friendship_id}

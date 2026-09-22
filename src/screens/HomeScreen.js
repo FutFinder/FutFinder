@@ -33,8 +33,6 @@ import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { getMyClubIds } from '../services/clubs';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
-import ClubSwitcher from '../components/club/ClubSwitcher';
-import { temaDeClub } from '../theme/clubThemes';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
 import useConfirmacion from '../components/useConfirmacion';
@@ -66,7 +64,6 @@ export default function HomeScreen({ navigation }) {
     club: clubActivo,
     role: rolEnClubActivo,
     can,
-    setActiveClub,
   } = useClubsHome();
   const [matches, setMatches] = useState([]);
   const [profile, setProfile] = useState(null);
@@ -248,8 +245,6 @@ export default function HomeScreen({ navigation }) {
         puedeCrearPartido: !!can?.responderDesafios,
       }
     : null;
-  const temaClubActivo = temaDeClub(clubActivo);
-  const variosClubes = (misMembresias || []).length > 1;
 
   /**
    * «ADMIN · 2 CLUBES». El número estuvo escrito a mano —siempre «1 CLUB»—
@@ -381,23 +376,10 @@ export default function HomeScreen({ navigation }) {
                   actionLabel="Ver club"
                   onAction={() => navigation.navigate('ClubDetail', { clubId: club.id })}
                 />
-                {/* CAMBIAR DE CLUB TAMBIÉN SE PUEDE DESDE ACÁ. El selector
-                    vivía sólo en la pestaña Clubes, así que para ver en
-                    Inicio otro de tus clubes había que ir allá, cambiarlo y
-                    volver. Es el mismo componente y el mismo club activo: no
-                    hay un «club de Inicio» aparte. Con un club no se dibuja
-                    — no hay nada que elegir. */}
-                {variosClubes ? (
-                  <View className="-mx-[16px] mb-2.5">
-                    <ClubSwitcher
-                      clubs={misMembresias}
-                      activeClubId={activeClubId}
-                      tema={temaClubActivo}
-                      onSelect={setActiveClub}
-                      onExplorar={() => navigation.navigate('ExploreClubs')}
-                    />
-                  </View>
-                ) : null}
+                {/* Sin fila de chips: cambiar de club se hace desde el botón
+                    del club activo que llevan las seis cabeceras
+                    (`ClubHeaderButton`). Tenerlo dos veces en esta pantalla
+                    era repetir el mismo control a dos alturas. */}
                 <MyClubCard
                   club={club}
                   onPressClub={() => navigation.navigate('ClubDetail', { clubId: club.id })}

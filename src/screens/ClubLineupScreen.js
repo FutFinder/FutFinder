@@ -30,8 +30,12 @@ import {
   fitsForMember,
   autocompletarAsignaciones,
   asignacionesVigentes,
+  conservarAsignaciones,
+  hayCambiosSinGuardar,
+  resumenAutocompletar,
   zoneLabel,
 } from '../utils/formacionClub';
+import useConfirmacion from '../components/useConfirmacion';
 import { getCurrentUser } from '../services/auth';
 import { getClubById, listMembers } from '../services/clubs';
 import { getClubLineup, saveClubLineup } from '../services/clubLineup';
@@ -54,6 +58,16 @@ function clamp(v, min, max) {
  * «Personalizada» se avisa una sola vez, al momento en que deja de ser una
  * formación establecida — no en cada arrastre siguiente — porque lo que
  * importa comunicar es el cambio de estado, no cada micro-ajuste.
+ *
+ * ES DEL CLUB, NO DE UN PARTIDO, Y HAY QUE DECIRLO. `club_lineups` no tiene
+ * `match_id`: esto es el once base del club y no inscribe a nadie en ninguna
+ * nómina. La pantalla se abría sin nombrar el club ni el alcance, así que
+ * parecía que se estaba armando el equipo de un encuentro concreto.
+ *
+ * Y LA INSTRUCCIÓN VISIBLE ERA LA DEL GESTO AVANZADO. La única línea de
+ * ayuda explicaba arrastrar puestos; cómo ubicar a alguien —tocar la banca y
+ * después el puesto— no estaba escrito en ninguna parte, que es justo lo
+ * primero que hay que descubrir.
  */
 export default function ClubLineupScreen({ navigation, route }) {
   const { clubId } = route.params || {};
@@ -75,11 +89,19 @@ export default function ClubLineupScreen({ navigation, route }) {
   const [custom, setCustom] = useState({}); // puesto → {left, top, label} arrastrado a mano
   const [personalizado, setPersonalizado] = useState(false);
   const [misPermisos, setMisPermisos] = useState(null);
+  // Lo último que se vació con «Limpiar», para poder devolverlo. Se descarta
+  // en cuanto el aviso desaparece: un deshacer que sigue vivo cinco minutos
+  // después deshace algo que ya nadie recuerda haber hecho.
+  const [deshacerLimpiar, setDeshacerLimpiar] = useState(null);
+  const { confirmar, dialogo } = useConfirmacion();
 
   const flash = useCallback((msg) => {
     clearTimeout(toastTimer.current);
     setToast(msg);
-    toastTimer.current = setTimeout(() => setToast(''), 2200);
+    toastTimer.current = setTimeout(() => {
+      setToast('');
+      setDeshacerLimpiar(null);
+    }, 4200);
   }, []);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
@@ -158,6 +180,30 @@ export default function ClubLineupScreen({ navigation, route }) {
     [members, assignedIds]
   );
   const placedCount = Object.keys(asignacionesVivas).length;
+
+  /**
+   * ¿Hay trabajo que se perdería al salir?
+   *
+   * Lo guardado se compara YA DEPURADO con `asignacionesVigentes()`: si no,
+   * un integrante expulsado hace meses bastaría para declarar cambios en
+   * cuanto se abre la pantalla, y una advertencia que salta siempre se
+   * aprende a ignorar. La regla se prueba en `formacionClub`.
+   */
+  const hayCambios = useMemo(() => {
+    if (!canEdit) return false;
+    return hayCambiosSinGuardar(
+      { modo, formacion, personalizado, asignaciones: asignacionesVivas, custom },
+      lineup
+        ? {
+            modo: lineup.modo,
+            formacion: lineup.formacion,
+            personalizado: !!lineup.personalizado,
+            asignaciones: asignacionesVigentes(lineup.asignaciones || {}, members),
+            custom: lineup.puestos_personalizados || {},
+          }
+        : null
+    );
+  }, [canEdit, modo, formacion, personalizado, asignacionesVivas, custom, lineup, members]);
   const pickedMember = picked ? membersById.get(picked) : null;
   const fits = pickedMember ? fitsForMember(pickedMember) : [];
 
@@ -259,26 +305,52 @@ export default function ClubLineupScreen({ navigation, route }) {
     setPicked((prev) => (prev === member.member_id ? null : member.member_id));
   };
 
-  const cambiarModo = (nuevoModo) => {
-    if (!canEdit || nuevoModo === modo) return;
-    const f = nuevoModo === 7 ? F7[0] : F11[0];
+  /**
+   * Pasar el tablero a otra formación sin tirar el trabajo.
+   *
+   * ANTES VACIABA TODO SIN PREGUNTAR: tocar un chip para ver cómo quedaría un
+   * 3-2-1 borraba las siete asignaciones. Ahora cada jugador conserva su
+   * puesto si la formación nueva lo tiene, y quien se queda sin puesto
+   * equivalente vuelve a la banca — donde de verdad queda— y se dice cuántos
+   * son. La regla la decide `conservarAsignaciones()`, que está probada.
+   *
+   * Los puestos arrastrados a mano sí se sueltan: son coordenadas de OTRA
+   * disposición de la cancha y conservarlas dejaría la formación nueva
+   * dibujada con la silueta de la anterior.
+   */
+  const aplicarFormacion = (nuevoModo, f) => {
+    const slotsNuevos = layoutSlots(f);
+    const conservadas = conservarAsignaciones(asignacionesVivas, slots, slotsNuevos);
+    const antes = Object.keys(asignacionesVivas).length;
+    const despues = Object.keys(conservadas).length;
+
     setModo(nuevoModo);
     setFormacion(f);
-    setAsignaciones({});
+    setAsignaciones(conservadas);
     setCustom({});
     setPersonalizado(false);
     setPicked(null);
+    setDeshacerLimpiar(null);
     respondersRef.current.clear();
+
+    const sueltos = antes - despues;
+    if (sueltos > 0) {
+      flash(
+        sueltos === 1
+          ? '1 jugador volvió a la banca'
+          : `${sueltos} jugadores volvieron a la banca`
+      );
+    }
+  };
+
+  const cambiarModo = (nuevoModo) => {
+    if (!canEdit || nuevoModo === modo) return;
+    aplicarFormacion(nuevoModo, nuevoModo === 7 ? F7[0] : F11[0]);
   };
 
   const cambiarFormacion = (f) => {
     if (!canEdit || (f === formacion && !personalizado)) return;
-    setFormacion(f);
-    setAsignaciones({});
-    setCustom({});
-    setPersonalizado(false);
-    setPicked(null);
-    respondersRef.current.clear();
+    aplicarFormacion(modo, f);
   };
 
   const quitarPersonalizacion = () => {
@@ -287,25 +359,66 @@ export default function ClubLineupScreen({ navigation, route }) {
     respondersRef.current.clear();
   };
 
+  /**
+   * Autocompletar dice lo que PASÓ, no lo que se pretendía.
+   *
+   * Con un integrante y siete puestos el contador quedaba en 1/7 y el aviso
+   * decía «Alineación completada». Y la cancha llena y la banca vacía —dos
+   * situaciones opuestas— compartían el texto «No queda banca disponible».
+   * Las tres cuentas se calculan de verdad y `resumenAutocompletar()` las
+   * redacta.
+   */
   const onAutocompletar = () => {
     // Un puesto cuyo integrante ya no está en el club está LIBRE, aunque su
     // clave siga en el JSON guardado.
     const libres = slots.filter((s) => !asignacionesVivas[s.key]);
-    if (libres.length === 0 || bench.length === 0) {
-      flash('No queda banca disponible');
+    const nuevas = libres.length > 0 && bench.length > 0
+      ? autocompletarAsignaciones(libres, bench)
+      : {};
+    const ubicados = Object.keys(nuevas).length;
+
+    if (ubicados > 0) {
+      setAsignaciones({ ...asignacionesVivas, ...nuevas });
+      setPicked(null);
+      setDeshacerLimpiar(null);
+    }
+
+    flash(
+      resumenAutocompletar({
+        puestosLibres: libres.length,
+        jugadoresEnBanca: bench.length,
+        ubicados,
+      }).mensaje
+    );
+  };
+
+  /** Vaciar el tablero se puede deshacer: es un botón fácil de pulsar sin querer. */
+  const onLimpiar = () => {
+    if (Object.keys(asignacionesVivas).length === 0) {
+      flash('El tablero ya está vacío');
       return;
     }
-    const nuevas = autocompletarAsignaciones(libres, bench);
-    setAsignaciones({ ...asignacionesVivas, ...nuevas });
-    setPicked(null);
-    flash('Alineación completada');
-  };
-
-  const onLimpiar = () => {
+    setDeshacerLimpiar(asignacionesVivas);
     setAsignaciones({});
     setPicked(null);
+    flash('Tablero vaciado');
   };
 
+  const onDeshacerLimpiar = () => {
+    if (!deshacerLimpiar) return;
+    setAsignaciones(deshacerLimpiar);
+    setDeshacerLimpiar(null);
+    clearTimeout(toastTimer.current);
+    setToast('');
+  };
+
+  /**
+   * Guarda y devuelve si lo consiguió.
+   *
+   * El booleano lo necesita «Guardar y salir» del aviso de cambios sin
+   * guardar: si el guardado choca con otra edición, hay que quedarse en la
+   * pantalla con la alineación real delante, no salir creyendo que se guardó.
+   */
   const onGuardar = async () => {
     setSaving(true);
     const { data, error } = await saveClubLineup(clubId, {
@@ -327,11 +440,59 @@ export default function ClubLineupScreen({ navigation, route }) {
         await load();
       }
       flash(error.message || 'No se pudo guardar');
-      return;
+      return false;
     }
     setLineup(data);
+    setDeshacerLimpiar(null);
     flash(`Alineación ${personalizado ? 'personalizada' : formacion} guardada`);
+    return true;
   };
+
+  /**
+   * Salir con cambios sin guardar pregunta antes.
+   *
+   * `beforeRemove` cubre las TRES formas de salir —el botón de la pantalla,
+   * el gesto del sistema y el botón físico de Android—, así que no hace falta
+   * envolver cada una por su cuenta.
+   *
+   * Los valores viajan por ref porque el oyente se registra una vez y, con
+   * ellos en las dependencias, se volvería a suscribir en cada toque del
+   * tablero.
+   */
+  const hayCambiosRef = useRef(hayCambios);
+  hayCambiosRef.current = hayCambios;
+  const guardarRef = useRef(onGuardar);
+  guardarRef.current = onGuardar;
+  const saliendoRef = useRef(false);
+
+  useEffect(() => {
+    const quitar = navigation.addListener('beforeRemove', (e) => {
+      if (!hayCambiosRef.current || saliendoRef.current) return;
+      e.preventDefault();
+      const salir = () => {
+        saliendoRef.current = true;
+        navigation.dispatch(e.data.action);
+      };
+      confirmar(
+        'Tienes cambios sin guardar',
+        'Si sales ahora, la alineación vuelve a la última guardada.',
+        salir,
+        {
+          confirmar: 'Salir sin guardar',
+          alternativa: {
+            label: 'Guardar y salir',
+            // Sólo sale si el guardado salió bien: con un choque de
+            // ediciones hay que quedarse a mirar la alineación real.
+            onPress: async () => {
+              if (await guardarRef.current()) salir();
+            },
+          },
+          cancelar: 'Seguir editando',
+        }
+      );
+    });
+    return quitar;
+  }, [navigation, confirmar]);
 
   if (loading || !club) {
     return (
@@ -371,10 +532,12 @@ export default function ClubLineupScreen({ navigation, route }) {
             Alineación
           </Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
+            {/* EL NOMBRE DEL CLUB VA SIEMPRE: quien administra dos clubes no
+                tenía cómo saber cuál de los dos estaba editando. */}
             {canEdit
-              ? `${formacionMostrada(personalizado, formacion)} · ${placedCount}/${slots.length} puestos`
+              ? `${club.nombre} · ${formacionMostrada(personalizado, formacion)} · ${placedCount}/${slots.length}`
               : lineup
-                ? `${formacionMostrada(lineup.personalizado, lineup.formacion)} · Fútbol ${lineup.modo}`
+                ? `${club.nombre} · ${formacionMostrada(lineup.personalizado, lineup.formacion)}`
                 : club.nombre}
           </Text>
         </View>
@@ -404,6 +567,13 @@ export default function ClubLineupScreen({ navigation, route }) {
         </View>
       ) : (
         <>
+          {/* QUÉ ES ESTO, ANTES DE CÓMO SE USA. Sin esta línea la pantalla se
+              leía como la nómina de un partido: se podía creer que acá se
+              inscribe gente en un encuentro o se cambia quién juega. */}
+          <Text style={styles.alcance}>
+            Alineación general del club. No inscribe jugadores en ningún partido.
+          </Text>
+
           {canEdit && (
             <>
               <View style={styles.modeRow}>
@@ -530,9 +700,17 @@ export default function ClubLineupScreen({ navigation, route }) {
             )}
           </View>
           {canEdit && (
-            <Text style={styles.dragHint}>
-              Arrastra un puesto por la cancha para reubicarlo a mano.
-            </Text>
+            <View style={styles.instrucciones}>
+              {/* Lo primero que hay que descubrir es esto, y era lo único que
+                  no estaba escrito en ninguna parte. */}
+              <Text style={styles.dragHint}>
+                Toca a alguien de la banca y después un puesto para ubicarlo. Toca un
+                puesto ocupado para devolverlo a la banca.
+              </Text>
+              <Text style={styles.dragHint}>
+                Y si quieres mover el puesto mismo, arrástralo por la cancha.
+              </Text>
+            </View>
           )}
 
           {canEdit && (
@@ -540,10 +718,20 @@ export default function ClubLineupScreen({ navigation, route }) {
               <View style={styles.benchHeader}>
                 <Text style={styles.benchTitle}>BANCA ({bench.length})</Text>
                 <View style={styles.benchActions}>
-                  <Pressable onPress={onAutocompletar} style={styles.benchActionBtn}>
+                  <Pressable
+                    onPress={onAutocompletar}
+                    accessibilityRole="button"
+                    accessibilityLabel="Autocompletar la alineación con la banca"
+                    style={styles.benchActionBtn}
+                  >
                     <Text style={styles.benchActionText}>Autocompletar</Text>
                   </Pressable>
-                  <Pressable onPress={onLimpiar} style={styles.benchActionBtnMuted}>
+                  <Pressable
+                    onPress={onLimpiar}
+                    accessibilityRole="button"
+                    accessibilityLabel="Vaciar el tablero"
+                    style={styles.benchActionBtnMuted}
+                  >
                     <Text style={styles.benchActionTextMuted}>Limpiar</Text>
                   </Pressable>
                 </View>
@@ -619,8 +807,24 @@ export default function ClubLineupScreen({ navigation, route }) {
       {!!toast && (
         <View style={styles.toast}>
           <Text style={styles.toastText}>{toast}</Text>
+          {/* «Limpiar» está al lado de «Autocompletar» y borra el tablero
+              entero de un toque: mientras el aviso está en pantalla se puede
+              devolver lo que había. */}
+          {deshacerLimpiar ? (
+            <Pressable
+              onPress={onDeshacerLimpiar}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Deshacer: devolver los jugadores al tablero"
+              style={({ pressed }) => [styles.toastAccion, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.toastAccionTexto}>Deshacer</Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
+
+      {dialogo}
     </SafeAreaView>
   );
 }
@@ -755,10 +959,21 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
   },
 
+  alcance: {
+    color: C.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    paddingHorizontal: S.screenPadding,
+    paddingTop: 10,
+  },
+
+  instrucciones: { gap: 2 },
   dragHint: {
     color: C.textFaint,
     fontSize: 11,
+    lineHeight: 15,
     textAlign: 'center',
+    paddingHorizontal: S.screenPadding,
     paddingTop: 8,
   },
 
@@ -909,4 +1124,6 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   toastText: { color: C.textPrimary, fontSize: 13, fontFamily: F.bold, textAlign: 'center' },
+  toastAccion: { alignSelf: 'center', paddingTop: 9 },
+  toastAccionTexto: { color: C.green, fontSize: 13, fontFamily: F.extraBold },
 });

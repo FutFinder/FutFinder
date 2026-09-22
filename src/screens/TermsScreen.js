@@ -16,7 +16,7 @@ import { completeOnboarding } from '../services/profile';
 import { APP_VERSION } from '../utils/appVersion';
 
 const TERMS_TEXT =
-  'Al usar FUTFINDER aceptas nuestros Términos de Servicios y Políticas de Privacidad. Tus datos de ubicación se procesarán de forma segura y no se compartirán con terceros sin tu consentimiento. Nos comprometemos a proteger tu información personal y a usarla exclusivamente para mejorar tu experiencia deportiva dentro de la plataforma.';
+  'Al usar FutFinder aceptas nuestros Términos de Servicios y Políticas de Privacidad. Tus datos de ubicación se procesarán de forma segura y no se compartirán con terceros sin tu consentimiento. Nos comprometemos a proteger tu información personal y a usarla exclusivamente para mejorar tu experiencia deportiva dentro de la plataforma.';
 
 function CheckboxRow({ value, onToggle, label }) {
   return (
@@ -100,7 +100,7 @@ export default function TermsScreen({ navigation }) {
             />
           </View>
 
-          <Text style={styles.footer}>FUTFINDER{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
+          <Text style={styles.footer}>FutFinder{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
         </ScrollView>
       </SafeAreaView>
     </View>

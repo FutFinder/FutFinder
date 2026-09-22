@@ -11,6 +11,7 @@ import {
 } from '../services/clubs';
 import { getClubEstadisticas } from '../services/clubMatches';
 import { listChallengesForClub } from '../services/clubChallenges';
+import { countRespuestasPendientes } from '../services/clubOpenChallenges';
 import { getPropuestaVigente } from '../services/clubProposals';
 import { getMisPermisosEnClub } from '../services/clubPermissions';
 import { getCambiosDelPartido } from '../services/clubMatchChanges';
@@ -155,6 +156,11 @@ const ESTADO_INICIAL = {
   club: null,
   role: null,
   can: permisosDeClub(null),
+  // Los nueve permisos delegables de la migración 119, tal como los devuelve
+  // `getMisPermisosEnClub()`. `can` es la mitad conservadora —sólo el rol—;
+  // esto es lo que de verdad tiene concedido quien mira, y de ello sale la
+  // nota de los accesos rápidos.
+  misPermisos: null,
   limits: cuposDelPlan({}),
   tasks: [],
   // `true` desde que se toca otro club hasta que llegan SUS datos. No es lo
@@ -168,6 +174,10 @@ const ESTADO_INICIAL = {
   nextMatchPlazo: null,
   activity: [],
   suggestedRivals: [],
+  // Respuestas que esperan decisión en las publicaciones del club. Es el
+  // badge del acceso rápido «Desafíos», y lo único pendiente que de verdad
+  // vive en la pantalla que ese tile abre.
+  openChallengeReplies: 0,
   invitations: [],
   pendingRequests: [],
   sentRequests: [],
@@ -238,6 +248,7 @@ export function ClubsHomeProvider({ children }) {
         club: nueva?.club ? { ...nueva.club, estadisticas: null } : s.club,
         role: rol,
         can: permisosDeClub(rol),
+        misPermisos: null,
         limits: ESTADO_INICIAL.limits,
         // Y LO DERIVADO SE VACÍA. Son del club anterior; dejarlos bajo el
         // nombre del nuevo es lo único peor que hacer esperar.
@@ -249,6 +260,7 @@ export function ClubsHomeProvider({ children }) {
         nextMatchPlazo: null,
         activity: [],
         suggestedRivals: [],
+        openChallengeReplies: 0,
         pendingRequests: [],
       };
     });
@@ -350,6 +362,7 @@ export function ClubsHomeProvider({ children }) {
           notifsData,
           partidosData,
           permisosDelegados,
+          respuestasAbiertas,
         ] = await Promise.all([
           segura(
             listChallengesForClub(activeId),
@@ -377,6 +390,12 @@ export function ClubsHomeProvider({ children }) {
           role === 'admin'
             ? Promise.resolve(null)
             : segura(getMisPermisosEnClub(activeId).then((r) => r.data?.permisos || null), null, 'getMisPermisosEnClub'),
+          // El badge del acceso rápido «Desafíos» contaba los desafíos
+          // DIRECTOS recibidos, que ya tienen su propia tarjeta en «Pendiente
+          // para ti» y desde la migración 112 no viven en la pantalla que ese
+          // tile abre. Lo que sí espera decisión ahí son las respuestas a las
+          // publicaciones del club.
+          segura(countRespuestasPendientes(activeId).then((r) => r.data || 0), 0, 'countRespuestasPendientes'),
         ]);
         if (!vivo) return;
 
@@ -444,7 +463,20 @@ export function ClubsHomeProvider({ children }) {
             sancion: sancionData,
             proximoPartido,
           },
-          { rol: role, ahora }
+          // `clubId` es sólo el respaldo de las tareas que son del club y no
+          // de un asunto propio (solicitud de ingreso, sanción): el resto ya
+          // viaja con su challengeId, proposalId o matchId.
+          //
+          // `puedeNegociar` decide si el desafío y el cambio pueden abrir el
+          // hilo. Es el permiso `chatClubs`, no el rol: es lo que exige
+          // `chat_puede_ver_desafio` (119:844), y sin él el hilo responde
+          // «este chat es solo para quienes negocian el desafío».
+          {
+            rol: role,
+            clubId: activeId,
+            puedeNegociar: role === 'admin' || !!permisosDelegados?.chatClubs,
+            ahora,
+          }
         );
 
         setState({
@@ -461,6 +493,7 @@ export function ClubsHomeProvider({ children }) {
             : null,
           role,
           can,
+          misPermisos: permisosDelegados,
           limits: cuposDelPlan({
             plan: membresiaActiva?.club?.plan,
             miembrosActivos: miembrosData.length,
@@ -482,6 +515,7 @@ export function ClubsHomeProvider({ children }) {
             club: membresiaActiva?.club,
             distancia: distanciaEntreClubesKm,
           }),
+          openChallengeReplies: respuestasAbiertas,
           invitations,
           pendingRequests: solicitudesData,
           sentRequests: solicitudesEnviadas,

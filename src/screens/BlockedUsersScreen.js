@@ -13,6 +13,7 @@ import { ArrowLeft, ShieldOff, AlertTriangle } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { listBlockedUsers, unblockUser } from '../services/blockedUsers';
+import { notify } from '../utils/notify';
 
 function inicialDe(profile) {
   const base = profile?.nombre || profile?.username || '';
@@ -71,11 +72,22 @@ export default function BlockedUsersScreen({ navigation }) {
 
   useEffect(() => { load(); }, [load]);
 
+  /**
+   * Desbloquear fallaba EN SILENCIO: sin banner, sin aviso y sin reintento,
+   * la fila se quedaba y el botón dejaba de girar. El caso más probable —la
+   * migración 51 sin aplicar— tiene un mensaje escrito en el servicio que
+   * nadie llegaba a leer.
+   */
   const handleUnblock = async (row) => {
     setBusyId(row.id);
     const { error: err } = await unblockUser(row.blockedId);
     setBusyId(null);
-    if (err) return;
+    if (err) {
+      // `notify` y no `setError`: el error de carga ocupa la pantalla entera,
+      // y acá la lista sigue siendo válida — lo que falló es una acción.
+      notify('No pudimos desbloquear', err.message || 'Intenta de nuevo.', 'error');
+      return;
+    }
     setItems((prev) => prev.filter((r) => r.id !== row.id));
   };
 
@@ -85,6 +97,8 @@ export default function BlockedUsersScreen({ navigation }) {
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
         >
           <ArrowLeft color={C.textPrimary} size={20} />

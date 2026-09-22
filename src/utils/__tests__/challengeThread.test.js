@@ -221,6 +221,30 @@ test('reconoce mi club sea el retador o el retado', () => {
   assert.equal(T.challengeCtaContext({ challenge: desafio, misClubIds: ['club-b'] }).myClubId, 'club-b');
 });
 
+test('el delegado de `answerChallenge` queda resuelto, con su club propio', () => {
+  // Sin esto `myClubId` salía null y `soyRetador` era falso por omisión, no
+  // por haber mirado el desafío.
+  const ctx = T.challengeCtaContext({
+    challenge: { ...desafio, estado: 'pendiente' },
+    misClubIds: [],
+    misClubIdsResponder: ['club-b'],
+  });
+  assert.equal(ctx.puedeResponderDesafio, true);
+  assert.equal(ctx.myClubId, 'club-b');
+  assert.equal(ctx.soyAdmin, false);
+});
+
+test('tener `answerChallenge` en el club que RETÓ no habilita nada', () => {
+  // `aceptar_desafio()` exige el permiso en el club retado (119:666).
+  // Ofrecer el botón del otro lado es mandar al usuario contra un 42501.
+  const ctx = T.challengeCtaContext({
+    challenge: { ...desafio, estado: 'pendiente' },
+    misClubIds: [],
+    misClubIdsResponder: ['club-a'],
+  });
+  assert.equal(ctx.puedeResponderDesafio, false);
+});
+
 test('un club ajeno al desafío no me convierte en parte de él', () => {
   const ctx = T.challengeCtaContext({ challenge: desafio, misClubIds: ['otro-club'] });
   assert.equal(ctx.myClubId, null);

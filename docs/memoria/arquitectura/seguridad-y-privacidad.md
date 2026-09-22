@@ -1,6 +1,6 @@
 # Seguridad y privacidad
 
-Última revisión: 2026-08-20
+Última revisión: 2026-09-22
 
 ## Propósito
 
@@ -108,4 +108,4 @@ La salida son dos piezas propias, que andan en los tres lados: `useConfirmacion`
 
 ## Confirmar algo destructivo
 
-`window.confirm` **no abre nada en la app web**: devuelve `false` en un milisegundo sin mostrar ningún cuadro. Tres pantallas tenían su propia copia de un `confirmAction` que lo usaba cuando `Platform.OS === 'web'`, así que **cerrar sesión no hacía nada, en silencio** — y lo mismo eliminar la cuenta, borrar una foto del club y expulsar a un integrante. El botón respondía al toque, no aparecía ningún error, y la única conclusión posible era que la app estaba rota. `Alert.alert` de React Native tampoco funciona en web. La salida es `useConfirmacion`, un Modal propio que anda en los tres lados (2026-09-15). Se descubrió probando cerrar sesión en el navegador, no leyendo código.
+`window.confirm` **no abre nada en la app web**: devuelve `false` en un milisegundo sin mostrar ningún cuadro. Tres pantallas tenían su propia copia de un `confirmAction` que lo usaba cuando `Platform.OS === 'web'`, así que **cerrar sesión no hacía nada, en silencio** — y lo mismo eliminar la cuenta, borrar una foto del club y expulsar a un integrante. El botón respondía al toque, no aparecía ningún error, y la única conclusión posible era que la app estaba rota. `Alert.alert` de React Native tampoco funciona en web. La salida es `useConfirmacion`, un Modal propio que anda en los tres lados (2026-09-15). Se descubrió probando cerrar sesión en el navegador, no leyendo código. Desde 2026-09-22 admite una TERCERA salida opcional (`alternativa: { label, onPress }`, entre la destructiva y el cierre, más un rótulo propio para el cierre): salir de una pantalla con cambios sin guardar tiene tres respuestas —guardar, descartar y seguir editando— y con dos botones una de las tres se pierde. Quien no la pasa ve el diálogo de siempre.

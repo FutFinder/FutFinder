@@ -5,7 +5,7 @@ import { paleta as C, fuentes as F } from '../theme/colors';
 
 /**
  * Logo de FutFinder: pin de ubicación con balón de fútbol dentro
- * + texto "futfinder" donde "fut" es blanco/negro y "finder" es verde.
+ * + wordmark «FutFinder», donde «Fut» va en blanco/negro y «Finder» en verde.
  *
  * Props:
  *  - size: tamaño del pin en px (default 48)
@@ -42,7 +42,7 @@ export default function Logo({ size = 48, showText = true, textColor = '#FFFFFF'
 
       {showText && (
         <Text style={[styles.text, { color: textColor, fontSize: size * 0.78 }]}>
-          fut<Text style={{ color: C.green }}>finder</Text>
+          Fut<Text style={{ color: C.green }}>Finder</Text>
         </Text>
       )}
     </View>
