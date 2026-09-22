@@ -1,6 +1,6 @@
 # Avisos y push
 
-Última revisión: 2026-09-18
+Última revisión: 2026-09-22
 
 ## Propósito
 
@@ -10,6 +10,8 @@ Entregar bandeja persistente dentro de la app y push externo por categoría, dis
 
 La bandeja lee, marca, borra y se suscribe a `notifications`; usa actualizaciones optimistas con reversión ante error y evita repetir la misma acción. Al tocar un aviso, `notificationTargets` resuelve su ruta; `App.js` espera que navegación y Splash estén listos y deduplica respuestas de arranque frío. En login se registra el token del dispositivo y en logout se elimina el token actual.
 
+**Popup de aviso nuevo (`NotificationToastHost`, montado en `App.js` junto a `AvisosHost`).** Mientras la app está abierta, un INSERT en `notifications` del canal Realtime compartido (`subscribeToNotifications`, el mismo que usan el badge y la bandeja) abre un popup arriba con el ícono/color de `NotificationCard` (misma fuente de verdad que la bandeja) y navega con el mismo `navigateToNotification` que ya usan App.js (tap sobre un push) y NotificationsScreen (tap sobre la tarjeta). No se abre si la ruta activa ya es `Notifications` —esa fila ya aparece sola ahí por el mismo canal— ni ante un UPDATE (p.ej. el recuento de un `message_new` agrupado subiendo), sólo ante un INSERT real; para distinguirlos, `services/notifications.js` pega `_eventType` a la fila emitida sin tocar su forma (`.id`, `.title`, etc. siguen ahí, así que el badge y la bandeja no cambiaron nada). La cola vive en `utils/notificationToasts.js`, aparte de `utils/avisos.js`: son dos cosas distintas —un aviso genérico de "tu acción falló/funcionó" contra un evento externo con ícono propio y destino de navegación—, y se dedupe por el `id` real de la notificación para no duplicar un mismo INSERT reentregado por el canal compartido. No se coordina con el banner nativo de `Notifications.setNotificationHandler` (push en primer plano en iOS/Android): en nativo pueden verse los dos a la vez; en web, que no tiene push nativo, este popup es la única señal en caliente.
+
 **«Actividad reciente» de la portada de Clubes abre `NotificationsScreen` con `{ filter: 'clubes', clubId }`.** El resumen de tres avisos ya estaba filtrado por el club activo (`avisoDelClub`, en `utils/clubsHomeSources.js`), pero «Ver toda» y tocar un ítem llevaban a la bandeja completa sin ningún filtro — mostraba avisos de partidos, sociales y de OTROS clubes que se administren, contradiciendo el resumen que llevó hasta ahí. `NotificationsScreen` ahora acepta esos dos parámetros: `filter` fija el chip inicial (sigue pudiéndose cambiar a mano) y `clubId`, si viene, aplica una segunda pasada con la misma `avisoDelClub` sobre la lista visible y sobre los contadores de cada chip. Sin `clubId` en los params (entrar desde la campana normal) el comportamiento es el de siempre.
 
 ## Reglas y permisos
@@ -18,8 +20,8 @@ Las preferencias de partidos, clubes, chat y amistades sólo cancelan el push ex
 
 ## Pantallas y dependencias
 
-- Pantalla/componentes: `NotificationsScreen` y `src/components/notifications/`.
-- Código: `src/services/notifications.js`, `src/utils/notificationInbox.js`, `notificationTargets.js` y `notificationPreferences.js`.
+- Pantalla/componentes: `NotificationsScreen`, `src/components/notifications/` y `src/components/NotificationToastHost.js`.
+- Código: `src/services/notifications.js`, `src/utils/notificationInbox.js`, `src/utils/notificationToasts.js`, `notificationTargets.js` y `notificationPreferences.js`.
 - Backend: `notifications`, tokens y tickets, `supabase/functions/send-push/`, migraciones 38 y 39.
 
 ## Estados, errores y problemas conocidos

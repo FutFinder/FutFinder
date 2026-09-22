@@ -43,7 +43,7 @@ export const CATEGORY = {
   club_revision_resuelta: 'clubes',
 };
 
-const ICON = {
+export const ICON = {
   friend_request: UserPlus,
   friend_accept: CheckCheck,
   message_new: MessageCircle,
@@ -97,7 +97,7 @@ const SOCIAL = { color: '#7DD3FC', bg: 'rgba(125,211,252,0.10)', border: 'rgba(1
 const MENSAJES = { color: '#C4B5FD', bg: 'rgba(196,181,253,0.10)', border: 'rgba(196,181,253,0.26)' };
 const CLUBES = { color: '#F472B6', bg: 'rgba(244,114,182,0.10)', border: 'rgba(244,114,182,0.28)' };
 
-const TAG = {
+export const TAG = {
   friend_request: { label: 'SOCIAL', ...SOCIAL },
   friend_accept: { label: 'SOCIAL', ...SOCIAL },
   message_new: { label: 'MENSAJES', ...MENSAJES },
@@ -145,7 +145,7 @@ const TAG = {
   club_revision_resuelta: { label: 'REVISIÓN RESUELTA', ...AMBAR },
 };
 
-const FALLBACK_TAG = { label: 'AVISO', color: C.textDim, bg: alfa(C.tinta, 0.06), border: alfa(C.tinta, 0.12) };
+export const FALLBACK_TAG = { label: 'AVISO', color: C.textDim, bg: alfa(C.tinta, 0.06), border: alfa(C.tinta, 0.12) };
 
 /**
  * Avisos que ofrecen un atajo visible además de la tarjeta entera.

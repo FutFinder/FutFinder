@@ -294,10 +294,16 @@ function canalDeNotificaciones(userId) {
         table: 'notifications',
         filter: `user_id=eq.${userId}`,
       };
+      // `_eventType` viaja pegado a la fila (no reemplaza su forma: `.id`,
+      // `.title`, etc. siguen ahí) para que quien ya escuchaba este canal
+      // (badge, bandeja) no tenga que cambiar nada, y quien sí necesita
+      // distinguir un aviso nuevo de una fila que solo se actualizó —el
+      // popup de NotificationToastHost, que no debe abrirse por un simple
+      // recuento de mensajes agrupados— pueda hacerlo sin un canal aparte.
       return supabase
         .channel(`notif-${userId}`)
-        .on('postgres_changes', { ...filtro, event: 'INSERT' }, (p) => emit(p.new))
-        .on('postgres_changes', { ...filtro, event: 'UPDATE' }, (p) => emit(p.new))
+        .on('postgres_changes', { ...filtro, event: 'INSERT' }, (p) => emit({ ...p.new, _eventType: p.eventType }))
+        .on('postgres_changes', { ...filtro, event: 'UPDATE' }, (p) => emit({ ...p.new, _eventType: p.eventType }))
         .subscribe();
     },
     close: (channel) => {
