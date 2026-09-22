@@ -29,6 +29,17 @@ import { buildMisClubesAdminQuery } from '../utils/permisosDesafio';
 export { CLUB_LIMITS } from '../utils/clubPlanLimits.js';
 
 /**
+ * Cuántos clubes puede tener una persona a la vez.
+ *
+ * Quien lo APLICA es el trigger `check_user_club_limit` (migración 24); acá
+ * está para que la interfaz no ofrezca lo que el servidor va a rechazar, que
+ * es peor que no ofrecerlo. Se exporta porque el número lo necesitan también
+ * las pantallas que deciden si dibujar «Crear club», «Solicitar unirme» o
+ * «Explorar clubes».
+ */
+export const MAX_CLUBES_POR_JUGADOR = 3;
+
+/**
  * Columnas de `clubs` que pueden no existir todavía en un entorno dado,
  * porque las agregó una migración posterior a la creación de la tabla:
  *
@@ -92,8 +103,10 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
     .from('club_members')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', me);
-  if ((myClubCount || 0) >= 3) {
-    return { error: { message: 'Ya perteneces al máximo de 3 clubes permitidos' } };
+  if ((myClubCount || 0) >= MAX_CLUBES_POR_JUGADOR) {
+    return {
+      error: { message: `Ya perteneces al máximo de ${MAX_CLUBES_POR_JUGADOR} clubes permitidos` },
+    };
   }
 
   const baseRow = {
@@ -466,8 +479,10 @@ export async function requestToJoin(clubId) {
     .from('club_members')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', me);
-  if ((myClubCount || 0) >= 3) {
-    return { error: { message: 'Ya perteneces al máximo de 3 clubes permitidos' } };
+  if ((myClubCount || 0) >= MAX_CLUBES_POR_JUGADOR) {
+    return {
+      error: { message: `Ya perteneces al máximo de ${MAX_CLUBES_POR_JUGADOR} clubes permitidos` },
+    };
   }
 
   const { data, error } = await supabase
@@ -507,8 +522,10 @@ export async function inviteToClub(clubId, userId) {
     .from('club_members')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId);
-  if ((theirClubCount || 0) >= 3) {
-    return { error: { message: 'Ese jugador ya pertenece al máximo de 3 clubes' } };
+  if ((theirClubCount || 0) >= MAX_CLUBES_POR_JUGADOR) {
+    return {
+      error: { message: `Ese jugador ya pertenece al máximo de ${MAX_CLUBES_POR_JUGADOR} clubes` },
+    };
   }
 
   const { data, error } = await supabase

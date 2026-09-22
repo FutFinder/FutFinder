@@ -96,10 +96,10 @@ test('Inicio muestra el club ACTIVO, no la membresía más antigua', () => {
     'getMyClub() devuelve la membresía más antigua: con tres clubes, Inicio enseñaba uno distinto del que marca el selector'
   );
   assert.match(src, /useClubsHome\(\)/, 'el club activo sale del contexto compartido');
-  assert.match(
+  assert.doesNotMatch(
     src,
     /<ClubSwitcher/,
-    'y se puede cambiar desde Inicio, sin ir a la pestaña Clubes y volver'
+    'la fila de chips salió de Inicio: cambiar de club es el botón de la cabecera, y tenerlo dos veces en la misma pantalla es repetir el mismo control a dos alturas'
   );
 });
 
@@ -152,4 +152,41 @@ test('el botón de la cabecera usa el MISMO setActiveClub que los chips y el car
     /setActiveClub\(/,
     'un tercer selector con su propio estado se desincroniza de los otros dos'
   );
+});
+
+/* ── El tope de tres clubes ────────────────────────────────────────── */
+
+test('la hoja no ofrece sumar un cuarto club a quien ya tiene tres', () => {
+  const src = leer('../../components/club/ClubHeaderButton.js');
+  assert.match(
+    src,
+    /enElTope \? \(/,
+    'ofrecer «Explorar clubes» sabiendo que el trigger lo va a rechazar es peor que no ofrecerlo'
+  );
+  assert.ok(
+    src.indexOf('enElTope ? (') < src.indexOf("navigation.navigate('ExploreClubs')"),
+    'el tope tiene que decidirse ANTES de dibujar el acceso a explorar'
+  );
+});
+
+test('la lista nunca enseña más de tres clubes', () => {
+  const src = leer('../../components/club/ClubHeaderButton.js');
+  assert.match(
+    src,
+    /\.slice\(0, MAX_CLUBES_POR_JUGADOR\)/,
+    'una cuarta membresía sólo puede venir de datos rotos, y la hoja no la presenta como algo entre lo que elegir'
+  );
+});
+
+test('el tope es UN número con nombre, no un 3 suelto en cada pantalla', () => {
+  const clubs = leer('../../services/clubs.js');
+  assert.match(clubs, /export const MAX_CLUBES_POR_JUGADOR = 3;/);
+  // Donde el propio servicio corta, ya no queda el literal: si el tope
+  // cambia, el mensaje al usuario cambia con él en vez de mentir.
+  assert.doesNotMatch(
+    clubs,
+    /\(myClubCount \|\| 0\) >= 3/,
+    'el chequeo tiene que usar la constante, no el literal'
+  );
+  assert.doesNotMatch(clubs, /'Ya perteneces al máximo de 3 clubes permitidos'/);
 });
