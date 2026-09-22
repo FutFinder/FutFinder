@@ -107,6 +107,7 @@ import {
   leaveRuleText,
   modalidadLabel,
   nivelLabel,
+  puedeCalificar,
   timeUntilLabel,
   trustLabel,
 } from '../services/matchRules';
@@ -444,8 +445,11 @@ export default function MatchDetailScreen({ route, navigation }) {
   const total = match?.cupos_totales ?? 0;
   const libres = match?.cupos_disponibles ?? 0;
   const tomados = Math.max(0, total - libres);
-  const iAmConfirmedGps = myAttendee?.estado === 'confirmado_gps';
-  const canRate = iAmConfirmedGps && hasFinished(match);
+  // Un partido cancelado no se califica: la cancelación conserva las
+  // confirmaciones de GPS, así que sin esta regla el detalle ofrecía evaluar a
+  // los compañeros de un partido que no se jugó. La regla vive en
+  // `matchRules` y la exige también el servidor (migración 124).
+  const canRate = puedeCalificar(match, myAttendee, ahora);
   // La ventana es la que acepta `confirm_attendance_gps`: media hora antes y
   // hasta media hora después del término. Ofrecerla solo «durante el partido»
   // dejaba sin botón a quien ya estaba en la cancha 15 minutos antes.

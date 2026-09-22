@@ -311,45 +311,86 @@ test('un partido normal nunca entra en esta sección, aunque sea el más próxim
   assert.equal(R.proximoPartidoDeClub(lista, ['club-a'], { ahora: AHORA }).id, 'm1');
 });
 
-// ── el reparto de Inicio: destacado + resto, sin repetir ──────
+// ── el reparto de Inicio: destacados + resto, sin repetir ──────
+//
+// Inicio ya no muestra UN partido de club sino TODOS los que vienen. Quien
+// pertenece a dos clubes tiene dos calendarios y ninguno es «el secundario»:
+// enseñarle sólo el más próximo le escondía el otro sin decírselo.
 
-test('SIN DUPLICADOS: el partido que sube a destacado se quita de la lista de cercanos', () => {
+test('Inicio muestra TODOS los partidos que vienen de mis clubes, del más próximo al más lejano', () => {
+  const lista = [
+    conHora('m3', '2026-09-10T20:00:00.000Z'),
+    conHora('m1', '2026-09-03T20:00:00.000Z'),
+    conHora('m2', '2026-09-07T20:00:00.000Z'),
+  ];
+  const { destacados } = R.seleccionInicio(lista, [], ['club-a'], { ahora: AHORA });
+  assert.deepEqual(destacados.map((m) => m.id), ['m1', 'm2', 'm3']);
+});
+
+test('UN PARTIDO LLENO SIGUE SIENDO MI PARTIDO: llenar la nómina no lo borra de Inicio', () => {
+  // Es el peor momento para esconderlo: el club acaba de terminar de armarse.
+  const lista = [conHora('m1', '2026-09-03T20:00:00.000Z', { estado: 'lleno' })];
+  const { destacados } = R.seleccionInicio(lista, [], ['club-a'], { ahora: AHORA });
+  assert.deepEqual(destacados.map((m) => m.id), ['m1']);
+});
+
+test('SIN DUPLICADOS: el partido entre DOS clubes míos sale una sola vez', () => {
+  // Llega dos veces porque se pide por club, y son dos clubes míos.
+  const uno = conHora('m1', '2026-09-03T20:00:00.000Z');
+  const { destacados } = R.seleccionInicio([uno, { ...uno }], [], ['club-a', 'club-b'], {
+    ahora: AHORA,
+  });
+  assert.deepEqual(destacados.map((m) => m.id), ['m1']);
+});
+
+test('SIN DUPLICADOS: el partido que sube arriba se quita de la lista de cercanos', () => {
   const club = conHora('m1', '2026-09-03T20:00:00.000Z');
   const normal = { ...partidoNormal(), id: 'n1', hora: '2026-09-04T20:00:00.000Z' };
-  const { destacado, resto } = R.seleccionInicio([club, normal], [club, normal], ['club-a'], {
+  const { destacados, resto } = R.seleccionInicio([club], [club, normal], ['club-a'], {
     ahora: AHORA,
   });
 
-  assert.equal(destacado.id, 'm1');
+  assert.deepEqual(destacados.map((m) => m.id), ['m1']);
   assert.deepEqual(resto.map((m) => m.id), ['n1'], 'm1 no puede salir dos veces en la misma pantalla');
 });
 
 test('un partido de clubes que se juega LEJOS igual se destaca', () => {
-  // `cercanos` viene filtrado por radio; `todos` no. El partido de mi club me
-  // importa aunque me quede lejos: es de mi club.
+  // `cercanos` viene filtrado por radio; los partidos de club no. El partido
+  // de mi club me importa aunque me quede lejos: es de mi club.
   const lejano = conHora('m1', '2026-09-03T20:00:00.000Z');
-  const { destacado, resto } = R.seleccionInicio([lejano], [], ['club-a'], { ahora: AHORA });
-  assert.equal(destacado.id, 'm1');
+  const { destacados, resto } = R.seleccionInicio([lejano], [], ['club-a'], { ahora: AHORA });
+  assert.deepEqual(destacados.map((m) => m.id), ['m1']);
   assert.deepEqual(resto, []);
 });
 
-test('sin partido de club, el destacado es null y la lista de cercanos queda intacta', () => {
+test('el tope evita que un club con agenda llena empuje el resto de Inicio fuera de pantalla', () => {
+  const lista = [
+    conHora('m1', '2026-09-03T20:00:00.000Z'),
+    conHora('m2', '2026-09-04T20:00:00.000Z'),
+    conHora('m3', '2026-09-05T20:00:00.000Z'),
+    conHora('m4', '2026-09-06T20:00:00.000Z'),
+  ];
+  const { destacados } = R.seleccionInicio(lista, [], ['club-a'], { ahora: AHORA });
+  assert.deepEqual(destacados.map((m) => m.id), ['m1', 'm2', 'm3']);
+});
+
+test('sin partido de club no hay sección y la lista de cercanos queda intacta', () => {
   const cercanos = [{ ...partidoNormal(), id: 'n1' }, { ...partidoNormal(), id: 'n2' }];
-  const { destacado, resto } = R.seleccionInicio(cercanos, cercanos, ['club-a'], { ahora: AHORA });
-  assert.equal(destacado, null, 'ESTADO VACÍO: no hay sección que dibujar');
+  const { destacados, resto } = R.seleccionInicio([], cercanos, ['club-a'], { ahora: AHORA });
+  assert.deepEqual(destacados, [], 'ESTADO VACÍO: no hay sección que dibujar');
   assert.deepEqual(resto.map((m) => m.id), ['n1', 'n2']);
 });
 
 test('a un usuario sin clubes no se le destaca nada y no se le quita nada', () => {
   const club = conHora('m1', '2026-09-03T20:00:00.000Z');
-  const { destacado, resto } = R.seleccionInicio([club], [club], [], { ahora: AHORA });
-  assert.equal(destacado, null);
+  const { destacados, resto } = R.seleccionInicio([club], [club], [], { ahora: AHORA });
+  assert.deepEqual(destacados, []);
   assert.deepEqual(resto.map((m) => m.id), ['m1'], 'lo sigue viendo, pero como un partido más');
 });
 
 test('seleccionInicio aguanta listas ausentes', () => {
-  const { destacado, resto } = R.seleccionInicio(null, null, ['club-a'], { ahora: AHORA });
-  assert.equal(destacado, null);
+  const { destacados, resto } = R.seleccionInicio(null, null, ['club-a'], { ahora: AHORA });
+  assert.deepEqual(destacados, []);
   assert.deepEqual(resto, []);
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,15 +18,19 @@ import {
   Shield,
   Zap,
   Check,
+  ServerCrash,
 } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { getMatchById } from '../services/matches';
+import { partidoAdmiteEvaluaciones } from '../services/matchRules';
 import {
   getRatableAttendees,
   submitRatings,
 } from '../services/ratings';
 import { notify } from '../utils/notify';
+import { crearSecuencia } from '../utils/paginacionPartidos';
+import { PrimaryButton } from '../components/partidos/ui';
 
 /**
  * Pantalla "Calificar partido".
@@ -75,51 +79,90 @@ export default function RateMatchScreen({ route, navigation }) {
   const [attendees, setAttendees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * Por qué esta pantalla no tiene nada que mostrar, cuando no lo tiene.
+   *
+   * `null` es «cargó bien». `'error'` es «no se pudo cargar» y `'cancelado'`
+   * es «este partido no se jugó». Antes los tres terminaban en el mismo
+   * «Nada por calificar», que además le echaba la culpa a los compañeros
+   * («si nadie más confirmó…»): un fallo de red se leía como un hecho del
+   * partido, y no quedaba forma de reintentar sin salir y volver a entrar.
+   */
+  const [bloqueo, setBloqueo] = useState(null);
 
   // Estado de los ratings por usuario:
   // { [userId]: { puntualidad, fairplay, nivel, comentario } }
   const [ratings, setRatings] = useState({});
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      const [{ data: m }, { data: peers }] = await Promise.all([
-        getMatchById(matchId),
-        getRatableAttendees(matchId),
-      ]);
-      if (!active) return;
-      setMatch(m || null);
-      setAttendees(peers || []);
+  // Dos cargas pueden solaparse —el botón de reintentar sobre una que todavía
+  // viene, o un cambio de partido—, y la que llegue tarde no puede escribir:
+  // es el mismo turno que usa el buscador para no pisar sus propios filtros.
+  const secuencia = useRef(crearSecuencia()).current;
 
-      // Inicializar ratings: si ya califiqué antes a alguien, lo pre-cargo
-      const initial = {};
-      for (const p of peers || []) {
-        if (p.myRating) {
-          initial[p.id] = {
-            puntualidad: p.myRating.puntualidad,
-            fairplay: p.myRating.fairplay,
-            nivel: p.myRating.nivel,
-            comentario: p.myRating.comentario || '',
-            locked: true, // no puedes recalificar
-          };
-        } else {
-          initial[p.id] = {
-            puntualidad: 0,
-            fairplay: 0,
-            nivel: 0,
-            comentario: '',
-            locked: false,
-          };
-        }
-      }
-      setRatings(initial);
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    setBloqueo(null);
+    const turno = secuencia.abrir();
+    const [partido, compas] = await Promise.all([
+      getMatchById(matchId).catch((e) => ({ data: null, error: e })),
+      getRatableAttendees(matchId).catch((e) => ({ data: [], error: e })),
+    ]);
+
+    if (!secuencia.vigente(turno)) return;
+
+    // El error se consume junto con los datos: `data: []` con `error` no es
+    // una lista vacía, es una lista que no se pudo leer.
+    // Un partido que no llega no es un partido cancelado: sin la fila no se
+    // sabe nada de él, y eso es un fallo de carga como cualquier otro.
+    if (partido.error || compas.error || !partido.data) {
+      console.error('[FutFinder] RateMatch:', partido.error || compas.error || 'sin partido');
+      setBloqueo('error');
       setLoading(false);
-    })();
-    return () => {
-      active = false;
-    };
-  }, [matchId]);
+      return;
+    }
+
+    setMatch(partido.data || null);
+
+    // La misma regla que decide si el detalle ofrece el botón, por si se llega
+    // acá por un enlace profundo o con la pantalla abierta desde antes de la
+    // cancelación. El servidor también la exige (migración 124).
+    if (!partidoAdmiteEvaluaciones(partido.data)) {
+      setBloqueo('cancelado');
+      setLoading(false);
+      return;
+    }
+
+    const peers = compas.data || [];
+    setAttendees(peers);
+
+    // Inicializar ratings: si ya califiqué antes a alguien, lo pre-cargo
+    const initial = {};
+    for (const p of peers) {
+      if (p.myRating) {
+        initial[p.id] = {
+          puntualidad: p.myRating.puntualidad,
+          fairplay: p.myRating.fairplay,
+          nivel: p.myRating.nivel,
+          comentario: p.myRating.comentario || '',
+          locked: true, // no puedes recalificar
+        };
+      } else {
+        initial[p.id] = {
+          puntualidad: 0,
+          fairplay: 0,
+          nivel: 0,
+          comentario: '',
+          locked: false,
+        };
+      }
+    }
+    setRatings(initial);
+    setLoading(false);
+  }, [matchId, secuencia]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
 
   const update = (userId, field, value) => {
     setRatings((prev) => {
@@ -198,6 +241,29 @@ export default function RateMatchScreen({ route, navigation }) {
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator color={C.green} />
+          </View>
+        ) : bloqueo === 'error' ? (
+          <View style={styles.emptyBox}>
+            <ServerCrash color={C.textMuted} size={42} strokeWidth={1.5} />
+            <Text style={styles.emptyTitle}>No pudimos cargar las evaluaciones</Text>
+            <Text style={styles.emptyText}>
+              No es que no haya a quién calificar: no alcanzamos a leer quiénes
+              confirmaron. Vuelve a intentarlo.
+            </Text>
+            <PrimaryButton
+              label="Reintentar"
+              onPress={cargar}
+              height={46}
+              style={{ alignSelf: 'stretch', marginTop: 6 }}
+            />
+          </View>
+        ) : bloqueo === 'cancelado' ? (
+          <View style={styles.emptyBox}>
+            <Star color={C.textMuted} size={42} strokeWidth={1.5} />
+            <Text style={styles.emptyTitle}>Este partido no se jugó</Text>
+            <Text style={styles.emptyText}>
+              El organizador lo canceló, así que no hay nada que evaluar.
+            </Text>
           </View>
         ) : attendees.length === 0 ? (
           <View style={styles.emptyBox}>

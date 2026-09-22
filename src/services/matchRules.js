@@ -262,6 +262,36 @@ export function hasStarted(match, ahora = new Date()) {
   return ahora.getTime() >= new Date(match.hora).getTime();
 }
 
+/**
+ * Estados en los que un partido no admite evaluaciones entre jugadores.
+ *
+ * Es uno solo, y se nombra igual para que se pueda mirar desde la pantalla de
+ * detalle y desde la de evaluación sin repetir el literal.
+ */
+export const ESTADOS_SIN_EVALUACION = ['cancelado'];
+
+/** ¿Este partido admite que sus jugadores se califiquen? */
+export function partidoAdmiteEvaluaciones(match) {
+  if (!match?.hora) return false;
+  return !ESTADOS_SIN_EVALUACION.includes(match.estado);
+}
+
+/**
+ * ¿Puedo calificar a mis compañeros de este partido?
+ *
+ * EL FALLO QUE LA TRAJO: bastaba con haber confirmado GPS y que hubiera pasado
+ * la hora de término. Cancelar un partido NO borra las confirmaciones, así que
+ * el detalle de un partido cancelado ofrecía «Calificar a los jugadores» a
+ * quien había alcanzado a marcar antes de la cancelación, por un partido que
+ * no se jugó. La misma condición la exige ahora el servidor en la política de
+ * `ratings` (migración 124): esto es el espejo, no la autoridad.
+ */
+export function puedeCalificar(match, miAsistencia, ahora = new Date()) {
+  if (!partidoAdmiteEvaluaciones(match)) return false;
+  if (miAsistencia?.estado !== 'confirmado_gps') return false;
+  return hasFinished(match, ahora);
+}
+
 /** ¿El organizador todavía puede registrar asistencia? */
 export function attendanceOpen(match) {
   if (!hasFinished(match)) return false;

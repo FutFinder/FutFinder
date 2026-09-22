@@ -547,6 +547,9 @@ export function getChallengeCta(ctx = {}) {
     online = true,
     sancion = null,
     pertenezcoAlProponente = false,
+    // Delegación de la migración 119: registrar y confirmar el resultado los
+    // autoriza el permiso `results`, no el rol de administrador.
+    puedeResultados = false,
   } = ctx;
 
   const estado = challenge.estado;
@@ -561,7 +564,15 @@ export function getChallengeCta(ctx = {}) {
     };
   }
 
-  if (!soyAdmin) {
+  // QUIÉN PUEDE ACTUAR SE RESUELVE POR ACCIÓN, NO POR ROL. Ser administrador
+  // habilita todo el ciclo; el permiso `results` delegado habilita sólo los
+  // estados del resultado, que es justo lo que autoriza el servidor en
+  // `proponer_resultado` y `confirmar_resultado` (migración 119). Antes esta
+  // puerta era un único `soyAdmin` y devolvía «Solo lectura» antes de mirar
+  // el estado: al delegado de resultados no le aparecía la acción que sí
+  // podía ejecutar, y la entrada a la pantalla de resultados cuelga de acá.
+  const esEstadoDeResultado = estado === 'esperando_resultado' || estado === 'resultado_en_disputa';
+  if (!soyAdmin && !(puedeResultados && esEstadoDeResultado)) {
     return {
       kind: 'solo_lectura',
       label: 'Solo lectura',

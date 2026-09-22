@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { partidoAdmiteEvaluaciones } from './matchRules';
 
 /**
  * Servicio de calificaciones post-partido.
@@ -51,11 +52,16 @@ export async function isMatchRatable(matchId) {
   // El partido ya pasó hace ≥ 90 min?
   const { data: match } = await supabase
     .from('matches')
-    .select('hora')
+    .select('hora, estado')
     .eq('id', matchId)
     .maybeSingle();
 
   if (!match) return { ok: false, reason: 'no-match' };
+
+  // Un partido cancelado no se califica aunque los dos hayan confirmado GPS:
+  // la cancelación no borra esas marcas. Lo exige también la política de
+  // `ratings` en el servidor (migración 124).
+  if (!partidoAdmiteEvaluaciones(match)) return { ok: false, reason: 'cancelled' };
 
   const matchTime = new Date(match.hora).getTime();
   const ninetyMin = 90 * 60 * 1000;

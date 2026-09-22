@@ -1,6 +1,6 @@
 # Base de datos
 
-Última revisión: 2026-09-09
+Última revisión: 2026-09-21
 
 ## Propósito
 
@@ -187,6 +187,16 @@ Tres hábitos que se ganaron a golpes en estas migraciones: `revoke ... from ano
 ## Convención de cambio
 
 `supabase/schema.sql` es una base idempotente; `supabase/migrations/NN_*.sql` mantiene cambios incrementales. Crea una migración nueva y una prueba SQL cuando corresponda; no edites ni reordenes migraciones ya aplicadas. La presencia de un archivo no confirma que esté aplicado en un proyecto remoto.
+
+## El orden de los bloqueos de un partido (migraciones 122, 123 y 125)
+
+Las operaciones que mueven reputación o cupos de un partido bloquean **primero la fila de `matches` y después la de `attendees`**, siempre en ese orden: `leave_match_penalized`, `save_match_attendance`, `swap_match` y `cancel_match_and_join` (que ya lo hacía `cancel_match` desde la 34). Mezclar el orden es la forma clásica de fabricar un abrazo mortal, así que la regla se escribe acá y no en cada función.
+
+Dos excepciones, las dos a propósito. `confirm_attendance_gps` bloquea **sólo su inscripción**: serializar por partido dejaría a veintidós jugadores haciendo fila para marcar GPS a la misma hora, y su inscripción es lo único que toca. Y `swap_match` bloquea sólo el partido de ORIGEN: la disponibilidad del destino la recalcula la guarda de cupos (105) desde la nómina dentro de la misma operación —con `CUPOS_MENOR_QUE_CONFIRMADOS` si alguien se pasa—, mientras que bloquear los dos abriría la puerta al abrazo mortal entre dos jugadores que se cambian en sentidos opuestos.
+
+Además del bloqueo, **la reclamación es la escritura**: `delete … returning` para soltar una inscripción y `update … where estado = 'inscrito' returning` para confirmar el GPS. El bloqueo hace esperar a la segunda sesión; el `returning` es lo que hace que, al despertar, no aplique un efecto que ya se aplicó. Las dos cosas juntas, no una.
+
+El trigger de reprogramación de la 123 toma además el `pg_advisory_xact_lock(107, hashtext(jugador))` de cada inscrito, el mismo espacio de locks que usa `tg_enforce_join_rules` desde la 109. Es lo que impide que una inscripción que está entrando a esa hora en otro partido y una reprogramación se crucen sin verse. Los toma **después** del bloqueo de fila que ya tiene el `update`, y en orden por `id_jugador` para que dos reprogramaciones simultáneas no se traben entre ellas. Un ciclo entre las dos clases de bloqueo necesitaría cuatro transacciones cruzadas a la vez; con dos no ocurre, porque toda inscripción nueva en un partido termina actualizando su fila de `matches` y por ahí ya estaba serializada.
 
 ## Fuentes principales
 

@@ -382,3 +382,45 @@ test('rangoDeFecha: sin ventana no acota nada', () => {
   assert.deepEqual(R.rangoDeFecha('todos'), { desde: null, hasta: null });
   assert.deepEqual(R.rangoDeFecha(undefined), { desde: null, hasta: null });
 });
+
+/**
+ * REGRESIÓN N10 — un partido cancelado no ofrece calificar a los jugadores.
+ *
+ * EL FALLO: dos jugadores confirmaban por GPS antes del inicio, el organizador
+ * cancelaba el partido y, pasada la hora de término, el detalle mostraba
+ * «Calificar a los jugadores». Cancelar NO borra las marcas de GPS, y la regla
+ * sólo miraba «confirmé» y «ya terminó». Además se comprobó contra producción
+ * que la política de `ratings` aceptaba guardar esas notas: por eso el arreglo
+ * va en los dos lados, y acá queda el del cliente (migración 124 el otro).
+ */
+
+const TERMINADO = { hora: '2026-09-20T20:00:00.000Z', duracion_min: 90, estado: 'finalizado' };
+const DESPUES = new Date('2026-09-20T23:00:00.000Z');
+const CONFIRMADO = { estado: 'confirmado_gps' };
+
+test('un partido jugado, con GPS confirmado y ya terminado, se puede calificar', () => {
+  assert.equal(R.puedeCalificar(TERMINADO, CONFIRMADO, DESPUES), true);
+});
+
+test('un partido CANCELADO no se califica, aunque el GPS esté confirmado', () => {
+  assert.equal(
+    R.puedeCalificar({ ...TERMINADO, estado: 'cancelado' }, CONFIRMADO, DESPUES),
+    false
+  );
+  assert.equal(R.partidoAdmiteEvaluaciones({ ...TERMINADO, estado: 'cancelado' }), false);
+});
+
+test('sin confirmar el GPS no se califica, y antes de que termine tampoco', () => {
+  assert.equal(R.puedeCalificar(TERMINADO, { estado: 'inscrito' }, DESPUES), false);
+  assert.equal(R.puedeCalificar(TERMINADO, null, DESPUES), false);
+  assert.equal(
+    R.puedeCalificar(TERMINADO, CONFIRMADO, new Date('2026-09-20T20:30:00.000Z')),
+    false
+  );
+});
+
+test('un partido «abierto» que ya pasó sí se califica: lo que manda es el reloj', () => {
+  // `finalizado` lo escribe el organizador al registrar asistencia. Que no lo
+  // haya hecho no puede dejar a los jugadores sin poder evaluarse.
+  assert.equal(R.puedeCalificar({ ...TERMINADO, estado: 'abierto' }, CONFIRMADO, DESPUES), true);
+});

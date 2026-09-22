@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
 import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
+import { aplicarOrdenYCursor } from '../utils/paginacionPartidos.js';
 import { aceptaACualquiera, rangoDeFecha } from './matchRules';
 
 /**
@@ -100,6 +101,35 @@ export async function listPartidosDeClub(clubId, { limit = 10 } = {}) {
     return { data: [], error };
   }
   return { data: await withClubs(data || []), error: null };
+}
+
+/**
+ * Los partidos que vienen de TODOS mis clubes, en una sola llamada.
+ *
+ * Una consulta por club y no una sola con `in`: `listPartidosDeClub()` ya
+ * resuelve el `or` sobre las dos columnas de club, el tope por club y la
+ * hidratación de escudos, y repetir eso acá sería mantener dos veces la misma
+ * regla. Son uno o dos clubes por persona, no cien.
+ *
+ * NO DEDUPLICA. Un partido entre dos clubes míos llega dos veces, y de eso se
+ * ocupa `seleccionInicio()`, que es donde se puede probar sin una base.
+ *
+ * Un club que falla no se lleva a los demás: su lista queda vacía y el resto
+ * de Inicio se dibuja igual.
+ */
+export async function listPartidosDeMisClubes(clubIds, { limitePorClub = 5 } = {}) {
+  const ids = [...new Set((Array.isArray(clubIds) ? clubIds : []).filter(Boolean))];
+  if (!isSupabaseConfigured || ids.length === 0) return { data: [], error: null };
+
+  const respuestas = await Promise.all(
+    ids.map((id) =>
+      listPartidosDeClub(id, { limit: limitePorClub }).catch((e) => {
+        console.error('[FutFinder] listPartidosDeMisClubes:', e);
+        return { data: [] };
+      })
+    )
+  );
+  return { data: respuestas.flatMap((r) => r?.data || []), error: null };
 }
 
 /**
@@ -301,10 +331,14 @@ function consultaDePartidos({ filtros = {}, texto = '', estados = ['abierto', 'l
  * para llegar a lo mismo que el cursor obtiene sin ningún duplicado. No es
  * «partidos invisibles hasta un refresh»: es paginación que se vuelve lenta
  * y repetitiva justo cuando más gente está publicando a la vez. El cursor
- * evita el problema de raíz, sin duplicados en ningún escenario. Queda una
- * grieta aceptada: más partidos que un tamaño de página con la MISMA `hora`
- * exacta al segundo, un empate que el desempate compuesto resolvería pero
- * que no vale la complejidad frente a lo raro que es.
+ * evita el problema de raíz, sin duplicados en ningún escenario.
+ *
+ * EL CURSOR ES COMPUESTO, `(hora, id)`. Con sólo `hora` y `hora > últimaHora`
+ * se perdía un partido cada vez que dos empataban la hora justo en el corte
+ * entre dos páginas: el segundo quedaba excluido por igualdad. El comentario
+ * de antes decía que hacía falta más de una página de empatados; es falso,
+ * bastan DOS. El par y su condición viven en `utils/paginacionPartidos.js`,
+ * donde están probados.
  */
 export async function buscarPartidos({
   filtros = {},
@@ -315,8 +349,7 @@ export async function buscarPartidos({
 } = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), hayMas: false, error: null };
 
-  let q = consultaDePartidos({ filtros, texto, estados }).order('hora', { ascending: true });
-  if (despuesDe?.hora) q = q.gt('hora', despuesDe.hora);
+  const q = aplicarOrdenYCursor(consultaDePartidos({ filtros, texto, estados }), despuesDe);
 
   const { data, error } = await q.limit(limite + 1);
 

@@ -135,7 +135,8 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [banner, setBanner] = useState(null);
   const [working, setWorking] = useState(false);
 
-  const [clubesAdmin, setClubesAdmin] = useState(null);
+  const [clubesPub, setClubesPub] = useState(null);
+  const [clubesResp, setClubesResp] = useState(null);
   const [nombreDeMiClub, setNombreDeMiClub] = useState('Mi club');
   const [clubActual, setClubActual] = useState(null);
 
@@ -167,18 +168,30 @@ export default function ClubChallengesScreen({ navigation, route }) {
   const [picker, setPicker] = useState(null); // 'region' | 'comuna' (del filtro)
   const [mineIndex, setMineIndex] = useState(0);
 
-  // `clubesAdmin` ya no es literalmente «clubes que administro»: incluye
-  // también los clubes donde tengo `pubChallenge` o `answerChallenge`
-  // concedidos como capitán o jugador (migración 119) — cualquiera de los
-  // dos alcanza para publicar en el tablero abierto o aceptar una respuesta.
-  const soyAdminDeEsteClub = Array.isArray(clubesAdmin) && clubesAdmin.includes(clubId);
+  /*
+    DOS PERMISOS, DOS BOOLEANOS. Antes los dos se juntaban en uno solo y ese
+    uno habilitaba acciones distintas: con sólo `answerChallenge` el tablero
+    ofrecía «Publicar» y dejaba llenar el formulario entero para que el
+    servidor lo rechazara al guardar, y con sólo `pubChallenge` ofrecía
+    responder publicaciones ajenas y aceptar respuestas a la propia. El
+    servidor nunca se dejó: lo que fallaba era la pantalla ofreciendo lo que
+    no se podía terminar (migración 119).
+
+      · `pubChallenge`   → publicar, editar y cancelar la publicación propia.
+      · `answerChallenge`→ responder la publicación de otro club, y elegir o
+                           rechazar una respuesta a la propia.
+  */
+  const puedoPublicar = Array.isArray(clubesPub) && clubesPub.includes(clubId);
+  const puedoResponder = Array.isArray(clubesResp) && clubesResp.includes(clubId);
 
   const load = useCallback(async () => {
-    const [{ data: clubesAdminData }, { data: miClub }] = await Promise.all([
-      getMisClubesConPermiso(['pubChallenge', 'answerChallenge']),
+    const [{ data: clubesPubData }, { data: clubesRespData }, { data: miClub }] = await Promise.all([
+      getMisClubesConPermiso(['pubChallenge']),
+      getMisClubesConPermiso(['answerChallenge']),
       getClubById(clubId),
     ]);
-    setClubesAdmin(clubesAdminData ?? null);
+    setClubesPub(clubesPubData ?? null);
+    setClubesResp(clubesRespData ?? null);
     if (miClub?.nombre) setNombreDeMiClub(miClub.nombre);
     setClubActual(miClub || null);
 
@@ -435,7 +448,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
         <TableroSubScreen
           subScreen={subScreen}
           tema={tema}
-          soyAdmin={soyAdminDeEsteClub}
+          puedoResponder={puedoResponder}
           working={working}
           banner={banner}
           onCloseBanner={() => setBanner(null)}
@@ -466,7 +479,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
         tema={tema}
         openCount={browsing.length}
         onPublicar={abrirPublicar}
-        soyAdmin={soyAdminDeEsteClub}
+        puedoPublicar={puedoPublicar}
       />
 
       <ScrollView
@@ -477,7 +490,8 @@ export default function ClubChallengesScreen({ navigation, route }) {
 
         <MisDesafiosCarrusel
           tema={tema}
-          soyAdmin={soyAdminDeEsteClub}
+          puedoPublicar={puedoPublicar}
+          puedoResponder={puedoResponder}
           misPublicaciones={misPublicaciones}
           cardWidth={cardWidth}
           mineIndex={mineIndex}
@@ -519,7 +533,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
         visible={!!detalle}
         pub={detalle}
         tema={tema}
-        soyAdmin={soyAdminDeEsteClub}
+        puedoResponder={puedoResponder}
         miRespuesta={detalle ? misRespuestas.get(detalle.id) : null}
         mensaje={mensajeRespuesta}
         setMensaje={setMensajeRespuesta}
@@ -578,7 +592,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
   );
 }
 
-function Header({ navigation, tema, openCount, onPublicar, soyAdmin }) {
+function Header({ navigation, tema, openCount, onPublicar, puedoPublicar }) {
   return (
     <View style={styles.header}>
       <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
@@ -590,7 +604,7 @@ function Header({ navigation, tema, openCount, onPublicar, soyAdmin }) {
           {openCount} {openCount === 1 ? 'club buscando' : 'clubes buscando'} rival
         </Text>
       </View>
-      {soyAdmin && (
+      {puedoPublicar && (
         <Pressable onPress={onPublicar} style={({ pressed }) => [styles.publishBtnSmall, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
           <Text style={[styles.publishBtnSmallText, { color: tema.ink }]}>Publicar</Text>
         </Pressable>
@@ -612,8 +626,11 @@ function EstadoBadge({ estado }) {
 
 /* ── Tablero abierto: carrusel de «Tus desafíos activos» ─────────── */
 
-function MisDesafiosCarrusel({ tema, soyAdmin, misPublicaciones, cardWidth, mineIndex, setMineIndex, onVerRespuestas, onEditar }) {
-  if (!soyAdmin) return null;
+function MisDesafiosCarrusel({ tema, puedoPublicar, puedoResponder, misPublicaciones, cardWidth, mineIndex, setMineIndex, onVerRespuestas, onEditar }) {
+  // El carrusel es la publicación del propio club: lo ve quien pueda hacer
+  // algo con ella. Editarla es `pubChallenge`; mirar y elegir respuestas es
+  // `answerChallenge`, y por eso cada botón pregunta por lo suyo.
+  if (!puedoPublicar && !puedoResponder) return null;
   const activas = misPublicaciones.filter((p) => p.estado === 'abierto');
   if (activas.length === 0 || cardWidth <= 0) return null;
 
@@ -684,9 +701,11 @@ function MisDesafiosCarrusel({ tema, soyAdmin, misPublicaciones, cardWidth, mine
                     {hayRespuestas ? `Ver ${n} ${n === 1 ? 'respuesta' : 'respuestas'}` : 'Ver respuestas'}
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => onEditar(pub)} style={({ pressed }) => [styles.mineEditBtn, pressed && { opacity: 0.7 }]}>
-                  <Text style={styles.mineEditBtnText}>Editar</Text>
-                </Pressable>
+                {puedoPublicar ? (
+                  <Pressable onPress={() => onEditar(pub)} style={({ pressed }) => [styles.mineEditBtn, pressed && { opacity: 0.7 }]}>
+                    <Text style={styles.mineEditBtnText}>Editar</Text>
+                  </Pressable>
+                ) : null}
               </View>
             </LinearGradient>
           );
@@ -761,7 +780,7 @@ function CandidateCard({ pub, tema, miRespuesta, onOpen }) {
 
 /* ── Tablero abierto: hoja de detalle + responder ───────────────── */
 
-function DetailSheet({ visible, pub, tema, soyAdmin, miRespuesta, mensaje, setMensaje, working, onClose, onEnviar, onRetirar, onReconsiderar }) {
+function DetailSheet({ visible, pub, tema, puedoResponder, miRespuesta, mensaje, setMensaje, working, onClose, onEnviar, onRetirar, onReconsiderar }) {
   const facts = pub
     ? [
         { k: 'Formato', v: modalidadInline(pub.modalidad) },
@@ -806,7 +825,7 @@ function DetailSheet({ visible, pub, tema, soyAdmin, miRespuesta, mensaje, setMe
 
               {pub.mensaje ? <Text style={styles.sheetMensaje}>&quot;{pub.mensaje}&quot;</Text> : null}
 
-              {soyAdmin && (
+              {puedoResponder && (
                 miRespuesta ? (
                   miRespuesta.estado === 'pendiente' ? (
                     <View style={styles.sheetRespondedBox}>
@@ -998,7 +1017,7 @@ function HourBound({ label, value, min, max, onChange, tema }) {
 function TableroSubScreen({
   subScreen,
   tema,
-  soyAdmin,
+  puedoResponder,
   working,
   banner,
   onCloseBanner,
@@ -1138,7 +1157,7 @@ function TableroSubScreen({
                 {r.estado === 'rechazada' && <EstadoBadge estado="rechazado" />}
               </View>
               {r.mensaje ? <Text style={styles.responseMensaje}>&quot;{r.mensaje}&quot;</Text> : null}
-              {soyAdmin && r.estado === 'pendiente' ? (
+              {puedoResponder && r.estado === 'pendiente' ? (
                 <View style={styles.mineActionsRow}>
                   <Pressable onPress={() => onRechazar(r)} style={({ pressed }) => [styles.rejectBtn, pressed && { opacity: 0.7 }]}>
                     <Text style={styles.rejectBtnText}>Rechazar</Text>
@@ -1147,7 +1166,7 @@ function TableroSubScreen({
                     <Text style={[styles.mineCtaText, { color: tema.ink }]}>Aceptar</Text>
                   </Pressable>
                 </View>
-              ) : soyAdmin && r.estado === 'rechazada' ? (
+              ) : puedoResponder && r.estado === 'rechazada' ? (
                 <Pressable onPress={() => onReconsiderar(r)} style={({ pressed }) => [styles.mineEditBtn, styles.reconsiderBtn, pressed && { opacity: 0.7 }]}>
                   <Text style={styles.reconsiderBtnText}>Reconsiderar</Text>
                 </Pressable>

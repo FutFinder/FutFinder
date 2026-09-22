@@ -29,6 +29,7 @@ import {
   layoutSlots,
   fitsForMember,
   autocompletarAsignaciones,
+  asignacionesVigentes,
   zoneLabel,
 } from '../utils/formacionClub';
 import { getCurrentUser } from '../services/auth';
@@ -138,12 +139,25 @@ export default function ClubLineupScreen({ navigation, route }) {
     () => baseSlots.map((s) => (custom[s.key] ? { ...s, ...custom[s.key] } : s)),
     [baseSlots, custom]
   );
-  const assignedIds = useMemo(() => new Set(Object.values(asignaciones)), [asignaciones]);
+  /**
+   * Las asignaciones que quedan en pie con la nómina de ahora.
+   *
+   * Un integrante expulsado seguía dentro del JSON guardado: el tablero lo
+   * dibujaba vacío —el render busca al integrante— pero el contador y la
+   * búsqueda de puestos libres sólo miraban la clave, así que decía «7/7» con
+   * un puesto vacío y «no queda banca» con gente en la banca. Todo lo que
+   * cuenta puestos usa esta lista, que aplica la MISMA regla que el dibujo.
+   */
+  const asignacionesVivas = useMemo(
+    () => asignacionesVigentes(asignaciones, members),
+    [asignaciones, members]
+  );
+  const assignedIds = useMemo(() => new Set(Object.values(asignacionesVivas)), [asignacionesVivas]);
   const bench = useMemo(
     () => members.filter((m) => !assignedIds.has(m.member_id)),
     [members, assignedIds]
   );
-  const placedCount = Object.keys(asignaciones).length;
+  const placedCount = Object.keys(asignacionesVivas).length;
   const pickedMember = picked ? membersById.get(picked) : null;
   const fits = pickedMember ? fitsForMember(pickedMember) : [];
 
@@ -189,7 +203,9 @@ export default function ClubLineupScreen({ navigation, route }) {
   tapActionRef.current = (slotKey) => {
     const slot = slots.find((s) => s.key === slotKey);
     if (!slot) return;
-    const occupant = asignaciones[slotKey] ? membersById.get(asignaciones[slotKey]) || null : null;
+    const occupant = asignacionesVivas[slotKey]
+      ? membersById.get(asignacionesVivas[slotKey]) || null
+      : null;
     onSlotPress(slot, occupant);
   };
 
@@ -272,13 +288,15 @@ export default function ClubLineupScreen({ navigation, route }) {
   };
 
   const onAutocompletar = () => {
-    const libres = slots.filter((s) => !asignaciones[s.key]);
+    // Un puesto cuyo integrante ya no está en el club está LIBRE, aunque su
+    // clave siga en el JSON guardado.
+    const libres = slots.filter((s) => !asignacionesVivas[s.key]);
     if (libres.length === 0 || bench.length === 0) {
       flash('No queda banca disponible');
       return;
     }
     const nuevas = autocompletarAsignaciones(libres, bench);
-    setAsignaciones((prev) => ({ ...prev, ...nuevas }));
+    setAsignaciones({ ...asignacionesVivas, ...nuevas });
     setPicked(null);
     flash('Alineación completada');
   };
@@ -294,7 +312,9 @@ export default function ClubLineupScreen({ navigation, route }) {
       modo,
       formacion,
       personalizado,
-      asignaciones,
+      // Se guarda lo vigente: si no, el id del expulsado vuelve al JSON y el
+      // problema renace en la próxima carga.
+      asignaciones: asignacionesVivas,
       puestosPersonalizados: custom,
       expectedUpdatedAt: lineup?.updated_at ?? null,
     });
@@ -461,8 +481,8 @@ export default function ClubLineupScreen({ navigation, route }) {
                 <View style={styles.pitchBoxTop} pointerEvents="none" />
 
                 {slots.map((slot) => {
-                  const occupant = asignaciones[slot.key]
-                    ? membersById.get(asignaciones[slot.key]) || null
+                  const occupant = asignacionesVivas[slot.key]
+                    ? membersById.get(asignacionesVivas[slot.key]) || null
                     : null;
                   const isFit = Boolean(pickedMember) && !occupant && fits.includes(slot.label);
                   const isCaptain = occupant?.rol === 'capitan';
