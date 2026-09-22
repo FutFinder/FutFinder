@@ -11,6 +11,7 @@ import {
 } from '../services/clubs';
 import { getClubEstadisticas } from '../services/clubMatches';
 import { listChallengesForClub } from '../services/clubChallenges';
+import { countRespuestasPendientes } from '../services/clubOpenChallenges';
 import { getPropuestaVigente } from '../services/clubProposals';
 import { getMisPermisosEnClub } from '../services/clubPermissions';
 import { getCambiosDelPartido } from '../services/clubMatchChanges';
@@ -173,6 +174,10 @@ const ESTADO_INICIAL = {
   nextMatchPlazo: null,
   activity: [],
   suggestedRivals: [],
+  // Respuestas que esperan decisión en las publicaciones del club. Es el
+  // badge del acceso rápido «Desafíos», y lo único pendiente que de verdad
+  // vive en la pantalla que ese tile abre.
+  openChallengeReplies: 0,
   invitations: [],
   pendingRequests: [],
   sentRequests: [],
@@ -255,6 +260,7 @@ export function ClubsHomeProvider({ children }) {
         nextMatchPlazo: null,
         activity: [],
         suggestedRivals: [],
+        openChallengeReplies: 0,
         pendingRequests: [],
       };
     });
@@ -356,6 +362,7 @@ export function ClubsHomeProvider({ children }) {
           notifsData,
           partidosData,
           permisosDelegados,
+          respuestasAbiertas,
         ] = await Promise.all([
           segura(
             listChallengesForClub(activeId),
@@ -383,6 +390,12 @@ export function ClubsHomeProvider({ children }) {
           role === 'admin'
             ? Promise.resolve(null)
             : segura(getMisPermisosEnClub(activeId).then((r) => r.data?.permisos || null), null, 'getMisPermisosEnClub'),
+          // El badge del acceso rápido «Desafíos» contaba los desafíos
+          // DIRECTOS recibidos, que ya tienen su propia tarjeta en «Pendiente
+          // para ti» y desde la migración 112 no viven en la pantalla que ese
+          // tile abre. Lo que sí espera decisión ahí son las respuestas a las
+          // publicaciones del club.
+          segura(countRespuestasPendientes(activeId).then((r) => r.data || 0), 0, 'countRespuestasPendientes'),
         ]);
         if (!vivo) return;
 
@@ -492,6 +505,7 @@ export function ClubsHomeProvider({ children }) {
             club: membresiaActiva?.club,
             distancia: distanciaEntreClubesKm,
           }),
+          openChallengeReplies: respuestasAbiertas,
           invitations,
           pendingRequests: solicitudesData,
           sentRequests: solicitudesEnviadas,

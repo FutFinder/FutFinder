@@ -52,14 +52,14 @@ export default function QuickActionGrid({ tema, can, misPermisos, badges, onPres
   return (
     <View style={styles.envoltorio}>
       <View style={styles.grilla}>
-        {tiles.map(({ clave, etiqueta, Icono }) => {
+        {tiles.map(({ clave, etiqueta, Icono, cuenta }) => {
           const badge = badges?.[clave] || 0;
           return (
             <Pressable
               key={clave}
               onPress={() => onPress?.(clave)}
               accessibilityRole="button"
-              accessibilityLabel={badge > 0 ? `${etiqueta}, ${badge} pendientes` : etiqueta}
+              accessibilityLabel={badge > 0 ? `${etiqueta}, ${rotularBadge(badge, cuenta)}` : etiqueta}
               style={({ pressed }) => [styles.tile, pressed && { opacity: 0.75 }]}
             >
               <View style={[styles.icono, { backgroundColor: escala.soft }]}>
@@ -95,13 +95,27 @@ export default function QuickActionGrid({ tema, can, misPermisos, badges, onPres
  */
 const ACCIONES = [
   { clave: 'alineacion', etiqueta: 'Alineación', Icono: Rows3 },
-  { clave: 'desafios', etiqueta: 'Desafíos', Icono: Swords },
+  // El badge de este tile son las respuestas a las publicaciones del club,
+  // que es lo único pendiente que vive en la pantalla que abre. Un lector de
+  // pantalla no puede oír «3 pendientes» y encontrarse con otra cosa.
+  {
+    clave: 'desafios',
+    etiqueta: 'Desafíos',
+    Icono: Swords,
+    cuenta: ['respuesta por decidir', 'respuestas por decidir'],
+  },
   { clave: 'rivales', etiqueta: 'Buscar rivales', Icono: Search },
   { clave: 'partido', etiqueta: 'Calendario', Icono: CalendarDays },
   { clave: 'integrantes', etiqueta: 'Integrantes', Icono: Users },
   { clave: 'chat', etiqueta: 'Chat del club', Icono: MessageCircle },
   { clave: 'permisos', etiqueta: 'Permisos de club', Icono: ShieldCheck, requiere: 'gestionarPermisos' },
 ];
+
+/** «3 respuestas por decidir», «1 pendiente». El plural, resuelto en un sitio. */
+function rotularBadge(n, cuenta) {
+  const [uno, varias] = cuenta || ['pendiente', 'pendientes'];
+  return `${n} ${n === 1 ? uno : varias}`;
+}
 
 const styles = StyleSheet.create({
   envoltorio: { gap: 10 },

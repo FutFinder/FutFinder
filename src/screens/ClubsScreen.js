@@ -83,6 +83,7 @@ export default function ClubsScreen({ navigation, route }) {
     nextMatchPlazo,
     activity,
     suggestedRivals,
+    openChallengeReplies,
     invitations,
     sentRequests,
     retry,
@@ -292,6 +293,7 @@ export default function ClubsScreen({ navigation, route }) {
           nextMatchPlazo,
           activity,
           suggestedRivals,
+          openChallengeReplies,
           tema,
           setActiveClub,
           onAccionRapida,
@@ -398,6 +400,7 @@ function Portada({
   nextMatchPlazo,
   activity,
   suggestedRivals,
+  openChallengeReplies,
   tema,
   setActiveClub,
   onAccionRapida,
@@ -517,7 +520,12 @@ function Portada({
           tema={tema}
           can={can}
           misPermisos={misPermisos}
-          badges={{ desafios: contarPorTipo(tasks, 'desafio') }}
+          // EL BADGE CUENTA LO QUE HAY EN EL DESTINO. Contaba los desafíos
+          // DIRECTOS recibidos, que ya tienen su tarjeta en «Pendiente para
+          // ti» y que desde el tablero abierto no están en la pantalla que
+          // este tile abre: prometía trabajo y llevaba a otro sitio. Lo que sí
+          // espera decisión ahí son las respuestas a las publicaciones.
+          badges={{ desafios: openChallengeReplies }}
           onPress={onAccionRapida}
         />
       </View>
@@ -786,16 +794,6 @@ function subtituloDe({ membership, clubs, club, sentRequests, invitations }) {
   }
   if (membership !== 'member' || !club) return 'Aún sin club';
   return (clubs || []).length > 1 ? `Club activo · ${club.nombre}` : club.nombre;
-}
-
-/**
- * Cuántas tareas accionables hay de un tipo, para el badge de un tile.
- *
- * Esto sí se puede contar acá: lee `type` y `status`, que son campos del
- * contrato, no el texto que se le muestra a alguien.
- */
-function contarPorTipo(tasks, tipo) {
-  return (tasks || []).filter((t) => t.type === tipo && t.status === 'abierta').length;
 }
 
 function fechaLegible(iso) {
