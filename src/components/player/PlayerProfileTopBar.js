@@ -9,7 +9,6 @@ import {
   fuentes as F,
 } from '../../theme/colors';
 import NotificationBell from '../NotificationBell';
-import ClubHeaderButton from '../club/ClubHeaderButton';
 
 /**
  * Barra superior del perfil.
@@ -53,10 +52,15 @@ export default function PlayerProfileTopBar({
         </>
       )}
 
-      {/* Sólo en el perfil propio: en el de otro jugador, «cambiar de club»
-          no significa nada. Esta barra es la misma para los dos. */}
-      {isOwnProfile ? <ClubHeaderButton /> : null}
-
+      {/* AQUÍ NO VA EL SELECTOR DE CLUB, y no es un olvido. Esta barra no es
+          una cabecera de pestaña raíz como las otras cinco: es la barra de un
+          detalle —volver, compartir, editar, ajustes— reutilizada para el
+          perfil propio y para el de otro jugador. A 375 px sus cinco
+          controles ya dejan 63 px para el título y «Mi perfil» necesita 66,
+          así que estaba a tres píxeles de recortarse; con un sexto control de
+          40 px el título quedaba en «M…». Medido en el navegador, no
+          estimado. Meterlo acá exige darle dos filas a esta barra, como ya
+          tienen Clubes y Chat, y eso es un cambio de diseño aparte. */}
       <Pressable
         onPress={onShare}
         accessibilityRole="button"

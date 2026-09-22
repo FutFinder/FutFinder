@@ -111,10 +111,9 @@ const CABECERAS = {
   Clubes: '../../components/club/ClubsHeader.js',
   Reservas: '../../screens/ReservasScreen.js',
   Chat: '../../components/chat/ChatInboxHeader.js',
-  Perfil: '../../components/player/PlayerProfileTopBar.js',
 };
 
-test('las seis pestañas llevan el selector de club en su cabecera', () => {
+test('las cinco cabeceras de marca llevan el selector de club', () => {
   for (const [pestana, ruta] of Object.entries(CABECERAS)) {
     const src = leer(ruta);
     assert.match(
@@ -126,12 +125,16 @@ test('las seis pestañas llevan el selector de club en su cabecera', () => {
   }
 });
 
-test('en el perfil de OTRO jugador no se dibuja: la barra es la misma para los dos', () => {
+test('la barra del perfil NO lo lleva: medido, no estimado, no le cabe', () => {
+  // A 375 px sus cinco controles dejan 63 px de título y «Mi perfil» pide 66:
+  // ya estaba a tres píxeles de recortarse. Con un sexto control de 40 px el
+  // título quedaba en «M…». Además es la barra de un detalle, compartida con
+  // el perfil de otro jugador, donde «cambiar de club» no significa nada.
   const src = leer('../../components/player/PlayerProfileTopBar.js');
-  assert.match(
+  assert.doesNotMatch(
     src,
-    /isOwnProfile \? <ClubHeaderButton \/> : null/,
-    '«cambiar de club» no significa nada mirando el perfil ajeno'
+    /<ClubHeaderButton/,
+    'volver a meterlo acá deja el título en «M…»: antes hay que darle dos filas a esta barra'
   );
 });
 
