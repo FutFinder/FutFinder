@@ -1,0 +1,205 @@
+FUTFINDER — AUDITORÍA DE CHATS Y NOTIFICACIONES
+Fecha de cierre: 23-09-2026
+Código contrastado: 28162c9.
+
+RESUMEN
+Se encontraron 10 errores. Priorizar lectura real, recepción de nuevos avisos
+y silencio; después completar historial y sincronización de la bandeja.
+Este informe documenta los problemas y propone soluciones. No los corrige.
+
+ALCANCE Y EVIDENCIA
+- Inspección del código vigente y migraciones, después de git pull.
+- Recorrido autenticado de la web local: bandeja Chat, conversación de club,
+  opciones y Detalles del chat. Sin enviar mensajes ni cambiar el silencio.
+- Ejecución de funciones y bloques reales del cliente con respuestas de red
+  simuladas: errores, mensajes con la misma fecha y actualizaciones simultáneas.
+- PostgreSQL local temporal con esquema reducido y las funciones reales
+  notify_message_new y mark_chat_read. Datos ficticios; servidor detenido al
+  terminar. No se ejecutaron escrituras de prueba en Supabase remoto.
+- npm test: 1566 pruebas aprobadas, 0 fallidas. Estas pruebas existentes no
+  impiden los errores nuevos que se describen abajo.
+- No se verificó entrega física en iOS/Android, configuración remota de Expo,
+  permisos del sistema ni versiones efectivamente desplegadas de Edge Functions.
+  Los hallazgos de push explican la decisión del código, no una entrega medida
+  en un teléfono. Tampoco se certifica aquí toda la RLS en la base remota.
+
+1. ALTA — EL CHAT MARCA COMO LEÍDOS MENSAJES QUE NO PUDO DESCARGAR
+Dónde: carga inicial de ChatThreadScreen.
+Pasos: abrir un hilo con mensajes nuevos y hacer que la consulta de mensajes
+devuelva un error de red. El acceso al hilo sí debe haber respondido bien.
+Actual: aparece «No pudimos cargar los mensajes», pero se ejecuta igualmente
+markThreadAsRead. El servidor avanza last_read_at; en DM también read_at.
+Consecuencia: desaparece la señal de mensajes pendientes y el remitente puede
+ver lectura aunque el receptor nunca pudo ver el contenido.
+Prueba: ejecución del bloque real con page.error dio banner de error y UNA
+llamada a markThreadAsRead.
+Corregir: marcar lectura solo después de una carga exitosa y visible; asociar
+el marcador al último mensaje realmente recibido, no a una lectura fallida.
+Referencias:
+  src/screens/ChatThreadScreen.js:317-325
+  supabase/migrations/32_chat_lectura_silencio_avisos.sql:176-202
+
+2. MEDIA — UN CHAT TAPADO POR OTRA PANTALLA SIGUE MARCANDO MENSAJES LEÍDOS
+Pasos: abrir una conversación y entrar a Detalles del chat. Mientras esa
+pantalla cubre el hilo, llega un mensaje nuevo al hilo anterior.
+Actual: la suscripción vive en useEffect mientras el componente esté montado;
+cada INSERT ajeno llama markThreadAsRead sin consultar foco de navegación,
+AppState ni si la persona está mirando el último mensaje.
+Consecuencia: se da por leído contenido que no está en pantalla. También
+ocurre al leer mensajes antiguos dentro del mismo hilo.
+Prueba: callback real ejecutado con nearBottomRef=false marca leído; revisión
+de su ciclo de vida sin guardia de foco. El acceso a Detalles se recorrió en
+web; no se envió un mensaje remoto para forzar el caso.
+Corregir: conservar la recepción de mensajes, pero condicionar el acuse de
+lectura a hilo enfocado, app activa y contenido visible.
+Referencia: src/screens/ChatThreadScreen.js:475-531.
+
+3. MEDIA — EL HISTORIAL PUEDE OMITIR MENSAJES CON LA MISMA FECHA
+Pasos: colocar el corte de una página entre mensajes que comparten created_at.
+Actual: se ordena solo por created_at y la página siguiente pide created_at
+estrictamente menor al mensaje más antiguo. No existe desempate por id.
+Prueba: el servicio real con 41 mensajes de igual timestamp devolvió 40,
+hasMore=true; al pedir la segunda página devolvió 0. Se perdió un mensaje.
+La fecha del servidor usa now(), que es compartido dentro de una transacción;
+el esquema no exige timestamps únicos.
+Corregir: orden estable por created_at e id, cursor con ambos campos y filtro
+lexicográfico. Probar empate justo en el límite y recepción simultánea.
+Referencias:
+  src/services/messages.js:676-745
+  src/screens/ChatThreadScreen.js:536-537
+  supabase/migrations/32_chat_lectura_silencio_avisos.sql:121
+
+4. ALTA — LEER UN DM NO CIERRA SU AVISO; LOS SIGUIENTES MENSAJES NO GENERAN PUSH NUEVO
+Pasos: recibir un DM, abrirlo desde Chat y leerlo, salir y recibir otro mensaje
+del mismo remitente sin haber abierto el aviso en la bandeja de Avisos.
+Actual: mark_chat_read actualiza chat_reads y messages, pero no notifications.
+notify_message_new encuentra el aviso anterior con read=false y lo actualiza.
+El disparador push solo escucha INSERT; el popup también ignora UPDATE.
+Consecuencia: los siguientes mensajes pueden quedarse sin nueva alerta externa
+ni popup aunque la conversación anterior ya se hubiera leído. La campana
+tampoco refleja la lectura realizada desde Chat.
+Prueba SQL real: después de leer quedaron 0 mensajes sin leer y 1 aviso sin
+leer. El segundo mensaje mantuvo el mismo aviso y elevó msgCount a 2; no hubo
+INSERT nuevo que disparase push.
+Corregir: sincronizar el aviso de ese hilo con la lectura confirmada o agrupar
+según mensajes realmente pendientes de lectura. Resolver también lectura desde
+popup/push y mensajes que llegan durante el marcado, sin silenciar alertas nuevas.
+Referencias:
+  supabase/migrations/15_notificaciones_mensajes.sql:42-80
+  supabase/migrations/32_chat_lectura_silencio_avisos.sql:176-202
+  supabase/migrations/117_el_push_saca_su_clave_del_vault.sql:119 (trigger AFTER INSERT)
+  src/components/NotificationToastHost.js:44
+
+5. ALTA — SILENCIAR UNA CONVERSACIÓN NO SILENCIA SUS ALERTAS
+Pasos: silenciar un DM, conservar notif_chat habilitado y recibir un mensaje
+cuando no existe un aviso anterior pendiente de ese remitente.
+Actual: chat_mutes se aplica al contador/bandeja de chats, pero el trigger de
+DM, el popup y send-push no consultan el silencio del hilo. El texto de Detalles
+promete «Silenciado hasta que lo reactives» dentro de Notificaciones.
+Prueba SQL real: con fila de silencio creada, el DM produjo un INSERT en
+notifications. El recorrido de send-push solo comprueba la preferencia general
+notif_chat antes de buscar tokens. El popup también acepta ese INSERT.
+Consecuencia: se ofrecen controles de silencio que no evitan las interrupciones.
+Corregir: respetar el silencio del hilo al decidir push y popup; conservar el
+mensaje interno y aplicar explícitamente la excepción de avisos importantes.
+Referencias:
+  src/screens/ChatDetailsScreen.js:193-196
+  src/services/messages.js:215-236
+  supabase/migrations/15_notificaciones_mensajes.sql:19-84
+  supabase/functions/send-push/index.ts:133-164
+  src/components/NotificationToastHost.js:41-47
+
+6. MEDIA — LOS AVISOS ANTERIORES A LOS ÚLTIMOS 50 NO SE PUEDEN CONSULTAR
+Actual: NotificationsScreen solicita 50 globales; después filtra por categoría
+y club en el cliente. No tiene paginación para continuar hacia avisos anteriores.
+El contador global, en cambio, cuenta todas las filas sin leer.
+Prueba: servicio real con 50 avisos recientes y una solicitud de club en el
+puesto 51 devolvió 50; el filtro Clubes no encuentra la solicitud existente.
+Consecuencia: puede haber contador pendiente y bandeja filtrada vacía, y un
+aviso con acción puede quedar inaccesible desde esta sección.
+Corregir: paginar y aplicar filtros antes del límite en servidor; no presentar
+el subconjunto de 50 como si cubriera toda la bandeja o todos sus pendientes.
+Referencias:
+  src/services/notifications.js:195-216
+  src/screens/NotificationsScreen.js:197,390-408
+
+7. MEDIA — AL FALLAR UNA ACCIÓN SE PIERDEN NOVEDADES LLEGADAS ENTRE MEDIO
+Pasos: iniciar eliminación de un aviso; recibir otro por Realtime mientras
+la petición sigue pendiente; hacer que falle la eliminación.
+Actual: runOptimistic restaura el arreglo completo que existía antes de la
+petición. Sobrescribe también los cambios ajenos a esa operación.
+Prueba con la función real: entró un aviso «nueva» durante la espera y el
+rollback lo quitó de la lista. Otra eliminación exitosa podría reaparecer.
+Consecuencia: la interfaz pierde novedades o resucita avisos ya eliminados
+hasta que se recargue; las filas del servidor no necesariamente se pierden.
+Corregir: aplicar/revertir únicamente el cambio afectado sobre el estado actual,
+o reconciliar de nuevo con el servidor. Coordinar acciones globales e individuales.
+Referencias:
+  src/utils/notificationInbox.js:55-60
+  src/screens/NotificationsScreen.js:281-334
+
+8. MEDIA — ABRIR UN AVISO LO DEJA «LEÍDO» EN PANTALLA AUNQUE FALLE EL GUARDADO
+Actual: handlePress cambia read a true y llama markAsRead sin esperar ni
+comprobar su resultado. No revierte ni muestra error.
+Prueba: el bloque real con markAsRead devolviendo error dejó read=true.
+Consecuencia: la campana, la tarjeta y otra sesión pueden discrepar; al recargar
+el aviso vuelve a estar pendiente sin explicación.
+Corregir: gestionar el resultado y revertir solo esa lectura o reintentarla;
+se puede permitir navegar aunque falle el marcado, sin falsear su persistencia.
+Referencia: src/screens/NotificationsScreen.js:258-261.
+
+9. MEDIA — BORRAR AVISOS NO ACTUALIZA LA CAMPANA YA MONTADA
+Pasos: con una campana montada y avisos sin leer, abrir Avisos y eliminarlos.
+Actual: el canal compartido escucha INSERT y UPDATE, pero no DELETE.
+useUnreadNotifications recarga al montar y recibir eventos; no al volver al
+foco. La eliminación tampoco publica una invalidación local del contador.
+Consecuencia: la campana puede seguir mostrando pendientes que ya se borraron
+hasta recibir otro evento o volver a montarse. Otra sesión queda desactualizada.
+Prueba de cableado: verificados los dos tipos de evento y los únicos puntos de
+recarga del hook. No se eliminaron notificaciones reales para probarlo.
+Corregir: invalidar contadores después de borrar y recargar al foco/reconectar;
+si se agrega DELETE remoto, comprobar sus restricciones de filtrado en Realtime.
+Referencias:
+  src/services/notifications.js:305-307
+  src/utils/useUnreadNotifications.js:18-43
+  src/screens/NotificationsScreen.js:281-334
+
+10. ALTA — UN POPUP PUEDE CONSERVAR CONTENIDO DE LA CUENTA ANTERIOR AL SALIR
+Pasos: recibir un popup y cerrar sesión antes de sus cinco segundos de duración.
+Actual: la cola es global al módulo. Existe limpiarToasts, pero solo la llaman
+tests; el cambio de usuario únicamente limpia la suscripción Realtime.
+NotificationToastHost permanece montado y no oculta su cola cuando user es nulo.
+Consecuencia: título y cuerpo del aviso anterior pueden seguir visibles en la
+pantalla de acceso o durante un cambio rápido de cuenta, hasta expirar/cerrarse.
+Prueba: cola real conservó el aviso ficticio; comprobados los flujos de sesión,
+el host y App.js, sin llamada a limpieza. No se cambió la cuenta real de la web.
+Corregir: limpiar cola y temporizadores al cerrar/cambiar sesión y comprobar
+que cada aviso corresponde al usuario actual antes de mostrarlo o abrirlo.
+Referencias:
+  src/utils/notificationToasts.js:21-60
+  src/components/NotificationToastHost.js:36-58
+  src/services/auth.js (signOut)
+  App.js (NotificationToastHost dentro de AuthProvider)
+
+EVIDENCIA LOCAL TEMPORAL
+/tmp/futfinder-chat-avisos-20260922/repro.mjs
+/tmp/futfinder-chat-avisos-20260922/repro-extra.mjs
+/tmp/futfinder-chat-avisos-20260922/results.json
+/tmp/futfinder-chat-avisos-20260922/extra-results.json
+/tmp/futfinder-chat-avisos-20260922/sql-results.json
+/tmp/futfinder-chat-avisos-20260922/npm-test.log
+/tmp/futfinder-auditoria-20260921/chat-notifs.mjs
+Los archivos /tmp son temporales; los pasos y resultados quedan conservados
+en este informe. Los dobles de red no sustituyen pruebas entre dos teléfonos.
+
+NO CONTADOS COMO ERRORES NUEVOS
+- Popup y banner nativo duplicados: ya documentado en la memoria de avisos.
+- Destino de club_challenge a Desafíos abiertos: relacionado con el informe
+  anterior de usabilidad; conviene contrastarlo al corregir aquellas rutas.
+- Baja de token después de SIGNED_OUT: requiere verificar la política remota
+  de push_tokens y una prueba nativa; no se afirma aquí que haya fuga de push.
+
+ORDEN SUGERIDO
+1, 4, 5 y 10 primero; luego 2 y 9; finalmente 3, 6, 7 y 8.
+Antes de considerar el módulo listo: repetir estos escenarios con dos sesiones,
+validar reconexión y comprobar entrega/silencio de push en un teléfono físico.
