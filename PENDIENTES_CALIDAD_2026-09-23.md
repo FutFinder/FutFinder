@@ -1,6 +1,6 @@
 # Pendientes de calidad de FutFinder
 
-Revisión: 2026-09-23. Base de código contrastada: `43fdc4b` después de `git pull`.
+Revisión: 2026-09-23. Base de código contrastada: `7e17aa2` después de `git pull`.
 
 Este es el listado único para priorizar arreglos de Inicio, Chat, Perfil, Avisos y Ajustes. **Ningún ítem de esta lista está corregido por este documento.** Los casos C01–C10 provienen de [la auditoría de chats y notificaciones](ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt), que contiene los pasos y las pruebas de reproducción. Los casos nuevos se detectaron al revisar el flujo de datos del código; donde falta una prueba de interfaz o de dos sesiones, se indica.
 
@@ -37,6 +37,7 @@ Prioridades: **P1** afecta lectura, privacidad o avisos relevantes; **P2** produ
 | I04 | P2 | Inicio puede ejecutar `load` dos veces (foco, refresco o inscripción) y no descarta respuestas antiguas. `HomeScreen.js:91-155`. **Detectado por flujo de código; falta reproducir con respuestas fuera de orden.** | Entregar la recarga nueva antes de una anterior y conservar la información nueva. |
 | I05 | P2 | Inicio interpreta el `trust_score=100` inicial como reputación ganada: muestra «TRUST 100», «ÉLITE» y «VERIFICADO» incluso con cero partidos confirmados. Si falla la carga del perfil, `getCurrentProfile` devuelve `null` y el mismo valor se inventa por `?? 100`. Perfil, en cambio, muestra `N.A.` sin partidos. `HomeScreen.js:200-205,242-245`, `TacticalHeader.js:38-46`, `auth.js:153-162`, `playerMeta.js:126-145`. | Comparar Inicio y Perfil de una cuenta nueva y repetir con fallo de carga; ninguno debe atribuir reputación no obtenida. |
 | I06 | P3 | La etiqueta «ADMIN · N CLUBES» cuenta **todas** las membresías cuando el club activo es administrado, aunque en los demás clubes la persona sea integrante común. `HomeScreen.js:230-238`. | Cuenta administradora en un club y miembro en otro: la etiqueta debe describir correctamente qué cuenta. |
+| I07 | P2 | Si el único partido cercano es uno destacado en «Tu club juega», Inicio dice arriba «1 partido cerca de ti» y abajo «Sin partidos en tu radio». `HomeScreen.js:240-242,258-263,371-398`, `clubMatchRules.js:359-366`. **Confirmado en web autenticada.** | Mostrar «No hay otros partidos cerca» o un estado equivalente cuando el único cercano ya está destacado, sin contradecir el resumen. |
 
 ## Perfil
 
@@ -48,6 +49,7 @@ Prioridades: **P1** afecta lectura, privacidad o avisos relevantes; **P2** produ
 | P04 | P2 | Si falla la consulta del estado de cuenta, el servicio devuelve `suspended:false` y la tarjeta afirma «Cuenta en buen estado»/«Sin sanciones ni restricciones activas». No distingue ausencia de sanción de falta de datos. `profile.js:265-285`, `AccountStatusCard.js:42-69`. | Fallar la consulta de estado y mostrar «No pudimos comprobarlo» o un estado equivalente, sin afirmar buen estado. |
 | P05 | P2 | Si falla la consulta de valoraciones, `getUserRatingSummary` devuelve ceros como si la persona no tuviera evaluaciones; Perfil transforma eso en «Sin evaluaciones todavía». `ratings.js:199-239`, `playerMeta.js:112-123`, `ReputationCard.js:44-57`. | Fallar solo la consulta de valoraciones para un perfil con reseñas y distinguir error de cero evaluaciones. |
 | P06 | P2 | «Invitar a este jugador a mi club» abre `ClubInvite` con solo `clubId`: no pasa el `userId` del perfil ni preselecciona al jugador. La pantalla de destino arranca con búsqueda vacía y un máximo de 30 resultados, así que el jugador que se quería invitar puede no aparecer. `PlayerPublicActions.js:124-137`, `ProfileScreen.js:333-337`, `ClubInviteScreen.js:36-65`. | Abrir la invitación desde un perfil fuera de los primeros 30 resultados y ofrecer directamente al destinatario correcto. |
+| P07 | P2 | En la lista de invitaciones, una persona sin partidos confirmados aparece como «Reputación 100», aunque su Perfil muestra «N.A.». La pantalla usa `trust_score ?? 100` sin considerar `asistencias_confirmadas`, que la búsqueda ya devuelve. **Confirmado en web autenticada con el mismo jugador en ambas pantallas.** `ClubInviteScreen.js:151-165`, `playerMeta.js:126-145`. | Ver el mismo jugador nuevo en Perfil e Invitaciones; ambos deben comunicar que su reputación todavía no es evaluable. |
 
 ## Ajustes
 
@@ -58,4 +60,19 @@ Prioridades: **P1** afecta lectura, privacidad o avisos relevantes; **P2** produ
 
 ## Alcance de la revisión
 
-La inspección cubrió el código de Inicio, bandeja/hilo/detalles de Chat, Perfil y sus servicios principales, además de los hallazgos existentes de Avisos y Ajustes. `npm run verify` pasó 1.566 pruebas con 25 advertencias de lint y `npm run build:web` terminó correctamente en la revisión anterior de la misma base de aplicación. Estas comprobaciones no cubren recorridos autenticados con dos cuentas, entrega push en teléfonos ni el estado desplegado de Supabase. Los casos nuevos C13–C16, I05–I06 y P04–P06 están sustentados por el flujo de datos y las ramas de error del código; falta reproducirlos en una interfaz autenticada. **Inicio, Chat y Perfil aún no se pueden dar por completos:** hay fallas pendientes en cada uno y los casos marcados como flujo de código requieren una reproducción dirigida.
+La inspección cubrió el código de Inicio, bandeja/hilo/detalles de Chat, Perfil y sus servicios principales, además de los hallazgos existentes de Avisos y Ajustes. En esta revisión `npm run verify` pasó 1.566 pruebas con 25 advertencias de lint; `npm run build:web` terminó correctamente en la revisión anterior de la misma base de aplicación. La verificación autenticada siguiente confirma varios casos de interfaz, pero no cubre errores de red provocados, respuestas fuera de orden, entrega push en teléfonos ni el estado desplegado de todas las migraciones. **Inicio, Chat y Perfil aún no se pueden dar por completos:** hay fallas pendientes en cada uno.
+
+## Verificación web con sesión iniciada (2026-09-23)
+
+Se usaron las tres cuentas del archivo de pruebas proporcionado fuera del repositorio, contra el Supabase configurado en `.env`. No se registran aquí correos, contraseñas, identificadores de usuario ni contenido de conversaciones. Las sesiones se abrieron en la web local; no se enviaron mensajes ni invitaciones, ni se crearon partidos. Abrir un DM sí marcó ese hilo como leído, que era el efecto que se necesitaba observar.
+
+- **I05 confirmado en dos cuentas:** Inicio mostró «TRUST 100», «ÉLITE» y «VERIFICADO» con cero partidos jugados; Perfil de cada una mostró Trust Score «N.A.» y la explicación de que se calcula tras los primeros partidos.
+- **I06 confirmado:** la cuenta organizadora mostró «ADMIN · 3 CLUBES» en Inicio, mientras el selector identificó dos clubes como «Administrador» y uno como «Integrante».
+- **I07 confirmado:** en esa misma cuenta, el resumen anunció un partido cercano, «Tu club juega» mostró ese encuentro y «Partidos cerca de ti» afirmó «Sin partidos en tu radio».
+- **P03 confirmado:** desde un Perfil con participaciones, «Ver todo» abrió la pestaña de búsqueda de partidos, no un historial.
+- **C14 confirmado:** Detalles de un desafío existente mostró el nombre del encuentro seguido de «Mensaje directo», junto a dos participantes de clubes.
+- **P06 confirmado en su primera parte:** desde un perfil público se pulsó «Invitar a este jugador a mi club»; la pantalla siguiente abrió una búsqueda vacía y sin destinatario seleccionado. En esta prueba el jugador sí apareció dentro de los primeros 30; el caso de quedar fuera del límite sigue pendiente.
+- **C04 confirmado en su primera parte:** antes de abrir un DM había un mensaje pendiente en Chat y un aviso `message_new` sin leer. Tras leer el DM, desapareció el pendiente del chat, pero la campana conservó sus dos avisos sin leer. No se generó un segundo mensaje para medir la falta de push nuevo; esa segunda parte conserva la reproducción SQL de la auditoría original.
+- **P07 confirmado:** el mismo jugador sin partidos tenía reputación «N.A.» en su Perfil y «Reputación 100» en la lista de invitaciones.
+
+Los casos que dependen de errores de red, respuestas fuera de orden, más de 50 avisos o push físico no se consideran verificados por esta sesión. **Inicio, Chat y Perfil siguen abiertos a corrección y prueba.**
