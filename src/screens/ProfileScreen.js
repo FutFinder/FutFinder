@@ -53,7 +53,7 @@ import {
 } from '../services/profile';
 import { getUserRatingSummary } from '../services/ratings';
 import { getProfilePhotos } from '../services/gallery';
-import { getMyClubs } from '../services/clubs';
+import { getMyClubs, inviteToClub } from '../services/clubs';
 import {
   getFriendshipWith,
   sendFriendRequest,
@@ -139,6 +139,11 @@ export default function ProfileScreen({ navigation, route }) {
   const [avatarViewer, setAvatarViewer] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(null);
   const [blockConfirm, setBlockConfirm] = useState(false);
+  // Invitar a mi club desde el perfil: va directo a ESTE jugador. Si administro
+  // más de un club, primero se elige cuál (`clubPicker`).
+  const [clubPicker, setClubPicker] = useState(false);
+  const [invitandoClub, setInvitandoClub] = useState(false);
+  const [clubesInvitados, setClubesInvitados] = useState(() => new Set());
 
   // Contexto único: se compara por identificador, nunca por nombre.
   const isOwnProfile = !viewUserId || (myId !== null && viewUserId === myId);
@@ -330,10 +335,42 @@ export default function ProfileScreen({ navigation, route }) {
     });
   };
 
+  // Desde el perfil de un jugador la invitación le llega a él y a nadie más:
+  // mandarlo al buscador con todos los jugadores obligaba a encontrarlo de
+  // nuevo en una lista enorme. El buscador sigue en el club, para cuando no
+  // se sabe a quién invitar.
+  const clubesQueAdministro = misClubs.filter((c) => c.miRol === 'admin' && c.club?.id);
+
+  const invitarAClub = async (club) => {
+    if (invitandoClub || !viewUserId) return;
+    setInvitandoClub(true);
+    const { error } = await inviteToClub(club.id, viewUserId);
+    setInvitandoClub(false);
+    if (error) {
+      showBanner('error', 'No se pudo invitar', error.message || '');
+      return;
+    }
+    setClubesInvitados((prev) => new Set(prev).add(club.id));
+    showBanner(
+      'success',
+      'Invitación enviada',
+      `@${profile?.username || 'jugador'} verá tu invitación a ${club.nombre} en su pestaña Clubes.`
+    );
+  };
+
   const handleInviteClub = () => {
-    const club = misClubs.find((c) => c.miRol === 'admin');
-    if (!club?.club?.id) return;
-    navigation.navigate('ClubInvite', { clubId: club.club.id });
+    const pendientes = clubesQueAdministro.filter((c) => !clubesInvitados.has(c.club.id));
+    if (pendientes.length === 0) return;
+    if (clubesQueAdministro.length > 1) {
+      setClubPicker(true);
+      return;
+    }
+    invitarAClub(pendientes[0].club);
+  };
+
+  const handlePickClub = (club) => {
+    setClubPicker(false);
+    invitarAClub(club);
   };
 
   const handleSubmitReport = async ({ motivo, descripcion }) => {
@@ -438,8 +475,9 @@ export default function ProfileScreen({ navigation, route }) {
 
   // La ficha "Club" muestra mi club sea cual sea mi rol; invitar exige ser admin.
   const clubActual = isOwnProfile ? misClubs[0]?.club?.nombre || null : null;
-  const puedeInvitarAClub =
-    !isOwnProfile && misClubs.some((c) => c.miRol === 'admin');
+  const puedeInvitarAClub = !isOwnProfile && clubesQueAdministro.length > 0;
+  const invitacionClubEnviada =
+    puedeInvitarAClub && clubesQueAdministro.every((c) => clubesInvitados.has(c.club.id));
   // El estado "perfil nuevo" sale de los datos reales, no de una bandera visual.
   const perfilVacio = perfilIncompleto({ profile, history, photos });
 
@@ -495,6 +533,8 @@ export default function ProfileScreen({ navigation, route }) {
               myId={myId}
               busy={friendBusy}
               puedeInvitarAClub={puedeInvitarAClub}
+              invitandoAClub={invitandoClub}
+              invitacionClubEnviada={invitacionClubEnviada}
               yaReportado={yaReportado}
               isBlocked={isBlocked}
               onAdd={handleAddFriend}
@@ -622,6 +662,54 @@ export default function ProfileScreen({ navigation, route }) {
         onClose={() => setReportOpen(false)}
         onSubmit={handleSubmitReport}
       />
+
+      {/* Elegir a cuál de mis clubes invitarlo (solo si administro más de uno) */}
+      <Modal
+        visible={clubPicker}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setClubPicker(false)}
+      >
+        <Pressable style={styles.dialogBackdrop} onPress={() => setClubPicker(false)}>
+          <Pressable style={styles.dialog} onPress={() => {}}>
+            <Text style={styles.dialogTitle}>¿A qué club invitas a @{profile.username || 'jugador'}?</Text>
+            <Text style={styles.dialogText}>Le llega la invitación y decide si acepta.</Text>
+            {clubesQueAdministro.map(({ club }) => {
+              const enviada = clubesInvitados.has(club.id);
+              return (
+                <Pressable
+                  key={club.id}
+                  onPress={() => handlePickClub(club)}
+                  disabled={enviada}
+                  accessibilityRole="button"
+                  accessibilityLabel={enviada ? `Ya invitaste a ${club.nombre}` : `Invitar a ${club.nombre}`}
+                  style={({ pressed }) => [
+                    styles.dialogOption,
+                    enviada && styles.dialogOptionDone,
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <Text
+                    style={[styles.dialogOptionText, enviada && styles.dialogOptionTextDone]}
+                    numberOfLines={1}
+                  >
+                    {enviada ? `${club.nombre} · invitación enviada` : club.nombre}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <Pressable
+              onPress={() => setClubPicker(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar"
+              style={({ pressed }) => [styles.dialogCancel, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.dialogCancelText}>Cancelar</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Confirmación de bloqueo */}
       <Modal
@@ -792,6 +880,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dialogDangerText: { color: C.loss, fontSize: 14.5, fontFamily: F.bold },
+  dialogOption: {
+    minHeight: 48,
+    marginTop: 10,
+    borderRadius: R.iconBtn,
+    borderWidth: 1,
+    borderColor: alfa(C.green, 0.35),
+    backgroundColor: alfa(C.green, 0.10),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  dialogOptionDone: { borderColor: C.borderSoft, backgroundColor: C.chip },
+  dialogOptionText: { color: C.green, fontSize: 14.5, fontFamily: F.bold },
+  dialogOptionTextDone: { color: C.textMuted },
   dialogCancel: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   dialogCancelText: { color: C.textSecondary, fontSize: 14, fontFamily: F.semiBold },
 

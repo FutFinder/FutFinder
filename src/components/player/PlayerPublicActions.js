@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import {
   UserPlus,
   UserCheck,
@@ -42,6 +42,8 @@ export default function PlayerPublicActions({
   myId,
   busy,
   puedeInvitarAClub,
+  invitandoAClub,
+  invitacionClubEnviada,
   yaReportado,
   isBlocked,
   onAdd,
@@ -134,12 +136,30 @@ export default function PlayerPublicActions({
       {!isBlocked && puedeInvitarAClub && (
         <Pressable
           onPress={onInviteClub}
+          disabled={invitandoAClub || invitacionClubEnviada}
           accessibilityRole="button"
-          accessibilityLabel="Invitar a este jugador a mi club"
-          style={({ pressed }) => [styles.clubBtn, pressed && { opacity: 0.85 }]}
+          accessibilityLabel={
+            invitacionClubEnviada
+              ? 'Ya invitaste a este jugador a tu club'
+              : 'Invitar a este jugador a mi club'
+          }
+          style={({ pressed }) => [
+            styles.clubBtn,
+            invitacionClubEnviada && styles.clubBtnDone,
+            invitandoAClub && styles.busy,
+            pressed && { opacity: 0.85 },
+          ]}
         >
-          <Shield color={C.green} size={16} strokeWidth={2} />
-          <Text style={styles.clubText}>Invitar a mi club</Text>
+          {invitandoAClub ? (
+            <ActivityIndicator color={C.green} size="small" />
+          ) : invitacionClubEnviada ? (
+            <Clock color={C.textSecondary} size={16} strokeWidth={2} />
+          ) : (
+            <Shield color={C.green} size={16} strokeWidth={2} />
+          )}
+          <Text style={[styles.clubText, invitacionClubEnviada && styles.clubTextDone]}>
+            {invitacionClubEnviada ? 'Invitación al club enviada' : 'Invitar a mi club'}
+          </Text>
         </Pressable>
       )}
 
@@ -277,6 +297,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   clubText: { color: C.green, fontSize: 13.5, fontFamily: F.bold },
+  clubBtnDone: { borderColor: C.border, backgroundColor: C.chip },
+  clubTextDone: { color: C.textSecondary },
 
   blockBtn: {
     minHeight: 44,
