@@ -7,7 +7,27 @@ import {
 
 import { paleta as C, alfa } from '../../theme/colors';
 
-/** A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de notificación. */
+/**
+ * A qué chip de filtro (CLUBES/PARTIDOS/SOCIAL) pertenece cada tipo real de
+ * notificación.
+ *
+ * UN TIPO QUE FALTA ACÁ NO SE VE AL FILTRAR. `NotificationsScreen` filtra con
+ * `CATEGORY[n.type] === filtro`, así que un tipo sin entrada desaparece de
+ * TODOS los chips menos «Todos», y tampoco suma en sus contadores. Faltaban
+ * 21 de los 53 que admite `notifications_type_check` —entre ellos toda la
+ * familia `club_challenge_proposal*`, `club_resultado_*` y las reservas—, con
+ * 22 avisos reales ya emitidos en producción invisibles.
+ *
+ * Y NO ES UN FILTRO QUE EL USUARIO ELIJA SIEMPRE: la portada de Clubes entra
+ * a Avisos con `filter: 'clubes'` y un `clubId`, y en ese caso la categoría
+ * queda FIJA en «clubes». Un aviso de club sin entrada acá no se puede ver
+ * por ninguna vía desde la portada.
+ *
+ * Las reservas y el saldo caen en «partidos»: no tienen chip propio —los
+ * cuatro son Todos/Clubes/Partidos/Social— y una cancha reservada es lo más
+ * cercano a un partido. Antes de inventar un quinto chip hay que decidir el
+ * producto; mientras tanto, mejor visibles ahí que invisibles.
+ */
 export const CATEGORY = {
   friend_request: 'social',
   friend_accept: 'social',
@@ -41,6 +61,34 @@ export const CATEGORY = {
   club_match_cancelled: 'clubes',
   club_sancionado: 'clubes',
   club_revision_resuelta: 'clubes',
+
+  // ── Los que faltaban ────────────────────────────────────────────
+  // Desafíos: el ciclo formal completo (migraciones 42 y 43).
+  club_challenge_extension: 'clubes',
+  club_challenge_closed: 'clubes',
+  club_challenge_proposal: 'clubes',
+  club_challenge_proposal_rejected: 'clubes',
+  club_resultado_propuesto: 'clubes',
+  club_resultado_confirmado: 'clubes',
+  club_resultado_disputado: 'clubes',
+
+  // Reservas y saldo. Ver la nota de arriba sobre por qué «partidos».
+  reserva_confirmada: 'partidos',
+  reserva_cancelada: 'partidos',
+  reserva_invitacion_capitan: 'partidos',
+  reserva_invitacion_jugador: 'partidos',
+  reserva_invitacion_rechazada: 'partidos',
+  reserva_cuota_recalculada: 'partidos',
+  reserva_saldo_insuficiente: 'partidos',
+  reserva_recordatorio_pago: 'partidos',
+  reserva_participante_quitado: 'partidos',
+  reserva_cancelacion_solicitada: 'partidos',
+  reserva_cancelacion_rechazada: 'partidos',
+  balance_cargado: 'partidos',
+  complejo_admin_agregado: 'partidos',
+
+  // Lista de espera: el turno que se dejó pasar (migración 105).
+  waitlist_turno_vencido: 'partidos',
 };
 
 export const ICON = {

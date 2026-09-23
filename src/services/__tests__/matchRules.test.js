@@ -424,3 +424,64 @@ test('un partido «abierto» que ya pasó sí se califica: lo que manda es el re
   // haya hecho no puede dejar a los jugadores sin poder evaluarse.
   assert.equal(R.puedeCalificar({ ...TERMINADO, estado: 'abierto' }, CONFIRMADO, DESPUES), true);
 });
+
+// ── Rango de edad: una sola regla para publicar y para editar ────────
+//
+// EL FALLO: `EditMatchScreen` tenía su propia copia de la validación y sólo
+// comparaba el mínimo contra el máximo. Sin los límites de
+// `matches_edad_check` se podía guardar `edad_min = 5` y estrellarse contra
+// la restricción con el error crudo de Postgres.
+
+test('validarRangoEdad: los límites son los de matches_edad_check (12 a 99)', () => {
+  assert.match(R.validarRangoEdad(5, 40), /entre 12 y 99/);
+  assert.match(R.validarRangoEdad(20, 120), /entre 12 y 99/);
+  assert.equal(R.validarRangoEdad(12, 99), null);
+});
+
+test('validarRangoEdad: el mínimo tiene que ser ESTRICTAMENTE menor', () => {
+  // La base exige `edad_min < edad_max`, no `<=`.
+  assert.match(R.validarRangoEdad(30, 30), /menor que la máxima/);
+  assert.equal(R.validarRangoEdad(29, 30), null);
+});
+
+test('validarRangoEdad: sin rango no hay error', () => {
+  assert.equal(R.validarRangoEdad('', ''), null);
+  assert.equal(R.validarRangoEdad(null, null), null);
+  assert.equal(R.validarRangoEdad(18, ''), null);
+});
+
+// ── Lo que se dice al confirmar por GPS ─────────────────────────────
+//
+// EL FALLO: se prometía «+1 Trust Score» mirando sólo que hubiera distancia.
+// El servidor sube con `LEAST(trust_score + 1, 100)` y el puntaje NACE en
+// 100: al revisarlo, 32 de 34 perfiles estaban en el tope, así que el caso
+// común era prometer un punto que no se daba. La migración 132 devuelve
+// `trust_delta` y esta función lo traduce.
+
+test('textoConfirmacionGps: con el puntaje en el tope no promete el punto', () => {
+  const t = R.textoConfirmacionGps({ ok: true, distance: 42, trust_delta: 0, trust_score: 100 });
+  assert.doesNotMatch(t.detalle, /\+1/);
+  assert.match(t.detalle, /al máximo/);
+  assert.match(t.detalle, /42 m/);
+});
+
+test('textoConfirmacionGps: cuando el punto SÍ se dio, lo dice', () => {
+  const t = R.textoConfirmacionGps({ ok: true, distance: 10, trust_delta: 1, trust_score: 81 });
+  assert.match(t.detalle, /\+1 de Trust Score/);
+});
+
+test('textoConfirmacionGps: «ya estaba confirmado» no se anuncia como recién hecho', () => {
+  const t = R.textoConfirmacionGps({ ok: true, already: true });
+  assert.match(t.titulo, /ya estaba/i);
+});
+
+test('textoConfirmacionGps: sin la migración 132 no se inventa el punto', () => {
+  // Una base vieja no manda `trust_delta`; entonces sólo se confirma el hecho.
+  const t = R.textoConfirmacionGps({ ok: true, distance: 15 });
+  assert.doesNotMatch(t.detalle, /Trust Score/);
+  assert.match(t.detalle, /15 m/);
+});
+
+test('textoConfirmacionGps: un fallo no produce texto de éxito', () => {
+  assert.equal(R.textoConfirmacionGps({ ok: false, reason: 'Estás demasiado lejos' }), null);
+});

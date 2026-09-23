@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Info, UserPlus, BellRing, Check, X } from 'lucide-react-native';
 
@@ -17,6 +17,10 @@ import {
 } from '../utils/pagoDividido';
 import { alcanzaPara } from '../utils/saldo';
 import { formatCLP } from '../services/reservasRules';
+// `Alert.alert` no abre NADA en la app web: sacar a alguien y salirse de la
+// reserva no hacían absolutamente nada ahí, en silencio. Ver la cabecera de
+// `useConfirmacion`, que existe por esto mismo.
+import useConfirmacion from '../components/useConfirmacion';
 
 /**
  * El grupo de una reserva dividida: quién va, quién ya puso su parte.
@@ -43,6 +47,7 @@ import { formatCLP } from '../services/reservasRules';
  */
 export default function ArmarReservaScreen({ navigation, route }) {
   const { reservaId } = route.params || {};
+  const { confirmar, dialogo } = useConfirmacion();
   const [detalle, setDetalle] = useState(null);
   const [saldo, setSaldo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -88,27 +93,21 @@ export default function ArmarReservaScreen({ navigation, route }) {
   };
 
   const sacar = (p) => {
-    Alert.alert(
+    confirmar(
       `¿Sacar a ${p.nombre}?`,
       'Queda fuera de la reserva y se le avisa. Puedes invitar a otra persona en su lugar.',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Sacar',
-          style: 'destructive',
-          onPress: async () => {
-            // Mismo guardia que `poneMiParte`: sin esto, un doble toque
-            // sobre el botón de "Sacar" (a diferencia del diálogo, que sólo
-            // protege UN toque) podía mandar dos llamadas seguidas.
-            if (ocupado) return;
-            setOcupado(true);
-            const { data, error: e } = await quitarJugador(reservaId, p.userId);
-            setOcupado(false);
-            if (e || !data?.ok) setAviso({ tono: 'warning', texto: data?.reason || e?.message });
-            load();
-          },
-        },
-      ],
+      async () => {
+        // Mismo guardia que `poneMiParte`: sin esto, un doble toque sobre el
+        // botón de «Sacar» (a diferencia del diálogo, que sólo protege UN
+        // toque) podía mandar dos llamadas seguidas.
+        if (ocupado) return;
+        setOcupado(true);
+        const { data, error: e } = await quitarJugador(reservaId, p.userId);
+        setOcupado(false);
+        if (e || !data?.ok) setAviso({ tono: 'warning', texto: data?.reason || e?.message });
+        load();
+      },
+      { confirmar: 'Sacar', cancelar: 'No' }
     );
   };
 
@@ -123,21 +122,15 @@ export default function ArmarReservaScreen({ navigation, route }) {
   };
 
   const salirme = () => {
-    Alert.alert(
+    confirmar(
       '¿Salirte de esta reserva?',
       'Le avisamos al organizador para que invite a alguien más. No pagaste nada, así que no hay nada que devolver.',
-      [
-        { text: 'Me quedo', style: 'cancel' },
-        {
-          text: 'Salirme',
-          style: 'destructive',
-          onPress: async () => {
-            const { data } = await rechazarInvitacion(reservaId);
-            if (data?.ok) navigation.goBack();
-            else setAviso({ tono: 'warning', texto: data?.reason || 'No se pudo.' });
-          },
-        },
-      ],
+      async () => {
+        const { data } = await rechazarInvitacion(reservaId);
+        if (data?.ok) navigation.goBack();
+        else setAviso({ tono: 'warning', texto: data?.reason || 'No se pudo.' });
+      },
+      { confirmar: 'Salirme', cancelar: 'Me quedo' }
     );
   };
 
@@ -294,6 +287,7 @@ export default function ArmarReservaScreen({ navigation, route }) {
           />
         </StickyFooter>
       ) : null}
+      {dialogo}
     </SafeAreaView>
   );
 }

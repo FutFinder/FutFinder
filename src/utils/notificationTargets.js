@@ -101,6 +101,15 @@ export function resolveNotificationTarget(n) {
           }
         : null;
 
+    // Te nombraron administrador de un recinto (migración 60). El aviso trae
+    // `complejoId`, que es justo lo que pide `PanelRecinto` — pero el tipo no
+    // estaba acá, así que tocarlo respondía «No pudimos abrir este aviso»
+    // sobre el único sitio donde esa persona puede ejercer lo que le dieron.
+    case 'complejo_admin_agregado':
+      return data.complejoId
+        ? { screen: 'PanelRecinto', params: { complejoId: data.complejoId } }
+        : null;
+
     // ── Reservas ──
     // NINGÚN AVISO DE RESERVA TENÍA DESTINO. La invitación a poner tu parte
     // llegaba y, al tocarla, no pasaba nada: el flujo del pago dividido se

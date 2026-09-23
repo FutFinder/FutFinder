@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -67,6 +66,7 @@ import {
   canUseMentionAll,
 } from '../services/messages';
 import { getMatchById, getMatchAttendees, withClubs } from '../services/matches';
+import { enVentanaGps, puedeCalificar, textoConfirmacionGps } from '../services/matchRules';
 import { getClubById, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import {
@@ -106,6 +106,7 @@ import { reportUser } from '../services/reports';
 import { getMisPermisosEnClub } from '../services/clubPermissions';
 import { supabase } from '../services/supabase';
 import { notify } from '../utils/notify';
+import useConfirmacion from '../components/useConfirmacion';
 import {
   decorateMessages,
   canSendDraft,
@@ -156,6 +157,7 @@ export default function ChatThreadScreen({ route, navigation }) {
   );
   const isChallengeThread = t?.type === 'challenge';
 
+  const { confirmar, dialogo } = useConfirmacion();
   const [myId, setMyId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -361,17 +363,19 @@ export default function ChatThreadScreen({ route, navigation }) {
           getMatchAttendees(t.id),
         ]);
         if (!alive) return;
-        const confirmados = (attendees?.data || []).filter(
-          (a) => a.estado !== 'cancelado'
-        ).length;
-        setContext({ kind: 'match', match, confirmados });
+        const filas = attendees?.data || [];
+        const confirmados = filas.filter((a) => a.estado !== 'cancelado').length;
+        // MI fila de `attendees`, que es lo que deciden las reglas de GPS y
+        // de calificación. Ya venía en la consulta; sólo no se guardaba.
+        const miAsistencia = myId ? filas.find((a) => a.id_jugador === myId) || null : null;
+        setContext({ kind: 'match', match, confirmados, miAsistencia });
       }
     })();
 
     return () => {
       alive = false;
     };
-  }, [t?.id, t?.type]);
+  }, [t?.id, t?.type, myId]);
 
   // ── Chat de desafío de club ──────────────────────────────────
   // En el hilo grupal se cargan además la bitácora (que se intercala como
@@ -680,15 +684,10 @@ export default function ChatThreadScreen({ route, navigation }) {
     setBusyAction(true);
     const r = await confirmAttendanceWithGPS(t.id);
     setBusyAction(false);
+    const dicho = textoConfirmacionGps(r);
     setBanner(
-      r?.ok
-        ? {
-            type: 'success',
-            title: 'Asistencia confirmada',
-            message: r.distance
-              ? `Estás a ${Math.round(r.distance)} m. +1 a tu Trust Score.`
-              : 'Tu asistencia quedó registrada.',
-          }
+      dicho
+        ? { type: 'success', title: dicho.titulo, message: dicho.detalle }
         : { type: 'error', title: 'No pude confirmar', message: r?.reason || 'Intenta de nuevo' }
     );
   };
@@ -1328,7 +1327,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       const { data, error } = await responderProrroga(challengeId, respuesta);
       if (error) {
         setChallengeBusy(false);
-        Alert.alert('No se pudo responder', error.message);
+        notify('No se pudo responder', error.message || '', 'error');
         return;
       }
       if (data) setClubChallenge(data);
@@ -1350,20 +1349,18 @@ export default function ChatThreadScreen({ route, navigation }) {
         enviarRespuestaProrroga(true);
         return;
       }
-      Alert.alert(
+      // `Alert.alert` NO ABRE NADA EN WEB: el «No» de la prórroga —que cierra
+      // el desafío para los dos clubes— no hacía absolutamente nada ahí, en
+      // silencio. Es el mismo fallo que `useConfirmacion` existe para no
+      // repetir (ver su cabecera y la nota de seguridad y privacidad).
+      confirmar(
         '¿El partido no se disputará?',
         'El desafío se cierra sin acuerdo para los dos clubes y la conversación queda solo como historial.',
-        [
-          { text: 'Volver', style: 'cancel' },
-          {
-            text: 'Sí, cerrar el desafío',
-            style: 'destructive',
-            onPress: () => enviarRespuestaProrroga(false),
-          },
-        ]
+        () => enviarRespuestaProrroga(false),
+        { confirmar: 'Sí, cerrar el desafío', cancelar: 'Volver' }
       );
     },
-    [enviarRespuestaProrroga]
+    [enviarRespuestaProrroga, confirmar]
   );
 
   /**
@@ -1388,7 +1385,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       const { error } = await respondChallenge(challengeId, aceptar);
       if (error) {
         setChallengeBusy(false);
-        Alert.alert('No se pudo responder', error.message || '');
+        notify('No se pudo responder', error.message || '', 'error');
         return;
       }
       await refrescarDesafio();
@@ -1403,20 +1400,14 @@ export default function ChatThreadScreen({ route, navigation }) {
         enviarRespuestaDesafio(true);
         return;
       }
-      Alert.alert(
+      confirmar(
         '¿Rechazar el desafío?',
         'El desafío queda cerrado y el club rival recibe el aviso. No se puede deshacer.',
-        [
-          { text: 'Volver', style: 'cancel' },
-          {
-            text: 'Sí, rechazar',
-            style: 'destructive',
-            onPress: () => enviarRespuestaDesafio(false),
-          },
-        ]
+        () => enviarRespuestaDesafio(false),
+        { confirmar: 'Sí, rechazar', cancelar: 'Volver' }
       );
     },
-    [enviarRespuestaDesafio]
+    [enviarRespuestaDesafio, confirmar]
   );
 
   const headerSubtitle = useMemo(() => {
@@ -1454,6 +1445,35 @@ export default function ChatThreadScreen({ route, navigation }) {
     context.match?.hora &&
     Date.now() >=
       new Date(context.match.hora).getTime() + (context.match.duracion_min ?? 90) * 60 * 1000;
+
+  /**
+   * LAS DOS ACCIONES DE LA BARRA SE OFRECÍAN SIEMPRE, Y CASI SIEMPRE FALLABAN.
+   *
+   * La barra aparece cuando el partido terminó, y ahí dibujaba «GPS» y
+   * «Calificar» sin mirar nada más. Pero:
+   *
+   *   · `confirm_attendance_gps` sólo acepta desde 30 minutos ANTES de la
+   *     hora hasta 30 minutos después del término. Como la barra nace al
+   *     terminar el partido y no se va nunca, el botón quedaba visible para
+   *     siempre en el hilo de cualquier partido viejo, y respondía «Fuera de
+   *     la ventana de confirmación» a todo el mundo. Encima faltaba justo
+   *     cuando sí sirve —mientras la gente llega a la cancha—, porque
+   *     entonces la barra todavía no existe.
+   *   · Calificar exige haber confirmado por GPS y que el partido no esté
+   *     cancelado (migración 124, y `puedeCalificar` es su espejo). El botón
+   *     se le ofrecía también a quien nunca marcó y en partidos cancelados.
+   *
+   * Las dos reglas ya estaban escritas y probadas en `matchRules`; el hilo
+   * era el único sitio que no las usaba. `MatchDetailScreen` y
+   * `MatchSpotScreen` sí.
+   */
+  const puedeGpsAqui =
+    context?.kind === 'match' &&
+    context.miAsistencia?.estado === 'inscrito' &&
+    enVentanaGps(context.match);
+
+  const puedeCalificarAqui =
+    context?.kind === 'match' && puedeCalificar(context.match, context.miAsistencia);
 
   const menuItems = useMemo(() => {
     const items = [];
@@ -1688,26 +1708,30 @@ export default function ChatThreadScreen({ route, navigation }) {
         {/* Partido terminado: acciones en lugar del compositor */}
         {isGroup && matchEnded ? (
           <View style={styles.endedBar}>
-            <Pressable
-              onPress={handleRateMatch}
-              disabled={busyAction}
-              accessibilityRole="button"
-              accessibilityLabel="Calificar el partido"
-              style={({ pressed }) => [styles.endedBtn, pressed && { opacity: 0.8 }]}
-            >
-              <Star color={C.green} size={16} fill={C.green} />
-              <Text style={styles.endedBtnText}>Calificar</Text>
-            </Pressable>
-            <Pressable
-              onPress={handleConfirmGPS}
-              disabled={busyAction}
-              accessibilityRole="button"
-              accessibilityLabel="Confirmar asistencia con GPS"
-              style={({ pressed }) => [styles.endedBtn, pressed && { opacity: 0.8 }]}
-            >
-              <MapPin color={C.green} size={16} />
-              <Text style={styles.endedBtnText}>GPS</Text>
-            </Pressable>
+            {puedeCalificarAqui && (
+              <Pressable
+                onPress={handleRateMatch}
+                disabled={busyAction}
+                accessibilityRole="button"
+                accessibilityLabel="Calificar el partido"
+                style={({ pressed }) => [styles.endedBtn, pressed && { opacity: 0.8 }]}
+              >
+                <Star color={C.green} size={16} fill={C.green} />
+                <Text style={styles.endedBtnText}>Calificar</Text>
+              </Pressable>
+            )}
+            {puedeGpsAqui && (
+              <Pressable
+                onPress={handleConfirmGPS}
+                disabled={busyAction}
+                accessibilityRole="button"
+                accessibilityLabel="Confirmar asistencia con GPS"
+                style={({ pressed }) => [styles.endedBtn, pressed && { opacity: 0.8 }]}
+              >
+                <MapPin color={C.green} size={16} />
+                <Text style={styles.endedBtnText}>GPS</Text>
+              </Pressable>
+            )}
             <Pressable
               onPress={handleDeleteChat}
               disabled={busyAction}
@@ -1882,6 +1906,8 @@ export default function ChatThreadScreen({ route, navigation }) {
           onSubmit={handleSubmitReport}
         />
       )}
+
+      {dialogo}
     </KeyboardAvoidingView>
   );
 }

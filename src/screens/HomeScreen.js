@@ -24,18 +24,15 @@ import {
   listOpenMatches,
   joinMatch,
   requestJoinMatch,
-  deleteMatch,
   applyFilters,
   listPartidosDeMisClubes,
 } from '../services/matches';
-import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { getMyClubIds } from '../services/clubs';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
-import useConfirmacion from '../components/useConfirmacion';
 
 function greetingFor(d = new Date()) {
   const h = d.getHours();
@@ -47,7 +44,6 @@ function greetingFor(d = new Date()) {
 
 export default function HomeScreen({ navigation }) {
   // `window.confirm` no abre nada en web: diálogo propio de la app.
-  const { confirmar, dialogo } = useConfirmacion();
   /**
    * EL CLUB DE INICIO ES EL CLUB ACTIVO, el mismo que marca el selector de la
    * pestaña Clubes. Antes salía de `getMyClub()`, que devuelve la membresía
@@ -186,39 +182,18 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleDelete = (matchId) => {
-    // `window.confirm` no abre nada en web: eliminar no hacía nada.
-    confirmar('¿Eliminar este partido?', 'No se puede deshacer.',
-      () => borrarPartido(matchId), { confirmar: 'Eliminar' });
-  };
-
-  const borrarPartido = async (matchId) => {
-    setBusyMatchId(matchId);
-    const { error } = await deleteMatch(matchId);
-    setBusyMatchId(null);
-    if (error) { showBanner('error', 'No pudimos eliminarlo', error.message); return; }
-    showBanner('success', 'Partido eliminado');
-    load();
-  };
-
-  const handleConfirmGPS = async (matchId) => {
-    if (busyMatchId === matchId) return;
-    setBanner(null);
-    setBusyMatchId(matchId);
-    try {
-      const result = await confirmAttendanceWithGPS(matchId);
-      if (result?.ok) {
-        showBanner('success', '✅ Asistencia confirmada', result.distance ? `${Math.round(result.distance)} m de la cancha. +1 Trust Score.` : 'Registrada.');
-        await load();
-      } else {
-        showBanner('error', 'No pude confirmar tu asistencia', result?.reason || 'Intenta de nuevo');
-      }
-    } catch (e) {
-      showBanner('error', 'Error al confirmar GPS', e?.message || String(e));
-    } finally {
-      setBusyMatchId(null);
-    }
-  };
+  /*
+   * ACÁ VIVÍAN `handleDelete` y `handleConfirmGPS`, Y NO LOS LLAMABA NADIE.
+   * Quedaron colgados de un rediseño anterior: el lint los marcaba como
+   * asignados y nunca usados, y el de GPS además prometía «+1 Trust Score»
+   * pase lo que pase — la frase que la migración 132 vino a corregir.
+   *
+   * No se pierde ninguna función: eliminar un partido está en
+   * `ManageMatchScreen` y confirmar por GPS en `MatchDetailScreen`,
+   * `MatchSpotScreen` y el hilo del partido, los tres con las reglas de
+   * `matchRules` aplicadas. Dejarlos acá era mantener una cuarta copia que
+   * nadie ejecutaba y que ya se había desincronizado del resto.
+   */
 
   // ── computed props para el diseño ──────────────────────────────────────────
 
@@ -498,8 +473,6 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
         </Pressable>
       </Modal>
-
-      {dialogo}
     </View>
   );
 }

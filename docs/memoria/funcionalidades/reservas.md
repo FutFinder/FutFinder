@@ -1,6 +1,6 @@
 # Reservas
 
-Última revisión: 2026-09-18
+Última revisión: 2026-09-22
 
 ## Propósito
 
@@ -188,6 +188,10 @@ El procedimiento para aprobar, en [Aprobar recintos](../operacion/aprobar-recint
 **El monto se compara en la Edge Function, no en la base.** `confirmar_pago` no recibe el monto, así que `flow-confirmacion` lee `pagos.monto` y lo compara con lo que dice Flow antes de confirmar. Si no coinciden no se confirma nada: queda un `[flow][ALERTA]` en el log y el pago pendiente, para que lo mire una persona. Mover esa comprobación adentro de `confirmar_pago` es candidato para cuando el Balance toque esa función igual.
 
 **Lo que falta de la pasarela:** las credenciales (no hay cuenta de comercio todavía: se abre a nombre de la empresa, no personal), el pago dividido con tarjeta —`iniciar_pago_reserva` lo rechaza explícito en vez de cobrarle todo al organizador por descuido—, la reversa automática de los `reversar`, y la pantalla de Ingresos del recinto, que sigue bloqueada por los plazos de abono.
+
+**La mitad de la cancha se redondea hacia arriba, igual que la cuota entre todos.** `computeMitad()` devolvía `totalClp / 2` sin redondear mientras `monto_a_pagar_de` usa `ceil(precio_total / 2)` (migración 89): con un total impar la app calculaba medio peso menos y `autorizar_cobro_reserva` habría rechazado el pago con «El monto no coincide con la cuota vigente». Es el mismo fallo que el encabezado de `reservasRules.js` cuenta como corregido para la modalidad «jugadores», repetido en «capitanes» — y con una prueba que fijaba el valor equivocado. Corregido el 22-09.
+
+**Sacar a alguien de una reserva y salirse de una reserva no hacían nada en la app web.** Los dos diálogos usaban `Alert.alert`, que en web no abre nada y devuelve al instante; ahora pasan por `useConfirmacion`, como el resto.
 
 ## Reglas y permisos
 

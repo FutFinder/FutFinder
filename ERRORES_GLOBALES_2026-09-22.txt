@@ -1,0 +1,207 @@
+FUTFINDER — REVISIÓN GLOBAL EN BUSCA DE ERRORES
+Fecha: 22-09-2026
+Base: d3444ac, árbol limpio.
+
+OBJETIVO Y ALCANCE
+Buscar errores en toda la app, fuera de los dos verticales ya revisados este
+mes (Clubes el 21 y 22, Chat y Social el 22). El foco quedó en partidos,
+reservas y plata, asistencia por GPS, Trust Score, avisos y push, y en el
+código compartido entre pantallas.
+
+MÉTODO
+Se contrastó el código del cliente contra las migraciones versionadas y
+contra el esquema DESPLEGADO: definiciones de funciones, restricciones
+`check`, políticas RLS y conteos agregados, todo con consultas de solo
+lectura. Los avisos de seguridad y rendimiento de Supabase se revisaron y no
+aportaron hallazgos nuevos. Las dos migraciones que salieron de acá se
+probaron con arnés dentro de `begin; … rollback;` antes de aplicarse.
+No se escribió nada en la base fuera de esas dos migraciones.
+
+RESULTADO
+12 hallazgos. 10 se corrigieron en esta misma sesión; 2 quedan reportados
+porque necesitan una decisión de producto, no una corrección.
+
+La mayoría son de la MISMA FAMILIA, y conviene decirlo junto: el cliente
+tiene copias de reglas que el servidor también aplica, y esas copias se
+desincronizaron. Tres de los diez son eso literalmente (1, 2, 4/5), y otros
+tres son ausencias en tablas de mapeo que nadie vuelve a mirar (6, 7, 8).
+
+
+1. ALTA — LA MITAD DE LA CANCHA NO SE REDONDEA COMO EL SERVIDOR
+Dónde: `computeMitad()`, modalidad «capitanes» (dividir 50/50).
+Actual: devolvía `totalClp / 2` sin redondear, mientras `monto_a_pagar_de`
+usa `ceil(precio_total / 2)` (migración 89, línea 90). Con un total impar la
+app calcula $14.250,5 donde el servidor espera $14.251, y
+`autorizar_cobro_reserva` rechaza con «El monto no coincide con la cuota
+vigente».
+Es EXACTAMENTE el fallo que el encabezado de `reservasRules.js` cuenta como
+ya corregido para la cuota entre todos, repetido en la otra modalidad. Y
+había una prueba fijando el valor equivocado (`computeMitad(28501) === 14250.5`).
+Corregido: `Math.ceil`, y la prueba ahora exige 14251.
+Referencias: src/services/reservasRules.js, supabase/migrations/89:86-91
+
+2. MEDIA — EDITAR UN PARTIDO NO VALIDA LOS LÍMITES DE EDAD
+Dónde: Editar partido > rango de edad personalizado.
+Actual: `EditMatchScreen` tenía su propia `validate()` y sólo comprobaba que
+el mínimo fuera menor que el máximo. Publicar sí comprueba además el rango
+12–99 de `matches_edad_check`. El campo acepta dos dígitos, así que escribir
+«5» pasaba la validación del cliente y se estrellaba contra la restricción
+con el error crudo de Postgres.
+Corregido: la regla se extrajo a `validarRangoEdad()` en `matchRules` y la
+usan las dos pantallas. La comparación es estricta porque la base exige
+`edad_min < edad_max`.
+
+3. ALTA — «+1 TRUST SCORE» SE PROMETÍA SIEMPRE, Y CASI NUNCA SE DABA
+Dónde: confirmar asistencia por GPS, en cuatro pantallas con cuatro textos
+distintos.
+Actual: el servidor sube con `LEAST(trust_score + 1, 100)` —el tope está
+bien— pero la app anunciaba el punto mirando sólo que viniera `distance`. Y
+`profiles.trust_score` NACE en 100: al revisar esto, 32 de los 34 perfiles
+estaban justo en el tope. O sea, el caso común era prometer un punto que no
+se daba.
+Peor: la RPC escribía igual una fila en `trust_score_history` con
+`change_amount = 1`, así que el historial que explica el puntaje dejó de
+cuadrar con el puntaje. Ya ocurrió: dos usuarios tienen 100 y un historial
+que suma 101.
+Corregido en los dos lados. Migración 132: el delta sale de restar el
+puntaje de antes y el de después (con la fila bloqueada), la fila de
+historial sólo se escribe si el delta es mayor que 0, y la respuesta
+devuelve `trust_delta` y `trust_score`. Cliente: `textoConfirmacionGps()`
+redacta las tres frases posibles en un solo sitio —se dio el punto, ya
+estabas en el máximo, ya estaba confirmado— y la usan las tres pantallas
+vivas.
+Las dos filas ya escritas de más NO se corrigieron: reescribir historial es
+otra decisión.
+
+4. ALTA — EL BOTÓN DE GPS DEL CHAT APARECE JUSTO CUANDO YA NO SIRVE
+Dónde: chat del partido, barra que reemplaza al compositor al terminar.
+Actual: la barra nace cuando el partido termina y no se va nunca, y dibujaba
+«GPS» sin mirar nada más. Pero `confirm_attendance_gps` sólo acepta desde 30
+minutos ANTES de la hora hasta 30 minutos después del término. Resultado: en
+el hilo de cualquier partido viejo el botón sigue ahí y responde «Fuera de la
+ventana de confirmación» a todo el mundo — y falta justo cuando sí sirve,
+mientras la gente llega a la cancha, porque entonces la barra no existe aún.
+La regla ya estaba escrita y probada (`enVentanaGps`, `GPS_WINDOW_MIN`) y la
+respetan `MatchDetailScreen` y `MatchSpotScreen`. El hilo era el único que no.
+Corregido: el botón sólo se dibuja dentro de la ventana y si esa persona está
+`inscrito`.
+
+5. MEDIA — Y «CALIFICAR» EN EL MISMO SITIO IGNORA SU PROPIA REGLA
+Actual: la misma barra ofrecía «Calificar» a cualquiera del hilo. Calificar
+exige haber confirmado por GPS y que el partido no esté cancelado (migración
+124, y `puedeCalificar()` es su espejo del lado del cliente). Se le ofrecía
+también a quien nunca marcó y en partidos cancelados; la RLS lo rechaza.
+Corregido: el botón usa `puedeCalificar()`.
+
+6. MEDIA — HAY AVISOS QUE ESQUIVAN TODAS LAS PREFERENCIAS DE PUSH
+Actual: `isPushAllowed` falla abierto, y para un tipo DESCONOCIDO está bien.
+El problema era que tipos que la propia app crea caían en esa rama por
+olvido: `complejo_admin_agregado` (con avisos reales en producción) y toda la
+familia `reserva_*` / `balance_cargado` / `waitlist_turno_vencido` no estaban
+mapeados, así que empujan siempre sin que nadie lo haya decidido.
+Corregido a medias, y a propósito: se añadió `PUSH_SIEMPRE`, el inventario
+explícito de lo que queda fuera. No cambia el comportamiento —siguen
+empujando— pero lo vuelve una decisión en vez de un descuido. Poder
+silenciarlos necesita una columna nueva y su interruptor en Ajustes: las
+cuatro que existen (`notif_matches`, `notif_clubs`, `notif_chat`,
+`notif_friends`) no cubren ni plata ni administración de recintos. Queda
+anotado como decisión de producto.
+
+7. ALTA — 21 TIPOS DE AVISO NO SE VEN AL FILTRAR, Y 22 AVISOS REALES ESTÁN
+   AFECTADOS
+Actual: `NotificationsScreen` filtra con `CATEGORY[n.type] === filtro`, y el
+mapa `CATEGORY` de `NotificationCard` sólo tenía 32 de los 53 tipos que
+admite `notifications_type_check`. Un tipo sin entrada desaparece de todos
+los chips menos «Todos» y tampoco suma en sus contadores.
+Y NO ES UN FILTRO QUE EL USUARIO SIEMPRE ELIJA: la portada de Clubes entra a
+Avisos con `filter: 'clubes'` y un `clubId`, y en ese caso la categoría queda
+FIJA. Así que toda la familia `club_challenge_proposal*`,
+`club_challenge_extension`, `club_challenge_closed` y `club_resultado_*` era
+invisible por la única puerta que la portada ofrece.
+Comprobado en producción: 22 avisos ya emitidos de esos tipos.
+Corregido: los 53 tipos tienen categoría. Las reservas y el saldo caen en
+«partidos» —no hay chip propio y una cancha reservada es lo más cercano—;
+inventar un quinto chip es decisión de producto.
+
+8. MEDIA — «AHORA ADMINISTRAS UN RECINTO» NO SE PODÍA ABRIR
+Actual: `complejo_admin_agregado` (migración 60) no estaba en
+`resolveNotificationTarget`, así que tocarlo respondía «No pudimos abrir este
+aviso» — sobre el único sitio donde esa persona puede ejercer lo que le
+acaban de dar. El aviso ya trae `complejoId`, que es justo lo que pide
+`PanelRecinto`.
+Corregido: el destino es `PanelRecinto`.
+
+9. BAJA — LA BANDEJA DE CHAT MANDA A PROBAR OTRA CATEGORÍA ESTANDO EN «TODOS»
+Actual: con una solicitud de amistad y cero conversaciones, la bandeja se
+monta con la lista vacía y muestra «Nada en este filtro · Prueba con otra
+categoría». No hay otra: «Todos» son todas. Es el primer día de alguien.
+Corregido: ahora dice qué tiene que pasar para que aparezca un chat.
+
+10. MEDIA — DOS DIÁLOGOS QUE EN LA APP WEB NO ABREN NADA
+Actual: `Alert.alert` no funciona en web —está documentado en `notify.js`,
+`avisos.js` y `useConfirmacion.js`, y ya costó que cerrar sesión no hiciera
+nada— pero seguía usándose en cuatro sitios vivos: responder «No» a la
+prórroga de un desafío y rechazar un desafío (`ChatThreadScreen`), y sacar a
+alguien de una reserva y salirse de una reserva (`ArmarReservaScreen`). En
+web los cuatro no hacían absolutamente nada, en silencio.
+Los dos del desafío los introdujo esta misma serie de sesiones copiando el
+patrón de la prórroga, que ya estaba mal.
+Corregido: los cuatro pasan por `useConfirmacion` / `notify`.
+
+11. BAJA — CÓDIGO MUERTO EN INICIO, CON UN MENSAJE EQUIVOCADO DENTRO
+Actual: `HomeScreen` definía `handleDelete` y `handleConfirmGPS` y no los
+llamaba nadie (el lint los marcaba). El de GPS era además la cuarta copia del
+mensaje del hallazgo 3, y la más desincronizada.
+Corregido: se eliminaron, con sus imports. No se pierde ninguna función:
+eliminar un partido vive en `ManageMatchScreen` y confirmar por GPS en las
+tres pantallas que sí aplican las reglas.
+
+
+REPORTADOS, NO CORREGIDOS — NECESITAN UNA DECISIÓN
+
+A. «No aparecer en búsquedas» no lo aplica el servidor.
+   `privacy_visible_in_search` sólo se usa como filtro del cliente
+   (`searchPlayersQuery`), y la política de lectura de `profiles` es
+   `profiles_read_all USING (true)`: cualquier usuario autenticado puede leer
+   cualquier perfil consultando la tabla directamente. El interruptor promete
+   algo que la base no sostiene.
+   Por qué no se tocó: restringir esa política afecta a todo lo que lee
+   perfiles —nóminas de club, participantes de chat, tarjetas de rival,
+   búsqueda— y exige decidir antes qué columnas son públicas y para quién. Es
+   un cambio de diseño, no una corrección.
+
+B. Protección de contraseñas filtradas desactivada.
+   Lo reporta el propio linter de Supabase. No se activó a propósito: la
+   memoria del proyecto anota que endurecer las reglas de contraseña en el
+   panel antes de un build rompe el registro, porque no hay OTA. Va junto al
+   próximo build, no antes.
+
+
+LO QUE SE REVISÓ Y ESTÁ BIEN
+- Las constantes del ciclo de desafíos del cliente coinciden una a una con
+  `desafio_reglas()` del servidor (14 valores).
+- Los límites de plan de club coinciden con `check_club_limits()`.
+- La ventana de cancelación de reservas (12 horas) coincide, y la aplica el
+  servidor.
+- El largo máximo de mensaje (1000) coincide con `messages_content_check`.
+- Las sondas de esquema del chat están memorizadas por módulo: no cuestan
+  consultas por envío.
+- Los mapas de preferencias de push de la app y de la Edge Function son
+  idénticos (39 entradas cada uno).
+- `puedeCalificar`, `enVentanaGps` y la validación del borrador de publicar
+  ya eran espejos correctos de sus reglas del servidor.
+
+GUARDAS QUE QUEDARON PUESTAS
+`src/utils/__tests__/avisosCompletos.test.js` lee la lista de tipos del
+`notifications_type_check` de las migraciones y exige que cada uno de los 53
+tenga categoría, tenga una decisión de push explícita, y que los dos mapas de
+preferencias sigan siendo el mismo. Los hallazgos 6, 7 y 8 no se pueden
+repetir en silencio.
+
+LÍMITES DE ESTA REVISIÓN
+- No se recorrió la app con sesión autenticada. Las correcciones están
+  cubiertas por 1566 pruebas en verde, por los arneses de las dos migraciones
+  y por una comprobación de arranque en el navegador, no por una prueba de
+  pantalla con datos reales.
+- No se revisó a fondo el panel de recintos (agenda, tarifas, cobros) ni el
+  flujo de pago con tarjeta: quedan para una revisión propia.

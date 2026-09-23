@@ -102,9 +102,11 @@ test('el jugador no paga ningún cargo de servicio: el total es el precio de la 
 
 
 
-test('computeMitad: exactamente la mitad, sin redondear a $50', () => {
+test('computeMitad: la mitad redondeada hacia arriba, como el servidor', () => {
   assert.equal(computeMitad(30000), 15000);
-  assert.equal(computeMitad(28501), 14250.5);
+  // `monto_a_pagar_de` hace `ceil(precio_total / 2)` (migración 89): medio
+  // peso de diferencia y el servidor rechaza el pago por monto que no calza.
+  assert.equal(computeMitad(28501), 14251);
 });
 
 test('isValidTopupAmount: rechaza montos bajo la carga mínima', () => {

@@ -48,6 +48,7 @@ import {
   leavePenaltyFor,
   leaveRuleText,
   timeUntilLabel,
+  textoConfirmacionGps,
 } from '../services/matchRules';
 
 /**
@@ -130,11 +131,8 @@ export default function MatchSpotScreen({ route, navigation }) {
       setFeedback({ tone: 'error', title: 'No pudimos confirmar tu asistencia', text: res?.reason || '' });
       return;
     }
-    setFeedback({
-      tone: 'success',
-      title: 'Asistencia confirmada',
-      text: res.distance ? `Estás a ${Math.round(res.distance)} m de la cancha.` : '',
-    });
+    const dicho = textoConfirmacionGps(res);
+    setFeedback({ tone: 'success', title: dicho.titulo, text: dicho.detalle });
     load();
   };
 
