@@ -33,8 +33,8 @@ async function usuario() {
   await admin.query(`insert into auth.users
     (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,created_at,updated_at,
      raw_app_meta_data,raw_user_meta_data,confirmation_token,email_change,email_change_token_new,recovery_token)
-    values('00000000-0000-0000-0000-000000000000',$1,'authenticated','authenticated',
-     'clubes-'||$1||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','','')`, [id]);
+    values('00000000-0000-0000-0000-000000000000',$1::uuid,'authenticated','authenticated',
+     'clubes-'||$1::text||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','','')`, [id]);
   usuarios.push(id);
   return id;
 }
@@ -42,7 +42,7 @@ async function usuario() {
 async function club(creador, plan = 'estandar') {
   const id = randomUUID();
   await admin.query(`insert into public.clubs (id,nombre,slug,created_by,plan)
-    values($1,'Prueba concurrencia','prueba-'||$1,$2,$3)`, [id, creador, plan]);
+    values($1::uuid,'Prueba concurrencia '||left($1::text,8),'prueba-'||$1::text,$2,$3)`, [id, creador, plan]);
   clubes.push(id);
   return id;
 }
@@ -151,8 +151,10 @@ async function unJugadorEnDosClubesALaVez() {
     console.log('Todo OK');
   } finally {
     try {
-      await admin.query('delete from public.club_members where club_id = any($1::uuid[])', [clubes]);
+      // Borrar el club arrastra la nómina; sacar a los miembros uno a uno choca
+      // con la regla de que un club no se queda sin administrador.
       await admin.query('delete from public.clubs where id = any($1::uuid[])', [clubes]);
+      await admin.query('delete from public.canchas where created_by = any($1::uuid[])', [usuarios]);
       await admin.query('delete from auth.users where id = any($1::uuid[])', [usuarios]);
     } catch (e) {
       console.error('No se pudo limpiar:', e.message);

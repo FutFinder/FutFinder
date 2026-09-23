@@ -212,6 +212,7 @@ async function asistenciaSimultaneaConMarcasDistintas() {
   } finally {
     try {
       await admin.query('delete from public.matches where id = any($1::uuid[])', [partidos]);
+      await admin.query('delete from public.canchas where created_by = any($1::uuid[])', [[org, jugador]]);
       await admin.query('delete from auth.users where id = any($1::uuid[])', [[org, jugador]]);
     } catch (e) {
       console.error('No se pudo limpiar:', e.message);

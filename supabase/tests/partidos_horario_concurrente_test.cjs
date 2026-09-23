@@ -81,6 +81,7 @@ async function race({name,hours,manual=false,rollback=false,adjacent=false,other
   } finally {
     await Promise.allSettled([a.query('rollback'),b.query('rollback')]);
     await admin.query('delete from public.matches where id=any($1::uuid[])',[matches]);
+    await admin.query('delete from public.canchas where created_by=any($1::uuid[])',[users]);
     await admin.query('delete from auth.users where id=any($1::uuid[])',[users]);
     await Promise.all([a.end(),b.end(),admin.end()]);
   }
