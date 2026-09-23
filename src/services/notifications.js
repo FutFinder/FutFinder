@@ -205,6 +205,40 @@ export async function listNotifications({ limit = 50 } = {}) {
   return { data: data || [], error };
 }
 
+/**
+ * Estado actual de las solicitudes que originaron estos avisos (amistad,
+ * solicitud de club, reto), para que la bandeja no ofrezca «Aceptar» sobre
+ * algo que ya se respondió — aquí, desde otra pantalla o en otro
+ * dispositivo. Devuelve `{ friendships, requests, challenges }`, cada uno un
+ * `Map` id → estado, o `null` si alguna consulta falló: en ese caso la
+ * bandeja deja las tarjetas como están.
+ */
+export async function getEstadosDeOrigen(items) {
+  if (!isSupabaseConfigured) return null;
+  const ids = (type, key) => [
+    ...new Set(
+      (items || []).filter((n) => n?.type === type && n.data?.[key]).map((n) => n.data[key])
+    ),
+  ];
+  const consultar = async (tabla, columna, lista) => {
+    if (lista.length === 0) return new Map();
+    const { data, error } = await supabase.from(tabla).select(`id, ${columna}`).in('id', lista);
+    if (error) throw error;
+    return new Map((data || []).map((r) => [r.id, r[columna]]));
+  };
+  try {
+    const [friendships, requests, challenges] = await Promise.all([
+      consultar('friendships', 'status', ids('friend_request', 'friendshipId')),
+      consultar('club_join_requests', 'status', ids('club_request', 'requestId')),
+      consultar('club_challenges', 'estado', ids('club_challenge', 'challengeId')),
+    ]);
+    return { friendships, requests, challenges };
+  } catch (e) {
+    console.error('[FutFinder] getEstadosDeOrigen:', e?.message || e);
+    return null;
+  }
+}
+
 /** Cuenta cuántas no leídas tiene el usuario (para badge). */
 export async function countUnread() {
   if (!isSupabaseConfigured) return 0;

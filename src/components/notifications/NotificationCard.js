@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import {
   UserPlus, CheckCheck, Swords, Shield, CalendarDays, MessageCircle, Star, Bell, Users, Trash2,
-  RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone, CalendarX, ShieldAlert, Scale,
+  RefreshCw, LockOpen, ListOrdered, LogOut, UserX, Megaphone, CalendarX, ShieldAlert, Scale, X, Clock,
 } from 'lucide-react-native';
 
 import { paleta as C, alfa } from '../../theme/colors';
@@ -254,7 +254,10 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
   const unread = !n.read;
   // «IR AHORA» no es una acción distinta de tocar la tarjeta: es la misma
   // navegación, hecha evidente. Así no hay dos caminos que mantener.
-  const atajo = !n.actions ? atajoDe(n) : null;
+  const atajo = !n.actions && !n.resolucion ? atajoDe(n) : null;
+  // Una solicitud ya respondida dice cómo terminó donde estaban los botones.
+  const aceptada = n._resolucion === 'aceptada';
+  const ResolucionIcon = aceptada ? CheckCheck : n._resolucion === 'rechazada' ? X : Clock;
 
   return (
     <Pressable
@@ -309,6 +312,23 @@ export default function NotificationCard({ notification: n, onPress, onDelete, o
             >
               <Text className="text-[13px] font-bold text-verde-ink">{atajo.label}</Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {n.resolucion ? (
+          <View
+            className="mt-2.5 h-[38px] flex-row items-center justify-center gap-2 rounded-xl border"
+            style={{
+              borderColor: aceptada ? alfa(C.green, 0.35) : alfa(C.tinta, 0.12),
+              backgroundColor: aceptada ? alfa(C.green, 0.10) : alfa(C.tinta, 0.05),
+            }}
+            accessibilityRole="text"
+            accessibilityLabel={n.resolucion}
+          >
+            <ResolucionIcon size={15} color={aceptada ? C.green : C.textSecondary} strokeWidth={2.2} />
+            <Text className="text-[13px] font-bold" style={{ color: aceptada ? C.green : C.textSecondary }}>
+              {n.resolucion}
+            </Text>
           </View>
         ) : null}
 

@@ -30,6 +30,7 @@ import {
   deleteNotification,
   deleteAllNotifications,
   subscribeToNotifications,
+  getEstadosDeOrigen,
 } from '../services/notifications';
 import { navigateToNotification } from '../utils/notificationTargets';
 import { puedeResponderDesafio } from '../utils/permisosDesafio';
@@ -41,6 +42,9 @@ import {
   withAllRead,
   withoutId,
   withActionsResolved,
+  fusionarAvisoEnVivo,
+  conResoluciones,
+  textoResolucion,
 } from '../utils/notificationInbox';
 import useConfirmacion from '../components/useConfirmacion';
 
@@ -204,7 +208,10 @@ export default function NotificationsScreen({ navigation, route }) {
       return;
     }
     setLoadError(null);
-    setItems(data || []);
+    // Lo ya respondido llega sin botones y con su resultado, aunque se haya
+    // respondido desde otra pantalla u otro dispositivo.
+    const estados = await getEstadosDeOrigen(data || []);
+    setItems(conResoluciones(data || [], estados));
     setClubesAdmin(clubResult?.data ?? null);
   }, []);
 
@@ -222,15 +229,7 @@ export default function NotificationsScreen({ navigation, route }) {
       const user = await getCurrentUser();
       if (!user?.id) return;
       unsubscribe = subscribeToNotifications(user.id, (notif) => {
-        setItems((prev) => {
-          const idx = prev.findIndex((p) => p.id === notif.id);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = notif;
-            return next;
-          }
-          return [notif, ...prev];
-        });
+        setItems((prev) => fusionarAvisoEnVivo(prev, notif));
       });
     })();
     return () => unsubscribe();
@@ -361,10 +360,21 @@ export default function NotificationsScreen({ navigation, route }) {
     setBusy(id, false);
 
     if (error) {
+      // «Ninguna fila» (PGRST116) es que ya no estaba pendiente: se respondió
+      // antes, desde otra pantalla u otro dispositivo. No es un fallo que
+      // haya que mostrar en inglés: se averigua cómo terminó y se dice eso.
+      if (error.code === 'PGRST116') {
+        const [cerrada] = conResoluciones([n], await getEstadosDeOrigen([n]));
+        if (cerrada?._actionsResolved) {
+          setItems((prev) => withActionsResolved(prev, id, cerrada._resolucion));
+          markAsRead(id);
+          return;
+        }
+      }
       setBanner({ type: 'error', title: 'No pudimos procesar tu respuesta', message: error.message || '' });
       return;
     }
-    setItems((prev) => withActionsResolved(prev, id));
+    setItems((prev) => withActionsResolved(prev, id, accept ? 'aceptada' : 'rechazada'));
     markAsRead(id);
 
     // Aceptar un desafío desde el aviso abre el chat de negociación: es
@@ -402,6 +412,7 @@ export default function NotificationsScreen({ navigation, route }) {
         ...n,
         timeLabel: formatNotifTime(n.created_at),
         actions: n._actionsResolved ? null : actionsFor(n, clubesAdmin),
+        resolucion: textoResolucion(n),
       })),
     }));
   }, [items, filtroEfectivo, clubesAdmin, clubIdActivo]);

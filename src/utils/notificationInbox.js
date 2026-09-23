@@ -70,5 +70,95 @@ export const withAllRead = (items) => items.map((p) => ({ ...p, read: true }));
 
 export const withoutId = (items, id) => items.filter((p) => p.id !== id);
 
-export const withActionsResolved = (items, id) =>
-  items.map((p) => (p.id === id ? { ...p, read: true, _actionsResolved: true } : p));
+/**
+ * La tarjeta ya se respondió: sin botones y, si se sabe, con el resultado
+ * (`'aceptada'`, `'rechazada'` o `'cerrada'`) para decirlo en su lugar.
+ */
+export const withActionsResolved = (items, id, resolucion = null) =>
+  items.map((p) =>
+    p.id === id ? { ...p, read: true, _actionsResolved: true, _resolucion: resolucion } : p
+  );
+
+/**
+ * Mete en la lista un aviso que llegó por Realtime (INSERT o UPDATE).
+ *
+ * UN UPDATE NO PUEDE BORRAR LO QUE SÓLO SABE LA PANTALLA. Aceptar una
+ * solicitud marca el aviso como leído; ese UPDATE vuelve por Realtime con la
+ * fila de la base, que no trae `_actionsResolved`. Reemplazar la tarjeta
+ * entera hacía reaparecer «Aceptar / Rechazar» un segundo después de haber
+ * aceptado, y el segundo toque terminaba en «Cannot coerce the result to a
+ * single JSON object»: la solicitud ya no estaba pendiente.
+ */
+export function fusionarAvisoEnVivo(items, notif) {
+  const idx = items.findIndex((p) => p.id === notif.id);
+  if (idx < 0) return [notif, ...items];
+  const previo = items[idx];
+  const next = [...items];
+  next[idx] = previo._actionsResolved
+    ? { ...notif, _actionsResolved: true, _resolucion: previo._resolucion ?? null }
+    : notif;
+  return next;
+}
+
+// Estado de la fila de origen → cómo terminó, por tipo de aviso. `null` es
+// «sigue pendiente»: la tarjeta conserva sus botones.
+const ESTADOS = {
+  friend_request: { pending: null, accepted: 'aceptada', rejected: 'rechazada' },
+  club_request: { pending: null, approved: 'aceptada', rejected: 'rechazada' },
+  club_challenge: { pendiente: null, aceptado: 'aceptada', rechazado: 'rechazada' },
+};
+
+/**
+ * Cómo terminó una solicitud según el estado de su fila. Cualquier estado
+ * que no sea pendiente cierra la tarjeta; uno que no tiene nombre propio
+ * (un reto caducado, una amistad borrada porque quien la envió la canceló)
+ * queda como `'cerrada'`.
+ */
+export function resolucionDeEstado(tipo, estado) {
+  const mapa = ESTADOS[tipo] || {};
+  if (estado in mapa) return mapa[estado];
+  return 'cerrada';
+}
+
+/** Lo que dice la tarjeta en lugar de los botones, o `null` si no aplica. */
+export function textoResolucion(n) {
+  const r = n?._resolucion;
+  if (!r) return null;
+  if (r === 'cerrada') return 'Ya no está pendiente';
+  if (n.type === 'club_challenge') return r === 'aceptada' ? 'Reto aceptado' : 'Reto rechazado';
+  return r === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud rechazada';
+}
+
+/**
+ * Marca como respondidas las tarjetas cuya solicitud ya no está pendiente.
+ *
+ * `estados` trae, por id, el estado actual de cada fila de origen
+ * (`friendships`, `requests`, `challenges`), o `null` si no se pudo
+ * averiguar — y entonces no se toca nada: mejor ofrecer los botones que
+ * esconderlos sin saber.
+ *
+ * Sólo una amistad AUSENTE cuenta como cerrada: quien la envió puede
+ * cancelarla y la fila se borra, pero las dos partes siempre pueden leerla
+ * mientras existe. Una solicitud de club o un reto ausentes pueden ser la RLS
+ * (dejé de administrar el club), así que ahí ausente es «no sé».
+ */
+export function conResoluciones(items, estados) {
+  if (!estados) return items;
+  return items.map((n) => {
+    const data = n?.data || {};
+    let estado;
+    if (n.type === 'friend_request' && data.friendshipId) {
+      estado = estados.friendships?.get(data.friendshipId);
+    } else if (n.type === 'club_request' && data.requestId) {
+      estado = estados.requests?.get(data.requestId);
+      if (estado === undefined) return n;
+    } else if (n.type === 'club_challenge' && data.challengeId) {
+      estado = estados.challenges?.get(data.challengeId);
+      if (estado === undefined) return n;
+    } else {
+      return n;
+    }
+    const resolucion = resolucionDeEstado(n.type, estado);
+    return resolucion ? { ...n, _actionsResolved: true, _resolucion: resolucion } : n;
+  });
+}

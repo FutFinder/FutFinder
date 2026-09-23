@@ -16,6 +16,10 @@ const {
   withAllRead,
   withoutId,
   withActionsResolved,
+  resolucionDeEstado,
+  textoResolucion,
+  conResoluciones,
+  fusionarAvisoEnVivo,
 } = require('../notificationInbox.js');
 
 // ---------------------------------------------------------------------------
@@ -198,7 +202,91 @@ test('withoutId quita únicamente el id indicado', () => {
 test('withActionsResolved marca leído y oculta las acciones inline del id indicado', () => {
   const items = [{ id: 1, read: false }, { id: 2, read: false }];
   assert.deepEqual(withActionsResolved(items, 1), [
-    { id: 1, read: true, _actionsResolved: true },
+    { id: 1, read: true, _actionsResolved: true, _resolucion: null },
     { id: 2, read: false },
   ]);
+});
+
+test('withActionsResolved guarda cómo se respondió, para decirlo en la tarjeta', () => {
+  const [n] = withActionsResolved([{ id: 1, type: 'friend_request' }], 1, 'aceptada');
+  assert.equal(n._resolucion, 'aceptada');
+  assert.equal(textoResolucion(n), 'Solicitud aceptada');
+});
+
+// El error de «Cannot coerce the result to a single JSON object»: aceptar
+// marcaba el aviso como leído, ese UPDATE volvía por Realtime, reemplazaba la
+// tarjeta entera y con ella se perdía la marca local — los botones volvían a
+// aparecer, y el segundo toque chocaba con una solicitud que ya no estaba
+// pendiente.
+test('un aviso que vuelve por Realtime no revive los botones de una solicitud ya respondida', () => {
+  const antes = withActionsResolved(
+    [{ id: 1, type: 'friend_request', read: false, data: { friendshipId: 'f' } }],
+    1,
+    'aceptada'
+  );
+  const llega = { id: 1, type: 'friend_request', read: true, data: { friendshipId: 'f' } };
+  const [n] = fusionarAvisoEnVivo(antes, llega);
+  assert.equal(n._actionsResolved, true);
+  assert.equal(n._resolucion, 'aceptada');
+  assert.equal(n.read, true);
+});
+
+test('un aviso nuevo por Realtime entra arriba de la lista', () => {
+  const lista = fusionarAvisoEnVivo([{ id: 1 }], { id: 2 });
+  assert.deepEqual(lista.map((n) => n.id), [2, 1]);
+});
+
+test('resolucionDeEstado: pendiente sigue abierta; lo demás cierra la tarjeta', () => {
+  assert.equal(resolucionDeEstado('friend_request', 'pending'), null);
+  assert.equal(resolucionDeEstado('friend_request', 'accepted'), 'aceptada');
+  assert.equal(resolucionDeEstado('friend_request', 'rejected'), 'rechazada');
+  assert.equal(resolucionDeEstado('club_request', 'pending'), null);
+  assert.equal(resolucionDeEstado('club_request', 'approved'), 'aceptada');
+  assert.equal(resolucionDeEstado('club_request', 'rejected'), 'rechazada');
+  assert.equal(resolucionDeEstado('club_challenge', 'pendiente'), null);
+  assert.equal(resolucionDeEstado('club_challenge', 'aceptado'), 'aceptada');
+  assert.equal(resolucionDeEstado('club_challenge', 'rechazado'), 'rechazada');
+  assert.equal(resolucionDeEstado('club_challenge', 'caducado'), 'cerrada');
+});
+
+// La amistad cancelada por quien la envió se borra: no hay fila que leer.
+test('resolucionDeEstado: una solicitud que ya no existe también cierra la tarjeta', () => {
+  assert.equal(resolucionDeEstado('friend_request', undefined), 'cerrada');
+});
+
+test('textoResolucion habla de solicitud o de reto según el aviso', () => {
+  assert.equal(textoResolucion({ type: 'club_request', _resolucion: 'rechazada' }), 'Solicitud rechazada');
+  assert.equal(textoResolucion({ type: 'club_challenge', _resolucion: 'aceptada' }), 'Reto aceptado');
+  assert.equal(textoResolucion({ type: 'club_challenge', _resolucion: 'rechazada' }), 'Reto rechazado');
+  assert.equal(textoResolucion({ type: 'friend_request', _resolucion: 'cerrada' }), 'Ya no está pendiente');
+  assert.equal(textoResolucion({ type: 'friend_request' }), null);
+});
+
+// Al recargar la bandeja, lo que ya se respondió —desde aquí, desde el perfil
+// o desde otro dispositivo— llega sin botones y con su resultado.
+test('conResoluciones marca como respondidas las solicitudes que ya no están pendientes', () => {
+  const items = [
+    { id: 1, type: 'friend_request', data: { friendshipId: 'f1' } },
+    { id: 2, type: 'friend_request', data: { friendshipId: 'f2' } },
+    { id: 3, type: 'club_request', data: { requestId: 'r1' } },
+    { id: 4, type: 'match_reminder', data: {} },
+  ];
+  const estados = {
+    friendships: new Map([['f1', 'accepted'], ['f2', 'pending']]),
+    requests: new Map([['r1', 'rejected']]),
+    challenges: new Map(),
+  };
+  const [a, b, c, d] = conResoluciones(items, estados);
+  assert.equal(a._resolucion, 'aceptada');
+  assert.equal(a._actionsResolved, true);
+  assert.equal(b._actionsResolved, undefined);
+  assert.equal(c._resolucion, 'rechazada');
+  assert.equal(d, items[3]);
+});
+
+// Si no se pudo averiguar (sin red, RLS), la tarjeta se queda como estaba:
+// mejor ofrecer botones que esconderlos sin saber.
+test('conResoluciones sin estados deja la lista intacta', () => {
+  const items = [{ id: 1, type: 'friend_request', data: { friendshipId: 'f1' } }];
+  assert.deepEqual(conResoluciones(items, null), items);
 });
