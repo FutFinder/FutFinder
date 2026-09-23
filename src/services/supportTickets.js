@@ -136,5 +136,20 @@ export async function submitSupportTicket({ category, title, description, screen
     return { data: null, error };
   }
 
+  avisarAlEquipo(data.id);
+
   return { data, error: null };
+}
+
+/**
+ * Avisa al equipo por correo (Resend) que llegó un ticket nuevo — el ticket
+ * ya quedó guardado arriba, así que esto es best-effort a propósito: un
+ * fallo acá (función caída, sin RESEND_API_KEY configurado todavía) no
+ * puede volver a mostrarle un error a alguien cuyo reporte SÍ se guardó.
+ * El equipo lo recupera igual leyendo `support_tickets` desde Supabase.
+ */
+function avisarAlEquipo(ticketId) {
+  supabase.functions.invoke('reportar-problema', { body: { id: ticketId } }).catch((e) => {
+    console.warn('[FutFinder] no se pudo avisar el ticket por correo:', e);
+  });
 }

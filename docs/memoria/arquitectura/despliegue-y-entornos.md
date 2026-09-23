@@ -1,6 +1,6 @@
 # Despliegue y entornos
 
-Última revisión: 2026-09-18
+Última revisión: 2026-09-22 (Edge Function reportar-problema, aviso por correo de "Reportar un problema")
 
 ## Propósito
 
@@ -102,5 +102,12 @@ Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cre
 **Sin `RESEND_API_KEY` nada explota**: la solicitud igual queda escrita en `solicitudes_recinto` y la función contesta `ok: true` con `avisada: false`. El correo es el aviso, no el registro, así que encender el secreto después no pierde ninguna solicitud anterior — se leen de la tabla. Con la clave cargada Y la función en v6, lo único que falta confirmar es que una solicitud nueva deje `avisada_at` con fecha — pendiente de una prueba posterior al redespliegue de v6.
 
 **`verify_jwt: true` NO garantiza que haya sesión**, y esto se descubrió probando `solicitud-recinto` en el navegador sin cuenta: la clave anónima es un JWT válido, así que la función corre igual y choca con el `grant ... to authenticated` de la RPC que llama. Vale para cualquier función futura: si necesita una sesión de verdad, tiene que comprobarla ella —o traducir el 42501 a un mensaje honesto, que es lo que hace esta— en vez de confiar en `verify_jwt`.
+
+**Secretos del aviso de "Reportar un problema"** (los lee `_shared/correoReporte.ts`; tampoco van en el repo):
+
+- `RESEND_API_KEY` — el mismo secreto que ya usa `correoSolicitud.ts`; no hay uno separado por función.
+- `REPORTES_EMAIL_TO` / `REPORTES_EMAIL_FROM` — opcionales, mismo rol que sus equivalentes `SOLICITUDES_EMAIL_*`. Sin `REPORTES_EMAIL_TO` cae en `futfindercl@gmail.com`.
+
+La Edge Function `reportar-problema` (2026-09-22) se desplegó con `_shared/correoReporte.ts` incluido en el MISMO despliegue —no en uno posterior—, así que el problema de deriva de arriba (`_shared/` tocado sin redesplegar) no aplica a su primera versión. Probada de punta a punta contra la base real: cuenta de prueba, ticket insertado en `support_tickets`, token real firmado contra el endpoint de la función (no un mock) → respondió `200` con `{ok:true, avisado:true}` en ~1.9s (tiempo consistente con una llamada real a la API de Resend, no con una ruta que no llegó a intentarlo). Cuenta y ticket de prueba borrados después.
 
 **Sin `FLOW_API_KEY`/`FLOW_SECRET_KEY` nada explota**: `pagar-reserva` contesta `configurada: false` y la app deja el botón de pago apagado diciendo que el medio de pago todavía no está conectado. Comprobado contra producción el 2026-09-10, con las tres funciones desplegadas y sin credenciales cargadas.
