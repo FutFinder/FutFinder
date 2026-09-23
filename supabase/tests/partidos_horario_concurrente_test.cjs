@@ -58,7 +58,7 @@ async function race({name,hours,manual=false,rollback=false,adjacent=false,other
   await b.query(result.error ? 'rollback' : 'commit');
   if(!otherPlayer) assert(waiting, `${name}: la segunda operación no esperó al mismo jugador`);
   if(rollback || adjacent || otherPlayer) assert.equal(result.data?.ok,true,JSON.stringify(result));
-  else assert.match(result.error || result.data?.reason || '',/CHOQUE_HORARIO/);
+  else assert.match(result.error || result.data?.code || result.data?.reason || '',/CHOQUE_HORARIO/);
   const count = await admin.query(`select count(*)::int n from attendees
     where id_partido=any($1::uuid[]) and id_jugador<>$2 and estado='inscrito'`,[[one,two],users[0]]);
   assert.equal(count.rows[0].n, adjacent || otherPlayer ? 2 : 1);

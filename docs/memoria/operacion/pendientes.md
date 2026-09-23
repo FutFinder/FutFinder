@@ -12,12 +12,9 @@ Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios
 - **Acción:** volcar esos objetos a una migración de recuperación para que una base nueva pueda reconstruirse desde el repositorio.
 - **Verificación necesaria:** una base creada sólo desde `supabase/` levanta sin objetos ausentes y las pruebas SQL pasan.
 
-## P1 — Aprobar a un jugador no revisa su agenda
+## Resuelto el 2026-09-23 — aprobar a un jugador también mira su agenda
 
-- **Dominio afectado:** partidos con aprobación manual.
-- **Evidencia (2026-09-23, sobre una copia local de la estructura de producción):** `approve_join` cambia la inscripción de `pendiente` a `inscrito` con un UPDATE, y `tg_enforce_join_rules` —el lock por jugador de la 109 y la revisión `CHOQUE_HORARIO`— sólo corre `BEFORE INSERT`. El organizador puede aprobar al mismo jugador en dos partidos superpuestos, incluso uno tras otro, y los dos devuelven `ok`. El caso 2 de `partidos_horario_concurrente_test.cjs` lo reproduce («la segunda operación no esperó al mismo jugador»).
-- **Acción:** que la aprobación pase por el mismo lock y la misma revisión de choque —en `approve_join` o con el trigger también en `UPDATE OF estado`— con su arnés SQL, y **reproducirlo antes contra producción** en una transacción revertida.
-- **Verificación necesaria:** `partidos_horario_concurrente_test.cjs` 5/5, y una aprobación secuencial en conflicto que devuelva `CHOQUE_HORARIO`.
+`approve_join` y `confirmar_nomina_club` pasaban la fila de `pendiente` a `inscrito` con un UPDATE, y `tg_enforce_join_rules` —con el lock por jugador de la 109 y la revisión `CHOQUE_HORARIO`— sólo corría al insertar. Se podía aprobar al mismo jugador en dos partidos a la misma hora, incluso uno tras otro; se reprodujo contra producción en un bloque revertido. La migración 133 agrega `trg_enforce_join_rules_al_aprobar` (`BEFORE UPDATE OF estado`, sólo para `pendiente → inscrito`) y las dos RPC traducen el rechazo a `ok:false` con motivo legible y `code`. Verificado: `133_aprobar_mira_la_agenda_test.sql` 9/9 antes y después de aplicar, arnés 45 14/14 con la 133, `partidos_horario_concurrente_test.cjs` 5/5 y las funciones desplegadas iguales byte a byte al archivo. **Cambio de comportamiento:** aprobar ahora también revisa suspensión, Trust Score y el turno de la lista de espera (`CUPO_RESERVADO`), las mismas reglas que al entrar.
 
 ## Resuelto el 2026-08-10 — migraciones 39, 40 y 41 aplicadas
 
