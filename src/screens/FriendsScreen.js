@@ -8,7 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Check, UserPlus, RotateCw, Search } from 'lucide-react-native';
 
 import PersonRow from '../components/chat/PersonRow';
@@ -46,6 +46,7 @@ import { threadTimeLabel } from '../utils/chatMeta';
  *     que un doble toque no cree dos escrituras.
  */
 export default function FriendsScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('recibidas');
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
@@ -162,6 +163,12 @@ export default function FriendsScreen({ navigation }) {
   };
 
   const openProfile = (userId) => navigation.navigate('UserProfile', { userId });
+  // El buscador de jugadores vive en la pestaña Partidos, en modo jugadores.
+  const buscarJugadores = () =>
+    navigation.navigate('Main', {
+      screen: 'SearchTab',
+      params: { initialMode: 'players' },
+    });
   const openChat = (user) =>
     navigation.navigate('ChatThread', {
       threadKey: `dm:${user.user_id}`,
@@ -248,12 +255,7 @@ export default function FriendsScreen({ navigation }) {
           title="No tienes solicitudes enviadas"
           text="Busca jugadores y envíales una solicitud para empezar a chatear."
           action="Buscar jugadores"
-          onAction={() =>
-            navigation.navigate('Main', {
-              screen: 'SearchTab',
-              params: { initialMode: 'players' },
-            })
-          }
+          onAction={buscarJugadores}
         />
       );
     }
@@ -289,12 +291,7 @@ export default function FriendsScreen({ navigation }) {
           title="Todavía no tienes amigos"
           text="Agrega jugadores para hablar sin compartir tu número."
           action="Buscar jugadores"
-          onAction={() =>
-            navigation.navigate('Main', {
-              screen: 'SearchTab',
-              params: { initialMode: 'players' },
-            })
-          }
+          onAction={buscarJugadores}
         />
       );
     }
@@ -402,6 +399,22 @@ export default function FriendsScreen({ navigation }) {
           </ScrollView>
         )}
       </SafeAreaView>
+
+      {/* Siempre a mano, no sólo en las listas vacías: con amigos o
+          solicitudes en pantalla no había cómo llegar a agregar a alguien. */}
+      <Pressable
+        onPress={buscarJugadores}
+        accessibilityRole="button"
+        accessibilityLabel="Buscar jugadores para agregar"
+        style={({ pressed }) => [
+          styles.fab,
+          { bottom: insets.bottom + 20 },
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        <UserPlus color={C.greenInk} size={19} strokeWidth={2.4} />
+        <Text style={styles.fabText}>Agregar amigos</Text>
+      </Pressable>
     </View>
   );
 }
@@ -458,7 +471,26 @@ const styles = StyleSheet.create({
   segmentText: { color: C.textDim, fontSize: 12.5, fontFamily: F.bold },
   segmentTextActive: { color: C.greenInk, fontFamily: F.extraBold },
 
-  list: { paddingHorizontal: S.screenPadding, paddingBottom: 40, gap: 10 },
+  // Espacio abajo para que el botón flotante no tape la última fila.
+  list: { paddingHorizontal: S.screenPadding, paddingBottom: 110, gap: 10 },
+
+  fab: {
+    position: 'absolute',
+    right: S.screenPadding,
+    height: 54,
+    paddingHorizontal: 20,
+    borderRadius: 27,
+    backgroundColor: C.green,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  fabText: { color: C.greenInk, fontSize: 15, fontFamily: F.bold },
 
   actionRow: { flexDirection: 'row', gap: 9, marginTop: 12 },
   accept: {
