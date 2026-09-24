@@ -1,6 +1,6 @@
 # TrueScore: cómo probarlo a mano
 
-Guía para probar las cuatro fases en la app. La lógica ya está probada con las pruebas SQL de `supabase/tests/134…137` (64, 36, 27 y 14 casos): acá se prueba lo que ve la gente. Las reglas están en `docs/truescore-spec.md`, con las decisiones en su sección 8.
+Guía para probar las cuatro fases en la app. La lógica ya está probada con las pruebas SQL de `supabase/tests/134…138` (64, 36, 27, 14 y 14 casos): acá se prueba lo que ve la gente. Las reglas están en `docs/truescore-spec.md`, con las decisiones en su sección 8.
 
 ## Antes de empezar
 
@@ -62,7 +62,7 @@ update matches set hora = hora - interval '25 hours' where id = '<id del partido
 | Expulsar | En Confirmados, el ícono de sacar a un jugador | Sale sin perder puntos; si intenta volver: «El organizador te sacó de este partido» |
 | GPS | Confirmar llegada por GPS | «Llegada confirmada», sin puntos |
 | Historial | Perfil → Ver historial | «Inicio de TrueScore 75» y cada evento con su motivo |
-| Teléfono | Ajustes → Verificar teléfono | Sin proveedor de SMS: «La verificación por SMS todavía no está disponible» |
+| Teléfono | Ajustes → Teléfono, registrar un celular | Queda «+56 9 •••• 1234» sin pedir SMS; el mismo número en otra cuenta: «Ese número ya está asociado a otra cuenta». Con `telefono_obligatorio` activo, sin número no deja inscribirse ni publicar |
 
 ## Fase 2
 
