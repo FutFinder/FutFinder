@@ -1,6 +1,6 @@
 # TrueScore: cómo probarlo a mano
 
-Guía para probar las cuatro fases en la app. La lógica ya está probada con las pruebas SQL de `supabase/tests/134…138` (64, 36, 27, 14 y 14 casos): acá se prueba lo que ve la gente. Las reglas están en `docs/truescore-spec.md`, con las decisiones en su sección 8.
+Guía para probar las cuatro fases en la app. Los archivos SQL de `supabase/tests/134…138` contienen 152 casos (61, 36, 27, 14 y 14): acá se prueba lo que ve la gente. Las reglas están en `docs/truescore-spec.md`, con las decisiones en su sección 8.
 
 ## Antes de empezar
 

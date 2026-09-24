@@ -1,6 +1,6 @@
 # Configuración
 
-Última revisión: 2026-09-22 (Reportar un problema avisa al equipo por correo vía Resend)
+Última revisión: 2026-09-24 (Teléfono sin SMS; los dos flags siguen apagados)
 
 ## Propósito
 
@@ -9,6 +9,8 @@ Centralizar preferencias de cuenta, privacidad, radio y categorías de avisos, a
 ## Flujos actuales
 
 `SettingsScreen` carga el perfil, persiste toggles y radio, y revierte un toggle si la escritura falla. Permite cambiar correo o contraseña tras verificar la contraseña actual, solicitar recuperación, editar ubicación/preferencias, cerrar sesión, exportar los datos propios y solicitar borrado de cuenta. Los valores se guardan en el perfil del usuario actual mediante una lista permitida de campos.
+
+**Teléfono.** Ajustes → Teléfono abre `VerificarTelefonoScreen`; `registrar_telefono` guarda un celular chileno único en `perfil_telefonos` y `mi_telefono` devuelve sólo su máscara a la cuenta. No se pide SMS mientras `telefono_verificacion_sms` esté apagado. `telefono_obligatorio` también estaba apagado en la comprobación autenticada del 2026-09-24. Si falla `mi_telefono`, la pantalla hoy trata el error como «sin número» (T07 en el listado de calidad).
 
 **Cambiar email es de tres pasos, no uno.** (1) Contraseña actual + email nuevo, con `verifyPassword()`. (2) `requestEmailChangeOtp()` manda un código de 6 dígitos al correo ACTUAL (`supabase.auth.signInWithOtp({ email: currentEmail, options: { shouldCreateUser: false } })`) — la persona tiene que seguir teniendo acceso a esa casilla, no a la nueva. La pantalla lo pide con seis casillas (`OtpBoxes`, propio de `SettingsScreen.js`) y un reenvío con cooldown de 60 s, mismo patrón que ya usa "¿Olvidaste tu contraseña?". (3) Sólo si `verifyEmailChangeOtp()` (`supabase.auth.verifyOtp({ email: currentEmail, token, type: 'email' })`) valida el código, se llama a `changeEmail()` — que sigue siendo `updateUser({ email: nuevo })` y por lo tanto Supabase manda ADEMÁS su propia confirmación al correo nuevo (link), sin cambios ahí. El código al correo actual es una capa nueva y adicional, no un reemplazo de esa confirmación — así que el cambio completo sigue necesitando abrir el correo nuevo al final, y la pantalla lo dice en el banner de éxito. Si `changeEmail()` falla después de un código válido, la pantalla vuelve al paso 1 porque el código ya se consumió (de un solo uso).
 
