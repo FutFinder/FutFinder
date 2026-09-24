@@ -93,6 +93,7 @@ const TITULOS_EVENTO = {
   reversion: 'Reclamo aceptado',
   reclamo_organizador: 'Un reclamo probó una marca errónea',
   bono_organizador: 'Confirmaste la asistencia a tiempo',
+  inactividad: 'Tiempo sin jugar',
 };
 
 /** Tipos que un jugador puede reclamar (fase 2): lo marcaron tarde o ausente. */

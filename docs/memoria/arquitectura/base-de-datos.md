@@ -205,6 +205,8 @@ Tres hábitos que se ganaron a golpes en estas migraciones: `revoke ... from ano
 - `fairplay_reportes` guarda el TrueScore de quien reporta al momento del reporte; la validez (`fairplay_reporte_valido`) se evalúa al cerrar el plazo, cuando ya se sabe quién jugó (`fairplay_jugo`). El job `futfinder-fairplay` cierra los partidos a las 48 h y marca `matches.fairplay_cerrado_at`, que la guarda de `matches` también protege.
 - La revisión por agresión vive en `fairplay_revisiones` y se cierra desde el editor SQL con `select public.fairplay_resolver_revision(id, 'nota');`: no hay pantalla de administrador todavía.
 
+**Fase 4, inactividad (migración 137), aplicada el 2026-09-24 con `truescore_fase4` apagado**; arnés `supabase/tests/137_truescore_fase4_inactividad_test.sql` 14/14 en ensayo contra producción. `truescore_inactividad()` corre el día 1 de cada mes (`futfinder-truescore-inactividad`); la última actividad sale de `truescore_ultima_actividad(usuario)` y la clave del evento lleva el mes de Chile. Cómo probar todo TrueScore a mano: `docs/truescore-como-probar.md`.
+
 ## Integridad y tiempo real
 
 - Triggers crean perfiles y asistentes organizadores, limitan clubes, automatizan cola y avisos, protegen mensajes y generan notificaciones de clubes, partido y chat.

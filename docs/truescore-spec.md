@@ -219,3 +219,13 @@ Estas decisiones las tomó Vicente al aprobar el plan de la fase 1. Donde contra
 | Agresión física | La reporta un compañero y la confirma el organizador (que también puede reportarla él). −40 una sola vez por partido y la cuenta queda marcada para revisión, que por ahora se resuelve desde el editor SQL. |
 | «Jugó» | Su inscripción quedó confirmada (GPS o marca del organizador). El organizador jugó si confirmó la asistencia. La validez de un reporte se evalúa al cerrar el plazo; el TrueScore de quien reporta se toma en el momento del reporte. |
 | Encuentros entre clubes | Fuera del fair play, igual que de TrueScore. |
+
+### Decisiones de la fase 4 (2026-09-24)
+
+| Tema | Decisión |
+| --- | --- |
+| Qué es «sin partidos» | No tener eventos que cuenten para los últimos 10 (asistencia, tardanza, plantón, salida). Quien nunca jugó cuenta desde su inicio de TrueScore. |
+| Racha | La inactividad no toca la racha ni cuenta en la ventana de reincidencia. |
+| Cuándo corre | El día 1 de cada mes a las 09:00 UTC; una sola vez por mes y por jugador. |
+
+La guía para probar todo a mano está en `docs/truescore-como-probar.md`.

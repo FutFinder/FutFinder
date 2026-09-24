@@ -130,6 +130,12 @@ test('los eventos nuevos de la fase 2 tienen título', () => {
   assert.equal(describirEvento({ tipo: 'reclamo_organizador', puntos_aplicados: -20 }).tono, 'negativo');
 });
 
+test('la inactividad (fase 4) se muestra con su cambio, que puede subir o bajar', () => {
+  assert.deepEqual(pick(describirEvento({ tipo: 'inactividad', puntos_aplicados: -2 })),
+    { titulo: 'Tiempo sin jugar', cambio: '-2', tono: 'negativo' });
+  assert.equal(describirEvento({ tipo: 'inactividad', puntos_aplicados: 2 }).cambio, '+2');
+});
+
 function pick(e) {
   return { titulo: e.titulo, cambio: e.cambio, tono: e.tono };
 }

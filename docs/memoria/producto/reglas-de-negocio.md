@@ -53,6 +53,8 @@ Con `truescore_fase2` activo (migración 135, también apagada): la tardanza val
 
 Con `truescore_fase3` (migración 136, apagada): el fair play es un puntaje aparte, de 0 a 100, que parte en 100. Hasta 48 h después del partido se puede reportar a un compañero una vez; el reporte vale si quien reporta jugó y tenía TrueScore 75 o más. Al cerrar ese plazo: sin reportes válidos, +1; con 3 o más, −15; con 1 o 2, nada. Una agresión física reportada y confirmada por el organizador resta 40 y deja la cuenta en revisión.
 
+Con `truescore_fase4` (migración 137, apagada): una vez al mes, quien lleva 6 meses sin partidos se acerca a 65 de a 2 puntos, sin pasarse, y sin tocar su racha.
+
 ## Trust Score
 
 - El puntaje se almacena entre 0 y 100 y puede condicionar el ingreso cuando un partido define `min_trust_score`.
