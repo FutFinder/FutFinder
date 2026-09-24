@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,32 +13,58 @@ import { ArrowLeft, CheckCircle2, Smartphone } from 'lucide-react-native';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import {
   enviarCodigoTelefono,
-  miTelefonoVerificado,
+  miTelefono,
   normalizarCelularChileno,
+  registrarTelefono,
   verificarCodigoTelefono,
 } from '../services/trueScore';
 
 /**
- * Verificar el teléfono (TrueScore, spec §1.5: una cuenta, un número).
+ * Teléfono de la cuenta (TrueScore, spec §1.5: una cuenta, un número).
  *
- * Queda LISTA pero no se exige: inscribirse o publicar sólo lo pide cuando se
- * active el flag `telefono_obligatorio`, y eso espera a que haya un proveedor
- * de SMS configurado en Supabase. Mientras tanto, pedir el código responde
- * con un mensaje claro en vez de un error crudo.
+ * Dos modos según el servidor (`mi_telefono`, migración 138):
+ *   · Sin `telefono_verificacion_sms`: basta con REGISTRAR el celular. Es
+ *     único entre cuentas, pero no se envía SMS.
+ *   · Con `telefono_verificacion_sms`: se verifica con un código por SMS.
+ *
+ * Con `telefono_obligatorio` activo, inscribirse o publicar lo exige.
  */
 export default function VerificarTelefonoScreen({ navigation }) {
-  const [verificado, setVerificado] = useState(null);
-  const [paso, setPaso] = useState('numero'); // 'numero' | 'codigo'
+  const [estado, setEstado] = useState(null);
+  const [editando, setEditando] = useState(false);
+  const [paso, setPaso] = useState('numero'); // 'numero' | 'codigo' (sólo con SMS)
   const [numero, setNumero] = useState('');
   const [codigo, setCodigo] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+  const [aviso, setAviso] = useState(null);
 
-  useEffect(() => {
-    miTelefonoVerificado().then(setVerificado);
+  const cargar = useCallback(async () => {
+    setEstado((await miTelefono()) || { registrado: false, verificacion_sms: false });
   }, []);
 
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
   const telefono = normalizarCelularChileno(numero);
+  const conSms = !!estado?.verificacion_sms;
+
+  const guardar = async () => {
+    if (!telefono || enviando) return;
+    setEnviando(true);
+    setError(null);
+    const res = await registrarTelefono(telefono);
+    setEnviando(false);
+    if (!res?.ok) {
+      setError(res?.reason || 'No pudimos guardar tu teléfono.');
+      return;
+    }
+    setEditando(false);
+    setNumero('');
+    setAviso('Listo: tu teléfono quedó registrado.');
+    await cargar();
+  };
 
   const pedirCodigo = async () => {
     if (!telefono || enviando) return;
@@ -63,8 +89,13 @@ export default function VerificarTelefonoScreen({ navigation }) {
       setError(res.reason);
       return;
     }
-    setVerificado(true);
+    await cargar();
   };
+
+  const listo = estado && (conSms ? estado.verificado : estado.registrado) && !editando;
+  const puedeEnviar = conSms && paso === 'codigo' ? codigo.length >= 6 : !!telefono;
+  const accion = conSms ? (paso === 'numero' ? pedirCodigo : confirmar) : guardar;
+  const textoAccion = conSms ? (paso === 'numero' ? 'Enviar código' : 'Verificar') : 'Guardar';
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -83,45 +114,53 @@ export default function VerificarTelefonoScreen({ navigation }) {
       </View>
 
       <View style={styles.body}>
-        {verificado === null ? (
+        {estado === null ? (
           <ActivityIndicator color={C.green} style={{ marginTop: 40 }} />
-        ) : verificado ? (
+        ) : listo ? (
           <View style={styles.card}>
             <CheckCircle2 color={C.green} size={30} />
-            <Text style={styles.title}>Tu teléfono está verificado</Text>
+            <Text style={styles.title}>
+              {conSms ? 'Tu teléfono está verificado' : 'Tu teléfono está registrado'}
+            </Text>
+            {estado.mascara ? <Text style={styles.numero}>{estado.mascara}</Text> : null}
             <Text style={styles.hint}>
               Cada cuenta de FutFinder tiene un número propio. Así el TrueScore de cada jugador es
               de una sola persona.
             </Text>
+            {aviso ? <Text style={styles.ok}>{aviso}</Text> : null}
+            <Pressable
+              onPress={() => {
+                setEditando(true);
+                setAviso(null);
+                setPaso('numero');
+              }}
+              style={{ marginTop: 8, alignSelf: 'flex-start' }}
+              accessibilityRole="button"
+            >
+              <Text style={styles.link}>Cambiar número</Text>
+            </Pressable>
           </View>
         ) : (
           <View style={styles.card}>
             <Smartphone color={C.green} size={30} />
             <Text style={styles.title}>
-              {paso === 'numero' ? 'Verifica tu celular' : 'Ingresa el código'}
+              {conSms
+                ? paso === 'numero'
+                  ? 'Verifica tu celular'
+                  : 'Ingresa el código'
+                : 'Registra tu celular'}
             </Text>
             <Text style={styles.hint}>
-              {paso === 'numero'
-                ? 'Te enviamos un código por SMS. Un número sirve para una sola cuenta.'
-                : `Enviamos un código de 6 dígitos al ${telefono}.`}
+              {conSms
+                ? paso === 'numero'
+                  ? 'Te enviamos un código por SMS. Un número sirve para una sola cuenta.'
+                  : `Enviamos un código de 6 dígitos al ${telefono}.`
+                : estado.obligatorio
+                ? 'Lo pedimos para inscribirte en partidos y publicarlos. Un número sirve para una sola cuenta.'
+                : 'Un número sirve para una sola cuenta.'}
             </Text>
 
-            {paso === 'numero' ? (
-              <TextInput
-                value={numero}
-                onChangeText={(t) => {
-                  setNumero(t);
-                  setError(null);
-                }}
-                placeholder="+56 9 1234 5678"
-                placeholderTextColor={C.textPlaceholder}
-                keyboardType="phone-pad"
-                autoComplete="tel"
-                textContentType="telephoneNumber"
-                style={styles.input}
-                accessibilityLabel="Número de celular"
-              />
-            ) : (
+            {conSms && paso === 'codigo' ? (
               <TextInput
                 value={codigo}
                 onChangeText={(t) => {
@@ -136,42 +175,60 @@ export default function VerificarTelefonoScreen({ navigation }) {
                 style={styles.input}
                 accessibilityLabel="Código de verificación"
               />
+            ) : (
+              <TextInput
+                value={numero}
+                onChangeText={(t) => {
+                  setNumero(t);
+                  setError(null);
+                }}
+                placeholder="+56 9 1234 5678"
+                placeholderTextColor={C.textPlaceholder}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                textContentType="telephoneNumber"
+                style={styles.input}
+                accessibilityLabel="Número de celular"
+              />
             )}
 
-            {paso === 'numero' && numero.length > 0 && !telefono ? (
+            {!(conSms && paso === 'codigo') && numero.length > 0 && !telefono ? (
               <Text style={styles.error}>Escribe un celular chileno: 9 seguido de 8 dígitos.</Text>
             ) : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
-              onPress={paso === 'numero' ? pedirCodigo : confirmar}
-              disabled={enviando || (paso === 'numero' ? !telefono : codigo.length < 6)}
+              onPress={accion}
+              disabled={enviando || !puedeEnviar}
               accessibilityRole="button"
               style={({ pressed }) => [
                 styles.button,
-                (enviando || (paso === 'numero' ? !telefono : codigo.length < 6)) && { opacity: 0.5 },
+                (enviando || !puedeEnviar) && { opacity: 0.5 },
                 pressed && { opacity: 0.85 },
               ]}
             >
               {enviando ? (
                 <ActivityIndicator color={C.greenInk} />
               ) : (
-                <Text style={styles.buttonText}>
-                  {paso === 'numero' ? 'Enviar código' : 'Verificar'}
-                </Text>
+                <Text style={styles.buttonText}>{textoAccion}</Text>
               )}
             </Pressable>
 
-            {paso === 'codigo' ? (
+            {editando || (conSms && paso === 'codigo') ? (
               <Pressable
                 onPress={() => {
-                  setPaso('numero');
-                  setCodigo('');
+                  if (conSms && paso === 'codigo') {
+                    setPaso('numero');
+                    setCodigo('');
+                  } else {
+                    setEditando(false);
+                    setNumero('');
+                  }
                   setError(null);
                 }}
                 style={{ marginTop: 12, alignSelf: 'center' }}
               >
-                <Text style={styles.link}>‹ Cambiar número</Text>
+                <Text style={styles.link}>{conSms && paso === 'codigo' ? '‹ Cambiar número' : 'Cancelar'}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -206,6 +263,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: { color: C.textPrimary, fontSize: 17, fontFamily: F.bold, marginTop: 4 },
+  numero: { color: C.textPrimary, fontSize: 16, fontFamily: F.semiBold },
   hint: { color: C.textSecondary, fontSize: 13, lineHeight: 19 },
   input: {
     marginTop: 10,
@@ -220,6 +278,7 @@ const styles = StyleSheet.create({
     fontFamily: F.semiBold,
   },
   error: { color: C.red, fontSize: 12.5, lineHeight: 17 },
+  ok: { color: C.green, fontSize: 12.5, lineHeight: 17 },
   button: {
     marginTop: 10,
     height: 50,

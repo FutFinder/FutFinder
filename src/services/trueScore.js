@@ -180,6 +180,26 @@ export async function confirmarAgresion(reporteId) {
 
 // ---------------------------------------------------------------- teléfono
 
+/**
+ * Mi teléfono (migración 138): { registrado, mascara, verificado, cumple,
+ * obligatorio, verificacion_sms }. Mientras `verificacion_sms` esté apagado,
+ * basta con registrar el número; no se envía SMS.
+ */
+export async function miTelefono() {
+  if (!isSupabaseConfigured) return null;
+  const { data, error } = await supabase.rpc('mi_telefono');
+  if (error) return null;
+  return data;
+}
+
+/** Registra (o cambia) mi celular, sin verificación por SMS. */
+export async function registrarTelefono(numero) {
+  if (!isSupabaseConfigured) return { ok: false, reason: 'Sin conexión con el servidor' };
+  const { data, error } = await supabase.rpc('registrar_telefono', { p_telefono: numero });
+  if (error) return { ok: false, reason: 'No pudimos guardar tu teléfono. Intenta de nuevo.', error };
+  return data;
+}
+
 /** ¿Mi cuenta tiene un teléfono verificado? */
 export async function miTelefonoVerificado() {
   if (!isSupabaseConfigured) return false;

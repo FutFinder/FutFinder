@@ -207,6 +207,8 @@ Tres hábitos que se ganaron a golpes en estas migraciones: `revoke ... from ano
 
 **Fase 4, inactividad (migración 137), aplicada el 2026-09-24 con `truescore_fase4` apagado**; arnés `supabase/tests/137_truescore_fase4_inactividad_test.sql` 14/14 en ensayo contra producción. `truescore_inactividad()` corre el día 1 de cada mes (`futfinder-truescore-inactividad`); la última actividad sale de `truescore_ultima_actividad(usuario)` y la clave del evento lleva el mes de Chile. Cómo probar todo TrueScore a mano: `docs/truescore-como-probar.md`.
 
+**Teléfono sin verificar (migración 138)**, arnés 14/14. El número vive en `perfil_telefonos` (único, formato `+569XXXXXXXX`, sin permisos para la app), no en `auth.users.phone`: escribir ahí dispara un SMS que hoy falla. `telefono_cumple(usuario)` es la regla que usan la inscripción y la publicación: con `telefono_verificacion_sms` apagado basta con tener el número registrado; encendido, tiene que estar verificado. La app lee lo suyo con `mi_telefono()` (enmascarado) y lo guarda con `registrar_telefono()`.
+
 ## Integridad y tiempo real
 
 - Triggers crean perfiles y asistentes organizadores, limitan clubes, automatizan cola y avisos, protegen mensajes y generan notificaciones de clubes, partido y chat.

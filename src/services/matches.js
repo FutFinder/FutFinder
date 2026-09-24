@@ -719,6 +719,10 @@ export async function joinMatch(matchId) {
 export function translateSchemaError(error) {
   if (!error) return null;
   const msg = String(error.message || '');
+  // Migración 138: publicar exige teléfono cuando `telefono_obligatorio` está activo.
+  if (msg.includes('TELEFONO_NO_VERIFICADO')) {
+    return 'Para publicar un partido necesitas registrar tu teléfono en Ajustes → Teléfono.';
+  }
   const m = msg.match(/Could not find the '([^']+)' column of '([^']+)'/i);
   if (!m) return null;
   const columnasNuevas = [
@@ -750,7 +754,7 @@ function translateJoinError(msg = '') {
     return 'El organizador te sacó de este partido, así que no puedes volver a entrar.';
   }
   if (msg.includes('TELEFONO_NO_VERIFICADO')) {
-    return 'Para inscribirte necesitas verificar tu teléfono en Ajustes.';
+    return 'Para inscribirte necesitas registrar tu teléfono en Ajustes → Teléfono.';
   }
   if (msg.includes('SUSPENDIDO')) {
     return 'Tu cuenta está suspendida temporalmente y no puede unirse a partidos.';

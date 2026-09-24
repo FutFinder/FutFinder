@@ -839,7 +839,7 @@ export default function SettingsScreen({ navigation }) {
           <Row icon={Lock} title="Cambiar contraseña" showChevron onPress={() => setModal('password')} />
           <Row
             icon={Smartphone}
-            title="Verificar teléfono"
+            title="Teléfono"
             subtitle="Una cuenta, un número"
             showChevron
             onPress={() => navigation.navigate('VerificarTelefono')}

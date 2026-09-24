@@ -229,3 +229,9 @@ Estas decisiones las tomó Vicente al aprobar el plan de la fase 1. Donde contra
 | Cuándo corre | El día 1 de cada mes a las 09:00 UTC; una sola vez por mes y por jugador. |
 
 La guía para probar todo a mano está en `docs/truescore-como-probar.md`.
+
+### Teléfono (2026-09-24)
+
+| Tema | Decisión |
+| --- | --- |
+| Verificación | Mientras no haya proveedor de SMS, `telefono_obligatorio` exige tener un celular chileno REGISTRADO y único entre cuentas, sin verificar. La verificación por SMS tiene su propio flag, `telefono_verificacion_sms`, que se activa cuando la API funcione. |
