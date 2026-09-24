@@ -303,7 +303,8 @@ export default function ManageMatchScreen({ route, navigation }) {
       res.already ? 'La asistencia ya estaba confirmada' : 'Asistencia confirmada',
       res.already
         ? 'No se aplicó nada dos veces.'
-        : 'El TrueScore de cada jugador se actualizó según lo que marcaste.'
+        : 'El TrueScore de cada jugador se actualizó según lo que marcaste.' +
+            (Number(res.bono) > 0 ? ` Ganaste +${res.bono} por confirmar a tiempo.` : '')
     );
     await load();
   };
@@ -629,13 +630,15 @@ export default function ManageMatchScreen({ route, navigation }) {
                         <Text style={styles.wlName} numberOfLines={1}>
                           @{w.username}
                         </Text>
+                        {w.prioridad ? <Tag label="Prioridad" tone="green" /> : null}
                         <TrueScoreChip score={w.trust_score} />
                       </View>
                     ))}
                   </Card>
                   <Note>
-                    Cuando se libera un cupo avisamos automáticamente al primero de la lista. No
-                    hace falta que lo aceptes a mano.
+                    {ajustes.fase2
+                      ? 'Cuando se libera un cupo avisamos automáticamente al primero de la lista; los jugadores «Muy confiable» tienen prioridad. No hace falta que lo aceptes a mano.'
+                      : 'Cuando se libera un cupo avisamos automáticamente al primero de la lista. No hace falta que lo aceptes a mano.'}
                   </Note>
                 </View>
               ) : null}
@@ -763,7 +766,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                   tone="green"
                   icon={ListChecks}
                   title="Marca a cada jugador"
-                  text={`Asistió, llegó tarde (más de ${ajustes.tarde_minutos ?? 10} min) o no fue. Se confirma una sola vez y cambia el TrueScore de cada uno.`}
+                  text={`Asistió, llegó tarde (más de ${ajustes.tarde_minutos ?? 10} min) o no fue. Se confirma una sola vez y cambia el TrueScore de cada uno.${ajustes.fase2 ? ' Mientras antes confirmes, más suma tu propio TrueScore.' : ''}`}
                 />
               )}
 

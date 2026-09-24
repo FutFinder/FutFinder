@@ -195,3 +195,16 @@ Estas decisiones las tomó Vicente al aprobar el plan de la fase 1. Donde contra
 | Encuentros entre clubes | Quedan fuera de TrueScore. |
 | Expulsión | No resta puntos y el expulsado no puede volver a ese partido (ni a su lista de espera). |
 | Teléfono verificado | La pantalla y el chequeo quedan listos, pero se exigen sólo con el flag `telefono_obligatorio`, que espera a que haya proveedor de SMS configurado. |
+
+### Decisiones de la fase 2 (2026-09-24)
+
+| Tema | Decisión |
+| --- | --- |
+| Alcance | Reincidencia, reclamos (con el −20 al organizador de la sección 1.5), prioridad en la lista de espera y los bonos de confirmación. Todo sobre el TrueScore global. |
+| Bono del organizador | +5 si confirma la asistencia antes de 12 h desde el fin del partido, +2 entre 12 y 24 h. Sólo si al menos un jugador asistió («partido realizado»). |
+| Información falsa (−25) | Fuera por ahora, junto con su pantalla de revisión. |
+| Ventana de reincidencia | Sólo cuentan los eventos ocurridos con la fase 2 activa: al activarla, todos parten de cero. |
+| Plazo del reclamo | Todo ocurre dentro de las 48 h desde la marca: reclamar y que los compañeros confirmen. Vencido el plazo, el reclamo se cierra y la marca se mantiene. |
+| Qué se reclama | Una tardanza o una ausencia marcadas por el organizador. Aceptado, se aplica «Asistió». Si no hay 2 compañeros que hayan asistido, no se puede reclamar. |
+| Quién confirma | Compañeros marcados «Asistió» o «Llegó tarde» en ese partido; no el reclamante ni el organizador. |
+| Prioridad en la lista de espera | El nivel «Muy confiable» va antes, y dentro de cada grupo manda el orden de llegada. Se evalúa con el puntaje del momento en que se libera el cupo. |

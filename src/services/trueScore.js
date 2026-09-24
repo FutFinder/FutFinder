@@ -86,6 +86,48 @@ export async function listMisEventosTrueScore({ limite = 100 } = {}) {
   return { data: data || [], error };
 }
 
+// --------------------------------------------------------------- reclamos
+
+function reclamoFallido(error) {
+  return { ok: false, reason: 'No pudimos completar el reclamo. Intenta de nuevo.', error };
+}
+
+/** Reclamo mi marca de tardanza o ausencia en este partido (fase 2). */
+export async function reclamarMarca(matchId) {
+  if (!isSupabaseConfigured) return { ok: false, reason: 'Sin conexión con el servidor' };
+  const { data, error } = await supabase.rpc('truescore_reclamar', { p_match_id: matchId });
+  if (error) return reclamoFallido(error);
+  return data;
+}
+
+/** Como compañero que asistió, confirmo que el reclamante sí estuvo. */
+export async function confirmarReclamo(reclamoId) {
+  if (!isSupabaseConfigured) return { ok: false, reason: 'Sin conexión con el servidor' };
+  const { data, error } = await supabase.rpc('truescore_confirmar_reclamo', { p_reclamo_id: reclamoId });
+  if (error) return reclamoFallido(error);
+  return data;
+}
+
+/** Los reclamos de un partido que puedo ver (el mío, o los que me toca confirmar). */
+export async function reclamosDelPartido(matchId) {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.rpc('truescore_reclamos_del_partido', { p_match_id: matchId });
+  if (error) return [];
+  return data || [];
+}
+
+/** Mis reclamos, por evento: { [evento_id]: reclamo }. */
+export async function misReclamos() {
+  if (!isSupabaseConfigured) return {};
+  const { data, error } = await supabase.rpc('truescore_mis_reclamos');
+  if (error) return {};
+  const porEvento = {};
+  (data || []).forEach((r) => {
+    porEvento[r.evento_id] = r;
+  });
+  return porEvento;
+}
+
 // ---------------------------------------------------------------- teléfono
 
 /** ¿Mi cuenta tiene un teléfono verificado? */

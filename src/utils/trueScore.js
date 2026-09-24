@@ -90,7 +90,37 @@ const TITULOS_EVENTO = {
   neutro: 'Sin cambios',
   cancelacion_organizador: 'Cancelaste un partido',
   sin_confirmar_organizador: 'No confirmaste la asistencia',
+  reversion: 'Reclamo aceptado',
+  reclamo_organizador: 'Un reclamo probó una marca errónea',
+  bono_organizador: 'Confirmaste la asistencia a tiempo',
 };
+
+/** Tipos que un jugador puede reclamar (fase 2): lo marcaron tarde o ausente. */
+const RECLAMABLES = ['tarde', 'planton'];
+
+/**
+ * ¿Se puede reclamar este evento? Sólo tardanzas y ausencias marcadas en un
+ * partido, dentro del plazo que manda el servidor, y si todavía no hay un
+ * reclamo por él. El servidor vuelve a comprobarlo todo.
+ */
+export function puedeReclamar(evento, { fase2, plazoHoras, reclamo, ahora = Date.now() } = {}) {
+  if (!fase2 || !evento || !evento.match_id) return false;
+  if (!RECLAMABLES.includes(evento.tipo)) return false;
+  if (reclamo) return false;
+  const creado = new Date(evento.created_at).getTime();
+  if (!Number.isFinite(creado)) return false;
+  return ahora <= creado + Number(plazoHoras) * 3600000;
+}
+
+/** El estado de un reclamo dicho en una frase. */
+export function textoEstadoReclamo(reclamo) {
+  if (!reclamo) return null;
+  if (reclamo.estado === 'aceptado') return 'Reclamo aceptado: se corrigió tu marca.';
+  if (reclamo.estado === 'vencido') return 'Tu reclamo se cerró sin las confirmaciones necesarias.';
+  const n = Number(reclamo.confirmaciones) || 0;
+  const total = Number(reclamo.necesarias) || 0;
+  return `Reclamo abierto: ${n} de ${total} compañeros confirmaron.`;
+}
 
 /** Una fila de `truescore_eventos` lista para el historial. */
 export function describirEvento(e) {

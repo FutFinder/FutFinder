@@ -49,6 +49,8 @@ La fuente de verdad es `docs/truescore-spec.md`, incluida su sección 8 de decis
 - El mínimo de puntaje que pone el organizador se mantiene; la suspensión automática en 0 no existe.
 - Los encuentros entre clubes quedan fuera de TrueScore.
 
+Con `truescore_fase2` activo (migración 135, también apagada): la tardanza vale −15 si ya hay 2 en los últimos 10 eventos, y el plantón −35 × (1 + 0,5 × plantones previos), contando sólo eventos ocurridos con la fase 2 activa. El jugador marcado tarde o ausente puede reclamar dentro de 48 h desde la marca; si 2 compañeros que asistieron lo confirman en ese mismo plazo, se aplica «Asistió», se rehacen puntaje, racha y reincidencia desde ese punto y el organizador pierde 20. El organizador gana +5 si confirma la asistencia antes de 12 h desde el fin, o +2 entre 12 y 24 h, siempre que alguien haya asistido. En la lista de espera, «Muy confiable» va primero.
+
 ## Trust Score
 
 - El puntaje se almacena entre 0 y 100 y puede condicionar el ingreso cuando un partido define `min_trust_score`.

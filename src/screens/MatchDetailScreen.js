@@ -63,6 +63,7 @@ import {
 } from '../components/partidos/ui';
 import Sheet from '../components/partidos/Sheet';
 import TrueScoreChip from '../components/TrueScoreChip';
+import ReclamosDelPartido from '../components/partidos/ReclamosDelPartido';
 import { getCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
 import { TEXTO_REGLA_SALIDA_TS, textoCostoSalida } from '../utils/trueScore';
 import ShareSheet from '../components/partidos/ShareSheet';
@@ -1176,6 +1177,9 @@ export default function MatchDetailScreen({ route, navigation }) {
             </Card>
           </Section> : null}
 
+          {/* Reclamos de asistencia (TrueScore fase 2) */}
+          {!usaNominaClub ? <ReclamosDelPartido matchId={matchId} /> : null}
+
           {/* Lista de espera */}
           {!usaNominaClub && waitlist.length > 0 ? (
             <Section label="Lista de espera" right={`${waitlist.length} en espera`}>
@@ -1191,6 +1195,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                       @{w.username}
                       {w.user_id === myId ? ' · tú' : ''}
                     </Text>
+                    {w.prioridad ? <Tag label="Prioridad" tone="green" /> : null}
                     <TrueScoreChip score={w.trust_score} />
                   </View>
                 ))}

@@ -191,6 +191,14 @@ Tres hábitos que se ganaron a golpes en estas migraciones: `revoke ... from ano
 - `flag_activo` es ejecutable por `authenticated` a propósito: `tg_auto_suspend` y la guarda de `matches` corren con el rol de quien edita y preguntan por el flag. Las demás funciones internas están cerradas a `public`, `anon` y `authenticated`.
 - El job `futfinder-truescore-sin-confirmar` corre cada 15 minutos.
 
+**Fase 2 (migración 135), aplicada el 2026-09-24 con `truescore_fase2` apagado**; arnés `supabase/tests/135_truescore_fase2_test.sql` 36/36 contra el esquema aplicado, y el de la 134 volvió a pasar después. Se activa con `select public.truescore_activar_fase2();` (exige la fase 1).
+
+- **El historial efectivo** es la regla: un evento revertido cuenta como `detalle.tipo_nuevo` de su reversión, en SU posición. `truescore_repasar(usuario)` lo recorre desde cero y es la definición del estado; `truescore_registrar` usa el caché más `truescore_ventana(usuario)` (últimos 10 eventos que cuentan, sólo los ocurridos con fase 2). El arnés exige que las dos vías coincidan.
+- **Un reclamo aceptado no edita nada**: `truescore_aplicar_reclamo` simula la reversión con `truescore_repasar(usuario, evento, 'asistio')` y recién entonces inserta el evento `reversion` con el puntaje final, así nace con su valor y no hay que tocarlo después. `revierte_evento_id` tiene índice único: una reversión por evento.
+- `truescore_reclamos` y `truescore_reclamo_confirmaciones` no tienen permisos para la app: todo pasa por `truescore_reclamar`, `truescore_confirmar_reclamo`, `truescore_reclamos_del_partido` y `truescore_mis_reclamos`. El job `futfinder-truescore-reclamos` cierra los vencidos cada 15 minutos.
+- `truescore_calcular` cambió de firma (siete argumentos); se borró la de cuatro para no dejar una sobrecarga.
+- `lista_de_espera(partido)` corre con los permisos de quien llama y da el orden real de la cola; `avanzar_lista_de_espera` y `join_waitlist` usan el mismo orden.
+
 ## Integridad y tiempo real
 
 - Triggers crean perfiles y asistentes organizadores, limitan clubes, automatizan cola y avisos, protegen mensajes y generan notificaciones de clubes, partido y chat.

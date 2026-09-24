@@ -19,6 +19,8 @@ const {
   textoCostoSalida,
   textoCostoCancelacion,
   describirEvento,
+  puedeReclamar,
+  textoEstadoReclamo,
 } = require('../trueScore.js');
 
 // La misma tabla que siembra la migración 134 en `truescore_config`.
@@ -98,6 +100,34 @@ test('el historial muestra lo aplicado, y el inicio muestra el puntaje', () => {
     pick(describirEvento({ tipo: 'inicio', puntos_aplicados: -25, puntaje_despues: 75 })),
     { titulo: 'Inicio de TrueScore', cambio: '75', tono: 'neutro' }
   );
+});
+
+test('se reclama una tardanza o ausencia de un partido, dentro de plazo y una vez', () => {
+  const creado = '2026-09-24T12:00:00Z';
+  const base = { tipo: 'planton', match_id: 'm1', created_at: creado };
+  const t0 = Date.parse(creado);
+  const opts = { fase2: true, plazoHoras: 48, ahora: t0 + 3600000 };
+  assert.equal(puedeReclamar(base, opts), true);
+  assert.equal(puedeReclamar({ ...base, tipo: 'tarde' }, opts), true);
+  assert.equal(puedeReclamar({ ...base, tipo: 'salida' }, opts), false);
+  assert.equal(puedeReclamar({ ...base, match_id: null }, opts), false);
+  assert.equal(puedeReclamar(base, { ...opts, fase2: false }), false);
+  assert.equal(puedeReclamar(base, { ...opts, reclamo: { estado: 'abierto' } }), false);
+  assert.equal(puedeReclamar(base, { ...opts, ahora: t0 + 48 * 3600000 }), true);
+  assert.equal(puedeReclamar(base, { ...opts, ahora: t0 + 48 * 3600000 + 1 }), false);
+});
+
+test('el estado del reclamo se lee en una frase', () => {
+  assert.match(textoEstadoReclamo({ estado: 'abierto', confirmaciones: 1, necesarias: 2 }), /1 de 2/);
+  assert.match(textoEstadoReclamo({ estado: 'aceptado' }), /aceptado/);
+  assert.match(textoEstadoReclamo({ estado: 'vencido' }), /se cerró/);
+  assert.equal(textoEstadoReclamo(null), null);
+});
+
+test('los eventos nuevos de la fase 2 tienen título', () => {
+  assert.equal(describirEvento({ tipo: 'reversion', puntos_aplicados: 58 }).titulo, 'Reclamo aceptado');
+  assert.equal(describirEvento({ tipo: 'bono_organizador', puntos_aplicados: 5 }).cambio, '+5');
+  assert.equal(describirEvento({ tipo: 'reclamo_organizador', puntos_aplicados: -20 }).tono, 'negativo');
 });
 
 function pick(e) {

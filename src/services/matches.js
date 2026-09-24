@@ -1074,11 +1074,17 @@ export async function getMatchRequests(matchId) {
 /** Cola de espera del partido, en orden de llegada. */
 export async function getWaitlist(matchId) {
   if (!isSupabaseConfigured) return { data: [], error: null };
-  const { data, error } = await supabase
-    .from('match_waitlist')
-    .select('id, id_jugador, created_at, avisado_at, confirmar_antes_de')
-    .eq('id_partido', matchId)
-    .order('created_at', { ascending: true });
+  // El orden real de la cola lo da el servidor (migración 135): con
+  // TrueScore fase 2, «Muy confiable» va primero. Si la función no existe
+  // todavía, se cae al orden de llegada de siempre.
+  let { data, error } = await supabase.rpc('lista_de_espera', { p_match_id: matchId });
+  if (error) {
+    ({ data, error } = await supabase
+      .from('match_waitlist')
+      .select('id, id_jugador, created_at, avisado_at, confirmar_antes_de')
+      .eq('id_partido', matchId)
+      .order('created_at', { ascending: true }));
+  }
   if (error) return { data: [], error };
   const ids = (data || []).map((w) => w.id_jugador);
   if (!ids.length) return { data: [], error: null };
@@ -1093,7 +1099,8 @@ export async function getWaitlist(matchId) {
       return {
         id: w.id,
         user_id: w.id_jugador,
-        posicion: i + 1,
+        posicion: w.posicion ?? i + 1,
+        prioridad: !!w.prioridad,
         username: p.username || 'jugador',
         foto_url: p.foto_url || null,
         trust_score: p.trust_score ?? null,

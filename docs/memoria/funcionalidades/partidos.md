@@ -35,6 +35,8 @@ El buscador pagina por el par `(hora, id)`, no sólo por la hora: dos partidos c
 
 Las pantallas leen `useTrueScoreAjustes()` (`src/services/trueScore.js`) y cambian sólo con `truescore_fase1` activo. Gestionar partido confirma la asistencia en tres estados y una sola vez, con una hoja de confirmación, y ofrece sacar a un jugador desde la nómina; la cancelación pide el motivo (lluvia, cierre de cancha u otro) y muestra el costo que calcula `truescore_costo_salida`. El detalle y «Mi cupo» muestran ese mismo costo antes de salir. `TrueScoreChip` pinta el puntaje con el color de su nivel en solicitudes, lista de espera, nómina y organizador; el perfil y el historial también. La presentación pura vive en `src/utils/trueScore.js` (pruebas en `src/utils/__tests__/trueScore.test.js`) y **no calcula puntos**: todo número llega del servidor. `VerificarTelefonoScreen` (Ajustes → Verificar teléfono) queda lista, pero sin proveedor de SMS responde que la verificación todavía no está disponible.
 
+Con `truescore_fase2`: el historial ofrece «Reclamar» en las tardanzas y ausencias dentro del plazo y muestra el estado del reclamo; el detalle del partido muestra `ReclamosDelPartido` (`src/components/partidos/ReclamosDelPartido.js`) para que los compañeros que asistieron confirmen; la lista de espera llega ordenada por `lista_de_espera` y marca «Prioridad»; y confirmar la asistencia avisa del bono ganado.
+
 ## Pantallas y dependencias
 
 - Pantallas: `PartidosScreen`, `MatchDetailScreen`, `PublishMatchScreen`, `EditMatchScreen`, `ManageMatchScreen`, `MatchRequestStatusScreen` y `MatchSpotScreen`.

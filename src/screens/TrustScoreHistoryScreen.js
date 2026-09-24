@@ -13,8 +13,18 @@ import { ArrowLeft, Minus, ShieldCheck, TrendingUp, TrendingDown } from 'lucide-
 import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
 import { getTrustScoreHistory } from '../services/settings';
 import { getMyProfile } from '../services/profile';
-import { getTrueScoreAjustes, listMisEventosTrueScore } from '../services/trueScore';
-import { describirEvento, nivelTrueScore } from '../utils/trueScore';
+import {
+  getTrueScoreAjustes,
+  listMisEventosTrueScore,
+  misReclamos,
+  reclamarMarca,
+} from '../services/trueScore';
+import {
+  describirEvento,
+  nivelTrueScore,
+  puedeReclamar,
+  textoEstadoReclamo,
+} from '../utils/trueScore';
 
 // Con TrueScore el historial sale del registro de eventos (migración 134);
 // sin él, de `trust_score_history`. Las dos se muestran con la misma fila.
@@ -41,7 +51,7 @@ function formatDate(iso) {
   }
 }
 
-function HistoryItem({ item }) {
+function HistoryItem({ item, reclamo, reclamable, reclamando, onReclamar }) {
   const color =
     item.tono === 'positivo' ? C.green : item.tono === 'negativo' ? C.red : C.textSecondary;
   const Icon =
@@ -56,6 +66,22 @@ function HistoryItem({ item }) {
         <Text style={styles.itemReason}>{item.titulo}</Text>
         {item.detalle ? <Text style={styles.itemDetail}>{item.detalle}</Text> : null}
         <Text style={styles.itemDate}>{formatDate(item.fecha)}</Text>
+        {reclamo ? <Text style={styles.claimText}>{textoEstadoReclamo(reclamo)}</Text> : null}
+        {reclamable ? (
+          <Pressable
+            onPress={onReclamar}
+            disabled={reclamando}
+            accessibilityRole="button"
+            accessibilityLabel="Reclamar esta marca"
+            style={({ pressed }) => [styles.claimBtn, (pressed || reclamando) && { opacity: 0.7 }]}
+          >
+            {reclamando ? (
+              <ActivityIndicator color={C.green} size="small" />
+            ) : (
+              <Text style={styles.claimBtnText}>Reclamar: sí estuve a tiempo</Text>
+            )}
+          </Pressable>
+        ) : null}
       </View>
       <Text style={[styles.itemChange, { color }]}>{item.cambio}</Text>
     </View>
@@ -68,6 +94,10 @@ export default function TrustScoreHistoryScreen({ navigation }) {
   const [racha, setRacha] = useState(null);
   const [ajustes, setAjustes] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Fase 2: reclamos por evento y el que se está enviando.
+  const [reclamos, setReclamos] = useState({});
+  const [reclamando, setReclamando] = useState(null);
+  const [aviso, setAviso] = useState(null);
   const ts = !!ajustes?.fase1;
   const nivel = ts ? nivelTrueScore(trustScore, ajustes.niveles) : null;
   const colorNivel =
@@ -77,8 +107,12 @@ export default function TrustScoreHistoryScreen({ navigation }) {
     const [a, profile] = await Promise.all([getTrueScoreAjustes(), getMyProfile()]);
     setAjustes(a);
     if (a.fase1) {
-      const { data } = await listMisEventosTrueScore({ limite: 100 });
-      setHistory(data.map(describirEvento));
+      const [{ data }, rec] = await Promise.all([
+        listMisEventosTrueScore({ limite: 100 }),
+        a.fase2 ? misReclamos() : Promise.resolve({}),
+      ]);
+      setHistory(data.map((e) => ({ ...describirEvento(e), raw: e })));
+      setReclamos(rec);
     } else {
       const { data } = await getTrustScoreHistory(100);
       setHistory((data || []).map(filaVieja));
@@ -89,6 +123,23 @@ export default function TrustScoreHistoryScreen({ navigation }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const reclamar = async (evento) => {
+    if (reclamando) return;
+    setReclamando(evento.id);
+    setAviso(null);
+    const res = await reclamarMarca(evento.match_id);
+    setReclamando(null);
+    if (!res?.ok) {
+      setAviso({ tono: 'error', texto: res?.reason || 'No pudimos enviar el reclamo.' });
+      return;
+    }
+    setAviso({
+      tono: 'ok',
+      texto: `Reclamo enviado. Avisamos a tus compañeros: si ${ajustes?.reclamo_confirmaciones ?? 2} confirman que estuviste, se corrige tu TrueScore.`,
+    });
+    await load();
+  };
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -138,7 +189,30 @@ export default function TrustScoreHistoryScreen({ navigation }) {
         <FlatList
           data={history}
           keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => <HistoryItem item={item} />}
+          ListHeaderComponent={
+            aviso ? (
+              <Text style={[styles.aviso, aviso.tono === 'error' && { color: C.red }]}>{aviso.texto}</Text>
+            ) : null
+          }
+          renderItem={({ item }) => {
+            const reclamo = item.raw ? reclamos[item.raw.id] : null;
+            return (
+              <HistoryItem
+                item={item}
+                reclamo={reclamo}
+                reclamable={
+                  !!item.raw &&
+                  puedeReclamar(item.raw, {
+                    fase2: !!ajustes?.fase2,
+                    plazoHoras: ajustes?.reclamo_plazo_horas ?? 48,
+                    reclamo,
+                  })
+                }
+                reclamando={reclamando === item.id}
+                onReclamar={() => reclamar(item.raw)}
+              />
+            );
+          }}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -231,6 +305,21 @@ const styles = StyleSheet.create({
   },
   itemDetail: { color: C.textSecondary, fontSize: 12.5, lineHeight: 17, marginBottom: 2 },
   itemDate: { color: C.textMuted, fontSize: 12 },
+  claimText: { color: C.textSecondary, fontSize: 12, marginTop: 6 },
+  claimBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    height: 32,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+    backgroundColor: alfa(C.green, 0.1),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  claimBtnText: { color: C.green, fontSize: 12.5, fontFamily: F.bold },
+  aviso: { color: C.green, fontSize: 13, lineHeight: 18, marginBottom: 12 },
   itemChange: {
     fontSize: 18, fontFamily: F.extraBold,
     flexShrink: 0,
