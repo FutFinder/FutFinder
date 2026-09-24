@@ -9,6 +9,11 @@ import {
   fuentes as F,
   alfa,
 } from '../../theme/colors';
+import { useTrueScoreAjustes } from '../../services/trueScore';
+import { nivelTrueScore } from '../../utils/trueScore';
+
+// Color del nivel de TrueScore, desde la única paleta.
+const TONO_NIVEL = { verde: C.green, amarillo: C.amber, rojo: C.red };
 
 /**
  * "Reputación": valoración media con estrellas + Trust Score.
@@ -23,6 +28,12 @@ import {
  * @param {object} trust  { value, pct, hint } de trustDisplay()
  */
 export default function ReputationCard({ rating, trust }) {
+  // Con TrueScore el número se pinta con el color de su nivel (spec §1.4).
+  const ajustes = useTrueScoreAjustes();
+  const nivel =
+    ajustes.fase1 && trust.pct !== null ? nivelTrueScore(trust.value, ajustes.niveles) : null;
+  const tono = nivel ? TONO_NIVEL[nivel.color] || C.green : C.green;
+  const nombre = ajustes.fase1 ? 'TrueScore' : 'Trust Score';
   return (
     <View style={styles.card}>
       <View style={styles.left}>
@@ -66,12 +77,14 @@ export default function ReputationCard({ rating, trust }) {
       <View style={styles.divider} />
 
       <View style={styles.right}>
-        <Text style={styles.trustLabel}>Trust Score</Text>
+        <Text style={styles.trustLabel}>{nombre}</Text>
         <View style={styles.trustRow}>
           <Text
-            style={[styles.trustValue, trust.pct === null && styles.dim]}
+            style={[styles.trustValue, { color: tono }, trust.pct === null && styles.dim]}
             accessibilityLabel={
-              trust.pct === null ? 'Trust Score no disponible' : `Trust Score ${trust.value} de 100`
+              trust.pct === null
+                ? `${nombre} no disponible`
+                : `${nombre} ${trust.value} de 100${nivel ? `, ${nivel.nombre}` : ''}`
             }
           >
             {trust.value}
@@ -79,9 +92,11 @@ export default function ReputationCard({ rating, trust }) {
           {trust.pct !== null && <Text style={styles.trustMax}>/ 100</Text>}
         </View>
         <View style={styles.track}>
-          {trust.pct !== null && <View style={[styles.fill, { width: `${trust.pct}%` }]} />}
+          {trust.pct !== null && (
+            <View style={[styles.fill, { width: `${trust.pct}%`, backgroundColor: tono }]} />
+          )}
         </View>
-        <Text style={styles.rightHint}>{trust.hint}</Text>
+        <Text style={styles.rightHint}>{nivel ? nivel.nombre : trust.hint}</Text>
       </View>
     </View>
   );

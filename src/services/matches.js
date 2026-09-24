@@ -746,6 +746,12 @@ export function translateMissingRpcError(error) {
 
 // Traduce las excepciones del trigger tg_enforce_join_rules a mensajes legibles.
 function translateJoinError(msg = '') {
+  if (msg.includes('EXPULSADO')) {
+    return 'El organizador te sacó de este partido, así que no puedes volver a entrar.';
+  }
+  if (msg.includes('TELEFONO_NO_VERIFICADO')) {
+    return 'Para inscribirte necesitas verificar tu teléfono en Ajustes.';
+  }
   if (msg.includes('SUSPENDIDO')) {
     return 'Tu cuenta está suspendida temporalmente y no puede unirse a partidos.';
   }
@@ -807,13 +813,15 @@ export async function leaveMatchPenalized(matchId) {
 
 /**
  * Cancelar un partido con penalización por tiempo (anfitrión).
+ * `tipo` es 'lluvia' | 'cierre_cancha' | 'otro' (migración 134): lluvia y
+ * cierre de cancha son neutros para todos con TrueScore.
  * Devuelve { ok, penalty, reason? }.
  */
-export async function cancelMatch(matchId) {
+export async function cancelMatch(matchId, tipo = null) {
   if (!isSupabaseConfigured) return { ok: true, demo: true, penalty: 0 };
-  const { data, error } = await supabase.rpc('cancel_match', {
-    p_match_id: matchId,
-  });
+  const params = { p_match_id: matchId };
+  if (tipo) params.p_tipo = tipo;
+  const { data, error } = await supabase.rpc('cancel_match', params);
   if (error) return { ok: false, error };
   return data;
 }
@@ -892,7 +900,7 @@ export async function getMatchAttendees(matchId) {
     // 1) Trae attendees
     const { data: atts, error: aErr } = await supabase
       .from('attendees')
-      .select('id, id_jugador, estado, inscrito_at, confirmado_at')
+      .select('id, id_jugador, estado, inscrito_at, confirmado_at, asistencia')
       .eq('id_partido', matchId)
       .order('inscrito_at', { ascending: true });
     if (aErr) {
@@ -943,6 +951,8 @@ export async function getMatchAttendees(matchId) {
         estado: a.estado,
         inscrito_at: a.inscrito_at,
         confirmado_at: a.confirmado_at,
+        // Marca del organizador con TrueScore: 'asistio' | 'tarde' | 'no_fue'.
+        asistencia: a.asistencia ?? null,
       };
     });
 
@@ -959,7 +969,7 @@ export async function getMatchAttendees(matchId) {
  * NO borra el registro: `cancel_match` cambia `estado` a 'cancelado' para que
  * el partido siga en el historial y el chat quede en solo lectura.
  */
-export async function cancelMatchWithReason(matchId, motivo = null) {
+export async function cancelMatchWithReason(matchId, motivo = null, tipo = null) {
   // El motivo se escribe ANTES de cancelar. La RPC `cancel_match` que está
   // corriendo en la base es una versión anterior a este repo (la migración 33
   // no la sobrescribe a propósito) y no sabemos con certeza si cambia el
@@ -972,7 +982,7 @@ export async function cancelMatchWithReason(matchId, motivo = null) {
       .eq('id', matchId);
   }
 
-  const res = await cancelMatch(matchId);
+  const res = await cancelMatch(matchId, tipo);
   if (!res?.ok) return res;
 
   // ¿Quedó como 'cancelado' en el historial, o desapareció?

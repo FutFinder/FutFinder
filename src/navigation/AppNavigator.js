@@ -61,6 +61,7 @@ import PermisosClubScreen from '../screens/PermisosClubScreen';
 import ClubInviteScreen from '../screens/ClubInviteScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
+import VerificarTelefonoScreen from '../screens/VerificarTelefonoScreen';
 import BlockedUsersScreen from '../screens/BlockedUsersScreen';
 import ReservasUiGalleryScreen from '../screens/ReservasUiGalleryScreen';
 import ComplejoDetailScreen from '../screens/ComplejoDetailScreen';
@@ -150,6 +151,7 @@ const GuardedPermisosClubScreen = withAuthGuard(PermisosClubScreen, 'PermisosClu
 const GuardedClubInviteScreen = withAuthGuard(ClubInviteScreen, 'ClubInvite');
 const GuardedSettingsScreen = withAuthGuard(SettingsScreen, 'Settings');
 const GuardedTrustScoreHistoryScreen = withAuthGuard(TrustScoreHistoryScreen, 'TrustScoreHistory');
+const GuardedVerificarTelefonoScreen = withAuthGuard(VerificarTelefonoScreen, 'VerificarTelefono');
 const GuardedBlockedUsersScreen = withAuthGuard(BlockedUsersScreen, 'BlockedUsers');
 const GuardedComplejoDetailScreen = withAuthGuard(ComplejoDetailScreen, 'ComplejoDetail');
 const GuardedElegirCanchaScreen = withAuthGuard(ElegirCanchaScreen, 'ElegirCancha');
@@ -455,6 +457,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="TrustScoreHistory"
           component={GuardedTrustScoreHistoryScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="VerificarTelefono"
+          component={GuardedVerificarTelefonoScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

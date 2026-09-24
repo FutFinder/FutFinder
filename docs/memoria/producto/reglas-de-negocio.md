@@ -1,6 +1,6 @@
 # Reglas de negocio
 
-Última revisión: 2026-09-15
+Última revisión: 2026-09-24
 
 ## Propósito
 
@@ -36,6 +36,18 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 - **De un encuentro terminado es público** el nombre y el escudo de los dos clubes, el día, el marcador y el V/E/D. La hora exacta y la cancha sólo las ven los integrantes de los dos clubes. Antes de terminar, el partido no existe para nadie más.
 - **El nivel de un encuentro entre clubes no se acuerda todavía** en ninguna parte del ciclo, así que no se muestra en el historial: el `nivel` del partido queda en el valor por defecto de la tabla y no representa ninguna decisión.
 - **La asistencia y el cierre de un encuentro entre clubes viajan con el resultado**, no por la vía del partido normal: nadie pierde Trust Score por un encuentro entre clubes, y un solo club no puede darlo por jugado.
+
+## TrueScore (reemplaza al Trust Score cuando se active)
+
+La fuente de verdad es `docs/truescore-spec.md`, incluida su sección 8 de decisiones. La fase 1 está en producción desde la migración 134 **con el flag `truescore_fase1` apagado**: mientras no se active, rige el Trust Score descrito más abajo. Con el flag activo:
+
+- Hay **un solo puntaje global**, entre 0 y 100, y todos parten en 75. Asistir a tiempo suma según la racha (+6, +8, +10, +12); llegar tarde resta 8 y no ir sin avisar resta 35, y los dos rompen la racha. Salirse cuesta según las horas de aviso, interpolado en la tabla de la spec (5 h = −13, 2 h = −23, 48 h = −1), igual para quien entró desde la lista de espera; con 24 h o más no rompe la racha.
+- El organizador **confirma la asistencia una sola vez** y a toda la nómina (Asistió, Llegó tarde, No fue) dentro de las 24 h desde el fin del partido. Si no lo hace, el partido queda neutro para los jugadores y el organizador pierde 10.
+- Cancelar es neutro para los jugadores. Al organizador no le cuesta con 12 h o más de aviso ni por lluvia o cierre de cancha; con menos de 12 h pierde 15, o 25 si faltan 2 h o menos.
+- El GPS ya no da puntos: queda como evidencia de llegada.
+- El organizador puede **sacar a un jugador**: no le resta puntos y no puede volver a ese partido.
+- El mínimo de puntaje que pone el organizador se mantiene; la suspensión automática en 0 no existe.
+- Los encuentros entre clubes quedan fuera de TrueScore.
 
 ## Trust Score
 

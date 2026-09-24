@@ -39,6 +39,8 @@ import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentUser } from '../services/auth';
 import { useOnline } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
+import { getCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
+import { TEXTO_REGLA_SALIDA_TS, textoCostoSalida } from '../utils/trueScore';
 import {
   GPS_RADIUS_METERS,
   cuotaLabel,
@@ -71,6 +73,18 @@ export default function MatchSpotScreen({ route, navigation }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [sheet, setSheet] = useState(null);
+  // Con TrueScore el costo de salirse lo calcula el servidor.
+  const ts = !!useTrueScoreAjustes().fase1;
+  const [costoSalida, setCostoSalida] = useState(null);
+  useEffect(() => {
+    if (!ts || sheet !== 'leave' || !matchId) return undefined;
+    let vivo = true;
+    setCostoSalida(null);
+    getCostoSalida(matchId).then((c) => vivo && setCostoSalida(c));
+    return () => {
+      vivo = false;
+    };
+  }, [ts, sheet, matchId]);
 
   const load = useCallback(async () => {
     const [res, user] = await Promise.all([
@@ -334,7 +348,7 @@ export default function MatchSpotScreen({ route, navigation }) {
                   style={{ flex: 1 }}
                 />
               </View>
-              <Note>{leaveRuleText(match.hora)}</Note>
+              <Note>{ts ? TEXTO_REGLA_SALIDA_TS : leaveRuleText(match.hora)}</Note>
             </>
           ) : null}
         </View>
@@ -348,7 +362,13 @@ export default function MatchSpotScreen({ route, navigation }) {
         footer={
           <View style={{ flex: 1, gap: 9 }}>
             <GhostButton
-              label={`Salir del partido (−${leavePenaltyFor(match.hora)} pts)`}
+              label={
+                ts
+                  ? costoSalida?.ok
+                    ? `Salir del partido (−${costoSalida.puntos} pts)`
+                    : 'Salir del partido'
+                  : `Salir del partido (−${leavePenaltyFor(match.hora)} pts)`
+              }
               tone="danger"
               onPress={leave}
               height={52}
@@ -363,8 +383,12 @@ export default function MatchSpotScreen({ route, navigation }) {
         <Card style={{ gap: 10 }} radius={16}>
           <SectionLabel>Qué va a pasar</SectionLabel>
           <Bullet
-            tone={isPenaltyFree(match.hora) ? 'gold' : 'danger'}
-            text={`Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`}
+            tone={ts || !isPenaltyFree(match.hora) ? 'danger' : 'gold'}
+            text={
+              ts
+                ? textoCostoSalida(costoSalida) || 'Calculando lo que te cuesta salir ahora…'
+                : `Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
+            }
           />
           <Bullet text="Tu cupo se libera y vuelve a aparecer en Partidos" />
           <Bullet text="Avisamos al grupo y al primero de la lista de espera" />
@@ -372,7 +396,7 @@ export default function MatchSpotScreen({ route, navigation }) {
         </Card>
         <View style={{ marginTop: 12 }}>
           <Note tone="card" icon={Clock}>
-            {leaveRuleText(match.hora)}
+            {ts ? TEXTO_REGLA_SALIDA_TS : leaveRuleText(match.hora)}
           </Note>
         </View>
       </Sheet>

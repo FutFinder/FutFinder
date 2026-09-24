@@ -34,6 +34,7 @@ import {
   AlertTriangle,
   ShieldOff,
   Download,
+  Smartphone,
 } from 'lucide-react-native';
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -836,6 +837,13 @@ export default function SettingsScreen({ navigation }) {
         <Card padded={false} style={styles.card}>
           <Row icon={Mail} title="Cambiar email" showChevron onPress={() => setModal('email')} />
           <Row icon={Lock} title="Cambiar contraseña" showChevron onPress={() => setModal('password')} />
+          <Row
+            icon={Smartphone}
+            title="Verificar teléfono"
+            subtitle="Una cuenta, un número"
+            showChevron
+            onPress={() => navigation.navigate('VerificarTelefono')}
+          />
           <Row icon={Download} title="Exportar mis datos" showChevron last onPress={handleExportData} />
         </Card>
 

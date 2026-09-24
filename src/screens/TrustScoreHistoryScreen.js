@@ -8,11 +8,27 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ShieldCheck, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { ArrowLeft, Minus, ShieldCheck, TrendingUp, TrendingDown } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
 import { getTrustScoreHistory } from '../services/settings';
 import { getMyProfile } from '../services/profile';
+import { getTrueScoreAjustes, listMisEventosTrueScore } from '../services/trueScore';
+import { describirEvento, nivelTrueScore } from '../utils/trueScore';
+
+// Con TrueScore el historial sale del registro de eventos (migración 134);
+// sin él, de `trust_score_history`. Las dos se muestran con la misma fila.
+function filaVieja(item) {
+  const n = Number(item.change_amount) || 0;
+  return {
+    id: item.id,
+    titulo: item.reason,
+    detalle: '',
+    cambio: n > 0 ? `+${n}` : `${n}`,
+    tono: n > 0 ? 'positivo' : n < 0 ? 'negativo' : 'neutro',
+    fecha: item.created_at,
+  };
+}
 
 function formatDate(iso) {
   try {
@@ -26,23 +42,22 @@ function formatDate(iso) {
 }
 
 function HistoryItem({ item }) {
-  const isPositive = item.change_amount > 0;
-  const color = isPositive ? C.green : C.red;
-  const sign = isPositive ? '+' : '';
-  const Icon = isPositive ? TrendingUp : TrendingDown;
+  const color =
+    item.tono === 'positivo' ? C.green : item.tono === 'negativo' ? C.red : C.textSecondary;
+  const Icon =
+    item.tono === 'positivo' ? TrendingUp : item.tono === 'negativo' ? TrendingDown : Minus;
 
   return (
     <View style={styles.item}>
-      <View style={[styles.iconBubble, { backgroundColor: isPositive ? C.greenSoft : alfa(C.red, 0.12) }]}>
+      <View style={[styles.iconBubble, { backgroundColor: alfa(color, 0.12) }]}>
         <Icon color={color} size={16} />
       </View>
       <View style={styles.itemInfo}>
-        <Text style={styles.itemReason}>{item.reason}</Text>
-        <Text style={styles.itemDate}>{formatDate(item.created_at)}</Text>
+        <Text style={styles.itemReason}>{item.titulo}</Text>
+        {item.detalle ? <Text style={styles.itemDetail}>{item.detalle}</Text> : null}
+        <Text style={styles.itemDate}>{formatDate(item.fecha)}</Text>
       </View>
-      <Text style={[styles.itemChange, { color }]}>
-        {sign}{item.change_amount}
-      </Text>
+      <Text style={[styles.itemChange, { color }]}>{item.cambio}</Text>
     </View>
   );
 }
@@ -50,15 +65,26 @@ function HistoryItem({ item }) {
 export default function TrustScoreHistoryScreen({ navigation }) {
   const [history, setHistory] = useState([]);
   const [trustScore, setTrustScore] = useState(null);
+  const [racha, setRacha] = useState(null);
+  const [ajustes, setAjustes] = useState(null);
   const [loading, setLoading] = useState(true);
+  const ts = !!ajustes?.fase1;
+  const nivel = ts ? nivelTrueScore(trustScore, ajustes.niveles) : null;
+  const colorNivel =
+    nivel?.color === 'amarillo' ? C.amber : nivel?.color === 'rojo' ? C.red : C.green;
 
   const load = useCallback(async () => {
-    const [{ data }, profile] = await Promise.all([
-      getTrustScoreHistory(100),
-      getMyProfile(),
-    ]);
-    setHistory(data);
-    setTrustScore(profile?.trust_score ?? 100);
+    const [a, profile] = await Promise.all([getTrueScoreAjustes(), getMyProfile()]);
+    setAjustes(a);
+    if (a.fase1) {
+      const { data } = await listMisEventosTrueScore({ limite: 100 });
+      setHistory(data.map(describirEvento));
+    } else {
+      const { data } = await getTrustScoreHistory(100);
+      setHistory((data || []).map(filaVieja));
+    }
+    setTrustScore(profile?.trust_score ?? null);
+    setRacha(profile?.truescore_racha ?? null);
     setLoading(false);
   }, []);
 
@@ -75,17 +101,22 @@ export default function TrustScoreHistoryScreen({ navigation }) {
         >
           <ArrowLeft color={C.textPrimary} size={20} />
         </Pressable>
-        <Text style={styles.headerTitle}>Trust Score</Text>
+        <Text style={styles.headerTitle}>{ts ? 'TrueScore' : 'Trust Score'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {/* Score actual */}
       <View style={styles.scoreCard}>
-        <ShieldCheck color={C.green} size={28} />
-        <Text style={styles.scoreValue}>{trustScore ?? '—'}</Text>
-        <Text style={styles.scoreLabel}>Puntuación actual</Text>
+        <ShieldCheck color={colorNivel} size={28} />
+        <Text style={[styles.scoreValue, { color: colorNivel }]}>{trustScore ?? '—'}</Text>
+        <Text style={styles.scoreLabel}>
+          {nivel ? nivel.nombre : 'Puntuación actual'}
+          {ts && racha > 0 ? ` · racha de ${racha} ${racha === 1 ? 'partido' : 'partidos'}` : ''}
+        </Text>
         <Text style={styles.scoreHint}>
-          El Trust Score refleja tu confiabilidad como jugador. Aumenta al confirmar asistencia por GPS.
+          {ts
+            ? 'Tu TrueScore sube cada vez que asistes a tiempo, y más con cada partido seguido. Baja si te sales, llegas tarde o no vas sin avisar.'
+            : 'El Trust Score refleja tu confiabilidad como jugador. Aumenta al confirmar asistencia por GPS.'}
         </Text>
       </View>
 
@@ -98,13 +129,15 @@ export default function TrustScoreHistoryScreen({ navigation }) {
           <ShieldCheck color={C.textMuted} size={40} />
           <Text style={styles.emptyTitle}>Sin historial aún</Text>
           <Text style={styles.emptyText}>
-            Confirma tu asistencia a partidos por GPS para ver los cambios aquí.
+            {ts
+              ? 'Cuando juegues tu primer partido verás aquí cada cambio de tu TrueScore.'
+              : 'Confirma tu asistencia a partidos por GPS para ver los cambios aquí.'}
           </Text>
         </View>
       ) : (
         <FlatList
           data={history}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => <HistoryItem item={item} />}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
@@ -196,6 +229,7 @@ const styles = StyleSheet.create({
     color: C.textPrimary,
     fontSize: 14, fontFamily: F.semiBold, marginBottom: 2,
   },
+  itemDetail: { color: C.textSecondary, fontSize: 12.5, lineHeight: 17, marginBottom: 2 },
   itemDate: { color: C.textMuted, fontSize: 12 },
   itemChange: {
     fontSize: 18, fontFamily: F.extraBold,

@@ -135,6 +135,18 @@ export function textoConfirmacionGps(res) {
     return { titulo: 'Tu asistencia ya estaba confirmada', detalle: metros || '' };
   }
 
+  // Con TrueScore el GPS ya no da puntos: la asistencia la confirma el
+  // organizador después del partido. Sin esta rama el delta 0 se leía como
+  // «ya estás al máximo», que con TrueScore casi nunca es verdad.
+  if (res.truescore) {
+    return {
+      titulo: 'Llegada confirmada',
+      detalle: [metros, 'Tu TrueScore se actualiza cuando el organizador confirme la asistencia.']
+        .filter(Boolean)
+        .join(' '),
+    };
+  }
+
   const delta = Number(res.trust_delta);
   if (Number.isFinite(delta) && delta > 0) {
     return {

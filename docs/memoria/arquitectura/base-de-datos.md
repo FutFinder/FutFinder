@@ -1,6 +1,6 @@
 # Base de datos
 
-Última revisión: 2026-09-21
+Última revisión: 2026-09-24
 
 ## Propósito
 
@@ -177,6 +177,19 @@ La 79 corrige el mensaje de `confirmar_reserva`, que decía «El pago con tarjet
 **Una lección que ya costó tres veces: agregar parámetros con `default` a una función NO la reemplaza, crea una SOBRECARGA.** Y entonces una llamada con los argumentos viejos calza con las dos y Postgres la rechaza por ambigua. Pasó con `crear_reserva` en la 67 y la 68, y con `admin_crear_bloqueo` y `admin_actualizar_bloqueo` en la 69. Siempre hay que hacer `drop function` de la firma vieja antes, y verificar después que quede una sola versión en `pg_proc`.
 
 Tres hábitos que se ganaron a golpes en estas migraciones: `revoke ... from anon` **no** quita el `EXECUTE` que PostgreSQL concede a `PUBLIC` por defecto, así que toda RPC nueva revoca de `public` explícitamente; **y al revés tampoco alcanza** — `revoke ... from public` no quita el `EXECUTE` que Supabase concede por privilegio *por defecto* directo a `anon`/`authenticated` en cada función nueva (mismo defecto documentado en la 43 para `procesar_vencimientos_desafios`), así que una RPC pensada solo para `authenticated` necesita `revoke ... from public, anon` explícito además del `grant ... to authenticated` — la 55 lo aplicó de entrada para `vencer_reservas_pasadas()`, y la 58 cerró el mismo hueco en las otras doce RPC del vertical que sólo habían revocado de `public`; en la práctica no era explotable porque todas empiezan comprobando `auth.uid() is null`, pero quedaba inconsistente con el resto del código. Y un `update ... returning * into fila` que no mueve ninguna fila deja la variable en NULL, de modo que los avisos posteriores se irían al vacío.
+
+## TrueScore (migración 134)
+
+**Aplicada el 2026-09-24 con el flag apagado**, arnés `supabase/tests/134_truescore_fase1_test.sql` 64/64 contra producción. Con `truescore_fase1` en `false` cada RPC reemplazada hace exactamente lo de antes; la regla nueva vive en una rama `if public.flag_activo('truescore_fase1')`. Se activa con `select public.truescore_activar_fase1();`, que prende el flag, guarda `activado_at` y deja a todas las cuentas en 75 con su evento `inicio`.
+
+- **`truescore_config`** tiene todos los números (puntos, tabla de salida, horas, niveles). Ninguna función los escribe a mano: los lee con `truescore_cfg(clave)`, que falla si la clave no existe en vez de valer 0.
+- **`feature_flags`** tiene un flag por fase y `telefono_obligatorio`. `activado_at` es la PRIMERA activación: la fase 2 no recalcula el pasado y el job de 24 h no barre plazos vencidos antes de esa fecha.
+- **`truescore_eventos` es el registro inmutable.** Un disparador rechaza todo UPDATE y todo DELETE, salvo el que llega en cascada al borrar la cuenta. `clave` es única y es la idempotencia: `asistencia:<attendee>`, `salida:<attendee>`, `neutro:<attendee>`, `cancelacion:<partido>`, `sin_confirmar:<partido>`, `inicio:<usuario>`. `match_id` no tiene llave foránea a propósito, para que el historial sobreviva al partido.
+- **El caché es `profiles.trust_score` y `profiles.truescore_racha`.** Sólo lo escribe `truescore_registrar()`, la única puerta, que bloquea el perfil, calcula con `truescore_calcular()` (pura) e inserta el evento. `truescore_recalcular(usuario)` rehace puntaje y racha desde cero con las reglas vigentes; el arnés exige que coincida con el caché.
+- **`matches` tiene UPDATE y DELETE directos del organizador**, así que `tg_matches_truescore_protegido` impide, a la petición directa de la app (`current_user = 'authenticated'`), tocar `tipo_cancelacion`, `asistencia_confirmada_at` o `asistencia_vencida_at`, pasar a `cancelado` sin `cancel_match` o borrar un partido con nómina. Las RPC corren como su dueño y no pasan por esa guarda.
+- `cancel_match` cambió de firma a `(p_match_id, p_tipo default null)`. Se borró la de un argumento porque las dos juntas hacían ambigua la llamada vieja (la lección de la 96).
+- `flag_activo` es ejecutable por `authenticated` a propósito: `tg_auto_suspend` y la guarda de `matches` corren con el rol de quien edita y preguntan por el flag. Las demás funciones internas están cerradas a `public`, `anon` y `authenticated`.
+- El job `futfinder-truescore-sin-confirmar` corre cada 15 minutos.
 
 ## Integridad y tiempo real
 

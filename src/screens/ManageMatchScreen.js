@@ -15,10 +15,12 @@ import {
   Check,
   CheckCircle2,
   ClipboardList,
+  Clock,
   ListChecks,
   MessageSquare,
   Pencil,
   Share2,
+  UserMinus,
   UserX,
   X,
 } from 'lucide-react-native';
@@ -44,6 +46,7 @@ import {
   Tag,
 } from '../components/partidos/ui';
 import Sheet from '../components/partidos/Sheet';
+import TrueScoreChip from '../components/TrueScoreChip';
 import ShareSheet from '../components/partidos/ShareSheet';
 import { InlineEmpty, LoadingList, ErrorState } from '../components/partidos/StateViews';
 import { formatFechaCorta } from '../components/partidos/DateTimeSheets';
@@ -57,6 +60,12 @@ import {
   saveMatchAttendance,
 } from '../services/matches';
 import { getCurrentUser } from '../services/auth';
+import { expulsarJugador, getCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
+import {
+  marcasCompletas,
+  plazoAsistenciaAbierto,
+  textoCostoCancelacion,
+} from '../utils/trueScore';
 import { suscribirseANomina } from '../services/clubRoster';
 import { useOnline } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
@@ -68,6 +77,14 @@ import {
   isPenaltyFree,
   timeUntilLabel,
 } from '../services/matchRules';
+
+// Motivos de cancelación (migración 134): lluvia y cierre de cancha son
+// neutros para todos, incluido el organizador.
+const TIPOS_CANCELACION = [
+  { value: 'lluvia', label: 'Lluvia' },
+  { value: 'cierre_cancha', label: 'Cierre de cancha' },
+  { value: 'otro', label: 'Otro motivo' },
+];
 
 const TABS = [
   { key: 'solicitudes', label: 'Solicitudes' },
@@ -87,6 +104,10 @@ export default function ManageMatchScreen({ route, navigation }) {
   const matchId = route?.params?.matchId;
   const insets = useSafeAreaInsets();
   const online = useOnline();
+  // Con TrueScore (flag `truescore_fase1`) cambian la asistencia, la
+  // cancelación y aparece la expulsión. Apagado, la pantalla es la de siempre.
+  const ajustes = useTrueScoreAjustes();
+  const ts = !!ajustes.fase1;
 
   const [tab, setTab] = useState(route?.params?.tab || 'solicitudes');
   const [match, setMatch] = useState(null);
@@ -102,8 +123,12 @@ export default function ManageMatchScreen({ route, navigation }) {
   const [feedback, setFeedback] = useState(null);
   const [sheet, setSheet] = useState(route?.params?.action === 'cancelar' ? 'cancelar' : null);
 
-  // Asistencia: { [userId]: 'presente' | 'ausente' }
+  // Asistencia: { [userId]: 'presente' | 'ausente' }, o con TrueScore
+  // { [userId]: 'asistio' | 'tarde' | 'no_fue' }.
   const [marks, setMarks] = useState({});
+  const [tipoCancelacion, setTipoCancelacion] = useState('otro');
+  const [costoCancelacion, setCostoCancelacion] = useState(null);
+  const [expulsando, setExpulsando] = useState(null);
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [reason, setReason] = useState('');
   const [canceling, setCanceling] = useState(false);
@@ -129,7 +154,8 @@ export default function ManageMatchScreen({ route, navigation }) {
     // Precargamos la asistencia ya registrada para no perder lo guardado.
     const pre = {};
     (attRes.data || []).forEach((a) => {
-      if (a.estado === 'confirmado_gps') pre[a.user_id] = 'presente';
+      if (a.asistencia) pre[a.user_id] = a.asistencia;
+      else if (a.estado === 'confirmado_gps') pre[a.user_id] = 'presente';
       else if (a.estado === 'no_asistio') pre[a.user_id] = 'ausente';
     });
     setMarks((prev) => ({ ...pre, ...prev }));
@@ -213,6 +239,36 @@ export default function ManageMatchScreen({ route, navigation }) {
     confirmed.some((c) => c.user_id === k)
   ).length;
 
+  // ── TrueScore ─────────────────────────────────────────────────
+  // La nómina a confirmar no incluye al organizador, y la marca vieja que
+  // precarga el GPS ('presente') se muestra como «Asistió» sugerido.
+  const nominaTS = useMemo(() => confirmed.filter((a) => !a.is_organizer), [confirmed]);
+  const marcaDe = (id) => marcaTrueScore(marks[id]);
+  const marcasTS = useMemo(() => {
+    const out = {};
+    nominaTS.forEach((a) => {
+      const m = marcaTrueScore(marks[a.user_id]);
+      if (m) out[a.user_id] = m;
+    });
+    return out;
+  }, [nominaTS, marks]);
+  const estadoMarcas = marcasCompletas(nominaTS, marcasTS);
+  const asistenciaConfirmada = !!match?.asistencia_confirmada_at;
+  const asistenciaVencida = !!match?.asistencia_vencida_at;
+  const plazoTS = Number(ajustes.confirmacion_plazo_horas) || 24;
+  const plazoAbiertoTS = plazoAsistenciaAbierto(match, plazoTS);
+
+  // El costo de cancelar lo calcula el servidor con el motivo elegido.
+  useEffect(() => {
+    if (!ts || sheet !== 'cancelar' || !matchId) return undefined;
+    let vivo = true;
+    setCostoCancelacion(null);
+    getCostoSalida(matchId, tipoCancelacion).then((c) => vivo && setCostoCancelacion(c));
+    return () => {
+      vivo = false;
+    };
+  }, [ts, sheet, matchId, tipoCancelacion]);
+
   const saveAttendance = async () => {
     if (savingAttendance || markedCount === 0) return;
     setSavingAttendance(true);
@@ -230,10 +286,48 @@ export default function ManageMatchScreen({ route, navigation }) {
     await load();
   };
 
+  // Con TrueScore se confirma UNA vez y a toda la nómina: el botón abre una
+  // confirmación, y esto la envía.
+  const confirmarAsistenciaTS = async () => {
+    if (savingAttendance || !estadoMarcas.completas) return;
+    setSavingAttendance(true);
+    const res = await saveMatchAttendance(matchId, marcasTS);
+    setSavingAttendance(false);
+    setSheet(null);
+    if (!res?.ok) {
+      say('error', 'No pudimos confirmar la asistencia', res?.reason || res?.error?.message || '');
+      return;
+    }
+    say(
+      'success',
+      res.already ? 'La asistencia ya estaba confirmada' : 'Asistencia confirmada',
+      res.already
+        ? 'No se aplicó nada dos veces.'
+        : 'El TrueScore de cada jugador se actualizó según lo que marcaste.'
+    );
+    await load();
+  };
+
+  const expulsarAhora = async () => {
+    const jugador = expulsando;
+    if (!jugador || busyId) return;
+    setBusyId(jugador.user_id);
+    const res = await expulsarJugador(matchId, jugador.user_id);
+    setBusyId(null);
+    setSheet(null);
+    setExpulsando(null);
+    if (!res?.ok) {
+      say('error', 'No pudimos sacar al jugador', res?.reason || '');
+      return;
+    }
+    say('info', `Sacaste a @${jugador.username}`, 'Le avisamos. Su TrueScore no cambia y no podrá volver a este partido.');
+    await load();
+  };
+
   const cancelMatchNow = async () => {
     if (canceling) return;
     setCanceling(true);
-    const res = await cancelMatchWithReason(matchId, reason.trim() || null);
+    const res = await cancelMatchWithReason(matchId, reason.trim() || null, ts ? tipoCancelacion : null);
     setCanceling(false);
     if (!res?.ok) {
       say('error', 'No pudimos cancelar el partido', res?.reason || res?.error?.message || '');
@@ -477,7 +571,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                               {posLabel(r.posicion_preferida) || 'Sin posición'}
                             </Text>
                             <View style={styles.metaDot} />
-                            <Text style={styles.tsText}>TS {r.trust_score ?? 'N.A.'}</Text>
+                            <TrueScoreChip score={r.trust_score} conNivel />
                           </View>
                           <Text style={styles.historyText}>
                             {r.partidos_jugados > 0
@@ -535,7 +629,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                         <Text style={styles.wlName} numberOfLines={1}>
                           @{w.username}
                         </Text>
-                        <Text style={styles.tsText}>TS {w.trust_score ?? 'N.A.'}</Text>
+                        <TrueScoreChip score={w.trust_score} />
                       </View>
                     ))}
                   </Card>
@@ -586,13 +680,31 @@ export default function ManageMatchScreen({ route, navigation }) {
                           @{a.username}
                           {a.is_organizer ? ' · organizador' : ''}
                         </Text>
-                        <Text style={styles.metaText}>
-                          {posLabel(a.posicion_preferida) || 'Sin posición'}
-                          {a.trust_score != null ? ` · TS ${a.trust_score}` : ''}
-                        </Text>
+                        <View style={styles.metaRow}>
+                          <Text style={styles.metaText}>
+                            {posLabel(a.posicion_preferida) || 'Sin posición'}
+                          </Text>
+                          <TrueScoreChip score={a.trust_score} />
+                        </View>
                       </View>
-                      {a.estado === 'confirmado_gps' ? <Tag label="Asistió" tone="green" /> : null}
+                      {a.asistencia === 'tarde' ? <Tag label="Llegó tarde" tone="gold" /> : null}
+                      {a.estado === 'confirmado_gps' && a.asistencia !== 'tarde' ? <Tag label="Asistió" tone="green" /> : null}
                       {a.estado === 'no_asistio' ? <Tag label="No asistió" tone="danger" /> : null}
+                      {ts && !a.is_organizer && !canceled && !finished ? (
+                        <Pressable
+                          onPress={() => {
+                            setExpulsando(a);
+                            setSheet('expulsar');
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Sacar a ${a.username} del partido`}
+                          hitSlop={6}
+                          disabled={!online || busyId === a.user_id}
+                          style={({ pressed }) => [styles.iconSquare, pressed && { opacity: 0.8 }]}
+                        >
+                          <UserMinus color={C.red} size={14} strokeWidth={2.4} />
+                        </Pressable>
+                      ) : null}
                       <Pressable
                         onPress={() =>
                           a.user_id !== myId && navigation.navigate('UserProfile', { userId: a.user_id })
@@ -615,8 +727,141 @@ export default function ManageMatchScreen({ route, navigation }) {
             </View>
           ) : null}
 
+          {/* ---------------- ASISTENCIA (TrueScore) ---------------- */}
+          {tab === 'asistencia' && ts ? (
+            <View style={{ gap: 10 }}>
+              {asistenciaConfirmada ? (
+                <Callout
+                  tone="green"
+                  icon={CheckCircle2}
+                  title="Asistencia confirmada"
+                  text="Ya confirmaste la asistencia de este partido. Si hubo un error, el jugador puede reclamar."
+                />
+              ) : asistenciaVencida ? (
+                <Callout
+                  tone="gold"
+                  icon={AlertCircle}
+                  title="Se venció el plazo para confirmar"
+                  text={`Pasaron ${plazoTS} h sin confirmar: el partido quedó neutro para los jugadores y tu TrueScore bajó.`}
+                />
+              ) : !finished ? (
+                <Callout
+                  tone="neutral"
+                  icon={ListChecks}
+                  title="La asistencia se confirma después del partido"
+                  text={`Cuando termine tendrás ${plazoTS} h para marcar a cada jugador. Si no lo haces, el partido queda neutro para ellos y tu TrueScore baja.`}
+                />
+              ) : !plazoAbiertoTS ? (
+                <Callout
+                  tone="gold"
+                  icon={AlertCircle}
+                  title="Se cerró el plazo para confirmar"
+                  text={`El plazo era de ${plazoTS} h después del partido.`}
+                />
+              ) : (
+                <Callout
+                  tone="green"
+                  icon={ListChecks}
+                  title="Marca a cada jugador"
+                  text={`Asistió, llegó tarde (más de ${ajustes.tarde_minutos ?? 10} min) o no fue. Se confirma una sola vez y cambia el TrueScore de cada uno.`}
+                />
+              )}
+
+              {nominaTS.length === 0 ? (
+                <InlineEmpty
+                  title="No hubo jugadores en la nómina"
+                  text="Sin jugadores no hay asistencia que confirmar."
+                />
+              ) : (
+                <>
+                  <Card style={{ gap: 9 }} radius={16}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                      <Text style={styles.planLabel}>Marcados</Text>
+                      <Text style={styles.planValue}>
+                        {nominaTS.length - estadoMarcas.faltan} de {nominaTS.length}
+                      </Text>
+                    </View>
+                    <ProgressBar
+                      ratio={(nominaTS.length - estadoMarcas.faltan) / nominaTS.length}
+                      height={7}
+                    />
+                  </Card>
+                  <Card style={{ paddingVertical: 4, paddingHorizontal: 13 }}>
+                    {nominaTS.map((a, i) => {
+                      const mark = marcaDe(a.user_id);
+                      const bloqueado = asistenciaConfirmada || asistenciaVencida || !plazoAbiertoTS;
+                      return (
+                        <View
+                          key={a.user_id}
+                          style={[styles.playerRow, i === nominaTS.length - 1 && { borderBottomWidth: 0 }]}
+                        >
+                          <Avatar url={a.foto_url} name={a.username} size={36} />
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.playerName} numberOfLines={1}>
+                              @{a.username}
+                            </Text>
+                            <Text style={styles.metaText}>
+                              {a.estado === 'confirmado_gps' && !a.asistencia
+                                ? 'Confirmó con GPS'
+                                : 'Sin confirmar por GPS'}
+                            </Text>
+                          </View>
+                          {[
+                            { v: 'asistio', icon: Check, label: 'Asistió', on: styles.markBtnOn, fgOn: C.greenInk, fg: C.green },
+                            { v: 'tarde', icon: Clock, label: 'Llegó tarde', on: styles.markBtnLate, fgOn: C.textOnRed, fg: C.amber },
+                            { v: 'no_fue', icon: UserX, label: 'No fue', on: styles.markBtnOff, fgOn: C.textOnRed, fg: C.red },
+                          ].map((b) => {
+                            const Icon = b.icon;
+                            const activo = mark === b.v;
+                            return (
+                              <Pressable
+                                key={b.v}
+                                onPress={() => !bloqueado && setMarks((m) => ({ ...m, [a.user_id]: b.v }))}
+                                disabled={bloqueado}
+                                accessibilityRole="button"
+                                accessibilityState={{ selected: activo, disabled: bloqueado }}
+                                accessibilityLabel={`${b.label}: ${a.username}`}
+                                style={({ pressed }) => [
+                                  styles.markBtn,
+                                  activo && b.on,
+                                  bloqueado && !activo && { opacity: 0.4 },
+                                  pressed && { opacity: 0.8 },
+                                ]}
+                              >
+                                <Icon color={activo ? b.fgOn : b.fg} size={15} strokeWidth={2.6} />
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      );
+                    })}
+                  </Card>
+                </>
+              )}
+
+              {!asistenciaConfirmada && !asistenciaVencida && finished && plazoAbiertoTS && nominaTS.length > 0 ? (
+                <>
+                  <PrimaryButton
+                    label="Confirmar asistencia"
+                    onPress={() => setSheet('confirmarAsistencia')}
+                    disabled={!estadoMarcas.completas || !online || canceled}
+                    height={52}
+                  />
+                  {!estadoMarcas.completas ? (
+                    <Note>
+                      {estadoMarcas.faltan === 1
+                        ? 'Falta marcar a 1 jugador.'
+                        : `Faltan ${estadoMarcas.faltan} jugadores por marcar.`}
+                    </Note>
+                  ) : null}
+                </>
+              ) : null}
+              <GhostButton label="Volver" onPress={() => goBackOrPartidos(navigation)} height={46} />
+            </View>
+          ) : null}
+
           {/* ---------------- ASISTENCIA ---------------- */}
-          {tab === 'asistencia' ? (
+          {tab === 'asistencia' && !ts ? (
             <View style={{ gap: 10 }}>
               {!finished ? (
                 <Callout
@@ -744,7 +989,13 @@ export default function ManageMatchScreen({ route, navigation }) {
         footer={
           <View style={{ flex: 1, gap: 9 }}>
             <GhostButton
-              label={`Sí, cancelar el partido (−${cancelPenaltyFor(match.hora)} pts)`}
+              label={
+                ts
+                  ? costoCancelacion?.ok && Number(costoCancelacion.puntos) > 0
+                    ? `Sí, cancelar el partido (−${costoCancelacion.puntos} pts)`
+                    : 'Sí, cancelar el partido'
+                  : `Sí, cancelar el partido (−${cancelPenaltyFor(match.hora)} pts)`
+              }
               tone="danger"
               onPress={cancelMatchNow}
               height={52}
@@ -773,11 +1024,45 @@ export default function ManageMatchScreen({ route, navigation }) {
             }
           />
           <Bullet text="El chat del partido queda en solo lectura" />
-          <Bullet
-            text={`Tu Trust Score baja ${cancelPenaltyFor(match.hora)} puntos${isPenaltyFree(match.hora) ? '' : ' — estás cancelando con poca antelación'}`}
-          />
+          {ts ? (
+            <Bullet
+              text={
+                textoCostoCancelacion(costoCancelacion, tipoCancelacion) ||
+                'Calculando lo que cuesta cancelar ahora…'
+              }
+            />
+          ) : (
+            <Bullet
+              text={`Tu Trust Score baja ${cancelPenaltyFor(match.hora)} puntos${isPenaltyFree(match.hora) ? '' : ' — estás cancelando con poca antelación'}`}
+            />
+          )}
           <Bullet text="El partido no se borra: queda en el historial como cancelado" />
         </Card>
+
+        {ts ? (
+          <View style={{ gap: 7, marginTop: 14 }}>
+            <SectionLabel>¿Por qué se cancela?</SectionLabel>
+            <View style={{ flexDirection: 'row', gap: 7 }}>
+              {TIPOS_CANCELACION.map((t) => (
+                <Pressable
+                  key={t.value}
+                  onPress={() => setTipoCancelacion(t.value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: tipoCancelacion === t.value }}
+                  style={({ pressed }) => [
+                    styles.tab,
+                    tipoCancelacion === t.value ? styles.tabOn : styles.tabOff,
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <Text style={[styles.tabText, tipoCancelacion === t.value && styles.tabTextOn]}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         <View style={{ gap: 7, marginTop: 14 }}>
           <SectionLabel>Motivo · opcional, lo ven los jugadores</SectionLabel>
@@ -790,6 +1075,72 @@ export default function ManageMatchScreen({ route, navigation }) {
           />
           <Note>{reason.length}/200 · Un motivo claro evita que el grupo quede con dudas.</Note>
         </View>
+      </Sheet>
+
+      {/* Expulsión (TrueScore) */}
+      <Sheet
+        visible={sheet === 'expulsar' && !!expulsando}
+        onClose={() => {
+          setSheet(null);
+          setExpulsando(null);
+        }}
+        title={expulsando ? `¿Sacar a @${expulsando.username}?` : ''}
+        subtitle={match.titulo}
+        footer={
+          <View style={{ flex: 1, gap: 9 }}>
+            <GhostButton
+              label="Sí, sacarlo del partido"
+              tone="danger"
+              onPress={expulsarAhora}
+              height={52}
+              disabled={!!busyId || !online}
+            />
+            <Pressable
+              onPress={() => {
+                setSheet(null);
+                setExpulsando(null);
+              }}
+              style={{ height: 40, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={styles.sheetBack}>Mantenerlo</Text>
+            </Pressable>
+          </View>
+        }
+      >
+        <Card style={{ gap: 10 }} radius={16}>
+          <Bullet tone="danger" text="Sale de la nómina y no puede volver a este partido" />
+          <Bullet text="Su TrueScore no cambia: sacar a alguien no le resta puntos" />
+          <Bullet tone="gold" text="Se libera su cupo y avisamos a la lista de espera" />
+        </Card>
+      </Sheet>
+
+      {/* Confirmar asistencia (TrueScore), una sola vez */}
+      <Sheet
+        visible={sheet === 'confirmarAsistencia'}
+        onClose={() => setSheet(null)}
+        title="¿Confirmar la asistencia?"
+        subtitle="Se confirma una sola vez"
+        footer={
+          <View style={{ flex: 1, gap: 9 }}>
+            <PrimaryButton
+              label="Sí, confirmar"
+              onPress={confirmarAsistenciaTS}
+              loading={savingAttendance}
+              disabled={!estadoMarcas.completas || !online}
+              height={52}
+            />
+            <Pressable onPress={() => setSheet(null)} style={{ height: 40, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={styles.sheetBack}>Revisar de nuevo</Text>
+            </Pressable>
+          </View>
+        }
+      >
+        <Card style={{ gap: 10 }} radius={16}>
+          <Bullet
+            text={`${nominaTS.filter((a) => marcasTS[a.user_id] === 'asistio').length} asistieron · ${nominaTS.filter((a) => marcasTS[a.user_id] === 'tarde').length} llegaron tarde · ${nominaTS.filter((a) => marcasTS[a.user_id] === 'no_fue').length} no fueron`}
+          />
+          <Bullet tone="gold" text="Después no se puede cambiar. Si te equivocas, el jugador puede reclamar." />
+        </Card>
       </Sheet>
     </View>
   );
@@ -831,6 +1182,14 @@ function Bullet({ text, tone }) {
       <Text style={{ flex: 1, fontSize: 12, lineHeight: 18, color: C.textSoft }}>{text}</Text>
     </View>
   );
+}
+
+// La marca vieja ('presente'/'ausente', o la que precarga el GPS) leída como
+// marca de TrueScore.
+function marcaTrueScore(m) {
+  if (m === 'presente') return 'asistio';
+  if (m === 'ausente') return 'no_fue';
+  return m || null;
 }
 
 function posLabel(pos) {
@@ -900,7 +1259,6 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   metaText: { fontSize: 11.5, fontFamily: F.medium, color: C.textFaint },
   metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#434A44' },
-  tsText: { fontSize: 11.5, fontFamily: F.bold, color: C.green },
   historyText: { fontSize: 10.5, color: C.textGhost, marginTop: 2 },
 
   smallBtn: {
@@ -944,6 +1302,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   markBtnOn: { backgroundColor: C.green, borderColor: C.green },
+  markBtnLate: { backgroundColor: C.amber, borderColor: C.amber },
   markBtnOff: { backgroundColor: C.red, borderColor: C.red },
 
   planLabel: { fontSize: 12, fontFamily: F.semiBold, color: C.textSecondary },

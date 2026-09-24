@@ -62,6 +62,9 @@ import {
   Tag,
 } from '../components/partidos/ui';
 import Sheet from '../components/partidos/Sheet';
+import TrueScoreChip from '../components/TrueScoreChip';
+import { getCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
+import { TEXTO_REGLA_SALIDA_TS, textoCostoSalida } from '../utils/trueScore';
 import ShareSheet from '../components/partidos/ShareSheet';
 import { LoadingDetail, ErrorState, OfflineNotice } from '../components/partidos/StateViews';
 import { formatFechaLarga } from '../components/partidos/DateTimeSheets';
@@ -158,6 +161,11 @@ export default function MatchDetailScreen({ route, navigation }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState(null); // { tone, title, text }
   const [sheet, setSheet] = useState(null); // 'join' | 'leave' | 'share' | 'waitlist'
+  // Con TrueScore el costo de salirse lo calcula el servidor (tabla
+  // interpolada por horas de aviso); la pantalla sólo lo muestra.
+  const ajustesTS = useTrueScoreAjustes();
+  const ts = !!ajustesTS.fase1;
+  const [costoSalida, setCostoSalida] = useState(null);
   const [checks, setChecks] = useState({ llegar: false, cuota: false, aviso: false });
   const [userCoords, setUserCoords] = useState(null);
   // Mis clubes: deciden si este partido es «de los míos» —qué cupos se
@@ -544,6 +552,16 @@ export default function MatchDetailScreen({ route, navigation }) {
       await load();
     });
 
+  useEffect(() => {
+    if (!ts || sheet !== 'leave' || !matchId) return undefined;
+    let vivo = true;
+    setCostoSalida(null);
+    getCostoSalida(matchId).then((c) => vivo && setCostoSalida(c));
+    return () => {
+      vivo = false;
+    };
+  }, [ts, sheet, matchId]);
+
   const doLeave = () =>
     guard(async () => {
       const res = await leaveMatchPenalized(matchId);
@@ -552,13 +570,14 @@ export default function MatchDetailScreen({ route, navigation }) {
         return;
       }
       setSheet(null);
-      const pts = res.penalty ?? leavePenaltyFor(match.hora);
+      const pts = res.penalty ?? (ts ? 0 : leavePenaltyFor(match.hora));
+      const nombre = ts ? 'TrueScore' : 'Trust Score';
       say(
         'success',
         'Saliste del partido',
         pts > 0
-          ? `Se liberó tu cupo y avisamos al grupo. Tu Trust Score bajó ${pts} puntos.`
-          : 'Se liberó tu cupo y avisamos al grupo. Sin efecto en tu Trust Score.'
+          ? `Se liberó tu cupo y avisamos al grupo. Tu ${nombre} bajó ${pts} ${pts === 1 ? 'punto' : 'puntos'}.`
+          : `Se liberó tu cupo y avisamos al grupo. Sin efecto en tu ${nombre}.`
       );
       await load();
     });
@@ -1079,9 +1098,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                     @{organizer.username}
                   </Text>
                   <View style={styles.metaRow}>
-                    <Text style={styles.tsText}>
-                      TS {organizer.trust_score ?? 'N.A.'}
-                    </Text>
+                    <TrueScoreChip score={organizer.trust_score} conNivel />
                     {organizer.comuna ? (
                       <>
                         <View style={styles.metaDot} />
@@ -1174,7 +1191,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                       @{w.username}
                       {w.user_id === myId ? ' · tú' : ''}
                     </Text>
-                    <Text style={styles.tsText}>TS {w.trust_score ?? 'N.A.'}</Text>
+                    <TrueScoreChip score={w.trust_score} />
                   </View>
                 ))}
               </Card>
@@ -1206,7 +1223,7 @@ export default function MatchDetailScreen({ route, navigation }) {
               <Requisito
                 text={`Confirmar en cancha con GPS (radio de ${GPS_RADIUS_METERS} m)`}
               />
-              <Requisito text={leaveRuleText(match.hora)} />
+              <Requisito text={ts ? TEXTO_REGLA_SALIDA_TS : leaveRuleText(match.hora)} />
             </Card>
           </Section>
 
@@ -1392,7 +1409,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                 />
               </View>
             ) : null}
-            <Note>{leaveRuleText(match.hora)}</Note>
+            <Note>{ts ? TEXTO_REGLA_SALIDA_TS : leaveRuleText(match.hora)}</Note>
           </View>
         ) : cta?.kind === 'pendiente' ? (
           <View style={{ gap: 9 }}>
@@ -1583,7 +1600,7 @@ export default function MatchDetailScreen({ route, navigation }) {
           <Note tone="card" icon={CheckCircle2}>
             Este partido acepta jugadores al instante: tu cupo queda tomado en cuanto confirmes.
             {' '}
-            {leaveRuleText(match.hora)}
+            {ts ? TEXTO_REGLA_SALIDA_TS : leaveRuleText(match.hora)}
           </Note>
         </View>
       </Sheet>
@@ -1633,7 +1650,11 @@ export default function MatchDetailScreen({ route, navigation }) {
           <View style={{ flex: 1, gap: 9 }}>
             <GhostButton
               label={
-                isPenaltyFree(match.hora)
+                ts
+                  ? costoSalida?.ok
+                    ? `Salir del partido (−${costoSalida.puntos} pts)`
+                    : 'Salir del partido'
+                  : isPenaltyFree(match.hora)
                   ? `Salir del partido (−${leavePenaltyFor(match.hora)} pts)`
                   : `Salir igual (−${leavePenaltyFor(match.hora)} pts)`
               }
@@ -1652,7 +1673,11 @@ export default function MatchDetailScreen({ route, navigation }) {
           <SectionLabel>Qué va a pasar</SectionLabel>
           <Requisito
             tone="danger"
-            text={`Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`}
+            text={
+              ts
+                ? textoCostoSalida(costoSalida) || 'Calculando lo que te cuesta salir ahora…'
+                : `Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
+            }
           />
           <Requisito tone="gold" text="Tu cupo se libera y vuelve a aparecer en Partidos" />
           <Requisito text="Avisamos a los jugadores confirmados y al primero de la lista de espera" />
@@ -1660,7 +1685,7 @@ export default function MatchDetailScreen({ route, navigation }) {
         </Card>
         <View style={{ marginTop: 12 }}>
           <Note tone="card" icon={Clock}>
-            {leaveRuleText(match.hora)}
+            {ts ? TEXTO_REGLA_SALIDA_TS : leaveRuleText(match.hora)}
           </Note>
         </View>
       </Sheet>
@@ -1812,7 +1837,6 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   metaText: { fontSize: 11.5, fontFamily: F.semiBold, color: C.textFaint },
   metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#434A44' },
-  tsText: { fontSize: 11.5, fontFamily: F.bold, color: C.green },
   link: { fontSize: 12, fontFamily: F.bold, color: C.green },
   desc: { fontSize: 13, lineHeight: 21, color: C.textDim },
 

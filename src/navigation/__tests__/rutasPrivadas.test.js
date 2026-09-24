@@ -158,6 +158,7 @@ test('las pantallas con datos de usuario, partidos, clubes y reservas están ent
     'ElegirCancha',
     'BlockedUsers',
     'TrustScoreHistory',
+    'VerificarTelefono',
   ]) {
     assert.ok(guardadas.has(ruta), `la ruta privada ${ruta} debe estar protegida`);
   }
