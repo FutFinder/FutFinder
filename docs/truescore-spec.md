@@ -208,3 +208,14 @@ Estas decisiones las tomó Vicente al aprobar el plan de la fase 1. Donde contra
 | Qué se reclama | Una tardanza o una ausencia marcadas por el organizador. Aceptado, se aplica «Asistió». Si no hay 2 compañeros que hayan asistido, no se puede reclamar. |
 | Quién confirma | Compañeros marcados «Asistió» o «Llegó tarde» en ese partido; no el reclamante ni el organizador. |
 | Prioridad en la lista de espera | El nivel «Muy confiable» va antes, y dentro de cada grupo manda el orden de llegada. Se evalúa con el puntaje del momento en que se libera el cupo. |
+
+### Decisiones de la fase 3 (2026-09-24)
+
+| Tema | Decisión |
+| --- | --- |
+| Puntaje | Fair play es un puntaje APARTE del TrueScore (0 a 100, parte en 100), con su propio registro de eventos. |
+| Dónde se reporta | En «Calificar jugadores», por compañero, con motivo: juego brusco, conducta antideportiva o agresión física. |
+| Plazo | 48 h desde el fin del partido para reportar y para que el organizador confirme una agresión. Al cerrar el plazo se suma +1 a quien jugó sin reportes válidos y se resta 15 a quien tuvo 3 o más. |
+| Agresión física | La reporta un compañero y la confirma el organizador (que también puede reportarla él). −40 una sola vez por partido y la cuenta queda marcada para revisión, que por ahora se resuelve desde el editor SQL. |
+| «Jugó» | Su inscripción quedó confirmada (GPS o marca del organizador). El organizador jugó si confirmó la asistencia. La validez de un reporte se evalúa al cerrar el plazo; el TrueScore de quien reporta se toma en el momento del reporte. |
+| Encuentros entre clubes | Fuera del fair play, igual que de TrueScore. |

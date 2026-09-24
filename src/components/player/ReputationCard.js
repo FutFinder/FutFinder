@@ -27,7 +27,7 @@ const TONO_NIVEL = { verde: C.green, amarillo: C.amber, rojo: C.red };
  * @param {object} rating { value, hasRatings, count, filled } de ratingDisplay()
  * @param {object} trust  { value, pct, hint } de trustDisplay()
  */
-export default function ReputationCard({ rating, trust }) {
+export default function ReputationCard({ rating, trust, fairplay = null }) {
   // Con TrueScore el número se pinta con el color de su nivel (spec §1.4).
   const ajustes = useTrueScoreAjustes();
   const nivel =
@@ -97,6 +97,11 @@ export default function ReputationCard({ rating, trust }) {
           )}
         </View>
         <Text style={styles.rightHint}>{nivel ? nivel.nombre : trust.hint}</Text>
+        {ajustes.fase3 && fairplay != null ? (
+          <Text style={styles.fairplay} accessibilityLabel={`Fair play ${fairplay} de 100`}>
+            Fair play <Text style={styles.fairplayValue}>{fairplay}</Text> / 100
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -153,4 +158,6 @@ const styles = StyleSheet.create({
   },
   fill: { height: '100%', borderRadius: 4, backgroundColor: C.green },
   rightHint: { color: C.textMuted, fontSize: 11, marginTop: 6 },
+  fairplay: { color: C.textMuted, fontSize: 11.5, marginTop: 6 },
+  fairplayValue: { color: C.textPrimary, fontFamily: F.bold },
 });

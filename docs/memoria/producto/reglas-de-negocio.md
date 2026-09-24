@@ -51,6 +51,8 @@ La fuente de verdad es `docs/truescore-spec.md`, incluida su sección 8 de decis
 
 Con `truescore_fase2` activo (migración 135, también apagada): la tardanza vale −15 si ya hay 2 en los últimos 10 eventos, y el plantón −35 × (1 + 0,5 × plantones previos), contando sólo eventos ocurridos con la fase 2 activa. El jugador marcado tarde o ausente puede reclamar dentro de 48 h desde la marca; si 2 compañeros que asistieron lo confirman en ese mismo plazo, se aplica «Asistió», se rehacen puntaje, racha y reincidencia desde ese punto y el organizador pierde 20. El organizador gana +5 si confirma la asistencia antes de 12 h desde el fin, o +2 entre 12 y 24 h, siempre que alguien haya asistido. En la lista de espera, «Muy confiable» va primero.
 
+Con `truescore_fase3` (migración 136, apagada): el fair play es un puntaje aparte, de 0 a 100, que parte en 100. Hasta 48 h después del partido se puede reportar a un compañero una vez; el reporte vale si quien reporta jugó y tenía TrueScore 75 o más. Al cerrar ese plazo: sin reportes válidos, +1; con 3 o más, −15; con 1 o 2, nada. Una agresión física reportada y confirmada por el organizador resta 40 y deja la cuenta en revisión.
+
 ## Trust Score
 
 - El puntaje se almacena entre 0 y 100 y puede condicionar el ingreso cuando un partido define `min_trust_score`.

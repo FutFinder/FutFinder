@@ -128,6 +128,56 @@ export async function misReclamos() {
   return porEvento;
 }
 
+// --------------------------------------------------------------- fair play
+
+/** Motivos de un reporte de fair play (fase 3), en el orden en que se ofrecen. */
+export const MOTIVOS_FAIRPLAY = [
+  { value: 'juego_brusco', label: 'Juego brusco' },
+  { value: 'antideportivo', label: 'Conducta antideportiva' },
+  { value: 'agresion_fisica', label: 'Agresión física' },
+];
+
+/** Reporto a un compañero de este partido. */
+export async function reportarFairplay(matchId, reportadoId, motivo, comentario = null) {
+  if (!isSupabaseConfigured) return { ok: false, reason: 'Sin conexión con el servidor' };
+  const { data, error } = await supabase.rpc('fairplay_reportar', {
+    p_match_id: matchId,
+    p_reportado: reportadoId,
+    p_motivo: motivo,
+    p_comentario: comentario,
+  });
+  if (error) return { ok: false, reason: 'No pudimos enviar el reporte. Intenta de nuevo.', error };
+  return data;
+}
+
+/** A quiénes reporté en este partido: { [userId]: motivo }. */
+export async function misReportesFairplay(matchId) {
+  if (!isSupabaseConfigured) return {};
+  const { data, error } = await supabase.rpc('fairplay_mis_reportes', { p_match_id: matchId });
+  if (error) return {};
+  const porJugador = {};
+  (data || []).forEach((r) => {
+    porJugador[r.reported_id] = r.motivo;
+  });
+  return porJugador;
+}
+
+/** Para el organizador: agresiones físicas reportadas en su partido. */
+export async function agresionesDelPartido(matchId) {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.rpc('fairplay_agresiones_del_partido', { p_match_id: matchId });
+  if (error) return [];
+  return data || [];
+}
+
+/** El organizador confirma una agresión física reportada. */
+export async function confirmarAgresion(reporteId) {
+  if (!isSupabaseConfigured) return { ok: false, reason: 'Sin conexión con el servidor' };
+  const { data, error } = await supabase.rpc('fairplay_confirmar_agresion', { p_reporte_id: reporteId });
+  if (error) return { ok: false, reason: 'No pudimos confirmar la agresión. Intenta de nuevo.', error };
+  return data;
+}
+
 // ---------------------------------------------------------------- teléfono
 
 /** ¿Mi cuenta tiene un teléfono verificado? */

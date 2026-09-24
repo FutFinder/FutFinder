@@ -18,6 +18,7 @@ import {
   Shield,
   Zap,
   Check,
+  Flag,
   ServerCrash,
 } from 'lucide-react-native';
 
@@ -31,6 +32,12 @@ import {
 import { notify } from '../utils/notify';
 import { crearSecuencia } from '../utils/paginacionPartidos';
 import { PrimaryButton } from '../components/partidos/ui';
+import {
+  MOTIVOS_FAIRPLAY,
+  misReportesFairplay,
+  reportarFairplay,
+  useTrueScoreAjustes,
+} from '../services/trueScore';
 
 /**
  * Pantalla "Calificar partido".
@@ -93,6 +100,42 @@ export default function RateMatchScreen({ route, navigation }) {
   // Estado de los ratings por usuario:
   // { [userId]: { puntualidad, fairplay, nivel, comentario } }
   const [ratings, setRatings] = useState({});
+
+  // Fair play (TrueScore fase 3): reportar a un compañero es aparte de las
+  // estrellas. `reportes` = { [userId]: motivo } de lo que ya reporté.
+  const ajustesTS = useTrueScoreAjustes();
+  const fairplay = !!(ajustesTS.fase1 && ajustesTS.fase3);
+  const [reportes, setReportes] = useState({});
+  const [reporteAbierto, setReporteAbierto] = useState(null); // { userId, motivo }
+  const [reportando, setReportando] = useState(false);
+
+  useEffect(() => {
+    if (!fairplay || !matchId) return undefined;
+    let vivo = true;
+    misReportesFairplay(matchId).then((r) => vivo && setReportes(r));
+    return () => {
+      vivo = false;
+    };
+  }, [fairplay, matchId]);
+
+  const enviarReporte = async () => {
+    if (!reporteAbierto?.motivo || reportando) return;
+    setReportando(true);
+    const res = await reportarFairplay(matchId, reporteAbierto.userId, reporteAbierto.motivo);
+    setReportando(false);
+    if (!res?.ok) {
+      notify('No se pudo reportar', res?.reason || 'Intenta de nuevo en un momento.');
+      return;
+    }
+    setReportes((prev) => ({ ...prev, [reporteAbierto.userId]: reporteAbierto.motivo }));
+    setReporteAbierto(null);
+    notify(
+      'Reporte enviado',
+      reporteAbierto.motivo === 'agresion_fisica'
+        ? 'Le avisamos al organizador para que lo revise.'
+        : 'Gracias. Solo cuenta si varios compañeros reportan lo mismo.'
+    );
+  };
 
   // Dos cargas pueden solaparse —el botón de reintentar sobre una que todavía
   // viene, o un cambio de partido—, y la que llegue tarde no puede escribir:
@@ -364,6 +407,71 @@ export default function RateMatchScreen({ route, navigation }) {
                       maxLength={200}
                       editable={!locked}
                     />
+
+                    {/* Reporte de fair play (fase 3) */}
+                    {fairplay ? (
+                      reportes[p.id] ? (
+                        <Text style={styles.reportDone}>
+                          Lo reportaste por:{' '}
+                          {MOTIVOS_FAIRPLAY.find((m) => m.value === reportes[p.id])?.label || reportes[p.id]}
+                        </Text>
+                      ) : reporteAbierto?.userId === p.id ? (
+                        <View style={{ gap: 8, marginTop: 10 }}>
+                          <Text style={styles.reportHint}>¿Por qué lo reportas?</Text>
+                          <View style={styles.chipRow}>
+                            {MOTIVOS_FAIRPLAY.map((m) => {
+                              const on = reporteAbierto.motivo === m.value;
+                              return (
+                                <Pressable
+                                  key={m.value}
+                                  onPress={() => setReporteAbierto({ userId: p.id, motivo: m.value })}
+                                  accessibilityRole="radio"
+                                  accessibilityState={{ selected: on }}
+                                  style={[styles.chip, on && styles.chipOn]}
+                                >
+                                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{m.label}</Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <Pressable
+                              onPress={() => setReporteAbierto(null)}
+                              style={[styles.chip, { flex: 1, alignItems: 'center' }]}
+                            >
+                              <Text style={styles.chipText}>Cancelar</Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={enviarReporte}
+                              disabled={!reporteAbierto.motivo || reportando}
+                              style={[
+                                styles.chip,
+                                styles.chipDanger,
+                                { flex: 1, alignItems: 'center' },
+                                (!reporteAbierto.motivo || reportando) && { opacity: 0.5 },
+                              ]}
+                            >
+                              {reportando ? (
+                                <ActivityIndicator color={C.red} size="small" />
+                              ) : (
+                                <Text style={[styles.chipText, { color: C.red }]}>Enviar reporte</Text>
+                              )}
+                            </Pressable>
+                          </View>
+                        </View>
+                      ) : (
+                        <Pressable
+                          onPress={() => setReporteAbierto({ userId: p.id, motivo: null })}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Reportar a ${p.username}`}
+                          hitSlop={6}
+                          style={styles.reportLink}
+                        >
+                          <Flag color={C.textMuted} size={13} />
+                          <Text style={styles.reportLinkText}>Reportar a este jugador</Text>
+                        </Pressable>
+                      )
+                    ) : null}
                   </View>
                 );
               })}
@@ -402,6 +510,23 @@ export default function RateMatchScreen({ route, navigation }) {
 const AVATAR = 44;
 
 const styles = StyleSheet.create({
+  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, alignSelf: 'flex-start' },
+  reportLinkText: { color: C.textMuted, fontSize: 12.5, fontFamily: F.semiBold },
+  reportHint: { color: C.textSecondary, fontSize: 12.5, fontFamily: F.semiBold },
+  reportDone: { color: C.textMuted, fontSize: 12.5, marginTop: 10 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  chip: {
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: R.chip,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.chip,
+  },
+  chipOn: { borderColor: C.redBorder, backgroundColor: C.redSoft },
+  chipDanger: { borderColor: C.redBorder },
+  chipText: { color: C.textSecondary, fontSize: 12.5, fontFamily: F.semiBold },
+  chipTextOn: { color: C.red },
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',

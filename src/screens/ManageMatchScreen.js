@@ -60,7 +60,13 @@ import {
   saveMatchAttendance,
 } from '../services/matches';
 import { getCurrentUser } from '../services/auth';
-import { expulsarJugador, getCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
+import {
+  agresionesDelPartido,
+  confirmarAgresion,
+  expulsarJugador,
+  getCostoSalida,
+  useTrueScoreAjustes,
+} from '../services/trueScore';
 import {
   marcasCompletas,
   plazoAsistenciaAbierto,
@@ -129,6 +135,9 @@ export default function ManageMatchScreen({ route, navigation }) {
   const [tipoCancelacion, setTipoCancelacion] = useState('otro');
   const [costoCancelacion, setCostoCancelacion] = useState(null);
   const [expulsando, setExpulsando] = useState(null);
+  // Fair play (fase 3): agresiones físicas que reportaron los jugadores.
+  const [agresiones, setAgresiones] = useState([]);
+  const [agresionSel, setAgresionSel] = useState(null);
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [reason, setReason] = useState('');
   const [canceling, setCanceling] = useState(false);
@@ -307,6 +316,31 @@ export default function ManageMatchScreen({ route, navigation }) {
             (Number(res.bono) > 0 ? ` Ganaste +${res.bono} por confirmar a tiempo.` : '')
     );
     await load();
+  };
+
+  const fairplayActivo = !!(ajustes.fase1 && ajustes.fase3);
+  const cargarAgresiones = useCallback(async () => {
+    if (!fairplayActivo || !matchId) return;
+    setAgresiones(await agresionesDelPartido(matchId));
+  }, [fairplayActivo, matchId]);
+  useEffect(() => {
+    cargarAgresiones();
+  }, [cargarAgresiones]);
+
+  const confirmarAgresionAhora = async () => {
+    const a = agresionSel;
+    if (!a || busyId) return;
+    setBusyId(a.reported_id);
+    const res = await confirmarAgresion(a.reporte_id);
+    setBusyId(null);
+    setSheet(null);
+    setAgresionSel(null);
+    if (!res?.ok) {
+      say('error', 'No pudimos confirmar la agresión', res?.reason || '');
+      return;
+    }
+    say('info', 'Agresión confirmada', `El fair play de @${a.usuario} bajó y su cuenta quedó en revisión.`);
+    await cargarAgresiones();
   };
 
   const expulsarAhora = async () => {
@@ -722,6 +756,47 @@ export default function ManageMatchScreen({ route, navigation }) {
                 </Card>
               )}
 
+              {fairplayActivo && agresiones.length > 0 ? (
+                <View style={{ gap: 9 }}>
+                  <SectionLabel>Agresiones físicas reportadas</SectionLabel>
+                  <Card style={{ paddingVertical: 4, paddingHorizontal: 13 }}>
+                    {agresiones.map((g, i) => (
+                      <View
+                        key={g.reported_id}
+                        style={[styles.playerRow, i === agresiones.length - 1 && { borderBottomWidth: 0 }]}
+                      >
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.playerName} numberOfLines={1}>
+                            @{g.usuario}
+                          </Text>
+                          <Text style={styles.metaText}>
+                            {g.reportes === 1 ? '1 reporte' : `${g.reportes} reportes`}
+                          </Text>
+                        </View>
+                        {g.confirmada ? (
+                          <Tag label="Confirmada" tone="danger" />
+                        ) : (
+                          <GhostButton
+                            label="La vi"
+                            tone="danger"
+                            height={36}
+                            disabled={!online || busyId === g.reported_id}
+                            onPress={() => {
+                              setAgresionSel(g);
+                              setSheet('agresion');
+                            }}
+                          />
+                        )}
+                      </View>
+                    ))}
+                  </Card>
+                  <Note>
+                    Confirma solo lo que viste. Una agresión confirmada le resta fair play al jugador
+                    y deja su cuenta en revisión.
+                  </Note>
+                </View>
+              ) : null}
+
               <Note>
                 Solo tú, como organizador, ves esta vista y las acciones administrativas de cada
                 jugador.
@@ -1114,6 +1189,43 @@ export default function ManageMatchScreen({ route, navigation }) {
           <Bullet tone="danger" text="Sale de la nómina y no puede volver a este partido" />
           <Bullet text="Su TrueScore no cambia: sacar a alguien no le resta puntos" />
           <Bullet tone="gold" text="Se libera su cupo y avisamos a la lista de espera" />
+        </Card>
+      </Sheet>
+
+      {/* Confirmar una agresión física (fair play) */}
+      <Sheet
+        visible={sheet === 'agresion' && !!agresionSel}
+        onClose={() => {
+          setSheet(null);
+          setAgresionSel(null);
+        }}
+        title={agresionSel ? `¿Confirmas la agresión de @${agresionSel.usuario}?` : ''}
+        subtitle={match.titulo}
+        footer={
+          <View style={{ flex: 1, gap: 9 }}>
+            <GhostButton
+              label="Sí, la vi"
+              tone="danger"
+              onPress={confirmarAgresionAhora}
+              height={52}
+              disabled={!!busyId || !online}
+            />
+            <Pressable
+              onPress={() => {
+                setSheet(null);
+                setAgresionSel(null);
+              }}
+              style={{ height: 40, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={styles.sheetBack}>No la vi</Text>
+            </Pressable>
+          </View>
+        }
+      >
+        <Card style={{ gap: 10 }} radius={16}>
+          <Bullet tone="danger" text="Su fair play baja y su cuenta queda marcada para revisión" />
+          <Bullet text="No cambia su TrueScore" />
+          <Bullet tone="gold" text="Confirma solo si lo viste tú: no se puede deshacer" />
         </Card>
       </Sheet>
 

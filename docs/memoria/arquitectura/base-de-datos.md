@@ -199,6 +199,12 @@ Tres hábitos que se ganaron a golpes en estas migraciones: `revoke ... from ano
 - `truescore_calcular` cambió de firma (siete argumentos); se borró la de cuatro para no dejar una sobrecarga.
 - `lista_de_espera(partido)` corre con los permisos de quien llama y da el orden real de la cola; `avanzar_lista_de_espera` y `join_waitlist` usan el mismo orden.
 
+**Fase 3, fair play (migración 136), aplicada el 2026-09-24 con `truescore_fase3` apagado**; arnés `supabase/tests/136_truescore_fase3_fairplay_test.sql` 27/27 en ensayo contra producción. Se activa con `select public.truescore_activar_fase3();` (exige la fase 1).
+
+- Puntaje aparte: `profiles.fairplay_score` (nace en 100) y `profiles.fairplay_revision`, con su registro inmutable `fairplay_eventos` (misma guarda que el de TrueScore) y `fairplay_recalcular(usuario)`.
+- `fairplay_reportes` guarda el TrueScore de quien reporta al momento del reporte; la validez (`fairplay_reporte_valido`) se evalúa al cerrar el plazo, cuando ya se sabe quién jugó (`fairplay_jugo`). El job `futfinder-fairplay` cierra los partidos a las 48 h y marca `matches.fairplay_cerrado_at`, que la guarda de `matches` también protege.
+- La revisión por agresión vive en `fairplay_revisiones` y se cierra desde el editor SQL con `select public.fairplay_resolver_revision(id, 'nota');`: no hay pantalla de administrador todavía.
+
 ## Integridad y tiempo real
 
 - Triggers crean perfiles y asistentes organizadores, limitan clubes, automatizan cola y avisos, protegen mensajes y generan notificaciones de clubes, partido y chat.

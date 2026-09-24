@@ -37,6 +37,8 @@ Las pantallas leen `useTrueScoreAjustes()` (`src/services/trueScore.js`) y cambi
 
 Con `truescore_fase2`: el historial ofrece «Reclamar» en las tardanzas y ausencias dentro del plazo y muestra el estado del reclamo; el detalle del partido muestra `ReclamosDelPartido` (`src/components/partidos/ReclamosDelPartido.js`) para que los compañeros que asistieron confirmen; la lista de espera llega ordenada por `lista_de_espera` y marca «Prioridad»; y confirmar la asistencia avisa del bono ganado.
 
+Con `truescore_fase3`: «Calificar jugadores» ofrece «Reportar a este jugador» con motivo; Gestionar partido muestra al organizador las agresiones físicas reportadas para confirmarlas; y la tarjeta de reputación del perfil suma el fair play.
+
 ## Pantallas y dependencias
 
 - Pantallas: `PartidosScreen`, `MatchDetailScreen`, `PublishMatchScreen`, `EditMatchScreen`, `ManageMatchScreen`, `MatchRequestStatusScreen` y `MatchSpotScreen`.

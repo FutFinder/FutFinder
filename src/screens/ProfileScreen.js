@@ -630,7 +630,7 @@ export default function ProfileScreen({ navigation, route }) {
           actionLabel={isOwnProfile ? 'Ver historial' : null}
           onAction={isOwnProfile ? goTrustHistory : null}
         />
-        <ReputationCard rating={rating} trust={trust} />
+        <ReputationCard rating={rating} trust={trust} fairplay={profile?.fairplay_score ?? null} />
 
         {/* ── Estado de la cuenta ── */}
         <SectionHeader title="Estado de la cuenta" />
