@@ -1355,7 +1355,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                 height={48}
               />
               <Note>
-                Tienes hasta {ATTENDANCE_WINDOW_HOURS} h después del partido para registrarla.
+                Tienes hasta {ts ? Number(ajustesTS.confirmacion_plazo_horas) || 24 : ATTENDANCE_WINDOW_HOURS} h después del partido para registrarla.
               </Note>
             </Section>
           ) : null}
