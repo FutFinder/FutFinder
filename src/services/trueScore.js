@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { estadoCostoSalida } from '../utils/trueScore';
 
 /**
  * Frontera de la app con TrueScore (migración 134).
@@ -57,8 +58,52 @@ export async function getCostoSalida(matchId, tipo = 'otro') {
     p_match_id: matchId,
     p_tipo_cancelacion: tipo,
   });
+  // `null` es «no lo sabemos», y quien lo recibe NO puede tratarlo como
+  // «no cuesta nada»: `estadoCostoSalida` lo convierte en un error con
+  // reintento y la pantalla deja el botón apagado hasta tener el número.
   if (error) return null;
-  return data;
+  return data ?? null;
+}
+
+/**
+ * El costo de salirse o cancelar, con su estado de carga.
+ *
+ * Tres cosas que la copia suelta en cada pantalla no hacía:
+ *
+ *   1. Distingue «todavía no contesta» de «falló» de «el costo es cero».
+ *   2. Deja reintentar sin cerrar y volver a abrir la hoja.
+ *   3. Descarta respuestas fuera de orden. Al cambiar rápido de motivo de
+ *      cancelación salían dos consultas; si la primera llegaba después, el
+ *      organizador veía el costo del motivo anterior y confirmaba con él.
+ *      El turno se compara al volver: sólo la última consulta escribe.
+ *
+ * @param {string} matchId
+ * @param {{ activo?: boolean, tipo?: string }} opciones `activo`: la hoja
+ *   está abierta y TrueScore encendido; sin eso no se consulta nada.
+ * @returns {{ estado: 'cargando'|'listo'|'error', costo: object|null,
+ *   error: string|null, reintentar: () => void }}
+ */
+export function useCostoSalida(matchId, { activo = false, tipo = 'otro' } = {}) {
+  const [respuesta, setRespuesta] = useState(undefined);
+  const [intento, setIntento] = useState(0);
+  const turno = useRef(0);
+
+  useEffect(() => {
+    // Al cerrarse vuelve a «cargando»: la próxima apertura no puede empezar
+    // mostrando el costo calculado hace media hora.
+    turno.current += 1;
+    setRespuesta(undefined);
+    if (!activo || !matchId) return undefined;
+    const mio = turno.current;
+    getCostoSalida(matchId, tipo).then((c) => {
+      if (mio !== turno.current) return;
+      setRespuesta(c ?? null);
+    });
+    return undefined;
+  }, [activo, matchId, tipo, intento]);
+
+  const reintentar = useCallback(() => setIntento((n) => n + 1), []);
+  return { ...estadoCostoSalida(respuesta), reintentar };
 }
 
 /** El organizador saca a un jugador. No le resta puntos y no puede volver. */
@@ -72,18 +117,33 @@ export async function expulsarJugador(matchId, jugadorId) {
   return data;
 }
 
-/** Mis eventos de TrueScore, del más nuevo al más viejo. */
-export async function listMisEventosTrueScore({ limite = 100 } = {}) {
-  if (!isSupabaseConfigured) return { data: [], error: null };
+/**
+ * Mis eventos de TrueScore, del más nuevo al más viejo, por páginas.
+ *
+ * La paginación va por CLAVE, no por `offset`: cada página pide los eventos
+ * con `id` menor que el último que ya tengo. `truescore_eventos.id` es una
+ * identidad y las filas son inmutables, así que la ventana no se corre
+ * cuando llega un evento nuevo mientras el jugador baja por el historial —un
+ * `offset` habría repetido una fila y saltado otra en cada página.
+ *
+ * `hayMas` mira si el servidor llenó la página: es la señal para pedir la
+ * siguiente, y evita la última consulta vacía cuando el total es exacto.
+ *
+ * @param {{ limite?: number, antesDe?: number|null }} opciones
+ * @returns {{ data: object[], error: object|null, hayMas: boolean }}
+ */
+export async function listMisEventosTrueScore({ limite = 100, antesDe = null } = {}) {
+  if (!isSupabaseConfigured) return { data: [], error: null, hayMas: false };
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: [], error: { message: 'No autenticado' } };
-  const { data, error } = await supabase
+  if (!user) return { data: [], error: { message: 'No autenticado' }, hayMas: false };
+  let q = supabase
     .from('truescore_eventos')
     .select('id, match_id, tipo, puntos_aplicados, puntaje_despues, racha_despues, motivo, created_at')
-    .eq('user_id', user.id)
-    .order('id', { ascending: false })
-    .limit(limite);
-  return { data: data || [], error };
+    .eq('user_id', user.id);
+  if (antesDe != null) q = q.lt('id', antesDe);
+  const { data, error } = await q.order('id', { ascending: false }).limit(limite);
+  const filas = data || [];
+  return { data: filas, error, hayMas: !error && filas.length === limite };
 }
 
 // --------------------------------------------------------------- reclamos
@@ -181,15 +241,23 @@ export async function confirmarAgresion(reporteId) {
 // ---------------------------------------------------------------- teléfono
 
 /**
- * Mi teléfono (migración 138): { registrado, mascara, verificado, cumple,
- * obligatorio, verificacion_sms }. Mientras `verificacion_sms` esté apagado,
- * basta con registrar el número; no se envía SMS.
+ * Mi teléfono (migración 138). Devuelve `{ ok: true, registrado, mascara,
+ * verificado, cumple, obligatorio, verificacion_sms }`, o `{ ok: false,
+ * reason }` si no se pudo consultar. Mientras `verificacion_sms` esté
+ * apagado, basta con registrar el número; no se envía SMS.
  */
 export async function miTelefono() {
-  if (!isSupabaseConfigured) return null;
+  if (!isSupabaseConfigured) {
+    return { ok: false, reason: 'Sin conexión con el servidor' };
+  }
   const { data, error } = await supabase.rpc('mi_telefono');
-  if (error) return null;
-  return data;
+  // «No pudimos consultarlo» NO es «no tiene teléfono». Devolver null hacía
+  // que la pantalla cayera en `{ registrado: false }` y le ofreciera el
+  // formulario de registro a alguien que ya tenía su número guardado.
+  if (error || !data) {
+    return { ok: false, reason: 'No pudimos consultar tu teléfono. Inténtalo de nuevo.', error };
+  }
+  return { ok: true, ...data };
 }
 
 /** Registra (o cambia) mi celular, sin verificación por SMS. */

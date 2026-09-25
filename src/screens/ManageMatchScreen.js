@@ -64,12 +64,13 @@ import {
   agresionesDelPartido,
   confirmarAgresion,
   expulsarJugador,
-  getCostoSalida,
+  useCostoSalida,
   useTrueScoreAjustes,
 } from '../services/trueScore';
 import {
   marcasCompletas,
   plazoAsistenciaAbierto,
+  sufijoCosto,
   textoCostoCancelacion,
 } from '../utils/trueScore';
 import { suscribirseANomina } from '../services/clubRoster';
@@ -133,7 +134,6 @@ export default function ManageMatchScreen({ route, navigation }) {
   // { [userId]: 'asistio' | 'tarde' | 'no_fue' }.
   const [marks, setMarks] = useState({});
   const [tipoCancelacion, setTipoCancelacion] = useState('otro');
-  const [costoCancelacion, setCostoCancelacion] = useState(null);
   const [expulsando, setExpulsando] = useState(null);
   // Fair play (fase 3): agresiones físicas que reportaron los jugadores.
   const [agresiones, setAgresiones] = useState([]);
@@ -267,16 +267,19 @@ export default function ManageMatchScreen({ route, navigation }) {
   const plazoTS = Number(ajustes.confirmacion_plazo_horas) || 24;
   const plazoAbiertoTS = plazoAsistenciaAbierto(match, plazoTS);
 
-  // El costo de cancelar lo calcula el servidor con el motivo elegido.
-  useEffect(() => {
-    if (!ts || sheet !== 'cancelar' || !matchId) return undefined;
-    let vivo = true;
-    setCostoCancelacion(null);
-    getCostoSalida(matchId, tipoCancelacion).then((c) => vivo && setCostoCancelacion(c));
-    return () => {
-      vivo = false;
-    };
-  }, [ts, sheet, matchId, tipoCancelacion]);
+  /*
+   * El costo de cancelar lo calcula el servidor con el motivo elegido, y se
+   * vuelve a pedir cada vez que el motivo cambia. Hasta que llegue, el botón
+   * de confirmar está apagado: cancelar es irreversible y le resta puntos al
+   * organizador, así que no puede confirmarse a ciegas. El hook además tira
+   * las respuestas fuera de orden, para que cambiar rápido de motivo no deje
+   * en pantalla el precio del motivo anterior.
+   */
+  const costoCancelacion = useCostoSalida(matchId, {
+    activo: ts && sheet === 'cancelar',
+    tipo: tipoCancelacion,
+  });
+  const costoListo = !ts || costoCancelacion.estado === 'listo';
 
   const saveAttendance = async () => {
     if (savingAttendance || markedCount === 0) return;
@@ -360,7 +363,7 @@ export default function ManageMatchScreen({ route, navigation }) {
   };
 
   const cancelMatchNow = async () => {
-    if (canceling) return;
+    if (canceling || !costoListo) return;
     setCanceling(true);
     const res = await cancelMatchWithReason(matchId, reason.trim() || null, ts ? tipoCancelacion : null);
     setCanceling(false);
@@ -1069,15 +1072,17 @@ export default function ManageMatchScreen({ route, navigation }) {
             <GhostButton
               label={
                 ts
-                  ? costoCancelacion?.ok && Number(costoCancelacion.puntos) > 0
-                    ? `Sí, cancelar el partido (−${costoCancelacion.puntos} pts)`
+                  ? costoCancelacion.estado === 'listo'
+                    ? `Sí, cancelar el partido${sufijoCosto(costoCancelacion.costo)}`
+                    : costoCancelacion.estado === 'cargando'
+                    ? 'Calculando el costo…'
                     : 'Sí, cancelar el partido'
                   : `Sí, cancelar el partido (−${cancelPenaltyFor(match.hora)} pts)`
               }
               tone="danger"
               onPress={cancelMatchNow}
               height={52}
-              disabled={canceling || !online}
+              disabled={canceling || !online || !costoListo}
             />
             <Pressable onPress={() => setSheet(null)} style={{ height: 40, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={styles.sheetBack}>Mantener el partido</Text>
@@ -1105,8 +1110,11 @@ export default function ManageMatchScreen({ route, navigation }) {
           {ts ? (
             <Bullet
               text={
-                textoCostoCancelacion(costoCancelacion, tipoCancelacion) ||
-                'Calculando lo que cuesta cancelar ahora…'
+                costoCancelacion.estado === 'listo'
+                  ? textoCostoCancelacion(costoCancelacion.costo, tipoCancelacion)
+                  : costoCancelacion.estado === 'cargando'
+                  ? 'Calculando lo que cuesta cancelar ahora…'
+                  : costoCancelacion.error
               }
             />
           ) : (
@@ -1115,6 +1123,15 @@ export default function ManageMatchScreen({ route, navigation }) {
             />
           )}
           <Bullet text="El partido no se borra: queda en el historial como cancelado" />
+          {ts && costoCancelacion.estado === 'error' ? (
+            <Pressable
+              onPress={costoCancelacion.reintentar}
+              accessibilityRole="button"
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <Text style={styles.retryLink}>Reintentar</Text>
+            </Pressable>
+          ) : null}
         </Card>
 
         {ts ? (
@@ -1443,4 +1460,5 @@ const styles = StyleSheet.create({
   },
   cancelLink: { fontSize: 13.5, fontFamily: F.bold, color: C.red },
   sheetBack: { fontSize: 13.5, fontFamily: F.bold, color: C.textSecondary },
+  retryLink: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
 });

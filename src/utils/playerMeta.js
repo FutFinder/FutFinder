@@ -124,23 +124,46 @@ export function ratingDisplay(summary) {
 }
 
 /**
- * Trust Score. Es 100 por defecto en la BD, así que sin partidos confirmados
- * no significa nada todavía: en ese caso se muestra N.A. en vez de un 100
- * que el jugador no se ha ganado.
+ * Trust Score / TrueScore del perfil.
  *
+ * Las dos épocas no se leen igual y por eso `ts` no es un adorno:
+ *
+ *   · Sin TrueScore, `trust_score` NACE en 100 por defecto en la BD, así que
+ *     sin partidos confirmados no significa nada: se muestra N.A. en vez de
+ *     un 100 que el jugador no se ha ganado.
+ *   · Con TrueScore (fase 1), el puntaje lo fija el servidor con un evento
+ *     «inicio» al crear la cuenta (75 hoy). Es un dato real desde el primer
+ *     día y esconderlo detrás de N.A. era el error: el jugador veía «se
+ *     calcula tras tus primeros partidos» mientras el servidor ya le había
+ *     dado un puntaje con el que otros deciden si lo aceptan.
+ *
+ * Lo que NO cambia en ninguna de las dos: sin el dato —perfil que no cargó,
+ * columna vacía— sigue siendo N.A. La interfaz nunca inventa un puntaje.
+ *
+ * @param {object|null} profile fila de `profiles`
+ * @param {{ ts?: boolean }} opciones `ts`: fase 1 de TrueScore activa
  * @returns {{ value: string, pct: number|null, hint: string }}
  */
-export function trustDisplay(profile) {
+export function trustDisplay(profile, { ts = false } = {}) {
   const confirmadas = profile?.asistencias_confirmadas ?? 0;
   const score = profile?.trust_score;
+  const n = Number(score);
 
-  if (confirmadas <= 0 || score === null || score === undefined) {
+  if (score === null || score === undefined || !Number.isFinite(n)) {
+    return {
+      value: 'N.A.',
+      pct: null,
+      hint: ts ? 'No pudimos cargar tu TrueScore' : 'Se calcula tras tus primeros partidos',
+    };
+  }
+  if (!ts && confirmadas <= 0) {
     return { value: 'N.A.', pct: null, hint: 'Se calcula tras tus primeros partidos' };
   }
-  const n = Number(score);
   return {
     value: String(n),
     pct: Math.max(0, Math.min(100, n)),
+    // Con TrueScore el nivel lo pone la tabla del servidor y quien pinta la
+    // tarjeta lo escribe encima de este texto; esta pista es la de antes.
     hint: n >= 85 ? 'Jugador confiable' : n >= 60 ? 'Reputación en construcción' : 'Reputación baja',
   };
 }

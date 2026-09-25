@@ -21,10 +21,16 @@ import {
 } from '../services/trueScore';
 import {
   describirEvento,
+  fusionarHistorial,
   nivelTrueScore,
   puedeReclamar,
   textoEstadoReclamo,
 } from '../utils/trueScore';
+
+// Cuántos movimientos trae cada página. El historial de TrueScore es
+// inmutable y crece para siempre: la pantalla pedía 100 y ahí se acababa,
+// aunque el cambio prometía acceso a CADA movimiento.
+const POR_PAGINA = 50;
 
 // Con TrueScore el historial sale del registro de eventos (migración 134);
 // sin él, de `trust_score_history`. Las dos se muestran con la misma fila.
@@ -94,6 +100,10 @@ export default function TrustScoreHistoryScreen({ navigation }) {
   const [racha, setRacha] = useState(null);
   const [ajustes, setAjustes] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Paginación: si quedan páginas, si una está en vuelo, y si la última falló.
+  const [hayMas, setHayMas] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const [errorMas, setErrorMas] = useState(null);
   // Fase 2: reclamos por evento y el que se está enviando.
   const [reclamos, setReclamos] = useState({});
   const [reclamando, setReclamando] = useState(null);
@@ -106,21 +116,60 @@ export default function TrustScoreHistoryScreen({ navigation }) {
   const load = useCallback(async () => {
     const [a, profile] = await Promise.all([getTrueScoreAjustes(), getMyProfile()]);
     setAjustes(a);
+    setErrorMas(null);
     if (a.fase1) {
-      const [{ data }, rec] = await Promise.all([
-        listMisEventosTrueScore({ limite: 100 }),
+      const [pagina, rec] = await Promise.all([
+        listMisEventosTrueScore({ limite: POR_PAGINA }),
         a.fase2 ? misReclamos() : Promise.resolve({}),
       ]);
-      setHistory(data.map((e) => ({ ...describirEvento(e), raw: e })));
+      setHistory(pagina.data.map((e) => ({ ...describirEvento(e), raw: e })));
+      setHayMas(pagina.hayMas);
       setReclamos(rec);
     } else {
-      const { data } = await getTrustScoreHistory(100);
-      setHistory((data || []).map(filaVieja));
+      const pagina = await getTrustScoreHistory(POR_PAGINA);
+      setHistory((pagina.data || []).map(filaVieja));
+      setHayMas(pagina.hayMas);
     }
     setTrustScore(profile?.trust_score ?? null);
     setRacha(profile?.truescore_racha ?? null);
     setLoading(false);
   }, []);
+
+  /**
+   * La página siguiente, desde la última fila cargada hacia atrás.
+   *
+   * El cursor es el final de lo que ya está en pantalla, no un `offset`: si
+   * llega un evento nuevo mientras el jugador baja, la ventana no se corre y
+   * no se repite ni se salta ninguna fila. `fusionarHistorial` descarta
+   * además las repetidas del borde que devuelve el historial antiguo.
+   */
+  const cargarMas = useCallback(async () => {
+    if (cargandoMas || !hayMas || loading) return;
+    const ultima = history[history.length - 1];
+    if (!ultima) return;
+    setCargandoMas(true);
+    setErrorMas(null);
+    const pagina = ajustes?.fase1
+      ? await listMisEventosTrueScore({ limite: POR_PAGINA, antesDe: ultima.raw?.id })
+      : await getTrustScoreHistory(POR_PAGINA, { antesDe: ultima.fecha });
+    setCargandoMas(false);
+    if (pagina.error) {
+      setErrorMas('No pudimos cargar más movimientos. Inténtalo de nuevo.');
+      return;
+    }
+    const filas = ajustes?.fase1
+      ? pagina.data.map((e) => ({ ...describirEvento(e), raw: e }))
+      : (pagina.data || []).map(filaVieja);
+    // La fusión se calcula aquí, no dentro del actualizador: `history` ya está
+    // en las dependencias y así `agregadas` se lee sin depender de cuándo
+    // React ejecute la función de actualización.
+    const { filas: fusionadas, agregadas } = fusionarHistorial(history, filas);
+    setHistory(fusionadas);
+    // Una página entera de repetidas —todas del mismo segundo en el historial
+    // antiguo— no avanza: sin esto el cursor se quedaría pegado pidiendo lo
+    // mismo para siempre.
+    setHayMas(pagina.hayMas && agregadas > 0);
+  }, [ajustes, cargandoMas, hayMas, history, loading]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -216,6 +265,32 @@ export default function TrustScoreHistoryScreen({ navigation }) {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          onEndReached={cargarMas}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            cargandoMas ? (
+              <ActivityIndicator color={C.green} style={{ marginTop: 16 }} />
+            ) : errorMas ? (
+              <Pressable
+                onPress={cargarMas}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.masBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.masError}>{errorMas}</Text>
+                <Text style={styles.masBtnText}>Reintentar</Text>
+              </Pressable>
+            ) : hayMas ? (
+              <Pressable
+                onPress={cargarMas}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.masBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.masBtnText}>Ver más movimientos</Text>
+              </Pressable>
+            ) : history.length > POR_PAGINA ? (
+              <Text style={styles.finLista}>Ese es tu historial completo.</Text>
+            ) : null
+          }
         />
       )}
     </SafeAreaView>
@@ -320,6 +395,15 @@ const styles = StyleSheet.create({
   },
   claimBtnText: { color: C.green, fontSize: 12.5, fontFamily: F.bold },
   aviso: { color: C.green, fontSize: 13, lineHeight: 18, marginBottom: 12 },
+  masBtn: { alignItems: 'center', gap: 6, paddingVertical: 16 },
+  masBtnText: { color: C.green, fontSize: 13, fontFamily: F.bold },
+  masError: { color: C.red, fontSize: 12.5, textAlign: 'center' },
+  finLista: {
+    color: C.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
   itemChange: {
     fontSize: 18, fontFamily: F.extraBold,
     flexShrink: 0,

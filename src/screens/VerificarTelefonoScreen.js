@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle2, Smartphone } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, CheckCircle2, Smartphone } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import {
@@ -18,6 +18,7 @@ import {
   registrarTelefono,
   verificarCodigoTelefono,
 } from '../services/trueScore';
+import { estadoTelefono } from '../utils/trueScore';
 
 /**
  * Teléfono de la cuenta (TrueScore, spec §1.5: una cuenta, un número).
@@ -30,7 +31,9 @@ import {
  * Con `telefono_obligatorio` activo, inscribirse o publicar lo exige.
  */
 export default function VerificarTelefonoScreen({ navigation }) {
-  const [estado, setEstado] = useState(null);
+  // `undefined` = cargando · `{ ok: false }` = no se pudo consultar ·
+  // `{ ok: true, ... }` = la respuesta del servidor.
+  const [estado, setEstado] = useState(undefined);
   const [editando, setEditando] = useState(false);
   const [paso, setPaso] = useState('numero'); // 'numero' | 'codigo' (sólo con SMS)
   const [numero, setNumero] = useState('');
@@ -39,8 +42,17 @@ export default function VerificarTelefonoScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [aviso, setAviso] = useState(null);
 
+  /*
+   * Tres respuestas, no dos: «tiene número», «no tiene» y «no pudimos
+   * consultarlo». Antes la tercera se convertía en la segunda —`miTelefono()`
+   * devolvía null ante un error y la pantalla lo reemplazaba por
+   * `{ registrado: false }`—, así que una caída de red le mostraba el
+   * formulario de registro a alguien que ya tenía su número guardado, y
+   * guardar desde ahí decidía sobre un estado desconocido.
+   */
   const cargar = useCallback(async () => {
-    setEstado((await miTelefono()) || { registrado: false, verificacion_sms: false });
+    setEstado(undefined);
+    setEstado(await miTelefono());
   }, []);
 
   useEffect(() => {
@@ -48,10 +60,14 @@ export default function VerificarTelefonoScreen({ navigation }) {
   }, [cargar]);
 
   const telefono = normalizarCelularChileno(numero);
-  const conSms = !!estado?.verificacion_sms;
+  const consulta = estadoTelefono(estado);
+  const conocido = consulta.puedeGuardar;
+  const datos = consulta.datos;
+  const conSms = conocido && !!datos.verificacion_sms;
 
   const guardar = async () => {
-    if (!telefono || enviando) return;
+    // Sin saber qué hay guardado no se escribe nada.
+    if (!telefono || enviando || !conocido) return;
     setEnviando(true);
     setError(null);
     const res = await registrarTelefono(telefono);
@@ -67,7 +83,7 @@ export default function VerificarTelefonoScreen({ navigation }) {
   };
 
   const pedirCodigo = async () => {
-    if (!telefono || enviando) return;
+    if (!telefono || enviando || !conocido) return;
     setEnviando(true);
     setError(null);
     const res = await enviarCodigoTelefono(telefono);
@@ -80,7 +96,7 @@ export default function VerificarTelefonoScreen({ navigation }) {
   };
 
   const confirmar = async () => {
-    if (codigo.trim().length < 6 || enviando) return;
+    if (codigo.trim().length < 6 || enviando || !conocido) return;
     setEnviando(true);
     setError(null);
     const res = await verificarCodigoTelefono(telefono, codigo);
@@ -92,8 +108,9 @@ export default function VerificarTelefonoScreen({ navigation }) {
     await cargar();
   };
 
-  const listo = estado && (conSms ? estado.verificado : estado.registrado) && !editando;
-  const puedeEnviar = conSms && paso === 'codigo' ? codigo.length >= 6 : !!telefono;
+  const listo = conocido && (conSms ? datos.verificado : datos.registrado) && !editando;
+  const puedeEnviar =
+    conocido && (conSms && paso === 'codigo' ? codigo.length >= 6 : !!telefono);
   const accion = conSms ? (paso === 'numero' ? pedirCodigo : confirmar) : guardar;
   const textoAccion = conSms ? (paso === 'numero' ? 'Enviar código' : 'Verificar') : 'Guardar';
 
@@ -114,15 +131,27 @@ export default function VerificarTelefonoScreen({ navigation }) {
       </View>
 
       <View style={styles.body}>
-        {estado === null ? (
+        {consulta.estado === 'cargando' ? (
           <ActivityIndicator color={C.green} style={{ marginTop: 40 }} />
+        ) : consulta.estado === 'error' ? (
+          <View style={styles.card}>
+            <AlertCircle color={C.red} size={30} />
+            <Text style={styles.title}>No pudimos consultar tu teléfono</Text>
+            <Text style={styles.hint}>
+              {consulta.error} No te mostramos el formulario porque no sabemos si ya tienes un
+              número guardado.
+            </Text>
+            <Pressable onPress={cargar} accessibilityRole="button" style={styles.button}>
+              <Text style={styles.buttonText}>Reintentar</Text>
+            </Pressable>
+          </View>
         ) : listo ? (
           <View style={styles.card}>
             <CheckCircle2 color={C.green} size={30} />
             <Text style={styles.title}>
               {conSms ? 'Tu teléfono está verificado' : 'Tu teléfono está registrado'}
             </Text>
-            {estado.mascara ? <Text style={styles.numero}>{estado.mascara}</Text> : null}
+            {datos.mascara ? <Text style={styles.numero}>{datos.mascara}</Text> : null}
             <Text style={styles.hint}>
               Cada cuenta de FutFinder tiene un número propio. Así el TrueScore de cada jugador es
               de una sola persona.
@@ -155,7 +184,7 @@ export default function VerificarTelefonoScreen({ navigation }) {
                 ? paso === 'numero'
                   ? 'Te enviamos un código por SMS. Un número sirve para una sola cuenta.'
                   : `Enviamos un código de 6 dígitos al ${telefono}.`
-                : estado.obligatorio
+                : datos.obligatorio
                 ? 'Lo pedimos para inscribirte en partidos y publicarlos. Un número sirve para una sola cuenta.'
                 : 'Un número sirve para una sola cuenta.'}
             </Text>

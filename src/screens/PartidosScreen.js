@@ -486,12 +486,20 @@ export default function PartidosScreen({ navigation, route }) {
           <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
             <View style={styles.suspended}>
               <Text style={styles.suspendedTitle}>Tu cuenta tiene una restricción activa</Text>
+              {/*
+                * El motivo NO se lee de ninguna parte: `profiles` guarda
+                * `estado` y `suspended_until`, y nada más. Decir «tu Trust
+                * Score llegó a 0» era adivinar —y con TrueScore (fase 1) es
+                * derechamente falso: el disparador `tg_auto_suspend` no
+                * suspende por puntaje. Una restricción puede venir de un
+                * reporte o de una revisión, así que el texto dice lo único
+                * que sabemos y deja la fecha cuando existe.
+                */}
               <Text style={styles.suspendedText}>
-                Tu Trust Score llegó a 0, así que por ahora no puedes buscar ni unirte a
-                partidos.
+                Por ahora no puedes buscar ni unirte a partidos.
                 {suspended.suspended_until
                   ? ` Se reactiva el ${new Date(suspended.suspended_until).toLocaleDateString('es-CL', { day: '2-digit', month: 'long' })}.`
-                  : ''}
+                  : ' Escríbenos desde Ajustes si no sabes por qué.'}
               </Text>
             </View>
           </View>

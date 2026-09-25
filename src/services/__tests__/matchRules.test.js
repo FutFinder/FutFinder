@@ -485,3 +485,45 @@ test('textoConfirmacionGps: sin la migración 132 no se inventa el punto', () =>
 test('textoConfirmacionGps: un fallo no produce texto de éxito', () => {
   assert.equal(R.textoConfirmacionGps({ ok: false, reason: 'Estás demasiado lejos' }), null);
 });
+
+/**
+ * T05 — una restricción no se le atribuye a TrueScore.
+ *
+ * `profiles` guarda `estado` y `suspended_until`, y nada más: el motivo de
+ * una restricción NO está en ninguna columna. Decir «tu Trust Score llegó a
+ * 0» era adivinarlo, y con TrueScore (fase 1) es además falso —
+ * `tg_auto_suspend` devuelve `new` sin tocar nada cuando el flag está
+ * activo, así que ninguna cuenta se suspende por puntaje bajo—. Una cuenta
+ * restringida por un reporte leía que su culpa era el puntaje.
+ */
+
+const RESTRINGIDO = {
+  match: { id: 'm-1', estado: 'abierto', hora: '2099-01-01T12:00:00Z', cupos_disponibles: 4 },
+  myId: 'u-1',
+  online: true,
+};
+
+test('T05: una cuenta restringida no lee que su Trust Score llegó a 0', () => {
+  const block = R.getBlockReason({ ...RESTRINGIDO, myProfile: { suspended: true } });
+  assert.equal(block.code, 'restringido');
+  assert.doesNotMatch(block.detail, /Trust ?Score|TrueScore/i);
+  assert.doesNotMatch(block.detail, /llegó a 0/i);
+  assert.match(block.detail, /\S/);
+});
+
+test('T05: si hay fecha de reactivación, se conserva', () => {
+  const block = R.getBlockReason({
+    ...RESTRINGIDO,
+    myProfile: { suspended: true, suspended_until: '2026-10-15T15:00:00Z' },
+  });
+  // El formato exacto lo pone `toLocaleDateString('es-CL')` y varía entre
+  // motores («15-octubre» / «15 de octubre»); lo que se prueba es que la
+  // fecha sigue ahí, no cómo la escribe el runtime.
+  assert.match(block.detail, /15.*octubre/);
+  assert.doesNotMatch(block.detail, /Trust ?Score|TrueScore/i);
+});
+
+test('T05: la restricción sigue bloqueando — el cambio es el texto, no la regla', () => {
+  assert.equal(R.getBlockReason({ ...RESTRINGIDO, myProfile: { suspended: false } })?.code, undefined);
+  assert.equal(R.getBlockReason({ ...RESTRINGIDO, myProfile: { suspended: true } }).code, 'restringido');
+});

@@ -447,7 +447,9 @@ export async function listMembers(clubId) {
       joined_at: m.joined_at,
       username: byId.get(m.user_id)?.username || 'jugador',
       foto_url: byId.get(m.user_id)?.foto_url || null,
-      trust_score: byId.get(m.user_id)?.trust_score ?? 100,
+      // Sin perfil no hay reputación: `null` para que la lista escriba
+      // «N.A.» en vez de regalar un 100 que nadie se ganó.
+      trust_score: byId.get(m.user_id)?.trust_score ?? null,
       posicion_preferida: byId.get(m.user_id)?.posicion_preferida || [],
       comuna: byId.get(m.user_id)?.comuna || null,
       flanco: byId.get(m.user_id)?.flanco || null,
@@ -603,7 +605,7 @@ export async function listPendingRequests(clubId) {
       created_at: r.created_at,
       username: byId.get(r.user_id)?.username || 'jugador',
       foto_url: byId.get(r.user_id)?.foto_url || null,
-      trust_score: byId.get(r.user_id)?.trust_score ?? 100,
+      trust_score: byId.get(r.user_id)?.trust_score ?? null,
       comuna: byId.get(r.user_id)?.comuna || null,
     })),
     error: null,

@@ -496,6 +496,9 @@ export function getBlockReason(ctx) {
     };
   }
 
+  // La restricción no trae motivo: `profiles` sólo guarda `estado` y
+  // `suspended_until`. Culpar al puntaje era inventarlo, y con TrueScore
+  // (fase 1) `tg_auto_suspend` ni siquiera suspende por puntaje bajo.
   if (myProfile?.suspended) {
     return {
       code: 'restringido',
@@ -504,7 +507,7 @@ export function getBlockReason(ctx) {
         ? `Podrás volver a unirte el ${new Date(
             myProfile.suspended_until
           ).toLocaleDateString('es-CL', { day: '2-digit', month: 'long' })}.`
-        : 'Tu Trust Score llegó a 0 y no puedes unirte a partidos por ahora.',
+        : 'Mientras esté activa no puedes unirte a partidos.',
       actions: ['verMotivo'],
     };
   }

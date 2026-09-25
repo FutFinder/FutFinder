@@ -65,6 +65,7 @@ import {
 import { reportUser, countReportsAgainst, getMyPendingReportFor } from '../services/reports';
 import { isBlockedByMe, blockUser, unblockUser } from '../services/blockedUsers';
 import { isSupabaseConfigured } from '../services/supabase';
+import { useTrueScoreAjustes } from '../services/trueScore';
 import {
   playerBadges,
   ratingDisplay,
@@ -116,6 +117,7 @@ export default function ProfileScreen({ navigation, route }) {
   const viewUserId = route?.params?.userId || null;
   const { isAuthenticated, user: authUser } = useAuth();
   const insets = useSafeAreaInsets();
+  const tsFase1 = !!useTrueScoreAjustes().fase1;
 
   const [myId, setMyId] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -243,7 +245,9 @@ export default function ProfileScreen({ navigation, route }) {
   // ── Derivados ──
   const stats = useMemo(() => deriveStats(profile, history), [profile, history]);
   const rating = useMemo(() => ratingDisplay(ratingSummary), [ratingSummary]);
-  const trust = useMemo(() => trustDisplay(profile), [profile]);
+  // Con TrueScore el puntaje es real desde el primer día (evento «inicio»),
+  // así que la tarjeta lo muestra en vez de esconderlo tras «N.A.».
+  const trust = useMemo(() => trustDisplay(profile, { ts: tsFase1 }), [profile, tsFase1]);
   const attendance = useMemo(() => attendanceDisplay(history), [history]);
   const badges = useMemo(() => playerBadges(profile), [profile]);
 

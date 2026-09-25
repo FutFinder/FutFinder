@@ -47,11 +47,15 @@ export async function getMyProfileWithStatus() {
 /**
  * Estado de cuenta del usuario actual para gating de funciones.
  * Devuelve { suspended, trust_score, suspended_until }.
+ *
+ * Sin perfil el puntaje es `null`, no 100: un hueco de datos no puede
+ * pasar por la mejor reputación posible ante una regla que compare
+ * puntajes. Quien no pueda decidir con `null` debe esperar el dato.
  */
 export async function getMyAccountStatus() {
-  if (!isSupabaseConfigured) return { suspended: false, trust_score: 100, suspended_until: null };
+  if (!isSupabaseConfigured) return { suspended: false, trust_score: null, suspended_until: null };
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { suspended: false, trust_score: 100, suspended_until: null };
+  if (!user) return { suspended: false, trust_score: null, suspended_until: null };
   const { data } = await supabase
     .from('profiles')
     .select('trust_score, estado, suspended_until')
@@ -62,7 +66,7 @@ export async function getMyAccountStatus() {
     (!data.suspended_until || new Date(data.suspended_until) > new Date());
   return {
     suspended,
-    trust_score: data?.trust_score ?? 100,
+    trust_score: data?.trust_score ?? null,
     suspended_until: data?.suspended_until || null,
   };
 }

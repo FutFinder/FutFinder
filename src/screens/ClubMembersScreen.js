@@ -636,7 +636,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.memberName}>{item.username}</Text>
                     <Text style={styles.memberMeta}>
-                      Reputación {item.trust_score}
+                      Reputación {item.trust_score ?? 'N.A.'}
                       {item.comuna ? ` · ${item.comuna}` : ''}
                     </Text>
                   </View>
@@ -694,7 +694,7 @@ export default function ClubMembersScreen({ navigation, route }) {
                         </View>
                       )}
                       <Text style={styles.memberMeta} numberOfLines={1}>
-                        Reputación {item.trust_score}
+                        Reputación {item.trust_score ?? 'N.A.'}
                         {posiciones ? ` · ${posiciones}` : ''}
                         {item.comuna ? ` · ${item.comuna}` : ''}
                       </Text>

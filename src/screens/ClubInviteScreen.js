@@ -160,7 +160,7 @@ export default function ClubInviteScreen({ navigation, route }) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.playerName}>{item.username}</Text>
                   <Text style={styles.playerMeta}>
-                    Reputación {item.trust_score ?? 100}
+                    Reputación {item.trust_score ?? 'N.A.'}
                     {item.comuna ? ` · ${item.comuna}` : ''}
                   </Text>
                 </View>

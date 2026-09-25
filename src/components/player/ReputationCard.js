@@ -21,8 +21,12 @@ const TONO_NIVEL = { verde: C.green, amarillo: C.amber, rojo: C.red };
  * Sin evaluaciones → "N.A.", cinco estrellas VACÍAS (nunca cinco llenas, que
  * se leerían como una valoración perfecta) y "Sin evaluaciones todavía".
  *
- * Sin partidos confirmados → Trust Score "N.A." con la barra vacía: el 100 de
- * la BD es un valor por defecto, no una reputación ganada.
+ * Trust Score "N.A." con la barra vacía cuando no hay un puntaje que mostrar.
+ * Cuándo es eso lo decide `trustDisplay`, y depende de la época: sin
+ * TrueScore, mientras no haya partidos confirmados, porque el 100 de la BD es
+ * un valor por defecto y no una reputación ganada; con TrueScore, sólo si el
+ * dato falta de verdad, porque ahí el servidor fija el puntaje inicial con un
+ * evento «inicio» y esconderlo era ocultarle al jugador su propio número.
  *
  * @param {object} rating { value, hasRatings, count, filled } de ratingDisplay()
  * @param {object} trust  { value, pct, hint } de trustDisplay()

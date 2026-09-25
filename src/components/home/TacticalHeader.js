@@ -13,7 +13,7 @@ import {
 
 export default function TacticalHeader({
   userName, comuna, summary, greeting = 'Buenas noches',
-  trustScore, verified, clubRoleLabel,
+  trustScore, trustLabel = 'TRUST', verified, clubRoleLabel,
 }) {
   return (
     <LinearGradient
@@ -48,7 +48,10 @@ export default function TacticalHeader({
             <Text className="text-[10.5px] font-bold tracking-[0.15em] text-verde">VERIFICADO</Text>
           </View>
         ) : null}
-        {typeof trustScore === 'number' ? <StatusPill tone="neutral" label={`TRUST ${trustScore}`} /> : null}
+        {/* Sin puntaje no hay chapita: «TRUST undefined» era peor que nada. */}
+        {typeof trustScore === 'number' && Number.isFinite(trustScore) ? (
+          <StatusPill tone="neutral" label={`${trustLabel} ${trustScore}`} />
+        ) : null}
         {clubRoleLabel ? <StatusPill tone="neutral" label={clubRoleLabel} /> : null}
       </View>
     </LinearGradient>

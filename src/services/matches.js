@@ -948,7 +948,7 @@ export async function getMatchAttendees(matchId) {
         user_id: a.id_jugador,
         username: p.username || 'jugador',
         foto_url: p.foto_url || null,
-        trust_score: p.trust_score ?? 100,
+        trust_score: p.trust_score ?? null,
         comuna: p.comuna,
         posicion_preferida: p.posicion_preferida,
         is_organizer: a.id_jugador === match?.id_organizador,

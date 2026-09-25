@@ -39,7 +39,7 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 
 ## TrueScore (reemplaza al Trust Score cuando se active)
 
-La fuente de verdad es `docs/truescore-spec.md`, incluida su sección 8 de decisiones. La fase 1 está en producción desde la migración 134 **con el flag `truescore_fase1` apagado**: mientras no se active, rige el Trust Score descrito más abajo. Con el flag activo:
+La fuente de verdad es `docs/truescore-spec.md`, incluida su sección 8 de decisiones. **Al 2026-09-25 los flags `truescore_fase1`, `truescore_fase2` y `truescore_fase3` están ACTIVOS en producción** —comprobado con `truescore_ajustes()`, que además devuelve `puntaje_inicial` 75 y `telefono_obligatorio` apagado—, así que rige lo de esta sección y no el Trust Score descrito más abajo. Ese apartado se conserva porque la app mantiene los dos caminos: con los flags apagados vuelve a regir. Con el flag activo:
 
 - Hay **un solo puntaje global**, entre 0 y 100, y todos parten en 75. Asistir a tiempo suma según la racha (+6, +8, +10, +12); llegar tarde resta 8 y no ir sin avisar resta 35, y los dos rompen la racha. Salirse cuesta según las horas de aviso, interpolado en la tabla de la spec (5 h = −13, 2 h = −23, 48 h = −1), igual para quien entró desde la lista de espera; con 24 h o más no rompe la racha.
 - El organizador **confirma la asistencia una sola vez** y a toda la nómina (Asistió, Llegó tarde, No fue) dentro de las 24 h desde el fin del partido. Si no lo hace, el partido queda neutro para los jugadores y el organizador pierde 10.

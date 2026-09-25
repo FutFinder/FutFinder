@@ -39,8 +39,13 @@ import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentUser } from '../services/auth';
 import { useOnline } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
-import { getCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
-import { TEXTO_REGLA_SALIDA_TS, textoCostoSalida } from '../utils/trueScore';
+import { useCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
+import {
+  TEXTO_REGLA_SALIDA_TS,
+  sufijoCosto,
+  textoCostoSalida,
+  textoEfectoGps,
+} from '../utils/trueScore';
 import {
   GPS_RADIUS_METERS,
   cuotaLabel,
@@ -73,18 +78,11 @@ export default function MatchSpotScreen({ route, navigation }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [sheet, setSheet] = useState(null);
-  // Con TrueScore el costo de salirse lo calcula el servidor.
+  // Con TrueScore el costo de salirse lo calcula el servidor: hasta que
+  // llegue, no se puede confirmar una salida cuyo precio no se conoce.
   const ts = !!useTrueScoreAjustes().fase1;
-  const [costoSalida, setCostoSalida] = useState(null);
-  useEffect(() => {
-    if (!ts || sheet !== 'leave' || !matchId) return undefined;
-    let vivo = true;
-    setCostoSalida(null);
-    getCostoSalida(matchId).then((c) => vivo && setCostoSalida(c));
-    return () => {
-      vivo = false;
-    };
-  }, [ts, sheet, matchId]);
+  const costo = useCostoSalida(matchId, { activo: ts && sheet === 'leave' });
+  const costoListo = !ts || costo.estado === 'listo';
 
   const load = useCallback(async () => {
     const [res, user] = await Promise.all([
@@ -313,8 +311,8 @@ export default function MatchSpotScreen({ route, navigation }) {
                 height={50}
               />
               <Note>
-                Validamos que estés a menos de {GPS_RADIUS_METERS} m de la cancha. Confirmar suma a
-                tu Trust Score.
+                Validamos que estés a menos de {GPS_RADIUS_METERS} m de la cancha.{' '}
+                {textoEfectoGps(ts)}
               </Note>
             </View>
           ) : null}
@@ -364,15 +362,17 @@ export default function MatchSpotScreen({ route, navigation }) {
             <GhostButton
               label={
                 ts
-                  ? costoSalida?.ok
-                    ? `Salir del partido (−${costoSalida.puntos} pts)`
+                  ? costo.estado === 'listo'
+                    ? `Salir del partido${sufijoCosto(costo.costo)}`
+                    : costo.estado === 'cargando'
+                    ? 'Calculando el costo…'
                     : 'Salir del partido'
                   : `Salir del partido (−${leavePenaltyFor(match.hora)} pts)`
               }
               tone="danger"
               onPress={leave}
               height={52}
-              disabled={busy || !online}
+              disabled={busy || !online || !costoListo}
             />
             <Pressable onPress={() => setSheet(null)} style={{ height: 40, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={styles.sheetBack}>Me quedo en el partido</Text>
@@ -386,10 +386,23 @@ export default function MatchSpotScreen({ route, navigation }) {
             tone={ts || !isPenaltyFree(match.hora) ? 'danger' : 'gold'}
             text={
               ts
-                ? textoCostoSalida(costoSalida) || 'Calculando lo que te cuesta salir ahora…'
+                ? costo.estado === 'listo'
+                  ? textoCostoSalida(costo.costo)
+                  : costo.estado === 'cargando'
+                  ? 'Calculando lo que te cuesta salir ahora…'
+                  : costo.error
                 : `Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
             }
           />
+          {ts && costo.estado === 'error' ? (
+            <Pressable
+              onPress={costo.reintentar}
+              accessibilityRole="button"
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <Text style={styles.link}>Reintentar</Text>
+            </Pressable>
+          ) : null}
           <Bullet text="Tu cupo se libera y vuelve a aparecer en Partidos" />
           <Bullet text="Avisamos al grupo y al primero de la lista de espera" />
           <Bullet text="Pierdes el acceso al chat del partido" />

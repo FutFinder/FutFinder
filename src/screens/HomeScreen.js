@@ -33,6 +33,8 @@ import { getMyClubIds } from '../services/clubs';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
+import { useTrueScoreAjustes } from '../services/trueScore';
+import { etiquetaTier } from '../utils/trueScore';
 
 function greetingFor(d = new Date()) {
   const h = d.getHours();
@@ -43,6 +45,10 @@ function greetingFor(d = new Date()) {
 }
 
 export default function HomeScreen({ navigation }) {
+  // Los niveles y sus umbrales los manda el servidor; la portada los pinta.
+  const ajustesTS = useTrueScoreAjustes();
+  const ts = !!ajustesTS.fase1;
+
   // `window.confirm` no abre nada en web: diálogo propio de la app.
   /**
    * EL CLUB DE INICIO ES EL CLUB ACTIVO, el mismo que marca el selector de la
@@ -197,11 +203,27 @@ export default function HomeScreen({ navigation }) {
 
   // ── computed props para el diseño ──────────────────────────────────────────
 
-  const trustScore = profile?.trust_score ?? 100;
+  /*
+   * El puntaje, o null si no hay perfil cargado.
+   *
+   * Acá decía `?? 100`: si el perfil no había llegado —o su carga falló— la
+   * portada le daba al jugador un 100 perfecto, la barra llena y la etiqueta
+   * «ÉLITE». Un hueco de datos se leía como la mejor reputación posible.
+   * Ahora null baja hasta la tarjeta, que dibuja el hueco como hueco.
+   */
+  const trustScore = Number.isFinite(Number(profile?.trust_score))
+    ? Number(profile.trust_score)
+    : null;
   const partidosJugados = profile?.partidos_jugados ?? 0;
   const reports = profile?.reportes ?? 0;
   const username = profile?.username || 'jugador';
-  const verified = trustScore >= 70;
+  /*
+   * «VERIFICADO» sólo cuando algo está verificado de verdad. Con TrueScore el
+   * puntaje es una reputación, no una verificación: el sello colgaba de
+   * `trustScore >= 70`, así que toda cuenta nueva nacía «VERIFICADA» por
+   * empezar en 75. Con fase 1 el nivel del servidor ocupa ese lugar.
+   */
+  const verified = !ts && trustScore !== null && trustScore >= 70;
 
   // El club activo, en el shape que esperan los sub-componentes.
   const membresiaActiva = (misMembresias || []).find((m) => m?.club?.id === activeClubId);
@@ -241,13 +263,14 @@ export default function HomeScreen({ navigation }) {
     ? `${matches.length} ${matches.length === 1 ? 'partido cerca de ti' : 'partidos cerca de ti'}`
     : 'Sin partidos cerca';
 
-  const tierLabel =
-    trustScore >= 90 ? 'ÉLITE' : trustScore >= 70 ? 'SÓLIDO' : 'EN PRUEBA';
+  // Con TrueScore la etiqueta sale de la tabla de niveles del servidor
+  // (75 → «CONFIABLE»), no de tramos escritos a mano en la portada.
+  const tierLabel = etiquetaTier(trustScore, { fase1: ts, niveles: ajustesTS.niveles });
 
   const quickActions = [
     { label: 'Buscar partido', hint: 'Filtros avanzados', onPress: () => navigation.navigate('Main', { screen: 'SearchTab' }) },
     { label: '¿Te falta un jugador?', hint: '¡Encuentra al jugador que necesitas!', onPress: () => navigation.navigate('CreateMatch') },
-    { label: 'Mi historial',   hint: 'Trust Score y reseñas', onPress: () => navigation.navigate('TrustScoreHistory') },
+    { label: 'Mi historial',   hint: `${ts ? 'TrueScore' : 'Trust Score'} y reseñas`, onPress: () => navigation.navigate('TrustScoreHistory') },
     { label: 'Explorar clubes', hint: 'Únete a un equipo', onPress: () => navigation.navigate('Main', { screen: 'ClubsTab' }) },
   ];
 
@@ -296,6 +319,7 @@ export default function HomeScreen({ navigation }) {
             summary={summary}
             greeting={greetingFor()}
             trustScore={trustScore}
+            trustLabel={ts ? 'TRUESCORE' : 'TRUST'}
             verified={verified}
             clubRoleLabel={clubRoleLabel}
           />
@@ -367,6 +391,7 @@ export default function HomeScreen({ navigation }) {
               <SectionHeader title="Reputación" />
               <TrustScoreCard
                 score={trustScore}
+                nombre={ts ? 'Tu TrueScore' : 'Tu Trust Score'}
                 matchesPlayed={partidosJugados}
                 reports={reports}
                 verified={verified}

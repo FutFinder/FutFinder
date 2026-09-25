@@ -23,6 +23,155 @@ export function nivelTrueScore(puntaje, niveles) {
   return ordenados.find((nv) => n >= Number(nv.desde)) || ordenados[ordenados.length - 1];
 }
 
+/**
+ * La etiqueta corta de un puntaje para la portada.
+ *
+ * Con TrueScore sale de la tabla `niveles` que manda el servidor —la misma
+ * que usa `truescore_nivel()` para decidir el color— y no de tramos escritos
+ * a mano. Inicio decía «SÓLIDO» a una cuenta que el servidor clasifica
+ * «Confiable»: dos escalas distintas para el mismo número.
+ *
+ * Sin puntaje devuelve null: quien llama decide qué dibujar, pero nunca
+ * recibe una etiqueta para un número que no existe.
+ */
+export function etiquetaTier(puntaje, { fase1 = false, niveles = null } = {}) {
+  const n = Number(puntaje);
+  if (puntaje === null || puntaje === undefined || !Number.isFinite(n)) return null;
+  if (fase1) {
+    const nivel = nivelTrueScore(n, niveles);
+    return nivel ? String(nivel.nombre).toUpperCase() : null;
+  }
+  return n >= 90 ? 'ÉLITE' : n >= 70 ? 'SÓLIDO' : 'EN PRUEBA';
+}
+
+/**
+ * Qué hace de verdad confirmar con GPS, en una frase.
+ *
+ * Con fase 1 el GPS sólo deja constancia de que llegaste: los puntos los
+ * aplica el organizador cuando confirma la asistencia (`confirmar_asistencia`,
+ * migración 134). Prometer «suma a tu Trust Score» era describir el flujo
+ * antiguo, que sigue vivo con el flag apagado.
+ */
+export function textoEfectoGps(fase1) {
+  return fase1
+    ? 'Deja registrado que llegaste a la cancha. Los puntos de TrueScore los aplica el organizador cuando confirma la asistencia.'
+    : 'Confirmar suma a tu Trust Score.';
+}
+
+/** Cómo se sube el puntaje, para la tarjeta de «no puedes unirte». */
+export function textoComoSubir(fase1) {
+  return fase1
+    ? 'Tu TrueScore sube cuando asistes a tiempo y el organizador lo confirma, y más aún con cada partido seguido.'
+    : 'Sube tu Trust Score jugando partidos y confirmando asistencia con GPS.';
+}
+
+// ------------------------------------------------- el costo antes de salir
+
+/**
+ * En qué estado quedó la consulta de `truescore_costo_salida`.
+ *
+ * Tres respuestas distintas que la pantalla mezclaba en una sola: mientras la
+ * RPC no contestaba, y también si fallaba, el botón decía «Salir del partido»
+ * sin costo y se dejaba pulsar. El jugador confirmaba a ciegas una acción que
+ * le resta puntos.
+ *
+ *   `undefined` → todavía no contesta          → 'cargando'
+ *   `null`      → la RPC falló (lo que devuelve el servicio ante un error)
+ *                 o el servidor no dio un costo usable  → 'error'
+ *   `{ ok: true, puntos }` → 'listo'; `puntos` puede ser 0, y cero es un
+ *                 costo válido que hay que mostrar, no un hueco.
+ */
+export function estadoCostoSalida(respuesta) {
+  if (respuesta === undefined) {
+    return { estado: 'cargando', costo: null, error: null };
+  }
+  if (respuesta === null) {
+    return {
+      estado: 'error',
+      costo: null,
+      error: 'No pudimos calcular cuánto te cuesta. Revisa tu conexión e inténtalo de nuevo.',
+    };
+  }
+  if (!respuesta.ok) {
+    return { estado: 'error', costo: null, error: respuesta.reason || 'No pudimos calcular cuánto te cuesta.' };
+  }
+  // `Number(null)` es 0, así que un `puntos: null` habría pasado por un cero
+  // válido y habilitado el botón con un costo que el servidor nunca dio.
+  if (respuesta.puntos === null || respuesta.puntos === undefined
+      || !Number.isFinite(Number(respuesta.puntos))) {
+    return { estado: 'error', costo: null, error: 'El servidor no devolvió un costo válido.' };
+  }
+  return { estado: 'listo', costo: respuesta, error: null };
+}
+
+/** «−7 pts» / «sin costo» para el botón que confirma la salida. */
+export function sufijoCosto(costo) {
+  const n = Number(costo?.puntos);
+  if (!Number.isFinite(n)) return '';
+  return n > 0 ? ` (−${n} pts)` : ' (sin costo)';
+}
+
+// ----------------------------------------------------------------- teléfono
+
+/**
+ * En qué estado quedó la consulta de `mi_telefono` (migración 138).
+ *
+ * El mismo error que el costo de salida, en otra pantalla: «no pudimos
+ * consultarlo» se convertía en «no tiene teléfono». Una caída de red le
+ * mostraba el formulario de registro a alguien que ya tenía su número
+ * guardado, y guardar desde ahí escribía sobre un estado desconocido.
+ *
+ *   `undefined`        → todavía no contesta            → 'cargando'
+ *   `{ ok: false }`    → no se pudo consultar           → 'error'
+ *   `{ ok: true, … }`  → la respuesta real del servidor → 'listo'
+ *
+ * `puedeGuardar` es la respuesta a la única pregunta que importa antes de
+ * escribir: ¿sabemos qué hay guardado? Sólo el tercer caso dice que sí.
+ */
+export function estadoTelefono(respuesta) {
+  if (respuesta === undefined) {
+    return { estado: 'cargando', datos: null, error: null, puedeGuardar: false };
+  }
+  if (!respuesta || respuesta.ok !== true) {
+    return {
+      estado: 'error',
+      datos: null,
+      error: respuesta?.reason || 'No pudimos consultar tu teléfono. Inténtalo de nuevo.',
+      puedeGuardar: false,
+    };
+  }
+  return { estado: 'listo', datos: respuesta, error: null, puedeGuardar: true };
+}
+
+// --------------------------------------------------------- historial largo
+
+/**
+ * Pega una página nueva al historial ya cargado sin repetir ni perder filas.
+ *
+ * Dos razones para que exista y no sea un `concat`:
+ *
+ *   · El historial antiguo pagina con `lte` sobre `created_at` para no
+ *     perder los empates de segundo, así que devuelve a propósito las filas
+ *     del borde otra vez. Acá se descartan por `id`.
+ *   · Mientras el jugador baja pueden entrar eventos nuevos. Son más nuevos
+ *     que todo lo cargado, así que no entran por el final: se ignoran hasta
+ *     que la pantalla recargue desde arriba, y ninguna fila vieja se duplica
+ *     ni se salta por el desplazamiento.
+ *
+ * El orden de lo ya cargado se respeta tal cual: sólo se agrega al final.
+ */
+export function fusionarHistorial(actual = [], nuevas = []) {
+  const vistos = new Set(actual.map((f) => String(f.id)));
+  const agregadas = [];
+  for (const fila of nuevas) {
+    const clave = String(fila?.id);
+    if (!fila || vistos.has(clave)) continue;
+    vistos.add(clave);
+    agregadas.push(fila);
+  }
+  return { filas: [...actual, ...agregadas], agregadas: agregadas.length };
+}
+
 /** Marcas que acepta el organizador, en el orden en que se muestran. */
 export const MARCAS_ASISTENCIA = ['asistio', 'tarde', 'no_fue'];
 

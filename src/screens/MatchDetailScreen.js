@@ -64,8 +64,14 @@ import {
 import Sheet from '../components/partidos/Sheet';
 import TrueScoreChip from '../components/TrueScoreChip';
 import ReclamosDelPartido from '../components/partidos/ReclamosDelPartido';
-import { getCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
-import { TEXTO_REGLA_SALIDA_TS, textoCostoSalida } from '../utils/trueScore';
+import { useCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
+import {
+  TEXTO_REGLA_SALIDA_TS,
+  sufijoCosto,
+  textoComoSubir,
+  textoCostoSalida,
+  textoEfectoGps,
+} from '../utils/trueScore';
 import ShareSheet from '../components/partidos/ShareSheet';
 import { LoadingDetail, ErrorState, OfflineNotice } from '../components/partidos/StateViews';
 import { formatFechaLarga } from '../components/partidos/DateTimeSheets';
@@ -166,7 +172,10 @@ export default function MatchDetailScreen({ route, navigation }) {
   // interpolada por horas de aviso); la pantalla sólo lo muestra.
   const ajustesTS = useTrueScoreAjustes();
   const ts = !!ajustesTS.fase1;
-  const [costoSalida, setCostoSalida] = useState(null);
+  // Nadie confirma una salida sin saber lo que cuesta: el botón espera al
+  // servidor y, si la consulta falla, ofrece reintentar en vez de seguir.
+  const costo = useCostoSalida(matchId, { activo: ts && sheet === 'leave' });
+  const costoListo = !ts || costo.estado === 'listo';
   const [checks, setChecks] = useState({ llegar: false, cuota: false, aviso: false });
   const [userCoords, setUserCoords] = useState(null);
   // Mis clubes: deciden si este partido es «de los míos» —qué cupos se
@@ -553,15 +562,6 @@ export default function MatchDetailScreen({ route, navigation }) {
       await load();
     });
 
-  useEffect(() => {
-    if (!ts || sheet !== 'leave' || !matchId) return undefined;
-    let vivo = true;
-    setCostoSalida(null);
-    getCostoSalida(matchId).then((c) => vivo && setCostoSalida(c));
-    return () => {
-      vivo = false;
-    };
-  }, [ts, sheet, matchId]);
 
   const doLeave = () =>
     guard(async () => {
@@ -1226,7 +1226,11 @@ export default function MatchDetailScreen({ route, navigation }) {
                 <Requisito ok text="Confirmación de asistencia al finalizar" />
               ) : null}
               <Requisito
-                text={`Confirmar en cancha con GPS (radio de ${GPS_RADIUS_METERS} m)`}
+                text={
+                  ts
+                    ? `Confirmar tu llegada en cancha con GPS (radio de ${GPS_RADIUS_METERS} m)`
+                    : `Confirmar en cancha con GPS (radio de ${GPS_RADIUS_METERS} m)`
+                }
               />
               <Requisito text={ts ? TEXTO_REGLA_SALIDA_TS : leaveRuleText(match.hora)} />
             </Card>
@@ -1272,9 +1276,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                         }}
                       />
                     </View>
-                    <Text style={styles.trustHint}>
-                      Sube tu Trust Score jugando partidos y confirmando asistencia con GPS.
-                    </Text>
+                    <Text style={styles.trustHint}>{textoComoSubir(ts)}</Text>
                   </View>
                 ) : null}
               </View>
@@ -1307,10 +1309,13 @@ export default function MatchDetailScreen({ route, navigation }) {
 
               {block.code === 'restringido' ? (
                 <View style={{ marginTop: 10 }}>
+                  {/* Antes prometía «el motivo»: el historial muestra los
+                      movimientos de puntaje, que no son la causa de una
+                      restricción. El enlace queda, sin prometer de más. */}
                   <AltRow
                     icon={Info}
-                    title="Ver el motivo de la restricción"
-                    sub="Historial de tu Trust Score"
+                    title={ts ? 'Ver mi historial de TrueScore' : 'Ver mi historial de Trust Score'}
+                    sub="Cada movimiento de tu puntaje"
                     onPress={() => navigation.navigate('TrustScoreHistory')}
                   />
                 </View>
@@ -1329,8 +1334,8 @@ export default function MatchDetailScreen({ route, navigation }) {
                 height={50}
               />
               <Note>
-                Validamos que estés a menos de {GPS_RADIUS_METERS} m de la cancha. Confirmar suma a
-                tu Trust Score.
+                Validamos que estés a menos de {GPS_RADIUS_METERS} m de la cancha.{' '}
+                {textoEfectoGps(ts)}
               </Note>
             </Section>
           ) : null}
@@ -1656,8 +1661,10 @@ export default function MatchDetailScreen({ route, navigation }) {
             <GhostButton
               label={
                 ts
-                  ? costoSalida?.ok
-                    ? `Salir del partido (−${costoSalida.puntos} pts)`
+                  ? costo.estado === 'listo'
+                    ? `Salir del partido${sufijoCosto(costo.costo)}`
+                    : costo.estado === 'cargando'
+                    ? 'Calculando el costo…'
                     : 'Salir del partido'
                   : isPenaltyFree(match.hora)
                   ? `Salir del partido (−${leavePenaltyFor(match.hora)} pts)`
@@ -1666,7 +1673,7 @@ export default function MatchDetailScreen({ route, navigation }) {
               tone="danger"
               onPress={doLeave}
               height={52}
-              disabled={busy || !online}
+              disabled={busy || !online || !costoListo}
             />
             <Pressable onPress={() => setSheet(null)} style={{ height: 40, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={styles.sheetBack}>Me quedo en el partido</Text>
@@ -1680,10 +1687,23 @@ export default function MatchDetailScreen({ route, navigation }) {
             tone="danger"
             text={
               ts
-                ? textoCostoSalida(costoSalida) || 'Calculando lo que te cuesta salir ahora…'
+                ? costo.estado === 'listo'
+                  ? textoCostoSalida(costo.costo)
+                  : costo.estado === 'cargando'
+                  ? 'Calculando lo que te cuesta salir ahora…'
+                  : costo.error
                 : `Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
             }
           />
+          {ts && costo.estado === 'error' ? (
+            <Pressable
+              onPress={costo.reintentar}
+              accessibilityRole="button"
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <Text style={styles.retryLink}>Reintentar</Text>
+            </Pressable>
+          ) : null}
           <Requisito tone="gold" text="Tu cupo se libera y vuelve a aparecer en Partidos" />
           <Requisito text="Avisamos a los jugadores confirmados y al primero de la lista de espera" />
           <Requisito text="Pierdes el acceso al chat del partido" />
@@ -1913,6 +1933,7 @@ const styles = StyleSheet.create({
   trustBox: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 12, gap: 8 },
   trustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   trustLabel: { fontSize: 11.5, fontFamily: F.semiBold, color: C.textSecondary },
+  retryLink: { fontSize: 12.5, fontFamily: F.bold, color: C.green },
   trustValue: { fontSize: 12.5, fontFamily: F.bold, color: C.textPrimary },
   trustTrack: { height: 6, borderRadius: 3, backgroundColor: C.chip, overflow: 'hidden' },
   trustHint: { fontSize: 11, lineHeight: 16, color: C.textFaint },

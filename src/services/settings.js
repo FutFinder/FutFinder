@@ -75,13 +75,30 @@ export async function deleteAccount() {
   return { error };
 }
 
-export async function getTrustScoreHistory(limit = 50) {
-  if (!isSupabaseConfigured) return { data: [], error: null };
-  const { data, error } = await supabase
+/**
+ * El historial antiguo de Trust Score, por páginas.
+ *
+ * Aquí `id` es un uuid, no una secuencia, así que la clave de paginación es
+ * `created_at`. Y va con `lte`, no con `lt`: dos movimientos del mismo
+ * segundo caen en el mismo valor, y con `lt` el segundo se perdía al cruzar
+ * el borde de la página. Repetir el empate es barato; perder una fila del
+ * historial, no. Quien llama fusiona por `id` y las repetidas se descartan.
+ *
+ * @param {number} limit filas por página
+ * @param {{ antesDe?: string|null }} opciones `created_at` de la última fila
+ * @returns {{ data: object[], error: object|null, hayMas: boolean }}
+ */
+export async function getTrustScoreHistory(limit = 50, { antesDe = null } = {}) {
+  if (!isSupabaseConfigured) return { data: [], error: null, hayMas: false };
+  let q = supabase
     .from('trust_score_history')
-    .select('id, change_amount, reason, created_at')
+    .select('id, change_amount, reason, created_at');
+  if (antesDe) q = q.lte('created_at', antesDe);
+  const { data, error } = await q
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(limit);
   if (error) console.error('[FutFinder] getTrustScoreHistory:', error);
-  return { data: data || [], error };
+  const filas = data || [];
+  return { data: filas, error, hayMas: !error && filas.length === limit };
 }
