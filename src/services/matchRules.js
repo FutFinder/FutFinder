@@ -16,6 +16,8 @@
  * completa queda alineada.
  */
 
+import { nombrePuntaje } from '../utils/trueScore.js';
+
 /**
  * Umbral de anticipación y castigos de Trust Score.
  *
@@ -542,8 +544,8 @@ export function getBlockReason(ctx) {
   if (minTrust > 0 && typeof myTrust === 'number' && myTrust < minTrust) {
     return {
       code: 'trust_bajo',
-      title: 'No cumples el Trust Score mínimo',
-      detail: `Este partido pide ${minTrust} o más y tu Trust Score actual es ${myTrust}.`,
+      title: `No cumples el ${nombrePuntaje()} mínimo`,
+      detail: `Este partido pide ${minTrust} o más y tu ${nombrePuntaje()} actual es ${myTrust}.`,
       trust: { actual: myTrust, requerido: minTrust },
       actions: ['verSinMinimo', 'publicar', 'buscarOtros'],
     };
@@ -785,7 +787,7 @@ export function getCtaState(ctx) {
     return {
       kind: 'en_espera',
       label: `En lista de espera · N° ${myWaitlist.posicion}`,
-      hint: `Si se libera un cupo te avisamos y tienes ${WAITLIST_CONFIRM_MINUTES} min para confirmar. Salir de la lista no afecta tu Trust Score.`,
+      hint: `Si se libera un cupo te avisamos y tienes ${WAITLIST_CONFIRM_MINUTES} min para confirmar. Salir de la lista no afecta tu ${nombrePuntaje()}.`,
       tone: 'gold',
     };
   }
@@ -808,7 +810,7 @@ export function getCtaState(ctx) {
     return {
       kind: 'espera',
       label: 'Entrar a la lista de espera',
-      hint: `Los ${match.cupos_totales} cupos están tomados. Salir de la lista no afecta tu Trust Score.`,
+      hint: `Los ${match.cupos_totales} cupos están tomados. Salir de la lista no afecta tu ${nombrePuntaje()}.`,
       tone: 'outline',
       block,
       disabled: online === false,
@@ -867,7 +869,7 @@ export function validateDraft(draft, step = null) {
       e.duracion = 'Elige una duración';
     }
     if (!TRUST_OPTS.some((t) => t.value === Number(draft.minTrust))) {
-      e.minTrust = 'Elige un Trust Score mínimo válido';
+      e.minTrust = `Elige un ${nombrePuntaje()} mínimo válido`;
     }
 
     const errorEdad = validarRangoEdad(draft.edadMin, draft.edadMax);

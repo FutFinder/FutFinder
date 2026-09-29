@@ -34,7 +34,7 @@ import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
 import { useTrueScoreAjustes } from '../services/trueScore';
-import { etiquetaTier } from '../utils/trueScore';
+import { etiquetaTier, nombrePuntajeDe } from '../utils/trueScore';
 
 function greetingFor(d = new Date()) {
   const h = d.getHours();
@@ -48,6 +48,7 @@ export default function HomeScreen({ navigation }) {
   // Los niveles y sus umbrales los manda el servidor; la portada los pinta.
   const ajustesTS = useTrueScoreAjustes();
   const ts = !!ajustesTS.fase1;
+  const nombreTS = nombrePuntajeDe(ts);
 
   // `window.confirm` no abre nada en web: diálogo propio de la app.
   /**
@@ -270,7 +271,7 @@ export default function HomeScreen({ navigation }) {
   const quickActions = [
     { label: 'Buscar partido', hint: 'Filtros avanzados', onPress: () => navigation.navigate('Main', { screen: 'SearchTab' }) },
     { label: '¿Te falta un jugador?', hint: '¡Encuentra al jugador que necesitas!', onPress: () => navigation.navigate('CreateMatch') },
-    { label: 'Mi historial',   hint: `${ts ? 'TrueScore' : 'Trust Score'} y reseñas`, onPress: () => navigation.navigate('TrustScoreHistory') },
+    { label: 'Mi historial',   hint: `${nombreTS} y reseñas`, onPress: () => navigation.navigate('TrustScoreHistory') },
     { label: 'Explorar clubes', hint: 'Únete a un equipo', onPress: () => navigation.navigate('Main', { screen: 'ClubsTab' }) },
   ];
 
@@ -319,7 +320,7 @@ export default function HomeScreen({ navigation }) {
             summary={summary}
             greeting={greetingFor()}
             trustScore={trustScore}
-            trustLabel={ts ? 'TRUESCORE' : 'TRUST'}
+            trustLabel={nombreTS.toUpperCase()}
             verified={verified}
             clubRoleLabel={clubRoleLabel}
           />
@@ -391,7 +392,7 @@ export default function HomeScreen({ navigation }) {
               <SectionHeader title="Reputación" />
               <TrustScoreCard
                 score={trustScore}
-                nombre={ts ? 'Tu TrueScore' : 'Tu Trust Score'}
+                nombre={`Tu ${nombreTS}`}
                 matchesPlayed={partidosJugados}
                 reports={reports}
                 verified={verified}

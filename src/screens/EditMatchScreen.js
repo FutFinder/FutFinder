@@ -71,6 +71,8 @@ import { useOnline, isNetworkError } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
 import { REGIONES, getComunasOfRegion, matchComuna } from '../data/regiones-chile';
 import { shorten } from '../components/partidos/FiltersSheet';
+import { useTrueScoreAjustes } from '../services/trueScore';
+import { nombrePuntajeDe } from '../utils/trueScore';
 import {
   CUPOS,
   DESC_MAX,
@@ -97,6 +99,9 @@ import {
  *   · Nunca se toca la lista de confirmados ni las solicitudes pendientes.
  */
 export default function EditMatchScreen({ route, navigation }) {
+  // Cómo se llama el puntaje, según el flag que responde el servidor.
+  const nombreTS = nombrePuntajeDe(!!useTrueScoreAjustes().fase1);
+
   const matchId = route?.params?.matchId;
   const insets = useSafeAreaInsets();
   const online = useOnline();
@@ -721,7 +726,7 @@ export default function EditMatchScreen({ route, navigation }) {
               ) : null}
             </Field>
 
-            <Field label="Trust Score mínimo">
+            <Field label={`${nombreTS} mínimo`}>
               <View style={styles.wrap}>
                 {TRUST_OPTS.map((t) => (
                   <OptionChip
@@ -885,7 +890,7 @@ export default function EditMatchScreen({ route, navigation }) {
             }
           />
           <Bullet text="Nadie pierde su cupo y las solicitudes pendientes se mantienen" />
-          <Bullet text="Quien ya no pueda ir tendrá que salirse, con las reglas normales de Trust Score" />
+          <Bullet text={`Quien ya no pueda ir tendrá que salirse, con las reglas normales de ${nombreTS}`} />
         </Card>
       </Sheet>
 

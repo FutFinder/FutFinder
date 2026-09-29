@@ -10,6 +10,50 @@
  * probarlo con `node --test`.
  */
 
+/*
+ * CÓMO SE LLAMA EL PUNTAJE, EN UN SOLO SITIO.
+ *
+ * La app mantiene los dos mundos: con `truescore_fase1` encendido el puntaje
+ * se llama TrueScore, y con el flag apagado sigue siendo el Trust Score de
+ * antes. El nombre estaba escrito a mano en una treintena de rótulos, así que
+ * con la fase activa el jugador leía «TrueScore» en Perfil y «Trust Score
+ * mínimo» dos pantallas más allá, para el mismo número.
+ *
+ * Quién lo fija: `getTrueScoreAjustes()` llama a `fijarNombrePuntaje()` en
+ * cuanto el servidor responde. Esto NO decide nada, sólo recuerda la última
+ * respuesta —igual que el caché de ajustes del servicio—, y así las funciones
+ * puras de `matchRules.js` y `matches.js` pueden escribir el nombre correcto
+ * sin importar React ni Supabase y sin cambiar sus firmas.
+ *
+ * Antes de la primera respuesta vale «Trust Score», que es lo que la app ya
+ * mostraba mientras los ajustes cargaban.
+ */
+const NOMBRE_ANTIGUO = 'Trust Score';
+const NOMBRE_NUEVO = 'TrueScore';
+let nombreActivo = NOMBRE_ANTIGUO;
+
+/** Lo llama el servicio con la respuesta de `truescore_ajustes`. */
+export function fijarNombrePuntaje(fase1) {
+  nombreActivo = fase1 ? NOMBRE_NUEVO : NOMBRE_ANTIGUO;
+}
+
+/**
+ * El nombre para un flag que ya se tiene a mano.
+ *
+ * Es la que usan los componentes, con el `fase1` del hook: así el rótulo se
+ * vuelve a pintar cuando llegan los ajustes. `nombrePuntaje()` lee el valor
+ * recordado y no avisa a nadie de que cambió, así que sólo sirve fuera de
+ * React —en las reglas puras— donde no hay render que rehacer.
+ */
+export function nombrePuntajeDe(fase1) {
+  return fase1 ? NOMBRE_NUEVO : NOMBRE_ANTIGUO;
+}
+
+/** «TrueScore» o «Trust Score», según la última respuesta del servidor. */
+export function nombrePuntaje() {
+  return nombreActivo;
+}
+
 /**
  * El nivel de un puntaje según la tabla que manda el servidor
  * (`niveles`, de mayor a menor). Devuelve null si no hay tabla: sin TrueScore

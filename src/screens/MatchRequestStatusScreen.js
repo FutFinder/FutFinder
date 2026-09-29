@@ -37,6 +37,8 @@ import { suscribirseANomina } from '../services/clubRoster';
 import { useOnline } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
 import { cuotaLabel } from '../services/matchRules';
+import { useTrueScoreAjustes } from '../services/trueScore';
+import { nombrePuntajeDe } from '../utils/trueScore';
 
 /**
  * «Mi solicitud» (variante 4b del handoff).
@@ -46,6 +48,9 @@ import { cuotaLabel } from '../services/matchRules';
  * esté confirmado, y así se dice explícitamente.
  */
 export default function MatchRequestStatusScreen({ route, navigation }) {
+  // Cómo se llama el puntaje, según el flag que responde el servidor.
+  const nombreTS = nombrePuntajeDe(!!useTrueScoreAjustes().fase1);
+
   const matchId = route?.params?.matchId;
   const insets = useSafeAreaInsets();
   const online = useOnline();
@@ -247,7 +252,7 @@ export default function MatchRequestStatusScreen({ route, navigation }) {
                 height={46}
                 disabled={busy || !online}
               />
-              <Note>Cancelar una solicitud no afecta tu Trust Score.</Note>
+              <Note>Cancelar una solicitud no afecta tu {nombreTS}.</Note>
             </View>
           ) : (
             <GhostButton label="Volver al partido" onPress={() => goBackOrPartidos(navigation)} height={50} />

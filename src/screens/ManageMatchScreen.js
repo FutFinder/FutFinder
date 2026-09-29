@@ -69,6 +69,7 @@ import {
 } from '../services/trueScore';
 import {
   marcasCompletas,
+  nombrePuntajeDe,
   plazoAsistenciaAbierto,
   sufijoCosto,
   textoCostoCancelacion,
@@ -115,6 +116,7 @@ export default function ManageMatchScreen({ route, navigation }) {
   // cancelación y aparece la expulsión. Apagado, la pantalla es la de siempre.
   const ajustes = useTrueScoreAjustes();
   const ts = !!ajustes.fase1;
+  const nombreTS = nombrePuntajeDe(ts);
 
   const [tab, setTab] = useState(route?.params?.tab || 'solicitudes');
   const [match, setMatch] = useState(null);
@@ -293,7 +295,7 @@ export default function ManageMatchScreen({ route, navigation }) {
     say(
       'success',
       'Asistencia guardada',
-      'El Trust Score de cada jugador se actualizó según lo que marcaste.'
+      `El ${nombreTS} de cada jugador se actualizó según lo que marcaste.`
     );
     await load();
   };
@@ -963,7 +965,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                   tone="green"
                   icon={ListChecks}
                   title="Marca quién asistió"
-                  text="Esto alimenta el Trust Score real de cada jugador, así que solo marca lo que viste en la cancha."
+                  text={`Esto alimenta el ${nombreTS} real de cada jugador, así que solo marca lo que viste en la cancha.`}
                 />
               )}
 

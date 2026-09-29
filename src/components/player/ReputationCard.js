@@ -10,7 +10,7 @@ import {
   alfa,
 } from '../../theme/colors';
 import { useTrueScoreAjustes } from '../../services/trueScore';
-import { nivelTrueScore } from '../../utils/trueScore';
+import { nivelTrueScore, nombrePuntajeDe } from '../../utils/trueScore';
 
 // Color del nivel de TrueScore, desde la única paleta.
 const TONO_NIVEL = { verde: C.green, amarillo: C.amber, rojo: C.red };
@@ -37,7 +37,7 @@ export default function ReputationCard({ rating, trust, fairplay = null }) {
   const nivel =
     ajustes.fase1 && trust.pct !== null ? nivelTrueScore(trust.value, ajustes.niveles) : null;
   const tono = nivel ? TONO_NIVEL[nivel.color] || C.green : C.green;
-  const nombre = ajustes.fase1 ? 'TrueScore' : 'Trust Score';
+  const nombre = nombrePuntajeDe(ajustes.fase1);
   return (
     <View style={styles.card}>
       <View style={styles.left}>

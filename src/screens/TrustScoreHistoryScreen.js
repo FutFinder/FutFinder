@@ -23,6 +23,7 @@ import {
   describirEvento,
   fusionarHistorial,
   nivelTrueScore,
+  nombrePuntajeDe,
   puedeReclamar,
   textoEstadoReclamo,
 } from '../utils/trueScore';
@@ -109,6 +110,7 @@ export default function TrustScoreHistoryScreen({ navigation }) {
   const [reclamando, setReclamando] = useState(null);
   const [aviso, setAviso] = useState(null);
   const ts = !!ajustes?.fase1;
+  const nombreTS = nombrePuntajeDe(ts);
   const nivel = ts ? nivelTrueScore(trustScore, ajustes.niveles) : null;
   const colorNivel =
     nivel?.color === 'amarillo' ? C.amber : nivel?.color === 'rojo' ? C.red : C.green;
@@ -201,7 +203,7 @@ export default function TrustScoreHistoryScreen({ navigation }) {
         >
           <ArrowLeft color={C.textPrimary} size={20} />
         </Pressable>
-        <Text style={styles.headerTitle}>{ts ? 'TrueScore' : 'Trust Score'}</Text>
+        <Text style={styles.headerTitle}>{nombreTS}</Text>
         <View style={{ width: 40 }} />
       </View>
 

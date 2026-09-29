@@ -67,6 +67,7 @@ import ReclamosDelPartido from '../components/partidos/ReclamosDelPartido';
 import { useCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
 import {
   TEXTO_REGLA_SALIDA_TS,
+  nombrePuntajeDe,
   sufijoCosto,
   textoComoSubir,
   textoCostoSalida,
@@ -172,6 +173,9 @@ export default function MatchDetailScreen({ route, navigation }) {
   // interpolada por horas de aviso); la pantalla sólo lo muestra.
   const ajustesTS = useTrueScoreAjustes();
   const ts = !!ajustesTS.fase1;
+  // Cómo se llama el puntaje en esta instalación. Sale del flag del hook, no
+  // del valor recordado del módulo, para que el rótulo se repinte al llegar.
+  const nombreTS = nombrePuntajeDe(ts);
   // Nadie confirma una salida sin saber lo que cuesta: el botón espera al
   // servidor y, si la consulta falla, ofrece reintentar en vez de seguir.
   const costo = useCostoSalida(matchId, { activo: ts && sheet === 'leave' });
@@ -558,7 +562,7 @@ export default function MatchDetailScreen({ route, navigation }) {
         say('error', 'No pudimos sacarte de la lista', res?.error?.message || '');
         return;
       }
-      say('success', 'Saliste de la lista de espera', 'Esto no afecta tu Trust Score.');
+      say('success', 'Saliste de la lista de espera', `Esto no afecta tu ${nombreTS}.`);
       await load();
     });
 
@@ -572,13 +576,12 @@ export default function MatchDetailScreen({ route, navigation }) {
       }
       setSheet(null);
       const pts = res.penalty ?? (ts ? 0 : leavePenaltyFor(match.hora));
-      const nombre = ts ? 'TrueScore' : 'Trust Score';
       say(
         'success',
         'Saliste del partido',
         pts > 0
-          ? `Se liberó tu cupo y avisamos al grupo. Tu ${nombre} bajó ${pts} ${pts === 1 ? 'punto' : 'puntos'}.`
-          : `Se liberó tu cupo y avisamos al grupo. Sin efecto en tu ${nombre}.`
+          ? `Se liberó tu cupo y avisamos al grupo. Tu ${nombreTS} bajó ${pts} ${pts === 1 ? 'punto' : 'puntos'}.`
+          : `Se liberó tu cupo y avisamos al grupo. Sin efecto en tu ${nombreTS}.`
       );
       await load();
     });
@@ -895,7 +898,7 @@ export default function MatchDetailScreen({ route, navigation }) {
             <StatCell value={`${match.duracion_min ?? 90}'`} label="DURACIÓN" />
             <StatCell
               value={trustLabel(match)}
-              label="TRUST"
+              label={ts ? 'TRUESCORE' : 'TRUST'}
               small={(match.min_trust_score ?? 0) === 0}
               highlight={(match.min_trust_score ?? 0) > 0}
             />
@@ -1070,7 +1073,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                 tone={match.aprobacion === 'manual' ? 'gold' : 'green'}
               />
               {(match.min_trust_score ?? 0) > 0 ? (
-                <DetailRow label="Trust Score mínimo" value={trustLabel(match)} />
+                <DetailRow label={`${nombreTS} mínimo`} value={trustLabel(match)} />
               ) : null}
               <DetailRow label="Rango de edad" value={edadLabel(match)} />
               <DetailRow
@@ -1210,8 +1213,8 @@ export default function MatchDetailScreen({ route, navigation }) {
                 ok
                 text={
                   (match.min_trust_score ?? 0) > 0
-                    ? `Trust Score ${match.min_trust_score} o más`
-                    : 'Sin Trust Score mínimo — cualquiera puede unirse'
+                    ? `${nombreTS} ${match.min_trust_score} o más`
+                    : `Sin ${nombreTS} mínimo — cualquiera puede unirse`
                 }
               />
               <Requisito
@@ -1260,7 +1263,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                 {block.trust ? (
                   <View style={styles.trustBox}>
                     <View style={styles.trustRow}>
-                      <Text style={styles.trustLabel}>Tu Trust Score</Text>
+                      <Text style={styles.trustLabel}>Tu {nombreTS}</Text>
                       <Text style={styles.trustValue}>
                         {block.trust.actual} / {block.trust.requerido}
                       </Text>
@@ -1301,7 +1304,11 @@ export default function MatchDetailScreen({ route, navigation }) {
                   <AltRow
                     icon={Trophy}
                     title="Publicar tu propio partido"
-                    sub="Organizar también suma Trust Score"
+                    sub={
+                      ts
+                        ? 'Confirmar la asistencia a tiempo cuida tu TrueScore'
+                        : 'Organizar también suma Trust Score'
+                    }
                     onPress={() => navigation.navigate('CreateMatch')}
                   />
                 </View>
@@ -1314,7 +1321,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                       restricción. El enlace queda, sin prometer de más. */}
                   <AltRow
                     icon={Info}
-                    title={ts ? 'Ver mi historial de TrueScore' : 'Ver mi historial de Trust Score'}
+                    title={`Ver mi historial de ${nombreTS}`}
                     sub="Cada movimiento de tu puntaje"
                     onPress={() => navigation.navigate('TrustScoreHistory')}
                   />
@@ -1508,8 +1515,8 @@ export default function MatchDetailScreen({ route, navigation }) {
               disabled={busy || !online}
             />
             <Note>
-              Serías el número {waitlist.length + 1}. Puedes salir cuando quieras, sin efecto en tu
-              Trust Score.
+              Serías el número {waitlist.length + 1}. Puedes salir cuando quieras, sin efecto en
+              tu {nombreTS}.
             </Note>
           </View>
         ) : (
@@ -1645,7 +1652,7 @@ export default function MatchDetailScreen({ route, navigation }) {
           <Divider />
           <Requisito ok text={`Si se libera un cupo avisamos al primero de la lista`} />
           <Requisito ok text={`Tienes ${WAITLIST_CONFIRM_MINUTES} min para confirmar cuando te toque`} />
-          <Requisito ok text="Salir de la lista no afecta tu Trust Score" />
+          <Requisito ok text={`Salir de la lista no afecta tu ${nombreTS}`} />
           <Requisito text="Si te aceptan en otro partido a esta hora, te sacamos de esta lista" />
         </Card>
       </Sheet>

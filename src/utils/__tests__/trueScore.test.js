@@ -389,3 +389,54 @@ test('T05: ninguna pantalla vuelve a culpar al puntaje de una restricción', () 
   );
   assert.deepEqual(culpables.map((f) => path.basename(f)), []);
 });
+
+// ============================================================ el nombre
+//
+// El puntaje se llamaba de dos maneras a la vez: con la fase 1 activa Perfil
+// decía «TrueScore» y el wizard de publicación, «Trust Score mínimo», para el
+// mismo número. El nombre pasa a salir de un solo sitio.
+
+const { fijarNombrePuntaje, nombrePuntaje, nombrePuntajeDe } = require('../trueScore.js');
+
+test('el nombre sale del flag, en sus dos épocas', () => {
+  assert.equal(nombrePuntajeDe(true), 'TrueScore');
+  assert.equal(nombrePuntajeDe(false), 'Trust Score');
+});
+
+test('antes de la primera respuesta del servidor vale el nombre antiguo', () => {
+  // Es lo que la app ya mostraba mientras los ajustes cargaban: el hook
+  // devuelve APAGADO hasta que `truescore_ajustes` contesta.
+  fijarNombrePuntaje(false);
+  assert.equal(nombrePuntaje(), 'Trust Score');
+});
+
+test('cuando el servidor dice fase 1, el nombre recordado cambia para todos', () => {
+  fijarNombrePuntaje(true);
+  assert.equal(nombrePuntaje(), 'TrueScore');
+  // Y se puede volver atrás: apagar el flag devuelve el nombre antiguo.
+  fijarNombrePuntaje(false);
+  assert.equal(nombrePuntaje(), 'Trust Score');
+});
+
+test('las reglas puras escriben el nombre activo, no uno fijo', () => {
+  const R = require('../../services/matchRules.js');
+  const ctx = {
+    match: { id: 'm-1', estado: 'abierto', hora: '2099-01-01T12:00:00Z', cupos_disponibles: 4, min_trust_score: 80 },
+    myId: 'u-1',
+    myProfile: { trust_score: 50 },
+    online: true,
+  };
+
+  fijarNombrePuntaje(true);
+  const conTs = R.getBlockReason(ctx);
+  assert.equal(conTs.code, 'trust_bajo');
+  assert.match(conTs.title, /TrueScore/);
+  assert.match(conTs.detail, /TrueScore/);
+  assert.doesNotMatch(conTs.title, /Trust Score/);
+
+  fijarNombrePuntaje(false);
+  const sinTs = R.getBlockReason(ctx);
+  assert.match(sinTs.title, /Trust Score/);
+
+  fijarNombrePuntaje(false);
+});

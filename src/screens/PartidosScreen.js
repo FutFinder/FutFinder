@@ -79,6 +79,8 @@ import {
 } from '../services/connectivity';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { DIST_OPTS } from '../services/matchRules';
+import { useTrueScoreAjustes } from '../services/trueScore';
+import { nombrePuntajeDe } from '../utils/trueScore';
 
 const CACHE_KEY = 'partidos/open';
 
@@ -115,6 +117,9 @@ const EDAD_JUG_OPTS = [
  * porque nadie publicó en la zona).
  */
 export default function PartidosScreen({ navigation, route }) {
+  // Cómo se llama el puntaje, según el flag que responde el servidor.
+  const nombreTS = nombrePuntajeDe(!!useTrueScoreAjustes().fase1);
+
   const online = useOnline();
   const scrollRef = useRef(null);
 
@@ -416,7 +421,7 @@ export default function PartidosScreen({ navigation, route }) {
         ],
         filters.sinMinimoTrust && [
           { ...filters, sinMinimoTrust: false },
-          'Incluir partidos con Trust Score mínimo',
+          `Incluir partidos con ${nombreTS} mínimo`,
         ],
       ].filter(Boolean);
 
@@ -432,7 +437,7 @@ export default function PartidosScreen({ navigation, route }) {
     return () => {
       vivo = false;
     };
-  }, [mode, loading, filtered.length, filters, text, applyFilterSet]);
+  }, [mode, loading, filtered.length, filters, text, applyFilterSet, nombreTS]);
 
   // ---------------------------------------------------------- jugadores
 

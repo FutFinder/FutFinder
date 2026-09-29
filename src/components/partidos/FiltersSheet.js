@@ -13,6 +13,8 @@ import {
 } from '../../theme/colors';
 import { DIST_OPTS, EDAD_PRESETS, MODALIDADES, NIVELES } from '../../services/matchRules';
 import { REGIONES, getComunasOfRegion } from '../../data/regiones-chile';
+import { useTrueScoreAjustes } from '../../services/trueScore';
+import { nombrePuntajeDe } from '../../utils/trueScore';
 
 /**
  * Hoja de filtros del listado de Partidos (variante 1d del handoff).
@@ -76,6 +78,9 @@ export function countActiveFilters(f) {
 }
 
 export default function FiltersSheet({ visible, onClose, filters, onApply, previewCount }) {
+  // Cómo se llama el puntaje, según el flag que responde el servidor.
+  const nombreTS = nombrePuntajeDe(!!useTrueScoreAjustes().fase1);
+
   const [temp, setTemp] = useState(filters);
   const [picker, setPicker] = useState(null); // 'region' | 'comuna'
 
@@ -281,7 +286,7 @@ export default function FiltersSheet({ visible, onClose, filters, onApply, previ
         </Group>
 
         {/* Trust Score mínimo del partido */}
-        <Group label="Trust Score">
+        <Group label={nombreTS}>
           <View style={styles.row}>
             <OptionChip
               label="Cualquiera"

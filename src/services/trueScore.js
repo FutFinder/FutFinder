@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from './supabase';
-import { estadoCostoSalida } from '../utils/trueScore';
+import { estadoCostoSalida, fijarNombrePuntaje } from '../utils/trueScore.js';
 
 /**
  * Frontera de la app con TrueScore (migración 134).
@@ -30,6 +30,9 @@ export async function getTrueScoreAjustes({ forzar = false } = {}) {
     if (error || !data) return cache || APAGADO;
     cache = data;
     cacheAt = Date.now();
+    // Desde acá los rótulos de toda la app saben cómo llamar al puntaje,
+    // incluidos los que escriben funciones puras sin acceso a los ajustes.
+    fijarNombrePuntaje(!!data.fase1);
     return data;
   })();
   return enVuelo;

@@ -63,7 +63,7 @@ import {
  *
  * Lo que el jugador confirmado necesita el día del partido: dónde es, cuánto
  * llevar, con quién juega, cómo llegar, el chat y la salida con su regla de
- * Trust Score explicada antes de tocar nada.
+ * puntaje explicada antes de tocar nada.
  */
 export default function MatchSpotScreen({ route, navigation }) {
   const matchId = route?.params?.matchId;

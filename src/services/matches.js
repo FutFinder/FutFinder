@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
 import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
 import { aplicarOrdenYCursor } from '../utils/paginacionPartidos.js';
+import { nombrePuntaje } from '../utils/trueScore.js';
 import { aceptaACualquiera, rangoDeFecha } from './matchRules';
 
 /**
@@ -767,7 +768,7 @@ function translateJoinError(msg = '') {
   }
   const m = msg.match(/TRUST_BAJO:(\d+):(\d+)/);
   if (m) {
-    return `Trust Score insuficiente: este partido pide ${m[2]} y tú tienes ${m[1]}.`;
+    return `${nombrePuntaje()} insuficiente: este partido pide ${m[2]} y tú tienes ${m[1]}.`;
   }
   return null;
 }

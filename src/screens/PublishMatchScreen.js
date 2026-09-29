@@ -90,6 +90,8 @@ import {
   validateDraft,
 } from '../services/matchRules';
 import { shorten } from '../components/partidos/FiltersSheet';
+import { useTrueScoreAjustes } from '../services/trueScore';
+import { nombrePuntajeDe } from '../utils/trueScore';
 
 const REGION_DEFAULT = 'Región Metropolitana de Santiago';
 
@@ -138,6 +140,9 @@ function initialDraft() {
  * redirige a la edición: publicar y editar son flujos distintos.
  */
 export default function PublishMatchScreen({ navigation, route }) {
+  // Cómo se llama el puntaje, según el flag que responde el servidor.
+  const nombreTS = nombrePuntajeDe(!!useTrueScoreAjustes().fase1);
+
   const insets = useSafeAreaInsets();
   const online = useOnline();
   const scrollRef = useRef(null);
@@ -611,7 +616,7 @@ export default function PublishMatchScreen({ navigation, route }) {
                 <ErrorHint>{errors.duracion}</ErrorHint>
               </Field>
 
-              <Field label="Trust Score mínimo para unirse" onLayout={registerPos('minTrust')}>
+              <Field label={`${nombreTS} mínimo para unirse`} onLayout={registerPos('minTrust')}>
                 {TRUST_OPTS.map((t) => (
                   <RadioRow
                     key={t.value}
@@ -875,7 +880,7 @@ export default function PublishMatchScreen({ navigation, route }) {
                   />
                   <ToggleRow
                     title="Pedir confirmación de asistencia"
-                    desc="Al terminar te pedimos marcar quién asistió. Afecta el Trust Score del grupo."
+                    desc={`Al terminar te pedimos marcar quién asistió. Afecta el ${nombreTS} del grupo.`}
                     value={draft.pedirAsistencia}
                     onChange={(v) => set({ pedirAsistencia: v })}
                     last
@@ -909,7 +914,7 @@ export default function PublishMatchScreen({ navigation, route }) {
                     value={cuotaLabel(draft.cuota === '' ? 0 : Number(draft.cuota))}
                     tone="green"
                   />
-                  <DetailRow label="Trust Score mínimo" value={trustLabel({ min_trust_score: Number(draft.minTrust) })} />
+                  <DetailRow label={`${nombreTS} mínimo`} value={trustLabel({ min_trust_score: Number(draft.minTrust) })} />
                   <DetailRow label="Rango de edad" value={edadLabel(resolveEdadAsMatch(draft))} />
                   <DetailRow
                     label="Aprobación"
