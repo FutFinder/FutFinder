@@ -198,20 +198,32 @@ export default function MatchDetailScreen({ route, navigation }) {
   const cacheKey = `partidos/detail/${matchId}`;
 
   const load = useCallback(async () => {
-    const [attRes, user, profile, status, conf, wl, loc, misClubes] = await Promise.all([
+    const [attRes, user, profile, status, conf, wl, misClubes] = await Promise.all([
       getMatchAttendees(matchId).catch((e) => ({ data: [], match: null, error: e })),
       getCurrentUser(),
       getMyProfile().catch(() => null),
       getMyAccountStatus().catch(() => null),
       getScheduleConflict(matchId).catch(() => ({ conflict: false })),
       getWaitlist(matchId).catch(() => ({ data: [] })),
-      getCurrentLocation(),
       getMyClubIds().catch(() => ({ data: [] })),
     ]);
 
     // Aparte del Promise.all: solo tiene sentido en un partido de clubes y
     // el servidor responde `aplica: false` en cualquier otro.
     canchaDelPartido(matchId).then(({ data }) => setCancha(data || null)).catch(() => setCancha(null));
+
+    /*
+     * La ubicación TAMBIÉN va aparte (G01). Sólo sirve para escribir la
+     * distancia a la cancha, así que nada de lo que se ve depende de ella; y
+     * dentro del `Promise.all` era lo único que podía no contestar nunca y
+     * dejar la pantalla en su esqueleto para siempre. Ahora llega cuando
+     * llegue, o no llega, y el partido se dibuja igual.
+     */
+    getCurrentLocation()
+      .then((loc) => {
+        if (loc?.ok) setUserCoords({ lat: loc.latitude, lng: loc.longitude });
+      })
+      .catch(() => {});
 
     setMyId(user?.id || null);
     // `getMyProfile()` devuelve el perfil plano; le sumamos el estado de cuenta
@@ -223,7 +235,6 @@ export default function MatchDetailScreen({ route, navigation }) {
     });
     setConflict(conf?.conflict ? conf : null);
     setWaitlist(wl?.data || []);
-    if (loc?.ok) setUserCoords({ lat: loc.latitude, lng: loc.longitude });
     setMisClubIds(misClubes?.data || []);
 
     if (attRes.error || !attRes.match) {

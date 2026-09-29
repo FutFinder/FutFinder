@@ -192,13 +192,60 @@ export default function PartidosScreen({ navigation, route }) {
 
   // ------------------------------------------------------------- carga
 
+  /**
+   * La ubicación, por su cuenta y sin bloquear a nadie.
+   *
+   * Escribe la distancia y el encuadre inicial del mapa. Si no llega —permiso
+   * denegado, o un navegador que no contesta— la pantalla se queda con el
+   * encuadre de Santiago y marca `locationDenied`, que es lo que ya hacía.
+   * `getCurrentLocation()` siempre termina desde G01, pero aun así no se
+   * espera: el listado no tiene por qué depender de ella.
+   */
+  const pedirUbicacion = useCallback(() => {
+    getCurrentLocation()
+      .then((loc) => {
+        if (loc?.ok) {
+          setUserCoords({ lat: loc.latitude, lng: loc.longitude });
+          setLocationDenied(false);
+          setMapRegion((prev) =>
+            prev || {
+              latitude: loc.latitude,
+              longitude: loc.longitude,
+              latitudeDelta: 0.08,
+              longitudeDelta: 0.08,
+            }
+          );
+        } else {
+          setUserCoords(null);
+          setLocationDenied(true);
+          setMapRegion((prev) =>
+            prev || {
+              latitude: -33.4489,
+              longitude: -70.6693,
+              latitudeDelta: 0.2,
+              longitudeDelta: 0.2,
+            }
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoadError(null);
     // Una búsqueda nueva reemplaza el listado entero, así que el error de la
     // página siguiente deja de tener a qué referirse.
     setErrorMas(null);
     const turno = secuencia.abrir();
-    const [res, loc, user, status, misClubes] = await Promise.all([
+    /*
+     * La ubicación va FUERA del `Promise.all` (G01). Sólo alimenta la
+     * distancia y el encuadre del mapa: ningún partido depende de ella para
+     * aparecer. Dentro, era lo único que podía no contestar nunca y dejaba la
+     * pantalla en «Buscando…» para siempre. Ahora el listado no la espera.
+     */
+    pedirUbicacion();
+
+    const [res, user, status, misClubes] = await Promise.all([
       // Los filtros que la base sabe resolver van EN la consulta: antes se
       // traían los N partidos más próximos y se filtraba después, así que uno
       // que calzaba pero caía fuera de esos N era invisible. `lleno` también
@@ -207,7 +254,6 @@ export default function PartidosScreen({ navigation, route }) {
       buscarPartidos({ filtros: filtrosRef.current, texto: textoRef.current, limite: PAGINA }).catch(
         (e) => ({ data: [], hayMas: false, error: e })
       ),
-      getCurrentLocation(),
       getCurrentUser(),
       getMyAccountStatus().catch(() => null),
       getMyClubIds().catch(() => ({ data: [] })),
@@ -227,30 +273,6 @@ export default function PartidosScreen({ navigation, route }) {
     setMyUserId(user?.id || null);
     setMisClubIds(misClubes?.data || []);
     setSuspended(status?.suspended ? status : null);
-
-    if (loc?.ok) {
-      setUserCoords({ lat: loc.latitude, lng: loc.longitude });
-      setLocationDenied(false);
-      setMapRegion((prev) =>
-        prev || {
-          latitude: loc.latitude,
-          longitude: loc.longitude,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        }
-      );
-    } else {
-      setUserCoords(null);
-      setLocationDenied(true);
-      setMapRegion((prev) =>
-        prev || {
-          latitude: -33.4489,
-          longitude: -70.6693,
-          latitudeDelta: 0.2,
-          longitudeDelta: 0.2,
-        }
-      );
-    }
 
     if (res.error) {
       const net = isNetworkError(res.error);
@@ -276,7 +298,7 @@ export default function PartidosScreen({ navigation, route }) {
 
     setLoading(false);
     setRefreshing(false);
-  }, [secuencia]);
+  }, [secuencia, pedirUbicacion]);
 
   /** La página siguiente, sin perder lo que ya está en pantalla. */
   const cargarMas = useCallback(async () => {

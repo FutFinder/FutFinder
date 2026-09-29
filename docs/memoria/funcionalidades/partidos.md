@@ -47,6 +47,8 @@ Con `truescore_fase3`: «Calificar jugadores» ofrece «Reportar a este jugador�
 
 ## Estados, errores y problemas conocidos
 
+**La ubicación no bloquea ninguna pantalla** (2026-09-29). `getCurrentLocation()` pasa por `conPlazo()` de `src/utils/geolocalizacion.js`, que garantiza que la promesa termina aunque la API de abajo no conteste: el Chrome de una de las Macs, con el permiso denegado, no llamaba a ninguno de los dos callbacks de `getCurrentPosition` y su propia opción `timeout` tampoco saltaba, así que la promesa quedaba viva dentro del `Promise.all` de la carga y el detalle del partido y Partidos se quedaban cargando para siempre. Además la ubicación salió del `Promise.all` en las dos: sólo alimenta la distancia y el encuadre del mapa, así que ningún contenido la espera. La regla general: el plazo de una API ajena no es nuestro plazo.
+
 Se muestran estados de carga, vacío, sin red, sin ubicación y bloqueos accionables. Si faltan columnas o RPC de la migración 33, el servicio entrega un mensaje de migración pendiente. La conservación de cancelados y chat de sólo lectura depende de la migración 34 aplicada en el entorno; no puede verificarse desde este repositorio.
 
 ## Notas relacionadas
