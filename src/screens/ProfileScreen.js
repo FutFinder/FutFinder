@@ -174,12 +174,12 @@ export default function ProfileScreen({ navigation, route }) {
       const targetId = propio ? uid : viewUserId;
 
       if (!targetId) {
-        setLoadError(propio ? 'sin-sesion' : 'no-existe');
+        setLoadError(propio ? 'sin-sesion' : 'no-disponible');
         setLoading(false);
         return;
       }
 
-      const [p, h, ph, rs, acc, reportes] = await Promise.all([
+      const [pRes, h, ph, rs, acc, reportes] = await Promise.all([
         propio ? getMyProfile() : getProfileById(viewUserId),
         getAttendanceHistoryFor(targetId, HISTORIAL_LIMITE),
         getProfilePhotos(targetId),
@@ -188,8 +188,20 @@ export default function ProfileScreen({ navigation, route }) {
         countReportsAgainst(targetId),
       ]);
 
+      // El perfil propio sigue llegando pelado; el ajeno viaja como
+      // { data, error } para poder separar «falló la carga» de «no está
+      // disponible». Antes las dos salían como «este jugador no existe».
+      const p = propio ? pRes : pRes?.data || null;
+      const errorPerfil = propio ? null : pRes?.error || null;
+
+      if (errorPerfil) {
+        setLoadError('perfil');
+        setLoading(false);
+        return;
+      }
+
       if (!p) {
-        setLoadError(propio ? 'perfil' : 'no-existe');
+        setLoadError(propio ? 'perfil' : 'no-disponible');
         setLoading(false);
         return;
       }
@@ -431,35 +443,35 @@ export default function ProfileScreen({ navigation, route }) {
         <View style={styles.errorWrap}>
           <EmptyStateCard
             icon={
-              loadError === 'no-existe' ? (
+              loadError === 'no-disponible' ? (
                 <UserX color={C.loss} size={18} strokeWidth={2} />
               ) : (
                 <AlertCircle color={C.loss} size={18} strokeWidth={2} />
               )
             }
             title={
-              loadError === 'no-existe'
-                ? 'Este jugador no existe'
+              loadError === 'no-disponible'
+                ? 'Este perfil no está disponible'
                 : loadError === 'sin-sesion'
                   ? 'Inicia sesión para ver tu perfil'
                   : 'No pudimos cargar el perfil'
             }
             subtitle={
-              loadError === 'no-existe'
-                ? 'La cuenta pudo haberse eliminado.'
+              loadError === 'no-disponible'
+                ? 'Puede ser un perfil privado o una cuenta que ya no existe.'
                 : loadError === 'sin-sesion'
                   ? 'Tu sesión no está activa. Inicia sesión para continuar.'
                   : 'Revisa tu conexión e inténtalo otra vez.'
             }
             actionLabel={
-              loadError === 'no-existe'
+              loadError === 'no-disponible'
                 ? 'Volver'
                 : loadError === 'sin-sesion'
                   ? 'Iniciar sesión'
                   : 'Reintentar'
             }
             onAction={
-              loadError === 'no-existe'
+              loadError === 'no-disponible'
                 ? () => navigation.goBack()
                 : loadError === 'sin-sesion'
                   ? () => (navigation.getParent() || navigation).reset({

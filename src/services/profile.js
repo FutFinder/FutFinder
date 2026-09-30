@@ -71,15 +71,38 @@ export async function getMyAccountStatus() {
   };
 }
 
+/**
+ * Perfil de otra persona. Devuelve `{ data, error }` porque `null` a
+ * secas mezclaba TRES cosas distintas y la pantalla las contaba todas
+ * como «este jugador no existe»:
+ *
+ *   · la cuenta no existe;
+ *   · existe pero no la puedo leer —desde la migración 143 el perfil se
+ *     lee por relación, así que un desconocido que apagó «Visible en
+ *     búsquedas» es privado, no inexistente—;
+ *   · falló la consulta y no se sabe ninguna de las dos cosas.
+ *
+ * El tercero se distingue por `error`. Los otros dos NO se distinguen, y
+ * es a propósito: la fila negada por RLS y la fila ausente se ven igual
+ * desde acá, y separarlas obligaría al servidor a confirmar que esa
+ * cuenta existe — justo lo que el interruptor viene a evitar. Por eso la
+ * pantalla dice «no está disponible» y no arriesga cuál de las dos es.
+ *
+ * `PGRST116` es «cero filas» de `.single()`: eso NO es un error de
+ * carga, es la ausencia.
+ */
 export async function getProfileById(id) {
-  if (!isSupabaseConfigured) return null;
+  if (!isSupabaseConfigured) return { data: null, error: null };
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', id)
-    .single();
-  if (error) return null;
-  return data;
+    .maybeSingle();
+  if (error && error.code !== 'PGRST116') {
+    console.error('[FutFinder] getProfileById:', error);
+    return { data: null, error };
+  }
+  return { data: data || null, error: null };
 }
 
 /**

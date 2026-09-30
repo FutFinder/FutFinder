@@ -141,14 +141,24 @@ export async function listPartidosDeMisClubes(clubIds, { limitePorClub = 5 } = {
 export async function withOrganizers(matches) {
   const list = matches || [];
   if (!isSupabaseConfigured || list.length === 0) return list;
-  const ids = [...new Set(list.map((m) => m.id_organizador).filter(Boolean))];
+  const ids = [...new Set(list.map((m) => m.id).filter(Boolean))];
   if (!ids.length) return list;
-  const { data: profs } = await supabase
-    .from('profiles')
-    .select('id, username, foto_url, trust_score')
-    .in('id', ids);
-  const byId = new Map((profs || []).map((p) => [p.id, p]));
-  return list.map((m) => ({ ...m, organizador: byId.get(m.id_organizador) || null }));
+  // Va por RPC y no por `profiles` desde la migración 144: con la 143, un
+  // organizador que apagó «Visible en búsquedas» ya no se lee sin
+  // relación, y la tarjeta perdía su nombre en silencio. La función
+  // entrega sólo usuario, foto y puntaje, y sólo de los partidos que
+  // quien mira puede ver.
+  const { data: profs } = await supabase.rpc('organizadores_publicos', { p_match_ids: ids });
+  const porPartido = new Map((profs || []).map((p) => [p.id_partido, p]));
+  return list.map((m) => {
+    const o = porPartido.get(m.id);
+    return {
+      ...m,
+      organizador: o
+        ? { id: o.id, username: o.username, foto_url: o.foto_url, trust_score: o.trust_score }
+        : null,
+    };
+  });
 }
 
 /**
