@@ -1,6 +1,6 @@
 # Pendientes
 
-Última revisión: 2026-09-23
+Última revisión: 2026-09-30
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
@@ -167,6 +167,32 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Acción:** distribuir un build con ese cambio y **después** volver a activar «Letters, digits and symbols» en Authentication → Sign In / Providers → Email.
 - **Verificación necesaria:** contra el servidor, que `contrasenalarga` vuelva a dar 422 por `characters` y que una válida siga dando 200; y que la app muestre qué falta, no un mensaje genérico.
 - **Relacionado:** la protección de contraseñas filtradas (HaveIBeenPwned) del advisor **no se puede activar**: es de plan Pro o superior y la organización está en `free`. Cuando se suba de plan no necesita ningún cambio en la app.
+
+## P2 — «No aparecer en búsquedas» no lo aplica el servidor
+
+- **Dominio afectado:** perfil, privacidad y cualquier pantalla que lea `profiles`.
+- **Evidencia (revisión global del 2026-09-22):** `privacy_visible_in_search` se usa sólo como filtro del cliente en `searchPlayersQuery`, y la política de lectura de `profiles` es `profiles_read_all USING (true)`. Cualquier usuario autenticado puede leer cualquier perfil consultando la tabla directamente, así que el interruptor promete algo que la base no sostiene.
+- **Por qué no se corrigió junto al resto de esa revisión:** restringir esa política afecta a todo lo que lee perfiles —nóminas de club, participantes de chat, tarjetas de rival, búsqueda—, y exige decidir antes qué columnas son públicas y para quién. Es un cambio de diseño, no una corrección.
+- **Acción:** decidir el contrato público de `profiles` (qué columnas, para qué rol) y recién entonces escribir la política y el filtro del servidor.
+- **Verificación necesaria:** con dos cuentas, una con el interruptor apagado no aparece en la búsqueda **ni** por consulta directa a la tabla, y las nóminas, los chats y las tarjetas de rival siguen mostrando lo que necesitan.
+
+## P3 — Cada partido publicado deja una fila en `public.canchas` que su autor no puede borrar
+
+- **Dominio afectado:** directorio de canchas y datos de prueba.
+- **Evidencia (auditoría de Partidos del 2026-09-15):** el trigger `trg_register_cancha` crea una entrada en `public.canchas` por cada partido publicado, y la cuenta que la creó no tiene permiso para eliminarla. Las entradas que dejaron esa auditoría y las comprobaciones posteriores se borraron a mano desde el panel.
+- **Por qué importa:** el directorio acumula residuos de partidos de prueba y de canchas escritas con error, sin ninguna vía de limpieza dentro de la app. Además, esa FK sin cascada ya tapó un fallo real en el arnés de concurrencia de la agenda (ver `pruebas.md`).
+- **Acción:** decidir si el directorio se cura (dueño, permiso de borrado o baja lógica) o si el trigger deja de escribir por cada partido. Va emparentado con el P1 de arriba: `canchas` y `tg_register_cancha` tampoco están versionados.
+- **Verificación necesaria:** publicar y borrar un partido de prueba no deja fila huérfana, o existe un camino documentado para retirarla.
+
+## P4 — Restos del rediseño de Clubes que nunca se cerraron
+
+- **Dominio afectado:** portada y ficha de club, perfil público.
+- **Contexto:** el rediseño se integró a `main` —`src/contexts/ClubsHomeContext.js`, `ClubsScreen`, `clubsHomeTasks.js`— y la rama `rediseno/portada-clubes` ya no existe. De su handoff quedaron tres cosas sin cerrar; las otras dos que anotaba (el `window.confirm` de salir del club y los `role="radio"` sin `aria-checked`) **sí** se corrigieron y se comprobó que ya no están en el código.
+- **Lo que sigue abierto:**
+  1. `ClubDetailScreen.js:346` navega a `EditClub` pasando el club como objeto. Funciona en memoria, pero el enlace no sobrevive a compartirse ni a una recarga profunda en web.
+  2. El perfil público de un administrador de club mostraba «CLUB — Sin club» (`PlayerHeroCard.js:134` usa `clubNombre || 'Sin club'`). **No verificado con sesión iniciada:** puede ser privacidad deliberada; hay que comprobarlo antes de tocar nada.
+  3. Dieciocho comprobaciones manuales del checklist del rediseño nunca se corrieron: E6–E9 (varios clubes y persistencia), H5–H6 (pila de navegación), K1 (los cuatro temas), L1–L2 (error total), M2–M6 (responsive), C3–C4, D7 y N3. Necesitan sesión iniciada y datos sembrados.
+- **Verificación necesaria:** para (1), que `EditClub` se abra desde una URL con el identificador del club; para (2), mirar el perfil público de una cuenta administradora antes de decidir; para (3), recorrer los dieciocho puntos con datos sembrados.
 
 ## Notas relacionadas
 

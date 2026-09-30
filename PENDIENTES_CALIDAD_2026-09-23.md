@@ -114,7 +114,7 @@ Los casos que dependen de errores de red, respuestas fuera de orden, más de 50 
 
 ## Correcciones de TrueScore y teléfono (2026-09-25)
 
-Sesión de implementación sobre el encargo [`ENCARGO_CLAUDE_CODE_TRUESCORE_2026-09-25.md`](ENCARGO_CLAUDE_CODE_TRUESCORE_2026-09-25.md). Se corrigieron los siete casos T01–T07 y se añadieron 30 pruebas nuevas.
+Sesión de implementación del encargo de TrueScore del 2026-09-25. Se corrigieron los siete casos T01–T07 y se añadieron 30 pruebas nuevas. (El archivo del encargo se retiró el 2026-09-30, al quedar los siete cerrados con prueba en vivo; el estado de cada uno vive en la tabla de arriba.)
 
 - `npm run lint` terminó con **0 errores** y las 25 advertencias conocidas. `npm test` pasó **1.616/1.616** pruebas (antes 1.586). `npm run build:web` exportó el paquete sin errores y la app arrancó en `localhost:8081` sin errores de consola.
 - Contra la instancia, por consulta de **solo lectura**: `truescore_ajustes()` devuelve fases 1–3 activas, `puntaje_inicial` 75 y la tabla de niveles donde 75 es «Confiable»; las 32 cuentas existentes tienen exactamente un evento «inicio» con puntaje 75 y ninguna asistencia, que es el caso que T01 escondía tras «N.A.»; `profiles` no tiene ninguna columna de motivo de restricción y no hay ninguna cuenta suspendida. **No se escribió nada ni se tocó ningún flag.**
