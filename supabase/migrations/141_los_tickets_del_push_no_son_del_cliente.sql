@@ -1,0 +1,58 @@
+-- =============================================================
+-- FutFinder migration 141: los tickets del push no son del cliente
+-- =============================================================
+-- `public.push_tickets` guarda una fila por token al que se le mandó un
+-- mensaje, con el ticket que devolvió Expo y, más tarde, el receipt. La
+-- migración 38 que la creó lo dejó escrito en su propio comentario:
+--
+--     «Sin policies a propósito: solo service_role (edge function) y el
+--      SECURITY DEFINER de abajo tocan esta tabla, nunca el cliente.»
+--
+-- La intención estaba bien. Los PERMISOS no la acompañaron: la tabla
+-- conserva el `grant all` por defecto de Supabase, así que hoy
+-- `authenticated` tiene select, insert, update, delete y truncate, y
+-- `anon` tiene select. La 113 le quitó a `anon` las escrituras junto con
+-- las de otras 56 tablas, pero a `authenticated` no se le tocó nada —y
+-- con razón: esa migración decía, explícitamente, que `authenticated`
+-- escribe por sus políticas. El problema es que acá no hay políticas.
+--
+-- LO QUE NO ES: un agujero abierto. Se comprobó el 2026-09-30 contra la
+-- instancia: la tabla es de `postgres`, `authenticated` no tiene
+-- `bypassrls`, y RLS activa sin ninguna política niega todo. Un select
+-- del cliente devuelve cero filas y un insert se rechaza. La tabla está
+-- en cero filas.
+--
+-- LO QUE SÍ ES, Y POR ESO SE CIERRA: el permiso y la política dicen cosas
+-- distintas sobre la misma tabla. El día que alguien agregue una política
+-- —para que una pantalla muestre si el aviso llegó, por ejemplo— esos
+-- cinco privilegios se vuelven efectivos de golpe, con el alcance más
+-- ancho posible. Quien escriba esa política estará pensando en la
+-- lectura que necesita, no en el `truncate` que heredó sin saberlo. Y el
+-- `truncate` NO pasa por RLS: es la excepción del motor que ya motivó la
+-- 113.
+--
+-- Las siete tablas hermanas que el advisor lista junto a ésta
+-- —`fairplay_reportes`, `fairplay_revisiones`, `feature_flags`,
+-- `perfil_telefonos`, `truescore_config`, `truescore_reclamos` y
+-- `truescore_reclamo_confirmaciones`— ya están así, con doble candado:
+-- RLS sin políticas y ni un `grant` al cliente. `push_tickets` es la
+-- única que quedó fuera, y sólo porque es de agosto y aquéllas son de
+-- septiembre.
+--
+-- LO QUE NO SE TOCA: `push_tokens` y `notifications` tienen la misma
+-- forma de permisos, y ahí SÍ corresponde — la app registra su token y
+-- lee y marca sus avisos, por políticas que existen. Esta migración es
+-- de una sola tabla a propósito.
+--
+-- `service_role` conserva todo: es el rol con el que la Edge Function
+-- `send-push` inserta los tickets. `check_push_receipts()` es
+-- `security definer` y de `postgres`, así que lee y escribe la tabla como
+-- su dueño y no depende de ningún grant del cliente.
+--
+-- Idempotente: seguro de re-ejecutar.
+-- =============================================================
+
+revoke all on public.push_tickets from public, anon, authenticated;
+
+comment on table public.push_tickets is
+  'Un ticket de Expo por token al que se le mandó un push (migración 38). Sin políticas y sin privilegios de cliente a propósito (migración 141): sólo la escriben service_role desde send-push y check_push_receipts(), que es security definer.';
