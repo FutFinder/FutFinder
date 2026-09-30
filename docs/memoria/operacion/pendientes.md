@@ -6,11 +6,26 @@ Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios
 
 La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Avisos y Ajustes el 2026-09-23 está en [`PENDIENTES_CALIDAD_2026-09-23.md`](../../../PENDIENTES_CALIDAD_2026-09-23.md). Ese documento distingue los casos reproducidos de los detectados por flujo de código y no los considera corregidos.
 
+## Repaso del 2026-09-30
+
+Los diecisiete pendientes abiertos se volvieron a contrastar, uno por uno, contra el código y contra `jvfoendzblkoxvwvommz` con consultas de **sólo lectura**. No se escribió nada. **Ninguno se puede cerrar**, pero cuatro cambiaron de tamaño y apareció uno nuevo:
+
+- **El esquema sin versionar se encogió de 16 objetos a 9**, sin que nadie lo persiguiera: migraciones posteriores redefinieron siete de ellos con `create or replace`, que en una base nueva los crea igual. Detalle en su propio ítem.
+- **Las funciones de trigger ejecutables por `authenticated` crecieron de 41 a 42, y el total de 43 a 52.** Es exactamente lo que ese ítem advertía que iba a pasar: el disparador de la 115 cierra lo nuevo a `public` y `anon`, no a `authenticated`, así que la lista se alimenta sola con cada migración.
+- **El historial de clubes ya no está vacío:** hay un resultado `confirmado` y un desafío `finalizado`. La comprobación visual que faltaba ya se puede hacer mirando datos reales, sin sembrar nada.
+- **Los partidos de clubes pasaron de 7 a 9**, los nueve en `recreativo` por omisión.
+- **Nuevo:** `push_tickets` conserva permisos de escritura para `authenticated` que sus siete tablas hermanas no tienen. Ver el ítem al final.
+
+Lo que se confirmó **sin cambios**: la política `profiles_read_all` sigue en `true`; las tres funciones de la cancha siguen validando sólo por rango y ninguna menciona el cero; `canchas` sigue con una única política, `canchas_select_any`, y 17 filas que nadie puede borrar; `historial_publico_club()` sigue sin un solo consumidor; `MatchMap.web.js` sigue devolviendo `null`; la migración 46 sigue sin arnés de dos sesiones; y no existe ni `reabrir_disputa` ni ninguna pantalla de moderación. Las dos colas que dependen de una persona están **vacías hoy** —cero revisiones de sanción pendientes y cero resultados en disputa—, así que el hueco no ha llegado a doler.
+
+No se pudieron comprobar desde acá: la entrega push en un teléfono y los tipos de carácter de la contraseña, las dos por falta de entorno nativo y de un build distribuido.
+
 ## P1 — El esquema desplegado tiene objetos que ninguna migración versiona
 
 - **Dominio afectado:** base de datos, recuperación de entornos y cualquier cambio que toque partidos, asistentes o avisos.
-- **Evidencia (comprobada el 2026-08-10 contra `jvfoendzblkoxvwvommz`):** dieciséis objetos existen en la base y en ninguna migración del repositorio — `canchas`, `search_canchas`, `tg_register_cancha`, `norm_text`, `recalc_user_ratings`, `tg_ratings_recalc`, `create_notification`, `tg_enforce_join_rules`, `tg_match_future_only`, `tg_notify_match_join`, `tg_notify_friend_request`, `tg_notify_message_new`, `reactivate_suspended`, `tg_auto_suspend`, `send_match_reminders`, `send_rating_reminders` — más las columnas `profiles.estado` y `profiles.suspended_until` y los cron `futfinder-match-reminders`, `futfinder-rating-reminders` y `futfinder-reactivate`.
-- **Por qué importa:** tres de ellos condicionan cualquier código nuevo que cree partidos o inscriba jugadores. `tg_match_future_only` rechaza insertar un partido con hora pasada; `tg_enforce_join_rules` valida suspensión, Trust Score y choque de horario antes de aceptar un asistente; `create_notification()` es el ayudante que conviene reutilizar en vez de insertar en `notifications` a mano.
+- **Evidencia (2026-08-10, revisada el 2026-09-30 contra `jvfoendzblkoxvwvommz`):** eran dieciséis objetos existentes en la base y ausentes de toda migración. **Hoy quedan nueve:** la tabla `canchas` y las funciones `search_canchas`, `norm_text`, `recalc_user_ratings`, `tg_ratings_recalc`, `create_notification`, `tg_match_future_only`, `tg_notify_friend_request` y `tg_notify_message_new`. Siguen fuera, además, las columnas `profiles.estado` y `profiles.suspended_until` y los tres cron `futfinder-match-reminders`, `futfinder-rating-reminders` y `futfinder-reactivate`.
+- **Los siete que se versionaron solos**, porque una migración posterior los redefinió con `create or replace` —que en una base nueva los crea igual—: `tg_register_cancha` (44b), `tg_enforce_join_rules` (45, 103, 104, 105, 109, 134, 138), `tg_notify_match_join` (45), `reactivate_suspended` y `tg_auto_suspend` (134), `send_match_reminders` y `send_rating_reminders` (128). **Ojo:** eso versiona el CUERPO de la función, no necesariamente su `create trigger`; al escribir la migración de recuperación hay que comprobar cada disparador aparte.
+- **Por qué importa:** dos de los que quedan condicionan cualquier código nuevo que cree partidos o inscriba jugadores. `tg_match_future_only` rechaza insertar un partido con hora pasada y `create_notification()` es el ayudante que conviene reutilizar en vez de insertar en `notifications` a mano. (`tg_enforce_join_rules`, el tercero de esa lista, ya quedó versionado.)
 - **Acción:** volcar esos objetos a una migración de recuperación para que una base nueva pueda reconstruirse desde el repositorio.
 - **Verificación necesaria:** una base creada sólo desde `supabase/` levanta sin objetos ausentes y las pruebas SQL pasan.
 
@@ -49,6 +64,7 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Evidencia:** `send-push` tiene pruebas de lógica y SQL, mientras que el registro de push nativo se omite en web y simuladores; la entrega final depende de permisos, Expo, tokens, webhook y cron remotos.
 - **Acción:** configurar el archivo de servicios Android/secretos EAS y los servicios remotos autorizados; probar registro, preferencias, recepción y tratamiento de token inválido en hardware físico.
 - **Verificación necesaria:** una matriz Android/iOS en dispositivos físicos confirma permisos, token, una categoría permitida, una bloqueada por preferencia y la recuperación ante token inválido. Las pruebas web no cierran este pendiente.
+- **No se puede avanzar desde la Mac en la que se trabaja hoy:** no tiene Xcode ni el SDK de Android, así que ni siquiera se llega a un build para instalar.
 
 ## P1 — No existe interfaz de moderación: las revisiones de sanción se resuelven a mano
 
@@ -80,7 +96,7 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 > **El servidor está demostrado de punta a punta; lo que falta es la aceptación visual.** El recorrido completo —propuesta, confirmación por el club contrario, `matches` y `club_challenges` en `finalizado`, `club_record()`, `club_estadisticas()` e `historial_club()`— lo recorren tres arneses contra el esquema aplicado: `48_resultado_test.sql` 19/19, `49_historial_test.sql` 13/13 y `50_una_sola_puerta_test.sql` 8/8, todos con `rollback`. Lo que ninguno puede ver es la pantalla.
 
 - **Dominio afectado:** historial y estadísticas del club (migraciones 48 a 50b, Tareas 6.1 a 6.3).
-- **Evidencia (comprobada el 2026-08-17 contra `jvfoendzblkoxvwvommz`):** `club_match_results` tiene **cero filas**, así que hoy todos los perfiles muestran el estado vacío —«Aún no hay partidos en el historial»—, que es el comportamiento correcto y no un fallo.
+- **Evidencia (2026-08-17, actualizada el 2026-09-30):** entonces `club_match_results` tenía **cero filas** y todos los perfiles mostraban el estado vacío. **Ahora hay una fila `confirmado` y un desafío `finalizado`**, así que el historial de esos dos clubes ya se dibuja con datos reales: los pasos 1 a 5 de abajo **ya no hay que montarlos**, basta abrir los dos perfiles y mirar. Lo que sigue sin datos es el paso 7, el del resultado rechazado: hay cero desafíos en `resultado_en_disputa`.
 - **Por qué importa:** es el mismo hueco que encontraron las comprobaciones manuales de U5.1 y U5.2, y las dos veces apareció un fallo real de interfaz que ninguna prueba SQL podía ver. Acá lo que falta por mirar es el corte de los nombres largos junto al marcador, las dos líneas de contexto en 390 px, y la fecha y la hora con el reloj del dispositivo.
 - **Pasos exactos, con dos cuentas (A y B, cada una administradora de un club):**
   1. Con A, desafiar al club de B; con B, aceptar. Acordar y aprobar la propuesta hasta que el partido quede publicado.
@@ -102,7 +118,7 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 ## P3 — El nivel de un encuentro entre clubes no se acuerda en ninguna parte
 
 - **Dominio afectado:** desafíos entre clubes y el historial del club.
-- **Evidencia (comprobada el 2026-08-17 contra `jvfoendzblkoxvwvommz`):** `club_challenges` no tiene columna de nivel, `club_challenge_proposals` tampoco —se acuerdan fecha, cancha, modalidad, cupos, método de inscripción y cuota— y `aprobar_propuesta()` (migración 44) crea el `matches` sin `nivel`, así que queda el `default 'recreativo'` de la tabla. Los **7** partidos de clubes que existen están todos en `recreativo`, ninguno por elección.
+- **Evidencia (comprobada el 2026-08-17 contra `jvfoendzblkoxvwvommz`):** `club_challenges` no tiene columna de nivel, `club_challenge_proposals` tampoco —se acuerdan fecha, cancha, modalidad, cupos, método de inscripción y cuota— y `aprobar_propuesta()` (migración 44) crea el `matches` sin `nivel`, así que queda el `default 'recreativo'` de la tabla. Los partidos de clubes que existen —**9** al 2026-09-30, eran 7— están todos en `recreativo`, ninguno por elección. Comprobado ese día: ninguna de las dos tablas tiene columna de nivel.
 - **Por qué importa:** la Tarea 6.2 mostraba ese campo en la tarjeta del historial como «tipo de partido», así que un encuentro competitivo se leía «Recreativo». Es un valor por defecto disfrazado de dato, exactamente lo que la 6.2 vino a quitar del historial. En la 6.3 se dejó de mostrar: `historial_club()` sigue devolviendo la columna, pero el cliente no la pinta (ver `NIVEL_POR_OMISION` en `src/utils/historialClub.js`).
 - **Acción:** decidir si el nivel se acuerda en la propuesta —quién lo elige, si se negocia como la hora y la cuota, y si condiciona algo— y sólo entonces agregarlo. Volver a mostrarlo son dos líneas: `tipoLabel` en `normalizarPartido()` y la prop en `MatchHistoryCard`.
 - **Verificación necesaria:** un encuentro creado con nivel competitivo se lee «Competitivo» en el historial de los dos clubes, y uno anterior a ese cambio no miente.
@@ -126,7 +142,7 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 ## P2 — Recuperar trazabilidad de las tablas base no creadas en el historial versionado
 
 - **Dominio afectado:** base de datos y recuperación de entornos.
-- **Evidencia:** `notifications`, `push_tokens` y `ratings` son consumidas por servicios y migraciones posteriores, pero su creación inicial no aparece en `supabase/schema.sql` ni en las migraciones presentes.
+- **Evidencia (reconfirmada el 2026-09-30):** `notifications`, `push_tokens`, `ratings` y también `canchas` existen en la base y son consumidas por servicios y migraciones posteriores, pero su creación inicial no aparece en `supabase/schema.sql` ni en ninguna migración. Es la misma falta que el P1 de arriba, visto desde las tablas.
 - **Acción:** identificar la fuente de esquema autorizada y añadir una estrategia de aprovisionamiento o migración que preserve los entornos existentes.
 - **Verificación necesaria:** una base nueva puede crearse desde las fuentes versionadas y ejecutar las pruebas de avisos, push y calificaciones sin objetos ausentes.
 
@@ -151,10 +167,10 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Acción:** repetir el arnés de dos sesiones simultáneas que se usó en U3 (`FOR UPDATE NOWAIT`) para dos aceptaciones a la vez y para dos solicitudes a la vez.
 - **Verificación necesaria:** con dos sesiones, sólo una aceptación aplica el cambio y sólo una solicitud queda pendiente; la otra recibe el rechazo esperado y no deja fila.
 
-## P4 — 41 funciones de trigger siguen ejecutables por `authenticated`
+## P4 — 42 funciones de trigger siguen ejecutables por `authenticated`
 
 - **Dominio afectado:** todo el esquema; son funciones anteriores al ciclo de desafíos.
-- **Evidencia (revisada el 2026-09-18):** la mitad de `anon` YA ESTÁ CERRADA por la migración 114 — de 43 funciones de trigger en `public`, `anon` ejecuta 0. Lo que queda es `authenticated`: **41 de esas 43** siguen siendo ejecutables por el rol con sesión. El advisor lo refleja como 146 `authenticated_security_definer_function_executable`, donde la mayoría son RPC del cliente a propósito. Las que sobran son funciones de TRIGGER —`club_challenges_valida_rival`, `notify_*`, `tg_*`, `attendees_solo_rpc_de_clubes`, `matches_guard_cupos`…— que nadie debería poder invocar. Llamarlas directamente falla con `0A000 — trigger functions can only be called as triggers`, así que hoy no se les puede sacar nada; es superficie expuesta, no un agujero.
+- **Evidencia (2026-09-18, recontada el 2026-09-30):** la mitad de `anon` YA ESTÁ CERRADA por la migración 114 — de las **52** funciones de trigger que hoy tiene `public`, `anon` ejecuta **0**, igual que cuando eran 43. Lo que queda es `authenticated`: **42 de esas 52** siguen siendo ejecutables por el rol con sesión, una más que las 41 de hace doce días y sobre un total que creció en nueve con las migraciones de TrueScore. El advisor lo refleja como 146 `authenticated_security_definer_function_executable`, donde la mayoría son RPC del cliente a propósito. Las que sobran son funciones de TRIGGER —`club_challenges_valida_rival`, `notify_*`, `tg_*`, `attendees_solo_rpc_de_clubes`, `matches_guard_cupos`…— que nadie debería poder invocar. Llamarlas directamente falla con `0A000 — trigger functions can only be called as triggers`, así que hoy no se les puede sacar nada; es superficie expuesta, no un agujero.
 - **Acción:** una migración que revoque `execute` de `authenticated` sobre esas 41 —`public` y `anon` ya están hechos—, en un cambio propio y revisado. **Ojo con el disparador de la 115**: cierra lo nuevo a `public` y `anon`, NO a `authenticated`, así que esta lista vuelve a crecer sola con cada función de trigger que se añada. La 47b ya lo hizo con `club_challenges_valida_sancion()` y sirve de plantilla, incluido su arnés.
 - **Verificación necesaria:** además de comprobar los privilegios, cada trigger tiene que seguir disparando. Revocar el `EXECUTE` no lo desactiva —PostgreSQL comprueba ese privilegio al crear el trigger, no en cada disparo—, pero si alguna vez dejara de aplicarse una regla el fallo sería SILENCIOSO: ninguna pantalla se rompe, sólo se pierde la validación. `47b_valida_sancion_sin_execute_test.sql` muestra la forma de probarlo.
 
@@ -193,6 +209,15 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
   2. El perfil público de un administrador de club mostraba «CLUB — Sin club» (`PlayerHeroCard.js:134` usa `clubNombre || 'Sin club'`). **No verificado con sesión iniciada:** puede ser privacidad deliberada; hay que comprobarlo antes de tocar nada.
   3. Dieciocho comprobaciones manuales del checklist del rediseño nunca se corrieron: E6–E9 (varios clubes y persistencia), H5–H6 (pila de navegación), K1 (los cuatro temas), L1–L2 (error total), M2–M6 (responsive), C3–C4, D7 y N3. Necesitan sesión iniciada y datos sembrados.
 - **Verificación necesaria:** para (1), que `EditClub` se abra desde una URL con el identificador del club; para (2), mirar el perfil público de una cuenta administradora antes de decidir; para (3), recorrer los dieciocho puntos con datos sembrados.
+
+## P3 — `push_tickets` conserva permisos de escritura que sus siete tablas hermanas no tienen
+
+- **Dominio afectado:** avisos y push; superficie de la API.
+- **Evidencia (comprobada el 2026-09-30 contra `jvfoendzblkoxvwvommz`):** el advisor marca ocho tablas con RLS activa y **cero políticas** —`fairplay_reportes`, `fairplay_revisiones`, `feature_flags`, `perfil_telefonos`, `push_tickets`, `truescore_config`, `truescore_reclamo_confirmaciones` y `truescore_reclamos`—. Siete de ellas son correctas por diseño y tienen **doble candado**: RLS sin políticas y, además, ni un solo `grant` a `anon` o `authenticated`; sólo las escriben las RPC `security definer`. `push_tickets` es la excepción: conserva `select`, `insert`, `update`, `delete` y `truncate` para `authenticated`, y `select` para `anon`.
+- **Hoy no es un agujero, y eso está comprobado:** la tabla es de `postgres`, `authenticated` no tiene `bypassrls` y RLS activa sin ninguna política niega todo, así que nadie del cliente lee ni escribe. La tabla está en cero filas.
+- **Por qué importa igual:** el día que alguien agregue una política a `push_tickets` —para que una pantalla consulte el estado de entrega, por ejemplo— esos privilegios se vuelven efectivos de golpe y con el alcance más ancho posible, incluido `truncate`. El permiso y la política dicen cosas distintas sobre la misma tabla, y la que manda hoy es la que se escribió después.
+- **Acción:** revocar de `anon` y `authenticated` lo que la tabla no necesita, dejándola como las otras siete, en una migración propia. Si en cambio se decide que el cliente sí debe leerla, entonces escribir la política que lo diga y recortar el resto.
+- **Verificación necesaria:** el catálogo devuelve cero privilegios de escritura del cliente sobre `push_tickets`, y `send-push` —que la escribe con `service_role`— sigue registrando sus tickets.
 
 ## Notas relacionadas
 
