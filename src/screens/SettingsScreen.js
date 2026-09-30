@@ -698,7 +698,7 @@ export default function SettingsScreen({ navigation }) {
           <Row
             icon={Eye}
             title="Visible en búsquedas"
-            subtitle="Tu perfil aparece al buscar jugadores"
+            subtitle="Apareces al buscar jugadores. Tu perfil sigue visible desde clubes, partidos y chats"
             right={
               <Toggle
                 value={profile?.privacy_visible_in_search ?? true}

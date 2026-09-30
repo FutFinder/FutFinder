@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { buildSearchPlayersQuery } from '../utils/searchPlayersQuery';
+import { buildBuscarJugadoresParams } from '../utils/buscarJugadoresParams';
 
 /**
  * Servicio de perfil del jugador.
@@ -99,20 +99,20 @@ export async function getProfileById(id) {
 export async function searchPlayers(query, { limit = 30, filters = {} } = {}) {
   if (!isSupabaseConfigured) return { data: [], error: null };
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const myId = user?.id || null;
-
-  const { data, error } = await buildSearchPlayersQuery(supabase, query, filters, limit);
+  // La búsqueda la resuelve el servidor desde la migración 142: es él
+  // quien aplica «Visible en búsquedas», quien excluye mi propio perfil
+  // y quien topa el límite. Acá ya no se filtra nada; un filtro de este
+  // lado sería exactamente el problema que esa migración vino a cerrar.
+  const { data, error } = await supabase.rpc(
+    'buscar_jugadores',
+    buildBuscarJugadoresParams(query, filters, limit)
+  );
   if (error) {
     console.error('[FutFinder] searchPlayers:', error);
     return { data: [], error };
   }
 
-  // Excluir mi propio perfil de los resultados
-  const filtered = (data || []).filter((p) => p.id !== myId);
-  return { data: filtered, error: null };
+  return { data: data || [], error: null };
 }
 
 export async function updateMyProfile(patch) {

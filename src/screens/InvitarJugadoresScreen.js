@@ -22,10 +22,11 @@ import { motivoLegible, textosDeModalidad } from '../utils/pagoDividido';
  * amigos mucho más de lo que protege a nadie.
  *
  * EL BUSCADOR ABIERTO NO EXPONE NADA NUEVO. `searchPlayers` es el mismo que
- * ya usa la búsqueda de jugadores, y respeta `privacy_visible_in_search`:
- * quien apagó «visible en búsquedas» no aparece acá tampoco. La RLS de
- * `profiles` ya permite leer todos los perfiles, así que esto es comodidad,
- * no una puerta nueva.
+ * ya usa la búsqueda de jugadores y, desde la migración 142, la resuelve la
+ * RPC `buscar_jugadores()`: es el SERVIDOR el que deja fuera a quien apagó
+ * «Visible en búsquedas», no un filtro de este lado. La RLS de `profiles`
+ * sigue permitiendo leer todos los perfiles, así que esto es comodidad, no
+ * una puerta nueva.
  *
  * SE PUEDE ELEGIR A VARIOS Y SE MANDA UNA POR UNA, EN ORDEN. El servidor
  * corta cuando se acaban los cupos (`cupos_llenos`); en paralelo dos podrían

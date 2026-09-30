@@ -24,7 +24,7 @@ Centralizar preferencias de cuenta, privacidad, radio y categorías de avisos, a
 
 ## Reglas y permisos
 
-`privacy_friend_requests` controla RLS de inserción de amistad; `privacy_visible_in_search` se aplica en búsqueda. `notif_matches`, `notif_clubs`, `notif_chat` y `notif_friends` son la única fuente para elegir el push externo de cada tipo, no para borrar avisos internos. La RPC de borrado actúa sobre la identidad autenticada y elimina/ajusta datos relacionados antes de la cuenta.
+`privacy_friend_requests` controla RLS de inserción de amistad; `privacy_visible_in_search` **lo aplica el servidor desde la migración 142**, dentro de `buscar_jugadores()`, que es la única puerta de búsqueda de la app (`searchPlayers()` la llama y ya no arma la consulta). Antes el filtro vivía sólo en el cliente y se omitía consultando `profiles` directo. Por eso el interruptor dice ahora «Apareces al buscar jugadores. Tu perfil sigue visible desde clubes, partidos y chats»: mientras `profiles_read_all` sea `using (true)`, la promesa no puede ser la invisibilidad. `notif_matches`, `notif_clubs`, `notif_chat` y `notif_friends` son la única fuente para elegir el push externo de cada tipo, no para borrar avisos internos. La RPC de borrado actúa sobre la identidad autenticada y elimina/ajusta datos relacionados antes de la cuenta.
 
 El bloqueo de usuarios (migración 51) vive en `blocked_users`, no en `friendships.status`: ver [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md) para el porqué y el alcance real (qué corta y qué no).
 
