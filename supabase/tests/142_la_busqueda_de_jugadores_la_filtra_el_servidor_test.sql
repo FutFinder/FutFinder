@@ -2,12 +2,12 @@
 -- FutFinder — pruebas de la migración 142
 --
 -- Qué cubre:
---   1. CONTROL NEGATIVO, y es el caso que da sentido a todo lo demás:
---      la consulta DIRECTA a `profiles` —la que arma cualquiera con la
---      clave publicable— sigue devolviendo al jugador que apagó
---      «Visible en búsquedas». Si este caso dejara de pasar, sería
---      porque alguien cerró las filas de `profiles` y esta migración
---      quedó chica.
+--   1. La consulta DIRECTA a `profiles` ya NO devuelve al jugador que
+--      apagó «Visible en búsquedas». Este caso era al revés: mientras la
+--      142 fue la única corrección, comprobaba que la puerta vieja
+--      seguía abierta y que por eso el arreglo estaba incompleto a
+--      propósito. **La migración 143 la cerró el 2026-09-30**, así que
+--      ahora comprueba lo contrario — y las dos puertas dicen lo mismo.
 --   2. `buscar_jugadores()` NO lo devuelve, aunque el texto calce y
 --      tenga más trust_score que el visible.
 --   3. El visible sí aparece.
@@ -39,6 +39,7 @@ declare
   v_yo      uuid := gen_random_uuid();
   v_visible uuid := gen_random_uuid();
   v_oculto  uuid := gen_random_uuid();
+  v_tercero uuid := gen_random_uuid();
   v_marca   text := 'm142' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
   v_n       int;
   v_pudo    boolean;
@@ -51,14 +52,17 @@ begin
   )
   select '00000000-0000-0000-0000-000000000000', u, 'authenticated', 'authenticated',
          'm142-' || u || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
-    from unnest(array[v_yo, v_visible, v_oculto]) u;
+    from unnest(array[v_yo, v_visible, v_oculto, v_tercero]) u;
 
   -- El trigger de alta puede haber creado ya la fila de perfil.
   insert into public.profiles (id, username, privacy_visible_in_search, trust_score, region, comuna, edad, flanco, posicion_preferida)
   values
     (v_yo,      v_marca || 'yo',      true, 70, 'Region Test', 'Comuna Test', 25, 'derecho',   array['defensa']),
     (v_visible, v_marca || 'visible', true, 60, 'Region Test', 'Comuna Test', 30, 'ambos',     array['delantero']),
-    (v_oculto,  v_marca || 'oculto',  false, 99, 'Region Test', 'Comuna Test', 30, 'izquierdo', array['delantero'])
+    (v_oculto,  v_marca || 'oculto',  false, 99, 'Region Test', 'Comuna Test', 30, 'izquierdo', array['delantero']),
+    -- El tercero existe sólo para el caso 9: sin DOS candidatos visibles
+    -- que no sean yo, «pedir 2 y recibir 2» no puede medir nada.
+    (v_tercero, v_marca || 'tercero', true,  75, 'Region Test', 'Comuna Test', 28, 'derecho',   array['defensa'])
   on conflict (id) do update
     set username = excluded.username,
         privacy_visible_in_search = excluded.privacy_visible_in_search,
@@ -94,12 +98,15 @@ begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_yo, 'role', 'authenticated')::text, true);
 
-  -- ── Caso 1: CONTROL NEGATIVO — la tabla sigue abierta ─────────
+  -- ── Caso 1: la puerta vieja también está cerrada (migración 143)
+  -- `v_oculto` no comparte nada con quien busca, así que la política de
+  -- lectura por relación no lo deja pasar. Antes de la 143 esta misma
+  -- consulta devolvía su fila, y ése era el límite declarado de la 142.
   select count(*) into v_n
     from public.profiles
    where username like v_marca || '%' and privacy_visible_in_search is false;
-  if v_n <> 1 then
-    raise exception 'CASO 1 FALLA: la consulta directa a profiles ya no devuelve al oculto (%). Si se cerraron las filas, esta prueba hay que rehacerla', v_n;
+  if v_n <> 0 then
+    raise exception 'CASO 1 FALLA: la consulta directa a profiles todavía devuelve al oculto (%) — la política de la 143 no está puesta', v_n;
   end if;
 
   -- ── Caso 2: la RPC no devuelve al oculto ──────────────────────
@@ -149,11 +156,15 @@ begin
   if v_n <> 1 then
     raise exception 'CASO 7 FALLA: el filtro de posición dejó fuera al visible (% filas)', v_n;
   end if;
+  select count(*) into v_n from public.buscar_jugadores(v_marca, null, null, 'defensa');
+  if v_n <> 1 then
+    raise exception 'CASO 7 FALLA: el filtro de posición dejó fuera al tercero (% filas)', v_n;
+  end if;
 
   -- ── Caso 8: 'derecho' incluye a los 'ambos' ───────────────────
   select count(*) into v_n from public.buscar_jugadores(v_marca, null, null, null, 'derecho');
-  if v_n <> 1 then
-    raise exception 'CASO 8 FALLA: buscar flanco derecho no incluyó al que juega ambos (% filas)', v_n;
+  if v_n <> 2 then
+    raise exception 'CASO 8 FALLA: buscar flanco derecho tiene que traer al derecho Y al que juega ambos (% filas)', v_n;
   end if;
   select count(*) into v_n from public.buscar_jugadores(v_marca, null, null, null, 'ambos');
   if v_n <> 1 then
