@@ -28,6 +28,7 @@ import {
   listPartidosDeMisClubes,
 } from '../services/matches';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
+import { getMyLocation } from '../services/profile';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { getMyClubIds } from '../services/clubs';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
@@ -96,14 +97,14 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [{ data: list }, prof, user, misClubes] = await Promise.all([
+    const [{ data: list }, prof, user, misClubes, userCoords] = await Promise.all([
       listOpenMatches({ limit: 20 }),
       getCurrentProfile(),
       getCurrentUser(),
       getMyClubIds().catch(() => ({ data: [] })),
+      getMyLocation().catch(() => null),
     ]);
     const userId = user?.id || null;
-    const userCoords = prof?.latitud ? { lat: prof.latitud, lng: prof.longitud } : null;
     const radiusKm = prof?.search_radius_km ?? 10;
     const filtered = userCoords
       ? applyFilters(list || [], { maxKm: radiusKm }, userCoords)

@@ -181,6 +181,8 @@ export async function completeOnboarding({ latitud = null, longitud = null } = {
 
 /**
  * Guarda la ubicación GPS actual del usuario para no volver a pedirla.
+ * Viaja por el UPDATE del perfil, pero el servidor la desvía a
+ * `perfil_ubicaciones` (migración 139): en `profiles` queda siempre en null.
  */
 export async function saveMyLocation({ latitud, longitud }) {
   return updateMyProfile({
@@ -330,4 +332,18 @@ export function deriveStats(profile, history) {
     confirmados_historial: confirmados,
     ausencias_historial: ausencias,
   };
+}
+
+/**
+ * Mi ubicación guardada, o `null` si no hay. Es la única forma de leerla:
+ * desde la migración 139 no vive en `profiles`, que es de lectura pública.
+ * Devuelve { lat, lng } o null.
+ */
+export async function getMyLocation() {
+  if (!isSupabaseConfigured) return null;
+  const { data, error } = await supabase.rpc('mi_ubicacion');
+  if (error || !data) return null;
+  const lat = Number(data.latitud);
+  const lng = Number(data.longitud);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }

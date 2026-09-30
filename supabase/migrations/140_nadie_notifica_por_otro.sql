@@ -1,0 +1,27 @@
+-- =============================================================
+-- 140. NADIE CREA AVISOS A NOMBRE DE OTRO
+--
+-- La 98 le quitó `create_notification` a anon y se la dejó a
+-- `authenticated`, con este razonamiento: «la llaman por dentro
+-- approve_join, reject_join, request_join, swap_match, cancel_match_and_join,
+-- send_*_reminders y los triggers tg_notify_*». Esa premisa estaba errada:
+-- todas esas funciones son `security definer` y su dueño es `postgres`, así
+-- que por dentro llaman a `create_notification` COMO postgres, no como quien
+-- las invocó. El EXECUTE de `authenticated` no lo necesita ninguna.
+--
+-- Lo que sí hacía ese EXECUTE era dejar a cualquier cuenta llamarla por
+-- `/rest/v1/rpc/create_notification`, que no revisa nada: inserta en
+-- `notifications` para el `p_user_id` que le pasen, con el título, el texto
+-- y el `data` que quieran, y `notifications_send_push` lo manda como push.
+-- Es decir, phishing con la apariencia de un aviso de FutFinder, a
+-- cualquier usuario, desde una cuenta cualquiera. La app no la llama desde
+-- `src/` ni desde las Edge Functions.
+--
+-- Verificado contra producción el 2026-09-30: los 11 llamadores son
+-- `security definer` con dueño `postgres`.
+--
+-- Idempotente: seguro de re-ejecutar.
+-- Pruebas: supabase/tests/140_nadie_notifica_por_otro_test.sql
+-- =============================================================
+
+revoke execute on function public.create_notification(uuid, text, text, text, jsonb) from public, anon, authenticated;
