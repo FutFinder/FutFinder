@@ -17,6 +17,14 @@
 --   6. El límite se topa en 50 aunque se pidan 1000.
 --   7. Los filtros de region, comuna, posición y edad filtran.
 --   8. `flanco = 'derecho'` incluye a quien juega 'ambos'.
+--   9. Quien busca se excluye ANTES del límite. El cliente viejo pedía
+--      30 y se sacaba a sí mismo después, en JavaScript: quien estaba
+--      entre los 30 primeros veía 29. Medido con datos reales el
+--      2026-09-30, le pasaba a dos de cada cuatro cuentas.
+--  10. El orden es repetible. Las 32 cuentas de producción tienen el
+--      mismo `trust_score`, así que el `order by trust_score desc` del
+--      cliente viejo elegía un conjunto arbitrario entre los empatados y
+--      podía cambiar entre dos llamadas iguales.
 --
 -- Cómo correr: pega este archivo completo en Supabase → SQL Editor →
 -- New query → Run. Todo corre dentro de una transacción que termina en
@@ -152,8 +160,32 @@ begin
     raise exception 'CASO 8 FALLA: buscar flanco ambos no devolvió al que juega ambos (% filas)', v_n;
   end if;
 
+  -- ── Caso 9: quien busca se excluye ANTES del límite ───────────
+  -- El cliente viejo pedía 30 y después se sacaba a sí mismo en JS, así
+  -- que quien estaba entre los 30 primeros veía 29. Comprobado con datos
+  -- reales el 2026-09-30: dos de cuatro cuentas recibían 29.
+  select count(*) into v_n from public.buscar_jugadores(v_marca, null, null, null, null, null, null, 2);
+  if v_n <> 2 then
+    raise exception 'CASO 9 FALLA: pidiendo 2 con dos candidatos visibles devolvió % — quien busca se está descontando del límite', v_n;
+  end if;
+
+  -- ── Caso 10: el orden no depende del azar ─────────────────────
+  -- Las 32 cuentas de producción tienen el MISMO trust_score, así que
+  -- `order by trust_score desc` a secas devolvía un conjunto arbitrario
+  -- que podía cambiar entre dos llamadas iguales. El desempate por `id`
+  -- es lo que lo vuelve repetible.
+  select count(*) into v_n
+    from (
+      select id from public.buscar_jugadores(v_marca, null, null, null, null, null, null, 1)
+      except
+      select id from public.buscar_jugadores(v_marca, null, null, null, null, null, null, 1)
+    ) d;
+  if v_n <> 0 then
+    raise exception 'CASO 10 FALLA: la misma búsqueda devolvió conjuntos distintos';
+  end if;
+
   reset role;
-  raise notice 'MIGRACIÓN 142: 8/8 casos OK';
+  raise notice 'MIGRACIÓN 142: 10/10 casos OK';
 end $$;
 
 rollback;
