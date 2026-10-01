@@ -144,13 +144,13 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 
 `notifications`, `push_tokens`, `ratings` y `canchas` existían en la base y no las creaba ninguna migración. Las crea la **146**, con sus índices, su RLS y sus políticas. Es la misma falta que el P1 de arriba, visto desde las tablas, y se cerró con el mismo cambio.
 
-## P4 — `tg_notify_message_new` es código muerto en la base
+## Resuelto el 2026-10-01 — se retiró el avisador de chat muerto
 
-- **Dominio afectado:** chat y avisos.
-- **Evidencia (2026-10-01):** la función existe en producción y no la versiona ninguna migración, pero **ningún disparador la usa**: `trg_notify_message_new` ejecuta `notify_message_new()`, que es otra función y sí está versionada. Es un resto de antes de la migración 32, cuando el chat cambió de camino.
-- **Por eso NO entró en la migración 146:** describirla habría fabricado en cada base nueva un objeto que en producción no hace nada.
-- **Acción:** comprobar una vez más que nada la invoca —ni un disparador, ni una RPC, ni una Edge Function— y retirarla con una migración propia.
-- **Verificación necesaria:** tras el `drop`, el chat sigue avisando por `notify_message_new` y el arnés de avisos sigue en verde.
+`tg_notify_message_new()` existía en producción desde antes del historial versionado y no la usaba nadie: el disparador que parecía suyo, `trg_notify_message_new`, ejecuta `notify_message_new()`, que es otra y sí está versionada —la puso la migración 32, cuando el chat cambió de camino—. Apareció al escribir la 146 y se dejó fuera de ella a propósito; la **150** la retira de la base.
+
+**Se comprobó por seis vías antes de borrarla**, no por una: cero disparadores la ejecutan, ninguna otra función la nombra, ningún cron, ninguna política, ninguna restricción, y desde la 147 no la puede ejecutar nadie del cliente. Tampoco aparece en `src/` ni en las Edge Functions. El `drop` va **sin `cascade`** a propósito: si algo dependiera de ella, falla en vez de llevarse por delante lo que cuelgue.
+
+**Verificación: arnés 4/4**, con el control que registra que la función existía antes del `drop`. El caso que vale es el 3: se manda un DM de verdad y se cuenta el aviso antes y después (0 → 1). Que el objeto ya no esté no demuestra que no hiciera falta; que el chat siga avisando, sí.
 
 ## P3 — Resolver o aceptar explícitamente la ausencia de mapa en web
 

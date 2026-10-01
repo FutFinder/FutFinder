@@ -48,10 +48,11 @@
 --
 -- UNA FUNCIÓN QUEDA FUERA A PROPÓSITO: `tg_notify_message_new`. No está
 -- versionada, pero tampoco la usa nadie — `trg_notify_message_new`
--- ejecuta `notify_message_new()`, que es otra y sí está versionada. Es
+-- ejecuta `notify_message_new()`, que es otra y sí está versionada. Era
 -- código muerto de antes de la migración 32 y resucitarlo en una base
--- nueva sería fabricar un objeto que en producción no hace nada. Queda
--- anotado como pendiente propio para retirarlo de la base.
+-- nueva habría sido fabricar un objeto que en producción no hacía nada.
+-- **La migración 150 la retiró de la base**, así que este párrafo queda
+-- como la explicación de por qué nunca estuvo acá.
 --
 -- LO QUE ESTA MIGRACIÓN NO RESUELVE: que una base nueva levante y FUNCIONE
 -- de punta a punta. Eso sólo lo demuestra construirla, y eso necesita un

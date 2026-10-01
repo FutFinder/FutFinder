@@ -1,0 +1,37 @@
+-- =============================================================
+-- 150. SE RETIRA EL AVISADOR DE CHAT MUERTO
+--
+-- `public.tg_notify_message_new()` existe en producción desde antes del
+-- historial versionado y **no la usa nadie**. El disparador que parece
+-- suyo, `trg_notify_message_new`, ejecuta `notify_message_new()`, que es
+-- otra función y sí está versionada — la puso la migración 32, cuando el
+-- chat cambió de camino. La vieja se quedó ahí.
+--
+-- Apareció al escribir la migración 146, que describe lo que la base
+-- tiene y el repositorio no. Se dejó fuera a propósito: describirla
+-- habría fabricado en cada base nueva un objeto que en producción no hace
+-- nada. Esto la retira del otro lado.
+--
+-- SE COMPROBÓ POR SEIS VÍAS antes de borrarla, no sólo por una:
+--   · cero disparadores la ejecutan (`pg_trigger` por `tgfoid`);
+--   · ninguna otra función la nombra en su cuerpo;
+--   · ningún `cron.job` la llama;
+--   · ninguna política de RLS la menciona;
+--   · ninguna restricción ni `default` la usa;
+--   · y desde la migración 147 no la puede ejecutar nadie del cliente.
+--   Tampoco aparece en `src/` ni en las Edge Functions.
+--
+-- QUÉ SIGUE AVISANDO, que es lo que de verdad importa: el `INSERT` en
+-- `messages` lo cubren cinco disparadores, y el del aviso es
+-- `trg_notify_message_new -> notify_message_new`. Ésa no se toca.
+--
+-- `drop function if exists` sin `cascade`: si algo dependiera de ella
+-- —y no debería, después de las seis comprobaciones— esto fallaría en
+-- vez de llevarse por delante lo que cuelgue. Un `cascade` acá sería
+-- justo lo contrario de lo que se quiere.
+--
+-- Idempotente: seguro de re-ejecutar.
+-- Pruebas: supabase/tests/150_se_retira_el_avisador_de_chat_muerto_test.sql
+-- =============================================================
+
+drop function if exists public.tg_notify_message_new();
