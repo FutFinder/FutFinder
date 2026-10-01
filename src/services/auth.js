@@ -1,4 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { COLUMNAS_PUBLICAS } from './perfilColumnas';
+import { misAjustes } from './profile';
 import { performLogin, performSignUp, describeAuthError, MENSAJES } from './authPolicy';
 import {
   guardarPasswordPendiente,
@@ -153,13 +155,15 @@ export async function getCurrentUser() {
 export async function getCurrentProfile() {
   const user = await getCurrentUser();
   if (!user) return null;
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  // Igual que `getMyProfile()`: desde la migración 148 un `select('*')`
+  // falla, y las nueve preferencias vienen por `mis_ajustes()`. Inicio lee
+  // de acá el `search_radius_km`, así que tienen que venir pegadas.
+  const [{ data, error }, ajustes] = await Promise.all([
+    supabase.from('profiles').select(COLUMNAS_PUBLICAS).eq('id', user.id).single(),
+    misAjustes(),
+  ]);
   if (error) return null;
-  return data;
+  return { ...data, ...ajustes };
 }
 
 export function onAuthChange(callback) {

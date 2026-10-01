@@ -1,24 +1,48 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { buildBuscarJugadoresParams } from '../utils/buscarJugadoresParams';
+import { COLUMNAS_PUBLICAS } from './perfilColumnas';
 
 /**
  * Servicio de perfil del jugador.
  */
 
+/**
+ * Las nueve preferencias del perfil propio, por RPC.
+ *
+ * Desde la migración 148 el cliente no puede leerlas de `profiles` ni
+ * siquiera las suyas: los privilegios por columna no son por fila, así
+ * que el dueño también las perdió. `mis_ajustes()` las devuelve y no
+ * acepta a quién preguntar — sólo puede traer las de quien llama.
+ *
+ * Un fallo devuelve `{}`, no valores inventados: quien las necesite verá
+ * los mismos huecos que vería sin conexión, y no un radio de búsqueda que
+ * nadie eligió.
+ */
+export async function misAjustes() {
+  if (!isSupabaseConfigured) return {};
+  const { data, error } = await supabase.rpc('mis_ajustes');
+  if (error) {
+    console.error('[FutFinder] misAjustes:', error);
+    return {};
+  }
+  return data || {};
+}
+
 export async function getMyProfile() {
   if (!isSupabaseConfigured) return null;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  // `select('*')` ya no sirve: la 148 dejó nueve columnas fuera del
+  // alcance del cliente y un `*` falla entero con «permission denied».
+  const [{ data, error }, ajustes] = await Promise.all([
+    supabase.from('profiles').select(COLUMNAS_PUBLICAS).eq('id', user.id).single(),
+    misAjustes(),
+  ]);
   if (error) {
     console.error('[FutFinder] getMyProfile:', error);
     return null;
   }
-  return { ...data, email: user.email };
+  return { ...data, ...ajustes, email: user.email };
 }
 
 /**
@@ -32,16 +56,15 @@ export async function getMyProfileWithStatus() {
   if (!isSupabaseConfigured) return { data: null, error: null };
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: null, error: { message: 'No autenticado' } };
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  const [{ data, error }, ajustes] = await Promise.all([
+    supabase.from('profiles').select(COLUMNAS_PUBLICAS).eq('id', user.id).single(),
+    misAjustes(),
+  ]);
   if (error) {
     console.error('[FutFinder] getMyProfileWithStatus:', error);
     return { data: null, error };
   }
-  return { data: { ...data, email: user.email }, error: null };
+  return { data: { ...data, ...ajustes, email: user.email }, error: null };
 }
 
 /**
@@ -93,9 +116,11 @@ export async function getMyAccountStatus() {
  */
 export async function getProfileById(id) {
   if (!isSupabaseConfigured) return { data: null, error: null };
+  // De OTRA persona, sólo lo público. Las nueve preferencias no viajan
+  // ni aunque se pidieran: la 148 se las quitó al cliente.
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select(COLUMNAS_PUBLICAS)
     .eq('id', id)
     .maybeSingle();
   if (error && error.code !== 'PGRST116') {
@@ -159,8 +184,11 @@ export async function updateMyProfile(patch) {
   }
   payload.updated_at = new Date().toISOString();
 
+  // El `.select()` sin argumentos devolvía `*`, que desde la 148 falla.
+  // Se piden las públicas: lo que la pantalla necesita de vuelta son los
+  // datos visibles, y las preferencias las conserva ella en su estado.
   const actualizar = (p) =>
-    supabase.from('profiles').update(p).eq('id', user.id).select().single();
+    supabase.from('profiles').update(p).eq('id', user.id).select(COLUMNAS_PUBLICAS).single();
 
   let { data, error } = await actualizar(payload);
 
