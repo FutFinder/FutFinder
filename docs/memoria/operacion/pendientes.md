@@ -133,12 +133,14 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 
 **Verificación: arnés 4/4**, con el control que registra que la función existía antes del `drop`. El caso que vale es el 3: se manda un DM de verdad y se cuenta el aviso antes y después (0 → 1). Que el objeto ya no esté no demuestra que no hiciera falta; que el chat siga avisando, sí.
 
-## P3 — Resolver o aceptar explícitamente la ausencia de mapa en web
+## Resuelto el 2026-10-01 — el mapa de partidos en web
 
-- **Dominio afectado:** descubrimiento de partidos en web.
-- **Evidencia:** `MatchMap.web.js` devuelve `null`; la variante nativa utiliza `react-native-maps` y la lista con filtros se conserva en web.
-- **Acción:** decidir si la lista/filtros es el alcance web definitivo o implementar una alternativa de mapa compatible.
-- **Verificación necesaria:** prueba manual de búsqueda de partidos en navegador documenta la experiencia acordada y, si se implementa un mapa, cubre selección y cambio de región.
+- **Qué pasaba, y no era lo que decía este pendiente.** `MatchMap.web.js` devolvía `null`, pero eso no era «en web la lista es el alcance»: el botón «Ver en el mapa» de `PartidosScreen` se dibuja **sin ninguna guarda de plataforma**, así que en el navegador abría una vista vacía. Era un botón muerto, no una decisión.
+- **Qué se hizo.** Mapbox GL JS, el mismo proveedor y el mismo `EXPO_PUBLIC_MAPBOX_TOKEN` que ya usa `LocationAutocomplete` para su autocompletado: no entra una cuenta nueva ni un proveedor nuevo. **Ojo con el costo:** el autocompletado cobra por sesión de búsqueda, pero el mapa cobra **por carga**, y esto es una carga cada vez que alguien abre la pestaña en el navegador.
+- **No es dependencia de npm.** Se inyecta desde el CDN y sólo al abrir el mapa: GL JS pesa ~200 KB comprimidos y quien nunca abre el mapa no tiene por qué pagarlos en el bundle. Sin token, sin red o con el script caído el componente **vuelve a devolver `null`** y la pantalla conserva su lista y sus filtros: un mapa que no carga no puede dejar algo peor que no tener mapa.
+- **La traducción vive aparte, en `src/utils/regionMapa.js`,** porque es donde está el error caro: los deltas de `react-native-maps` son el alto y el ancho **completos** de la ventana, no la mitad, y confundirlo deja el mapa al doble o a la mitad del zoom sin que nada falle. `fmtHora` se movió ahí desde la versión nativa para que las dos plataformas dibujen la misma chapita y no se separen.
+- **Verificación: 10/10 en `regionMapa.test.js`** (ida y vuelta región→rectángulo→región, deltas negativos, los polos, y el centro del mapa mandando sobre el del rectángulo) **y recorrido en el navegador con la sesión de Vicente**, que es lo que este pendiente pedía: se vieron los tres marcadores con su formato `8/10 · 00:16`, **la selección** —el marcador se pone verde y abajo abre la ficha del partido— y **el cambio de región**: arrastrar el mapa hace aparecer «Buscar en esta zona», pulsarlo dispara la consulta por límites, cierra el botón y limpia la selección.
+- **Los partidos del recorrido fueron fabricados interceptando `fetch`**, de sólo lectura y sin escribir una fila: en producción hay 27 partidos y **ninguno futuro**, así que la lista está vacía para todo el mundo y no había marcadores reales que mirar.
 
 ## Resuelto el 2026-10-01 — una cancha en (0, 0) no es una cancha
 

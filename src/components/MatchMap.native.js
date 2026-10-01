@@ -4,15 +4,10 @@ import MapView, { Marker } from 'react-native-maps';
 import { Search as SearchIcon } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
+// La hora de la chapita vive en el util: la dibujan los dos mapas y
+// tenerla duplicada era pedir que se separaran.
+import { fmtHora } from '../utils/regionMapa';
 
-function fmtHora(iso) {
-  try {
-    const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  } catch {
-    return '';
-  }
-}
 
 /**
  * Estilo dark/green minimalista para Google Maps (Android / iOS con
