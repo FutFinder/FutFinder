@@ -20,14 +20,15 @@ Lo que se confirmó **sin cambios**: la política `profiles_read_all` sigue en `
 
 No se pudieron comprobar desde acá: la entrega push en un teléfono y los tipos de carácter de la contraseña, las dos por falta de entorno nativo y de un build distribuido.
 
-## P1 — El esquema desplegado tiene objetos que ninguna migración versiona
+## P1 — Falta construir una base nueva desde el repositorio y comprobar que funciona
 
-- **Dominio afectado:** base de datos, recuperación de entornos y cualquier cambio que toque partidos, asistentes o avisos.
-- **Evidencia (2026-08-10, revisada el 2026-09-30 contra `jvfoendzblkoxvwvommz`):** eran dieciséis objetos existentes en la base y ausentes de toda migración. **Hoy quedan nueve:** la tabla `canchas` y las funciones `search_canchas`, `norm_text`, `recalc_user_ratings`, `tg_ratings_recalc`, `create_notification`, `tg_match_future_only`, `tg_notify_friend_request` y `tg_notify_message_new`. Siguen fuera, además, las columnas `profiles.estado` y `profiles.suspended_until` y los tres cron `futfinder-match-reminders`, `futfinder-rating-reminders` y `futfinder-reactivate`.
-- **Los siete que se versionaron solos**, porque una migración posterior los redefinió con `create or replace` —que en una base nueva los crea igual—: `tg_register_cancha` (44b), `tg_enforce_join_rules` (45, 103, 104, 105, 109, 134, 138), `tg_notify_match_join` (45), `reactivate_suspended` y `tg_auto_suspend` (134), `send_match_reminders` y `send_rating_reminders` (128). **Ojo:** eso versiona el CUERPO de la función, no necesariamente su `create trigger`; al escribir la migración de recuperación hay que comprobar cada disparador aparte.
-- **Por qué importa:** dos de los que quedan condicionan cualquier código nuevo que cree partidos o inscriba jugadores. `tg_match_future_only` rechaza insertar un partido con hora pasada y `create_notification()` es el ayudante que conviene reutilizar en vez de insertar en `notifications` a mano. (`tg_enforce_join_rules`, el tercero de esa lista, ya quedó versionado.)
-- **Acción:** volcar esos objetos a una migración de recuperación para que una base nueva pueda reconstruirse desde el repositorio.
-- **Verificación necesaria:** una base creada sólo desde `supabase/` levanta sin objetos ausentes y las pruebas SQL pasan.
+> **El repositorio ya describe todo lo que la base tiene (migración 146, 2026-10-01).** Lo que queda no es escribir: es construir una base vacía desde `supabase/` y ver que levanta. Eso necesita un PostgreSQL local, que la Mac donde se cerró esto no tiene.
+
+- **Lo que se cerró:** se cruzó el catálogo ENTERO contra todas las migraciones y `schema.sql`, buscando la sentencia que crea cada objeto. El inventario real era **mayor** que el de esta nota: 4 tablas (`canchas`, `notifications`, `push_tokens`, `ratings`), 8 funciones (`norm_text`, `search_canchas`, `recalc_user_ratings`, `tg_ratings_recalc`, `create_notification`, `tg_match_future_only`, `tg_notify_friend_request`, `tg_notify_friend_accept`), **8 disparadores**, 2 columnas de `profiles` y 3 cron. Los describe la migración 146.
+- **Los ocho disparadores son el hallazgo que esta nota no tenía**, y es el peor de los casos: seis de sus funciones SÍ estaban versionadas, pero su `create trigger` no. En una base nueva la función existiría y **nadie la llamaría** — todo compila, nada falla, y las reglas simplemente no se aplican. Lo fija el caso 3 del arnés, que comprueba que cada disparador apunte a su función.
+- **La 146 no toca nada de lo que ya existe.** Cada objeto va detrás de su comprobación de existencia y no se usa `create or replace function`, que habría reemplazado el cuerpo desplegado por la transcripción. Comprobado con una huella md5 de todo el catálogo de `public` —columnas con tipo y default, restricciones, índices, políticas, disparadores, cuerpos de función y cron— **idéntica antes y después** de aplicarla: `e1baa073…`.
+- **Dos cosas quedan fuera a propósito**, y están explicadas en el archivo: `notifications_type_check` (la lista de 53 tipos de aviso, que catorce migraciones posteriores fueron ampliando; copiarla fijaría una versión vieja) y `ratings_insert_eligible` (la migración 124 la reescribió para exigir que el partido no esté cancelado). En una base nueva las pone la migración que corresponda.
+- **Verificación necesaria para cerrar esto del todo:** levantar una base vacía corriendo `supabase/migrations/` en orden y comprobar que no falta ningún objeto y que las pruebas SQL pasan. Hasta entonces, lo que está demostrado es que el repositorio lo describe y que aplicarlo sobre producción no cambia nada — no que el resultado arranque.
 
 ## Resuelto el 2026-09-23 — aprobar a un jugador también mira su agenda
 
@@ -139,12 +140,17 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Acción:** decidir roles, revisión, estados, medidas y apelación; después diseñar políticas, persistencia, interfaz y pruebas de autorización.
 - **Verificación necesaria:** pruebas de RLS y flujos autenticados demuestran que sólo las personas autorizadas revisan o resuelven reportes y que el usuario ve el estado permitido.
 
-## P2 — Recuperar trazabilidad de las tablas base no creadas en el historial versionado
+## Resuelto el 2026-10-01 — las tablas base ya están en el historial versionado
 
-- **Dominio afectado:** base de datos y recuperación de entornos.
-- **Evidencia (reconfirmada el 2026-09-30):** `notifications`, `push_tokens`, `ratings` y también `canchas` existen en la base y son consumidas por servicios y migraciones posteriores, pero su creación inicial no aparece en `supabase/schema.sql` ni en ninguna migración. Es la misma falta que el P1 de arriba, visto desde las tablas.
-- **Acción:** identificar la fuente de esquema autorizada y añadir una estrategia de aprovisionamiento o migración que preserve los entornos existentes.
-- **Verificación necesaria:** una base nueva puede crearse desde las fuentes versionadas y ejecutar las pruebas de avisos, push y calificaciones sin objetos ausentes.
+`notifications`, `push_tokens`, `ratings` y `canchas` existían en la base y no las creaba ninguna migración. Las crea la **146**, con sus índices, su RLS y sus políticas. Es la misma falta que el P1 de arriba, visto desde las tablas, y se cerró con el mismo cambio.
+
+## P4 — `tg_notify_message_new` es código muerto en la base
+
+- **Dominio afectado:** chat y avisos.
+- **Evidencia (2026-10-01):** la función existe en producción y no la versiona ninguna migración, pero **ningún disparador la usa**: `trg_notify_message_new` ejecuta `notify_message_new()`, que es otra función y sí está versionada. Es un resto de antes de la migración 32, cuando el chat cambió de camino.
+- **Por eso NO entró en la migración 146:** describirla habría fabricado en cada base nueva un objeto que en producción no hace nada.
+- **Acción:** comprobar una vez más que nada la invoca —ni un disparador, ni una RPC, ni una Edge Function— y retirarla con una migración propia.
+- **Verificación necesaria:** tras el `drop`, el chat sigue avisando por `notify_message_new` y el arnés de avisos sigue en verde.
 
 ## P3 — Resolver o aceptar explícitamente la ausencia de mapa en web
 

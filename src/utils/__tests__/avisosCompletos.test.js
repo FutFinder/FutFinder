@@ -52,7 +52,19 @@ const CATEGORY = categorias();
  *
  * Se busca la ÚLTIMA migración que declara la restricción: varias la
  * reescriben entera al agregar tipos, y la que manda es la de número mayor.
+ *
+ * LOS COMENTARIOS NO CUENTAN. Antes bastaba con que el nombre apareciera
+ * en el archivo, y la migración 146 —que explica en un comentario por qué
+ * NO copia esta restricción— se volvía «la última» y rompía el parseo. Un
+ * comentario no declara nada, así que se quitan antes de buscar. Si la
+ * última declaración de verdad no se puede leer, esto sigue fallando
+ * fuerte a propósito: quedarse con una definición vieja en silencio sería
+ * peor que un rojo.
  */
+function sinComentarios(sql) {
+  return sql.replace(/--[^\n]*/g, '');
+}
+
 function tiposPermitidos() {
   const archivos = fs
     .readdirSync(MIGRACIONES)
@@ -61,7 +73,7 @@ function tiposPermitidos() {
 
   let ultima = null;
   for (const f of archivos) {
-    const sql = fs.readFileSync(path.join(MIGRACIONES, f), 'utf8');
+    const sql = sinComentarios(fs.readFileSync(path.join(MIGRACIONES, f), 'utf8'));
     if (sql.includes('notifications_type_check')) ultima = sql;
   }
   assert.ok(ultima, 'no se encontró ninguna migración con notifications_type_check');
