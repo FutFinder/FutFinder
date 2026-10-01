@@ -28,6 +28,10 @@ export default function PlayerHeroCard({
   badges,
   metaLabel,
   clubNombre,
+  // `true` cuando no se pudo averiguar a qué club pertenece. No es lo
+  // mismo que no tener: afirmar «Sin club» sin saberlo es mentir sobre
+  // otra persona, y eso fue exactamente el fallo que se corrigió.
+  clubDesconocido = false,
   rating,
   inicial,
   verificado = false,
@@ -131,7 +135,7 @@ export default function PlayerHeroCard({
               />
             }
             label="Club"
-            value={clubNombre || 'Sin club'}
+            value={clubNombre || (clubDesconocido ? 'N.A.' : 'Sin club')}
             empty={!clubNombre}
             onPress={clubNombre ? onPressClub : undefined}
           />

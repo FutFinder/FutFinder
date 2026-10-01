@@ -200,6 +200,56 @@ export async function getMyClubs() {
 }
 
 /**
+ * Los clubes de OTRA persona, para su perfil público.
+ *
+ * POR QUÉ NO SIRVE `getMyClubs()`: está atada a `getMe()`. Al abrir el
+ * perfil ajeno la pantalla la llamaba igual —necesita MIS clubes para
+ * «Invitar a mi club»— y por eso no podía usar ese resultado para la
+ * ficha del otro: habría mostrado mi club en su perfil. La guarda que
+ * había, `isOwnProfile ? ... : null`, evitaba ese error pero dejaba otro:
+ * la tarjeta imprimía «Sin club» sin haberlo mirado nunca.
+ *
+ * Devuelve `{ data, error }`. Un fallo NO se disfraza de «sin club»: la
+ * pantalla tiene que poder distinguir «no pertenece a ninguno» de «no
+ * pudimos averiguarlo», que es el mismo error que ya se corrigió en el
+ * perfil y en el estado de cuenta.
+ *
+ * No expone nada nuevo: `club_members` y `clubs` ya son de lectura para
+ * cualquier sesión, y la nómina de un club se ve entera desde su ficha.
+ */
+export async function getClubesDe(userId) {
+  if (!isSupabaseConfigured || !userId) return { data: [], error: null };
+
+  const { data: memberships, error } = await supabase
+    .from('club_members')
+    .select('club_id, rol, joined_at')
+    .eq('user_id', userId)
+    .order('joined_at', { ascending: true });
+  if (error) {
+    console.error('[FutFinder] getClubesDe:', error);
+    return { data: null, error };
+  }
+  if (!memberships || memberships.length === 0) return { data: [], error: null };
+
+  const { data: clubsData, error: errorClubs } = await supabase
+    .from('clubs')
+    .select('id, nombre, foto_url, verificado')
+    .in('id', memberships.map((m) => m.club_id));
+  if (errorClubs) {
+    console.error('[FutFinder] getClubesDe (clubs):', errorClubs);
+    return { data: null, error: errorClubs };
+  }
+
+  const clubById = new Map((clubsData || []).map((c) => [c.id, c]));
+  return {
+    data: memberships
+      .map((m) => ({ club: clubById.get(m.club_id), rol: m.rol }))
+      .filter((m) => m.club),
+    error: null,
+  };
+}
+
+/**
  * Sólo los ids de los clubes a los que pertenezco, con cualquier rol.
  *
  * `getMyClubs()` trae además el club entero y el recuento de integrantes de

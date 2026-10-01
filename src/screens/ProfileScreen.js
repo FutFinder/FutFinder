@@ -53,7 +53,8 @@ import {
 } from '../services/profile';
 import { getUserRatingSummary } from '../services/ratings';
 import { getProfilePhotos } from '../services/gallery';
-import { getMyClubs, inviteToClub } from '../services/clubs';
+import { getMyClubs, inviteToClub, getClubesDe
+} from '../services/clubs';
 import {
   getFriendshipWith,
   sendFriendRequest,
@@ -129,6 +130,11 @@ export default function ProfileScreen({ navigation, route }) {
   const [friendship, setFriendship] = useState(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [misClubs, setMisClubs] = useState([]);
+  // Los clubes de la persona que se está MIRANDO. No son `misClubs`:
+  // ésos son los míos, y en un perfil ajeno sirven para «Invitar a mi
+  // club». `null` significa «no pudimos averiguarlo», que no es lo
+  // mismo que `[]`, «no pertenece a ninguno».
+  const [clubsDelPerfil, setClubsDelPerfil] = useState([]);
   const [yaReportado, setYaReportado] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -222,15 +228,18 @@ export default function ProfileScreen({ navigation, route }) {
         setIsBlocked(false);
         const clubs = await getMyClubs();
         setMisClubs(clubs.data || []);
+        setClubsDelPerfil(clubs.data || []);
       } else {
-        const [f, clubs, reporteMio, bloqueado] = await Promise.all([
+        const [f, clubs, suyos, reporteMio, bloqueado] = await Promise.all([
           getFriendshipWith(viewUserId),
           getMyClubs(),
+          getClubesDe(viewUserId),
           getMyPendingReportFor(viewUserId),
           isBlockedByMe(viewUserId),
         ]);
         setFriendship(f);
         setMisClubs(clubs.data || []);
+        setClubsDelPerfil(suyos.error ? null : suyos.data || []);
         setYaReportado(Boolean(reporteMio.data));
         setIsBlocked(bloqueado);
       }
@@ -490,7 +499,17 @@ export default function ProfileScreen({ navigation, route }) {
   }
 
   // La ficha "Club" muestra mi club sea cual sea mi rol; invitar exige ser admin.
-  const clubActual = isOwnProfile ? misClubs[0]?.club?.nombre || null : null;
+  // El club que muestra la ficha. Antes era `isOwnProfile ? ... : null`,
+  // así que en un perfil ajeno la tarjeta decía «Sin club» sin haberlo
+  // consultado nunca — una afirmación falsa sobre otra persona. Ahora sale
+  // de los clubes de quien se mira, propio o ajeno.
+  //
+  // `clubsDelPerfil === null` es el fallo de carga: ahí no se afirma ni que
+  // tiene club ni que no tiene, y la ficha lo muestra vacío sin el texto.
+  const clubActual = clubsDelPerfil === null
+    ? null
+    : clubsDelPerfil[0]?.club?.nombre || null;
+  const clubDesconocido = clubsDelPerfil === null;
   const puedeInvitarAClub = !isOwnProfile && clubesQueAdministro.length > 0;
   const invitacionClubEnviada =
     puedeInvitarAClub && clubesQueAdministro.every((c) => clubesInvitados.has(c.club.id));
@@ -532,6 +551,7 @@ export default function ProfileScreen({ navigation, route }) {
           badges={badges}
           metaLabel={metaJugador(profile, stats?.partidos_jugados ?? 0)}
           clubNombre={clubActual}
+          clubDesconocido={clubDesconocido}
           rating={rating}
           inicial={inicialDe(profile)}
           perfilVacio={perfilVacio}
