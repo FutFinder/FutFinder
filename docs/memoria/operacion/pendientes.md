@@ -86,29 +86,16 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 
 **No manda aviso al reabrir**, a propósito: un tipo nuevo en `notifications_type_check` necesita un texto que alguien tiene que escribir, y la verificación que pedía este pendiente no lo incluía. El evento en el hilo sí está, y las apps instaladas lo muestran sin romperse gracias al `default` de `ChallengeEventBubble`.
 
-## P3 — Falta la comprobación manual del historial en pantalla (NO bloqueante)
+## Resuelto casi entero el 2026-10-01 — la comprobación visual del historial
 
-> **El servidor está demostrado de punta a punta; lo que falta es la aceptación visual.** El recorrido completo —propuesta, confirmación por el club contrario, `matches` y `club_challenges` en `finalizado`, `club_record()`, `club_estadisticas()` e `historial_club()`— lo recorren tres arneses contra el esquema aplicado: `48_resultado_test.sql` 19/19, `49_historial_test.sql` 13/13 y `50_una_sola_puerta_test.sql` 8/8, todos con `rollback`. Lo que ninguno puede ver es la pantalla.
+> Llevaba abierto desde agosto porque `club_match_results` estaba **vacía** y todos los perfiles mostraban el estado vacío. Ya hay un resultado confirmado, así que se pudo mirar sin sembrar nada.
 
-- **Dominio afectado:** historial y estadísticas del club (migraciones 48 a 50b, Tareas 6.1 a 6.3).
-- **Evidencia (2026-08-17, actualizada el 2026-09-30):** entonces `club_match_results` tenía **cero filas** y todos los perfiles mostraban el estado vacío. **Ahora hay una fila `confirmado` y un desafío `finalizado`**, así que el historial de esos dos clubes ya se dibuja con datos reales: los pasos 1 a 5 de abajo **ya no hay que montarlos**, basta abrir los dos perfiles y mirar. Lo que sigue sin datos es el paso 7, el del resultado rechazado: hay cero desafíos en `resultado_en_disputa`.
-- **Por qué importa:** es el mismo hueco que encontraron las comprobaciones manuales de U5.1 y U5.2, y las dos veces apareció un fallo real de interfaz que ninguna prueba SQL podía ver. Acá lo que falta por mirar es el corte de los nombres largos junto al marcador, las dos líneas de contexto en 390 px, y la fecha y la hora con el reloj del dispositivo.
-- **Pasos exactos, con dos cuentas (A y B, cada una administradora de un club):**
-  1. Con A, desafiar al club de B; con B, aceptar. Acordar y aprobar la propuesta hasta que el partido quede publicado.
-  2. Esperar a que el desafío pase a `esperando_resultado` (el cron corre cada cinco minutos; el hilo también lo empuja al abrirlo). Si no se quiere esperar el partido, mover la hora del partido al pasado desde el panel de Supabase.
-  3. Con A: «Registrar resultado» en el hilo, poner un marcador **distinto de un empate** y destildar a alguien de la nómina.
-  4. En el hilo de B tiene que aparecer la burbuja con el club, el `username` y el marcador anclado —«Club A (@a) registró el resultado: 3-1 (local-visitante)»— y el CTA «Confirmar resultado».
-  5. Con B: confirmar. Revisar entonces **los dos perfiles de club**: el ganador debe leer «Victoria 3-1» y el perdedor «Derrota 1-3» del MISMO partido, con «Local» o «Visita» según corresponda, y el resumen «1 partido jugado · 3 goles a favor · 1 en contra» cuadrando con la tarjeta.
-  6. Con una tercera cuenta que no pertenezca a ninguno de los dos clubes, abrir el perfil de cualquiera de ellos: tiene que verse el marcador y los escudos, y **no** la hora ni la cancha, y la tarjeta no debe llevar a ninguna parte (sin chevron).
-  7. Repetir el paso 3 en otro encuentro y, con B, **rechazar**: el hilo debe decir que queda en disputa y que sólo la moderación puede reabrirlo, el aviso también, y el historial y las estadísticas de los dos clubes no deben moverse.
-- **Verificación necesaria:** los seis puntos de arriba. Es aceptación visual, no funcionalidad pendiente: por eso no bloquea el cierre de la Fase 6.
-
-## Resuelto el 2026-08-17 — «Ver todo» del historial ya lleva al historial
-
-- **Dominio afectado:** perfil del club.
-- **Evidencia:** `ClubDetailScreen` mostraba los tres últimos encuentros y su «Ver todo» navegaba a `ClubChallenges`, la bandeja de retos pendientes: en cuanto un club pasara de tres encuentros confirmados, los anteriores no se podían ver desde la aplicación.
-- **Resolución (Tarea 6.3):** se creó `ClubHistoryScreen` —registrada como `ClubHistory` en `AppNavigator`— que pide `historial_club()` con su tope real de 50 y reutiliza `getClubMatchHistory`, `MatchHistoryCard` y `resumenEstadisticas`, sin duplicar ninguna regla. «Ver todo» sólo aparece cuando hay más de tres encuentros.
-- **Verificación de cierre:** `historialClub.test.js` comprueba que la sección del historial ya no navega a `ClubChallenges`, que la ruta existe en el navegador, que la pantalla pide `HISTORIAL_LIMITE_MAX` y que las dos pantallas usan el mismo servicio, la misma tarjeta y el mismo resumen.
+- **El partido que existe:** `clubesprueba` **2–2** `Club prueba`, desafío `finalizado`, jugado el 2026-08-15 00:00 UTC en la cancha «jaja». Es un **empate**, así que los textos de victoria y derrota («Victoria 3-1» / «Derrota 1-3») **no se ejercitaron**: sólo el de empate.
+- **Los dos perfiles de club, verificados (paso 5).** Desde dentro: récord «0 victorias · 1 empate · 0 derrotas», tarjeta «Club prueba 2 - 2 clubesprueba» con chip «Empate» y **«Visita»**, y resumen «1 partido jugado · 2 goles a favor · 2 en contra», que cuadra con la tarjeta. Desde el otro club: el mismo partido con el marcador anclado a quien se mira y **«Local»** en vez de «Visita». La perspectiva se invierte bien por los dos lados.
+- **La fecha con el reloj del dispositivo, verificada.** La base guarda `2026-08-15 00:00+00` y la tarjeta muestra **«14-ago · 20:00»** — la conversión a UTC−4 es correcta. Era uno de los puntos que ninguna prueba SQL podía ver.
+- **Los nombres largos y las dos líneas de contexto, verificados a 375 px** (más estrecho que los 390 que pedía la nota): los dos nombres se cortan con elipsis, **el marcador queda anclado y legible en el centro**, y el contexto cabe en dos líneas.
+- **El paso 6, a medias y hay que decirlo.** La mitad del servidor está comprobada contra producción: una cuenta que **no** pertenece a ninguno de los dos clubes recibe el marcador pero con **hora y cancha ocultas**, y `soy_integrante = false`. La mitad visual —que la tarjeta no lleve a ninguna parte— está comprobada **por código**, no vista: `ClubDetailScreen` y `ClubHistoryScreen` pasan `onPress` sólo si `soyIntegrante`, y `MatchHistoryCard` dibuja el chevron sólo si hay `onPress`. Para verlo hace falta una sesión de una cuenta ajena a los dos clubes, y en este recorrido sólo había una.
+- **El paso 7 sigue sin hacerse:** el del resultado rechazado que deja el desafío en disputa. Hoy hay **cero** desafíos en `resultado_en_disputa` y montarlo exige rechazar un resultado real.
 
 ## P3 — El nivel de un encuentro entre clubes no se acuerda en ninguna parte
 
