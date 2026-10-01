@@ -120,6 +120,11 @@ export function textoDelEvento(event) {
       return textoResultadoConfirmado(p);
     case 'resultado_disputado':
       return textoResultadoDisputado(p);
+    // Migración 151. Lo único que se dice es que el resultado volvió a
+    // estar abierto: la nota de quien moderó es para el expediente, no
+    // para el hilo, igual que en `revision_solicitada`.
+    case 'resultado_reabierto':
+      return 'La moderación reabrió el resultado. Pueden proponerlo otra vez.';
     default:
       // Un tipo que este cliente todavía no conoce (una migración más nueva
       // en el servidor) no debe romper la conversación ni mostrar el valor
