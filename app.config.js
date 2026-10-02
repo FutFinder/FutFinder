@@ -10,7 +10,13 @@
  * descifrado — por eso `process.env.GOOGLE_SERVICES_JSON` aquí es una RUTA,
  * no el contenido del archivo.
  */
-const googleServicesFile = process.env.GOOGLE_SERVICES_JSON || './google-services.json';
+const fs = require('fs');
+
+// Sin el archivo, el build igual sale: se omite `googleServicesFile` en vez
+// de apuntar a una ruta que no existe, que hace fallar el prebuild. El costo
+// es que Android queda sin push (FCM) hasta que se cargue el secreto.
+const googleServicesPath = process.env.GOOGLE_SERVICES_JSON || './google-services.json';
+const googleServicesFile = fs.existsSync(googleServicesPath) ? googleServicesPath : undefined;
 
 module.exports = {
   expo: {
@@ -48,7 +54,7 @@ module.exports = {
       // Local: cae a ./google-services.json (no versionado, ver .gitignore).
       // EAS Build: viene de la variable de entorno inyectada por el secreto
       // de tipo file `GOOGLE_SERVICES_JSON` (falta crearlo, ver docs).
-      googleServicesFile,
+      ...(googleServicesFile ? { googleServicesFile } : {}),
     },
     notification: {
       // Sin `icon`: no hay un ícono de notificación real en el repo todavía

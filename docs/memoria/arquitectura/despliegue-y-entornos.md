@@ -24,7 +24,14 @@ La configuración del repositorio define exportación web con Vercel, builds nat
 - **`eas-cli` NO va como dependencia del proyecto.** Se probó el 2026-09-18 y `expo-doctor` lo rechaza: «EAS CLI should not be installed in your project. Instead, install it globally or use npx». La instalación global tampoco salió: en esta máquina el prefijo de npm es `/usr/local`, que es de root, y pedía `sudo`. La vía que queda —y que Expo sanciona— es `npx eas-cli@latest`, que no instala nada de forma permanente.
 - Atajos versionados, ya con esa forma: `npm run build:android` y `build:ios` usan el perfil **`preview`**, que es el de distribución interna — el que sirve para llevarle un arreglo a quien ya tiene la app, sin pasar por tienda. `npm run build:store` usa `production` para las dos plataformas. La primera ejecución descarga la CLI y tarda un poco más.
 
-### Lo que falta para que un build salga (2026-09-18)
+### Estado al 2026-10-02
+
+- **Sesión de Expo**: activa en la cuenta `futfinder`.
+- **Variables del entorno `preview` de EAS**: creadas `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` y `EXPO_PUBLIC_MAPBOX_TOKEN` (visibilidad *sensitive*). Hacen falta porque `.env` está en `.gitignore` y EAS no lo sube: sin ellas el build sale en modo de demostración, sin backend. Los perfiles `development` y `production` todavía no las tienen.
+- **`google-services.json` es opcional**: `app.config.js` sólo declara `android.googleServicesFile` si el archivo existe. Sin el secreto `GOOGLE_SERVICES_JSON` el APK compila y funciona, pero Android queda **sin push**; los fallos del token ya los atrapa `services/notifications.js`.
+- **Keystore de Android**: lo generó EAS en la nube en el primer build (2026-10-02) y vive en sus servidores. Antes de esa fecha no hubo ningún build nativo.
+
+### Lo que faltaba para que un build salga (2026-09-18)
 
 Ninguna de estas tres cosas está en el repositorio, y las tres necesitan las cuentas:
 
