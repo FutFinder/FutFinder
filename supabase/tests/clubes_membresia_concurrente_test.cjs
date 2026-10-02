@@ -39,10 +39,10 @@ async function usuario() {
   return id;
 }
 
-async function club(creador, plan = 'estandar') {
+async function club(creador) {
   const id = randomUUID();
-  await admin.query(`insert into public.clubs (id,nombre,slug,created_by,plan)
-    values($1::uuid,'Prueba concurrencia '||left($1::text,8),'prueba-'||$1::text,$2,$3)`, [id, creador, plan]);
+  await admin.query(`insert into public.clubs (id,nombre,slug,created_by)
+    values($1::uuid,'Prueba concurrencia '||left($1::text,8),'prueba-'||$1::text,$2)`, [id, creador]);
   clubes.push(id);
   return id;
 }
@@ -84,7 +84,7 @@ async function carrera(sqlA, paramsA, sqlB, paramsB) {
 
 async function dosAdminsSalenALaVez() {
   const uno = await usuario(), dos = await usuario(), jug = await usuario();
-  const c = await club(uno, 'premium');
+  const c = await club(uno);
   await miembro(c, uno, 'admin');
   await miembro(c, dos, 'admin');
   await miembro(c, jug, 'jugador');
@@ -104,10 +104,11 @@ async function dosAdminsSalenALaVez() {
 
 async function dosAceptanLaUltimaPlaza() {
   const jefe = await usuario();
-  const c = await club(jefe, 'estandar');
+  const c = await club(jefe);
   await miembro(c, jefe, 'admin');
-  // 13 más: con el administrador son 14 de 15.
-  for (let i = 0; i < 13; i += 1) await miembro(c, await usuario());
+  // 24 más: con el administrador son 25 de 26 (el tope fijo desde la 152;
+  // antes esto era un club `estandar` con 14 de 15).
+  for (let i = 0; i < 24; i += 1) await miembro(c, await usuario());
   const uno = await usuario(), dos = await usuario();
 
   const { segunda, espero } = await carrera(
@@ -116,10 +117,10 @@ async function dosAceptanLaUltimaPlaza() {
   );
 
   assert(espero, 'la segunda alta no esperó: el club no quedó serializado');
-  assert.match(segunda.error || '', /límite de 15 integrantes|limite de 15 integrantes/,
+  assert.match(segunda.error || '', /límite de 26 integrantes|limite de 26 integrantes/,
     JSON.stringify(segunda));
   const q = await admin.query("select count(*)::int n from public.club_members where club_id=$1", [c]);
-  assert.equal(q.rows[0].n, 15, 'el club pasó de su máximo');
+  assert.equal(q.rows[0].n, 26, 'el club pasó de su máximo');
   console.log('OK: C05 — dos aceptaciones no ocupan la misma última plaza');
 }
 

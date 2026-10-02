@@ -15,7 +15,7 @@
  * banner, escudo, «Crear desafío», iconos y tarjetas de acción, estados
  * seleccionados, enlaces «Ver todos», «Añadir foto» y los botones atados al
  * club. El fondo oscuro, los textos, la navegación, el botón flotante
- * global, el dorado de Premium y los colores de victoria / empate / derrota
+ * global, el dorado y los colores de victoria / empate / derrota
  * / error siguen siendo los de la paleta única para todos los clubes: un club
  * rojo no puede hacer que una victoria parezca una derrota.
  *
@@ -24,7 +24,7 @@
  * ENCIMA del principal. Las tintas están elegidas para cumplir 4,5:1 de la
  * WCAG sobre su color principal, y cada principal cumple 4,5:1 sobre el
  * fondo `reservas.bg`. Lo comprueba `__tests__/clubThemes.test.js`,
- * que además exige distancia de color contra derrota, empate y Premium.
+ * que además exige distancia de color contra derrota, empate y el dorado.
  */
 
 import { paleta as C } from './colors.js';
@@ -74,7 +74,7 @@ const DEFINICIONES = [
   {
     value: 'yellow',
     label: 'Amarillo',
-    // Ámbar saturado. El empate (#E0C25A) y el dorado de Premium (#F0C85A)
+    // Ámbar saturado. El empate (#E0C25A) y el dorado (#F0C85A)
     // son amarillos apagados; este es deliberadamente más vivo para que no
     // se confundan a simple vista.
     main: '#FFBE1A',

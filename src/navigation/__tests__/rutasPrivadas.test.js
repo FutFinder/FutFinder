@@ -153,7 +153,6 @@ test('las pantallas con datos de usuario, partidos, clubes y reservas están ent
     'CreateMatch',
     'ClubDetail',
     'ClubMembers',
-    'ClubPlans',
     'Resumen',
     'ElegirCancha',
     'BlockedUsers',

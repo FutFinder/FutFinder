@@ -115,13 +115,13 @@ begin
                     v_ambos, v_ajeno, v_jugador]) u;
 
   -- ── clubes ────────────────────────────────────────────────────
-  -- `premium` porque el plan estándar admite un solo administrador y los
-  -- clubes A y B necesitan dos (el suyo y el que administra los dos).
-  insert into public.clubs (id, nombre, slug, plan, created_by)
-  values (v_cA, 'Club A 47c', 'club-a-47c-'||left(v_cA::text,8), 'premium', v_adminA),
-         (v_cB, 'Club B 47c', 'club-b-47c-'||left(v_cB::text,8), 'premium', v_adminB),
-         (v_cD, 'Club D 47c', 'club-d-47c-'||left(v_cD::text,8), 'premium', v_adminD),
-         (v_cE, 'Club E 47c', 'club-e-47c-'||left(v_cE::text,8), 'premium', v_adminE);
+  -- Los clubes A y B necesitan dos administradores (el suyo y el que
+  -- administra los dos); el tope es de 3 por club.
+  insert into public.clubs (id, nombre, slug, created_by)
+  values (v_cA, 'Club A 47c', 'club-a-47c-'||left(v_cA::text,8), v_adminA),
+         (v_cB, 'Club B 47c', 'club-b-47c-'||left(v_cB::text,8), v_adminB),
+         (v_cD, 'Club D 47c', 'club-d-47c-'||left(v_cD::text,8), v_adminD),
+         (v_cE, 'Club E 47c', 'club-e-47c-'||left(v_cE::text,8), v_adminE);
 
   insert into public.club_members (club_id, user_id, rol)
   values (v_cA, v_adminA, 'admin'), (v_cB, v_adminB, 'admin'),

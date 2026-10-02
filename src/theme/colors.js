@@ -25,7 +25,7 @@
 //
 // LO QUE SE UNIFICA Y LO QUE NO. Se unifican los neutros (fondos, superficies,
 // bordes, escalones de texto) y el verde de acción. NO se unifican los colores
-// que llevan SIGNIFICADO: victoria/empate/derrota, el dorado Premium, el ámbar
+// que llevan SIGNIFICADO: victoria/empate/derrota, el dorado, el ámbar
 // de advertencia y el rojo neón del desafío recién aceptado siguen siendo lo
 // que eran. Un club rojo no puede hacer que una victoria parezca una derrota.
 //
@@ -170,8 +170,8 @@ export const paleta = {
   amberBorder: '#4A3A14',
   textAmber: '#F0DBA8',
 
-  // Dorado Premium. Distinto del ámbar a propósito: uno dice «cuidado» y el
-  // otro dice «este club paga». Unificarlos es una decisión de diseño aparte.
+  // Dorado: pendiente, capitán, valoraciones. Distinto del ámbar a propósito,
+  // que dice «cuidado». Unificarlos es una decisión de diseño aparte.
   gold: '#F0C85A',
   goldSoft: 'rgba(240, 200, 90, 0.10)',
   goldBorder: 'rgba(240, 200, 90, 0.30)',

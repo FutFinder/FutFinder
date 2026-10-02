@@ -78,9 +78,9 @@ begin
     'u50-'||u||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','',''
   from unnest(array[v_adminA, v_adminB, v_jugA, v_jugB, v_orgN, v_jugN, v_jugN2]) u;
 
-  insert into public.clubs (id, nombre, slug, plan, created_by)
-  values (v_cA, 'Club A 50', 'club-a-50-'||left(v_cA::text,8), 'estandar', v_adminA),
-         (v_cB, 'Club B 50', 'club-b-50-'||left(v_cB::text,8), 'estandar', v_adminB);
+  insert into public.clubs (id, nombre, slug, created_by)
+  values (v_cA, 'Club A 50', 'club-a-50-'||left(v_cA::text,8), v_adminA),
+         (v_cB, 'Club B 50', 'club-b-50-'||left(v_cB::text,8), v_adminB);
 
   insert into public.club_members (club_id, user_id, rol)
   values (v_cA, v_adminA, 'admin'), (v_cB, v_adminB, 'admin'),

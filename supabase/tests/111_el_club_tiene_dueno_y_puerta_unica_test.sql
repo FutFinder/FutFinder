@@ -69,9 +69,8 @@ begin
   insert into public.club_members (club_id, user_id, rol) values (v_a, v_fund, 'admin');
 
   reset role; set local request.jwt.claims to '{}';
-  -- Premium para que el límite de 1 admin del plan estándar no enturbie
-  -- C1: lo que se prueba ahí es el permiso, no el límite del plan.
-  update public.clubs set plan = 'premium' where id = v_a;
+  -- El tope de 3 administradores por club deja margen para el traspaso:
+  -- lo que se prueba en C1 es el permiso, no el tope.
   update public.club_members set rol = 'jugador' where club_id = v_a and user_id = v_fund;
   insert into public.club_members (club_id, user_id, rol) values (v_a, v_jug, 'admin');
   delete from public.club_members where club_id = v_a and user_id = v_fund;

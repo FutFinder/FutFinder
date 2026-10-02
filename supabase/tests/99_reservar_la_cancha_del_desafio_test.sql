@@ -17,9 +17,10 @@
 -- propios clubes, miembros y partido: en el proyecto real no había ningún
 -- partido de clubes cuando se escribió.
 --
--- OJO CON LOS TOPES DEL PLAN: `check_club_limits` corta en 1 administrador
--- por club, así que el montaje suma gente como `capitan` — que además es la
--- otra rama del permiso y conviene probarla.
+-- OJO CON LOS TOPES: cuando se escribió, `check_club_limits` cortaba en 1
+-- administrador por club (hoy son 3, migración 152), así que el montaje suma
+-- gente como `capitan` — que además es la otra rama del permiso y conviene
+-- probarla.
 -- =============================================================
 
 begin;

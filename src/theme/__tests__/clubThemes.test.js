@@ -25,7 +25,7 @@ const { paleta: C, clubTonos, clubSuperficies } = require('../colors.js');
  *
  *   · UN TEMA NO PUEDE DISFRAZARSE DE SEMÁNTICA. El rojo del club no puede
  *     confundirse con la derrota, ni el amarillo con el empate o con el
- *     dorado de Premium: se exige distancia de color, no solo hex distinto.
+ *     dorado: se exige distancia de color, no solo hex distinto.
  */
 
 // ── Utilidades de color, solo para las pruebas ────────────────────────
@@ -210,11 +210,11 @@ test('el color principal sobre el fondo oscuro cumple 4,5:1', () => {
 
 // ── El tema no puede disfrazarse de color semántico ──────────────────
 
-test('ningún tema se confunde con derrota, empate ni con el dorado de Premium', () => {
+test('ningún tema se confunde con derrota, empate ni con el dorado', () => {
   const SEMANTICOS = {
     derrota: C.loss,
     empate: C.draw,
-    premium: C.gold,
+    dorado: C.gold,
   };
   for (const clave of CLAVES) {
     const { main } = T.temaClub(clave);

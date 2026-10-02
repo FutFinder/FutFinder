@@ -8,23 +8,20 @@ import {
   medidas as S,
   fuentes as F,
 } from '../../theme/colors';
-import ClubPlanBadge from './ClubPlanBadge';
 
 /**
  * Barra superior del detalle de club:
- * volver · título · compartir · Editar (solo admin) · insignia de plan.
+ * volver · título · compartir · Editar (solo admin).
  *
  * Los botones cuadrados miden 40 px pero llevan hitSlop de 8 para cumplir
  * el mínimo táctil de 44 × 44.
  */
 export default function ClubHeaderBar({
   title,
-  esPremium,
   puedeEditar,
   onBack,
   onShare,
   onEdit,
-  onPlan,
 }) {
   return (
     <View style={styles.bar}>
@@ -65,7 +62,6 @@ export default function ClubHeaderBar({
         </Pressable>
       )}
 
-      <ClubPlanBadge esPremium={esPremium} onPress={onPlan} />
     </View>
   );
 }

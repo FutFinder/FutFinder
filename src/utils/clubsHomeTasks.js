@@ -25,7 +25,7 @@
 
 import { ESTADOS_CERRADOS } from '../services/clubChallengeRules.js';
 import { challengeThreadKey } from './challengeThread.js';
-import { CLUB_LIMITS } from './clubPlanLimits.js';
+import { CLUB_LIMITS } from './clubLimits.js';
 
 /**
  * Prioridad de la lista: es el orden del handoff, no alfabético.
@@ -660,14 +660,13 @@ export function repartirTareas(tareas, { tope = TOPE_VISIBLE } = {}) {
 }
 
 /**
- * Cupos del plan. `miembrosActivos` son integrantes de verdad: una solicitud
+ * Cupos del club. `miembrosActivos` son integrantes de verdad: una solicitud
  * pendiente no ocupa cupo, o un club con espacio diría que está lleno.
  */
-export function cuposDelPlan({ plan, miembrosActivos = 0, admins = 0 } = {}) {
-  const limites = CLUB_LIMITS[plan] || CLUB_LIMITS.estandar;
+export function cuposDelClub({ miembrosActivos = 0, admins = 0 } = {}) {
   return {
-    members: { used: miembrosActivos, max: limites.miembros },
-    admins: { used: admins, max: limites.admins },
+    members: { used: miembrosActivos, max: CLUB_LIMITS.miembros },
+    admins: { used: admins, max: CLUB_LIMITS.admins },
   };
 }
 

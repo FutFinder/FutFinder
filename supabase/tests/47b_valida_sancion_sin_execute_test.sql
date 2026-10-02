@@ -48,9 +48,9 @@ begin
   values ('00000000-0000-0000-0000-000000000000',v_admin,'authenticated','authenticated',
     'u47b-'||v_admin||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','','');
 
-  insert into public.clubs (id, nombre, slug, plan, created_by)
-  values (v_c1, 'Club 47b Uno', 'club-47b-uno-'||left(v_c1::text,8), 'premium', v_admin),
-         (v_c2, 'Club 47b Dos', 'club-47b-dos-'||left(v_c2::text,8), 'premium', v_admin);
+  insert into public.clubs (id, nombre, slug, created_by)
+  values (v_c1, 'Club 47b Uno', 'club-47b-uno-'||left(v_c1::text,8), v_admin),
+         (v_c2, 'Club 47b Dos', 'club-47b-dos-'||left(v_c2::text,8), v_admin);
   insert into public.club_members (club_id, user_id, rol)
   values (v_c1, v_admin, 'admin');
 

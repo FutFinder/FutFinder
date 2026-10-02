@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { paleta as C, alfa, fuentes as F, clubTonos, clubSuperficies } from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
-import { cuposDelPlan } from '../../utils/clubsHomeTasks.js';
+import { cuposDelClub } from '../../utils/clubsHomeTasks.js';
 import { ratingLabel as formatearRating } from '../../utils/clubMeta';
 import ClubSummaryCard from './ClubSummaryCard';
 
@@ -122,7 +122,7 @@ export default function ClubSummaryCarousel({ clubs, activeClubId, tema, onSelec
                 stats={esActiva ? club?.estadisticas : null}
                 ratingLabel={formatearRating(club?.rating)}
                 totalMiembros={totalMiembros}
-                maxMiembros={cuposDelPlan({ plan: club?.plan, miembrosActivos: totalMiembros }).members.max}
+                maxMiembros={cuposDelClub({ miembrosActivos: totalMiembros }).members.max}
                 onVerClub={() => onVerClub?.(club.id)}
               />
             </View>

@@ -62,7 +62,7 @@ begin;
 
 create temp table t45c (n text, resultado text, detalle text) on commit drop;
 
--- ── Escenario: dos clubes premium, dos administradores cada uno,
+-- ── Escenario: dos clubes, dos administradores cada uno,
 --    tres jugadores cada uno, y un desafío en negociación. ──────────
 create function pg_temp.escenario(p_cupos integer, p_metodo text)
 returns jsonb
@@ -87,11 +87,11 @@ begin
   update public.profiles set trust_score = 100
    where id = any (array[v_a1,v_a2,v_b1,v_b2] || v_ja || v_jb);
 
-  -- Premium: el plan estándar sólo admite un administrador, y aquí
-  -- hacen falta dos por club para probar que sale el correcto.
-  insert into public.clubs (id,nombre,slug,created_by,plan,region,comuna,modalidad)
-  values (v_ca,'Club A '||v_sufijo,'club-a-'||v_sufijo,v_a1,'premium','Metropolitana','Nunoa','futbol7'),
-         (v_cb,'Club B '||v_sufijo,'club-b-'||v_sufijo,v_b1,'premium','Metropolitana','Nunoa','futbol7');
+  -- Cada club admite hasta 3 administradores, y aquí hacen falta dos
+  -- por club para probar que sale el correcto.
+  insert into public.clubs (id,nombre,slug,created_by,region,comuna,modalidad)
+  values (v_ca,'Club A '||v_sufijo,'club-a-'||v_sufijo,v_a1,'Metropolitana','Nunoa','futbol7'),
+         (v_cb,'Club B '||v_sufijo,'club-b-'||v_sufijo,v_b1,'Metropolitana','Nunoa','futbol7');
 
   insert into public.club_members (club_id,user_id,rol) values
     (v_ca,v_a1,'admin'), (v_ca,v_a2,'admin'), (v_cb,v_b1,'admin'), (v_cb,v_b2,'admin');

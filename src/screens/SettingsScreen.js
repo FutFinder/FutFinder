@@ -27,7 +27,6 @@ import {
   MapPin,
   Flag,
   FileText,
-  Crown,
   ChevronRight,
   SlidersHorizontal,
   FileLock,
@@ -44,7 +43,6 @@ import { Card, SectionLabel, Sheet, Button, IconButton } from '../components/res
 import NotificationBell from '../components/NotificationBell';
 import Banner from '../components/Banner';
 import { getMyProfileWithStatus, updateMyProfile } from '../services/profile';
-import { getMyClub } from '../services/clubs';
 import { signOut } from '../services/auth';
 import {
   changeEmail,
@@ -267,7 +265,6 @@ export default function SettingsScreen({ navigation }) {
   const { confirmar, dialogo } = useConfirmacion();
 
   const [profile, setProfile] = useState(null);
-  const [misClub, setMisClub] = useState(null);
   const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -319,12 +316,6 @@ export default function SettingsScreen({ navigation }) {
     }
     setProfile(p);
     setRadiusKm(p?.search_radius_km ?? 10);
-    // El plan y el club de "Mi Plan" viven en `clubs`, no en `profiles` — no
-    // hay (ni debería haber) un profile.plan/profile.club_id que leer. Si
-    // esto falla, "Mi Plan" simplemente no muestra club (no bloquea el resto
-    // de Ajustes: no es la carga que importa para el resto de la pantalla).
-    const { data: club } = await getMyClub();
-    setMisClub(club);
     setLoadStatus('ready');
   }, []);
 
@@ -663,7 +654,6 @@ export default function SettingsScreen({ navigation }) {
   }
 
   const friendRequestLabel = profile?.privacy_friend_requests === 'nobody' ? 'Nadie' : 'Todos';
-  const planLabel = misClub?.plan === 'premium' ? 'Premium' : 'Estándar';
 
   const nombre = profile?.nombre?.trim();
   const username = profile?.username;
@@ -808,29 +798,6 @@ export default function SettingsScreen({ navigation }) {
         </Card>
 
         {APP_VERSION && <Text style={styles.versionText}>FutFinder {APP_VERSION}</Text>}
-
-        {/* ── PLAN ────────────────────────────────────────── */}
-        <SectionLabel>Mi Plan</SectionLabel>
-        <Card padded={false} style={styles.card}>
-          <Row
-            icon={Crown}
-            title="Plan actual"
-            right={
-              <Text style={[styles.rowValue, misClub && planLabel === 'Premium' && { color: '#F2C94C' }]}>
-                {/* El plan es del CLUB, no tuyo: sin club no hay nada que
-                    mostrar acá — "Estándar" sería un dato inventado. */}
-                {misClub ? planLabel : 'Sin club'}
-              </Text>
-            }
-          />
-          <Row
-            icon={Crown}
-            title="Ver planes"
-            showChevron
-            last
-            onPress={() => navigation.navigate('ClubPlans', { clubId: misClub?.id })}
-          />
-        </Card>
 
         {/* ── CUENTA ──────────────────────────────────────── */}
         <SectionLabel>Cuenta</SectionLabel>

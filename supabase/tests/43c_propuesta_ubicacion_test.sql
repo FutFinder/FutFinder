@@ -69,10 +69,10 @@ begin
          '{}', '{}', '', '', '', ''
   from (values (v_a1,'a1'), (v_b1,'b1'), (v_bj,'bj'), (v_x,'x')) as u(id, tag);
 
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Ubica A', 'club-ubica-a', v_a1, 'premium') returning id into v_club_a;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Ubica B', 'club-ubica-b', v_b1, 'premium') returning id into v_club_b;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Ubica A', 'club-ubica-a', v_a1) returning id into v_club_a;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Ubica B', 'club-ubica-b', v_b1) returning id into v_club_b;
 
   insert into public.club_members (club_id, user_id, rol) values
     (v_club_a, v_a1, 'admin'),

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { MapPin, ChevronRight, Crown } from 'lucide-react-native';
+import { MapPin, ChevronRight } from 'lucide-react-native';
 
 import { temaClub } from '../../theme/clubThemes';
 import { paleta as C, clubTonos, clubSuperficies, fuentes as F, alfa } from '../../theme/colors';
@@ -56,7 +56,6 @@ export default function ClubSummaryCard({
   if (!club) return null;
 
   const esAdmin = rol === 'admin';
-  const esPremium = club.plan === 'premium';
   // Sin partidos jugados no hay récord que mostrar, ni siquiera un cero.
   const hayRecord = Number.isFinite(stats?.pj) && stats.pj > 0;
   // `ratingLabel` llega de `clubMeta.ratingLabel()`, que marca «todavía no hay
@@ -97,7 +96,6 @@ export default function ClubSummaryCard({
             {Number.isFinite(totalMiembros) && Number.isFinite(maxMiembros) ? (
               <Chip texto={`${totalMiembros} / ${maxMiembros}`} />
             ) : null}
-            {esPremium ? <Chip texto="Premium" color="#FFBE1A" Icono={Crown} /> : null}
           </View>
         </View>
       </View>

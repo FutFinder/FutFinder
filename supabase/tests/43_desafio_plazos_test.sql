@@ -94,17 +94,17 @@ begin
     (v_x, 'x')
   ) as u(id, tag);
 
-  -- Plan premium: `check_club_limits()` solo deja 1 administrador en el
-  -- plan estándar, y acá hace falta probar que la respuesta de UN
-  -- administrador vale por todo su club.
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Plazos A', 'club-plazos-a', v_a1, 'premium') returning id into v_club_a;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Plazos B', 'club-plazos-b', v_b1, 'premium') returning id into v_club_b;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Plazos C', 'club-plazos-c', v_c1, 'premium') returning id into v_club_c;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Plazos D', 'club-plazos-d', v_d1, 'premium') returning id into v_club_d;
+  -- `check_club_limits()` deja hasta 3 administradores por club, y acá
+  -- hace falta probar que la respuesta de UN administrador vale por
+  -- todo su club.
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Plazos A', 'club-plazos-a', v_a1) returning id into v_club_a;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Plazos B', 'club-plazos-b', v_b1) returning id into v_club_b;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Plazos C', 'club-plazos-c', v_c1) returning id into v_club_c;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Plazos D', 'club-plazos-d', v_d1) returning id into v_club_d;
 
   insert into public.club_members (club_id, user_id, rol) values
     (v_club_a, v_a1, 'admin'), (v_club_a, v_a2, 'admin'), (v_club_a, v_ap, 'jugador'),

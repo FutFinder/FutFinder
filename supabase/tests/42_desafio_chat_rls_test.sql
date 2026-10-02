@@ -73,16 +73,16 @@ begin
   ) as u(id, tag);
 
   -- ── Setup: clubes y membresías ───────────────────────────────
-  -- Plan premium a propósito: `check_club_limits()` permite 1 solo
-  -- administrador en el plan estándar y 3 en premium. Con un admin por
-  -- club no se podría probar lo que de verdad importa acá — que el hilo
-  -- es GRUPAL y alcanza a TODOS los administradores de ambos clubes.
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Desafio Test A', 'club-desafio-test-a', v_a1, 'premium')
+  -- `check_club_limits()` permite hasta 3 administradores por club, y
+  -- hacen falta varios: con un admin por club no se podría probar lo que
+  -- de verdad importa acá — que el hilo es GRUPAL y alcanza a TODOS los
+  -- administradores de ambos clubes.
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Desafio Test A', 'club-desafio-test-a', v_a1)
   returning id into v_club_a;
 
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Desafio Test B', 'club-desafio-test-b', v_b1, 'premium')
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Desafio Test B', 'club-desafio-test-b', v_b1)
   returning id into v_club_b;
 
   insert into public.club_members (club_id, user_id, rol) values

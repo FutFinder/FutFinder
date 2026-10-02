@@ -32,7 +32,7 @@ Diseño y fases: `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 ### Lo que NO se unificó, a propósito
 
 Los colores que llevan **significado** y no estética: victoria/empate/derrota,
-el dorado Premium, el ámbar de advertencia y el `#FF2D55` del desafío recién
+el dorado, el ámbar de advertencia y el `#FF2D55` del desafío recién
 aceptado (que no es un rojo de error: es «hay un partido nuevo que
 coordinar»). Viven dentro de `paleta` como tokens propios.
 

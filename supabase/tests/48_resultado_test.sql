@@ -92,11 +92,11 @@ begin
   from unnest(array[v_adminA, v_adminB, v_ambos, v_ajeno, v_j1, v_j2, v_j3, v_j4]) u;
 
   -- ── clubes ────────────────────────────────────────────────────
-  -- `premium` porque el plan estándar admite un solo administrador y los
-  -- clubes A y B necesitan dos (el suyo y el que administra los dos).
-  insert into public.clubs (id, nombre, slug, plan, created_by)
-  values (v_cA, 'Club A 48', 'club-a-48-'||left(v_cA::text,8), 'premium', v_adminA),
-         (v_cB, 'Club B 48', 'club-b-48-'||left(v_cB::text,8), 'premium', v_adminB);
+  -- Los clubes A y B necesitan dos administradores (el suyo y el que
+  -- administra los dos); el tope es de 3 por club.
+  insert into public.clubs (id, nombre, slug, created_by)
+  values (v_cA, 'Club A 48', 'club-a-48-'||left(v_cA::text,8), v_adminA),
+         (v_cB, 'Club B 48', 'club-b-48-'||left(v_cB::text,8), v_adminB);
 
   insert into public.club_members (club_id, user_id, rol)
   values (v_cA, v_adminA, 'admin'), (v_cB, v_adminB, 'admin'),

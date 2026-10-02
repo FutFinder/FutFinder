@@ -1,6 +1,6 @@
 # Visión y alcance
 
-Última revisión: 2026-08-08
+Última revisión: 2026-10-02
 
 ## Propósito
 
@@ -29,12 +29,12 @@ El repositorio no define un rol global de administrador de la plataforma; esta n
 
 ## Límites de alcance verificados
 
-La contratación de Premium no se realiza dentro de la app: la pantalla de planes indica contacto con el equipo de FutFinder y que la contratación directa está prevista a futuro. No se deduce de esto una hoja de ruta más amplia ni se presentan otras funcionalidades no implementadas como compromisos de producto.
+Los clubes no tienen planes ni nada de pago: Estándar y Premium se retiraron el 2026-10-02 y todos los clubes tienen el mismo tope. No se deduce de esto una hoja de ruta más amplia ni se presentan otras funcionalidades no implementadas como compromisos de producto.
 
 ## Rutas de código relacionadas
 
 - `src/screens/PartidosScreen.js`, `src/screens/PublishMatchScreen.js` y `src/screens/ManageMatchScreen.js`
-- `src/screens/ClubsScreen.js`, `src/screens/ClubDetailScreen.js` y `src/screens/ClubPlansScreen.js`
+- `src/screens/ClubsScreen.js` y `src/screens/ClubDetailScreen.js`
 - `src/screens/ChatScreen.js`, `src/screens/NotificationsScreen.js` y `src/screens/ProfileScreen.js`
 - `src/navigation/AppNavigator.js` y `src/navigation/MainTabs.js`
 - `src/data/regiones-chile.js` y `src/data/comunas-coords.js`

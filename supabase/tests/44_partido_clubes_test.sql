@@ -119,21 +119,21 @@ begin
     (v_s1, 's1'), (v_t1, 't1'), (v_u1, 'u1'), (v_v1, 'v1')
   ) as u(id, tag);
 
-  -- Plan premium: el plan estándar sólo admite 1 administrador y acá
-  -- hacen falta varios por club para probar que la aprobación es del
-  -- CLUB y no de una persona concreta.
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Publica P', 'club-publica-p', v_p1, 'premium') returning id into v_club_p;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Publica R', 'club-publica-r', v_r1, 'premium') returning id into v_club_r;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Publica S', 'club-publica-s', v_s1, 'premium') returning id into v_club_s;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Publica T', 'club-publica-t', v_t1, 'premium') returning id into v_club_t;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Publica U', 'club-publica-u', v_u1, 'premium') returning id into v_club_u;
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('Club Publica V', 'club-publica-v', v_v1, 'premium') returning id into v_club_v;
+  -- Cada club admite hasta 3 administradores, y acá hacen falta varios
+  -- por club para probar que la aprobación es del CLUB y no de una
+  -- persona concreta.
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Publica P', 'club-publica-p', v_p1) returning id into v_club_p;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Publica R', 'club-publica-r', v_r1) returning id into v_club_r;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Publica S', 'club-publica-s', v_s1) returning id into v_club_s;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Publica T', 'club-publica-t', v_t1) returning id into v_club_t;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Publica U', 'club-publica-u', v_u1) returning id into v_club_u;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Club Publica V', 'club-publica-v', v_v1) returning id into v_club_v;
 
   insert into public.club_members (club_id, user_id, rol) values
     (v_club_p, v_p1, 'admin'), (v_club_p, v_p2, 'admin'), (v_club_p, v_pj, 'jugador'),

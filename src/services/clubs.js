@@ -13,8 +13,8 @@ import { buildMisClubesAdminQuery } from '../utils/permisosDesafio';
 /**
  * Servicio de clubes.
  *
- * Planes: 'estandar' (15 integrantes, 1 admin) | 'premium' (26, 3 admins).
- * Los límites los valida un trigger en la BD (check_club_limits).
+ * Tope por club: 26 integrantes y 3 administradores, igual para todos.
+ * Lo valida un trigger en la BD (check_club_limits, migración 152).
  *
  * Ingreso al club (club_join_requests):
  *   tipo 'solicitud'  → el jugador pide entrar, un admin responde
@@ -26,7 +26,7 @@ import { buildMisClubesAdminQuery } from '../utils/permisosDesafio';
  * que reemplazó el límite anterior de un club por persona.
  */
 
-export { CLUB_LIMITS } from '../utils/clubPlanLimits.js';
+export { CLUB_LIMITS } from '../utils/clubLimits.js';
 
 /**
  * Cuántos clubes puede tener una persona a la vez.
@@ -349,13 +349,13 @@ export async function searchClubs(args = '') {
     typeof args === 'string' ? { query: args } : args || {};
 
   const BASE_COLS =
-    'id, nombre, slug, descripcion, foto_url, region, comuna, plan, verificado, modalidad, tema';
+    'id, nombre, slug, descripcion, foto_url, region, comuna, verificado, modalidad, tema';
 
   const buscar = (cols) => {
     let q = supabase
       .from('clubs')
       .select(cols)
-      // los verificados (Premium) tienen prioridad en búsquedas
+      // los verificados tienen prioridad en búsquedas
       .order('verificado', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(30);
@@ -686,7 +686,7 @@ export async function listMyInvitations() {
   const ids = data.map((r) => r.club_id);
   const { data: clubs } = await supabase
     .from('clubs')
-    .select('id, nombre, foto_url, comuna, plan, verificado')
+    .select('id, nombre, foto_url, comuna, verificado')
     .in('id', ids);
   const byId = new Map((clubs || []).map((c) => [c.id, c]));
 
@@ -752,7 +752,7 @@ export async function listMyRequests() {
   const ids = data.map((r) => r.club_id);
   const { data: clubs } = await supabase
     .from('clubs')
-    .select('id, nombre, foto_url, comuna, plan, verificado')
+    .select('id, nombre, foto_url, comuna, verificado')
     .in('id', ids);
   const byId = new Map((clubs || []).map((c) => [c.id, c]));
 
@@ -802,7 +802,7 @@ export async function getMyRequestTo(clubId) {
  * Salir del club.
  *  - Si soy el último miembro, el club se elimina.
  *  - Si soy admin y quedan otros miembros, no puedo salir (debo
- *    expulsarlos primero o ceder la administración — Premium).
+ *    expulsarlos primero o ceder la administración).
  */
 export async function leaveClub(clubId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
@@ -843,7 +843,7 @@ export async function leaveClub(clubId) {
   }
 
   if (membership.rol === 'admin') {
-    // ¿quedan otros admins? (posible en Premium)
+    // ¿quedan otros admins? (un club puede tener hasta 3)
     const { count: adminCount } = await supabase
       .from('club_members')
       .select('id', { count: 'exact', head: true })
@@ -889,7 +889,7 @@ export async function removeMember(memberId) {
 
 /**
  * Promueve un miembro a admin. El trigger check_club_limits valida en la BD
- * el límite de admins del plan (1 Estándar, 3 Premium).
+ * el tope de 3 administradores por club.
  */
 export async function promoteToAdmin(memberId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
@@ -908,7 +908,7 @@ export async function promoteToAdmin(memberId) {
     if (error.message?.includes('límite')) {
       return {
         error: {
-          message: 'Tu plan ya alcanzó el límite de administradores. Puedes ceder tu administración o pasar a Premium.',
+          message: 'El club ya tiene el máximo de 3 administradores. Puedes ceder tu administración.',
         },
       };
     }
@@ -987,8 +987,8 @@ export async function setApodo(memberId, apodo) {
 
 /**
  * Cede MI administración a otro miembro: yo paso a jugador y él a admin.
- * Es una RPC atómica (transfer_club_admin) porque en plan Estándar no se
- * puede promover primero (límite de 1 admin) ni degradarse primero (la RLS
+ * Es una RPC atómica (transfer_club_admin) porque con el cupo de admins
+ * lleno no se puede promover primero ni degradarse primero (la RLS
  * exigiría seguir siendo admin para promover al otro).
  */
 export async function transferAdmin(memberId) {
@@ -1084,7 +1084,7 @@ export function subscribeToPendingRequests(clubId, onChange) {
  * respuesta llega vacía y acá se traduce a «no tienes permiso». Esconder el
  * botón «Editar» es comodidad; la puerta está en la base de datos.
  *
- * QUÉ NO SE TOCA: `plan` y `verificado` no salen nunca del cliente.
+ * QUÉ NO SE TOCA: `verificado` no sale nunca del cliente.
  *
  * `tema` es una de las cuatro claves de `theme/clubThemes.js`. La validación
  * de forma vive en `utils/clubEdit.js` —probada sin red— y el CHECK de la

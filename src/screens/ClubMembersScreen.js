@@ -262,7 +262,7 @@ export default function ClubMembersScreen({ navigation, route }) {
   };
 
   const handlePromote = async (member) => {
-    const limites = CLUB_LIMITS[club?.plan] || CLUB_LIMITS.estandar;
+    const limites = CLUB_LIMITS;
     // Cuenta fresca, no la del último `load()`: si otro admin cambió el
     // plantel entremedio, decidir con el número viejo podía ofrecer «se
     // suma sin que dejes de ser admin» con el cupo ya lleno (o al revés), y
@@ -290,10 +290,10 @@ export default function ClubMembersScreen({ navigation, route }) {
         }
       );
     } else {
-      // sin cupo (p.ej. Estándar = 1 admin): ceder mi administración
+      // sin cupo (ya hay 3 admins): ceder mi administración
       confirmar(
         `¿Ceder la administración a ${member.username}?`,
-        `Tu plan permite ${limites.admins} admin${limites.admins > 1 ? 's' : ''}: tú pasarás a ser jugador.`,
+        `Un club puede tener hasta ${limites.admins} admin${limites.admins > 1 ? 's' : ''}: tú pasarás a ser jugador.`,
         async () => {
           const { error } = await transferAdmin(member.member_id);
           if (error) {
@@ -441,7 +441,7 @@ export default function ClubMembersScreen({ navigation, route }) {
     );
   }
 
-  const limites = CLUB_LIMITS[club.plan] || CLUB_LIMITS.estandar;
+  const limites = CLUB_LIMITS;
   const cuposRestantes = Math.max(0, limites.miembros - members.length);
   const isSolicitudesTab = soyAdmin && tab === 'solicitudes';
   const listData = isSolicitudesTab ? requests : filteredMembers;

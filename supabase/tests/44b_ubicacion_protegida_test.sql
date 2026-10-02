@@ -68,10 +68,10 @@ begin
     'prot-'||u.tag||'-'||u.id||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','',''
   from (values (v_l1,'l1'),(v_lj,'lj'),(v_r1,'r1'),(v_x,'x')) as u(id,tag);
 
-  insert into public.clubs (nombre,slug,created_by,plan)
-  values ('Club Protegido L','club-protegido-l',v_l1,'premium') returning id into v_club_l;
-  insert into public.clubs (nombre,slug,created_by,plan)
-  values ('Club Protegido R','club-protegido-r',v_r1,'premium') returning id into v_club_r;
+  insert into public.clubs (nombre,slug,created_by)
+  values ('Club Protegido L','club-protegido-l',v_l1) returning id into v_club_l;
+  insert into public.clubs (nombre,slug,created_by)
+  values ('Club Protegido R','club-protegido-r',v_r1) returning id into v_club_r;
   insert into public.club_members (club_id,user_id,rol) values
     (v_club_l,v_l1,'admin'),(v_club_l,v_lj,'jugador'),(v_club_r,v_r1,'admin');
 

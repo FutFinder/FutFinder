@@ -131,10 +131,8 @@ begin
   from unnest(array[v_adminA2, v_ambos, v_inscrito, v_ajeno,
                     v_adminC, v_adminD, v_adminE]) u;
 
-  -- El plan estándar admite un solo administrador: los dos clubes reales
-  -- suben a premium DENTRO de la transacción para que el arnés no falle
-  -- por el tope del plan.
-  update public.clubs set plan = 'premium' where id in (v_cA, v_cB);
+  -- El club A suma dos administradores (v_adminA2 y v_ambos) a los que
+  -- ya tiene: caben dentro del tope de 3 por club que rige desde la 152.
   insert into public.club_members (club_id, user_id, rol) values (v_cA, v_adminA2, 'admin');
   insert into public.club_members (club_id, user_id, rol) values (v_cA, v_ambos, 'admin');
   insert into public.club_members (club_id, user_id, rol) values (v_cB, v_ambos, 'admin');
@@ -147,10 +145,10 @@ begin
   -- Se crean ANTES de sancionar: con la sanción encima, el propio trigger
   -- de la 47 impediría crear el desafío, y entonces el arnés no podría
   -- comprobar que impide aceptarlo y proponerlo.
-  insert into public.clubs (id, nombre, slug, plan, created_by)
-  values (v_cC, 'Club C 47', 'club-c-47-'||left(v_cC::text,8), 'premium', v_adminC),
-         (v_cD, 'Club D 47', 'club-d-47-'||left(v_cD::text,8), 'premium', v_adminD),
-         (v_cE, 'Club E 47', 'club-e-47-'||left(v_cE::text,8), 'premium', v_adminE);
+  insert into public.clubs (id, nombre, slug, created_by)
+  values (v_cC, 'Club C 47', 'club-c-47-'||left(v_cC::text,8), v_adminC),
+         (v_cD, 'Club D 47', 'club-d-47-'||left(v_cD::text,8), v_adminD),
+         (v_cE, 'Club E 47', 'club-e-47-'||left(v_cE::text,8), v_adminE);
   insert into public.club_members (club_id, user_id, rol)
   values (v_cC, v_adminC, 'admin'), (v_cD, v_adminD, 'admin'), (v_cE, v_adminE, 'admin');
 

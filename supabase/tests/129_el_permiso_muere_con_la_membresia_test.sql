@@ -8,9 +8,12 @@
 --   A4  Y el administrador sigue editando.
 --   B1  El invitado no puede mover su invitación a otro club.
 --   B2  Pero sí puede aceptarla, y entra al club que lo invitó.
---   C1  Ni el administrador puede cambiar `plan` ni `verificado`…
+--   C1  Ni el administrador puede cambiar `verificado`…
 --   C2  …y sigue pudiendo editar nombre y descripción.
---   C3  Un club tampoco puede NACER premium ni verificado.
+--   C3  Un club tampoco puede NACER verificado.
+--
+-- C1 y C3 probaban también `plan`; la migración 152 borró esa columna y
+-- con ella el caso, así que quedan sólo con `verificado`.
 --
 -- Los tres hallazgos se reprodujeron antes contra producción con las
 -- definiciones vivas: el expulsado editó la descripción, la invitación del
@@ -32,7 +35,7 @@ declare
   v_socio uuid := gen_random_uuid();
   v_admin_b uuid := gen_random_uuid();
   v_a uuid; v_b uuid; v_inv uuid;
-  v_n int; v_txt text; v_plan text; v_ver boolean; v_ok boolean;
+  v_n int; v_txt text; v_ver boolean; v_ok boolean;
 begin
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
@@ -99,19 +102,10 @@ begin
     json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
   update public.clubs set descripcion = 'editado por el admin' where id = v_a;
   get diagnostics v_n = row_count;
-
-  -- ── C1: pero no el plan ni la verificación ───────────────────
-  v_ok := true;
-  begin
-    update public.clubs set plan = 'premium' where id = v_a;
-  exception when insufficient_privilege then
-    v_ok := false;
-  end;
   reset role;
   insert into r129 values ('A4 el administrador sigue editando', v_n = 1, 'filas=' || v_n);
-  insert into r129 values ('C1 el administrador NO puede cambiar el plan', v_ok = false,
-    case when v_ok then 'la actualizacion pasó' else 'permission denied' end);
 
+  -- ── C1: pero no la verificación ───────────────────────────────
   set local role authenticated;
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_admin, 'role', 'authenticated')::text, true);
@@ -122,27 +116,27 @@ begin
     v_ok := false;
   end;
   reset role;
-  insert into r129 values ('C1 ni la marca de verificado', v_ok = false,
+  insert into r129 values ('C1 el administrador NO puede marcar el club como verificado', v_ok = false,
     case when v_ok then 'la actualizacion pasó' else 'permission denied' end);
 
-  select plan, verificado, descripcion into v_plan, v_ver, v_txt from public.clubs where id = v_a;
-  insert into r129 values ('C2 y el club quedó editado pero sin tocar plan ni verificado',
-    v_plan = 'estandar' and v_ver = false and v_txt = 'editado por el admin',
-    v_plan || ' / ' || v_ver || ' / ' || v_txt);
+  select verificado, descripcion into v_ver, v_txt from public.clubs where id = v_a;
+  insert into r129 values ('C2 y el club quedó editado pero sin tocar verificado',
+    v_ver = false and v_txt = 'editado por el admin',
+    v_ver || ' / ' || v_txt);
 
-  -- ── C3: tampoco puede NACER premium ───────────────────────────
+  -- ── C3: tampoco puede NACER verificado ────────────────────────
   set local role authenticated;
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_admin_b, 'role', 'authenticated')::text, true);
   v_ok := true;
   begin
-    insert into public.clubs (nombre, slug, created_by, plan, verificado)
-    values ('r129 nace premium', 'r129-premium-' || substr(v_admin_b::text,1,8), v_admin_b, 'premium', true);
+    insert into public.clubs (nombre, slug, created_by, verificado)
+    values ('r129 nace verificado', 'r129-verificado-' || substr(v_admin_b::text,1,8), v_admin_b, true);
   exception when insufficient_privilege then
     v_ok := false;
   end;
   reset role;
-  insert into r129 values ('C3 un club no puede nacer premium ni verificado', v_ok = false,
+  insert into r129 values ('C3 un club no puede nacer verificado', v_ok = false,
     case when v_ok then 'la insercion pasó' else 'permission denied' end);
 
   -- ── B: la invitación ──────────────────────────────────────────

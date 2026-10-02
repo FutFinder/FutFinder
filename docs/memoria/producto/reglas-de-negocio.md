@@ -1,6 +1,6 @@
 # Reglas de negocio
 
-Última revisión: 2026-09-24
+Última revisión: 2026-10-02
 
 ## Propósito
 
@@ -17,7 +17,7 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 ## Clubes y planes
 
 - La regla histórica de un solo club por usuario fue reemplazada por la migración 24: una persona puede pertenecer como máximo a **tres clubes** y solo una vez a cada club. No debe reintroducirse el límite anterior.
-- Un club Estándar admite hasta 15 integrantes y 1 administrador; un club Premium, hasta 26 integrantes y 3 administradores. El trigger `check_club_limits` valida estos topes.
+- Todo club admite hasta 26 integrantes y 3 administradores; no hay planes de club (se retiraron en la migración 152). El trigger `check_club_limits` valida estos topes.
 - Las solicitudes de ingreso y las invitaciones usan estados `pending`, `approved` o `rejected`; al aprobarse se crea la membresía.
 
 ## Desafíos entre clubes

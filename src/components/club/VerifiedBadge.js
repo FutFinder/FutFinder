@@ -7,8 +7,8 @@ import { temaClub } from '../../theme/clubThemes';
  * Insignia de club verificado: escudo festoneado de 12 puntas con un check.
  *
  * Se dibuja, no se importa: hace falta en cuatro tamaños (13 en el chip del
- * club activo, 17 en el resumen, 21 en la cabecera de «Mi club» y junto al
- * chip «Premium») y en cuatro colores de tema. Una imagen obligaría a
+ * club activo, 17 en el resumen y 21 en la cabecera de «Mi club») y en
+ * cuatro colores de tema. Una imagen obligaría a
  * mantener dieciséis archivos y se vería sucia al escalar.
  *
  * El escudo va en `tema.main` y el check en `tema.ink`, que es la tinta con

@@ -8,7 +8,7 @@
 --       que es de lo que dependen los tres casos.
 --   M2  El último administrador sigue sin poder salir (la regla de la 111 no
 --       se rompió al meterle el bloqueo por delante).
---   M3  El tope de integrantes del plan sigue vigente.
+--   M3  El tope de integrantes del club (26, fijo desde la 152) sigue vigente.
 --   M4  El máximo de tres clubes por jugador, también.
 --
 -- LAS TRES CARRERAS —dos administradores saliendo a la vez, dos invitados
@@ -39,8 +39,8 @@ begin
          'r130-' || u || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
     from unnest(array[v_admin, v_admin2, v_jug]) u;
 
-  insert into public.clubs (nombre, slug, created_by, plan)
-  values ('r130 club', 'r130-' || substr(v_admin::text,1,8), v_admin, 'premium')
+  insert into public.clubs (nombre, slug, created_by)
+  values ('r130 club', 'r130-' || substr(v_admin::text,1,8), v_admin)
   returning id into v_club;
 
   insert into public.club_members (club_id, user_id, rol) values (v_club, v_admin, 'admin');
@@ -71,11 +71,12 @@ begin
       false, 'las dos bajas pasaron');
   end if;
 
-  -- M3. El integrante 16 de un club estándar.
+  -- M3. El integrante 27 de un club. Antes de la 152 era el 16 de un club
+  -- `estandar`; ahora todos los clubes tienen el mismo tope de 26.
   insert into public.clubs (nombre, slug, created_by)
-  values ('r130 estandar', 'r130-e-' || substr(v_admin::text,1,8), v_admin)
+  values ('r130 lleno', 'r130-e-' || substr(v_admin::text,1,8), v_admin)
   returning id into v_otro;
-  select array_agg(gen_random_uuid()) into v_users from generate_series(1,16);
+  select array_agg(gen_random_uuid()) into v_users from generate_series(1,27);
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
     confirmation_token, email_change, email_change_token_new, recovery_token)
@@ -83,17 +84,17 @@ begin
          'r130b-' || u || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
     from unnest(v_users) u;
   insert into public.club_members (club_id, user_id, rol)
-  select v_otro, u, 'jugador' from unnest(v_users[1:15]) u;
+  select v_otro, u, 'jugador' from unnest(v_users[1:26]) u;
   v_ok := true;
   begin
-    insert into public.club_members (club_id, user_id, rol) values (v_otro, v_users[16], 'jugador');
+    insert into public.club_members (club_id, user_id, rol) values (v_otro, v_users[27], 'jugador');
   exception when others then
     v_ok := false;
-    insert into r130 values ('M3 el integrante 16 se rechaza',
-      sqlerrm like '%limite%' or sqlerrm like '%límite%', sqlerrm);
+    insert into r130 values ('M3 el integrante 27 se rechaza',
+      sqlerrm like '%limite de 26%' or sqlerrm like '%límite de 26%', sqlerrm);
   end;
   if v_ok then
-    insert into r130 values ('M3 el integrante 16 se rechaza', false, 'entró igual');
+    insert into r130 values ('M3 el integrante 27 se rechaza', false, 'entró igual');
   end if;
 
   -- M4. El cuarto club del mismo jugador.

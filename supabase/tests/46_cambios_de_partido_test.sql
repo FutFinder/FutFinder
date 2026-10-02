@@ -123,11 +123,8 @@ begin
     'u46-'||u||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','',''
   from unnest(array[v_adminA2, v_jugB, v_ajeno, v_inscrito]) u;
 
-  -- Un segundo administrador en el club que propone. El plan estándar
-  -- admite uno solo —y 15 integrantes—, así que los dos clubes suben a
-  -- premium DENTRO de la transacción: el arnés no puede fallar porque el
-  -- club de prueba esté cerca de su tope.
-  update public.clubs set plan = 'premium' where id in (v_cA, v_cB);
+  -- Un segundo administrador en el club que propone. El tope es de 3
+  -- administradores y 26 integrantes por club, así que cabe sin más.
   insert into public.club_members (club_id, user_id, rol) values (v_cA, v_adminA2, 'admin');
   insert into public.club_members (club_id, user_id, rol) values (v_cB, v_jugB, 'jugador');
   insert into public.club_members (club_id, user_id, rol) values (v_cA, v_inscrito, 'jugador');

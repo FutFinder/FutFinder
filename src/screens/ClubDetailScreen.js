@@ -35,7 +35,6 @@ import SectionHeader from '../components/ds/SectionHeader';
 import RivalClubCard, { ANCHO_TARJETA_RIVAL } from '../components/club/RivalClubCard';
 import MatchHistoryCard from '../components/club/MatchHistoryCard';
 import ClubPhotoGallery from '../components/club/ClubPhotoGallery';
-import PremiumUpsellCard from '../components/club/PremiumUpsellCard';
 import EmptyStateCard from '../components/ds/EmptyStateCard';
 import { getCurrentUser } from '../services/auth';
 import {
@@ -99,7 +98,7 @@ const MAX_HISTORIAL = 3;
  * COLOR: los acentos de identidad —banner, escudo, iconos de acción, enlaces
  * «Ver todos», «Añadir foto» y los botones atados al club— salen de
  * `temaDeClub(club)` y de ningún otro lado. Lo que NO cambia
- * de color: el fondo, los textos, la navegación, el dorado de Premium y el
+ * de color: el fondo, los textos, la navegación y el
  * récord V/E/D, que es semántico. Las tarjetas de rival usan el tema DEL
  * RIVAL, no el de esta pantalla.
  */
@@ -320,7 +319,6 @@ export default function ClubDetailScreen({ navigation, route }) {
     );
   }
 
-  const esPremium = club.plan === 'premium';
   const historialVisible = historial.slice(0, MAX_HISTORIAL);
   // Las estadísticas NO se derivan de `historial`: ese viaja paginado y las
   // suma el servidor sobre todos los resultados confirmados del club. La frase
@@ -339,12 +337,10 @@ export default function ClubDetailScreen({ navigation, route }) {
     <SafeAreaView edges={['top']} style={styles.root}>
       <ClubHeaderBar
         title={soyMiembro ? 'Mi club' : club.nombre}
-        esPremium={esPremium}
         puedeEditar={puedeEditarClub}
         onBack={() => navigation.goBack()}
         onShare={handleShare}
         onEdit={() => navigation.navigate('EditClub', { club })}
-        onPlan={soyMiembro ? () => navigation.navigate('ClubPlans', { clubId: club.id }) : undefined}
       />
 
       <ScrollView
@@ -560,13 +556,6 @@ export default function ClubDetailScreen({ navigation, route }) {
           onOpenPhoto={goToGallery}
           tema={tema}
         />
-
-        {/* ── Premium (solo integrantes del club) ── */}
-        {soyMiembro && !esPremium && (
-          <PremiumUpsellCard
-            onPress={() => navigation.navigate('ClubPlans', { clubId: club.id })}
-          />
-        )}
 
         {/* ── Acciones de admin ── */}
         {soyAdmin && (

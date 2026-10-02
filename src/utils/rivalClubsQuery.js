@@ -25,7 +25,7 @@
  * reintenta sin ella si todavía no está aplicada.
  */
 export const RIVAL_CLUB_COLUMNS =
-  'id, nombre, slug, foto_url, region, comuna, plan, verificado, tema';
+  'id, nombre, slug, foto_url, region, comuna, verificado, tema';
 
 /**
  * @param client        cliente de Supabase (o uno falso, en pruebas)

@@ -117,24 +117,19 @@ test('el plural se respeta: una sola pendiente no dice «pendientes»', () => {
   assert.equal(D.repartirTareas(tareas).etiquetaVerMas, 'Ver 1 pendiente más');
 });
 
-// ── Cupos del plan ──────────────────────────────────────────────────
+// ── Cupos del club ──────────────────────────────────────────────────
 
 test('las solicitudes pendientes NO ocupan cupo de integrante', () => {
-  const cupos = D.cuposDelPlan({ plan: 'estandar', miembrosActivos: 11, admins: 1 });
+  const cupos = D.cuposDelClub({ miembrosActivos: 11, admins: 1 });
   assert.equal(cupos.members.used, 11);
-  assert.equal(cupos.members.max, 15);
-});
-
-test('el plan premium sube los dos límites', () => {
-  const cupos = D.cuposDelPlan({ plan: 'premium', miembrosActivos: 20, admins: 2 });
   assert.equal(cupos.members.max, 26);
-  assert.equal(cupos.admins.max, 3);
 });
 
-test('un plan desconocido cae en estándar, nunca deja sin límite', () => {
-  const cupos = D.cuposDelPlan({ plan: 'inventado', miembrosActivos: 3, admins: 1 });
-  assert.equal(cupos.members.max, 15);
-  assert.equal(cupos.admins.max, 1);
+test('todos los clubes tienen el mismo tope: 26 integrantes y 3 admins', () => {
+  const cupos = D.cuposDelClub({ miembrosActivos: 20, admins: 2 });
+  assert.equal(cupos.members.max, 26);
+  assert.equal(cupos.admins.used, 2);
+  assert.equal(cupos.admins.max, 3);
 });
 
 // ── Permisos ────────────────────────────────────────────────────────

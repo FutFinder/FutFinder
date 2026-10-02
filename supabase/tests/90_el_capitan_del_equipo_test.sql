@@ -12,9 +12,10 @@
 --      `club_members_update` tenía la misma auto-referencia que ya se
 --      había corregido en insert (18) y delete (20), así que esto
 --      habría pasado con cualquier administrador de cualquier club.
---   5. Nombrar capitán no cuenta contra el tope de administradores del
---      plan: un club 'estandar' (tope 1 admin) ya con su admin puesto
---      puede además nombrar un capitán sin que el trigger lo rechace.
+--   5. Nombrar capitán no cuenta contra el tope de administradores: un
+--      club con sus 3 administradores ya puestos (el tope fijo desde la
+--      152; antes era el club 'estandar' con su único admin) puede además
+--      nombrar un capitán sin que el trigger lo rechace.
 --   6. Puede haber más de un capitán a la vez en el mismo club.
 --   7. Un rol inventado ('presidente') lo rechaza el CHECK del servidor.
 --   8. Un usuario ajeno al club (ni siquiera integrante) tampoco puede
@@ -31,6 +32,8 @@ begin;
 do $$
 declare
   v_admin_a    uuid := gen_random_uuid();
+  v_admin_a2   uuid := gen_random_uuid();
+  v_admin_a3   uuid := gen_random_uuid();
   v_jugador_a1 uuid := gen_random_uuid();
   v_jugador_a2 uuid := gen_random_uuid();
   v_admin_b    uuid := gen_random_uuid();
@@ -54,18 +57,24 @@ begin
     confirmation_token, email_change, email_change_token_new, recovery_token
   ) values
     ('00000000-0000-0000-0000-000000000000', v_admin_a,    'authenticated', 'authenticated', 'cap-admin-a-'    || v_admin_a    || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_admin_a2,   'authenticated', 'authenticated', 'cap-admin-a2-'   || v_admin_a2   || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_admin_a3,   'authenticated', 'authenticated', 'cap-admin-a3-'   || v_admin_a3   || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_jugador_a1, 'authenticated', 'authenticated', 'cap-jugador-a1-' || v_jugador_a1 || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_jugador_a2, 'authenticated', 'authenticated', 'cap-jugador-a2-' || v_jugador_a2 || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_admin_b,    'authenticated', 'authenticated', 'cap-admin-b-'    || v_admin_b    || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_ajeno,      'authenticated', 'authenticated', 'cap-ajeno-'      || v_ajeno      || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', '');
 
-  -- ── Setup: dos clubes 'estandar' (tope 1 admin / 15 integrantes) ─
+  -- ── Setup: dos clubes (tope 3 admins / 26 integrantes) ────────
+  -- El club A llena el tope de administradores, para que el caso 5
+  -- pruebe de verdad que el capitán no cuenta contra él.
   insert into public.clubs (id, nombre, slug, created_by) values
     (v_club_a, 'Capitán Club A ' || left(v_club_a::text, 8), 'capitan-club-a-' || left(v_club_a::text, 8), v_admin_a),
     (v_club_b, 'Capitán Club B ' || left(v_club_b::text, 8), 'capitan-club-b-' || left(v_club_b::text, 8), v_admin_b);
 
   insert into public.club_members (club_id, user_id, rol) values
     (v_club_a, v_admin_a,    'admin'),
+    (v_club_a, v_admin_a2,   'admin'),
+    (v_club_a, v_admin_a3,   'admin'),
     (v_club_a, v_jugador_a1, 'jugador'),
     (v_club_a, v_jugador_a2, 'jugador'),
     (v_club_b, v_admin_b,    'admin');
@@ -95,7 +104,7 @@ begin
   if v_filas <> 1 then
     raise exception 'FALLÓ (caso 5): nombrar un segundo capitán no debería chocar con el tope de administradores';
   end if;
-  raise notice 'OK (caso 5): capitán no cuenta contra el tope de administradores del plan';
+  raise notice 'OK (caso 5): capitán no cuenta contra el tope de administradores';
 
   -- ── Caso 6: puede haber más de un capitán a la vez ───────────
   if (select count(*) from public.club_members where club_id = v_club_a and rol = 'capitan') <> 2 then

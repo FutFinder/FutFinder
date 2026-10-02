@@ -35,7 +35,7 @@ import {
   normalizarTareas,
   contarConAccion,
   repartirTareas,
-  cuposDelPlan,
+  cuposDelClub,
   permisosDeClub,
   plazoDePartido,
   etiquetaPlazo,
@@ -161,7 +161,7 @@ const ESTADO_INICIAL = {
   // esto es lo que de verdad tiene concedido quien mira, y de ello sale la
   // nota de los accesos rápidos.
   misPermisos: null,
-  limits: cuposDelPlan({}),
+  limits: cuposDelClub({}),
   tasks: [],
   // `true` desde que se toca otro club hasta que llegan SUS datos. No es lo
   // mismo que `refreshing`: acá lo que hay en pantalla ya no corresponde al
@@ -242,7 +242,7 @@ export function ClubsHomeProvider({ children }) {
         activeClubId: id,
         cambiandoClub: true,
         // La IDENTIDAD del club nuevo ya la tenemos: nombre, escudo, comuna,
-        // rol y plan vienen todos de `getMyClubs()`, que es lo que llena
+        // rol y tema vienen todos de `getMyClubs()`, que es lo que llena
         // `clubs`. Por eso el nombre, el tema y el carrusel cambian en el
         // mismo gesto, sin esperar a nada.
         club: nueva?.club ? { ...nueva.club, estadisticas: null } : s.club,
@@ -494,8 +494,7 @@ export function ClubsHomeProvider({ children }) {
           role,
           can,
           misPermisos: permisosDelegados,
-          limits: cuposDelPlan({
-            plan: membresiaActiva?.club?.plan,
+          limits: cuposDelClub({
             miembrosActivos: miembrosData.length,
             admins: miembrosData.filter((m) => m.rol === 'admin').length,
           }),

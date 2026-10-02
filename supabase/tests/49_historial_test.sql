@@ -95,12 +95,12 @@ begin
   -- ── clubes ────────────────────────────────────────────────────
   -- Con escudo: la tarjeta del historial los dibuja y el caso 11
   -- comprueba que son públicos.
-  insert into public.clubs (id, nombre, slug, plan, created_by, foto_url)
-  values (v_cA, 'Club A 49', 'club-a-49-'||left(v_cA::text,8), 'estandar', v_adminA,
+  insert into public.clubs (id, nombre, slug, created_by, foto_url)
+  values (v_cA, 'Club A 49', 'club-a-49-'||left(v_cA::text,8), v_adminA,
           'https://cdn.futfinder.test/a.png'),
-         (v_cB, 'Club B 49', 'club-b-49-'||left(v_cB::text,8), 'estandar', v_adminB,
+         (v_cB, 'Club B 49', 'club-b-49-'||left(v_cB::text,8), v_adminB,
           'https://cdn.futfinder.test/b.png'),
-         (v_cC, 'Club C 49', 'club-c-49-'||left(v_cC::text,8), 'estandar', v_ajeno, null);
+         (v_cC, 'Club C 49', 'club-c-49-'||left(v_cC::text,8), v_ajeno, null);
 
   insert into public.club_members (club_id, user_id, rol)
   values (v_cA, v_adminA, 'admin'), (v_cB, v_adminB, 'admin');

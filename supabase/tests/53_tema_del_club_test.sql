@@ -14,7 +14,8 @@
 --   6. Un HEX ('#FF0000') tampoco entra: el tema es una clave, no un
 --      color libre.
 --   7. Dos clubes con temas distintos no se contaminan.
---   8. Cambiar el tema no toca `plan` ni `verificado`.
+--   8. Cambiar el tema no toca `verificado`. (Antes también miraba
+--      `plan`, que la migración 152 borró.)
 --   9. Cualquiera puede LEER el tema de un club: sin eso, el resto de
 --      la gente no vería el color nuevo al recargar el club.
 --
@@ -42,7 +43,6 @@ declare
   v_temas     text[] := array['green', 'blue', 'red', 'yellow'];
   v_uno       text;
   v_filas     int;
-  v_plan      text;
   v_verificado boolean;
   v_rechazado boolean;
 begin
@@ -123,13 +123,13 @@ begin
   end if;
   raise notice 'OK (caso 6): el servidor rechaza un HEX';
 
-  -- ── Caso 8: cambiar el tema no toca plan ni verificado ───────
+  -- ── Caso 8: cambiar el tema no toca verificado ───────────────
   update public.clubs set tema = 'red' where id = v_club_a;
-  select plan, verificado into v_plan, v_verificado from public.clubs where id = v_club_a;
-  if v_plan is distinct from 'estandar' or v_verificado is distinct from false then
-    raise exception 'FALLÓ (caso 8): cambiar el tema alteró plan=% verificado=%', v_plan, v_verificado;
+  select verificado into v_verificado from public.clubs where id = v_club_a;
+  if v_verificado is distinct from false then
+    raise exception 'FALLÓ (caso 8): cambiar el tema alteró verificado=%', v_verificado;
   end if;
-  raise notice 'OK (caso 8): el tema no arrastra plan ni verificado';
+  raise notice 'OK (caso 8): el tema no arrastra verificado';
 
   -- ── Actuar como el INTEGRANTE que no administra ──────────────
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_a, 'role', 'authenticated')::text);
