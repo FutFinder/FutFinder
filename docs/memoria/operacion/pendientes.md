@@ -215,13 +215,24 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Verificación:** arnés `149_..._test.sql`, que aplica la 149 **dentro de la transacción** y la revierte: control + **8/8**. Y seis pruebas de `npm test` que impiden que vuelva un `select('*')` y que la lista de columnas del cliente se separe de la de la migración.
 - **Para cerrarlo:** distribuir el build, aplicar la 149, y recién entonces activar también los tipos de carácter de la contraseña.
 
-## P3 — Cada partido publicado deja una fila en `public.canchas` que su autor no puede borrar
+## Resuelto el 2026-10-04 — el directorio de canchas tiene umbral de entrada
 
-- **Dominio afectado:** directorio de canchas y datos de prueba.
-- **Evidencia (auditoría de Partidos del 2026-09-15):** el trigger `trg_register_cancha` crea una entrada en `public.canchas` por cada partido publicado, y la cuenta que la creó no tiene permiso para eliminarla. Las entradas que dejaron esa auditoría y las comprobaciones posteriores se borraron a mano desde el panel.
-- **Por qué importa:** el directorio acumula residuos de partidos de prueba y de canchas escritas con error, sin ninguna vía de limpieza dentro de la app. Además, esa FK sin cascada ya tapó un fallo real en el arnés de concurrencia de la agenda (ver `pruebas.md`).
-- **Acción:** decidir si el directorio se cura (dueño, permiso de borrado o baja lógica) o si el trigger deja de escribir por cada partido. Va emparentado con el P1 de arriba: `canchas` y `tg_register_cancha` tampoco están versionados.
-- **Verificación necesaria:** publicar y borrar un partido de prueba no deja fila huérfana, o existe un camino documentado para retirarla.
+- **Qué pasaba, y era peor de lo que decía esta nota.** `trg_register_cancha` mete una fila en `public.canchas` por cada partido publicado, con el nombre de cancha que el organizador escribió a mano, y ese directorio alimenta el autocompletado de `LocationAutocomplete` **al publicar un partido**. No era sólo que se acumulara basura: al publicar te podían ofrecer «Nsjsjsj» o «jnkj» como cancha. De las 17 filas de producción, casi todas son basura de prueba o nombres tecleados con error.
+- **Y la causa de que nadie pudiera borrarlas era otra que la anotada:** no faltaba un `grant` —`authenticated` tiene `delete`— sino una política. `canchas` tiene UNA sola, `canchas_select_any`, así que RLS bloquea todo lo demás.
+- **La decisión (Vicente, 2026-10-04): umbral de entrada, no puerta de salida.** Una cancha entra al directorio público cuando la han usado **dos organizadores distintos**. Corta la basura en la fuente sin juzgar el texto —«jnkj» no se distingue de un nombre raro de verdad— y sin pantallas nuevas. Se acepta que una cancha real tarde un partido más en aparecer; mientras tanto el autocompletado sigue ofreciendo las de Mapbox, que es de donde salen casi todas.
+- **Dos organizadores, no dos usos.** `usos_count` ya existía y no servía: `tangus` tiene 2 usos y UN solo organizador. Una persona publicando cinco partidos en su cancha inventada la ascendería sola. Por eso la migración **153** añade `cancha_usos` —el par (cancha, organizador), sin privilegios de cliente porque diría dónde juega cada persona— y el umbral vive en `search_canchas`, **no en la RLS**: la fila tiene que existir desde el primer uso para poder acumular el segundo.
+- **Verificación: arnés `153_..._test.sql` 8/8**, en el ensayo revertido y otra vez contra el esquema aplicado, llegando las dos veces a la última línea. El **control de antes/después** se midió aparte con la función vieja en pie: una cancha de una sola persona devolvía **1**. Cubre además que `usos_count` siga contando usos, que la cancha de un desafío siga fuera del directorio y que borrar una cancha se lleve sus usos en cascada.
+- **Efecto medido en producción tras aplicar: 15 de las 17 filas quedan ocultas.** Las dos que pasan el umbral —`maiclub` (4 organizadores) y `Cancha test` (2)— **también son de prueba**, así que el umbral por sí solo no limpia esta base: la limpieza de las 17 va aparte y a mano, porque borrar datos de producción no es trabajo de una migración idempotente.
+
+## P4 — `authenticated` tiene TRUNCATE sobre 58 tablas
+
+> Hallazgo del 2026-10-04, al mirar los privilegios de `canchas`. **No es un agujero vivo**, y conviene decirlo antes que nada: PostgREST no emite `TRUNCATE`, así que desde la app no hay forma de llegar. Es defensa en profundidad, no una puerta abierta.
+
+- **Dominio afectado:** privilegios de base de datos, todas las tablas de `public`.
+- **Evidencia:** `authenticated` tiene el privilegio `TRUNCATE` sobre 58 tablas, incluidas `profiles`, `matches`, `messages` y `pagos`. Es el reparto por omisión de Supabase (`grant all on all tables ... to authenticated`), no algo que ninguna migración haya pedido.
+- **Por qué importa igualmente:** **`TRUNCATE` no pasa por RLS.** Todas las demás escrituras de esas tablas están contenidas por políticas; ésta no lo estaría. La única razón de que no sea explotable hoy es que no existe el camino para emitir la sentencia — una función `security invoker` con SQL dinámico lo abriría sin que nadie lo notara.
+- **Acción:** una migración que revoque `truncate` de `authenticated` y `anon` en todo `public`, más el disparador de eventos que cierre lo que nazca después —el mismo patrón de la 147, que ya existe y funciona—.
+- **Verificación necesaria:** cero tablas de `public` con `truncate` para `authenticated` o `anon`, una tabla nueva creada después nace sin él, y el arnés comprueba antes que el privilegio estaba (control negativo) y después que las escrituras normales de la app siguen funcionando.
 
 ## P4 — Restos del rediseño de Clubes que nunca se cerraron
 
