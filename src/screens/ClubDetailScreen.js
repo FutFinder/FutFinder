@@ -340,7 +340,13 @@ export default function ClubDetailScreen({ navigation, route }) {
         puedeEditar={puedeEditarClub}
         onBack={() => navigation.goBack()}
         onShare={handleShare}
-        onEdit={() => navigation.navigate('EditClub', { club })}
+        // SÓLO el id. Mandar el club entero parecía gratis —el formulario se
+        // pintaba sin esperar la consulta— pero React Navigation lo serializa
+        // en la URL como `?club=[object Object]`: un enlace feo y, peor, una
+        // trampa. Quien compartiera ESA dirección se la pasaba a una pantalla
+        // que creía tener el club (la cadena es verdadera) y no lo pedía, así
+        // que el formulario se abría vacío. El id viaja entero y se consulta.
+        onEdit={() => navigation.navigate('EditClub', { clubId: club.id })}
       />
 
       <ScrollView

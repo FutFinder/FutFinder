@@ -129,17 +129,51 @@ export function puedeEditarClub({ clubesAdmin, clubId } = {}) {
 }
 
 /**
+ * El id del club que hay que editar, venga de donde venga.
+ *
+ * La pantalla se abre de dos maneras y las dos son legítimas: desde dentro de
+ * la app, que pasa el club ENTERO para que el formulario se pinte sin esperar
+ * ninguna consulta, y desde una URL `clubes/<id>/editar`, donde lo único que
+ * cabe es el id. Un objeto no viaja por una ruta.
+ *
+ * Si las dos llegan y discrepan manda la ruta: es lo que la persona pidió al
+ * abrir el enlace. Y devuelve `null`, no `undefined`, para que un id ausente
+ * se note al leerlo en vez de colarse hasta `includes(undefined)`.
+ */
+export function clubIdDeRuta(params) {
+  const deRuta = params?.clubId;
+  if (typeof deRuta === 'string' && deRuta.length > 0) return deRuta;
+  const delObjeto = params?.club?.id;
+  if (typeof delObjeto === 'string' && delObjeto.length > 0) return delObjeto;
+  return null;
+}
+
+/**
  * Qué vista mostrar en «Editar club»:
- *   'loading' → todavía se comprueba el permiso
- *   'error'   → no se pudo comprobar (red caída, sesión rara)
+ *   'loading' → todavía se comprueba el permiso, o se está trayendo el club
+ *   'error'   → no se pudo comprobar, o es mi club y no se pudo leer
  *   'denied'  → se comprobó y no soy administrador de este club
  *   'ready'   → formulario
  *
  * Un formulario abierto mientras no se sabe el permiso invita a escribir
  * cambios que el servidor va a rechazar después.
+ *
+ * EL ORDEN IMPORTA, y no es estético: el permiso se decide por el id ANTES de
+ * mirar si el club se pudo leer. Al revés, la diferencia entre 'denied' y
+ * 'error' le contaría a cualquiera qué identificadores de club son reales.
+ *
+ * `club` y `cargandoClub` son opcionales: quien navega desde dentro de la app
+ * ya trae el club en la mano y no pasa ninguno de los dos. Sin noticia del
+ * club se asume que lo trajo quien navegó, que es como se comportaba esta
+ * función antes de que la pantalla tuviera URL propia.
  */
-export function getEditClubStatus({ loading, clubesAdmin, clubId } = {}) {
-  if (loading) return 'loading';
+export function getEditClubStatus({ loading, clubesAdmin, clubId, club, cargandoClub } = {}) {
+  if (loading || cargandoClub) return 'loading';
   if (!Array.isArray(clubesAdmin)) return 'error';
-  return puedeEditarClub({ clubesAdmin, clubId }) ? 'ready' : 'denied';
+  if (!puedeEditarClub({ clubesAdmin, clubId })) return 'denied';
+  // Administro este club pero no lo tengo: es la recarga con la red caída.
+  // Abrir el formulario en blanco y dejar guardar habría borrado la
+  // descripción, la región y la comuna del club.
+  if (club === null) return 'error';
+  return 'ready';
 }

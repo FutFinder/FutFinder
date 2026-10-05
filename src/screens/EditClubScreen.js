@@ -24,12 +24,12 @@ import {
 import { temaClub, TEMA_CLUB_POR_DEFECTO } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import ClubThemePicker from '../components/club/ClubThemePicker';
-import { updateClub } from '../services/clubs';
+import { updateClub, getClubById } from '../services/clubs';
 import { getMisClubesConPermiso } from '../services/clubPermissions';
 import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD } from '../utils/clubMeta';
-import { getEditClubStatus, NOMBRE_MIN } from '../utils/clubEdit';
+import { getEditClubStatus, clubIdDeRuta, NOMBRE_MIN } from '../utils/clubEdit';
 
 /**
  * Editar los datos del club (modal sobre las tabs, como CreateClub).
@@ -59,7 +59,27 @@ import { getEditClubStatus, NOMBRE_MIN } from '../utils/clubEdit';
  * igual que en el celular.
  */
 export default function EditClubScreen({ navigation, route }) {
-  const { club } = route.params || {};
+  /*
+   * Esta pantalla se abre de dos maneras y las dos son legítimas:
+   *
+   *   · desde «Mi club», que pasa el club ENTERO para que el formulario se
+   *     pinte de inmediato, sin esperar ninguna consulta;
+   *   · desde la URL `clubes/<id>/editar` —una recarga en web, un enlace
+   *     compartido—, donde lo único que viaja es el id.
+   *
+   * El segundo camino no existía: `EditClub` no estaba en `linking`, así que
+   * la pantalla no tenía dirección propia y recargar devolvía a la raíz.
+   */
+  const clubId = clubIdDeRuta(route.params);
+  // Un `club` que no sea un objeto se ignora: por la URL sólo puede llegar la
+  // cadena `'[object Object]'` de un enlace viejo, y es VERDADERA — darla por
+  // buena dejaba el formulario en blanco creyendo que estaba lleno.
+  const clubDeLaNavegacion =
+    route.params?.club && typeof route.params.club === 'object' ? route.params.club : null;
+  const [club, setClub] = useState(clubDeLaNavegacion);
+  // `null` es «no está», y sólo se sale de ahí cuando la consulta contesta.
+  const [cargandoClub, setCargandoClub] = useState(!clubDeLaNavegacion && !!clubId);
+
   const { width: anchoVentana } = useWindowDimensions();
   // A partir de acá sobra espacio para dos columnas; más abajo se apila.
   const esAncho = anchoVentana >= 860;
@@ -90,7 +110,9 @@ export default function EditClubScreen({ navigation, route }) {
   const status = getEditClubStatus({
     loading: checkingPermiso,
     clubesAdmin,
-    clubId: club?.id,
+    clubId,
+    club,
+    cargandoClub,
   });
   const nombreValido = nombre.trim().length >= NOMBRE_MIN;
 
@@ -101,9 +123,40 @@ export default function EditClubScreen({ navigation, route }) {
     setCheckingPermiso(false);
   }, []);
 
+  /**
+   * Trae el club cuando se llegó por la URL.
+   *
+   * Siembra los campos aquí y no en `useState` porque aquellos sólo corren al
+   * montar: por este camino el club llega después. Sin esto el formulario se
+   * abría en blanco y «guardar» habría borrado la descripción, la región y la
+   * comuna del club.
+   */
+  const traerClub = useCallback(async () => {
+    if (!clubId) return;
+    setCargandoClub(true);
+    const { data } = await getClubById(clubId);
+    if (data) {
+      setClub(data);
+      setNombre(data.nombre || '');
+      setDescripcion(data.descripcion || '');
+      setRegion(data.region || null);
+      setComuna(data.comuna || null);
+      setModalidad(data.modalidad || null);
+      setTema(data.tema || TEMA_CLUB_POR_DEFECTO);
+    } else {
+      setClub(null);
+    }
+    setCargandoClub(false);
+  }, [clubId]);
+
   useEffect(() => {
     comprobarPermiso();
   }, [comprobarPermiso]);
+
+  useEffect(() => {
+    // Quien llegó con el club en la mano no vuelve a pedirlo.
+    if (!clubDeLaNavegacion) traerClub();
+  }, [clubDeLaNavegacion, traerClub]);
 
   const handlePickLogo = async () => {
     const result = await pickImage({ aspect: [1, 1], quality: 0.8 });
@@ -230,7 +283,15 @@ export default function EditClubScreen({ navigation, route }) {
                   : 'Pídele a un administrador que haga el cambio, o que te dé el permiso desde Permisos de club.'}
               </Text>
               <Pressable
-                onPress={status === 'error' ? comprobarPermiso : cerrar}
+                onPress={
+                  status === 'error'
+                    ? () => {
+                        // Las dos: el error puede ser del permiso o del club.
+                        comprobarPermiso();
+                        if (!club) traerClub();
+                      }
+                    : cerrar
+                }
                 accessibilityRole="button"
                 accessibilityLabel={status === 'error' ? 'Reintentar' : 'Volver'}
                 style={({ pressed }) => [

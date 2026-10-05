@@ -220,6 +220,12 @@ const linking = {
       // entrada, tocar el push con la app cerrada dejaba al usuario en la
       // raíz en vez de en la conversación.
       ChatThread: 'chat/:threadKey',
+      // La ficha de un club y su editor. Sin estas dos, «Editar club» no
+      // tenía URL propia: en web la barra de direcciones seguía marcando la
+      // pantalla anterior y recargar devolvía a la raíz. No chocan con
+      // `ClubsTab: 'clubes'` porque ese camino es exacto y estos llevan id.
+      ClubDetail: 'clubes/:clubId',
+      EditClub: 'clubes/:clubId/editar',
       // `p/<id>` es el formato del enlace público que compartimos.
       MatchDetail: 'p/:matchId',
       ManageMatch: 'p/:matchId/gestionar',
