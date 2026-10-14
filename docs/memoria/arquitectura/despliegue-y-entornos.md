@@ -67,6 +67,18 @@ Al 2026-09-18 sigue sin ejecutarse ningún build nativo; el cierre de U3 del 202
 - `.env.example`, `.gitignore` y `package.json`
 - `src/services/supabase.js`, `src/services/notifications.js` y `supabase/functions/send-push/`
 
+## Informes de error (Sentry), desde el 2026-10-14
+
+Hasta ahora un fallo en el teléfono de alguien no dejaba rastro en ninguna parte: la única traza era un `console.error` que nadie iba a leer. No es teórico — en octubre aparecieron dos fallos **vivos en producción** (el editor de club abriéndose vacío y `search_canchas` devolviendo 42501 a todos) y los dos se encontraron mirando a mano.
+
+- **`@sentry/react-native` instalado y registrado como plugin de Expo.** El plugin sólo trabaja en el build nativo, donde sube los mapas de origen; sin ellos el stack llega minificado y el informe no sirve. Para eso hace falta además configurar organización y proyecto (el aviso `Missing config for organization, project` que aparece al arrancar lo recuerda).
+- **No se enciende sin `EXPO_PUBLIC_SENTRY_DSN`,** y eso no es un modo degradado: es que no pasa nada. Un repositorio recién clonado no manda errores a ninguna parte. **Tampoco se enciende en desarrollo**, aunque la variable esté: esos errores ya se ven en la consola y en el boundary con su stack.
+- **El marcador de `.env.example` no cuenta como DSN.** Está escrito a propósito para que copiar el archivo sin reemplazarlo no arranque Sentry con una dirección inventada, que produce errores de red en bucle en el teléfono.
+- **Qué sale y qué no.** Mandar errores a un tercero es publicar datos, y las URL de esta app llevan identificadores de persona y texto que la gente escribió (`/rest/v1/profiles?id=eq.<uuid>`, `?or=(titulo.ilike.%<lo que buscó>%)`, `/clubes/<uuid>/editar`). La aduana vive en `src/utils/observabilidad.js`, es pura y está probada: se va la query entera, los uuid del camino se vuelven `<id>`, **no se adjunta identidad de nadie** (`sendDefaultPii: false` y además se borra `user` del evento) y las migas de consola se descartan enteras, porque los `console.error` de los servicios imprimen el objeto de PostgREST. Se conservan el camino de la URL, el mensaje y el stack, que es lo que sirve para arreglar.
+- **Sin trazas de rendimiento** (`tracesSampleRate: 0`): la pregunta de hoy es si algo se rompió, no cuánto tardó. Multiplicaría el volumen y la cuota.
+- **Un solo enganche.** `ErrorBoundary.componentDidCatch` es por donde pasan todos los errores de render, porque `withAuthGuard` envuelve cada pantalla con él y `App.js` envuelve la raíz. Hay una prueba que fija las dos cosas: si alguien saca el boundary del guard, el informe quedaría cubriendo sólo la raíz sin que nadie lo note.
+- **Lo que falta para que esto sirva de verdad:** crear el proyecto en Sentry, poner el DSN en las variables de EAS (hoy el perfil `preview` tiene las otras tres) y **sacar un build**. Hasta entonces está instalado y apagado.
+
 ## Limitaciones conocidas
 
 Sin el archivo de servicios válido, un prebuild o build Android que evalúe `googleServicesFile` no puede resolver esa entrada. La exportación web y Expo Go no usan ese archivo.

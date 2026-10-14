@@ -74,6 +74,11 @@ module.exports = {
       backgroundColor: '#0A0C0A',
     },
     plugins: [
+      // Sentry. Su trabajo en el build nativo es subir los mapas de origen:
+      // sin ellos el stack llega minificado y un informe no sirve de nada.
+      // El SDK se inicializa en `App.js` y NO arranca sin
+      // EXPO_PUBLIC_SENTRY_DSN, así que esto es inerte hasta que exista.
+      '@sentry/react-native',
       [
         'expo-location',
         {

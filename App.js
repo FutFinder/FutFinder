@@ -1,5 +1,11 @@
 import 'react-native-gesture-handler';
 import './global.css';
+
+// Antes que nada: un error que ocurra mientras se monta la app también tiene
+// que llegar a alguna parte. Sin `EXPO_PUBLIC_SENTRY_DSN` esto no hace nada.
+import { iniciarObservabilidad } from './src/services/observabilidad';
+
+iniciarObservabilidad();
 import React, { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
