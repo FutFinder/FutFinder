@@ -11,7 +11,7 @@
     "build:android": "npx eas-cli@latest build --platform android --profile preview",
     "build:ios": "npx eas-cli@latest build --platform ios --profile preview",
     "build:store": "npx eas-cli@latest build --platform all --profile production",
-    "test": "node --test 'src/**/__tests__/*.test.js'",
+    "test": "node --test 'src/**/__tests__/*.test.js' 'scripts/__tests__/*.test.js'",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "verify": "npm run lint && npm test"

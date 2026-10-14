@@ -56,3 +56,6 @@ out/
 # cambian a cada iteración y no describen lo que la app hace hoy.
 docs/Prompt-Claude-Design-*.md
 docs/Rediseno-*.md
+
+# Scratch de la CLI de Supabase (base local)
+supabase/.temp/

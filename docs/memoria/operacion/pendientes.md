@@ -20,15 +20,41 @@ Lo que se confirmó **sin cambios**: la política `profiles_read_all` sigue en `
 
 No se pudieron comprobar desde acá: la entrega push en un teléfono y los tipos de carácter de la contraseña, las dos por falta de entorno nativo y de un build distribuido.
 
-## P1 — Falta construir una base nueva desde el repositorio y comprobar que funciona
+## Resuelto el 2026-10-14 — el repositorio ya construye una base desde cero
 
-> **El repositorio ya describe todo lo que la base tiene (migración 146, 2026-10-01).** Lo que queda no es escribir: es construir una base vacía desde `supabase/` y ver que levanta. Eso necesita un PostgreSQL local, que la Mac donde se cerró esto no tiene.
+**Y no construía.** Fallaba en la migración 16 de 169. Se levantó por primera vez una base vacía (colima + el stack local de Supabase, Postgres 17.11) y se fue arreglando hasta que entró entera. Lo que apareció por el camino no se veía desde producción, y ése era justamente el punto.
 
-- **Lo que se cerró:** se cruzó el catálogo ENTERO contra todas las migraciones y `schema.sql`, buscando la sentencia que crea cada objeto. El inventario real era **mayor** que el de esta nota: 4 tablas (`canchas`, `notifications`, `push_tokens`, `ratings`), 8 funciones (`norm_text`, `search_canchas`, `recalc_user_ratings`, `tg_ratings_recalc`, `create_notification`, `tg_match_future_only`, `tg_notify_friend_request`, `tg_notify_friend_accept`), **8 disparadores**, 2 columnas de `profiles` y 3 cron. Los describe la migración 146.
-- **Los ocho disparadores son el hallazgo que esta nota no tenía**, y es el peor de los casos: seis de sus funciones SÍ estaban versionadas, pero su `create trigger` no. En una base nueva la función existiría y **nadie la llamaría** — todo compila, nada falla, y las reglas simplemente no se aplican. Lo fija el caso 3 del arnés, que comprueba que cada disparador apunte a su función.
-- **La 146 no toca nada de lo que ya existe.** Cada objeto va detrás de su comprobación de existencia y no se usa `create or replace function`, que habría reemplazado el cuerpo desplegado por la transcripción. Comprobado con una huella md5 de todo el catálogo de `public` —columnas con tipo y default, restricciones, índices, políticas, disparadores, cuerpos de función y cron— **idéntica antes y después** de aplicarla: `e1baa073…`.
-- **Dos cosas quedan fuera a propósito**, y están explicadas en el archivo: `notifications_type_check` (la lista de 53 tipos de aviso, que catorce migraciones posteriores fueron ampliando; copiarla fijaría una versión vieja) y `ratings_insert_eligible` (la migración 124 la reescribió para exigir que el partido no esté cancelado). En una base nueva las pone la migración que corresponda.
-- **Verificación necesaria para cerrar esto del todo:** levantar una base vacía corriendo `supabase/migrations/` en orden y comprobar que no falta ningún objeto y que las pruebas SQL pasan. Hasta entonces, lo que está demostrado es que el repositorio lo describe y que aplicarlo sobre producción no cambia nada — no que el resultado arranque.
+### Los cinco huecos
+
+1. **El orden de los archivos, que ningún `sort` acierta.** Alfabéticamente la **100 va entre la 09 y la 10** —noventa posiciones antes de donde corresponde—, así que cualquier herramienta que lea el directorio aplica la 100 sobre tablas que la 10 no ha creado. Y `sort -V`, que arregla eso, pone **44b, 44c y 44d ANTES que la 44**, que es la que crea lo que las otras modifican. Las dos fallan al aplicar, no al leer. Lo resuelve `scripts/ordenMigraciones.js`, con pruebas que fijan las dos trampas.
+2. **Tres de las cuatro tablas de la migración 146 se creaban después de usarse.** `notifications` la usa la **16**, `canchas` la **101** y `ratings` la **124**; las tres nacían en la **146**. La 146 demostró con una huella md5 que el repositorio describía todo lo que la base tiene, y era cierto **para producción** —donde ya existían— pero no decía nada de una base nueva.
+3. **La 146 transcribió mal una columna, y no se podía notar.** `canchas.nombre_norm` es una columna **generada** (`attgenerated = 's'`) y la 146 la escribió como `default public.norm_text(nombre)`, que Postgres rechaza: «cannot use column reference in DEFAULT expression». En producción el `create table if not exists` nunca se evaluó, así que el error llevaba ahí desde octubre sin que nada lo delatara. La huella md5 probaba que no cambiaba nada, **no que la transcripción fuera correcta**.
+4. **Nadie creaba `pg_net` ni `pg_cron`,** y el repositorio las usa: la migración 38 escribe `net.http_response_result` y la 146 llama `cron.schedule`. Estaban en producción porque Supabase las instaló a mano.
+5. **Cuatro cosas más sin versionar:** `matches.direccion`, `matches.reminder_sent_at`, `matches.rating_reminder_sent_at` y la función `tg_auto_suspend` —que la migración **88** toca y que sólo se versionó en la **134**, cuarenta y seis después—.
+
+### Cómo quedó
+
+- **`scripts/construir-base.mjs`** levanta la base entera desde `supabase/schema.sql` más las 169 migraciones en el orden correcto. Usa `psql` si está, y si no, el que vive dentro del contenedor del stack local. Para en la PRIMERA que falla y dice cuántas iban.
+- **`schema.sql` creció** con lo que faltaba: las dos extensiones, las tres columnas de `matches`, las funciones del cimiento (secciones 2 y 6 de la 146), `tg_auto_suspend` en su forma anterior a TrueScore, las cuatro tablas **con `nombre_norm` corregida** y las dos columnas de `profiles`. **La 146 no se tocó**: está aplicada, y como todo lo suyo lleva `if not exists`, cuando le llega su turno ya no hace nada.
+- Sus **disparadores** (sección 7 de la 146) sí se quedan donde están: dependen de funciones que crean otras migraciones, así que no pueden ir antes que ellas.
+
+### La comprobación
+
+**169/169 migraciones aplicadas**, y reconstruida después **sin la 149** —la que espera un build— para comparar contra producción:
+
+| | base nueva | producción |
+|---|---|---|
+| Tablas de `public` | 72 | 72 |
+| Funciones de `public` | 285 | 285 |
+| Políticas de `public` | 118 | 118 |
+| Disparadores | 68 | 68 |
+| Tareas cron | 12 | 12 |
+
+La única diferencia bruta era una política de más en el recuento total, y resultó ser del propio stack local en `storage`, no del repositorio.
+
+### Lo que esto deja montado
+
+El stack local sigue disponible: `colima start` y después `supabase start` desde la carpeta aislada. Es lo que destraba el pendiente de la carrera de dos sesiones, que no se podía montar contra producción.
 
 ## Resuelto el 2026-09-23 — aprobar a un jugador también mira su agenda
 
