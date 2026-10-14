@@ -5,6 +5,7 @@ import {
   limpiarEvento,
   limpiarUrl,
 } from '../utils/observabilidad';
+import { APP_VERSION } from '../utils/appVersion';
 
 /**
  * El arranque de Sentry.
@@ -47,7 +48,14 @@ export function iniciarObservabilidad() {
       tracesSampleRate: 0,
       // La versión que se ve en la tienda, para saber a qué build pertenece
       // cada informe. Sin esto todos los errores se mezclan.
-      release: process.env.EXPO_PUBLIC_APP_VERSION || undefined,
+      //
+      // Sale de `app.config.js` vía `Constants.expoConfig.version`, NO de una
+      // variable de entorno. La primera versión de este archivo leía
+      // `EXPO_PUBLIC_APP_VERSION`, que no la define nadie: el `release`
+      // habría llegado vacío a Sentry y todos los informes se habrían
+      // mezclado, que es justo lo que se quería evitar. Además sería un
+      // número escrito a mano, desincronizable del que de verdad se publica.
+      release: APP_VERSION || undefined,
       beforeSend: (evento) => limpiarEvento(evento),
       beforeBreadcrumb: (miga) => {
         // Las migas de consola se descartan enteras: en esta app los

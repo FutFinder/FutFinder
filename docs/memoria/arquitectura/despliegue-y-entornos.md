@@ -28,6 +28,27 @@ La configuración del repositorio define exportación web con Vercel, builds nat
 
 - **Sesión de Expo**: activa en la cuenta `futfinder`.
 - **Variables del entorno `preview` de EAS**: creadas `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` y `EXPO_PUBLIC_MAPBOX_TOKEN` (visibilidad *sensitive*). Hacen falta porque `.env` está en `.gitignore` y EAS no lo sube: sin ellas el build sale en modo de demostración, sin backend. Los perfiles `development` y `production` todavía no las tienen.
+
+### Qué necesita un build, lista completa (2026-10-14)
+
+Sacada del código, no escrita a mano: la mantiene al día `src/utils/__tests__/variablesDeEntorno.test.js`, que falla si aparece una variable que nadie documentó o si una documentada deja de usarse. **Una variable que falta no rompe el build: lo cambia**, y eso se descubre con el teléfono en la mano.
+
+| Variable | Si falta |
+|---|---|
+| `EXPO_PUBLIC_SUPABASE_URL` | la app entra en modo de demostración: pantallas sin backend |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | lo mismo |
+| `EXPO_PUBLIC_MAPBOX_TOKEN` | sin mapa ni autocompletado de direcciones; la lista y los filtros siguen |
+| `EXPO_PUBLIC_SENTRY_DSN` | no se manda ningún informe de error; la app funciona igual |
+| `GOOGLE_SERVICES_JSON` (secreto de archivo) | el APK compila pero Android queda **sin push** |
+
+**`EXPO_PUBLIC_APP_VERSION` no existe y no debe crearse.** La versión sale de `app.config.js` vía `Constants.expoConfig.version` (ver `src/utils/appVersion.js`). La primera versión de la integración de Sentry leía esa variable para su `release` y era un fallo: nadie la define, así que el `release` habría llegado vacío y **todos los informes se habrían mezclado**, que es justo lo que el campo existe para evitar. Corregido el 2026-10-14 y fijado por una prueba.
+
+**Lo que falta comprobar, y necesita la sesión de Expo:** si el perfil `production` tiene esas variables. El 2026-10-02 no las tenía, y un build de tienda sin ellas **sale en modo de demostración**: una app en la tienda sin backend. La sesión caducó (`eas whoami` → `Not logged in`), así que la comprobación es:
+
+```
+npx eas-cli@latest login
+npx eas-cli@latest env:list --environment production
+```
 - **`google-services.json` es opcional**: `app.config.js` sólo declara `android.googleServicesFile` si el archivo existe. Sin el secreto `GOOGLE_SERVICES_JSON` el APK compila y funciona, pero Android queda **sin push**; los fallos del token ya los atrapa `services/notifications.js`.
 - **Keystore de Android**: lo generó EAS en la nube en el primer build (2026-10-02) y vive en sus servidores. Antes de esa fecha no hubo ningún build nativo.
 
