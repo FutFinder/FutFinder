@@ -27,6 +27,21 @@ exporte una segunda paleta y que ningún token que el código usa se quede sin
 valor —en React Native un token inexistente pinta transparente o negro y no
 avisa.
 
+El cuarto candado, y el único que caza un color **escrito a mano**, es
+`src/theme/__tests__/nadieEscribeLaPaletaAMano.test.js`: busca por TEXTO cada
+hex borrado y su `rgba()`, porque ni el lint ni la migración de tokens ven un
+color dentro de una cadena. **Desde el 14-10-2026 lee además los archivos de
+configuración de la raíz**, `app.config.js` y `tailwind.config.js`. Recorría
+sólo `src/`, y por ese hueco el olivo legado sobrevivió casi un mes en tres
+sitios de `app.config.js`: `notification.color`, el `themeColor` del PWA y el
+`color` del plugin `expo-notifications` —el tinte del ícono de notificación en
+Android, o sea el color de marca que veía cualquiera que recibiera un push.
+Ahí el verde va escrito a mano a propósito (el prebuild evalúa ese archivo con
+un Node cuya versión no fijamos, y `colors.js` es un módulo ES); lo que
+mantiene la copia al día es una aserción de esa misma prueba contra
+`paleta.green`. Corolario para quien edite esos archivos: un hex prohibido no
+se escribe **ni en un comentario**, porque la prueba va por texto.
+
 Diseño y fases: `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 
 ### Lo que NO se unificó, a propósito

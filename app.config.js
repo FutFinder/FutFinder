@@ -18,6 +18,33 @@ const fs = require('fs');
 const googleServicesPath = process.env.GOOGLE_SERVICES_JSON || './google-services.json';
 const googleServicesFile = fs.existsSync(googleServicesPath) ? googleServicesPath : undefined;
 
+/**
+ * El verde de la app: `paleta.green` de `src/theme/colors.js`.
+ *
+ * VA ESCRITO A MANO, y no es por pereza. `colors.js` es un módulo ES, y que
+ * un `require()` lo lea depende de la detección de sintaxis de Node, que es
+ * reciente: acá (Node 26) funciona —pruébalo y verás que sí—, pero en un Node
+ * 18 el mismo `require` tira `SyntaxError: Unexpected token 'export'`. Este
+ * archivo lo evalúa el prebuild, también en el worker de EAS Build, y no
+ * fijamos su versión de Node en ninguna parte: `package.json` no declara
+ * `engines` ni `type`. Un hex duplicado se ve feo; un prebuild que no arranca
+ * deja sin build. (`tailwind.config.js` sí importa `colors.js`, y por eso es
+ * la excepción y no el ejemplo a seguir.)
+ *
+ * La copia no se desincroniza sola: `nadieEscribeLaPaletaAMano.test.js`
+ * compara este valor con `paleta.green` y desde ahora además lee los archivos
+ * de configuración de la raíz, que era justo lo que no miraba.
+ *
+ * Hasta hoy acá estaba el verde oliva de la paleta legada, borrada al
+ * unificar la estética (2026-09-16). No se escribe su hex ni para contar
+ * esto: la prueba va por texto y lo cazaría acá igual. Sobrevivió casi un mes
+ * porque esa prueba sólo recorría `src/`. El peor de los tres sitios era el
+ * `color` del plugin `expo-notifications`: es el tinte del ícono de
+ * notificación en Android, o sea el color de marca que ve cualquiera que
+ * reciba un push.
+ */
+const VERDE = '#55DF69';
+
 module.exports = {
   expo: {
     name: 'FutFinder',
@@ -61,7 +88,7 @@ module.exports = {
       // (tampoco existe carpeta `assets/`). Sin este campo, Android/iOS usan
       // su ícono de notificación por defecto en vez de fallar el build por
       // apuntar a un archivo inexistente.
-      color: '#71B533',
+      color: VERDE,
       androidMode: 'default',
       androidCollapsedTitle: 'FutFinder',
       iosDisplayInForeground: true,
@@ -70,7 +97,7 @@ module.exports = {
       bundler: 'metro',
       name: 'FutFinder',
       shortName: 'FutFinder',
-      themeColor: '#71B533',
+      themeColor: VERDE,
       backgroundColor: '#0A0C0A',
     },
     plugins: [
@@ -92,7 +119,7 @@ module.exports = {
       [
         'expo-notifications',
         {
-          color: '#71B533',
+          color: VERDE,
           defaultChannel: 'default',
           sounds: [],
         },
