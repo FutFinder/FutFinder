@@ -169,6 +169,7 @@ export default function ClubHistoryScreen({ navigation, route }) {
                 horaLabel={item.horaLabel}
                 localLabel={item.localLabel}
                 canchaNombre={item.canchaNombre}
+                tipoLabel={item.tipoLabel}
                 onPress={
                   item.soyIntegrante
                     ? () => navigation.navigate('MatchDetail', { matchId: item.id })

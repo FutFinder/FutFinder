@@ -339,23 +339,44 @@ test('cada partido trae escudos, fecha, hora y cancha', () => {
   assert.match(p.fechaLabel, /^28/);
 });
 
-test('el tipo de partido NO viaja al historial: en un encuentro entre clubes nadie lo elige', () => {
-  // Hallazgo de la auditoría de la 6.3: ni `club_challenges` ni
-  // `club_challenge_proposals` tienen nivel, y `aprobar_propuesta()` crea el
-  // partido sin ponerlo, así que queda el `default 'recreativo'` de la tabla.
-  // Los 7 partidos de clubes de producción están todos en 'recreativo' por
-  // omisión. Mostrarlo era enseñar un valor por defecto como si fuera un dato.
-  for (const nivel of ['recreativo', 'intermedio', 'competitivo', null]) {
+test('el tipo de partido vuelve al historial, pero sólo cuando alguien lo eligió', () => {
+  // ESTA PRUEBA DECÍA LO CONTRARIO HASTA EL 2026-10-14, y por una buena
+  // razón: ni `club_challenges` ni `club_challenge_proposals` tenían nivel,
+  // `aprobar_propuesta()` creaba el partido sin ponerlo y quedaba el
+  // `default 'recreativo'` de la tabla. Mostrarlo era enseñar un valor por
+  // defecto como si fuera un dato, así que se dejó de pintar.
+  //
+  // La migración 156 le dio a quien propone un sitio donde elegirlo, y la
+  // 157 hizo que `historial_club()` lo saque de la PROPUESTA —que admite
+  // nulo— en vez de `matches`. Con eso la distinción ya existe y la razón
+  // para esconderlo desapareció.
+  //
+  // Lo que esta prueba vigila ahora es la otra mitad: que un encuentro que
+  // nadie clasificó siga sin inventarse un nivel.
+  for (const [nivel, etiqueta] of [
+    ['recreativo', 'Recreativo'],
+    ['intermedio', 'Intermedio'],
+    ['competitivo', 'Competitivo'],
+  ]) {
     const p = normalizarPartido(fila({ id: 'm-nivel', golesLocal: 1, golesVisitante: 0, nivel }), CLUB_A);
-    assert.equal(p.tipoLabel, undefined, `el nivel «${nivel}» volvió a la tarjeta`);
+    assert.equal(p.tipoLabel, etiqueta, `el nivel «${nivel}» no llegó a la tarjeta`);
   }
 
-  // Y la tarjeta tampoco lo espera ya.
+  // Y los que nadie eligió —todos los anteriores a la 156— no pintan nada.
+  // `undefined` no se prueba acá porque el ayudante `fila()` tiene su propio
+  // valor por defecto y estaríamos probando el ayudante; la fila SIN la
+  // columna la cubre `services/__tests__/nivelDelEncuentro.test.js`.
+  for (const nivel of [null, 'profesional']) {
+    const p = normalizarPartido(fila({ id: 'm-nivel', golesLocal: 1, golesVisitante: 0, nivel }), CLUB_A);
+    assert.equal(p.tipoLabel, null, `se inventó una etiqueta para «${nivel}»`);
+  }
+
+  // Y la tarjeta vuelve a recibirlo.
   const tarjeta = fs.readFileSync(
     path.join(RAIZ, 'src', 'components', 'club', 'MatchHistoryCard.js'),
     'utf8'
   );
-  assert.equal(tarjeta.includes('tipoLabel'), false, 'MatchHistoryCard sigue recibiendo tipoLabel');
+  assert.ok(tarjeta.includes('tipoLabel'), 'MatchHistoryCard no recibe tipoLabel');
 });
 
 test('la fecha no se corre un día: 2026-07-28 se lee 28, no 27', () => {

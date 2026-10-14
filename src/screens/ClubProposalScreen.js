@@ -40,6 +40,7 @@ import {
 import {
   DURACIONES,
   MODALIDADES,
+  NIVELES,
   METODOS_INSCRIPCION,
   CUPOS_POR_CLUB,
   INSTRUCCIONES_MAX,
@@ -160,6 +161,11 @@ export default function ClubProposalScreen({ navigation, route }) {
   const { direccion, canchaNombre, comuna, region } = ubicacion;
   const hayUbicacion = ubicacionFijada(ubicacion);
   const [modalidad, setModalidad] = useState('futbol7');
+  // Nace en `null` y no en 'recreativo': «no elegí» y «elegí recreativo»
+  // son cosas distintas, y el servidor las guarda distintas desde la
+  // migración 156. Un valor por defecto acá volvería a borrar esa
+  // diferencia, que es justo el fallo que se vino a cerrar.
+  const [nivel, setNivel] = useState(null);
   const [cuposPorClub, setCuposPorClub] = useState(String(CUPOS_POR_CLUB.min + 3));
   const [metodoInscripcion, setMetodoInscripcion] = useState('orden_llegada');
   const [cuotaPorPersona, setCuotaPorPersona] = useState('0');
@@ -244,6 +250,7 @@ export default function ClubProposalScreen({ navigation, route }) {
       duracionMin,
       ...ubicacionDraft(ubicacion),
       modalidad,
+      nivel,
       cuposPorClub: parseInt(cuposPorClub, 10),
       metodoInscripcion,
       cuotaPorPersona: parseInt(cuotaPorPersona, 10),
@@ -281,6 +288,7 @@ export default function ClubProposalScreen({ navigation, route }) {
     fechaStr,
     horaStr,
     duracionMin,
+    nivel,
     ubicacion,
     modalidad,
     cuposPorClub,
@@ -671,6 +679,27 @@ export default function ClubProposalScreen({ navigation, route }) {
                       />
                     ))}
                   </View>
+                </View>
+
+                <View style={styles.grupo}>
+                  <FieldLabel>Nivel (opcional)</FieldLabel>
+                  <View style={styles.chipsRow}>
+                    {NIVELES.map((n) => (
+                      <Opcion
+                        key={n.value}
+                        label={n.label}
+                        activa={nivel === n.value}
+                        // Volver a tocar el elegido lo suelta: sin esto no
+                        // habría forma de volver a «no lo digo» una vez
+                        // marcado, y el campo es opcional.
+                        onPress={() => setNivel(nivel === n.value ? null : n.value)}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.ayuda}>
+                    Lo eliges tú y no se negocia. Si lo dejas en blanco, el
+                    encuentro no queda clasificado.
+                  </Text>
                 </View>
 
                 <View style={styles.grupo}>

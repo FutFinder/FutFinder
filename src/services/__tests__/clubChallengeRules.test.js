@@ -583,7 +583,8 @@ test('el payload usa los nombres de columna que espera la RPC', () => {
   assert.deepEqual(Object.keys(p).sort(), [
     'cancha_nombre', 'comuna', 'cuota_por_persona', 'cupos_por_club',
     'direccion', 'duracion_min', 'fecha', 'instrucciones', 'latitud',
-    'longitud', 'metodo_inscripcion', 'modalidad', 'proponente_juega', 'region',
+    'longitud', 'metodo_inscripcion', 'modalidad', 'nivel', 'proponente_juega',
+    'region',
   ]);
   assert.equal(p.duracion_min, 90);
   assert.equal(p.cupos_por_club, 7);

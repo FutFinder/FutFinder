@@ -534,6 +534,7 @@ export default function ClubDetailScreen({ navigation, route }) {
                 horaLabel={p.horaLabel}
                 localLabel={p.localLabel}
                 canchaNombre={p.canchaNombre}
+                tipoLabel={p.tipoLabel}
                 // Al partido sólo entran los integrantes de los dos clubes: a
                 // quien mira desde fuera, la tarjeta no le ofrece un destino
                 // que le va a contestar «este partido ya no está disponible».
