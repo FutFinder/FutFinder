@@ -140,7 +140,21 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Evidencia:** la creó la migración 44d como la proyección estrictamente pública de un partido de clubes terminado (clubes, día, marcador y V/E/D) y la 48 le rellenó el marcador. Desde la 49, la aplicación lee el historial con `historial_club()`, que devuelve más —escudos y nivel— y reserva la hora exacta y la cancha para los integrantes de los dos clubes. Ninguna pantalla, servicio ni Edge Function llama ya a `historial_publico_club()`; sólo la usan `44d_partido_privado_test.sql` (caso 15) y `49_historial_test.sql` (caso 5), que la comparan a propósito.
 - **Por qué NO se elimina:** sigue siendo el contrato que fija qué es público de un encuentro terminado, y `clubs.slug` existe desde la migración 11 «para la futura página pública `futfinder.com/club/<slug>`», donde el visitante es `anon` — el caso exacto que esta función atiende. Retirar una función aplicada porque hoy no tiene quien la llame es perder la referencia sin ganar nada; su coste es una función `stable security definer` de sólo lectura.
 - **El detalle que hay que recordar si se usa:** su `join` contra `club_match_results` es `left`, así que publica cualquier partido `finalizado` **aunque nadie haya confirmado el marcador**, con los goles en `null`. `historial_club()` hace ese join interno justamente para no publicar un partido como jugado sin resultado. Quien construya la página pública tiene que elegir una de las dos a conciencia.
-- **Acción:** al construir la página pública del club, decidir si se usa `historial_club()` para todo —recomendado, ya funciona para `anon`— y, si es así, retirar `historial_publico_club()` con una migración nueva que también actualice el caso 15 de la prueba de la 44d. Nunca editando la 44d.
+- **CORRECCIÓN del 2026-10-14: «ya funciona para `anon`» era falso, y de las dos funciones.** Medido con `set local role anon` contra producción: `historial_club()` y `historial_publico_club()` dan **42501** las dos. Ninguna la puede ejecutar `anon` —el `execute` es de `postgres`, `authenticated` y `service_role`— así que la recomendación que estaba escrita acá habría mandado a quien construya la página pública directo contra un muro. Elegir cuál se usa **no basta**: hace falta además un `grant execute … to anon`, y eso es una decisión de seguridad, no un trámite.
+- **Lo que un visitante anónimo YA ve hoy, sin que exista ninguna página pública** (medido el 2026-10-14):
+
+  | | `anon` |
+  |---|---|
+  | `profiles` | **0 filas** — cerrado por las migraciones 142, 143 y 148 |
+  | `clubs` | 13 filas (`clubs_read` es `true` para todos) |
+  | `club_members` | 15 filas… |
+  | …pero esos `user_id` | **no resuelven a nadie**: 0 de 15 llegan a un perfil |
+  | `club_photos` | 4 filas |
+  | `matches` | 18 de 27 |
+  | `historial_club()` / `historial_publico_club()` | **42501** |
+
+  O sea: el padrón de quién pertenece a qué club es legible, pero **anonimizado** —son uuid que no llevan a ninguna persona, porque `profiles` se cerró—. Esa mitigación no es deliberada, es un efecto de las migraciones de privacidad del perfil; si alguien reabriera `profiles` a `anon`, el grafo de membresías quedaría con nombre y apellido sin que nadie tocara `club_members`.
+- **Acción:** al construir la página pública del club, decidir si se usa `historial_club()` para todo y, si es así, retirar `historial_publico_club()` con una migración nueva que también actualice el caso 15 de la prueba de la 44d. Nunca editando la 44d. **Y, antes que eso, decidir qué se abre a `anon`:** hoy no hay ninguna función de historial que pueda llamar.
 - **Verificación necesaria:** la página pública no muestra ningún partido sin marcador confirmado, y ninguna prueba versionada queda apuntando a una función que ya no existe.
 
 ## P2 — Definir y construir la moderación posterior a un reporte
