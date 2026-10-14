@@ -67,18 +67,19 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Verificación necesaria:** una matriz Android/iOS en dispositivos físicos confirma permisos, token, una categoría permitida, una bloqueada por preferencia y la recuperación ante token inválido. Las pruebas web no cierran este pendiente.
 - **No se puede avanzar desde la Mac en la que se trabaja hoy:** no tiene Xcode ni el SDK de Android, así que ni siquiera se llega a un build para instalar.
 
-## P1 — Falta decidir quién modera, y después las pantallas
+## Resuelto el 2026-10-14 — ya hay quien modera, y pantalla para hacerlo
 
-> **El mecanismo ya está (migración 151, 2026-10-01) y el padrón nace VACÍO.** Mientras nadie esté en él no cambia nada. Lo que queda es una decisión tuya y, después, las pantallas.
-
-- **Lo que quedó listo:** la tabla `moderadores` —sin privilegios de cliente: ni la app la lee ni puede nombrar a nadie—, `es_moderador()` como única fuente de la pregunta, `moderacion_cola()` con las tres colas en una llamada, `moderacion_resolver_revision()` como puerta con nombre sobre la función de la 47c, y `moderacion_reabrir_resultado()`.
-- **Nombrar a alguien es un `insert` desde el panel:** `insert into public.moderadores (user_id, nota) values ('<uuid>', 'por qué');`. Es la única parte que queda en manos de una persona, a propósito.
-- **Lo que sigue sin existir, y es lo que decides tú:** quién modera. La nota original ya lo acotaba —rol propio, no `admin` de club, porque quien modera no puede ser parte interesada— y el padrón respeta eso sin elegir a nadie.
-- **Y después, las pantallas:** una bandeja que lea `moderacion_cola()` y dos acciones. No se construyeron porque sin rol no hay a quién mostrárselas.
-- **Un dato medido que le hace falta a quien construya esa pantalla:** quien modera **no ve el hilo** del desafío que modera. `club_challenge_events_read` exige `chat_puede_ver_desafio()`, y quien modera no pertenece a ninguno de los dos clubes — que es justamente lo que lo hace imparcial. Se comprobó: ve 0 eventos. Por eso `club_sanction_reviews.contexto` ya guarda el expediente copiado al pedir la revisión; la pantalla usa eso, o necesita su propia puerta `security definer`.
-- **Sigue en pie la obligación operativa:** nadie recibe un aviso cuando llega una revisión. Hasta que exista la bandeja hay que mirar la cola a mano — ahora con `select public.moderacion_cola();`, que además trae los resultados en disputa y los reportes sin mirar.
-- **Cómo se resuelve HOY, sin pantalla:** nombrarse en el padrón y llamar `moderacion_resolver_revision('<review_id>', 'retirar' | 'mantener', 'nota')`; o seguir con `resolver_revision_sancion(...)` desde el panel con `service_role`, que no cambió. La diferencia es que por la puerta nueva queda registrado **quién** decidió, y por la vieja `resuelta_por` queda en null.
-- **Verificación: arnés 9/9.** Mide las dos mitades: con el padrón vacío nadie modera, la cola está cerrada, reabrir está cerrado y el desafío no se mueve; con alguien nombrado, modera, ve las tres colas con datos reales, reabre y deja su evento. Y los dos bordes: nombrar a uno **no** le abre la puerta a otro, y no se reabre lo que no está en disputa.
+- **La decisión (Vicente): modera él, y solo él.** Con 32 usuarios no hace falta más, y no reparte un poder que después cuesta quitar. Queda **una fila** en `public.moderadores`, puesta desde el panel porque la tabla no tiene políticas ni privilegios de cliente: la app ni lee el padrón ni puede nombrar a nadie.
+- **La pantalla** (`src/screens/ModeracionScreen.js`) muestra las tres colas de `moderacion_cola()` y resuelve dos: retirar o mantener una sanción revisada, y reabrir un resultado en disputa. Se llega por Configuración → Moderación, y **esa entrada sólo se dibuja para quien está en el padrón**.
+- **Esconder la entrada es cosmética y el código lo dice.** `es_moderador()` decide en el servidor y las tres RPC lo comprueban por su cuenta; la pantalla nunca es la autoridad.
+- **Los reportes se muestran y no se tocan**, y la pantalla lo explica en vez de limitarse a no traer botones: resolverlos exige decidir estados, medidas y apelación, que sigue abierto (ver el P2). Esa decisión vive en `COLAS` de `src/utils/moderacion.js` con una prueba que se pone roja si alguien agrega el botón sin darse cuenta.
+- **«Vacía» y «no se pudo leer» se dibujan distinto.** En una pantalla de sanciones sin resolver, confundirlas es grave: la primera dice que no hay nada, la segunda ofrece reintentar.
+- **Verificación, con la sesión real de Vicente:**
+  - La entrada aparece en Configuración y la pantalla abre con las colas de producción (2 reportes, 0 revisiones, 0 disputas).
+  - **Las filas accionables se vieron dibujadas** —con su expediente, su campo de nota y sus botones— fabricando la respuesta de `moderacion_cola()` con el arnés de `fetch`, de sólo lectura. Las dos colas estaban vacías en producción y no se iba a sembrar una sanción para mirarla.
+  - **El camino de acción está probado de punta a punta sin escribir nada:** al confirmar «Retirar sanción» sobre una fila inventada, la pantalla mostró **«No se pudo — Esa revisión no existe»**, que es un texto que vive dentro de `resolver_revision_sancion`. Para llegar ahí la RPC se llamó, `es_moderador()` devolvió **true** (si no, habría sido un 42501, no un `ok:false`) y el cliente leyó `data.ok === false`. Lo único sin ejercitar es la rama de éxito, que necesita una sanción real.
+  - **La puerta cierra por los cuatro lados:** con una cuenta fuera del padrón, `es_moderador()` da false y `moderacion_cola()`, `moderacion_reabrir_resultado()` y `moderacion_resolver_revision()` responden **42501**; y `public.moderadores` no se puede leer desde la app.
+- **Lo que esto NO cierra:** el P2 de moderación de reportes sigue abierto, y a propósito.
 
 ## Resuelto el 2026-10-01 — un resultado en disputa ya tiene forma de reabrirse
 

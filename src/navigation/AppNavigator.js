@@ -57,6 +57,7 @@ import ClubResultScreen from '../screens/ClubResultScreen';
 import ExploreClubsScreen from '../screens/ExploreClubsScreen';
 import EditClubScreen from '../screens/EditClubScreen';
 import PermisosClubScreen from '../screens/PermisosClubScreen';
+import ModeracionScreen from '../screens/ModeracionScreen';
 import ClubInviteScreen from '../screens/ClubInviteScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
@@ -146,6 +147,10 @@ const GuardedClubResultScreen = withAuthGuard(ClubResultScreen, 'ClubResult');
 const GuardedExploreClubsScreen = withAuthGuard(ExploreClubsScreen, 'ExploreClubs');
 const GuardedEditClubScreen = withAuthGuard(EditClubScreen, 'EditClub');
 const GuardedPermisosClubScreen = withAuthGuard(PermisosClubScreen, 'PermisosClub');
+// La guarda de sesión es lo único que se aplica acá: quién MODERA lo
+// decide `es_moderador()` en el servidor, y las tres RPC lo comprueban
+// por su cuenta. Esconder la entrada del menú es cosmética.
+const GuardedModeracionScreen = withAuthGuard(ModeracionScreen, 'Moderacion');
 const GuardedClubInviteScreen = withAuthGuard(ClubInviteScreen, 'ClubInvite');
 const GuardedSettingsScreen = withAuthGuard(SettingsScreen, 'Settings');
 const GuardedTrustScoreHistoryScreen = withAuthGuard(TrustScoreHistoryScreen, 'TrustScoreHistory');
@@ -437,6 +442,11 @@ export default function AppNavigator() {
           name="EditClub"
           component={GuardedEditClubScreen}
           options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="Moderacion"
+          component={GuardedModeracionScreen}
+          options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="PermisosClub"

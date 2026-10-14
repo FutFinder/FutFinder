@@ -34,6 +34,7 @@ import {
   ShieldOff,
   Download,
   Smartphone,
+  Gavel,
 } from 'lucide-react-native';
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -44,6 +45,7 @@ import NotificationBell from '../components/NotificationBell';
 import Banner from '../components/Banner';
 import { getMyProfileWithStatus, updateMyProfile } from '../services/profile';
 import { signOut } from '../services/auth';
+import { soyModerador } from '../services/moderacion';
 import {
   changeEmail,
   changePassword,
@@ -268,6 +270,18 @@ export default function SettingsScreen({ navigation }) {
   const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
+  // La entrada de moderación sólo se dibuja para quien está en el padrón.
+  // Es COSMÉTICA: `es_moderador()` decide en el servidor y las tres RPC lo
+  // comprueban igual. Sin esto, el 99 % vería una pantalla que falla en
+  // cada botón.
+  const [moderador, setModerador] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    soyModerador().then((v) => { if (vivo) setModerador(v); });
+    return () => { vivo = false; };
+  }, []);
+
   const [banner, setBanner] = useState(null);
 
   // Modal state
@@ -811,7 +825,17 @@ export default function SettingsScreen({ navigation }) {
             showChevron
             onPress={() => navigation.navigate('VerificarTelefono')}
           />
-          <Row icon={Download} title="Exportar mis datos" showChevron last onPress={handleExportData} />
+          <Row icon={Download} title="Exportar mis datos" showChevron onPress={handleExportData} />
+          {moderador ? (
+            <Row
+              icon={Gavel}
+              title="Moderación"
+              subtitle="Revisiones, disputas y reportes"
+              showChevron
+              last
+              onPress={() => navigation.navigate('Moderacion')}
+            />
+          ) : null}
         </Card>
 
         <View style={styles.footerBtns}>
