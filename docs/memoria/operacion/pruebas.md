@@ -112,6 +112,29 @@ Con una instancia de desarrollo configurada y cuentas de prueba, comprobar al me
 
 La validación de push nativo exige dispositivos físicos Android/iOS, permisos concedidos, configuración de Firebase/EAS y servicios remotos autorizados. Probar registro de token, cada preferencia de categoría, recepción en primer plano y arranque frío, además de un token inválido. Web y simuladores omiten el registro nativo; por tanto, ni `npm test` ni `npm run build:web` validan push nativo.
 
+## El recorrido manual del rediseño de Clubes — 18/18 el 2026-09-04
+
+Se rescata acá porque vivía en `HANDOFF_CLUBES.md`, que se retiró en la limpieza del 2026-09-30, y al irse el archivo se fue la evidencia: `pendientes.md` quedó afirmando durante seis semanas que estos dieciocho controles «nunca se corrieron». Sí se corrieron.
+
+El recorrido usó Playwright con clics por JavaScript —la comprobación de estabilidad no funciona con las animaciones de React Native Web— y **0 `pageerror`** en las cuatro sesiones.
+
+| Control | Qué se comprobó |
+|---|---|
+| C3 / C4 | Aceptar y rechazar una invitación, dos veces cada uno: desde el explorador y desde la tarjeta nueva |
+| E6–E9 | Cambio de club activo, persistencia al salir de la pestaña, persistencia tras recargar, y caída al club restante al salir del activo |
+| D7 | El último elemento termina **82 px** por encima de la barra |
+| H5 / H6 | Tres idas y vueltas al detalle: siempre vuelve a la portada |
+| K1 | Los cuatro temas. Los elementos que se quedan verdes son las tarjetas de rival, que usan **el tema del rival**: conducta documentada, no un fallo |
+| L1 / L2 | Error total y recuperación con «Reintentar» |
+| M2 / M3 / M6 | 390, 360 y 1280 px sin desborde horizontal |
+| M4 | Nombre de **76 caracteres**: tres apariciones, todas con elipsis, ninguna se sale |
+| M5 | El carrusel desplaza **1850 px** sobre 390 visibles |
+| N3 | Chat de mensaje directo y de partido normal futuro, en los dos sentidos: historial, compositor, enviar y recibir |
+
+**N3 necesitó una segunda pasada, y el motivo importa:** la primera no falló por el código sino porque **la base no tenía ni un solo partido futuro**, así que el único chat de partido disponible era de un partido ya jugado y en solo lectura. Es el mismo vacío de datos que sigue hoy (ver [Estado actual](estado-actual.md)) y que vuelve a morder cada vez que algo hay que mirarlo en pantalla.
+
+**Los datos de prueba quedaron restaurados**, y se comprobó: tema de «Club prueba» de vuelta en rojo, su comuna de vuelta en vacío **sin tocar la región** —que ya estaba puesta antes, así que borrar las dos habría destruido un dato ajeno—, el nombre largo de «Los Papi Pasty» revertido, las membresías e invitaciones deshechas, y el partido, desafío, propuesta, amistad temporal y la cancha sembrada eliminados. **La cuenta cuadra: 24 partidos antes de sembrar y 24 después de limpiar.**
+
 ## Notas relacionadas
 
 - [Estado actual](estado-actual.md)
