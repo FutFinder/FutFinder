@@ -235,15 +235,14 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Verificación: arnés `154_..._test.sql` 5/5**, en el ensayo revertido y otra vez contra el esquema aplicado, y **esta vez con `set local role authenticated`**. Su caso 1 es el control que faltaba: comprueba que `cancha_usos` siga ilegible, para que el arreglo no pueda ser «publicar la tabla».
 - **Y comprobado en la pantalla, con la sesión real,** que es lo único que no se puede engañar con el rol equivocado: al publicar un partido, «maiclub» sale con su distintivo «CANCHA FUTFINDER · 4 USOS»; «tangus» —que sigue en la tabla pero tiene un solo organizador— **no sale**, sólo lugares de Mapbox; y «prueba» ya no ofrece ninguna cancha del directorio.
 
-## P4 — `authenticated` tiene TRUNCATE sobre 58 tablas
+## Resuelto el 2026-10-14 — nadie trunca desde el cliente (migración 155)
 
-> Hallazgo del 2026-10-04, al mirar los privilegios de `canchas`. **No es un agujero vivo**, y conviene decirlo antes que nada: PostgREST no emite `TRUNCATE`, así que desde la app no hay forma de llegar. Es defensa en profundidad, no una puerta abierta.
-
-- **Dominio afectado:** privilegios de base de datos, todas las tablas de `public`.
-- **Evidencia:** `authenticated` tiene el privilegio `TRUNCATE` sobre 58 tablas, incluidas `profiles`, `matches`, `messages` y `pagos`. Es el reparto por omisión de Supabase (`grant all on all tables ... to authenticated`), no algo que ninguna migración haya pedido.
-- **Por qué importa igualmente:** **`TRUNCATE` no pasa por RLS.** Todas las demás escrituras de esas tablas están contenidas por políticas; ésta no lo estaría. La única razón de que no sea explotable hoy es que no existe el camino para emitir la sentencia — una función `security invoker` con SQL dinámico lo abriría sin que nadie lo notara.
-- **Acción:** una migración que revoque `truncate` de `authenticated` y `anon` en todo `public`, más el disparador de eventos que cierre lo que nazca después —el mismo patrón de la 147, que ya existe y funciona—.
-- **Verificación necesaria:** cero tablas de `public` con `truncate` para `authenticated` o `anon`, una tabla nueva creada después nace sin él, y el arnés comprueba antes que el privilegio estaba (control negativo) y después que las escrituras normales de la app siguen funcionando.
+- **Qué pasaba.** `authenticated` tenía `TRUNCATE` sobre **58 tablas** de `public`, incluidas `profiles`, `matches`, `messages` y `pagos`. No lo pidió ninguna migración: es el reparto por omisión de Supabase, que `pg_default_acl` volvía a aplicar a cada tabla nueva.
+- **Por qué importaba, y por qué no era una alarma.** `TRUNCATE` **no pasa por RLS**: todas las demás escrituras de esas tablas están contenidas por políticas, ésta no. Pero **no era explotable** — PostgREST no emite esa sentencia, así que desde la app no existía el camino. Era defensa en profundidad, no una puerta abierta.
+- **El control fue más fuerte de lo esperado, y conviene que quede escrito:** no se dedujo del catálogo, se **ejecutó**. Con `set local role authenticated`, una sesión truncó de verdad una tabla de `public`, y una tabla recién creada nacía con el privilegio puesto. O sea: a nivel de SQL el agujero era real; lo único que lo tapaba era que ningún camino de la app llega a emitir `TRUNCATE`.
+- **Se quita SÓLO `truncate`.** `insert`, `update` y `delete` de `authenticated` quedan intactos: ésos sí los usa la app y los gobierna la RLS. `service_role` y `postgres` lo conservan, porque son quienes corren migraciones y mantenimiento.
+- **Y un disparador para lo que nazca mañana,** `nadie_trunca_desde_el_cliente`, porque `pg_default_acl` habría vuelto a llenar la lista con la próxima migración que añadiera una tabla. No se tocó `anon_nace_sin_llaves` —que ya cubría a `anon`, y por eso `anon` estaba en cero—: su nombre dice lo que hace y `authenticated` **necesita** las otras tres escrituras. Que los dos se solapen en `anon` es inofensivo.
+- **Verificación: arnés `155_..._test.sql` 8/8**, en el ensayo revertido y otra vez contra el esquema aplicado, llegando las dos veces a la última línea. El caso 7 es el que vale: **con la lente de un usuario real**, publica un partido (la escritura más común de la app, pasando por la RLS de `matches`) y **no** puede truncar. El caso 1 es el control que impide confundir «se cerró `TRUNCATE`» con «se rompió la app».
 
 ## P4 — Restos del rediseño de Clubes que nunca se cerraron
 
