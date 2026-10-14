@@ -1,36 +1,105 @@
 # Estado actual
 
-Última revisión: 2026-08-08
+Última revisión: 2026-10-14
 
-## Alcance verificado en el repositorio
+## Qué es esta nota
 
-FutFinder contiene flujos de autenticación y onboarding, navegación protegida, partidos, clubes, chat, avisos, perfil, amistades y preferencias. `src/services/` concentra la mayor parte de las llamadas de dominio y los límites principales se complementan con migraciones, RLS, RPC y la Edge Function `send-push`. Aún existen accesos directos puntuales al cliente Supabase: `src/screens/HomeScreen.js` consulta `attendees` y `matches`, y `src/screens/ChatThreadScreen.js` obtiene el usuario actual y perfiles.
+Una fotografía comprobable de dónde está FutFinder: qué existe, qué está
+aplicado y qué no se ha podido verificar. Lo que está **abierto** vive en
+[Pendientes](pendientes.md); acá no se repite.
 
-- La navegación resuelve sesión antes de montar la aplicación, restringe las rutas privadas y reanuda un destino protegido después de autenticar.
-- Partidos permite descubrimiento, filtros, publicación, cupos/solicitudes, cola, asistencia GPS, gestión y registro final de asistencia.
-- Clubes incluye creación, membresías, administración, galería, desafíos e historial; la base de datos define los límites de integrantes y administradores por plan.
-- Chat cubre conversaciones directas, de partido y de club, lectura, silencio, ocultamiento, paginación, avisos importantes y `/todos` en conversaciones grupales.
-- Perfil y amistades cubren edición con staging/rollback de medios, privacidad de descubrimiento/solicitudes, reputación e informes de usuario.
-- La bandeja de avisos tiene operaciones optimistas con reversión y destino de navegación; el push externo depende de token, permisos, preferencias y el procesamiento de la Edge Function.
+## Lo construido
 
-## Seguridad y fiabilidad terminadas recientemente
+Autenticación y onboarding, navegación protegida, partidos, clubes, chat,
+avisos, perfil, amistades, reputación, preferencias y el vertical de reservas
+de canchas. `src/services/` concentra las llamadas de dominio.
 
-El historial reciente verifica cambios versionados que reforzaron límites y recuperación de fallos:
+- **Ninguna pantalla consulta la base directamente.** Catorce de las 74
+  importan algo de `services/supabase`, pero ocho sólo traen
+  `isSupabaseConfigured` y las otras seis usan `supabase.auth` para saber
+  quién es el usuario. **Cero `supabase.from(` en `src/screens/`** — la nota
+  anterior decía que `HomeScreen` consultaba `attendees` y `matches` y que
+  `ChatThreadScreen` leía perfiles; eso se limpió y ya no es cierto.
+- **Partidos**: descubrimiento, filtros, publicación, cupos y solicitudes,
+  cola de espera, asistencia por GPS, gestión y registro final. Desde octubre
+  hay **mapa también en web** (Mapbox GL cargado del CDN, no como
+  dependencia); antes el botón «Ver en el mapa» abría una vista vacía en el
+  navegador.
+- **Clubes**: creación, membresías, administración, galería, desafíos,
+  propuestas negociadas, resultados e historial. **Ya no hay planes**: la
+  migración 152 los retiró, con sus límites por plan y sus pantallas.
+  `ClubDetail` y `EditClub` tienen URL propia desde octubre, así que el editor
+  sobrevive a una recarga y a un enlace compartido.
+- **Chat**: conversaciones directas, de partido y de club, lectura, silencio,
+  ocultamiento, paginación, avisos importantes y `/todos` en grupos.
+- **Perfil y amistades**: edición con staging y reversión de medios,
+  privacidad de descubrimiento y solicitudes, reputación (TrueScore) e
+  informes de usuario.
+- **Reservas**: complejos, canchas reservables, tarifas, reglas de horario,
+  bloqueos, reservas, cobros y pagos por Flow. Está completo y **nunca se ha
+  usado** (ver más abajo).
+- **Avisos**: bandeja por RPC con operaciones optimistas y destino de
+  navegación. El push externo depende de token, permisos, preferencias y la
+  Edge Function `send-push`.
+- **Moderación**: la migración 151 dejó el mecanismo —padrón, colas y las
+  puertas para resolver— con el **padrón vacío a propósito**. Mientras nadie
+  esté en él, no cambia nada.
+- **Informes de error**: `@sentry/react-native` instalado desde el 2026-10-14
+  y **apagado** hasta que exista `EXPO_PUBLIC_SENTRY_DSN`. Detalle y política
+  de privacidad en [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md).
 
-- `9ee91d6` agregó la guarda global de sesión para pantallas privadas y `f7531d5` añadió pruebas de rutas y destinos de avisos.
-- Las migraciones 35 a 37 establecen privacidad efectiva en solicitudes/búsqueda, RLS de chat y helpers `SECURITY INVOKER`.
-- `013034b` incorporó la migración 38 y pruebas de lógica para tickets, recibos, tokens e idempotencia de `send-push`.
-- `486770a` incorporó backend de `/todos`, paginación estable, desconexión explícita y la bandeja por RPC; las migraciones 39 y 40 y sus pruebas SQL acompañan ese cambio.
+## Base de datos
 
-Estos hechos describen código y pruebas versionadas. No confirman que una instancia remota de Supabase tenga las migraciones aplicadas ni que un dispositivo físico haya recibido una notificación push.
+- **167 archivos de migración** en el repositorio, **143 aplicados** en
+  `jvfoendzblkoxvwvommz`. De la 140 a la 155 está todo aplicado **salvo la
+  149**, que lleva en su cabecera «no aplicar hasta distribuir un build» y
+  espera ahí a propósito.
+- **72 tablas, 285 funciones, 147 políticas y 12 tareas cron.**
+- **118 arneses SQL** en `supabase/tests/`. No se ejecutan con `npm test`: se
+  pegan en el editor SQL y corren dentro de una transacción que termina en
+  `ROLLBACK`.
+- **Seis Edge Functions desplegadas y activas**: `send-push`, `pagar-reserva`,
+  `flow-retorno`, `flow-confirmacion`, `solicitud-recinto` y
+  `reportar-problema`. Sus pruebas las corre Deno, aparte de `npm run verify`.
 
-## Límites operativos
+## Lo que la app no ha vivido todavía
 
-Sin las variables públicas de Supabase, el cliente entra en modo de demostración para renderizar las pantallas, lo que no equivale a un backend conectado. La exportación web y las pruebas de Node no sustituyen pruebas de integración contra Supabase ni validación de push en hardware físico.
+Esto es lo que más define el estado real y no se ve mirando el código. Medido
+en producción el 2026-10-14:
+
+- **32 usuarios, 5 con sesión en los últimos 30 días.**
+- **27 partidos en total y ninguno futuro.** Quien abre la app hoy no ve
+  ningún partido al que inscribirse.
+- **Cero reservas y cero pagos**, con 13 canchas reservables, 19 tarifas y 73
+  reglas de horario ya cargadas. El vertical entero está armado y nunca ha
+  transaccionado.
+- **Un solo token de push** entre los 32 usuarios.
+- **Cero moderadores**, con 2 reportes de usuario sin mirar.
+
+No es un diagnóstico de calidad: es que el producto no se ha puesto delante de
+nadie. Casi todo lo que queda abierto en [Pendientes](pendientes.md) espera a
+eso o a una decisión de producto, no a más código.
+
+## Límites de lo verificable desde acá
+
+- **Sin las variables públicas de Supabase el cliente entra en modo de
+  demostración**, que renderiza las pantallas pero no es un backend conectado.
+- **No hay entorno de pruebas.** Todo se comprueba contra producción, dentro de
+  transacciones revertidas o interceptando `fetch` en el navegador. No hay
+  PostgreSQL local ni proyecto de staging.
+- **Un arnés que corre como `postgres` no dice nada sobre lo que ve un
+  usuario.** Costó un fallo real en octubre: la migración 153 dio 8/8 dos veces
+  sobre una función que para `authenticated` reventaba con 42501. Los arneses
+  de lo que ejecuta el cliente llevan `set local role authenticated`.
+- **El push en un teléfono físico sigue sin comprobarse**, y `tsc --noEmit` no
+  sirve como chequeo en este repositorio (desbordamiento de pila preexistente).
+- **`npm run verify`**: 1687 pruebas en verde y cero errores de lint al cerrar
+  esta revisión. Los avisos de lint son deuda conocida y no bloquean.
 
 ## Notas relacionadas
 
 - [Pendientes](pendientes.md)
 - [Pruebas](pruebas.md)
+- [Calidad y lint](calidad-y-lint.md)
 - [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md)
 - [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md)
