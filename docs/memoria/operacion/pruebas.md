@@ -135,6 +135,28 @@ El recorrido usó Playwright con clics por JavaScript —la comprobación de est
 
 **Los datos de prueba quedaron restaurados**, y se comprobó: tema de «Club prueba» de vuelta en rojo, su comuna de vuelta en vacío **sin tocar la región** —que ya estaba puesta antes, así que borrar las dos habría destruido un dato ajeno—, el nombre largo de «Los Papi Pasty» revertido, las membresías e invitaciones deshechas, y el partido, desafío, propuesta, amistad temporal y la cancha sembrada eliminados. **La cuenta cuadra: 24 partidos antes de sembrar y 24 después de limpiar.**
 
+## Los 120 arneses, corridos juntos por primera vez (2026-10-15)
+
+Se escriben uno por migración y se corren cuando se escriben, pegándolos a mano en el editor SQL. **Nadie los había corrido juntos contra el esquema actual**, porque contra producción cada uno siembra y revierte y hacerlo 120 veces a mano no es realista. Con la base local sí lo es: `node scripts/correr-arneses.mjs`.
+
+**Resultado: 76 de 120 pasan.** El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
+
+- **~10 necesitan datos de producción.** Mueren en el montaje: «No hay ningún partido de clubes en la base contra el que probar», «Club no encontrado», «La prueba necesita al menos un complejo con dueño cargado». No están rotas: **no son autosuficientes**, y por eso sólo sirven contra una base con historia. Es una propiedad, no un fallo, pero conviene saber cuáles son antes de confiar en un «pasó».
+- **~14 están VIEJAS: el esquema se movió y nadie volvió a correrlas.** Insertan en `reservas` sin `precio_cancha` o sin `cancha_id`, que después se hicieron `not null`; llaman `aprobar_propuesta(uuid)` cuando hace tiempo recibe dos argumentos; crean reservas sin el nombre de contacto que ahora se exige. **Eso significa que las garantías que esas migraciones probaron llevan meses sin comprobarse.**
+- **El resto** son fallos de montaje encadenados a los dos grupos anteriores, más cinco que merecen mirarse una por una y quedan anotadas para eso.
+
+**Lo que este ejercicio encontró y ya está arreglado** (ver `pendientes.md`):
+
+- Cuatro columnas de `profiles` sin versionar —`rating_count` y las tres medias de valoración—, que hacían morir cuatro arneses con `column p.rating_count does not exist`.
+- `reactivate_suspended()` ejecutable por `authenticated` en una base nueva y no en producción. Lo cierra la migración **158**.
+
+**Y una lección sobre cómo se compara.** El 2026-10-14 se dio por buena la equivalencia con producción comparando **conteos de objetos** —72 tablas, 285 funciones, 118 políticas— y coincidían. Lo que no coincidía eran las columnas de una tabla y el privilegio de una función. **Contar no es comparar.** Ahora se comparan huellas md5 de dos cosas concretas, y las dos cuadran:
+
+| | base nueva | producción |
+|---|---|---|
+| Columnas de las 72 tablas | `b4ae0d3f…` | `b4ae0d3f…` |
+| `execute` de las 285 funciones | `7e37dd47…` | `7e37dd47…` |
+
 ## Notas relacionadas
 
 - [Estado actual](estado-actual.md)

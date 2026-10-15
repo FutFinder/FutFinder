@@ -718,5 +718,20 @@ alter table public.ratings       enable row level security;
 
 -- Las lee `tg_auto_suspend`, `reactivate_suspended` y toda la tarjeta de
 -- estado de cuenta. Sin ellas, una base nueva no arranca el perfil.
+-- Las cuatro medias de valoración. **Tampoco las crea nadie**, y producción
+-- sí las tiene: las escribe `recalc_user_ratings()` —que la migración 146 sí
+-- transcribió— y las leen la búsqueda de jugadores (142), el perfil por
+-- relación (143) y el panel de administradores (121).
+--
+-- Salieron al correr los 120 arneses contra la base recién construida, el
+-- 2026-10-15: cuatro de ellos morían con `column p.rating_count does not
+-- exist`. La comparación del día anterior no las vio porque contaba
+-- OBJETOS —72 tablas, 285 funciones— y los objetos coincidían; lo que no
+-- coincidía eran sus columnas. Contar no es comparar.
+alter table public.profiles add column if not exists rating_puntualidad_avg numeric(3,2) default 0;
+alter table public.profiles add column if not exists rating_fairplay_avg    numeric(3,2) default 0;
+alter table public.profiles add column if not exists rating_nivel_avg       numeric(3,2) default 0;
+alter table public.profiles add column if not exists rating_count           integer      default 0;
+
 alter table public.profiles add column if not exists estado text not null default 'activo';
 alter table public.profiles add column if not exists suspended_until timestamptz;
