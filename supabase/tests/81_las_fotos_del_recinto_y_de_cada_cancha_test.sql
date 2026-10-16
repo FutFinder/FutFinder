@@ -45,8 +45,29 @@ declare
   v_rechazado boolean;
   v_publicado boolean;
 begin
-  select a.complejo_id, a.user_id into v_cpl, v_dueno
-    from public.complejo_admins a where a.rol = 'dueño' limit 1;
+  -- SIEMBRA SU PROPIO RECINTO Y SU DUEÑO (2026-10-15). Antes tomaba el
+  -- primer `complejo_admins` con rol 'dueño' que hubiera en la base, y
+  -- contra una recién construida no hay ninguno: moría en el montaje. No
+  -- estaba roto, no era autosuficiente.
+  v_cpl := gen_random_uuid();
+  v_dueno := gen_random_uuid();
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+    confirmation_token, email_change, email_change_token_new, recovery_token)
+  values ('00000000-0000-0000-0000-000000000000', v_dueno, 'authenticated', 'authenticated',
+    'dueno81-' || v_dueno || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', '');
+  -- DESPUBLICADO a propósito: el caso 15 comprueba que sin sesión no se ve
+  -- ni una foto de un recinto que no está publicado, y que la consulta no
+  -- revienta. Sembrarlo publicado hacía que `anon` viera las siete y el
+  -- caso fallara por culpa del fixture, no del código.
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado, created_by)
+  values (v_cpl, 'Recinto arnés 81', 'Ñuñoa', -33.45, -70.60, false, v_dueno);
+  insert into public.complejo_admins (complejo_id, user_id, rol, puede_canchas, puede_cobros, puede_ficha)
+  values (v_cpl, v_dueno, 'dueño', true, true, true);
+  -- Y su cancha: este arnés la busca por separado más abajo, porque prueba
+  -- las fotos del recinto Y las de cada cancha.
+  insert into public.canchas_reservables (complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
+  values (v_cpl, 'Cancha arnés 81', 'futbol_7', 20000, 60, true);
   if v_cpl is null then
     raise exception 'La prueba necesita al menos un complejo con dueño cargado';
   end if;

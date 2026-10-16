@@ -35,10 +35,22 @@ begin
          'r86-' || u || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
     from unnest(array[v_yo, v_otro]) u;
 
-  select c.id into v_cpl from public.complejos c where c.publicado limit 1;
-  select k.id into v_cancha from public.canchas_reservables k
-   where k.complejo_id = v_cpl and k.activa
-     and exists (select 1 from public.cancha_horario_reglas hr where hr.cancha_id = k.id) limit 1;
+  -- SIEMBRA SU PROPIO RECINTO (2026-10-15). Antes tomaba uno que ya
+  -- existiera en la base, lo que lo ataba a una con historia: contra una
+  -- recién construida no encontraba nada y reventaba al insertar con
+  -- `cancha_id` nulo. No estaba roto, no era autosuficiente.
+  --
+  -- El horario cubre LOS SIETE DÍAS de 00:00 a 23:00: varios casos piden
+  -- disponibilidad de días distintos de hoy, y con una sola franja el
+  -- resultado dependía del día en que se corriera el arnés.
+  v_cpl := gen_random_uuid();
+  v_cancha := gen_random_uuid();
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+  values (v_cpl, 'Recinto arnés 86', 'Ñuñoa', -33.45, -70.60, true);
+  insert into public.canchas_reservables (id, complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
+  values (v_cancha, v_cpl, 'Cancha arnés 86', 'futbol_7', 20000, 60, true);
+  insert into public.cancha_horario_reglas (cancha_id, dia_semana, hora_apertura, hora_cierre)
+  select v_cancha, d, time '00:00', time '23:00' from generate_series(0, 6) as d;
   v_hoy := (now() at time zone 'America/Santiago')::date;
 
   set local role authenticated;

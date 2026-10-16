@@ -37,8 +37,21 @@ declare
   v_url text;
   v_rechazado boolean;
 begin
-  select a.complejo_id, a.user_id into v_cpl, v_dueno
-    from public.complejo_admins a where a.rol = 'dueño' limit 1;
+  -- SIEMBRA SU PROPIO RECINTO Y SU DUEÑO (2026-10-15). Antes tomaba el
+  -- primer `complejo_admins` con rol 'dueño' que hubiera en la base, y
+  -- contra una recién construida no hay ninguno: moría en el montaje. No
+  -- estaba roto, no era autosuficiente.
+  v_cpl := gen_random_uuid();
+  v_dueno := gen_random_uuid();
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+    confirmation_token, email_change, email_change_token_new, recovery_token)
+  values ('00000000-0000-0000-0000-000000000000', v_dueno, 'authenticated', 'authenticated',
+    'dueno75-' || v_dueno || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', '');
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado, created_by)
+  values (v_cpl, 'Recinto arnés 75', 'Ñuñoa', -33.45, -70.60, true, v_dueno);
+  insert into public.complejo_admins (complejo_id, user_id, rol, puede_canchas, puede_cobros, puede_ficha)
+  values (v_cpl, v_dueno, 'dueño', true, true, true);
   if v_cpl is null then
     raise exception 'La prueba necesita al menos un complejo con dueño cargado';
   end if;

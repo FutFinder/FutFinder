@@ -31,10 +31,27 @@ begin
   values ('00000000-0000-0000-0000-000000000000', v_yo, 'authenticated', 'authenticated',
          'r84-' || v_yo || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', '');
 
-  select c.id into v_cpl from public.complejos c where c.publicado limit 1;
-  select k.id into v_cancha from public.canchas_reservables k
-   where k.complejo_id = v_cpl and k.activa
-     and exists (select 1 from public.cancha_horario_reglas hr where hr.cancha_id = k.id) limit 1;
+  -- SIEMBRA SU PROPIO RECINTO (2026-10-15). Antes buscaba uno publicado
+  -- que ya existiera —`where c.publicado limit 1`— y eso lo ataba a una
+  -- base con historia: contra una recién construida no encontraba nada,
+  -- `v_cancha` quedaba nulo y reventaba con «null value in column
+  -- cancha_id». No estaba roto, no era autosuficiente.
+  --
+  -- El horario cubre el día de HOY de 00:00 a 23:00 a propósito: este
+  -- arnés compara los slots ya pasados contra los que quedan, así que
+  -- necesita que a esta hora haya de los dos. Con una franja de tarde,
+  -- corriéndolo de mañana no habría pasados y el caso no probaría nada.
+  v_cpl := gen_random_uuid();
+  v_cancha := gen_random_uuid();
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+  values (v_cpl, 'Recinto arnés 84', 'Ñuñoa', -33.45, -70.60, true);
+  insert into public.canchas_reservables (id, complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
+  values (v_cancha, v_cpl, 'Cancha arnés 84', 'futbol_7', 20000, 60, true);
+  -- LOS SIETE DÍAS, no sólo hoy: el caso 4 pide disponibilidad de
+  -- `v_hoy + 2`, que cae en otro día de la semana. Con una sola regla ese
+  -- día no tenía slots, `v_h` quedaba nulo y `crear_reserva` reventaba.
+  insert into public.cancha_horario_reglas (cancha_id, dia_semana, hora_apertura, hora_cierre)
+  select v_cancha, d, time '00:00', time '23:00' from generate_series(0, 6) as d;
 
   -- La hora de CHILE, no la del servidor: es la diferencia que arregló la 70.
   v_hoy := (now() at time zone 'America/Santiago')::date;
