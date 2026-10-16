@@ -256,11 +256,9 @@ begin
   raise notice 'OK (caso 14): crear_reserva rechaza el slot bloqueado';
 
   -- Reserva confirmada a las 18:00 para el caso 15.
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values (
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values (
     v_reserva, v_cancha, v_ajeno, date '2027-03-01', time '18:00', time '19:00',
+    20000,
     20000, 'completa', 'tarjeta', 'confirmada'
   );
 

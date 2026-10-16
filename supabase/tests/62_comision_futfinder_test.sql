@@ -196,9 +196,9 @@ begin
   -- cancelada que NO debe sumar.
   update public.reservas set estado = 'confirmada', confirmada_at = now() where id = v_res;
 
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res_canc, v_cancha, v_jugador, v_fecha, time '12:00', time '13:00',
+          28000,
           28000, 'completa', 'tarjeta', 'cancelada');
   insert into public.reserva_comisiones (reserva_id, base, tasa, piso, techo, iva_tasa, monto)
   values (v_res_canc, 28000, 0.05, 1000, 2500, 0.19, public.calcular_comision(28000));
@@ -232,9 +232,9 @@ begin
   -- Se usa una reserva que EXISTE y todavía no tiene comisión, para que
   -- el rechazo venga del CHECK y no de la llave foránea.
   execute 'reset role';
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res_sin, v_cancha, v_jugador, v_fecha, time '14:00', time '15:00',
+          28000,
           28000, 'completa', 'tarjeta', 'procesando');
   begin
     insert into public.reserva_comisiones (reserva_id, base, tasa, piso, techo, iva_tasa, monto)

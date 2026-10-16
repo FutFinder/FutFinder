@@ -183,9 +183,9 @@ begin
 
   -- ── Casos 10-11: la ventana se cierra ──────────────────────────
   -- Una reserva de hace tres días: la ventana de 12 h ya pasó.
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_vieja, v_cancha, v_org, v_hace3, time '20:00', time '21:00',
+          28000,
           28000, 'completa', 'tarjeta', 'confirmada');
   insert into public.reserva_contacto (reserva_id, nombre, telefono)
   values (v_vieja, 'Camila Rojas', '+56911112222');
@@ -212,9 +212,9 @@ begin
   raise notice 'OK (casos 9-10): se cierra para el recinto, no para quien lo escribió';
 
   -- Caso 11: cancelada, desaparece de inmediato
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_cancelada, v_cancha, v_org, v_manana, time '18:00', time '19:00',
+          28000,
           28000, 'completa', 'tarjeta', 'cancelada');
   insert into public.reserva_contacto (reserva_id, nombre, telefono)
   values (v_cancelada, 'Javiera Soto', '+56933334444');

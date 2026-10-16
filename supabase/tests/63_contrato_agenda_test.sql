@@ -64,9 +64,9 @@ begin
   insert into public.complejo_admins (complejo_id, user_id, rol)
   values (v_complejo, v_dueno, 'dueño');
 
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res, v_cancha, v_dueno, v_fecha, time '10:00', time '11:00',
+          28000,
           28000, 'completa', 'tarjeta', 'confirmada');
   insert into public.reserva_comisiones (reserva_id, base, tasa, piso, techo, iva_tasa, monto)
   values (v_res, 28000, 0.05, 1000, 2500, 0.19, 1400);

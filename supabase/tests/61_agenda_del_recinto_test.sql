@@ -90,16 +90,16 @@ begin
   insert into public.complejo_admins (complejo_id, user_id, rol) values (v_complejo, v_admin, 'admin');
 
   -- Reserva CONFIRMADA a las 10:00
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res_conf, v_cancha, v_jugador, v_fecha, time '10:00', time '11:00',
+          20000,
           20000, 'completa', 'tarjeta', 'confirmada');
 
   -- Reserva ARMANDO a las 12:00, dividida entre 10, con 8 aceptados.
   -- Esta NO ocupa el horario: es la regla central del vertical.
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, n_jugadores, cuota, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, n_jugadores, cuota, estado)
   values (v_res_arm, v_cancha, v_jugador, v_fecha, time '12:00', time '13:00',
+          20000,
           20000, 'jugadores', 'balance', 10, 2000, 'armando');
   insert into public.reserva_participantes (reserva_id, user_id, rol, estado)
   values (v_res_arm, v_jugador, 'organizador', 'aceptado');
@@ -123,22 +123,22 @@ begin
    where u.email like 'r61-p%@futfinder.test';
 
   -- Reserva VENCIDA a las 14:00 — no debe salir en la agenda
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res_venc, v_cancha, v_jugador, v_fecha, time '14:00', time '15:00',
+          20000,
           20000, 'completa', 'tarjeta', 'vencida');
 
   -- Reserva de 90 min a las 16:00 en una cancha de bloques de 60:
   -- tiene que ocupar 16:00 y 17:00.
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res_larga, v_cancha, v_jugador, v_fecha, time '16:00', time '17:30',
+          30000,
           30000, 'completa', 'tarjeta', 'confirmada');
 
   -- Reserva del OTRO complejo — nunca debe aparecer
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res_otro, v_otra_ch, v_jugador, v_fecha, time '10:00', time '11:00',
+          20000,
           20000, 'completa', 'tarjeta', 'confirmada');
 
   -- Bloqueo de 20:00 a 21:00

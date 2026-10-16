@@ -85,6 +85,17 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Resolución:** la migración **114** revocó `execute` sobre TODAS las rutinas de `public` a `public` y a `anon` —a los dos, que es la parte que las migraciones anteriores erraban— y la **115** puso un disparador de eventos para que lo que se cree mañana nazca igual de cerrado.
 - **Verificación de cierre (2026-09-18, contra `jvfoendzblkoxvwvommz`):** de 43 funciones de trigger en `public`, `anon` puede ejecutar **0** y ninguna conserva `EXECUTE` para `PUBLIC`. El advisor ya no devuelve ni un `anon_security_definer_function_executable`. Las 91 RPC que el cliente llama de verdad siguen accesibles (arnés de la 114, sacado de `grep .rpc(` sobre `src/`).
 
+## P3 — La disponibilidad de canchas dejó de ser pública, y nadie lo decidió
+
+> Descubierto el 2026-10-15 al correr los 120 arneses juntos. **No urge** —hoy ninguna pantalla la llama sin sesión— pero es una intención revertida en silencio, y eso se arregla mejor ahora que cuando haya una página pública esperándola.
+
+- **Dominio afectado:** reservas de canchas y la futura página pública de un recinto.
+- **Qué pasó.** `get_disponibilidad_cancha(uuid, date)` era ejecutable por `anon` **a propósito**: las migraciones **54, 60, 64, 65 y 84** se la conceden explícitamente, cinco veces a lo largo de treinta migraciones, y el arnés de la 58 tenía un caso dedicado a comprobar que «sigue siendo pública». Hoy su ACL es `postgres | authenticated | service_role`.
+- **La cerró la migración 114** («anon no ejecuta nada»), que barrió TODAS las funciones de `public` para quitarle a `anon` el `execute` que `alter default privileges` le concedía a su nombre. La 114 **ni la nombra**: cayó en la redada. Fue daño colateral, no una decisión.
+- **Por qué nadie se enteró:** el caso 13 del arnés de la 58 lo habría cazado el mismo día, pero ese arnés lleva rojo desde entonces por otras razones y no se volvió a correr hasta ahora. Ya se invirtió para que mida lo que de verdad pasa, con el conflicto escrito dentro.
+- **La decisión que hace falta:** si la disponibilidad de una cancha debe poder verse sin cuenta. Es la misma familia que la página pública del club: ampliar el acceso anónimo no es un trámite, hay que decidir qué queda a la vista de cualquiera con la clave publicable.
+- **Verificación necesaria:** si se reabre, el caso 13 vuelve a su forma original y una comprobación con `set local role anon` muestra que la función contesta; y revisar que no haya arrastrado nada más de la redada de la 114 que también se concediera a propósito.
+
 ## P1 — Validar el envío push de extremo a extremo en dispositivo físico
 
 - **Dominio afectado:** avisos y push.

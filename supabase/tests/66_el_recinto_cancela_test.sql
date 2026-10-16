@@ -94,9 +94,9 @@ begin
   insert into public.complejo_admins (complejo_id, user_id, rol) values (v_complejo, v_dueno, 'dueño');
 
   -- Confirmada futura, pago dividido entre dos que ya pagaron.
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, n_jugadores, cuota, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, n_jugadores, cuota, estado)
   values (v_futura, v_cancha, v_org, v_manana, time '20:00', time '21:00',
+          28000,
           28000, 'jugadores', 'balance', 2, 14000, 'confirmada');
   insert into public.reserva_comisiones (reserva_id, base, tasa, piso, techo, iva_tasa, monto)
   values (v_futura, 28000, 0.05, 1000, 2500, 0.19, 1400);
@@ -199,9 +199,9 @@ begin
   raise notice 'OK (caso 9)';
 
   -- ── Caso 8: un partido ya jugado no se cancela ─────────────────
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_pasada, v_cancha, v_org, v_ayer, time '20:00', time '21:00',
+          28000,
           28000, 'completa', 'tarjeta', 'confirmada');
   begin
     perform public.admin_cancelar_reserva(v_pasada, 'Motivo suficientemente largo para pasar');
@@ -213,9 +213,9 @@ begin
   raise notice 'OK (caso 8)';
 
   -- ── Caso 10: una 'armando' sí, y devuelve lo cobrado ───────────
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, n_jugadores, cuota, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, n_jugadores, cuota, estado)
   values (v_armando, v_cancha, v_org, v_manana, time '18:00', time '19:00',
+          28000,
           28000, 'jugadores', 'balance', 4, 7000, 'armando');
   insert into public.balance_movimientos (user_id, tipo, monto, reserva_id)
   values (v_org, 'cobro_reserva', -7000, v_armando);
@@ -229,13 +229,13 @@ begin
   -- ── Casos 11-14: las próximas del recinto ──────────────────────
   -- Tres confirmadas futuras más una pasada y una de otro complejo.
   insert into public.reservas (cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+                               precio_total, precio_cancha, modalidad, medio_pago, estado)
   select v_cancha, v_org, v_manana + g, time '19:00', time '20:00',
-         28000, 'completa', 'tarjeta', 'confirmada'
+         28000, 28000, 'completa', 'tarjeta', 'confirmada'
     from generate_series(1, 3) as g;
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_ajena, v_otra_ch, v_org, v_manana, time '19:00', time '20:00',
+          28000,
           28000, 'completa', 'tarjeta', 'confirmada');
 
   v_j := public.admin_reservas_proximas(v_complejo, 2);

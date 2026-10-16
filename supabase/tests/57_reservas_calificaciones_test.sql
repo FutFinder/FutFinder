@@ -67,13 +67,10 @@ begin
   values (v_cancha1, v_complejo1, 'Cancha 1', 'futbol_7', 20000, 60, true),
          (v_cancha2, v_complejo2, 'Cancha 1', 'futbol_7', 20000, 60, true);
 
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values
-    (v_res_ok,      v_cancha1, v_org,         current_date + 3, time '10:00', time '11:00', 20000, 'completa',  'balance', 'confirmada'),
-    (v_res_armando, v_cancha1, v_org_armando, current_date + 4, time '10:00', time '11:00', 20000, 'completa',  'balance', 'armando'),
-    (v_res_otro,    v_cancha2, v_org_otro,    current_date + 3, time '10:00', time '11:00', 20000, 'completa',  'balance', 'confirmada');
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values
+    (v_res_ok,      v_cancha1, v_org,         current_date + 3, time '10:00', time '11:00', 20000, 20000, 'completa',  'balance', 'confirmada'),
+    (v_res_armando, v_cancha1, v_org_armando, current_date + 4, time '10:00', time '11:00', 20000, 20000, 'completa',  'balance', 'armando'),
+    (v_res_otro,    v_cancha2, v_org_otro,    current_date + 3, time '10:00', time '11:00', 20000, 20000, 'completa',  'balance', 'confirmada');
 
   insert into public.reserva_participantes (reserva_id, user_id, rol, estado)
   values (v_res_ok, v_part, 'jugador', 'aceptado');

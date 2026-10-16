@@ -128,11 +128,9 @@ begin
   -- migración 55): el fixture se escribe sin RLS y se retoma el rol
   -- autenticado después, para no romper el resto de las aserciones.
   reset role;
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values (
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values (
     v_reserva_bloqueante, v_cancha, v_user, v_fecha, time '19:00', time '20:00',
+    20000,
     20000, 'completa', 'balance', 'confirmada'
   );
   execute format('set local role authenticated');
@@ -157,11 +155,9 @@ begin
 
   -- ── Setup: una reserva 'armando' en el slot 20:00 ─────────────────
   reset role;
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values (
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values (
     v_reserva_armando, v_cancha, v_user, v_fecha, time '20:00', time '21:00',
+    20000,
     20000, 'capitanes', 'balance', 'armando'
   );
   execute format('set local role authenticated');

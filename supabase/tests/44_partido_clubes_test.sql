@@ -195,7 +195,7 @@ begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L',
       json_build_object('sub', v_p1, 'role', 'authenticated')::text);
-    perform public.aprobar_propuesta(v_prop.id);
+    perform public.aprobar_propuesta(v_prop.id, p_me_inscribo => false);
     execute 'reset role';
   exception when others then
     execute 'reset role';
@@ -216,7 +216,7 @@ begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L',
       json_build_object('sub', v_rj, 'role', 'authenticated')::text);
-    perform public.aprobar_propuesta(v_prop.id);
+    perform public.aprobar_propuesta(v_prop.id, p_me_inscribo => false);
     execute 'reset role';
   exception when others then
     execute 'reset role';
@@ -234,7 +234,7 @@ begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L',
       json_build_object('sub', v_x, 'role', 'authenticated')::text);
-    perform public.aprobar_propuesta(v_prop.id);
+    perform public.aprobar_propuesta(v_prop.id, p_me_inscribo => false);
     execute 'reset role';
   exception when others then
     execute 'reset role';
@@ -253,7 +253,7 @@ begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L',
       json_build_object('sub', v_d, 'role', 'authenticated')::text);
-    perform public.aprobar_propuesta(v_prop.id);
+    perform public.aprobar_propuesta(v_prop.id, p_me_inscribo => false);
     execute 'reset role';
   exception when others then
     execute 'reset role';
@@ -282,7 +282,7 @@ begin
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L',
     json_build_object('sub', v_r1, 'role', 'authenticated')::text);
-  v_match := public.aprobar_propuesta(v_prop.id);
+  v_match := public.aprobar_propuesta(v_prop.id, p_me_inscribo => false);
   execute 'reset role';
 
   if v_match.id is null then
@@ -371,14 +371,14 @@ begin
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L',
     json_build_object('sub', v_r2, 'role', 'authenticated')::text);
-  v_match2 := public.aprobar_propuesta(v_prop.id);
+  v_match2 := public.aprobar_propuesta(v_prop.id, p_me_inscribo => false);
   execute 'reset role';
 
   -- Y el mismo de antes, otra vez (doble pulsación).
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L',
     json_build_object('sub', v_r1, 'role', 'authenticated')::text);
-  v_match3 := public.aprobar_propuesta(v_prop.id);
+  v_match3 := public.aprobar_propuesta(v_prop.id, p_me_inscribo => false);
   execute 'reset role';
 
   if v_match2.id <> v_match.id or v_match3.id <> v_match.id then
@@ -463,7 +463,7 @@ begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L',
       json_build_object('sub', v_t1, 'role', 'authenticated')::text);
-    perform public.aprobar_propuesta(v_prop_s.id);
+    perform public.aprobar_propuesta(v_prop_s.id, p_me_inscribo => false);
     execute 'reset role';
   exception when others then
     execute 'reset role';
@@ -495,7 +495,7 @@ begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L',
       json_build_object('sub', v_t1, 'role', 'authenticated')::text);
-    perform public.aprobar_propuesta(v_prop_s.id);
+    perform public.aprobar_propuesta(v_prop_s.id, p_me_inscribo => false);
     execute 'reset role';
   exception when others then
     execute 'reset role';
@@ -541,7 +541,7 @@ begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L',
       json_build_object('sub', v_v1, 'role', 'authenticated')::text);
-    perform public.aprobar_propuesta(v_prop_u.id);
+    perform public.aprobar_propuesta(v_prop_u.id, p_me_inscribo => false);
     execute 'reset role';
   exception when others then
     execute 'reset role';
@@ -557,13 +557,18 @@ begin
   raise notice 'OK (caso 10): la fecha pasada no se publica — %', v_err;
 
   -- ══ CASO 11: permisos de ejecución ═══════════════════════════
-  if has_function_privilege('public', 'public.aprobar_propuesta(uuid)', 'EXECUTE') then
+  -- La firma lleva DOS argumentos desde que la 45c añadió `p_me_inscribo`.
+  -- Con la de uno, `has_function_privilege` no devuelve false: **lanza**,
+  -- porque la función no existe — así que este caso no estaba midiendo
+  -- permisos, estaba reventando. Se descubrió al correr los 120 arneses
+  -- juntos el 2026-10-15.
+  if has_function_privilege('public', 'public.aprobar_propuesta(uuid, boolean)', 'EXECUTE') then
     raise exception 'FALLÓ (caso 11): PUBLIC puede ejecutar aprobar_propuesta';
   end if;
-  if has_function_privilege('anon', 'public.aprobar_propuesta(uuid)', 'EXECUTE') then
+  if has_function_privilege('anon', 'public.aprobar_propuesta(uuid, boolean)', 'EXECUTE') then
     raise exception 'FALLÓ (caso 11): anon puede ejecutar aprobar_propuesta';
   end if;
-  if not has_function_privilege('authenticated', 'public.aprobar_propuesta(uuid)', 'EXECUTE') then
+  if not has_function_privilege('authenticated', 'public.aprobar_propuesta(uuid, boolean)', 'EXECUTE') then
     raise exception 'FALLÓ (caso 11): authenticated NO puede ejecutar aprobar_propuesta';
   end if;
   if has_function_privilege('public', 'public.club_esta_sancionado(uuid)', 'EXECUTE')

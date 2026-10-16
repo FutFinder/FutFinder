@@ -139,11 +139,17 @@ El recorrido usó Playwright con clics por JavaScript —la comprobación de est
 
 Se escriben uno por migración y se corren cuando se escriben, pegándolos a mano en el editor SQL. **Nadie los había corrido juntos contra el esquema actual**, porque contra producción cada uno siembra y revierte y hacerlo 120 veces a mano no es realista. Con la base local sí lo es: `node scripts/correr-arneses.mjs`.
 
-**Resultado: 76 de 120 pasan.** El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
+**Resultado tras arreglar los arreglables: 84 de 121 pasan** (eran 76 de 120 en la primera pasada). El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
 
 - **~10 necesitan datos de producción.** Mueren en el montaje: «No hay ningún partido de clubes en la base contra el que probar», «Club no encontrado», «La prueba necesita al menos un complejo con dueño cargado». No están rotas: **no son autosuficientes**, y por eso sólo sirven contra una base con historia. Es una propiedad, no un fallo, pero conviene saber cuáles son antes de confiar en un «pasó».
-- **~14 están VIEJAS: el esquema se movió y nadie volvió a correrlas.** Insertan en `reservas` sin `precio_cancha` o sin `cancha_id`, que después se hicieron `not null`; llaman `aprobar_propuesta(uuid)` cuando hace tiempo recibe dos argumentos; crean reservas sin el nombre de contacto que ahora se exige. **Eso significa que las garantías que esas migraciones probaron llevan meses sin comprobarse.**
-- **El resto** son fallos de montaje encadenados a los dos grupos anteriores, más cinco que merecen mirarse una por una y quedan anotadas para eso.
+- **Las que estaban VIEJAS ya están arregladas (2026-10-15).** Eran menos de las que parecía: la primera estimación dijo «~14» contando por el texto del error, y varias de esas —`null value in column cancha_id`, `complejo_id`— resultaron ser del primer grupo: el arnés hace `select … from complejos where publicado limit 1` y en una base vacía no hay ninguno. El error parecía mecánico y no lo era. **Contar errores por su mensaje tampoco es clasificar.**
+
+  Lo que sí estaba viejo y quedó corregido:
+  - **Diez arneses del vertical de Reservas** insertaban sin `reservas.precio_cancha`, que la migración **68** hizo `not null`. Llevaban rotos desde entonces. El valor correcto es el mismo `precio_total`, y lo dice la propia 68 al rellenar las filas viejas: «hasta acá `precio_total` ERA el precio de la cancha».
+  - **El arnés de la 55** llamaba `crear_reserva` sin el contacto que la **67** hizo obligatorio (18 llamadas). Ahora va por nombre de parámetro, no por posición: la firma ya creció dos veces.
+  - **Su caso 26 se había vuelto imposible.** Montaba dos jugadores, los dos autorizando antes de recalcular la cuota; después llegó el auto-confirmado y con dos el grupo se completaba, la reserva salía de `armando` y `recalcular_cuota_reserva` la rechazaba con razón. Se rehízo con un tercero que no autoriza, de modo que **las dos aserciones siguen midiendo lo suyo** — bajar a una sola autorización habría dejado la segunda pasando sin probar nada.
+  - **El arnés de la 44** llamaba `aprobar_propuesta(uuid)`, que dejó de existir cuando la 45c añadió `p_me_inscribo`. Y su caso 11, el de permisos, preguntaba por esa misma firma: `has_function_privilege` con una función que no existe **no devuelve false, lanza**. Ese caso no medía permisos, reventaba.
+- **El resto** son fallos de montaje encadenados al primer grupo, más unos pocos que merecen mirarse uno por uno.
 
 **Lo que este ejercicio encontró y ya está arreglado** (ver `pendientes.md`):
 

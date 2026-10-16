@@ -139,9 +139,9 @@ begin
   raise notice 'OK (casos 6-7)';
 
   -- ── Caso 9: despublicar no toca las reservas confirmadas ───────
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res, v_cancha, v_jugador, v_fecha, time '12:00', time '13:00',
+          20000,
           20000, 'completa', 'tarjeta', 'confirmada');
 
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_dueno, 'role', 'authenticated')::text);

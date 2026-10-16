@@ -45,6 +45,13 @@
 -- de la 56 para financiar a los pagadores), o las cuatro corridas
 -- dentro de la misma transacción que este arnés, en orden.
 --
+-- NOTA (2026-10-15): este arnés llevaba roto desde la migración 67, que hizo
+-- obligatorio el contacto de la reserva, y desde la 68, que añadió
+-- `reservas.precio_cancha` como `not null`. No lo supo nadie porque nunca se
+-- volvió a correr. El contacto se pasa por NOMBRE de parámetro a propósito:
+-- la firma de `crear_reserva` ya creció dos veces y por posición esto se
+-- rompe a la próxima.
+--
 -- Cómo correr: pega este archivo completo en Supabase → SQL Editor →
 -- Run. Todo corre en una transacción que termina en ROLLBACK. Si un
 -- caso falla, la ejecución se corta con RAISE EXCEPTION indicando cuál.
@@ -134,7 +141,9 @@ begin
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_org, 'role', 'authenticated')::text);
 
   -- Caso 1: 'completa' nace 'procesando', sin fila en reserva_participantes.
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '10:00', 'completa', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '10:00', 'completa', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   if (v_j->>'ok')::boolean is not true then
     raise exception 'FALLÓ (caso 1): crear_reserva completa debería aceptar, respondió %', v_j;
   end if;
@@ -150,7 +159,9 @@ begin
   raise notice 'OK (caso 1): completa nace procesando, sin participantes';
 
   -- Caso 2: 'capitanes' nace 'armando', organizador ya 'aceptado'.
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '11:00', 'capitanes', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '11:00', 'capitanes', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   v_res := (v_j->>'reserva_id')::uuid;
   select estado into v_estado from public.reservas where id = v_res;
   if v_estado <> 'armando' then
@@ -165,7 +176,9 @@ begin
   raise notice 'OK (caso 2): capitanes nace armando con el organizador ya aceptado';
 
   -- Caso 3: 'jugadores' calcula la cuota por CEIL(total/n).
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '12:00', 'jugadores', 'balance', 3);
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '12:00', 'jugadores', 'balance', 3,
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   v_res := (v_j->>'reserva_id')::uuid;
   if not exists (select 1 from public.reservas where id = v_res and cuota = ceil(30000::numeric / 3)) then
     raise exception 'FALLÓ (caso 3): la cuota de jugadores debería ser CEIL(30000/3)=10000';
@@ -173,49 +186,59 @@ begin
   raise notice 'OK (caso 3): la cuota de jugadores se calcula por CEIL(total/n)';
 
   -- Caso 4: capitanes/jugadores con tarjeta se rechaza.
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '11:00', 'capitanes', 'tarjeta');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '11:00', 'capitanes', 'tarjeta',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   if (v_j->>'ok')::boolean is not false then
     raise exception 'FALLÓ (caso 4): capitanes con tarjeta debería rechazarse, respondió %', v_j;
   end if;
   raise notice 'OK (caso 4): capitanes/jugadores exige Balance, no tarjeta';
 
   -- Caso 5: jugadores sin n_jugadores válido se rechaza.
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '12:00', 'jugadores', 'balance', 1);
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '12:00', 'jugadores', 'balance', 1,
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   if (v_j->>'ok')::boolean is not false then
     raise exception 'FALLÓ (caso 5): jugadores con n_jugadores=1 debería rechazarse, respondió %', v_j;
   end if;
   raise notice 'OK (caso 5): jugadores exige al menos 2 jugadores';
 
   -- Caso 6: cancha inactiva se rechaza.
-  v_j := public.crear_reserva(v_cancha_off, v_fecha, time '10:00', 'completa', 'balance');
+  v_j := public.crear_reserva(v_cancha_off, v_fecha, time '10:00', 'completa', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   if (v_j->>'ok')::boolean is not false then
     raise exception 'FALLÓ (caso 6): una cancha inactiva debería rechazar la reserva';
   end if;
   raise notice 'OK (caso 6): una cancha inactiva no admite reservas nuevas';
 
   -- ── Setup: slot 13:00 con una reserva YA confirmada ───────────────
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values (
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values (
     gen_random_uuid(), v_cancha, v_ajeno, v_fecha, time '13:00', time '14:00',
+    30000,
     30000, 'completa', 'balance', 'confirmada'
   );
 
   -- Caso 7: un slot ya 'confirmada' se rechaza al crear (informativo).
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '13:00', 'completa', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '13:00', 'completa', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   if (v_j->>'ok')::boolean is not false or (v_j->>'reason') <> 'ocupado' then
     raise exception 'FALLÓ (caso 7): un slot confirmado debería rechazar con reason=ocupado, respondió %', v_j;
   end if;
   raise notice 'OK (caso 7): crear_reserva rechaza un slot ya confirmado';
 
   -- Caso 8: DOS reservas 'armando'/'procesando' del MISMO slot coexisten.
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '14:00', 'capitanes', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '14:00', 'capitanes', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   if (v_j->>'ok')::boolean is not true then
     raise exception 'FALLÓ (caso 8): la primera reserva armando del slot 14:00 debería crearse, respondió %', v_j;
   end if;
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ajeno, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '14:00', 'completa', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '14:00', 'completa', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   if (v_j->>'ok')::boolean is not true then
     raise exception 'FALLÓ (caso 8): una segunda reserva "armando/procesando" del mismo slot debería coexistir, respondió %', v_j;
   end if;
@@ -226,7 +249,9 @@ begin
   -- INVITAR / RECHAZAR INVITACIÓN
   -- ══════════════════════════════════════════════════════════════
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_org, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '15:00', 'capitanes', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '15:00', 'capitanes', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   v_res := (v_j->>'reserva_id')::uuid;
 
   -- Caso 9: un no-organizador no puede invitar.
@@ -294,7 +319,9 @@ begin
   -- Caso 16: en 'completa' paga solo el organizador — otro que intente falla.
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin1, 'role', 'authenticated')::text);
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_org, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '10:00', 'completa', 'balance'); -- 2ª reserva, otro slot
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '10:00', 'completa', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321'); -- 2ª reserva, otro slot
   declare v_completa uuid := (v_j->>'reserva_id')::uuid;
   begin
     execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ajeno, 'role', 'authenticated')::text);
@@ -419,7 +446,9 @@ begin
   -- ══════════════════════════════════════════════════════════════
   -- FALTA_CAPITAN / FALTAN_JUGADORES
   -- ══════════════════════════════════════════════════════════════
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '16:00', 'capitanes', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '16:00', 'capitanes', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   declare v_solo_org uuid := (v_j->>'reserva_id')::uuid;
   begin
     v_j := public.autorizar_cobro_reserva(v_solo_org, ceil(30000::numeric / 2)::int);
@@ -430,7 +459,9 @@ begin
   end if;
   raise notice 'OK (caso 24): confirmar sin el segundo capitán responde falta_capitan';
 
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '17:00', 'jugadores', 'balance', 3);
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '17:00', 'jugadores', 'balance', 3,
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   declare v_pocos uuid := (v_j->>'reserva_id')::uuid;
   begin
     v_j := public.invitar_participante_reserva(v_pocos, v_j2, 'jugador');
@@ -448,19 +479,36 @@ begin
   -- ══════════════════════════════════════════════════════════════
   -- AUTORIZACION_PENDIENTE tras un recálculo de cuota
   -- ══════════════════════════════════════════════════════════════
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '18:00', 'jugadores', 'balance', 2);
+  -- TRES jugadores, no dos, y el tercero NUNCA autoriza. Es deliberado y
+  -- tiene historia: este caso se escribió con dos, los dos autorizando antes
+  -- de recalcular. Después llegó el auto-confirmado —`autorizar_cobro_reserva`
+  -- confirma la reserva en cuanto autoriza el último— así que con dos el
+  -- grupo se completaba, la reserva salía de 'armando' y
+  -- `recalcular_cuota_reserva` la rechazaba con razón: «La reserva ya no
+  -- admite cambios». El escenario se volvió imposible y el arnés llevaba
+  -- meses rojo sin que nadie lo supiera.
+  --
+  -- Con un tercero sin autorizar el grupo queda incompleto, la reserva sigue
+  -- en 'armando' y **las dos aserciones siguen midiendo lo suyo**: que el
+  -- organizador no se resetea y que v_j3, que SÍ había autorizado, sí.
+  -- Bajar a una sola autorización habría dejado a v_j3 en 'pendiente' desde
+  -- el principio y la segunda aserción habría pasado sin probar nada.
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '18:00', 'jugadores', 'balance', 3,
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   declare v_recalc uuid := (v_j->>'reserva_id')::uuid;
   begin
     v_j := public.invitar_participante_reserva(v_recalc, v_j3, 'jugador');
+    v_j := public.invitar_participante_reserva(v_recalc, v_j4, 'jugador');
     execute format('set local request.jwt.claims to %L', json_build_object('sub', v_j3, 'role', 'authenticated')::text);
-    v_j := public.autorizar_cobro_reserva(v_recalc, ceil(30000::numeric / 2)::int);
+    v_j := public.autorizar_cobro_reserva(v_recalc, ceil(30000::numeric / 3)::int);
     execute format('set local request.jwt.claims to %L', json_build_object('sub', v_org, 'role', 'authenticated')::text);
-    v_j := public.autorizar_cobro_reserva(v_recalc, ceil(30000::numeric / 2)::int);
-    -- Grupo completo y ambos autorizados. Recalcular invalida las
-    -- autorizaciones vigentes; el organizador SIGUE 'aceptado' (no lo
-    -- resetea) pero pierde su autorización — a diferencia de v_j3, que
-    -- vuelve a 'pendiente' y ya no cuenta como pagador.
-    v_j := public.recalcular_cuota_reserva(v_recalc, 2);
+    v_j := public.autorizar_cobro_reserva(v_recalc, ceil(30000::numeric / 3)::int);
+    -- Dos de tres autorizados: la reserva sigue en 'armando'. Recalcular
+    -- invalida las autorizaciones vigentes; el organizador SIGUE 'aceptado'
+    -- (no lo resetea) pero pierde su autorización — a diferencia de v_j3,
+    -- que vuelve a 'pendiente' y ya no cuenta como pagador.
+    v_j := public.recalcular_cuota_reserva(v_recalc, 3);
     if (v_j->>'ok')::boolean is not true then
       raise exception 'FALLÓ (setup caso 26): recalcular_cuota_reserva debería aceptar, respondió %', v_j;
     end if;
@@ -478,9 +526,14 @@ begin
     end if;
 
     -- v_j3 vuelve a autorizar con la cuota recalculada (igual en este caso:
-    -- mismo precio, mismo n). El organizador NO vuelve a autorizar.
+    -- mismo precio, mismo n) y v_j4 autoriza por primera vez. El organizador
+    -- NO vuelve a autorizar, y queda siendo **el único** que falta: sin eso
+    -- la confirmación fallaría por culpa de v_j4 y esta aserción no diría
+    -- nada sobre el organizador, que es justo lo que viene a probar.
     execute format('set local request.jwt.claims to %L', json_build_object('sub', v_j3, 'role', 'authenticated')::text);
-    v_j := public.autorizar_cobro_reserva(v_recalc, ceil(30000::numeric / 2)::int);
+    v_j := public.autorizar_cobro_reserva(v_recalc, ceil(30000::numeric / 3)::int);
+    execute format('set local request.jwt.claims to %L', json_build_object('sub', v_j4, 'role', 'authenticated')::text);
+    v_j := public.autorizar_cobro_reserva(v_recalc, ceil(30000::numeric / 3)::int);
     execute format('set local request.jwt.claims to %L', json_build_object('sub', v_org, 'role', 'authenticated')::text);
     v_j := public.confirmar_reserva(v_recalc);
   end;
@@ -496,7 +549,9 @@ begin
   -- SALDO INSUFICIENTE — atomicidad: no se cobra a nadie si falta uno
   -- ══════════════════════════════════════════════════════════════
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_pobre, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '19:00', 'completa', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '19:00', 'completa', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   v_sin_plata := (v_j->>'reserva_id')::uuid;
   begin
     v_j := public.autorizar_cobro_reserva(v_sin_plata, 30000);
@@ -565,7 +620,9 @@ begin
   raise notice 'OK (caso 30): cancelar una reserva confirmada devuelve el monto exacto a cada pagador';
 
   -- Caso 31: cancelar una reserva 'armando' (nunca cobrada) no genera devolución.
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '09:00', 'capitanes', 'balance');
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '09:00', 'capitanes', 'balance',
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   v_sin_cobro := (v_j->>'reserva_id')::uuid;
   begin
     v_j := public.cancelar_reserva(v_sin_cobro);
@@ -581,7 +638,9 @@ begin
   -- ══════════════════════════════════════════════════════════════
   -- RECALCULAR_CUOTA_RESERVA (efecto directo, además del caso 26)
   -- ══════════════════════════════════════════════════════════════
-  v_j := public.crear_reserva(v_cancha, v_fecha, time '08:00', 'jugadores', 'balance', 2);
+  v_j := public.crear_reserva(v_cancha, v_fecha, time '08:00', 'jugadores', 'balance', 2,
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   declare v_recalc2 uuid := (v_j->>'reserva_id')::uuid;
   begin
     v_j := public.recalcular_cuota_reserva(v_recalc2, 4);
@@ -597,8 +656,9 @@ begin
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin1, 'role', 'authenticated')::text);
   v_j := public.crear_reserva(
     v_cancha, v_fecha, time '07:00', 'completa', 'balance',
-    null, true, v_club1, v_club2
-  );
+    null, true, v_club1, v_club2,
+                              p_contacto_nombre => 'Arnés 55',
+                              p_contacto_telefono => '+56 9 8765 4321');
   declare v_desafio uuid := (v_j->>'reserva_id')::uuid;
   begin
     v_j := public.autorizar_cobro_reserva(v_desafio, 30000);
@@ -692,13 +752,12 @@ begin
     v_vencida    uuid := gen_random_uuid();
     v_confirmada_pasada uuid := gen_random_uuid();
   begin
-    insert into public.reservas (
-      id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-      precio_total, modalidad, medio_pago, estado
-    ) values
+    insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values
       (v_vencida, v_cancha, v_org, current_date - 1, time '10:00', time '11:00',
+       30000,
        30000, 'completa', 'balance', 'armando'),
       (v_confirmada_pasada, v_cancha, v_org, current_date - 1, time '12:00', time '13:00',
+       30000,
        30000, 'completa', 'balance', 'confirmada');
 
     -- Caso 39: un autenticado NO puede llamarla directo (solo cron/service_role).
