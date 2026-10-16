@@ -1,6 +1,6 @@
 # Pendientes
 
-Última revisión: 2026-09-30
+Última revisión: 2026-10-16
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
@@ -84,6 +84,23 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Acción:** una migración de limpieza que revoque `EXECUTE` de `public` en todas las funciones de trigger. Se mantiene SEPARADA a propósito: no se metió en la 44, ni en la 44b, ni en la 44c, para no mezclar una limpieza transversal con correcciones acotadas. Ninguna de esas funciones filtra la ubicación; las dos que sí lo hacían (`tg_register_cancha` y `search_canchas` a través de `canchas`) ya están cerradas por la 44b.
 - **Resolución:** la migración **114** revocó `execute` sobre TODAS las rutinas de `public` a `public` y a `anon` —a los dos, que es la parte que las migraciones anteriores erraban— y la **115** puso un disparador de eventos para que lo que se cree mañana nazca igual de cerrado.
 - **Verificación de cierre (2026-09-18, contra `jvfoendzblkoxvwvommz`):** de 43 funciones de trigger en `public`, `anon` puede ejecutar **0** y ninguna conserva `EXECUTE` para `PUBLIC`. El advisor ya no devuelve ni un `anon_security_definer_function_executable`. Las 91 RPC que el cliente llama de verdad siguen accesibles (arnés de la 114, sacado de `grep .rpc(` sobre `src/`).
+
+## Resuelto el 2026-10-16 — lo que la base nueva todavía no reproducía (migración 162)
+
+La 146 cerró cinco huecos entre el repositorio y producción. Quedaban **siete**, y sólo salieron al comparar las dos bases en **siete dimensiones** en vez de dos. Detalle del método y de la trampa del `prosrc` en [Pruebas](pruebas.md).
+
+- **El que importa: `solicitar_revision_sancion` estaba mejor en producción que en el repositorio.** Producción filtra el informe de incomparecencia por `club_reportado_id = v_club`; el archivo 47c lo busca sólo por `challenge_id`. La función hermana de esa misma migración sí filtra, y lleva el comentario que lo explica: «el otro club puede tener su propio informe, y ése no es el reintento de éste». Sin el filtro, **un club que NO fue reportado puede pedir una revisión apoyándose en el informe del otro**, y el expediente que se congela en `contexto` retrata al club equivocado. Alguien lo arregló en el editor y nunca lo escribió de vuelta.
+- **Tres CHECK sin versionar**: `matches_duracion_min_check` (10-300), `matches_min_trust_score_check` (0-100) y `profiles_estado_check` ('activo','suspendido'). Una base nueva aceptaba un partido de 5000 minutos y un perfil en un estado inventado.
+- **`idx_profiles_username`** existe en producción y no estaba en ningún archivo.
+- **`idx_matches_con_reserva`** es al revés: lo crea la migración 99 y producción no lo tiene. Repite, sin ser único, exactamente lo que ya cubre `matches_reserva_uidx`. Se retira.
+- **Verificación:** arnés `162_..._test.sql` **16/16** en local, con el control que degrada la función dentro de la transacción y demuestra el agujero (`ok:true` y revisión creada para el club equivocado); **12/12** contra producción, sin los dos controles destructivos. Dry-run revertido antes de aplicar. Después de aplicar, **las siete huellas de producción quedaron idénticas a las de una base construida desde cero** y los **124 arneses pasan contra esa base**. La migración no cambió nada en producción: lo que arregla es lo que el repositorio levanta.
+
+### Lo que queda decidido a medias: dos textos de aviso
+
+`notify_club_challenge_responded` manda en producción «Coordinen los detalles por el chat.» y «Puedes desafiar a otros equipos.». Las migraciones **26 y 28** dicen «…los detalles **del partido** por el chat.» y «…a otros equipos **desde tu club**.». El cuerpo desplegado llega con saltos de línea de Windows, así que en algún momento se pegó desde otra parte; no hay forma de saber cuál es la intención vigente.
+
+- **Qué se hizo:** conservar lo que la gente recibe hoy, y que el repositorio deje de decir otra cosa. Cambiar copia de producción por mi cuenta no corresponde.
+- **Acción (de Vicente):** si prefiere los textos largos, es una línea en una migración nueva — nunca editando la 26, la 28 ni la 162.
 
 ## P2 — La migración 114 cerró a `anon` las CATORCE funciones que el producto le había abierto
 

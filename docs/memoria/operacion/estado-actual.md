@@ -50,15 +50,20 @@ de canchas. `src/services/` concentra las llamadas de dominio.
 
 ## Base de datos
 
-- **167 archivos de migración** en el repositorio, **143 aplicados** en
-  `jvfoendzblkoxvwvommz`. De la 140 a la 155 está todo aplicado **salvo la
+- **174 archivos de migración** en el repositorio. Con la **162** aplicada
+  el 2026-10-16, **la única que el repositorio tiene y producción no es la
   149**, que lleva en su cabecera «no aplicar hasta distribuir un build» y
-  espera ahí a propósito.
-- **72 tablas, 285 funciones, 147 políticas y 12 tareas cron.**
-- **123 arneses SQL** en `supabase/tests/`, **123 en verde** contra la base
-  local (2026-10-16). No se ejecutan con `npm test`: corren con
-  `node scripts/correr-arneses.mjs`, o se pegan en el editor SQL, siempre
-  dentro de una transacción que termina en `ROLLBACK`.
+  espera ahí a propósito. No es una cuenta: es el resultado de construir
+  una base desde cero con `--sin-149` y comparar las dos huella por huella
+  (ver [Pruebas](pruebas.md)).
+- **72 tablas, 285 funciones, 118 políticas y 12 tareas cron.** La nota
+  anterior decía 147 políticas; son 118 en `public`, medidas sobre
+  `pg_policy`.
+- **124 arneses SQL** en `supabase/tests/`, **124 en verde** contra una
+  base construida desde cero con el repositorio (2026-10-16). No se
+  ejecutan con `npm test`: corren con `node scripts/correr-arneses.mjs`, o
+  se pegan en el editor SQL, siempre dentro de una transacción que termina
+  en `ROLLBACK`.
 - **Seis Edge Functions desplegadas y activas**: `send-push`, `pagar-reserva`,
   `flow-retorno`, `flow-confirmacion`, `solicitud-recinto` y
   `reportar-problema`. Sus pruebas las corre Deno, aparte de `npm run verify`.

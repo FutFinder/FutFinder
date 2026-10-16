@@ -182,12 +182,33 @@ Se escriben uno por migración y se corren cuando se escriben, pegándolos a man
 
 **Y una de SQL que cuesta una tarde:** el caso 7 del 40 comprobaba `v_payload->'last_message' is not null` contra una RPC que devuelve `'last_message': null`. `->` entrega el valor JSON `null`, que no es un NULL de SQL, así que la condición era cierta siempre. Para preguntar por «vacío» hay que usar `->>`.
 
-**Y una lección sobre cómo se compara.** El 2026-10-14 se dio por buena la equivalencia con producción comparando **conteos de objetos** —72 tablas, 285 funciones, 118 políticas— y coincidían. Lo que no coincidía eran las columnas de una tabla y el privilegio de una función. **Contar no es comparar.** Ahora se comparan huellas md5 de dos cosas concretas, y las dos cuadran:
+**Y una lección sobre cómo se compara.** El 2026-10-14 se dio por buena la equivalencia con producción comparando **conteos de objetos** —72 tablas, 285 funciones, 118 políticas— y coincidían. Lo que no coincidía eran las columnas de una tabla y el privilegio de una función. **Contar no es comparar.**
+
+## Comparar las dos bases objeto por objeto (2026-10-16)
+
+Comparar dos huellas tampoco bastaba: columnas y privilegios cuadraban desde el 14 de octubre, y aun así la base que construye el repositorio **no era** producción. Se comparan ahora **siete dimensiones**, y la 162 cerró lo que faltaba:
 
 | | base nueva | producción |
 |---|---|---|
-| Columnas de las 72 tablas | `b4ae0d3f…` | `b4ae0d3f…` |
-| `execute` de las 285 funciones | `7e37dd47…` | `7e37dd47…` |
+| Columnas (658 en 72 tablas) | `65dea24a…` | `65dea24a…` |
+| `execute` y `security` de las 285 funciones | `bb7d1ccf…` | `bb7d1ccf…` |
+| **Cuerpos** de las 285 funciones | `addf38f8…` | `addf38f8…` |
+| Políticas (118) | `bb2a653a…` | `bb2a653a…` |
+| Disparadores (58) | `f549a45a…` | `f549a45a…` |
+| Restricciones (431) | `cd15f320…` | `cd15f320…` |
+| Índices (202) | `e7f820a4…` | `e7f820a4…` |
+
+**EL `prosrc` DE PRODUCCIÓN NO ES EL DEL ARCHIVO, y por eso casi nadie compara cuerpos.** Lo que se aplica por el editor o por el MCP llega **sin comentarios y con los saltos de línea comidos**. Un `md5(prosrc)` a secas da 285 diferencias de 285 y ninguna es real; quitando comentarios y colapsando espacios quedan 14, que siguen sin serlo —son `(select` contra `( select`—. Hay que quitar **todo** el espacio en blanco, la misma transformación en los dos lados. Entonces quedan **dos**, y las dos importan. Es el mismo trabajo que hacía falta para no volver a perder una decisión como la de la 48b.
+
+**Lo que encontró, y que ninguna de las otras seis dimensiones habría visto:**
+
+- **`solicitar_revision_sancion` estaba MEJOR en producción que en el repositorio.** Filtra el informe de incomparecencia por `club_reportado_id = v_club`; el archivo 47c lo busca sólo por `challenge_id`. La función hermana de esa misma migración sí filtra, con el comentario que lo explica. Sin el filtro, un club que no fue reportado puede pedir revisión apoyándose en el informe del otro, y el expediente que se congela retrata al club equivocado. El arnés de la 162 lo demuestra con un control que degrada la función dentro de la transacción: con el cuerpo viejo, `ok:true` y revisión creada.
+- **Tres CHECK que producción tiene y `schema.sql` no declara**: `matches_duracion_min_check`, `matches_min_trust_score_check` y `profiles_estado_check`. Una base nueva aceptaba un partido de 5000 minutos, un `min_trust_score` de -3 y un perfil en estado inventado.
+- **`idx_profiles_username`**, que existe en producción y nunca se versionó.
+- **`idx_matches_con_reserva`**, al revés: lo crea la migración 99 y producción no lo tiene. Es un índice no único sobre exactamente la misma columna y el mismo predicado que `matches_reserva_uidx`, que sí es único. Peso muerto; la 162 lo retira.
+- **Dos textos de aviso** que el repositorio dice más largos de lo que la gente recibe. Se conservó lo que recibe hoy; la elección está anotada en `pendientes.md`.
+
+**La prueba de que la 162 cierra el círculo:** contenedores nuevos, base vacía, `node scripts/construir-base.mjs --sin-149` (schema.sql + 173 migraciones), y las siete huellas iguales a producción. Después, **124/124 arneses** contra esa base recién construida. La 162 se aplicó a producción el 2026-10-16 y **no cambió ni una huella**, que era justamente lo que tenía que pasar: lo que arregla es la base que el repositorio levanta, no la que está corriendo.
 
 ## Notas relacionadas
 
