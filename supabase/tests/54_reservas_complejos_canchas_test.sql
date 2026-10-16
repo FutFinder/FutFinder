@@ -62,8 +62,14 @@ begin
     'canchas-user-' || v_user || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
   );
 
-  insert into public.complejos (id, nombre, comuna, latitud, longitud)
-  values (v_complejo, 'Complejo Prueba 54', 'Ñuñoa', -33.45, -70.60);
+  -- PUBLICADO (2026-10-15). Cuando se escribió este arnés, `complejos` se
+  -- leía sin condiciones; la migración **65** cambió la política a
+  -- `publicado`, así que un recinto sin publicar dejó de ser legible y el
+  -- caso 1 llevaba rojo desde entonces. Lo que ese caso mide sigue siendo
+  -- válido —que cualquier autenticado lee un recinto público— sólo que
+  -- ahora hay que publicarlo para que lo sea.
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+  values (v_complejo, 'Complejo Prueba 54', 'Ñuñoa', -33.45, -70.60, true);
 
   insert into public.canchas_reservables (id, complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
   values
@@ -85,11 +91,25 @@ begin
   end if;
   raise notice 'OK (caso 1): complejos se lee públicamente';
 
-  select count(*) into v_count from public.canchas_reservables where complejo_id = v_complejo;
-  if v_count <> 2 then
-    raise exception 'FALLÓ (caso 2): cualquier autenticado debería poder leer canchas_reservables, vio %', v_count;
+  -- UNA de las dos, no las dos. Este arnés siembra una cancha activa y una
+  -- inactiva, y cuando se escribió las leía las dos. La política de hoy es
+  -- `activa AND (el complejo está publicado)`, así que la inactiva dejó de
+  -- verse — a propósito, y el caso llevaba rojo desde entonces.
+  --
+  -- Se comprueban las dos caras en vez de sólo contar: que la activa se ve
+  -- y que la inactiva NO. Contar «1» a secas pasaría también si se viera la
+  -- equivocada.
+  select count(*) into v_count from public.canchas_reservables
+   where complejo_id = v_complejo and id = v_cancha;
+  if v_count <> 1 then
+    raise exception 'FALLÓ (caso 2): la cancha activa de un recinto publicado debería leerse, vio %', v_count;
   end if;
-  raise notice 'OK (caso 2): canchas_reservables se lee públicamente';
+  select count(*) into v_count from public.canchas_reservables
+   where complejo_id = v_complejo and id = v_cancha_off;
+  if v_count <> 0 then
+    raise exception 'FALLÓ (caso 2): una cancha INACTIVA no debería leerse públicamente, vio %', v_count;
+  end if;
+  raise notice 'OK (caso 2): la cancha activa se lee y la inactiva no';
 
   select count(*) into v_count from public.cancha_horario_reglas where cancha_id = v_cancha;
   if v_count <> 1 then

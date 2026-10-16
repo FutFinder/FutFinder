@@ -44,7 +44,25 @@ begin
     ('00000000-0000-0000-0000-000000000000', v_user1, 'authenticated', 'authenticated', 'balance-u1-' || v_user1 || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_user2, 'authenticated', 'authenticated', 'balance-u2-' || v_user2 || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', '');
 
+  -- OJO (2026-10-15): este arnés llevaba rojo desde la migración **73**,
+  -- que revocó `cargar_balance` de `authenticated` A PROPÓSITO — cargar
+  -- saldo todavía no existe como función del producto, y el código de la
+  -- app lo dice: «lo único honesto mientras `cargar_balance` siga revocada
+  -- (migración 73)» en `SaldoScreen`. No es un fallo, es una decisión.
+  --
+  -- Primero se comprueba ESA decisión, y después las reglas de negocio de
+  -- la función se siguen probando con las credenciales puestas pero sin
+  -- cambiar de rol: `auth.uid()` lee los claims igual, así que la función
+  -- actúa en nombre del usuario, y el arnés recupera todo lo que medía.
   execute format('set local role authenticated');
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_user1, 'role', 'authenticated')::text);
+  begin
+    perform public.cargar_balance(5000, 'transferencia');
+    raise exception 'FALLÓ (caso 0): `authenticated` ejecutó cargar_balance; la 73 la revocó';
+  exception when insufficient_privilege then
+    raise notice 'OK (caso 0): cargar_balance sigue revocada de authenticated (migración 73)';
+  end;
+  execute 'reset role';
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_user1, 'role', 'authenticated')::text);
 
   -- ── Caso 1: menos de $1.000 se rechaza ────────────────────────────
@@ -93,6 +111,10 @@ begin
   raise notice 'OK (caso 6): get_mi_balance devuelve saldo y movimientos propios completos';
 
   -- ── Caso 7: RLS — un usuario no lee los movimientos de otro ───────
+  -- Vuelve el rol `authenticated`: de acá en adelante lo que se mide es la
+  -- RLS, y `postgres` se la salta. Los casos anteriores corrían sin él
+  -- sólo porque la 73 revocó `cargar_balance` de `authenticated`.
+  execute format('set local role authenticated');
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_user2, 'role', 'authenticated')::text);
   select count(*) into v_count from public.balance_movimientos where user_id = v_user1;
   if v_count <> 0 then
