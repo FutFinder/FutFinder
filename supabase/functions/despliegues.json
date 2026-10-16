@@ -1,0 +1,66 @@
+{
+  "_lee_esto": [
+    "Qué versión de cada Edge Function está DESPLEGADA en jvfoendzblkoxvwvommz, y con qué contenido.",
+    "`archivos` guarda el sha256 de cada archivo TAL COMO SE DESPLEGÓ. Lo comprueba scripts/__tests__/edgeDespliegues.test.js: si el archivo del repositorio ya no da ese hash, la función está corriendo código viejo y la prueba falla.",
+    "No se compara por fecha: el patrón normal es desplegar y commitear un minuto después, así que el commit SIEMPRE es más nuevo que el despliegue y una comparación de fechas daría falso positivo siempre.",
+    "`comparada` es el día en que ese contenido se trajo con get_edge_function y se verificó contra el repositorio. `null` significa que el hash es el del archivo de hoy y se dio por bueno sin traer la copia desplegada.",
+    "AL DESPLEGAR: actualiza version, desplegada y los hashes. Es a propósito que haya que tocar esto a mano.",
+    "UN CAMBIO EN _shared/ NO ESTÁ EN PRODUCCIÓN HASTA REDESPLEGAR CADA FUNCIÓN QUE LO IMPORTA: la copia viaja dentro de cada despliegue."
+  ],
+  "proyecto": "jvfoendzblkoxvwvommz",
+  "funciones": {
+    "flow-confirmacion": {
+      "version": 2,
+      "desplegada": "2026-09-11T01:31:28Z",
+      "comparada": null,
+      "archivos": {
+        "flow-confirmacion/index.ts": "3ac337a8a8b2472ba7b65e2863a6fb5bc7c9488a0b2a20e027de784348ea4200",
+        "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441"
+      }
+    },
+    "flow-retorno": {
+      "version": 2,
+      "desplegada": "2026-09-11T01:28:33Z",
+      "comparada": null,
+      "archivos": {
+        "flow-retorno/index.ts": "f2e7ec30569db0fc7e37e71458c630f6c1541e1491b6b27408650d00e626e968"
+      }
+    },
+    "pagar-reserva": {
+      "version": 2,
+      "desplegada": "2026-09-11T01:30:08Z",
+      "comparada": null,
+      "archivos": {
+        "pagar-reserva/index.ts": "e80131c31ee790bfae95cc738d5c9b6e8a5b640f217a9e34047e2bdfabfc69bb",
+        "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441"
+      }
+    },
+    "reportar-problema": {
+      "version": 1,
+      "desplegada": "2026-09-22T23:55:09Z",
+      "comparada": "2026-10-16",
+      "archivos": {
+        "reportar-problema/index.ts": "793a06c6fb02ff4a1a8b1408fc43c4ddee932317d462a8fee7108e17e25d3b39",
+        "_shared/correoReporte.ts": "088822374fd4016699c9c46633eb9729084f61c205f8f76e31e6bebeabf3963d"
+      }
+    },
+    "send-push": {
+      "version": 10,
+      "desplegada": "2026-10-16T23:45:48Z",
+      "comparada": "2026-10-16",
+      "archivos": {
+        "send-push/index.ts": "fa50376383116d7869bd4437b03beefc78369071d9c731d40d79080540f7b9c8",
+        "send-push/pushLogic.ts": "dc1c8709707e0057e882c60b06361d4cebbb36462d1cba4d8a62e9a968a96c2e"
+      }
+    },
+    "solicitud-recinto": {
+      "version": 7,
+      "desplegada": "2026-09-21T11:10:18Z",
+      "comparada": "2026-10-16",
+      "archivos": {
+        "solicitud-recinto/index.ts": "40e393edd7eb9f5e440f3970a847e058ac7e80ee388a8778be3f3ff76f252f38",
+        "_shared/correoSolicitud.ts": "b0f4ba51d671685ac01caacfbf109487f816668b2844cd4562decbc835071593"
+      }
+    }
+  }
+}

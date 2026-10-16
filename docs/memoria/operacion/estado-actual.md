@@ -70,7 +70,11 @@ de canchas. `src/services/` concentra las llamadas de dominio.
   2026-10-16 **`npm run verify` las incluye** (`npm run test:edge`). Si
   Deno no está instalado el paso no bloquea, pero lo dice en una línea
   imposible de no ver: un paso que se salta en silencio es peor que no
-  tenerlo.
+  tenerlo. **Qué versión está desplegada de cada una vive en
+  `supabase/functions/despliegues.json`**, con el sha256 de cada archivo;
+  una prueba falla si el repositorio se adelanta al despliegue. Hizo falta:
+  `send-push` llevaba dos meses corriendo código viejo (ver
+  [Pendientes](pendientes.md)).
 
 ## Lo que la app no ha vivido todavía
 
