@@ -425,6 +425,10 @@ begin
       'duracion_min', 90,
       'direccion', 'Av. Siempre Viva 742',
       'cancha_nombre', 'Complejo Municipal',
+      -- La ubicación en el mapa va desde el 2026-10-16: la hizo obligatoria
+      -- la migración **43c**, posterior a este arnés, que moría en «Falta la
+      -- ubicación de la cancha en el mapa» antes de llegar a los casos 9 a 15.
+      'latitud', -33.4569, 'longitud', -70.6483,
       'comuna', 'Ñuñoa', 'region', 'Metropolitana',
       'modalidad', 'futbol7', 'cupos_por_club', 7,
       'metodo_inscripcion', 'orden_llegada', 'cuota_por_persona', 4000,
@@ -470,6 +474,7 @@ begin
       'duracion_min', 60,
       'direccion', 'Otra dirección 111',
       'cancha_nombre', 'Otra cancha',
+      'latitud', -33.5110, 'longitud', -70.7580,
       'comuna', 'Maipú', 'region', 'Metropolitana',
       'modalidad', 'futbol11', 'cupos_por_club', 11,
       'metodo_inscripcion', 'seleccion_admin', 'cuota_por_persona', 9000

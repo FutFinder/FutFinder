@@ -58,6 +58,7 @@ declare
 
   v_last_quiet_id uuid;
   v_newest_id     uuid;
+  v_tick          int := 0;   -- el reloj del arnés: un segundo por mensaje
   v_count         int;
   v_unread_before int;
   v_unread_after  int;
@@ -128,15 +129,55 @@ begin
     (v_match_history, v_match_mate, 'inscrito'),
     (v_match_history, v_other_mate, 'inscrito');
 
+  -- EL RELOJ DEL ARNÉS (2026-10-16). Desde la migración **32** hay un
+  -- disparador —`messages_force_server_fields`— que estampa
+  -- `new.created_at := now()`, y `now()` es la hora de ARRANQUE de la
+  -- transacción: dentro de este arnés, que corre entero en una sola, los
+  -- 12 mensajes del partido ruidoso y los 3 del historial nacían todos con
+  -- el MISMO instante. Los `pg_sleep` no separaban nada —el propio caso 8
+  -- lo comprobaba y habría gritado— y «el más nuevo» quedaba indefinido.
+  -- En producción cada mensaje es su propia transacción y sí van
+  -- separados. Para reproducir eso, cada insert se vuelve a estampar con
+  -- un segundo más que el anterior, y para poder hacerlo se apaga el
+  -- guardia de ediciones mientras dura el arnés. No se está probando el
+  -- guardia acá: eso es del arnés de la 32.
+  --
+  -- HACIA ATRÁS, no hacia adelante: las marcas de lectura
+  -- (`mark_chat_read`) también se guardan con `now()`, así que si los
+  -- mensajes quedaran DESPUÉS de ese instante ninguna lectura los
+  -- alcanzaría y el no-leído no bajaría nunca. Se los deja en la hora
+  -- anterior, separados de a un segundo. Las lecturas entran en el mismo
+  -- reloj, así que «leído» y «llegó después de leer» conservan su orden.
+  execute 'alter table public.messages disable trigger trg_messages_block_content_edits';
+
   -- A partir de acá actuamos como v_me, autenticado, igual que PostgREST.
   execute format('set local role authenticated');
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_me, 'role', 'authenticated')::text);
 
+  -- COMO CADA REMITENTE, no como v_me (2026-10-16). Este arnés ponía el
+  -- `sender_id` a mano y se quedaba autenticado como v_me para todo. Desde
+  -- la migración **32** hay un disparador —`messages_force_server_fields`—
+  -- que hace `new.sender_id := coalesce(auth.uid(), new.sender_id)`: el
+  -- autor lo decide el servidor, no el cliente. Así que todos estos
+  -- mensajes se guardaban como si los hubiera escrito v_me, y el caso de
+  -- la bandeja medía una conversación de uno solo consigo mismo. El DM
+  -- terminaba de delatarlo: v_me escribiéndose a v_me no es una amistad y
+  -- la policy lo rechazaba con «new row violates row-level security
+  -- policy». Ahora cada bloque se autentica como quien escribe.
+
   -- ── Caso 2: "partido ruidoso" no le come el último mensaje al ──
   -- "partido silencioso" — se inserta el mensaje viejo PRIMERO...
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_match_mate, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, match_id, content)
   values (v_match_mate, v_match_quiet, 'primer y único mensaje del silencioso')
   returning id into v_last_quiet_id;
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
 
   -- ...y DESPUÉS 12 mensajes en el ruidoso (más de los que "ganarían" si
   -- hubiera un tope global chico compartido entre conversaciones). Con
@@ -146,25 +187,73 @@ begin
     perform pg_sleep(0.01);
     insert into public.messages (sender_id, match_id, content)
     values (v_match_mate, v_match_noisy, 'mensaje ruidoso #' || i);
+    -- el reloj del arnés (ver la nota de arriba)
+    execute 'reset role';
+    v_tick := v_tick + 1;
+    update public.messages
+       set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+     where created_at = now();
+    execute 'set local role authenticated';
   end loop;
 
   -- Mensaje de club y DM, para tener las 3 categorías.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_club_mate, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, club_id, content)
   values (v_club_mate, v_club_id, 'hola desde el club');
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_friend, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, receiver_id, content)
   values (v_friend, v_me, 'hola desde el DM');
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
 
   -- ── Caso 8: mensajes antiguos — "partido con historial" tiene dos
   -- mensajes viejos y uno nuevo, separados por tiempo real.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_match_mate, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, match_id, content)
   values (v_match_mate, v_match_history, 'mensaje viejo #1');
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
   perform pg_sleep(0.02);
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_other_mate, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, match_id, content)
   values (v_other_mate, v_match_history, 'mensaje viejo #2');
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
   perform pg_sleep(0.02);
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_match_mate, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, match_id, content)
   values (v_match_mate, v_match_history, 'mensaje MÁS NUEVO')
   returning id into v_newest_id;
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_me, 'role', 'authenticated')::text);
 
   -- ══ CASO 1 y 2: una fila por conversación, sin robarse el último ═
   -- 4 partidos (ruidoso, silencioso, sin mensajes, con historial) + 1 club + 1 DM = 6.
@@ -200,7 +289,11 @@ begin
   if v_payload is null then
     raise exception 'FALLÓ (caso 7): el partido sin mensajes debería aparecer igual en la bandeja';
   end if;
-  if v_payload->'last_message' is not null then
+  -- `->>` y no `->` (2026-10-16): la RPC devuelve `'last_message': null`,
+  -- un null de JSON, y `v_payload->'last_message' is not null` es CIERTO
+  -- para eso —el operador entrega el valor JSON `null`, no un NULL de SQL—.
+  -- El caso fallaba sin que hubiera nada malo en la RPC.
+  if v_payload->>'last_message' is not null then
     raise exception 'FALLÓ (caso 7): un partido sin mensajes no debería tener last_message';
   end if;
   raise notice 'OK (caso 7): un partido sin mensajes aparece con last_message null (no se inventa nada)';
@@ -243,8 +336,17 @@ begin
   select coalesce((payload->>'unread')::int, 0) into v_unread_before
   from public.get_my_threads() where thread_key = 'club:' || v_club_id::text;
 
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_other_mate, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, club_id, content)
   values (v_other_mate, v_club_id, 'segundo remitente sin leer');
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_me, 'role', 'authenticated')::text);
 
   select (payload->>'unread')::int into v_unread_after
   from public.get_my_threads() where thread_key = 'club:' || v_club_id::text;
@@ -255,6 +357,15 @@ begin
 
   -- 3c: marcar como leído deja el no-leído en cero...
   perform public.mark_chat_read('club:' || v_club_id::text);
+  -- La lectura también entra en el reloj del arnés: se guarda con `now()`,
+  -- igual que los mensajes, así que hay que ponerla en la línea de tiempo
+  -- para que lo que venga DESPUÉS quede efectivamente después.
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.chat_reads
+     set last_read_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where last_read_at = now();
+  execute 'set local role authenticated';
   select (payload->>'unread')::int into v_count
   from public.get_my_threads() where thread_key = 'club:' || v_club_id::text;
   if v_count <> 0 then
@@ -264,8 +375,17 @@ begin
 
   -- ...y un mensaje nuevo POSTERIOR a esa lectura vuelve a contar desde 1,
   -- no se queda pegado en 0 ni arrastra los ya leídos.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_club_mate, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, club_id, content)
   values (v_club_mate, v_club_id, 'mensaje después de leer todo');
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_me, 'role', 'authenticated')::text);
   select (payload->>'unread')::int into v_count
   from public.get_my_threads() where thread_key = 'club:' || v_club_id::text;
   if v_count <> 1 then
@@ -285,8 +405,15 @@ begin
   raise notice 'OK (caso 4): muted refleja chat_mutes por conversación, no globalmente';
 
   -- ══ CASO 5: escondido desaparece, reaparece con actividad nueva ══
+  -- El escondite también va en el reloj del arnés, por lo mismo que la
+  -- lectura: si se guardara con `now()` quedaría DESPUÉS de todo y el
+  -- mensaje del caso 5b no contaría como actividad posterior.
+  execute 'reset role';
+  v_tick := v_tick + 1;
   insert into public.chat_hides (user_id, thread_key, hidden_at)
-  values (v_me, 'dm:' || v_friend::text, now());
+  values (v_me, 'dm:' || v_friend::text,
+          now() - interval '1 hour' + (v_tick * interval '1 second'));
+  execute 'set local role authenticated';
 
   select count(*) into v_count from public.get_my_threads() where thread_key = 'dm:' || v_friend::text;
   if v_count <> 0 then
@@ -294,8 +421,17 @@ begin
   end if;
   raise notice 'OK (caso 5a): un hilo escondido sin actividad nueva no aparece';
 
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_friend, 'role', 'authenticated')::text);
   insert into public.messages (sender_id, receiver_id, content)
   values (v_friend, v_me, 'mensaje nuevo después de esconder');
+  -- el reloj del arnés (ver la nota de arriba)
+  execute 'reset role';
+  v_tick := v_tick + 1;
+  update public.messages
+     set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+   where created_at = now();
+  execute 'set local role authenticated';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_me, 'role', 'authenticated')::text);
 
   select count(*) into v_count from public.get_my_threads() where thread_key = 'dm:' || v_friend::text;
   if v_count <> 1 then
@@ -305,27 +441,41 @@ begin
 
   -- ══ CASO 9: muchas conversaciones a la vez ═══════════════════════
   -- El problema que resolvía esta migración era justo un tope arbitrario
-  -- bajo carga: 30 clubes nuevos, cada uno con exactamente un mensaje
-  -- propio, no deberían perder ni mezclar ninguno.
+  -- bajo carga: 30 conversaciones nuevas, cada una con exactamente un
+  -- mensaje propio, no deberían perder ni mezclar ninguno.
+  --
+  -- CON PARTIDOS Y NO CON CLUBES (2026-10-16): esto creaba 30 clubes para
+  -- v_me, y una migración posterior puso un tope —`check_user_club_limit`,
+  -- «Ya perteneces al máximo de 3 clubes permitidos»— que hace imposible
+  -- el montaje. La escala es lo que importa, no de qué tipo sea el hilo:
+  -- se arma con 30 partidos, que no tienen tope.
   for i in 1..30 loop
-    insert into public.clubs (nombre, slug, created_by)
-    values ('Club Escala ' || i, 'club-escala-' || i || '-' || gen_random_uuid()::text, v_me)
+    insert into public.matches (
+      id_organizador, titulo, region, comuna, cancha_nombre,
+      latitud, longitud, hora, cupos_totales, cupos_disponibles
+    ) values
+      (v_me, 'Partido Escala ' || i, 'Metropolitana', 'Ñuñoa', 'Cancha E' || i,
+       -33.45, -70.60, now() + interval '10 days', 10, 10)
     returning id into v_scale_club;
 
     v_scale_ids := array_append(v_scale_ids, v_scale_club);
 
-    insert into public.club_members (club_id, user_id, rol)
-    values (v_scale_club, v_me, 'admin');
-
-    insert into public.messages (sender_id, club_id, content)
+    insert into public.messages (sender_id, match_id, content)
     values (v_me, v_scale_club, 'mensaje del club de escala #' || i);
+    -- el reloj del arnés (ver la nota de arriba)
+    execute 'reset role';
+    v_tick := v_tick + 1;
+    update public.messages
+       set created_at = now() - interval '1 hour' + (v_tick * interval '1 second')
+     where created_at = now();
+    execute 'set local role authenticated';
   end loop;
 
   select count(*) into v_count
   from public.get_my_threads()
-  where thread_type = 'club' and thread_key = any (select 'club:' || x::text from unnest(v_scale_ids) x);
+  where thread_type = 'match' and thread_key = any (select 'match:' || x::text from unnest(v_scale_ids) x);
   if v_count <> 30 then
-    raise exception 'FALLÓ (caso 9): deberían verse los 30 clubes nuevos, se ven %', v_count;
+    raise exception 'FALLÓ (caso 9): deberían verse las 30 conversaciones nuevas, se ven %', v_count;
   end if;
   raise notice 'OK (caso 9): 30 conversaciones nuevas a la vez, ninguna se pierde';
 
@@ -334,10 +484,10 @@ begin
   if exists (
     select 1
     from public.get_my_threads() t
-    join unnest(v_scale_ids) with ordinality as s(id, ord) on t.thread_key = ('club:' || s.id::text)
+    join unnest(v_scale_ids) with ordinality as s(id, ord) on t.thread_key = ('match:' || s.id::text)
     where t.payload->'last_message'->>'content' <> ('mensaje del club de escala #' || s.ord)
   ) then
-    raise exception 'FALLÓ (caso 9b): algún club de escala muestra el mensaje de otro (o ninguno)';
+    raise exception 'FALLÓ (caso 9b): algún hilo de escala muestra el mensaje de otro (o ninguno)';
   end if;
   raise notice 'OK (caso 9b): cada una de las 30 conversaciones muestra su propio último mensaje, sin mezclarse';
 
