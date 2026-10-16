@@ -108,6 +108,18 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **La decisión que hace falta** no es función por función, es una sola: **si FutFinder tiene superficie pública sin cuenta**. Si la respuesta es sí, se reabren con una lista explícita —y el barrido de la 114 debería llevar esa lista para que no vuelva a pasar—. Si es no, hay que retirar las concesiones de catorce migraciones y los casos de arnés que las comprueban, para que el repositorio deje de decir dos cosas distintas.
 - **Verificación necesaria:** con `set local role anon`, cada función de la lista que se decida reabrir responde; las que no, dan 42501; y ningún arnés queda afirmando lo contrario de lo que la base hace.
 
+## Resuelto el 2026-10-15 — la disputa vuelve a cerrarse (migración 159)
+
+**Un fallo de verdad en producción, encontrado por un arnés que llevaba cinco meses en rojo diciéndolo.**
+
+- **La regla.** La migración **48b** existía para una sola cosa: con el desafío en `resultado_en_disputa`, **ningún club propone un resultado nuevo por su cuenta**. Su texto lo dice con todas sus letras y cambió la guarda de `estado not in ('esperando_resultado','resultado_en_disputa')` a `estado <> 'esperando_resultado'`.
+- **Qué la rompió.** La **119** («permisos del club») reescribió `proponer_resultado` entera para añadirle la comprobación de permisos, y la reconstruyó desde una copia **anterior a la 48b**. La guarda laxa volvió. La función compila igual y hace otra cosa: no hubo aviso de nada.
+- **La consecuencia.** Un club podía empujar su marcador otra vez estando en disputa, en vez de esperar a que alguien la resolviera — que es exactamente lo que la pieza de moderación de la **151** (`moderacion_reabrir_resultado`) vino a hacer bien. La puerta trasera llevaba abierta desde entonces.
+- **Por qué nadie se enteró en cinco meses:** el caso 11 del arnés de la 48 lo comprueba literalmente, y estaba rojo. Los arneses se corren cuando se escriben y nadie vuelve. Salió al correrlos todos juntos.
+- **Gravedad real, sin inflarla:** hoy hay **cero** desafíos en `resultado_en_disputa`, así que **no hay ni un dato afectado**. Lo que estaba abierto era la puerta.
+- **Verificación:** arnés `159_..._test.sql` **4/4**, midiendo conducta y no el texto de la función — en `esperando_resultado` sí se propone (control), en disputa no lo hacen ni el proponente ni el contrario, y la moderación reabre y entonces sí se puede, que es la salida que impide que un encuentro quede trabado para siempre. Más el caso 11 de la 48, que vuelve a verde.
+- **La lección, que no es nueva pero costó cinco meses:** reescribir una función de 12 KB para cambiarle una línea es la forma más fácil de revertir lo que otra migración decidió. Por eso las migraciones de estos días parchean el cuerpo **desplegado** con anclas que fallan si no existen, en vez de transcribirlo.
+
 ## P1 — Validar el envío push de extremo a extremo en dispositivo físico
 
 - **Dominio afectado:** avisos y push.

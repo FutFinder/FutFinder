@@ -139,7 +139,7 @@ El recorrido usó Playwright con clics por JavaScript —la comprobación de est
 
 Se escriben uno por migración y se corren cuando se escriben, pegándolos a mano en el editor SQL. **Nadie los había corrido juntos contra el esquema actual**, porque contra producción cada uno siembra y revierte y hacerlo 120 veces a mano no es realista. Con la base local sí lo es: `node scripts/correr-arneses.mjs`.
 
-**Resultado: 99 de 121 pasan** (76 en la primera pasada del 2026-10-15, 84 tras arreglar los viejos, 95 tras el recinto sembrado, 99 tras el partido de clubes sembrado). El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
+**Resultado: 101 de 122 pasan** (76 en la primera pasada del 2026-10-15, 84 tras arreglar los viejos, 95 tras el recinto sembrado, 99 tras el partido de clubes sembrado, 101 tras arreglar el fallo que el caso 11 del arnés de la 48 llevaba cinco meses denunciando). El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
 
 - **~10 necesitan datos de producción.** Mueren en el montaje: «No hay ningún partido de clubes en la base contra el que probar», «Club no encontrado», «La prueba necesita al menos un complejo con dueño cargado». No están rotas: **no son autosuficientes**, y por eso sólo sirven contra una base con historia. Es una propiedad, no un fallo, pero conviene saber cuáles son antes de confiar en un «pasó».
 - **Las que estaban VIEJAS ya están arregladas (2026-10-15).** Eran menos de las que parecía: la primera estimación dijo «~14» contando por el texto del error, y varias de esas —`null value in column cancha_id`, `complejo_id`— resultaron ser del primer grupo: el arnés hace `select … from complejos where publicado limit 1` y en una base vacía no hay ninguno. El error parecía mecánico y no lo era. **Contar errores por su mensaje tampoco es clasificar.**
@@ -164,7 +164,9 @@ Se escriben uno por migración y se corren cuando se escriben, pegándolos a man
 
 **Y el 46 tenía un defecto latente que sólo se ve con datos sembrados:** buscaba el evento del rechazo con `order by created_at desc limit 1`, y **dentro de una transacción `now()` no avanza**, así que todos los eventos comparten `created_at` y esa consulta devuelve cualquiera. Acusaba a la función de inventarse un motivo que venía de un caso anterior. Ahora se busca por `change_id`. Contra una base con historia el defecto estaba igual de presente; sólo que no se notaba.
 
-**Lo que sigue rojo (22) y por qué importa menos:** casi todos necesitan un partido de clubes sembrado —la cadena desafío → propuesta → aprobación— y son el mismo trabajo mecánico que se le hizo al vertical de Reservas. Quedan además cinco que merecen mirarse uno por uno, anotados con su mensaje en el historial de este archivo.
+**Y el ejercicio encontró un fallo de verdad en producción.** El caso 11 del arnés de la 48 —«en disputa nadie debería poder proponer de nuevo»— llevaba rojo desde mayo, y tenía razón: la migración **119** reescribió `proponer_resultado` para añadirle los permisos de club y la reconstruyó desde una copia **anterior a la 48b**, devolviendo la guarda laxa que aquella había cerrado. Lo arregla la **159**. Detalle en `pendientes.md`.
+
+**Lo que sigue rojo (21) y por qué importa menos:** casi todos necesitan un partido de clubes sembrado —la cadena desafío → propuesta → aprobación— y son el mismo trabajo mecánico que se le hizo al vertical de Reservas. Quedan además cinco que merecen mirarse uno por uno, anotados con su mensaje en el historial de este archivo.
 
 **Y una lección sobre cómo se compara.** El 2026-10-14 se dio por buena la equivalencia con producción comparando **conteos de objetos** —72 tablas, 285 funciones, 118 políticas— y coincidían. Lo que no coincidía eran las columnas de una tabla y el privilegio de una función. **Contar no es comparar.** Ahora se comparan huellas md5 de dos cosas concretas, y las dos cuadran:
 
