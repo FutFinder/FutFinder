@@ -69,8 +69,14 @@ begin
          'r60-' || u || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
     from unnest(array[v_dueno, v_admin, v_ajeno]) as u;
 
-  insert into public.complejos (id, nombre, comuna, latitud, longitud)
-  values (v_complejo, 'Complejo Prueba 60', 'Ñuñoa', -33.45, -70.60);
+  -- PUBLICADO a propósito (2026-10-16): nació sin `publicado` porque cuando
+  -- se escribió este arnés la columna no mandaba nada. La migración **65**
+  -- hizo que `get_disponibilidad_cancha` no entregue slots de un recinto sin
+  -- publicar, así que los casos 12 en adelante preguntaban por el slot de
+  -- las 14:00 de una cancha que no tenía ninguno y recibían NULL. Nada que
+  -- ver con los bloqueos, que es lo que creían estar midiendo.
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+  values (v_complejo, 'Complejo Prueba 60', 'Ñuñoa', -33.45, -70.60, true);
 
   insert into public.canchas_reservables (id, complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
   values (v_cancha, v_complejo, 'Cancha 1', 'futbol_7', 20000, 60, true);
@@ -110,13 +116,35 @@ begin
   -- siguientes (caso 5 verifica de paso el aviso).
   perform public.admin_agregar_admin(v_complejo, v_admin, 'admin');
 
+  -- OJO (2026-10-16): el caso 3 pedía que un `admin` recién agregado
+  -- editara la ficha, y eso valía hasta la migración **83** («permisos de
+  -- cada administrador»), que partió el cargo en tres permisos y dejó a los
+  -- administradores NUEVOS naciendo sin ninguno —decisión de Vicente: el
+  -- dueño los enciende a mano—. El arnés, escrito antes, moría con «No
+  -- tienes permiso para esto en este recinto (Permiso necesario: ficha)».
+  -- Ahora prueba las dos mitades, que es lo que la 83 realmente instaló.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin, 'role', 'authenticated')::text);
+  begin
+    perform public.admin_actualizar_complejo(v_complejo, null, 'Sin permiso todavía');
+    v_rechazado := false;
+  exception when others then
+    v_rechazado := true;
+  end;
+  if not v_rechazado then
+    raise exception 'FALLÓ (caso 3a): un admin sin `puede_ficha` no debería editar la ficha';
+  end if;
+  raise notice 'OK (caso 3a): un admin nace sin permisos';
+
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_dueno, 'role', 'authenticated')::text);
+  perform public.admin_permisos_admin(v_complejo, v_admin, false, false, true);
+
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin, 'role', 'authenticated')::text);
   perform public.admin_actualizar_complejo(v_complejo, null, 'Con pasto sintético nuevo');
   select descripcion into v_nombre from public.complejos where id = v_complejo;
   if v_nombre <> 'Con pasto sintético nuevo' then
-    raise exception 'FALLÓ (caso 3): un admin debería poder editar el complejo';
+    raise exception 'FALLÓ (caso 3b): con `puede_ficha` encendido debería poder editar el complejo';
   end if;
-  raise notice 'OK (caso 3): un admin (no dueño) edita el complejo';
+  raise notice 'OK (caso 3b): con el permiso encendido, un admin (no dueño) edita el complejo';
 
   -- ── Casos 4-8: gestión de administradores ──────────────────────
   begin
@@ -249,7 +277,11 @@ begin
   raise notice 'OK (caso 13): el solape es semiabierto, 13:00 sigue libre';
 
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ajeno, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha, date '2027-03-01', time '14:00', 'completa', 'tarjeta');
+  -- Con contacto desde el 2026-10-16: la migración 67 lo hizo obligatorio y
+  -- sin él la RPC se caía por «Escribe un nombre de contacto» antes de
+  -- llegar a mirar el bloqueo, que es lo que este caso quiere probar.
+  v_j := public.crear_reserva(v_cancha, date '2027-03-01', time '14:00', 'completa', 'tarjeta',
+    p_contacto_nombre := 'QA 60', p_contacto_telefono := '+56911111111');
   if (v_j->>'ok')::boolean is not false or v_j->>'reason' <> 'bloqueado' then
     raise exception 'FALLÓ (caso 14): crear_reserva debería rechazar un slot bloqueado, devolvió %', v_j::text;
   end if;
@@ -370,21 +402,29 @@ begin
 
   execute 'reset role';
 
-  -- `get_disponibilidad_cancha` sigue siendo pública a propósito: se
-  -- muestra sin iniciar sesión, y ahora también respeta los bloqueos.
-  execute format('set local role anon');
+  -- OJO (2026-10-16): acá decía «`get_disponibilidad_cancha` sigue siendo
+  -- pública a propósito: se muestra sin iniciar sesión», y lo comprobaba
+  -- como `anon` —se le concedió a propósito en las migraciones 54, 60, 64,
+  -- 65 y 84—. La migración **114** («anon no ejecuta nada») barrió todas
+  -- las funciones de `public` sin lista de excepciones y la cerró de paso.
+  -- Se corre como `authenticated`, que es quien puede hoy, para que el caso
+  -- siga midiendo LO SUYO —que la disponibilidad respeta el bloqueo— en vez
+  -- de reventar con «permission denied for function
+  -- get_disponibilidad_cancha». El conflicto está anotado como P2 en
+  -- `pendientes.md`; si se reabre a `anon`, esto vuelve a `set local role anon`.
+  execute format('set local role authenticated');
   v_j := public.get_disponibilidad_cancha(v_cancha, date '2027-03-08');
   if (v_j->>'ok')::boolean is not true then
-    raise exception 'FALLÓ (caso 20f): anon debería seguir viendo la disponibilidad';
+    raise exception 'FALLÓ (caso 20f): la disponibilidad debería entregarse';
   end if;
   select (s->>'disponible')::boolean into v_disp
     from json_array_elements(v_j->'slots') s
    where s->>'hora_inicio' = '14:00';
   if v_disp is not false then
-    raise exception 'FALLÓ (caso 20f): anon debería ver el slot bloqueado como no disponible';
+    raise exception 'FALLÓ (caso 20f): el slot bloqueado debería verse como no disponible';
   end if;
   execute 'reset role';
-  raise notice 'OK (caso 20): anon no ejecuta ninguna RPC de administración, pero sí ve la disponibilidad con los bloqueos aplicados';
+  raise notice 'OK (caso 20): anon no ejecuta ninguna RPC de administración, y la disponibilidad aplica los bloqueos';
 
   raise notice '=== TODOS LOS CASOS DE LA MIGRACIÓN 60 PASARON ===';
 end $$;

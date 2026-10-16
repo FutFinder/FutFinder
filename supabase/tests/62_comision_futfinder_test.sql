@@ -113,7 +113,11 @@ begin
   -- Se usa la RPC real y no un insert a mano: lo que se prueba es que el
   -- camino de verdad escriba la comisión.
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha43, v_fecha, time '10:00', 'completa', 'tarjeta');
+  -- El contacto va explícito desde el 2026-10-16: la migración 67 lo hizo
+  -- obligatorio y este arnés, escrito antes, seguía llamando sin él. No
+  -- probaba la comisión: moría en «Escribe un nombre de contacto».
+  v_j := public.crear_reserva(v_cancha43, v_fecha, time '10:00', 'completa', 'tarjeta',
+    p_contacto_nombre := 'QA 62', p_contacto_telefono := '+56911111111');
   if (v_j->>'ok')::boolean is not true then
     raise exception 'FALLÓ (caso 10): no se pudo crear la reserva: %', v_j::text;
   end if;
