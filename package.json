@@ -14,7 +14,8 @@
     "test": "node --test 'src/**/__tests__/*.test.js' 'scripts/__tests__/*.test.js'",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "verify": "npm run lint && npm test"
+    "verify": "npm run lint && npm test && npm run test:edge",
+    "test:edge": "node scripts/pruebas-edge.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",

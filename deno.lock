@@ -49,6 +49,7 @@
         "npm:@react-navigation/bottom-tabs@^7.16.0",
         "npm:@react-navigation/native-stack@^7.1.14",
         "npm:@react-navigation/native@^7.0.13",
+        "npm:@sentry/react-native@7.2",
         "npm:@supabase/supabase-js@^2.45.4",
         "npm:@types/react@~19.1.10",
         "npm:eslint-plugin-react-hooks@^5.2.0",

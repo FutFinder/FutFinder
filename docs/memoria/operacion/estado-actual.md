@@ -66,7 +66,11 @@ de canchas. `src/services/` concentra las llamadas de dominio.
   en `ROLLBACK`.
 - **Seis Edge Functions desplegadas y activas**: `send-push`, `pagar-reserva`,
   `flow-retorno`, `flow-confirmacion`, `solicitud-recinto` y
-  `reportar-problema`. Sus pruebas las corre Deno, aparte de `npm run verify`.
+  `reportar-problema`. Sus **49 pruebas las corre Deno**, y desde el
+  2026-10-16 **`npm run verify` las incluye** (`npm run test:edge`). Si
+  Deno no está instalado el paso no bloquea, pero lo dice en una línea
+  imposible de no ver: un paso que se salta en silencio es peor que no
+  tenerlo.
 
 ## Lo que la app no ha vivido todavía
 

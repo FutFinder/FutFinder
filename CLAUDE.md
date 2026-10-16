@@ -10,7 +10,8 @@ Este repositorio se trabaja desde dos Macs. Ejecuta `git pull` antes de tocar ar
 Consulta `docs/memoria/00-inicio.md`, clasifica la tarea y lee únicamente la nota principal del dominio y las dependencias directas indicadas. No leas toda la bóveda por defecto. Verifica contra el código y las migraciones cualquier dato sensible al tiempo.
 
 ## Al terminar
-Ejecuta `npm run verify` (lint + pruebas) y revisa `git status`.
+Ejecuta `npm run verify` (lint + pruebas de Node + las 49 de Deno de las
+Edge Functions) y revisa `git status`.
 `npm run lint` tiene que salir con **cero errores**: la configuración es corta
 a propósito y solo marca fallos reales, así que un error es un fallo de verdad.
 Los avisos son deuda conocida y no bloquean. Si tocaste la interfaz, `no-undef`
@@ -24,7 +25,8 @@ npm run ios
 npm run android
 npm test
 npm run lint
-npm run verify      # lint + pruebas: lo mínimo antes de dar algo por terminado
+npm run verify      # lint + pruebas (Node y Deno): lo mínimo antes de dar algo por terminado
+npm run test:edge   # sólo las de las Edge Functions; avisa fuerte si falta Deno
 npm run build:web
 ```
 
