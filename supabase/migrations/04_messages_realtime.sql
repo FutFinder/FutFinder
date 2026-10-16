@@ -93,7 +93,23 @@ create policy "messages_update_read"
 -- 4. REALTIME: publica la tabla messages -----------------------
 -- Esto es lo que hace que el cliente reciba INSERTS/UPDATES
 -- en tiempo real vía websocket.
-alter publication supabase_realtime add table public.messages;
+-- Idempotente (2026-10-15): `alter publication … add table` falla con
+-- «is already member of publication» si se corre dos veces, y eso rompía
+-- `scripts/construir-base.mjs` contra una base que ya tuviera la tabla —
+-- justo lo que la cabecera del esquema promete que no pasa. Mismo guardia
+-- que usa la migración 45 para `attendees`.
+do $$
+begin
+    if not exists (
+        select 1 from pg_publication_tables
+         where pubname = 'supabase_realtime'
+           and schemaname = 'public'
+           and tablename = 'messages'
+    ) then
+        alter publication supabase_realtime add table public.messages;
+    end if;
+end;
+$$;
 
 -- 5. FUNCTION: marcar todos los mensajes de un hilo como leídos -
 create or replace function public.mark_thread_as_read(

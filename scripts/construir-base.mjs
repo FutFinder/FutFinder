@@ -22,6 +22,13 @@
  * construida con esto se diferencia de producción EXACTAMENTE en la 149.
  * Con `--sin-149` se omite y quedan iguales.
  *
+ * ESPERA UNA BASE VACÍA. No es un «aplica lo que falte»: varias migraciones
+ * crean políticas y publicaciones sin guardia, así que correrlo sobre una
+ * base ya construida falla a media lista. Para repetirlo, contenedores
+ * nuevos: `supabase stop && supabase start`. Ojo con `supabase db reset` a
+ * secas — vacía la base pero deja el contenedor de storage con su esquema
+ * ya creado, y entonces la migración 08 no encuentra `storage.buckets`.
+ *
  * Uso:
  *   node scripts/construir-base.mjs                     # contra la base local
  *   node scripts/construir-base.mjs --sin-149
