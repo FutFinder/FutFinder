@@ -92,7 +92,15 @@ begin
   raise notice 'OK (casos 2-3)';
 
   execute 'reset role';
-  execute format('set local role anon');
+  -- OJO (2026-10-15): esta parte corría como `anon` porque
+  -- `get_disponibilidad_cancha` se le concedió a propósito —migraciones 54,
+  -- 60, 64, 65 y 84—. La migración **114** («anon no ejecuta nada») barrió
+  -- todas las funciones de `public` sin lista de excepciones y la cerró de
+  -- paso. Se corre como `authenticated`, que es quien puede hoy, para que el
+  -- caso siga midiendo LO SUYO —la regla de negocio, no el privilegio— en vez
+  -- de reventar con 42501. El conflicto está anotado como P2 en
+  -- `pendientes.md`; si se reabre a `anon`, esto vuelve a `set local role anon`.
+  execute format('set local role authenticated');
   v_j := public.get_disponibilidad_cancha(v_cancha, v_fecha);
   if (v_j->>'ok')::boolean is not false then
     raise exception 'FALLÓ (caso 4): la disponibilidad de un recinto sin publicar no debería darse: %', v_j::text;
@@ -113,6 +121,16 @@ begin
   raise notice 'OK (caso 8)';
 
   -- ── Casos 6-7: se publica y se vuelve visible ──────────────────
+  -- La migración 82 metió un paso ANTES de publicar: FutFinder tiene que
+  -- aprobar el recinto («Pide la revisión y te avisamos»). Este arnés es
+  -- anterior y publicaba directo, así que llevaba rojo desde entonces.
+  -- La aprobación es una acción del panel, no del dueño, así que se hace
+  -- por debajo y con el rol de siempre — lo que este caso prueba es que
+  -- publicar lo vuelve visible, no quién aprueba.
+  execute 'reset role';
+  update public.complejos set aprobado_futfinder = true where id = v_complejo;
+  execute format('set local role authenticated');
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_dueno, 'role', 'authenticated')::text);
   perform public.admin_publicar_complejo(v_complejo, true);
   select publicado into v_pub from public.complejos where id = v_complejo;
   if v_pub is not true then
@@ -130,7 +148,9 @@ begin
     raise exception 'FALLÓ (caso 7): y también sus canchas';
   end if;
   execute 'reset role';
-  execute format('set local role anon');
+  -- Como `authenticated`, por lo mismo que el caso 4: la 114 le quitó a
+  -- `anon` esta función. Ver el P2 de `pendientes.md`.
+  execute format('set local role authenticated');
   v_j := public.get_disponibilidad_cancha(v_cancha, v_fecha);
   if (v_j->>'ok')::boolean is not true then
     raise exception 'FALLÓ (caso 7): publicado, la disponibilidad debería darse: %', v_j::text;

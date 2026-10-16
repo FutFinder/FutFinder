@@ -139,7 +139,7 @@ El recorrido usó Playwright con clics por JavaScript —la comprobación de est
 
 Se escriben uno por migración y se corren cuando se escriben, pegándolos a mano en el editor SQL. **Nadie los había corrido juntos contra el esquema actual**, porque contra producción cada uno siembra y revierte y hacerlo 120 veces a mano no es realista. Con la base local sí lo es: `node scripts/correr-arneses.mjs`.
 
-**Resultado tras arreglar los arreglables: 84 de 121 pasan** (eran 76 de 120 en la primera pasada). El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
+**Resultado: 95 de 121 pasan** (76 de 120 en la primera pasada del 2026-10-15, 84 tras arreglar los viejos, 95 tras hacerlos sembrar lo suyo). El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
 
 - **~10 necesitan datos de producción.** Mueren en el montaje: «No hay ningún partido de clubes en la base contra el que probar», «Club no encontrado», «La prueba necesita al menos un complejo con dueño cargado». No están rotas: **no son autosuficientes**, y por eso sólo sirven contra una base con historia. Es una propiedad, no un fallo, pero conviene saber cuáles son antes de confiar en un «pasó».
 - **Las que estaban VIEJAS ya están arregladas (2026-10-15).** Eran menos de las que parecía: la primera estimación dijo «~14» contando por el texto del error, y varias de esas —`null value in column cancha_id`, `complejo_id`— resultaron ser del primer grupo: el arnés hace `select … from complejos where publicado limit 1` y en una base vacía no hay ninguno. El error parecía mecánico y no lo era. **Contar errores por su mensaje tampoco es clasificar.**
@@ -155,6 +155,12 @@ Se escriben uno por migración y se corren cuando se escriben, pegándolos a man
 
 - Cuatro columnas de `profiles` sin versionar —`rating_count` y las tres medias de valoración—, que hacían morir cuatro arneses con `column p.rating_count does not exist`.
 - `reactivate_suspended()` ejecutable por `authenticated` en una base nueva y no en producción. Lo cierra la migración **158**.
+
+**Ocho arneses de Reservas ya no dependen de datos de producción.** Tomaban el primer complejo publicado que hubiera, o el primer `complejo_admins` con rol dueño; ahora cada uno crea su recinto, su cancha y sus horarios. Dos detalles que costaron una vuelta: el horario se siembra para **los siete días** —varios casos piden disponibilidad de `hoy + 2`, que cae en otro día de la semana— y el del 81 va **despublicado**, porque su caso 15 comprueba justamente que sin sesión no se ve ni una foto de un recinto no publicado.
+
+**Y cuatro arneses destaparon lo de la migración 114** (ver el P2 de [Pendientes](pendientes.md)): los casos que corrían como `anon` ya no pueden, porque esa migración cerró las catorce funciones que el producto le había abierto. Se ajustaron para medir lo que de verdad pasa, con el conflicto escrito dentro de cada uno y la indicación de cómo revertirlos si se decide reabrir.
+
+**Lo que sigue rojo (26) y por qué importa menos:** casi todos necesitan un partido de clubes sembrado —la cadena desafío → propuesta → aprobación— y son el mismo trabajo mecánico que se le hizo al vertical de Reservas. Quedan además cinco que merecen mirarse uno por uno, anotados con su mensaje en el historial de este archivo.
 
 **Y una lección sobre cómo se compara.** El 2026-10-14 se dio por buena la equivalencia con producción comparando **conteos de objetos** —72 tablas, 285 funciones, 118 políticas— y coincidían. Lo que no coincidía eran las columnas de una tabla y el privilegio de una función. **Contar no es comparar.** Ahora se comparan huellas md5 de dos cosas concretas, y las dos cuadran:
 

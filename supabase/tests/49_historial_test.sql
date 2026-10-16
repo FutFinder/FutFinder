@@ -312,9 +312,21 @@ begin
   insert into t49 values (10, 'autenticado ajeno',
     'sin hora ni cancha, pero con clubes, marcador y resultado: es historial público');
 
-  -- ══ CASO 11: anon ve lo público, escudos incluidos ════════════
-  execute format('set local request.jwt.claims to %L', json_build_object('role','anon')::text);
-  execute 'set local role anon';
+  -- ══ CASO 11: quien NO es del club ve sólo lo público ══════════
+  --
+  -- ESTE CASO CORRÍA COMO `anon`, y con razón: la migración 49 concede
+  -- `historial_club` a `anon` explícitamente, para el historial público de
+  -- un club. La migración **114** («anon no ejecuta nada») barrió todas las
+  -- funciones de `public` sin lista de excepciones y se la llevó de paso —
+  -- junto con las otras trece que el producto había abierto a propósito.
+  --
+  -- Se corre como un `authenticated` AJENO a los dos clubes, que es la otra
+  -- cara de lo mismo: la proyección pública no depende del rol sino de
+  -- `soy_integrante`, así que el caso sigue midiendo lo que vino a medir —
+  -- que no se filtran hora ni cancha a quien no pertenece—. Si se reabre a
+  -- `anon`, esto vuelve a `set local role anon`. Ver el P2 de `pendientes.md`.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', gen_random_uuid(), 'role','authenticated')::text);
+  execute 'set local role authenticated';
   select hora, cancha_nombre, club_local_foto_url, nivel, soy_integrante
     into v_hora, v_cancha, v_logo, v_nivel, v_soy
     from public.historial_club(v_cA, 20) where match_id = v_m1;

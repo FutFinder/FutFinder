@@ -85,16 +85,28 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Resolución:** la migración **114** revocó `execute` sobre TODAS las rutinas de `public` a `public` y a `anon` —a los dos, que es la parte que las migraciones anteriores erraban— y la **115** puso un disparador de eventos para que lo que se cree mañana nazca igual de cerrado.
 - **Verificación de cierre (2026-09-18, contra `jvfoendzblkoxvwvommz`):** de 43 funciones de trigger en `public`, `anon` puede ejecutar **0** y ninguna conserva `EXECUTE` para `PUBLIC`. El advisor ya no devuelve ni un `anon_security_definer_function_executable`. Las 91 RPC que el cliente llama de verdad siguen accesibles (arnés de la 114, sacado de `grep .rpc(` sobre `src/`).
 
-## P3 — La disponibilidad de canchas dejó de ser pública, y nadie lo decidió
+## P2 — La migración 114 cerró a `anon` las CATORCE funciones que el producto le había abierto
 
-> Descubierto el 2026-10-15 al correr los 120 arneses juntos. **No urge** —hoy ninguna pantalla la llama sin sesión— pero es una intención revertida en silencio, y eso se arregla mejor ahora que cuando haya una página pública esperándola.
+> Descubierto el 2026-10-15 al correr los 120 arneses juntos. **No urge** —hoy ninguna pantalla llama nada sin sesión— pero es una decisión de producto revertida en silencio, y se arregla mejor ahora que cuando haya una página pública esperándola.
 
-- **Dominio afectado:** reservas de canchas y la futura página pública de un recinto.
-- **Qué pasó.** `get_disponibilidad_cancha(uuid, date)` era ejecutable por `anon` **a propósito**: las migraciones **54, 60, 64, 65 y 84** se la conceden explícitamente, cinco veces a lo largo de treinta migraciones, y el arnés de la 58 tenía un caso dedicado a comprobar que «sigue siendo pública». Hoy su ACL es `postgres | authenticated | service_role`.
-- **La cerró la migración 114** («anon no ejecuta nada»), que barrió TODAS las funciones de `public` para quitarle a `anon` el `execute` que `alter default privileges` le concedía a su nombre. La 114 **ni la nombra**: cayó en la redada. Fue daño colateral, no una decisión.
-- **Por qué nadie se enteró:** el caso 13 del arnés de la 58 lo habría cazado el mismo día, pero ese arnés lleva rojo desde entonces por otras razones y no se volvió a correr hasta ahora. Ya se invirtió para que mida lo que de verdad pasa, con el conflicto escrito dentro.
-- **La decisión que hace falta:** si la disponibilidad de una cancha debe poder verse sin cuenta. Es la misma familia que la página pública del club: ampliar el acceso anónimo no es un trámite, hay que decidir qué queda a la vista de cualquiera con la clave publicable.
-- **Verificación necesaria:** si se reabre, el caso 13 vuelve a su forma original y una comprobación con `set local role anon` muestra que la función contesta; y revisar que no haya arrastrado nada más de la redada de la 114 que también se concediera a propósito.
+- **Qué pasó.** A lo largo del historial, varias migraciones concedieron `execute` a `anon` **a propósito**, cada una con su motivo y varias con un caso de arnés dedicado a comprobarlo. La migración **114** («anon no ejecuta nada») barrió TODAS las funciones de `public` para quitarle a `anon` el `execute` que `alter default privileges` le concedía a su nombre — un problema real, bien diagnosticado: 56 funciones `security definer` ejecutables por `anon` sin que nadie lo pidiera. **Pero el barrido no llevaba lista de excepciones**, así que se llevó por delante las concesiones deliberadas.
+- **Medido: de las 14 funciones que alguna migración concede explícitamente a `anon`, hoy `anon` no puede ejecutar NINGUNA.**
+
+  | Función | Quién se la concedió, y para qué |
+  |---|---|
+  | `historial_club(uuid,integer)` | **49** — el historial público de un club. Su caso 11 se llama «anon ve lo público, escudos incluidos» |
+  | `historial_publico_club(uuid,integer)` | **44d** — la proyección estrictamente pública de un encuentro |
+  | `get_disponibilidad_cancha(uuid,date)` | **54, 60, 64, 65, 84** — cinco veces en treinta migraciones |
+  | `buscar_complejos(numeric,numeric,text,integer)` | buscar recintos sin cuenta |
+  | `precio_de_bloque(uuid,date,time)` | el precio de una hora, sin cuenta |
+  | `club_estadisticas(uuid)`, `club_record(uuid)` | las estadísticas públicas de un club |
+  | `inicio_de_reserva`, `fin_de_reserva`, `desafio_reglas`, `distancia_km`, `normaliza_telefono_cl`, `sin_tildes` | ayudantes puros que acompañaban a las anteriores |
+  | `expire_old_challenges()` | (conviene mirar ésta aparte: no es obvio que deba ser de `anon`) |
+
+- **Por qué nadie se enteró:** los arneses que lo habrían cazado el mismo día —**49, 58, 65 y 69**— se pusieron rojos a la vez y no se volvieron a correr hasta ahora. Ya están actualizados para medir lo que de verdad pasa, con el conflicto escrito dentro de cada uno.
+- **Esto explica el P4.** La nota de `historial_publico_club()` decía que `historial_club()` «ya funciona para `anon`» y el 2026-10-14 se corrigió como si fuera un error de la nota. **No lo era: era cierto cuando se escribió.** Lo reversó la 114.
+- **La decisión que hace falta** no es función por función, es una sola: **si FutFinder tiene superficie pública sin cuenta**. Si la respuesta es sí, se reabren con una lista explícita —y el barrido de la 114 debería llevar esa lista para que no vuelva a pasar—. Si es no, hay que retirar las concesiones de catorce migraciones y los casos de arnés que las comprueban, para que el repositorio deje de decir dos cosas distintas.
+- **Verificación necesaria:** con `set local role anon`, cada función de la lista que se decida reabrir responde; las que no, dan 42501; y ningún arnés queda afirmando lo contrario de lo que la base hace.
 
 ## P1 — Validar el envío push de extremo a extremo en dispositivo físico
 
@@ -151,7 +163,7 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Evidencia:** la creó la migración 44d como la proyección estrictamente pública de un partido de clubes terminado (clubes, día, marcador y V/E/D) y la 48 le rellenó el marcador. Desde la 49, la aplicación lee el historial con `historial_club()`, que devuelve más —escudos y nivel— y reserva la hora exacta y la cancha para los integrantes de los dos clubes. Ninguna pantalla, servicio ni Edge Function llama ya a `historial_publico_club()`; sólo la usan `44d_partido_privado_test.sql` (caso 15) y `49_historial_test.sql` (caso 5), que la comparan a propósito.
 - **Por qué NO se elimina:** sigue siendo el contrato que fija qué es público de un encuentro terminado, y `clubs.slug` existe desde la migración 11 «para la futura página pública `futfinder.com/club/<slug>`», donde el visitante es `anon` — el caso exacto que esta función atiende. Retirar una función aplicada porque hoy no tiene quien la llame es perder la referencia sin ganar nada; su coste es una función `stable security definer` de sólo lectura.
 - **El detalle que hay que recordar si se usa:** su `join` contra `club_match_results` es `left`, así que publica cualquier partido `finalizado` **aunque nadie haya confirmado el marcador**, con los goles en `null`. `historial_club()` hace ese join interno justamente para no publicar un partido como jugado sin resultado. Quien construya la página pública tiene que elegir una de las dos a conciencia.
-- **CORRECCIÓN del 2026-10-14: «ya funciona para `anon`» era falso, y de las dos funciones.** Medido con `set local role anon` contra producción: `historial_club()` y `historial_publico_club()` dan **42501** las dos. Ninguna la puede ejecutar `anon` —el `execute` es de `postgres`, `authenticated` y `service_role`— así que la recomendación que estaba escrita acá habría mandado a quien construya la página pública directo contra un muro. Elegir cuál se usa **no basta**: hace falta además un `grant execute … to anon`, y eso es una decisión de seguridad, no un trámite.
+- **CORRECCIÓN del 2026-10-14, matizada el 2026-10-15: «ya funciona para `anon`» era falso HOY, pero era cierto cuando se escribió** — lo reversó la migración 114 (ver el P2 de arriba, que cubre las catorce funciones afectadas). Medido con `set local role anon` contra producción: `historial_club()` y `historial_publico_club()` dan **42501** las dos. Ninguna la puede ejecutar `anon` —el `execute` es de `postgres`, `authenticated` y `service_role`— así que la recomendación que estaba escrita acá habría mandado a quien construya la página pública directo contra un muro. Elegir cuál se usa **no basta**: hace falta además un `grant execute … to anon`, y eso es una decisión de seguridad, no un trámite.
 - **Lo que un visitante anónimo YA ve hoy, sin que exista ninguna página pública** (medido el 2026-10-14):
 
   | | `anon` |
