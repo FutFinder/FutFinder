@@ -44,16 +44,33 @@ begin
          'r99-' || u || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
     from unnest(array[v_jefe, v_rival, v_ajeno]) u;
 
-  select id into v_local from public.clubs order by created_at limit 1;
-  select id into v_visita from public.clubs where id <> v_local order by created_at limit 1;
+  -- SIEMBRA SUS DOS CLUBES (2026-10-16). Antes tomaba los dos más
+  -- antiguos que hubiera en la base; contra una recién construida no hay
+  -- ninguno y moría con «Club no encontrado». No estaba roto, no era
+  -- autosuficiente.
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Local 99 ' || left(v_jefe::text, 8), 'local-99-' || left(v_jefe::text, 8), v_jefe)
+  returning id into v_local;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Visita 99 ' || left(v_rival::text, 8), 'visita-99-' || left(v_rival::text, 8), v_rival)
+  returning id into v_visita;
   insert into public.club_members (club_id, user_id, rol) values (v_local, v_jefe, 'capitan');
   insert into public.club_members (club_id, user_id, rol) values (v_visita, v_rival, 'capitan');
 
-  select k.id into v_cancha
-    from public.canchas_reservables k join public.complejos c on c.id = k.complejo_id
-   where c.publicado and k.activa
-     and exists (select 1 from public.cancha_horario_reglas hr where hr.cancha_id = k.id)
-   limit 1;
+  -- Y SU RECINTO, por lo mismo. El horario cubre los siete días: este
+  -- arnés pide disponibilidad de `hoy + 4`, que cae en otro día de la
+  -- semana según cuándo se corra.
+  declare
+    v_cpl99 uuid := gen_random_uuid();
+  begin
+    insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+    values (v_cpl99, 'Recinto arnés 99', 'Ñuñoa', -33.45, -70.60, true);
+    insert into public.canchas_reservables (complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
+    values (v_cpl99, 'Cancha arnés 99', 'futbol_7', 20000, 60, true)
+    returning id into v_cancha;
+    insert into public.cancha_horario_reglas (cancha_id, dia_semana, hora_apertura, hora_cierre)
+    select v_cancha, d, time '00:00', time '23:00' from generate_series(0, 6) as d;
+  end;
 
   v_fecha := (now() at time zone 'America/Santiago')::date + 4;
   select (s->>'hora_inicio')::time into v_hora
