@@ -54,7 +54,15 @@ begin
 
   -- Los dos ya se jugaron. Se mueve la hora DESPUÉS de crearlos porque el
   -- trigger `trg_match_future_only` no deja crear un partido en el pasado.
-  update public.matches set hora = now() - interval '2 hours' where id in (v_p, v_pc);
+  -- A HORAS DISTINTAS (2026-10-16): los dos se movían al mismo instante y
+  -- `v_jug` está inscrito en ambos. Una migración posterior puso
+  -- `tg_reprogramar_mira_la_agenda`, que no deja reprogramar si algún
+  -- inscrito quedaría con dos partidos a la vez, y el arnés moría en el
+  -- montaje con «1 inscrito(s) quedarían con dos partidos a la vez». Que
+  -- sean dos horas distintas no le quita nada al caso: lo único que pide
+  -- es que los dos ya se hayan jugado.
+  update public.matches set hora = now() - interval '2 hours' where id = v_p;
+  update public.matches set hora = now() - interval '6 hours' where id = v_pc;
   update public.matches set estado = 'cancelado' where id = v_pc;
 
   set local role authenticated;

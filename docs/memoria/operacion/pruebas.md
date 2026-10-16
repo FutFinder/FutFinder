@@ -135,11 +135,11 @@ El recorrido usó Playwright con clics por JavaScript —la comprobación de est
 
 **Los datos de prueba quedaron restaurados**, y se comprobó: tema de «Club prueba» de vuelta en rojo, su comuna de vuelta en vacío **sin tocar la región** —que ya estaba puesta antes, así que borrar las dos habría destruido un dato ajeno—, el nombre largo de «Los Papi Pasty» revertido, las membresías e invitaciones deshechas, y el partido, desafío, propuesta, amistad temporal y la cancha sembrada eliminados. **La cuenta cuadra: 24 partidos antes de sembrar y 24 después de limpiar.**
 
-## Los 120 arneses, corridos juntos por primera vez (2026-10-15)
+## Los 123 arneses, todos en verde (2026-10-16)
 
 Se escriben uno por migración y se corren cuando se escriben, pegándolos a mano en el editor SQL. **Nadie los había corrido juntos contra el esquema actual**, porque contra producción cada uno siembra y revierte y hacerlo 120 veces a mano no es realista. Con la base local sí lo es: `node scripts/correr-arneses.mjs`.
 
-**Resultado: 101 de 122 pasan** (76 en la primera pasada del 2026-10-15, 84 tras arreglar los viejos, 95 tras el recinto sembrado, 99 tras el partido de clubes sembrado, 101 tras arreglar el fallo que el caso 11 del arnés de la 48 llevaba cinco meses denunciando). El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
+**Resultado final: 123 de 123** (2026-10-16). El camino: 76 en la primera pasada del 2026-10-15, 84 tras arreglar los viejos, 95 tras el recinto sembrado, 99 tras el partido de clubes sembrado, 101 tras el fallo que el caso 11 del arnés de la 48 llevaba cinco meses denunciando, 109 tras los tres que NUNCA habían pasado, 115 tras los que se habían quedado en el mundo anterior, 120 tras los de chat y 123 al final. Lo que fallaba se repartía así:
 
 - **~10 necesitan datos de producción.** Mueren en el montaje: «No hay ningún partido de clubes en la base contra el que probar», «Club no encontrado», «La prueba necesita al menos un complejo con dueño cargado». No están rotas: **no son autosuficientes**, y por eso sólo sirven contra una base con historia. Es una propiedad, no un fallo, pero conviene saber cuáles son antes de confiar en un «pasó».
 - **Las que estaban VIEJAS ya están arregladas (2026-10-15).** Eran menos de las que parecía: la primera estimación dijo «~14» contando por el texto del error, y varias de esas —`null value in column cancha_id`, `complejo_id`— resultaron ser del primer grupo: el arnés hace `select … from complejos where publicado limit 1` y en una base vacía no hay ninguno. El error parecía mecánico y no lo era. **Contar errores por su mensaje tampoco es clasificar.**
@@ -166,7 +166,21 @@ Se escriben uno por migración y se corren cuando se escriben, pegándolos a man
 
 **Y el ejercicio encontró un fallo de verdad en producción.** El caso 11 del arnés de la 48 —«en disputa nadie debería poder proponer de nuevo»— llevaba rojo desde mayo, y tenía razón: la migración **119** reescribió `proponer_resultado` para añadirle los permisos de club y la reconstruyó desde una copia **anterior a la 48b**, devolviendo la guarda laxa que aquella había cerrado. Lo arregla la **159**. Detalle en `pendientes.md`.
 
-**Lo que sigue rojo (21) y por qué importa menos:** casi todos necesitan un partido de clubes sembrado —la cadena desafío → propuesta → aprobación— y son el mismo trabajo mecánico que se le hizo al vertical de Reservas. Quedan además cinco que merecen mirarse uno por uno, anotados con su mensaje en el historial de este archivo.
+**La última tanda (2026-10-16) no era trabajo mecánico.** De los que quedaban rojos, casi ninguno estaba «roto»: cada uno pedía una regla que una migración posterior cambió a propósito, y nadie volvió a correrlos. Vale la pena la lista, porque es el catálogo de cómo envejece un arnés:
+
+- **La 67** hizo obligatorio el contacto de la reserva: el 60, el 62 y el 64 morían en «Escribe un nombre de contacto» antes de llegar a lo suyo.
+- **La 43c** hizo obligatoria la ubicación en el mapa de la propuesta oficial: los casos 9 a 15 del 43 nunca llegaban a correr.
+- **La 65** dejó de entregar disponibilidad de un recinto sin publicar, y varios arneses creaban el suyo sin publicar. El 57 ni siquiera llegaba al caso 1: la policy de insert de las calificaciones se une a `canchas_reservables`, que sólo muestra las de un recinto publicado.
+- **La 77** añadió `canchas_reservables_select_admin`, y el caso 1 del 72 seguía exigiendo que el dueño NO viera sus canchas.
+- **La 83** partió el cargo de administrador en tres permisos y dejó a los nuevos naciendo sin ninguno: el caso 3 del 60 editaba la ficha con un admin recién agregado.
+- **La 44d** cambió la regla entera del partido de clubes —privado hasta que termina—, así que los casos 6 y 7 del 44b pedían lo contrario de lo vigente, y su caso 9 se inscribía a mano en un partido que la 44d cerró.
+- **Un tope de 3 clubes por usuario** hacía imposible el caso 9 del 40, que creaba 30. La escala es lo que importa, no el tipo de hilo: se arma con 30 partidos.
+
+**Y dos arneses de chat no medían nada de lo que creían.** El del `/todos` (39) contaba los avisos sin salir del rol de quien acababa de escribir, y `notifications` sólo deja ver lo propio: el remitente nunca es destinatario de su propia mención, así que contaba cero y culpaba al disparador. El de la bandeja (40) ponía el `sender_id` a mano, pero desde la migración **32** el disparador `messages_force_server_fields` hace `sender_id := auth.uid()`: **todos** sus mensajes se guardaban como de una sola persona y la bandeja medía una conversación de uno consigo mismo. El DM lo delataba —nadie es amigo de sí mismo— y por eso moría ahí.
+
+**El reloj de la transacción, otra vez.** Ese mismo disparador estampa `created_at := now()`, que es la hora de ARRANQUE de la transacción: los `pg_sleep` del arnés 40 no separaban nada y «el mensaje más nuevo» quedaba indefinido. Su propio caso 8 lo comprobaba y habría gritado, si hubiera llegado a correr. Ahora los mensajes, las lecturas y el escondite van en un reloj propio del arnés, **hacia atrás** y de a un segundo —hacia adelante ninguna lectura los alcanzaría—. Es la misma lección del 46, en otra tabla: *dentro de una transacción `now()` no avanza*.
+
+**Y una de SQL que cuesta una tarde:** el caso 7 del 40 comprobaba `v_payload->'last_message' is not null` contra una RPC que devuelve `'last_message': null`. `->` entrega el valor JSON `null`, que no es un NULL de SQL, así que la condición era cierta siempre. Para preguntar por «vacío» hay que usar `->>`.
 
 **Y una lección sobre cómo se compara.** El 2026-10-14 se dio por buena la equivalencia con producción comparando **conteos de objetos** —72 tablas, 285 funciones, 118 políticas— y coincidían. Lo que no coincidía eran las columnas de una tabla y el privilegio de una función. **Contar no es comparar.** Ahora se comparan huellas md5 de dos cosas concretas, y las dos cuadran:
 

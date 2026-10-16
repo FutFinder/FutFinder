@@ -39,7 +39,7 @@ declare
   v_encola uuid := gen_random_uuid();
   v_otro uuid := gen_random_uuid();   -- organiza los destinos
   v_mio uuid; v_destino uuid; v_destino2 uuid;
-  v_club_m uuid; v_prop uuid; v_club uuid;
+  v_club_m uuid; v_prop uuid; v_club uuid; v_club_rival uuid; v_ch uuid;
   v_res0 jsonb; v_res6 jsonb; v_res9a jsonb; v_res9b jsonb;
   v_t int; v_estado text; v_n int;
   v_base timestamptz := date_trunc('hour', now()) + interval '3 days';
@@ -71,12 +71,30 @@ begin
   insert into public.messages (sender_id, match_id, content)
   values (v_anfitrion, v_mio, 'Nos vemos el sábado');
 
-  -- El partido entre clubes de C9, sobre una propuesta real que todavía no
-  -- tenga partido (el índice único parcial de la 44 no deja dos).
-  select p.id into v_prop from public.club_challenge_proposals p
-   where not exists (select 1 from public.matches m where m.challenge_proposal_id = p.id)
-   limit 1;
-  select id into v_club from public.clubs order by created_at limit 1;
+  -- El partido entre clubes de C9, sobre una propuesta PROPIA (2026-10-16).
+  -- Antes buscaba en la base una propuesta sin partido y el club más
+  -- antiguo que hubiera: contra una recién construida no hay ninguno de
+  -- los dos, `v_prop` quedaba nulo y el caso se auto-reprobaba con «no hay
+  -- propuesta libre para armar el partido de clubes». No estaba roto, no
+  -- era autosuficiente.
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Retador 127 ' || left(v_anfitrion::text, 8),
+          'retador-127-' || left(v_anfitrion::text, 8), v_anfitrion)
+  returning id into v_club;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Retado 127 ' || left(v_otro::text, 8),
+          'retado-127-' || left(v_otro::text, 8), v_otro)
+  returning id into v_club_rival;
+  insert into public.club_challenges (club_retador_id, club_retado_id, creado_por, estado)
+  values (v_club, v_club_rival, v_anfitrion, 'esperando_aprobacion')
+  returning id into v_ch;
+  insert into public.club_challenge_proposals (challenge_id, club_proponente_id, creada_por,
+      fecha, duracion_min, direccion, cancha_nombre, comuna, region, latitud, longitud,
+      modalidad, cupos_por_club, metodo_inscripcion, cuota_por_persona)
+  values (v_ch, v_club, v_anfitrion, v_base + interval '6 days', 60,
+      'Av. Siempre Viva 742', 'Cancha', 'Santiago', 'Metropolitana', -33.45, -70.66,
+      'futbol7', 7, 'orden_llegada', 0)
+  returning id into v_prop;
   if v_prop is not null then
     insert into public.matches (id_organizador, titulo, comuna, cancha_nombre, latitud, longitud,
         hora, cupos_totales, cupos_disponibles, estado, duracion_min, aprobacion, challenge_proposal_id)

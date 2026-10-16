@@ -1,6 +1,6 @@
 # Estado actual
 
-Última revisión: 2026-10-14
+Última revisión: 2026-10-16
 
 ## Qué es esta nota
 
@@ -55,9 +55,10 @@ de canchas. `src/services/` concentra las llamadas de dominio.
   149**, que lleva en su cabecera «no aplicar hasta distribuir un build» y
   espera ahí a propósito.
 - **72 tablas, 285 funciones, 147 políticas y 12 tareas cron.**
-- **118 arneses SQL** en `supabase/tests/`. No se ejecutan con `npm test`: se
-  pegan en el editor SQL y corren dentro de una transacción que termina en
-  `ROLLBACK`.
+- **123 arneses SQL** en `supabase/tests/`, **123 en verde** contra la base
+  local (2026-10-16). No se ejecutan con `npm test`: corren con
+  `node scripts/correr-arneses.mjs`, o se pegan en el editor SQL, siempre
+  dentro de una transacción que termina en `ROLLBACK`.
 - **Seis Edge Functions desplegadas y activas**: `send-push`, `pagar-reserva`,
   `flow-retorno`, `flow-confirmacion`, `solicitud-recinto` y
   `reportar-problema`. Sus pruebas las corre Deno, aparte de `npm run verify`.
@@ -84,16 +85,18 @@ eso o a una decisión de producto, no a más código.
 
 - **Sin las variables públicas de Supabase el cliente entra en modo de
   demostración**, que renderiza las pantallas pero no es un backend conectado.
-- **No hay entorno de pruebas.** Todo se comprueba contra producción, dentro de
-  transacciones revertidas o interceptando `fetch` en el navegador. No hay
-  PostgreSQL local ni proyecto de staging.
+- **Hay base local desde el 2026-10-15**, levantada con colima y el CLI de
+  Supabase y construida desde `supabase/schema.sql` más las migraciones
+  (`node scripts/construir-base.mjs`). No hay proyecto de staging: lo que no
+  se puede probar ahí se comprueba contra producción, dentro de transacciones
+  revertidas o interceptando `fetch` en el navegador.
 - **Un arnés que corre como `postgres` no dice nada sobre lo que ve un
   usuario.** Costó un fallo real en octubre: la migración 153 dio 8/8 dos veces
   sobre una función que para `authenticated` reventaba con 42501. Los arneses
   de lo que ejecuta el cliente llevan `set local role authenticated`.
 - **El push en un teléfono físico sigue sin comprobarse**, y `tsc --noEmit` no
   sirve como chequeo en este repositorio (desbordamiento de pila preexistente).
-- **`npm run verify`**: 1687 pruebas en verde y cero errores de lint al cerrar
+- **`npm run verify`**: 1716 pruebas en verde y cero errores de lint al cerrar
   esta revisión. Los avisos de lint son deuda conocida y no bloquean.
 
 ## Notas relacionadas
