@@ -73,6 +73,64 @@ declare
   v_texto2   text;
   v_payload  jsonb;
 begin
+  -- ── SIEMBRA SU PROPIO PARTIDO DE CLUBES (2026-10-15) ──────────
+  -- Antes tomaba el primero que hubiera en la base, lo que ataba este
+  -- arnés a una con historia: contra una recién construida moría en el
+  -- montaje. No estaba roto, no era autosuficiente.
+  --
+  -- Se recorre el flujo REAL —desafío, aceptación, propuesta, aprobación—
+  -- y no se fuerzan estados a mano: así el partido que queda es el que la
+  -- app habría creado, con su desafío, su propuesta y sus dos clubes.
+  declare
+    v_sa uuid := gen_random_uuid(); v_sb uuid := gen_random_uuid();
+    v_sx uuid := gen_random_uuid();
+    v_sca uuid; v_scb uuid; v_sch uuid; v_sprop record;
+    v_smarca text := 'sem' || substr(replace(gen_random_uuid()::text,'-',''),1,6);
+  begin
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+      confirmation_token, email_change, email_change_token_new, recovery_token)
+    select '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated',
+      v_smarca||'-'||u.id||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','',''
+    from (values (v_sa), (v_sb), (v_sx)) as u(id);
+    -- El tercero (v_sx) existe para los casos que necesitan a alguien
+    -- AJENO a los dos clubes; en una base vacía no habría ninguno.
+    insert into public.profiles (id, username) values
+      (v_sa, v_smarca||'a'), (v_sb, v_smarca||'b'), (v_sx, v_smarca||'x')
+      on conflict (id) do nothing;
+
+    insert into public.clubs (nombre, slug, created_by)
+    values (v_smarca||' A', v_smarca||'-a', v_sa) returning id into v_sca;
+    insert into public.clubs (nombre, slug, created_by)
+    values (v_smarca||' B', v_smarca||'-b', v_sb) returning id into v_scb;
+    insert into public.club_members (club_id, user_id, rol) values
+      (v_sca, v_sa, 'admin'), (v_scb, v_sb, 'admin');
+
+    insert into public.club_challenges (club_retador_id, club_retado_id, creado_por, estado)
+    values (v_sca, v_scb, v_sa, 'pendiente') returning id into v_sch;
+
+    execute 'set local role authenticated';
+    execute format('set local request.jwt.claims to %L',
+      json_build_object('sub', v_sb, 'role','authenticated')::text);
+    perform public.aceptar_desafio(v_sch);
+
+    execute format('set local request.jwt.claims to %L',
+      json_build_object('sub', v_sa, 'role','authenticated')::text);
+    v_sprop := public.crear_propuesta_oficial(v_sch, jsonb_build_object(
+      'fecha', (now() + interval '7 days')::text, 'duracion_min', 90,
+      'direccion', 'Av. Siempre Viva 742', 'cancha_nombre', 'Cancha '||v_smarca,
+      'comuna', 'Ñuñoa', 'region', 'Metropolitana',
+      'latitud', -33.4569, 'longitud', -70.6483, 'modalidad', 'futbol7',
+      'cupos_por_club', 7, 'metodo_inscripcion', 'orden_llegada',
+      'cuota_por_persona', 0), gen_random_uuid());
+
+    execute format('set local request.jwt.claims to %L',
+      json_build_object('sub', v_sb, 'role','authenticated')::text);
+    perform public.aprobar_propuesta(v_sprop.id, p_me_inscribo => false);
+    execute 'reset role';
+    execute 'set local request.jwt.claims to ''{}''';
+  end;
+
   -- ── el partido con el que se trabaja ──────────────────────────
   select m.id, m.challenge_id, m.club_local_id, m.club_visitante_id
     into v_m, v_ch, v_cA, v_cB
@@ -319,8 +377,14 @@ begin
   if v_texto2 <> 'ese día no tenemos arquero' then
     raise exception 'FALLÓ (caso 9): el motivo quedó como «%» (¿sin recortar?)', v_texto2;
   end if;
+  -- Se busca por `change_id`, NO por «el más reciente». Dentro de una
+  -- transacción `now()` no avanza, así que todos los eventos comparten
+  -- `created_at` y `order by created_at desc limit 1` devuelve cualquiera.
+  -- Defecto latente del arnés, no del código.
   select payload into v_payload from public.club_challenge_events
-   where challenge_id = v_ch and tipo = 'cambio_respondido' order by created_at desc limit 1;
+   where challenge_id = v_ch and tipo = 'cambio_respondido'
+     and payload ->> 'change_id' = v_cambio::text
+   limit 1;
   if (v_payload ->> 'motivo') <> 'ese día no tenemos arquero'
      or (v_payload ->> 'actor_id')::uuid <> v_adminB then
     raise exception 'FALLÓ (caso 9): el evento del rechazo no trae motivo y actor — %', v_payload;
@@ -623,8 +687,14 @@ begin
   if v_texto2 is not null then
     raise exception 'FALLÓ (caso 22): un rechazo sin motivo guardó «%»', v_texto2;
   end if;
+  -- Se busca por `change_id`, NO por «el más reciente». Dentro de una
+  -- transacción `now()` no avanza, así que todos los eventos comparten
+  -- `created_at` y `order by created_at desc limit 1` devuelve cualquiera.
+  -- Defecto latente del arnés, no del código.
   select payload into v_payload from public.club_challenge_events
-   where challenge_id = v_ch and tipo = 'cambio_respondido' order by created_at desc limit 1;
+   where challenge_id = v_ch and tipo = 'cambio_respondido'
+     and payload ->> 'change_id' = v_cambio2::text
+   limit 1;
   if v_payload ->> 'motivo' is not null then
     raise exception 'FALLÓ (caso 22): el evento inventó un motivo — %', v_payload;
   end if;

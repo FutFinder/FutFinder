@@ -139,7 +139,7 @@ El recorrido usó Playwright con clics por JavaScript —la comprobación de est
 
 Se escriben uno por migración y se corren cuando se escriben, pegándolos a mano en el editor SQL. **Nadie los había corrido juntos contra el esquema actual**, porque contra producción cada uno siembra y revierte y hacerlo 120 veces a mano no es realista. Con la base local sí lo es: `node scripts/correr-arneses.mjs`.
 
-**Resultado: 95 de 121 pasan** (76 de 120 en la primera pasada del 2026-10-15, 84 tras arreglar los viejos, 95 tras hacerlos sembrar lo suyo). El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
+**Resultado: 99 de 121 pasan** (76 en la primera pasada del 2026-10-15, 84 tras arreglar los viejos, 95 tras el recinto sembrado, 99 tras el partido de clubes sembrado). El número asusta menos de lo que parece, pero no es inocuo. Las 44 que fallan se reparten así:
 
 - **~10 necesitan datos de producción.** Mueren en el montaje: «No hay ningún partido de clubes en la base contra el que probar», «Club no encontrado», «La prueba necesita al menos un complejo con dueño cargado». No están rotas: **no son autosuficientes**, y por eso sólo sirven contra una base con historia. Es una propiedad, no un fallo, pero conviene saber cuáles son antes de confiar en un «pasó».
 - **Las que estaban VIEJAS ya están arregladas (2026-10-15).** Eran menos de las que parecía: la primera estimación dijo «~14» contando por el texto del error, y varias de esas —`null value in column cancha_id`, `complejo_id`— resultaron ser del primer grupo: el arnés hace `select … from complejos where publicado limit 1` y en una base vacía no hay ninguno. El error parecía mecánico y no lo era. **Contar errores por su mensaje tampoco es clasificar.**
@@ -160,7 +160,11 @@ Se escriben uno por migración y se corren cuando se escriben, pegándolos a man
 
 **Y cuatro arneses destaparon lo de la migración 114** (ver el P2 de [Pendientes](pendientes.md)): los casos que corrían como `anon` ya no pueden, porque esa migración cerró las catorce funciones que el producto le había abierto. Se ajustaron para medir lo que de verdad pasa, con el conflicto escrito dentro de cada uno y la indicación de cómo revertirlos si se decide reabrir.
 
-**Lo que sigue rojo (26) y por qué importa menos:** casi todos necesitan un partido de clubes sembrado —la cadena desafío → propuesta → aprobación— y son el mismo trabajo mecánico que se le hizo al vertical de Reservas. Quedan además cinco que merecen mirarse uno por uno, anotados con su mensaje en el historial de este archivo.
+**Cuatro arneses de clubes ya siembran su propio partido** (44d, 45, 46 y 47). Recorren el flujo real —desafío, aceptación, propuesta, aprobación— en vez de forzar estados, así que el partido que queda es el que la app habría creado. El 44d siembra además un partido NORMAL y un tercer usuario ajeno a los dos clubes, porque sus casos 12 y 14 los necesitan.
+
+**Y el 46 tenía un defecto latente que sólo se ve con datos sembrados:** buscaba el evento del rechazo con `order by created_at desc limit 1`, y **dentro de una transacción `now()` no avanza**, así que todos los eventos comparten `created_at` y esa consulta devuelve cualquiera. Acusaba a la función de inventarse un motivo que venía de un caso anterior. Ahora se busca por `change_id`. Contra una base con historia el defecto estaba igual de presente; sólo que no se notaba.
+
+**Lo que sigue rojo (22) y por qué importa menos:** casi todos necesitan un partido de clubes sembrado —la cadena desafío → propuesta → aprobación— y son el mismo trabajo mecánico que se le hizo al vertical de Reservas. Quedan además cinco que merecen mirarse uno por uno, anotados con su mensaje en el historial de este archivo.
 
 **Y una lección sobre cómo se compara.** El 2026-10-14 se dio por buena la equivalencia con producción comparando **conteos de objetos** —72 tablas, 285 funciones, 118 políticas— y coincidían. Lo que no coincidía eran las columnas de una tabla y el privilegio de una función. **Contar no es comparar.** Ahora se comparan huellas md5 de dos cosas concretas, y las dos cuadran:
 
