@@ -208,6 +208,16 @@ Comparar dos huellas tampoco bastaba: columnas y privilegios cuadraban desde el 
 - **`idx_matches_con_reserva`**, al revés: lo crea la migración 99 y producción no lo tiene. Es un índice no único sobre exactamente la misma columna y el mismo predicado que `matches_reserva_uidx`, que sí es único. Peso muerto; la 162 lo retira.
 - **Dos textos de aviso** que el repositorio dice más largos de lo que la gente recibe. Se conservó lo que recibe hoy; la elección está anotada en `pendientes.md`.
 
+## Y una octava diferencia, en `storage` (2026-10-16)
+
+Las siete dimensiones de arriba miran `public`. `storage` se mira igual, y ahí apareció la última: producción tenía **27** políticas sobre `storage.objects` y el repositorio construye **28**. La que faltaba era `match_covers_organizer_delete`, o sea que **nadie podía borrar la portada de un partido, ni siquiera quien lo organiza**. Todos los demás buckets tienen su puerta de borrado; `match-covers` era el único asimétrico, y la asimetría no estaba escrita en ninguna parte: es un accidente de cómo se aplicó la 08. Lo repone la **163**.
+
+No amplía nada que no se pudiera hacer: el organizador ya sube con `upsert: true` y tiene la política de `update`, así que podía SOBRESCRIBIR la portada con cualquier cosa. Borrarla es estrictamente menos. Hoy no la llama nadie —`storage.js` no exporta un `removeMatchCoverFile`—; se repone para que las dos bases digan lo mismo y para que la puerta esté donde la 08 dijo.
+
+**Un detalle para quien escriba el próximo arnés de `storage`:** `storage.objects` trae un disparador, `storage.protect_delete`, que rechaza cualquier borrado por SQL —«use la Storage API»— salvo que esté puesto `storage.allow_delete_query`. Eso es lo que pone la API antes de borrar, así que ponerlo en el arnés es ponerse en su lugar; quién puede y quién no lo sigue decidiendo la RLS. Sin eso, los cuatro casos de borrado mueren todos igual y el arnés no prueba nada.
+
+**Lo que también se comparó y SÍ cuadraba:** las 12 tareas de `cron` (nombre, horario, comando y activas), los 8 buckets de `storage` con sus límites y tipos, los privilegios de las 72 tablas, los de las 41 columnas con ACL propia, y los privilegios por omisión de `public` y `storage` —los de la 115—. Los `pg_default_acl` de los esquemas que administra Supabase (`cron`, `extensions`, `graphql`, `realtime`, `auth`, `supabase_functions`) sí difieren, y eso es del alojamiento, no del repositorio: no se persigue.
+
 **La prueba de que la 162 cierra el círculo:** contenedores nuevos, base vacía, `node scripts/construir-base.mjs --sin-149` (schema.sql + 173 migraciones), y las siete huellas iguales a producción. Después, **124/124 arneses** contra esa base recién construida. La 162 se aplicó a producción el 2026-10-16 y **no cambió ni una huella**, que era justamente lo que tenía que pasar: lo que arregla es la base que el repositorio levanta, no la que está corriendo.
 
 ## Notas relacionadas

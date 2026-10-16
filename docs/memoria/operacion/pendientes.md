@@ -95,6 +95,14 @@ La 146 cerró cinco huecos entre el repositorio y producción. Quedaban **siete*
 - **`idx_matches_con_reserva`** es al revés: lo crea la migración 99 y producción no lo tiene. Repite, sin ser único, exactamente lo que ya cubre `matches_reserva_uidx`. Se retira.
 - **Verificación:** arnés `162_..._test.sql` **16/16** en local, con el control que degrada la función dentro de la transacción y demuestra el agujero (`ok:true` y revisión creada para el club equivocado); **12/12** contra producción, sin los dos controles destructivos. Dry-run revertido antes de aplicar. Después de aplicar, **las siete huellas de producción quedaron idénticas a las de una base construida desde cero** y los **124 arneses pasan contra esa base**. La migración no cambió nada en producción: lo que arregla es lo que el repositorio levanta.
 
+### La octava, en `storage` (migración 163)
+
+Las siete dimensiones de arriba miran `public`. Mirando `storage` igual apareció una más: producción tenía 27 políticas sobre `storage.objects` y el repositorio construye 28. Faltaba `match_covers_organizer_delete`, o sea que **nadie podía borrar la portada de un partido, ni siquiera quien lo organiza**. Todos los demás buckets tienen su puerta de borrado; `match-covers` era el único asimétrico, y eso no está escrito en ninguna parte — es un accidente de cómo se aplicó la 08.
+
+- **No amplía nada que no se pudiera hacer:** el organizador sube con `upsert: true` y tiene la política de `update`, así que ya podía sobrescribir la portada con cualquier cosa. Borrarla es estrictamente menos.
+- **Hoy no la llama nadie:** `src/services/storage.js` no exporta un `removeMatchCoverFile`. Se repone para que las dos bases digan lo mismo y para que la puerta esté donde la 08 dijo, el día que la pantalla ofrezca «quitar la portada».
+- **Verificación:** arnés `163_..._test.sql` **7/7** en local —con el control que quita la política y comprueba que entonces ni el organizador puede, que es lo que producción hacía— y **6/6** contra producción, sin el control. Después de aplicar, las políticas de `storage` de producción quedaron idénticas a las de la base construida: 28 y la misma huella.
+
 ### Lo que queda decidido a medias: dos textos de aviso
 
 `notify_club_challenge_responded` manda en producción «Coordinen los detalles por el chat.» y «Puedes desafiar a otros equipos.». Las migraciones **26 y 28** dicen «…los detalles **del partido** por el chat.» y «…a otros equipos **desde tu club**.». El cuerpo desplegado llega con saltos de línea de Windows, así que en algún momento se pegó desde otra parte; no hay forma de saber cuál es la intención vigente.
