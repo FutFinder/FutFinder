@@ -269,8 +269,15 @@ begin
   execute format('set local request.jwt.claims to %L', json_build_object('sub',v_adminB,'role','authenticated')::text);
   v_j := public.confirmar_resultado(v_res1, true);
   execute 'reset role';
-  if (v_j->>'ok')::boolean is not false or (v_j->>'reason') not ilike '%ya fue rechazado%' then
-    raise exception 'FALLÓ (caso 10): un resultado rechazado no debería poder confirmarse: %', v_j;
+  -- El motivo tiene que decir dos cosas: que quedó rechazado Y que la
+  -- salida es la moderación. Este caso comprobaba sólo «ya fue rechazado»,
+  -- que era el texto que la 119 había revertido y la 161 corrigió; pedir
+  -- también la moderación evita que vuelva a pasar sin que nadie lo note.
+  if (v_j->>'ok')::boolean is not false
+     or (v_j->>'reason') not ilike '%rechazado%'
+     or (v_j->>'reason') not ilike '%moderación%' then
+    raise exception 'FALLÓ (caso 10): un resultado rechazado no debería poder confirmarse, '
+      'y el motivo debe mandar a la moderación: %', v_j;
   end if;
   insert into t48 values (10, 'no se confirma un rechazado', v_j->>'reason');
 

@@ -45,6 +45,7 @@ declare
   v_resp_id      uuid;
   v_match_id     uuid;
   v_res          json;
+  v_apodo        text;   -- `v_res` es json: un apodo no cabe ahí
 begin
   -- ── Setup: usuarios, clubes, membresías ───────────────────────
   insert into auth.users (
@@ -71,8 +72,13 @@ begin
     (v_club_a, v_jugador_a,  'jugador'),
     (v_club_a, v_jugador_a2, 'jugador'),
     (v_club_b, v_admin_b,    'admin'),
-    (v_club_b, v_jugador_b,  'jugador')
-  returning id into v_member_jugador_a; -- se pisa, se recupera abajo
+    (v_club_b, v_jugador_b,  'jugador');
+  -- Antes acá iba un `returning id into v_member_jugador_a` con el
+  -- comentario «se pisa, se recupera abajo». No se pisaba: PL/pgSQL
+  -- rechaza un RETURNING INTO sobre varias filas —«query returned more
+  -- than one row»— así que este arnés **nunca pasó**. No se rompió, nació
+  -- así, y como nadie volvió a correrlo no se supo hasta el 2026-10-16.
+  -- Los tres ids se recuperan justo abajo, que es lo que ya hacía.
 
   select id into v_member_jugador_a  from public.club_members where club_id = v_club_a and user_id = v_jugador_a;
   select id into v_member_jugador_a2 from public.club_members where club_id = v_club_a and user_id = v_jugador_a2;
@@ -307,7 +313,12 @@ begin
   --             siempre se puede cambiar ────────────────────────────
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_a, 'role', 'authenticated')::text);
   perform public.set_apodo_club(v_member_jugador_a, 'MiPropioApodo');
-  select apodo into v_res from public.club_member_apodos where member_id = v_member_jugador_a; -- ok, sólo comprobación de humo
+  -- A `v_res` (json) no se le puede asignar un texto: «invalid input
+  -- syntax for type json». Otro defecto de nacimiento de este arnés.
+  select apodo into v_apodo from public.club_member_apodos where member_id = v_member_jugador_a;
+  if v_apodo is distinct from 'MiPropioApodo' then
+    raise exception 'FALLÓ (caso 15): el apodo propio no se guardó, quedó «%»', v_apodo;
+  end if;
 
   begin
     perform public.set_apodo_club(v_member_capitan_a, 'ApodoAjeno');

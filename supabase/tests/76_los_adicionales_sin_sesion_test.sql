@@ -42,11 +42,16 @@ begin
   insert into public.complejo_admins (complejo_id, user_id, rol) values
     (v_pub, v_dueno, 'dueño'), (v_oculto, v_dueno, 'dueño');
 
+  -- El `returning … into` iba sobre las TRES filas y PL/pgSQL lo rechaza:
+  -- «query returned more than one row». Este arnés nunca pasó — no es que
+  -- se rompiera, es que nació así, y como nadie volvió a correrlo no se
+  -- supo. El apagado se inserta aparte para capturar SU id.
   insert into public.complejo_cobros (complejo_id, nombre, precio, activo) values
     (v_pub, 'Balón', 3000, true),
-    (v_pub, 'Estacionamiento', 1000, false),
-    (v_oculto, 'Árbitro', 12000, true)
-    returning id into v_apagado;
+    (v_oculto, 'Árbitro', 12000, true);
+  insert into public.complejo_cobros (complejo_id, nombre, precio, activo)
+  values (v_pub, 'Estacionamiento', 1000, false)
+  returning id into v_apagado;
   insert into public.complejo_servicios (complejo_id, servicio) values
     (v_pub, 'estacionamiento'), (v_oculto, 'wifi');
 
