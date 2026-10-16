@@ -108,6 +108,16 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **La decisión que hace falta** no es función por función, es una sola: **si FutFinder tiene superficie pública sin cuenta**. Si la respuesta es sí, se reabren con una lista explícita —y el barrido de la 114 debería llevar esa lista para que no vuelva a pasar—. Si es no, hay que retirar las concesiones de catorce migraciones y los casos de arnés que las comprueban, para que el repositorio deje de decir dos cosas distintas.
 - **Verificación necesaria:** con `set local role anon`, cada función de la lista que se decida reabrir responde; las que no, dan 42501; y ningún arnés queda afirmando lo contrario de lo que la base hace.
 
+## Resuelto el 2026-10-16 — las otras dos cosas que la 119 revirtió (migraciones 160 y 161)
+
+La 159 restauró la **regla**; faltaban las dos frases que la gente sí lee. Mismo origen: la 119 reescribió `confirmar_resultado` para añadirle los permisos de club y la reconstruyó desde una copia anterior a la **50**.
+
+- **El aviso del rechazo** decía «… rechazó el marcador propuesto para «X». **Propongan uno nuevo.**» La 50 ya lo había cambiado, con esta razón escrita en su cabecera: «es una instrucción que el servidor rechaza acto seguido». La **160** devuelve el texto que explica lo que de verdad pasa: el encuentro queda en disputa y las estadísticas no se mueven hasta que la moderación lo revise.
+- **El motivo de error** al confirmar algo ya rechazado decía «pide que propongan uno nuevo». La **161** lo devuelve a «quedó rechazado y el encuentro está en disputa: sólo la moderación puede reabrirlo».
+- **Por qué importan más de lo que parece:** las dos invitaban a una acción que el servidor rechaza. Un aviso que pide lo imposible manda a dos administradores a pelearse con un botón que no existe y les hace creer que la app está rota.
+- **Se comprobó que no hay una cuarta.** Se tomaron los siete textos que la 50 introdujo y se buscó cada uno en producción: faltaban dos. Éstos. El tercero que parecía faltar —«Solo un administrador del club contrario puede confirmar este resultado»— **no es una reversión**: lo reemplazó la 119 a propósito al meter `tiene_permiso_de_club(…, 'results')`, que era justamente su trabajo. Queda anotado para que nadie lo «restaure» y deshaga los permisos.
+- **Verificación:** arnés `160_161_..._test.sql` 3/3 —con un control que exige que los textos nuevos nombren a la moderación, porque borrar la frase vieja sin decir qué sí se puede habría pasado igual— y los casos 6 y 7 del arnés de la 50, de vuelta en verde.
+
 ## Resuelto el 2026-10-15 — la disputa vuelve a cerrarse (migración 159)
 
 **Un fallo de verdad en producción, encontrado por un arnés que llevaba cinco meses en rojo diciéndolo.**
