@@ -85,6 +85,16 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Resolución:** la migración **114** revocó `execute` sobre TODAS las rutinas de `public` a `public` y a `anon` —a los dos, que es la parte que las migraciones anteriores erraban— y la **115** puso un disparador de eventos para que lo que se cree mañana nazca igual de cerrado.
 - **Verificación de cierre (2026-09-18, contra `jvfoendzblkoxvwvommz`):** de 43 funciones de trigger en `public`, `anon` puede ejecutar **0** y ninguna conserva `EXECUTE` para `PUBLIC`. El advisor ya no devuelve ni un `anon_security_definer_function_executable`. Las 91 RPC que el cliente llama de verdad siguen accesibles (arnés de la 114, sacado de `grep .rpc(` sobre `src/`).
 
+## P2 — Seis arneses dan por buena la regla PRE-TrueScore
+
+Descubierto el 2026-10-16 al poner la base local con **los interruptores como los tiene producción**. Las siete huellas de esquema cuadran; los datos de configuración, no: una base construida con `construir-base.mjs` nace con las cuatro fases de TrueScore **apagadas** y producción las tiene **encendidas desde el 2026-09-24**.
+
+- **Qué pasa:** con las fases encendidas la suite da **119 de 125**. Seis arneses afirman la regla vieja —la salida legítima cobra 3 en vez de 1, el puntaje baja 80 → 77, la sanción son 3 puntos— y nunca se corrieron con la configuración real. El `125/125` se midió con los interruptores apagados.
+- **Cuáles:** `122_una_salida_y_una_asistencia_se_cobran_una_sola_vez`, `125_la_otra_puerta_de_la_salida`, `127_cancelar_para_cambiarse_no_borra_el_partido`, `50_una_sola_puerta`, `profiles_reputacion_protegida` y `134_truescore_fase1`.
+- **Los cinco primeros están VIEJOS, no rotos:** afirman la conducta anterior a las migraciones 134-137, igual que los doce que se repararon esta semana. El sexto es distinto: `134_truescore_fase1` **enciende la fase él mismo** y ahora se la encuentra encendida, así que hay que hacerlo autosuficiente —que funcione esté como esté el interruptor—.
+- **La decisión de fondo:** la suite tiene que correr con la configuración de producción, no con la que deja una base recién construida. Si no, afirma cosas que la app ya no hace. Lo más barato es que `construir-base.mjs` termine encendiendo las mismas fases que producción (una línea y un comentario), y arreglar los seis.
+- **Verificación necesaria:** con las cuatro fases encendidas, los 125 en verde; y un control que compruebe que la base recién construida queda con los mismos interruptores que producción.
+
 ## Resuelto el 2026-10-16 — la app ya se puede correr contra la base local, y lo primero que apareció
 
 **`npm run web:local`** levanta la app web contra `127.0.0.1:54321` en vez de contra producción. Hasta ahora la única forma de abrir FutFinder era contra `jvfoendzblkoxvwvommz`, así que probar un flujo de verdad —registrarse, crear un partido, escribir en el chat— significaba escribir en producción, y por eso no se hacía nunca.

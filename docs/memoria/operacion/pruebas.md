@@ -212,7 +212,28 @@ Comparar dos huellas tampoco bastaba: columnas y privilegios cuadraban desde el 
 
 `npm run web:local`. Lo que desbloquea no es poco: hasta ahora cualquier prueba de un flujo real —registrarse, crear un partido, escribir en el chat— habría escrito en producción, así que no se hacía. Las trampas y la razón de cada defensa están en la cabecera de `scripts/web-local.mjs`; lo que importa recordar es que **pasar las variables en el proceso no alcanza** (Expo incrusta el `.env` en el bundle y ése gana) y que el respaldo del `.env` **tiene que estar ignorado por git**, comprobado con `git check-ignore` antes de tocar nada.
 
-**Lo que el stack local todavía no reproduce: el correo con el código.** El registro no deja una cuenta usable hasta verificar el OTP —la contraseña se fija después, en `completeSignUpPassword`— y la plantilla por omisión del stack local manda un **enlace mágico**, no `{{ .Token }}`. Resultado: la cuenta se crea, el perfil se crea, y la contraseña nunca queda fijada; el login después dice «Correo o contraseña incorrectos» y parece un fallo de la app cuando es del entorno. Para exercitar registro → verificación → sesión hay que apuntar `[auth.email.template.confirmation]` del `config.toml` del stack local a una plantilla con `{{ .Token }}`. El correo se lee en Mailpit, `http://127.0.0.1:54324`.
+**El registro completo ya corre en local (2026-10-16):** crear cuenta → código de 6 dígitos por correo → verificar → términos → Inicio, con la contraseña fijada y comprobada pidiendo un token a `/auth/v1/token`. Costó tres cosas, y las tres valen para cualquiera que levante el stack:
+
+- **La plantilla de correo.** El registro no deja una cuenta usable hasta verificar el OTP —la contraseña se fija después, en `completeSignUpPassword`— y la plantilla por omisión manda un **enlace mágico**, no `{{ .Token }}`. Con esa plantilla la cuenta se crea, el perfil se crea, la contraseña nunca queda fijada, y el login siguiente dice «Correo o contraseña incorrectos»: parece un fallo de la app y es del entorno. La plantilla está versionada en `supabase/plantillas-correo/`. Va en `confirmation` **y** en `magic_link`: «Reenviar código» pasa por `signInWithOtp`.
+- **colima sólo comparte `/Users/...`.** El proyecto del stack vivía en `/private/tmp` y Docker montó la plantilla dentro del contenedor como un **directorio vacío**, sin quejarse; gotrue mandó un listado de directorio en vez del código. El proyecto del stack local vive ahora en `~/.futfinder-local` — fuera del repositorio, para que `supabase db reset` no pueda aplicar las migraciones en orden alfabético.
+- **`[api]` y `[realtime]` estaban apagados.** Para los arneses da igual —se habla con Postgres directo— pero con la app encima el `/auth` funciona y **cada `supabase.from(...)` vuelve 503**: Inicio decía «¡Hola, jugador!» y «No pudimos cargar tu reputación». Parecían dos fallos de la app y eran uno solo del entorno.
+
+## La diferencia que no es de esquema: los interruptores (2026-10-16)
+
+Las siete huellas de la base construida cuadran con producción. **Los datos de configuración, no.** Una base nueva nace con **las cuatro fases de TrueScore apagadas** y producción las tiene encendidas desde el 2026-09-24.
+
+**Y eso cambia el resultado de la suite.** Con los interruptores como los tiene producción, **119 de 125** pasan: seis arneses dan por buena la regla PRE-TrueScore y nunca se corrieron con la configuración de verdad.
+
+| arnés | lo que afirma |
+|---|---|
+| `122_una_salida_y_una_asistencia…` | la salida legítima cobra **3** (con TrueScore cobra 1) |
+| `125_la_otra_puerta_de_la_salida` | el cambio legítimo cobra **3** |
+| `127_cancelar_para_cambiarse…` | cobra 25 de una vez, 80 → 55 |
+| `50_una_sola_puerta` | el jugador del club rival no pierde puntaje |
+| `134_truescore_fase1` | enciende la fase él mismo y ya estaba encendida |
+| `profiles_reputacion_protegida` | la sanción vigente son 3 puntos |
+
+Los cinco primeros no están rotos: están **viejos**, igual que los doce que se repararon esta misma semana. El sexto —el arnés de la 134— supone que arranca con la fase apagada y hay que hacerlo autosuficiente. **El 125/125 de más arriba se midió con los interruptores apagados**, y eso es lo que queda por cerrar: o se corren siempre con la configuración de producción, o la suite afirma cosas que la app ya no hace.
 
 **Y lo que sí se puede comprobar sin eso:** que la app arrancó contra la base local se verifica leyendo el bundle servido, no mirando la pantalla — `curl` al `index.bundle` y contar apariciones del proyecto de producción. Tiene que haber cero. Mirar la pantalla engaña: la primera corrida abrió con la sesión y los datos de producción y parecía correcta.
 

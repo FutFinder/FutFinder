@@ -32,3 +32,38 @@ verify_jwt = true
 # usa ese mismo token para crear la solicitud: sin sesión no tiene nada que
 # hacer. El correo al equipo lo manda después, con sus propios secretos.
 verify_jwt = true
+
+# ── Correo del stack LOCAL ───────────────────────────────────────
+# OJO: el stack local NO se levanta desde este directorio, sino desde
+# `~/.futfinder-local`, que tiene una copia de estas líneas. Vive aparte a
+# propósito: si el `config.toml` del stack estuviera acá, `supabase db reset`
+# aplicaría `supabase/migrations/` en orden ALFABÉTICO —la 100 entre la 09 y
+# la 10, la 44b antes que la 44— y construiría una base distinta sin avisar.
+# La base se arma con `node scripts/construir-base.mjs`, que sabe el orden.
+#
+# Esto queda versionado como referencia, y funciona si alguna vez se levanta
+# desde acá. Las plantillas de producción viven en el panel y no se pueden
+# versionar desde ningún lado.
+#
+# La pantalla de verificación espera un CÓDIGO DE 6 DÍGITOS, no un enlace
+# (ver `src/services/auth.js`). La plantilla por omisión del stack local
+# manda un enlace mágico, y con eso el registro local queda a medias de una
+# forma que parece un fallo de la app: la cuenta se crea y la contraseña
+# nunca se fija —se fija al verificar el código—, así que el login siguiente
+# contesta «Correo o contraseña incorrectos».
+#
+# Detalle y motivo de cada línea en `supabase/plantillas-correo/LEEME.md`.
+
+[auth.email]
+enable_confirmations = true
+
+[auth.email.template.confirmation]
+subject = "Tu código de FutFinder"
+content_path = "./supabase/plantillas-correo/confirmacion.html"
+
+# La misma plantilla a propósito: «Reenviar código» va por `signInWithOtp`,
+# así que Supabase manda la de magic_link. Si sólo se cambiara la de arriba,
+# el primer correo traería el código y el del reenvío un enlace.
+[auth.email.template.magic_link]
+subject = "Tu código de FutFinder"
+content_path = "./supabase/plantillas-correo/confirmacion.html"
