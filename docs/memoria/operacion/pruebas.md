@@ -208,6 +208,14 @@ Comparar dos huellas tampoco bastaba: columnas y privilegios cuadraban desde el 
 - **`idx_matches_con_reserva`**, al revés: lo crea la migración 99 y producción no lo tiene. Es un índice no único sobre exactamente la misma columna y el mismo predicado que `matches_reserva_uidx`, que sí es único. Peso muerto; la 162 lo retira.
 - **Dos textos de aviso** que el repositorio dice más largos de lo que la gente recibe. Se conservó lo que recibe hoy; la elección está anotada en `pendientes.md`.
 
+## Correr la APP contra la base local (2026-10-16)
+
+`npm run web:local`. Lo que desbloquea no es poco: hasta ahora cualquier prueba de un flujo real —registrarse, crear un partido, escribir en el chat— habría escrito en producción, así que no se hacía. Las trampas y la razón de cada defensa están en la cabecera de `scripts/web-local.mjs`; lo que importa recordar es que **pasar las variables en el proceso no alcanza** (Expo incrusta el `.env` en el bundle y ése gana) y que el respaldo del `.env` **tiene que estar ignorado por git**, comprobado con `git check-ignore` antes de tocar nada.
+
+**Lo que el stack local todavía no reproduce: el correo con el código.** El registro no deja una cuenta usable hasta verificar el OTP —la contraseña se fija después, en `completeSignUpPassword`— y la plantilla por omisión del stack local manda un **enlace mágico**, no `{{ .Token }}`. Resultado: la cuenta se crea, el perfil se crea, y la contraseña nunca queda fijada; el login después dice «Correo o contraseña incorrectos» y parece un fallo de la app cuando es del entorno. Para exercitar registro → verificación → sesión hay que apuntar `[auth.email.template.confirmation]` del `config.toml` del stack local a una plantilla con `{{ .Token }}`. El correo se lee en Mailpit, `http://127.0.0.1:54324`.
+
+**Y lo que sí se puede comprobar sin eso:** que la app arrancó contra la base local se verifica leyendo el bundle servido, no mirando la pantalla — `curl` al `index.bundle` y contar apariciones del proyecto de producción. Tiene que haber cero. Mirar la pantalla engaña: la primera corrida abrió con la sesión y los datos de producción y parecía correcta.
+
 ## Y una octava diferencia, en `storage` (2026-10-16)
 
 Las siete dimensiones de arriba miran `public`. `storage` se mira igual, y ahí apareció la última: producción tenía **27** políticas sobre `storage.objects` y el repositorio construye **28**. La que faltaba era `match_covers_organizer_delete`, o sea que **nadie podía borrar la portada de un partido, ni siquiera quien lo organiza**. Todos los demás buckets tienen su puerta de borrado; `match-covers` era el único asimétrico, y la asimetría no estaba escrita en ninguna parte: es un accidente de cómo se aplicó la 08. Lo repone la **163**.
