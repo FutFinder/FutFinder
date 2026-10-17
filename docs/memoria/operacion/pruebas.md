@@ -233,7 +233,21 @@ Las siete huellas de la base construida cuadran con producción. **Los datos de 
 | `134_truescore_fase1` | enciende la fase él mismo y ya estaba encendida |
 | `profiles_reputacion_protegida` | la sanción vigente son 3 puntos |
 
-Los cinco primeros no están rotos: están **viejos**, igual que los doce que se repararon esta misma semana. El sexto —el arnés de la 134— supone que arranca con la fase apagada y hay que hacerlo autosuficiente. **El 125/125 de más arriba se midió con los interruptores apagados**, y eso es lo que queda por cerrar: o se corren siempre con la configuración de producción, o la suite afirma cosas que la app ya no hace.
+Los cinco primeros no estaban rotos: estaban **viejos**, igual que los doce que se repararon esta misma semana. **Cerrado el 2026-10-17, y con 126/126** (los 125 más el guardián nuevo).
+
+**Lo que se cambió, y por qué no es «ajustar el número esperado».** Lo que esas migraciones prometen no es «3 puntos»: es que **se cobre UNA SOLA VEZ**. Clavar el número ataba el arnés a una tabla de penalizaciones que no es suya. Ahora:
+
+- se lee el puntaje antes, se llama una vez, y se exige que la baja sea **exactamente lo que la propia RPC dice haber cobrado**;
+- cuando el cobro no viene en la respuesta —cancelar— se le pregunta a `truescore_costo_salida` **antes** de cancelar;
+- el segundo intento tiene que dejar el puntaje donde estaba, que es el caso de verdad.
+
+**`construir-base.mjs` enciende ahora las cuatro fases** al terminar, y `interruptores_como_produccion_test.sql` falla si alguna está apagada —o si las de teléfono están encendidas sin proveedor de SMS—. Control comprobado: apagar la fase 3 lo pone en rojo nombrándola.
+
+**Y tres trampas que cazó el ejercicio, ninguna sobre TrueScore:**
+
+- El arnés de la 122 contaba los apuntes del historial **con el rol puesto**, y los dos libros tienen RLS de «sólo lo mío»: la sesión era la del organizador mirando los del jugador. Contaba 0 y parecía que el registro de puntos no se había hecho. Misma trampa que el arnés 39.
+- El de la 134 contaba *todos* los eventos del partido y exigía 3; con la fase 2 encendida aparece un cuarto, el bono del organizador.
+- Y el de la **86** no tenía nada que ver: su caso M7 ponía la reserva «hoy a las 23:30» y comprobaba que ya no se pudiera cancelar. A las 21:00 faltaban dos horas y pasaba; a las 10:30 faltaban trece y fallaba. **No probaba la regla, probaba el reloj.** Ahora la pone a una hora de AHORA, sobre la hora de Chile y partiendo fecha y hora juntas para que cruzar la medianoche no la deje en el día equivocado.
 
 **Y lo que sí se puede comprobar sin eso:** que la app arrancó contra la base local se verifica leyendo el bundle servido, no mirando la pantalla — `curl` al `index.bundle` y contar apariciones del proyecto de producción. Tiene que haber cero. Mirar la pantalla engaña: la primera corrida abrió con la sesión y los datos de producción y parecía correcta.
 

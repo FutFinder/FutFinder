@@ -64,6 +64,10 @@ declare
   v_jb      jsonb;
   v_estado  text;
   v_trust   int;
+  -- El puntaje de PARTIDA no es un número de este archivo: ver la nota
+  -- del caso 2.
+  v_trust0  int;
+  v_costo   int;
   v_body    text;
   v_res     uuid;
   v_recv    int;
@@ -136,6 +140,7 @@ begin
   -- ══ CASO 1: la asistencia de un partido de clubes se rechaza ═══
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L', json_build_object('sub',v_adminA,'role','authenticated')::text);
+  select trust_score into v_trust0 from public.profiles where id = v_jugB;
   v_jb := public.save_match_attendance(v_mC, jsonb_build_object(v_jugB::text, 'ausente'));
   execute 'reset role';
   if (v_jb->>'ok')::boolean is not false then
@@ -156,12 +161,18 @@ begin
   if v_estado <> 'inscrito' then
     raise exception 'FALLÓ (caso 2): el inscrito del club rival quedó como %', v_estado;
   end if;
+  -- «NO SE MOVIÓ», no «vale 100» (2026-10-17). Acá estaba clavado en 100,
+  -- que es con lo que nacía una cuenta antes de TrueScore; con las fases
+  -- encendidas —y producción las tiene desde el 2026-09-24— nace en 75. El
+  -- caso no es sobre el número de partida: es que un intento RECHAZADO no
+  -- le cueste nada a nadie.
   select trust_score into v_trust from public.profiles where id = v_jugB;
-  if v_trust <> 100 then
-    raise exception 'FALLÓ (caso 2): el jugador del club rival perdió Trust Score (%)', v_trust;
+  if v_trust <> v_trust0 then
+    raise exception 'FALLÓ (caso 2): el jugador del club rival pasó de % a % por un intento rechazado',
+      v_trust0, v_trust;
   end if;
   insert into t50 values (2, 'sin rastro',
-    'el partido no quedó finalizado, el inscrito sigue inscrito y su Trust Score sigue en 100');
+    'el partido no quedó finalizado, el inscrito sigue inscrito y su puntaje no se movió');
 
   -- ══ CASO 3: el partido normal sigue funcionando igual ══════════
   execute 'set local role authenticated';
@@ -175,16 +186,21 @@ begin
   if v_estado <> 'finalizado' then
     raise exception 'FALLÓ (caso 3): el partido normal no quedó finalizado, quedó %', v_estado;
   end if;
+  -- Que el ausente PIERDA, no cuánto: la tabla de puntos es de TrueScore y
+  -- tiene su propio arnés (134). Acá lo que importa es que el partido
+  -- normal sigue funcionando igual que antes de la 50.
   select trust_score into v_trust from public.profiles where id = v_jugN;
-  if v_trust <> 85 then
-    raise exception 'FALLÓ (caso 3): el ausente de un partido normal debería quedar en 85, quedó %', v_trust;
+  if v_trust >= v_trust0 then
+    raise exception 'FALLÓ (caso 3): el ausente de un partido normal debería perder puntos, quedó en % (partía en %)',
+      v_trust, v_trust0;
   end if;
   insert into t50 values (3, 'partido normal',
-    'cierra el partido y el ausente pierde sus 15 puntos, exactamente como antes de la 50');
+    'cierra el partido y el ausente pierde puntos, exactamente como antes de la 50');
 
   -- ══ CASO 4: cancelar un partido de clubes se rechaza ═══════════
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L', json_build_object('sub',v_adminA,'role','authenticated')::text);
+  select trust_score into v_trust0 from public.profiles where id = v_adminA;
   v_jb := public.cancel_match(v_mC);
   execute 'reset role';
   if (v_jb->>'ok')::boolean is not false then
@@ -198,8 +214,8 @@ begin
     raise exception 'FALLÓ (caso 4): el encuentro entre clubes quedó cancelado por la puerta de atrás';
   end if;
   select trust_score into v_trust from public.profiles where id = v_adminA;
-  if v_trust <> 100 then
-    raise exception 'FALLÓ (caso 4): el administrador perdió Trust Score (%) por un intento rechazado', v_trust;
+  if v_trust <> v_trust0 then
+    raise exception 'FALLÓ (caso 4): el administrador pasó de % a % por un intento rechazado', v_trust0, v_trust;
   end if;
   insert into t50 values (4, 'cancelar un partido de clubes',
     'cancel_match lo rechaza, el partido sigue vivo y nadie pierde Trust Score');
@@ -207,6 +223,12 @@ begin
   -- ══ CASO 5: cancelar un partido normal sigue igual ═════════════
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L', json_build_object('sub',v_orgN,'role','authenticated')::text);
+  -- Cuánto cuesta cancelar lo dice la regla, no este archivo: acá estaba
+  -- clavado en 85 —los 15 fijos de antes de TrueScore— y con las fases
+  -- encendidas un anfitrión que avisa con 12 h o más no paga nada.
+  select trust_score into v_trust0 from public.profiles where id = v_orgN;
+  select coalesce((public.truescore_costo_salida(v_mN2, 'otro')->>'puntos')::int, 15)
+    into v_costo;
   v_jb := public.cancel_match(v_mN2);
   execute 'reset role';
   if (v_jb->>'ok')::boolean is not true then
@@ -217,8 +239,9 @@ begin
     raise exception 'FALLÓ (caso 5): el partido normal no quedó cancelado, quedó %', v_estado;
   end if;
   select trust_score into v_trust from public.profiles where id = v_orgN;
-  if v_trust <> 85 then
-    raise exception 'FALLÓ (caso 5): el organizador debería quedar en 85 (penalización temprana), quedó %', v_trust;
+  if v_trust <> v_trust0 - v_costo then
+    raise exception 'FALLÓ (caso 5): el organizador debería quedar en % (% menos lo que cobra la regla, %), quedó %',
+      v_trust0 - v_costo, v_trust0, v_costo, v_trust;
   end if;
   insert into t50 values (5, 'cancelar un partido normal',
     'sigue cancelándose y el organizador conserva su penalización personal de siempre');

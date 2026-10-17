@@ -271,11 +271,18 @@ begin
   v_res := public.save_match_attendance(m10,
     jsonb_build_object(J, 'asistio', K, 'asistio', L, 'asistio'));
   reset role;
-  select count(*) into v_n from public.truescore_eventos where match_id = m10;
+  -- SÓLO LOS EVENTOS DE LOS JUGADORES (2026-10-17). Contaba todos los del
+  -- partido y exigía 3; con la **fase 2** encendida aparece un cuarto, el
+  -- bono del organizador por confirmar a tiempo. Este arnés se escribió con
+  -- sólo la fase 1 activa, y producción tiene las cuatro desde el
+  -- 2026-09-24. Lo que el caso mide —que confirmar dos veces no aplique los
+  -- puntos dos veces— se mide mejor sobre los tres jugadores.
+  select count(*) into v_n from public.truescore_eventos
+   where match_id = m10 and user_id in (J, K, L);
   insert into r134 values ('T14 confirmar dos veces aplica los puntos una sola vez',
     (v_res->>'already') = 'true' and v_n = 3
       and pg_temp.ts(J) = 81 and pg_temp.ts(K) = 67 and pg_temp.ts(L) = 40,
-    v_res::text || ' eventos ' || v_n);
+    v_res::text || ' eventos de jugadores ' || v_n);
 
   m11 := pg_temp.partido(O4, now() - interval '26 hours 30 minutes');   -- terminó hace 25 h
   perform pg_temp.inscribir(m11, N);
@@ -377,8 +384,15 @@ begin
   -- ── Sin suspensión automática; el mínimo del organizador sigue ──
   v_seq := array[pg_temp.ev(S, 'planton'), pg_temp.ev(S, 'planton'), pg_temp.ev(S, 'planton')];
   select estado into v_txt from public.profiles where id = S;
-  insert into r134 values ('C08 llegar a 0 no suspende la cuenta (40, 5, 0)',
-    v_seq = array[40, 5, 0] and v_txt = 'activo', v_seq::text || ' ' || v_txt);
+  -- LA SECUENCIA EXACTA NO, EL PISO SÍ (2026-10-17). Estaba clavada en
+  -- {40, 5, 0}, que es lo que daban tres plantones con sólo la fase 1; con
+  -- la **fase 2** —reincidencia— el segundo cuesta más y la secuencia es
+  -- {40, 0, 0}. Lo que este caso cuida no es la curva, es que **llegar a
+  -- cero no suspenda la cuenta**: el puntaje baja, toca el piso y el estado
+  -- sigue activo.
+  insert into r134 values ('C08 llegar a 0 no suspende la cuenta',
+    v_seq[1] > 0 and v_seq[2] <= v_seq[1] and v_seq[3] = 0 and v_txt = 'activo',
+    v_seq::text || ' ' || v_txt);
 
   m15 := pg_temp.partido(O, now() + interval '9 days', 80);
   begin

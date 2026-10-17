@@ -5,12 +5,12 @@
 --
 --   S1  Cambiarse desde un partido cancelado se rechaza…
 --   S2  …sin revivirlo y sin cobrarle nada al jugador.
---   S3  El cambio legítimo cobra 3 una sola vez.
+--   S3  El cambio legítimo cobra UNA sola vez lo que diga la regla.
 --   S4  Repetirlo cuando ya no estás en el origen no vuelve a cobrar (es la
 --       misma rama por la que cae la sesión perdedora de una carrera).
 --   S5  «Cancelar y cambiarme» sobre un partido ya cancelado se rechaza…
---   S6  …sin volver a cobrar los 25 del anfitrión.
---   S7  Y el legítimo sí los cobra, una vez, cancelando el partido (la 127
+--   S6  …sin volver a cobrar lo del anfitrión.
+--   S7  Y el legítimo sí lo cobra, una vez, cancelando el partido (la 127
 --       cambió ese borrado por una cancelación).
 --   S8  El partido de origen queda bloqueado aunque la operación se rechace.
 --
@@ -30,6 +30,8 @@ declare
   v_cancelado uuid; v_origen uuid; v_d1 uuid; v_d2 uuid; v_d3 uuid;
   v_mio_cancelado uuid; v_mio_vivo uuid;
   v_res jsonb; v_t int; v_estado text; v_n int; v_bloqueada boolean;
+  -- Para medir sin clavar los números: ver la nota de la cabecera.
+  v_antes int; v_pen int;
   v_base timestamptz := date_trunc('hour', now());
 begin
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -100,11 +102,20 @@ begin
     v_bloqueada, coalesce(v_bloqueada::text, 'null'));
 
   -- ── S3 ────────────────────────────────────────────────────────
+  -- LOS NÚMEROS SE MIDEN, NO SE CLAVAN (2026-10-17). Acá decía «cobra 3» y
+  -- «80 a 77», que era la regla hasta las migraciones 134-137. Con TrueScore
+  -- —encendido en producción desde el 2026-09-24— la salida cuesta según las
+  -- horas de aviso. Lo que esta migración promete es que se cobre UNA SOLA
+  -- VEZ, así que se compara el puntaje contra lo que la propia RPC dice
+  -- haber cobrado.
+  select trust_score into v_antes from public.profiles where id = v_jug;
   v_res := public.swap_match(v_origen, v_d1);
-  insert into r125 values ('S3 el cambio legitimo cobra 3',
-    (v_res->>'ok') = 'true' and (v_res->>'penalty') = '3', v_res::text);
+  v_pen := coalesce((v_res->>'penalty')::int, -1);
+  insert into r125 values ('S3 el cambio legitimo se acepta y cobra algo',
+    (v_res->>'ok') = 'true' and v_pen > 0, v_res::text);
   select trust_score into v_t from public.profiles where id = v_jug;
-  insert into r125 values ('S3 el puntaje baja UNA vez (80 a 77)', v_t = 77, v_t::text);
+  insert into r125 values ('S3 el puntaje baja UNA vez, exactamente lo cobrado',
+    v_t = v_antes - v_pen, v_antes || ' -> ' || v_t || ', cobrado ' || v_pen);
   select count(*) into v_n from public.attendees where id_partido = v_d1 and id_jugador = v_jug;
   insert into r125 values ('S3 y queda inscrito en el destino', v_n = 1, v_n::text);
 
@@ -113,23 +124,35 @@ begin
   insert into r125 values ('S4 sin inscripcion que soltar, no cobra',
     (v_res->>'ok') = 'true' and (v_res->>'penalty') = '0', v_res::text);
   select trust_score into v_t from public.profiles where id = v_jug;
-  insert into r125 values ('S4 el puntaje sigue en 77', v_t = 77, v_t::text);
+  insert into r125 values ('S4 el puntaje no se movio', v_t = v_antes - v_pen, v_t::text);
 
   -- ── S5 y S6 ───────────────────────────────────────────────────
   v_res := public.cancel_match_and_join(v_mio_cancelado, v_d3);
   insert into r125 values ('S5 cancelar y cambiarse sobre un cancelado se rechaza',
     (v_res->>'ok') = 'false', v_res::text);
   select trust_score into v_t from public.profiles where id = v_jug;
-  insert into r125 values ('S6 y no vuelve a cobrar los 25', v_t = 77, v_t::text);
+  insert into r125 values ('S6 y no vuelve a cobrar nada', v_t = v_antes - v_pen, v_t::text);
   select count(*) into v_n from public.matches where id = v_mio_cancelado;
   insert into r125 values ('S6 el partido cancelado sigue existiendo', v_n = 1, v_n::text);
 
   -- ── S7 ────────────────────────────────────────────────────────
+  -- LO QUE CUESTA CANCELAR LO DICE LA REGLA, no este archivo. Acá estaba
+  -- clavado en 25 y «77 a 52»; con TrueScore el anfitrión que avisa con 12 h
+  -- o más no paga nada, y con menos paga según la tabla. Se le pregunta a la
+  -- propia función ANTES de cancelar y se compara con eso: el caso sigue
+  -- cazando un cobro doble, que es lo suyo, sin romperse cada vez que se
+  -- ajusta la tabla.
+  select coalesce((public.truescore_costo_salida(v_mio_vivo, 'otro')->>'puntos')::int, 0)
+    into v_pen;
+  select trust_score into v_antes from public.profiles where id = v_jug;
+
   v_res := public.cancel_match_and_join(v_mio_vivo, v_d3);
   insert into r125 values ('S7 el legitimo si cancela y cambia',
     (v_res->>'ok') = 'true', v_res::text);
   select trust_score into v_t from public.profiles where id = v_jug;
-  insert into r125 values ('S7 y cobra los 25 una vez (77 a 52)', v_t = 52, v_t::text);
+  insert into r125 values ('S7 y cobra UNA vez lo que dice la regla',
+    v_t = v_antes - v_pen,
+    v_antes || ' -> ' || v_t || ', la regla dice ' || v_pen);
   -- Desde la 127 el partido viejo se CANCELA, no se borra: su gente lo
   -- conserva en el historial y el aviso que reciben apunta a algo que existe.
   select count(*) into v_n from public.matches where id = v_mio_vivo and estado = 'cancelado';

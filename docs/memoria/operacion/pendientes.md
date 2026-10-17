@@ -85,15 +85,19 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Resolución:** la migración **114** revocó `execute` sobre TODAS las rutinas de `public` a `public` y a `anon` —a los dos, que es la parte que las migraciones anteriores erraban— y la **115** puso un disparador de eventos para que lo que se cree mañana nazca igual de cerrado.
 - **Verificación de cierre (2026-09-18, contra `jvfoendzblkoxvwvommz`):** de 43 funciones de trigger en `public`, `anon` puede ejecutar **0** y ninguna conserva `EXECUTE` para `PUBLIC`. El advisor ya no devuelve ni un `anon_security_definer_function_executable`. Las 91 RPC que el cliente llama de verdad siguen accesibles (arnés de la 114, sacado de `grep .rpc(` sobre `src/`).
 
-## P2 — Seis arneses dan por buena la regla PRE-TrueScore
+## Resuelto el 2026-10-17 — seis arneses daban por buena la regla PRE-TrueScore
 
 Descubierto el 2026-10-16 al poner la base local con **los interruptores como los tiene producción**. Las siete huellas de esquema cuadran; los datos de configuración, no: una base construida con `construir-base.mjs` nace con las cuatro fases de TrueScore **apagadas** y producción las tiene **encendidas desde el 2026-09-24**.
 
 - **Qué pasa:** con las fases encendidas la suite da **119 de 125**. Seis arneses afirman la regla vieja —la salida legítima cobra 3 en vez de 1, el puntaje baja 80 → 77, la sanción son 3 puntos— y nunca se corrieron con la configuración real. El `125/125` se midió con los interruptores apagados.
 - **Cuáles:** `122_una_salida_y_una_asistencia_se_cobran_una_sola_vez`, `125_la_otra_puerta_de_la_salida`, `127_cancelar_para_cambiarse_no_borra_el_partido`, `50_una_sola_puerta`, `profiles_reputacion_protegida` y `134_truescore_fase1`.
 - **Los cinco primeros están VIEJOS, no rotos:** afirman la conducta anterior a las migraciones 134-137, igual que los doce que se repararon esta semana. El sexto es distinto: `134_truescore_fase1` **enciende la fase él mismo** y ahora se la encuentra encendida, así que hay que hacerlo autosuficiente —que funcione esté como esté el interruptor—.
-- **La decisión de fondo:** la suite tiene que correr con la configuración de producción, no con la que deja una base recién construida. Si no, afirma cosas que la app ya no hace. Lo más barato es que `construir-base.mjs` termine encendiendo las mismas fases que producción (una línea y un comentario), y arreglar los seis.
-- **Verificación necesaria:** con las cuatro fases encendidas, los 125 en verde; y un control que compruebe que la base recién construida queda con los mismos interruptores que producción.
+- **Cómo se arregló (2026-10-17):** `construir-base.mjs` enciende las cuatro fases al terminar —las huellas de esquema no ven una fila de `feature_flags`— y hay un arnés nuevo, `interruptores_como_produccion_test.sql`, que **falla si alguna fase está apagada** o si las de teléfono están encendidas sin proveedor de SMS. Control comprobado: apagar la fase 3 lo pone en rojo nombrándola.
+- **Y los seis arneses dejaron de clavar números.** Lo que esas migraciones prometen no es «3 puntos», es «se cobra UNA SOLA VEZ». Ahora se mide el puntaje antes y después y se compara con lo que la propia RPC dice haber cobrado, o se le pregunta a `truescore_costo_salida` cuánto toca ANTES de cancelar. Siguen cazando el cobro doble —que es lo suyo— y dejan de romperse cada vez que alguien ajusta la tabla de penalizaciones.
+- **Dos cosas más que salieron por el camino:**
+  - El arnés de la 122 contaba los apuntes del historial **con el rol puesto**, y los dos libros tienen RLS de «sólo lo mío»: la sesión era la del organizador mirando los del jugador, así que contaba 0 y parecía que no se registraba nada. Es la misma trampa del arnés 39.
+  - El arnés de la 134 contaba *todos* los eventos del partido y exigía 3; con la fase 2 encendida aparece un cuarto, el bono del organizador. Y su caso C08 clavaba la secuencia `{40, 5, 0}`, que con reincidencia es `{40, 0, 0}`. Lo que ese caso cuida es que llegar a cero **no suspenda la cuenta**, no la curva.
+- **Verificación: 126/126 con los interruptores de producción**, incluido el arnés nuevo.
 
 ## Resuelto el 2026-10-16 — la app ya se puede correr contra la base local, y lo primero que apareció
 

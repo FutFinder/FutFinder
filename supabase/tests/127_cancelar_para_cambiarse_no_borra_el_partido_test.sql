@@ -6,7 +6,7 @@
 --   C3  …y el aviso que reciben apunta a un partido que todavía existe.
 --   C4  El chat del partido sobrevive (lo conservaba la 34 y el `cascade` se
 --       lo llevaba).
---   C5  La sanción de 25 se cobra una sola vez.
+--   C5  La sanción de cancelar se cobra una sola vez, la que diga la regla.
 --   C6  La segunda llamada se rechaza y no vuelve a cobrar.
 --   C7  La lista de espera recibe aviso y se cierra.
 --   C8  El anfitrión queda inscrito en el partido de destino.
@@ -42,6 +42,8 @@ declare
   v_club_m uuid; v_prop uuid; v_club uuid; v_club_rival uuid; v_ch uuid;
   v_res0 jsonb; v_res6 jsonb; v_res9a jsonb; v_res9b jsonb;
   v_t int; v_estado text; v_n int;
+  -- Lo que cuesta cancelar se le pregunta a la regla, no se clava acá.
+  v_antes int; v_pen int;
   v_base timestamptz := date_trunc('hour', now()) + interval '3 days';
 begin
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -110,6 +112,15 @@ begin
   set local role authenticated;
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_anfitrion, 'role', 'authenticated')::text, true);
+  -- CUÁNTO CUESTA LO DICE LA REGLA (2026-10-17). Acá estaba clavado en 25 y
+  -- «80 a 55», que era la sanción fija de antes de TrueScore. Con TrueScore
+  -- —encendido en producción desde el 2026-09-24— el anfitrión que avisa con
+  -- 12 h o más no paga nada, y con menos paga según la tabla de la 134. Se
+  -- le pregunta ANTES de cancelar: el caso sigue cazando el cobro doble, que
+  -- es lo que la 127 promete, sin depender del número.
+  select coalesce((public.truescore_costo_salida(v_mio, 'otro')->>'puntos')::int, 0) into v_pen;
+  select trust_score into v_antes from public.profiles where id = v_anfitrion;
+
   v_res0 := public.cancel_match_and_join(v_mio, v_destino);
   v_res6 := public.cancel_match_and_join(v_mio, v_destino2);
 
@@ -147,10 +158,11 @@ begin
   insert into r127 values ('C4 el chat sobrevive', v_n = 1, v_n::text);
 
   select trust_score into v_t from public.profiles where id = v_anfitrion;
-  insert into r127 values ('C5 cobra los 25 una vez (80 a 55)', v_t = 55, v_t::text);
+  insert into r127 values ('C5 cobra UNA vez lo que dice la regla',
+    v_t = v_antes - v_pen, v_antes || ' -> ' || v_t || ', la regla dice ' || v_pen);
 
   insert into r127 values ('C6 la segunda llamada se rechaza', (v_res6->>'ok') = 'false', v_res6::text);
-  insert into r127 values ('C6 y no vuelve a cobrar', v_t = 55, v_t::text);
+  insert into r127 values ('C6 y no vuelve a cobrar', v_t = v_antes - v_pen, v_t::text);
 
   select count(*) into v_n from public.match_waitlist where id_partido = v_mio;
   insert into r127 values ('C7 la lista de espera se cierra', v_n = 0, v_n::text);

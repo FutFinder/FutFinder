@@ -16,6 +16,20 @@
 --   · Que guardar la asistencia dos veces deje el mismo puntaje (N04) y que
 --     el partido quede bloqueado al hacerlo.
 --
+-- LOS NÚMEROS NO SE CLAVAN, SE MIDEN (2026-10-17). Este arnés exigía que la
+-- salida legítima cobrara exactamente 3 y que el puntaje fuera de 80 a 77.
+-- Eso era cierto hasta las migraciones 134-137: con TrueScore encendido —y
+-- producción lo tiene encendido desde el 2026-09-24— la salida cobra según
+-- una tabla por horas de aviso, y a más de 48 h cuesta 1. Los seis casos
+-- que se caían no estaban rotos: afirmaban la regla vieja, y pasaban sólo
+-- porque la base local nacía con los interruptores apagados.
+--
+-- Lo que esta migración promete no es un número: es que **se cobre UNA
+-- SOLA VEZ**. Así que ahora se mide el puntaje antes y después y se compara
+-- con lo que la propia RPC dice haber cobrado. El caso sigue fallando si se
+-- cobra dos veces, que es lo suyo, y deja de fallar cada vez que alguien
+-- ajusta la tabla de penalizaciones.
+--
 -- LA CARRERA DE VERDAD —dos conexiones, dos transacciones— está en
 -- supabase/tests/partidos_salida_concurrente_test.cjs. Repetir llamadas una
 -- después de otra NO reproduce N02–N04, y por eso existen las dos pruebas.
@@ -42,6 +56,9 @@ declare
   v_can uuid; v_fut uuid; v_lleno uuid; v_curso uuid; v_pasado uuid; v_jugado uuid;
   v_res jsonb; v_gps json; v_t int; v_asis int; v_estado text; v_cupos int;
   v_bloqueada boolean; v_n int;
+  -- Para medir SIN clavar los números: lo que esta migración promete es
+  -- «una sola vez», no «tres puntos». Ver la nota de abajo.
+  v_antes int; v_pen int; v_t2 int;
 begin
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
@@ -125,17 +142,22 @@ begin
   insert into r122 values ('N01 y tampoco cobra los 20 puntos', v_t = 80, v_t::text);
 
   -- ── N02 ───────────────────────────────────────────────────────
+  select trust_score into v_antes from public.profiles where id = v_jug;
   v_res := public.leave_match_penalized(v_fut);
-  insert into r122 values ('N02 la salida legitima cobra 3',
-    (v_res->>'ok') = 'true' and (v_res->>'penalty') = '3', v_res::text);
+  v_pen := coalesce((v_res->>'penalty')::int, -1);
+  insert into r122 values ('N02 la salida legitima se acepta y cobra algo',
+    (v_res->>'ok') = 'true' and v_pen > 0, v_res::text);
+
   select trust_score into v_t from public.profiles where id = v_jug;
-  insert into r122 values ('N02 el puntaje baja UNA vez (80 a 77)', v_t = 77, v_t::text);
+  insert into r122 values ('N02 el puntaje baja UNA vez, exactamente lo cobrado',
+    v_t = v_antes - v_pen, v_antes || ' -> ' || v_t || ', cobrado ' || v_pen);
 
   v_res := public.leave_match_penalized(v_fut);
   insert into r122 values ('N02 el segundo intento no encuentra inscripcion',
     (v_res->>'ok') = 'false', v_res::text);
-  select trust_score into v_t from public.profiles where id = v_jug;
-  insert into r122 values ('N02 y NO vuelve a cobrar (sigue en 77)', v_t = 77, v_t::text);
+  select trust_score into v_t2 from public.profiles where id = v_jug;
+  insert into r122 values ('N02 y NO vuelve a cobrar',
+    v_t2 = v_t, 'quedó en ' || v_t2 || ', estaba en ' || v_t);
 
   -- ── Reabrir es reabrir lo que estaba lleno ────────────────────
   v_res := public.leave_match_penalized(v_lleno);
@@ -153,32 +175,62 @@ begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_otro, 'role', 'authenticated')::text, true);
 
+  select trust_score into v_antes from public.profiles where id = v_otro;
+
   v_gps := public.confirm_attendance_gps(v_jugado, -33.45, -70.66);
   insert into r122 values ('N03 la primera confirmacion por GPS entra',
     (v_gps->>'ok') = 'true' and (v_gps->>'already') is null, v_gps::text);
+  select trust_score into v_t from public.profiles where id = v_otro;
 
   v_gps := public.confirm_attendance_gps(v_jugado, -33.45, -70.66);
   insert into r122 values ('N03 la segunda dice que ya estaba confirmado',
     (v_gps->>'already') = 'true', v_gps::text);
 
-  select trust_score, asistencias_confirmadas into v_t, v_asis from public.profiles where id = v_otro;
-  insert into r122 values ('N03 un punto y una asistencia, no dos',
-    v_t = 81 and v_asis = 1, 'puntaje ' || v_t || ', asistencias ' || v_asis);
+  select trust_score, asistencias_confirmadas into v_t2, v_asis from public.profiles where id = v_otro;
+  -- NO se exige que el puntaje SUBA acá: con TrueScore el punto llega
+  -- cuando el organizador confirma la asistencia (N04), no al marcar el
+  -- GPS. Lo que esta migración promete, y lo único que se mide, es que la
+  -- segunda llamada no sume nada.
+  insert into r122 values ('N03 la segunda no suma: mismo puntaje y una asistencia',
+    v_t2 = v_t and v_asis = 1,
+    v_antes || ' -> ' || v_t || ' -> ' || v_t2 || ', asistencias ' || v_asis);
 
-  select count(*) into v_n from public.trust_score_history
-   where user_id = v_otro and match_id = v_jugado and reason = 'Asistencia confirmada por GPS';
-  insert into r122 values ('N03 un solo movimiento en el historial', v_n = 1, v_n::text);
+  -- El apunte en el historial se comprueba en N04, no acá: con TrueScore
+  -- el GPS no mueve el puntaje ni escribe movimiento, lo hace la
+  -- confirmación del organizador.
 
   -- ── N04 ───────────────────────────────────────────────────────
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_org, 'role', 'authenticated')::text, true);
   update public.matches set hora = now() - interval '3 hours' where id = v_jugado;
 
+  -- Se MIRA lo que contesta, no se hace `perform` a ciegas: un guardado
+  -- rechazado dejaba el historial vacío y el caso de abajo culpaba al
+  -- registro de puntos.
+  v_res := public.save_match_attendance(v_jugado, jsonb_build_object(v_otro::text, 'presente'))::jsonb;
+  insert into r122 values ('N04 el primer guardado se acepta', (v_res->>'ok') = 'true', v_res::text);
+  select trust_score into v_t from public.profiles where id = v_otro;
   perform public.save_match_attendance(v_jugado, jsonb_build_object(v_otro::text, 'presente'));
-  perform public.save_match_attendance(v_jugado, jsonb_build_object(v_otro::text, 'presente'));
-  select trust_score, asistencias_confirmadas into v_t, v_asis from public.profiles where id = v_otro;
-  insert into r122 values ('N04 dos guardados dejan 83 y una asistencia, no 85 y dos',
-    v_t = 83 and v_asis = 1, 'puntaje ' || v_t || ', asistencias ' || v_asis);
+  select trust_score, asistencias_confirmadas into v_t2, v_asis from public.profiles where id = v_otro;
+  insert into r122 values ('N04 el segundo guardado no suma: mismo puntaje y una asistencia',
+    v_t2 = v_t and v_asis = 1,
+    'tras el primero ' || v_t || ', tras el segundo ' || v_t2 || ', asistencias ' || v_asis);
+
+  -- UN SOLO MOVIMIENTO EN EL HISTORIAL, EN EL LIBRO QUE SE ESTÉ USANDO.
+  -- Con TrueScore encendido el apunte va a `truescore_eventos`; antes iba a
+  -- `trust_score_history`. Se suman los dos: lo que importa es que haya
+  -- UNO después de guardar dos veces, no en cuál de las dos tablas está.
+  -- SIN ROL para contar: los dos libros tienen RLS de «sólo lo mío», y acá
+  -- la sesión es la del ORGANIZADOR mirando los apuntes del jugador. Con el
+  -- rol puesto la consulta devuelve 0 y parece que no se registró nada.
+  reset role;
+  select (select count(*) from public.trust_score_history
+           where user_id = v_otro and match_id = v_jugado)
+       + (select count(*) from public.truescore_eventos
+           where user_id = v_otro and match_id = v_jugado)
+    into v_n;
+  set local role authenticated;
+  insert into r122 values ('N04 un solo movimiento en el historial', v_n = 1, v_n::text);
 
   select xmax::text::bigint <> 0 into v_bloqueada from public.matches where id = v_jugado;
   insert into r122 values ('N04 la asistencia tambien bloquea el partido', v_bloqueada,

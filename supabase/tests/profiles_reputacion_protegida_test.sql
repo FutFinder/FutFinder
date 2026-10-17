@@ -54,6 +54,8 @@ declare
     columna text;
     rechazado boolean;
     n integer;
+    n_antes integer;
+    n_pen integer;
     r jsonb;
 begin
     select * into strict f from perfil_fixture;
@@ -96,12 +98,24 @@ begin
     insert into perfil_resultados values ('RLS impide editar otro perfil');
 
     -- El cliente no puede tocar trust_score, pero la RPC debe poder sancionar.
+    --
+    -- CUÁNTO cobra no se clava acá (2026-10-17). Estaba fijo en 77 —los 3
+    -- puntos de antes de TrueScore— y con las fases encendidas, que es como
+    -- está producción desde el 2026-09-24, la salida cuesta según las horas
+    -- de aviso. Lo que este archivo cuida es que la RPC SÍ pueda mover el
+    -- puntaje que el cliente no puede tocar: se compara contra lo que la
+    -- propia salida dice haber cobrado.
+    select trust_score into strict n_antes from public.profiles where id = f.jugador;
     r := public.join_match(f.inmediato)::jsonb;
     if (r->>'ok')::boolean is distinct from true then raise exception 'Ingreso falló: %', r; end if;
     r := public.leave_match_penalized(f.inmediato)::jsonb;
     if (r->>'ok')::boolean is distinct from true then raise exception 'Salida falló: %', r; end if;
+    n_pen := coalesce((r->>'penalty')::int, -1);
+    if n_pen <= 0 then raise exception 'La salida no cobró nada: %', r; end if;
     select trust_score into strict n from public.profiles where id = f.jugador;
-    if n <> 77 then raise exception 'La RPC no aplicó la sanción vigente de 3 puntos: %', n; end if;
+    if n <> n_antes - n_pen then
+      raise exception 'La RPC no aplicó la sanción que dijo: % -> %, cobrando %', n_antes, n, n_pen;
+    end if;
     insert into perfil_resultados values ('La RPC legítima aplica la sanción de salida');
 
     if exists (

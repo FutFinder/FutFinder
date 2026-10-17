@@ -59,8 +59,11 @@ de canchas. `src/services/` concentra las llamadas de dominio.
 - **72 tablas, 285 funciones, 118 políticas y 12 tareas cron.** La nota
   anterior decía 147 políticas; son 118 en `public`, medidas sobre
   `pg_policy`.
-- **125 arneses SQL** en `supabase/tests/`, **125 en verde** contra una
-  base construida desde cero con el repositorio (2026-10-16). No se
+- **126 arneses SQL** en `supabase/tests/`, **126 en verde** contra una
+  base construida desde cero con el repositorio **y con los interruptores
+  de producción** (2026-10-17). Lo segundo no es un detalle: con las fases
+  de TrueScore apagadas —como las deja una base recién construida— seis
+  arneses daban verde midiendo la regla anterior. No se
   ejecutan con `npm test`: corren con `node scripts/correr-arneses.mjs`, o
   se pegan en el editor SQL, siempre dentro de una transacción que termina
   en `ROLLBACK`.

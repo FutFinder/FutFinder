@@ -79,11 +79,20 @@ begin
   insert into r86 values ('M6', v_fila.pago_estado = 'pendiente',
                           coalesce(v_fila.pago_estado, 'null'));
 
-  -- Confirmada y a pocas horas: se cierra la ventana.
+  -- Confirmada y A POCAS HORAS DE AHORA, no «hoy a las 23:30» (2026-10-17).
+  -- Con la hora clavada, este caso dependía de a qué hora se corriera el
+  -- arnés: a las 21:00 faltaban dos horas y la ventana estaba cerrada —
+  -- pasaba—, pero a las 10:30 faltaban trece y se podía cancelar
+  -- perfectamente — fallaba. No probaba la regla, probaba el reloj. Se
+  -- calcula sobre la hora de CHILE y se parte en fecha y hora juntas para
+  -- que cruzar la medianoche no deje la reserva en el día equivocado.
   reset role;
   set local request.jwt.claims to '{}';
   update public.reservas
-     set estado = 'confirmada', fecha = v_hoy, hora_inicio = '23:30', hora_fin = '23:59'
+     set estado = 'confirmada',
+         fecha = (((now() at time zone 'America/Santiago') + interval '1 hour'))::date,
+         hora_inicio = (((now() at time zone 'America/Santiago') + interval '1 hour'))::time,
+         hora_fin = (((now() at time zone 'America/Santiago') + interval '2 hours'))::time
    where id = v_r;
   set local role authenticated;
   execute format('set local request.jwt.claims to %L',

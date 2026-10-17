@@ -16,6 +16,10 @@
  *   1. `supabase/schema.sql` — la base de la Fase 2, idempotente.
  *   2. Cada archivo de `supabase/migrations/`, por número y después por
  *      letra (44, 44b, 44c…).
+ *   3. Las cuatro fases de TrueScore, encendidas. Las migraciones las dejan
+ *      apagadas y producción las tiene encendidas desde el 2026-09-24: sin
+ *      este paso la base se comporta como el FutFinder anterior, y eso no
+ *      se ve en ninguna huella de esquema.
  *
  * LA 149 SE APLICA. En una base nueva no hay apps instaladas que romper,
  * que es lo único que la mantiene fuera de producción. O sea: una base
@@ -105,6 +109,44 @@ function aplicar(archivo, etiqueta) {
   }
 }
 
+/**
+ * Deja los INTERRUPTORES como los tiene producción.
+ *
+ * LAS MIGRACIONES CREAN LAS FASES DE TRUESCORE APAGADAS, a propósito: se
+ * encendieron a mano el 2026-09-24, una por una. Una base recién construida
+ * se comporta entonces como el FutFinder anterior a TrueScore — la salida de
+ * un partido cuesta 3 fijos en vez de salir de la tabla por horas de aviso,
+ * una cuenta nace en 100 en vez de 75— y eso no es un detalle: el
+ * 2026-10-16 la suite daba 125/125 con los interruptores apagados y 119/125
+ * con los de producción. Seis arneses afirmaban la regla vieja y nadie se
+ * había enterado.
+ *
+ * Las huellas de ESQUEMA no lo ven: es una fila de `feature_flags`.
+ */
+function encenderLoMismoQueProduccion() {
+  const sql = [
+    'truescore_activar_fase1',
+    'truescore_activar_fase2',
+    'truescore_activar_fase3',
+    'truescore_activar_fase4',
+  ].map((f) => `select public.${f}();`).join('\n');
+  try {
+    if (COMO.modo === 'psql') {
+      execFileSync('psql', [DB, '-v', 'ON_ERROR_STOP=1', '-q', '-c', sql],
+        { stdio: ['ignore', 'ignore', 'pipe'] });
+    } else {
+      execFileSync('docker',
+        ['exec', '-i', COMO.contenedor, 'psql', '-U', 'postgres', '-d', 'postgres',
+         '-v', 'ON_ERROR_STOP=1', '-q'],
+        { input: Buffer.from(sql), stdio: ['pipe', 'ignore', 'pipe'] });
+    }
+    return { ok: true };
+  } catch (e) {
+    const err = (e.stderr || Buffer.from('')).toString().trim();
+    return { ok: false, error: err || e.message };
+  }
+}
+
 function main() {
   if (!existsSync(SCHEMA)) {
     console.error(`No encuentro ${SCHEMA}`);
@@ -147,6 +189,14 @@ function main() {
   }
 
   console.log(`\n✔ ${n}/${archivos.length} migraciones aplicadas`);
+
+  const flags = encenderLoMismoQueProduccion();
+  if (!flags.ok) {
+    console.error(`\n✖ no se pudieron encender las fases de TrueScore\n${flags.error}`);
+    process.exit(1);
+  }
+  console.log('✔ las cuatro fases de TrueScore encendidas, como producción');
+
   console.log(SIN_149
     ? 'Sin la 149: esta base debería ser equivalente a producción.'
     : 'Con la 149 aplicada: esta base se diferencia de producción en eso y sólo en eso.');
