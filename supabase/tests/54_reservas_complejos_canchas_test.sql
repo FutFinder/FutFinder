@@ -40,8 +40,15 @@ declare
 
   -- Fecha fija de prueba: se ancla el día de la semana de las reglas de
   -- horario a esta fecha, así el arnés no depende del día en que se corre.
-  v_fecha      date := date '2027-03-01'; -- lunes
-  v_dow        int  := extract(dow from date '2027-03-01')::int;
+  -- EL LUNES DE DENTRO DE DOS SEMANAS, no una fecha de marzo de 2027
+  -- (2026-10-17). Estaba clavada en `date '2027-03-01'`, y a partir del
+  -- 2 de marzo de 2027 esa fecha es PASADO: `crear_reserva` la rechaza
+  -- —es la regla de la 84— y este arnés se habría puesto rojo, junto con
+  -- otros siete, sin que nadie tocara una línea de código. Se calcula
+  -- sobre la hora de CHILE y cae siempre en lunes, que es lo que las
+  -- reglas de horario de más abajo dan por supuesto.
+  v_fecha      date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date;
+  v_dow        int  := 1;   -- lunes: `date_trunc('week', …)` siempre cae ahí
 
   v_json       json;
   v_slots      json;

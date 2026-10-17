@@ -218,6 +218,29 @@ Comparar dos huellas tampoco bastaba: columnas y privilegios cuadraban desde el 
 - **colima sólo comparte `/Users/...`.** El proyecto del stack vivía en `/private/tmp` y Docker montó la plantilla dentro del contenedor como un **directorio vacío**, sin quejarse; gotrue mandó un listado de directorio en vez del código. El proyecto del stack local vive ahora en `~/.futfinder-local` — fuera del repositorio, para que `supabase db reset` no pueda aplicar las migraciones en orden alfabético.
 - **`[api]` y `[realtime]` estaban apagados.** Para los arneses da igual —se habla con Postgres directo— pero con la app encima el `/auth` funciona y **cada `supabase.from(...)` vuelve 503**: Inicio decía «¡Hola, jugador!» y «No pudimos cargar tu reputación». Parecían dos fallos de la app y eran uno solo del entorno.
 
+## Lo que los arneses miden sin querer: el reloj y el calendario (2026-10-17)
+
+El caso M7 de la **86** salió por casualidad —se corrió la suite de mañana y no de noche—, así que se buscaron los demás a propósito. Hay dos familias y se distinguen bien.
+
+**1. Depende de la HORA del día.** Pasa cuando un escenario mezcla una hora del reloj con una ventana relativa. Son dos, las dos arregladas:
+
+- **86**: ponía la reserva «hoy a las 23:30» y comprobaba que ya no se pudiera cancelar. A las 21:00 faltaban dos horas y pasaba; a las 10:30 faltaban trece y fallaba. Ahora la pone **a una hora de ahora**, sobre la hora de Chile y partiendo fecha y hora juntas para que cruzar la medianoche no la deje en el día equivocado. El modelo a copiar estaba al lado: la **70** ya lo hacía así (`v_ts := v_ahora + interval '13 hours'`, y después `v_ts::date` y `v_ts::time`).
+- **84**: su caso C2 —«reservar una hora de hoy que ya pasó se rechaza»— vivía dentro de un `if v_h is not null`, y `v_h` es «un bloque de hoy que ya empezó». Entre las 00:00 y las 00:59 de Chile no existe ninguno: **el caso desaparecía sin dejar rastro y el arnés terminaba en verde**. Ahora, si no hay bloque pasado, lo dice y falla. Un caso que no corre no es un caso que pasa.
+
+Lo que NO es hora-dependiente aunque lo parezca: `now() ± N horas` y `date_trunc('hour', now()) + N días`. Son relativos y se comportan igual a cualquier hora. Están en 25 arneses y ninguno es un problema.
+
+**2. Depende del CALENDARIO, y tenía fecha de estallido.** Once arneses del vertical de Reservas montaban su escenario sobre `date '2027-03-01'`. **El 2 de marzo de 2027, los ocho que crean una reserva ahí se habrían puesto rojos a la vez**: desde la migración 84, `crear_reserva` rechaza el pasado. Ocho arneses en rojo por el calendario, sin que nadie tocara una línea.
+
+Se cambiaron por **el lunes de dentro de dos semanas**, calculado sobre la hora de Chile:
+
+```sql
+(date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date
+```
+
+Lunes porque las reglas de horario de esos arneses lo dan por supuesto, y a dos semanas porque así nunca cae en pasado. Los tres que conservan una fecha fija —**66**, **67** y **70**— comprueban una **conversión** (el desfase de zona horaria, el cruce de la medianoche), no reservan nada, y lo dicen en un comentario.
+
+**El guardián:** `scripts/__tests__/arnesesSinFechaCaduca.test.js` falla si un arnés escribe una fecha del calendario a mano. La exención se declara en el propio archivo —un comentario con las palabras «no caduca»— y no en una lista que vive en otra parte y que nadie vuelve a leer. Control comprobado: una fecha de 2028 colada en el arnés de la 63 lo pone en rojo con el archivo y la línea.
+
 ## La diferencia que no es de esquema: los interruptores (2026-10-16)
 
 Las siete huellas de la base construida cuadran con producción. **Los datos de configuración, no.** Una base nueva nace con **las cuatro fases de TrueScore apagadas** y producción las tiene encendidas desde el 2026-09-24.

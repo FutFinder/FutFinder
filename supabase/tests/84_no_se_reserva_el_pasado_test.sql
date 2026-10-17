@@ -68,10 +68,21 @@ begin
   insert into r84 values ('C1', v_pasadas = 0,
                           v_pasadas || ' pasadas de ' || v_libres || ' libres hoy');
 
+  -- EL CASO 2 NO SE SALTA EN SILENCIO (2026-10-17). Esto estaba envuelto en
+  -- un `if v_h is not null`, y `v_h` es «un bloque de HOY que ya empezó».
+  -- Entre las 00:00 y las 00:59 de Chile no existe ninguno, así que el caso
+  -- que da nombre al arnés —reservar una hora de hoy que ya pasó se
+  -- rechaza— desaparecía sin dejar rastro y el arnés terminaba en verde. Un
+  -- caso que no corre no es un caso que pasa: si no hay bloque pasado, se
+  -- dice y se falla, que es lo que obliga a mirarlo.
   select (s->>'hora_inicio')::time into v_h
     from json_array_elements(public.get_disponibilidad_cancha(v_cancha, v_hoy)->'slots') s
    where (s->>'hora_inicio')::time < v_ahora limit 1;
-  if v_h is not null then
+  if v_h is null then
+    insert into r84 values ('C2', false,
+      'no hay ningún bloque de hoy ya empezado (son las ' || v_ahora::text ||
+      ' en Chile): el caso no se pudo correr, no es que haya pasado');
+  else
     v_res := public.crear_reserva(p_cancha_id := v_cancha, p_fecha := v_hoy, p_hora_inicio := v_h,
       p_modalidad := 'completa', p_medio_pago := 'tarjeta', p_n_jugadores := 10,
       p_contacto_nombre := 'QA', p_contacto_telefono := '+56911111111', p_cobros := null);

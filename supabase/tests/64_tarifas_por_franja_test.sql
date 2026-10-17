@@ -36,8 +36,15 @@ declare
   -- Se derivan en vez de hardcodearse: `date_trunc('week')` cae en lunes,
   -- así que +5 es sábado. Hardcodear un día de la semana es la clase de
   -- supuesto que hace fallar un arnés por el motivo equivocado.
-  v_lunes    date := date_trunc('week', date '2027-03-08')::date;
-  v_sabado   date := date_trunc('week', date '2027-03-08')::date + 5;
+  -- EL LUNES DE DENTRO DE DOS SEMANAS, no una fecha de marzo de 2027
+  -- (2026-10-17). Estaba clavada en `date '2027-03-01'`, y a partir del
+  -- 2 de marzo de 2027 esa fecha es PASADO: `crear_reserva` la rechaza
+  -- —es la regla de la 84— y este arnés se habría puesto rojo, junto con
+  -- otros siete, sin que nadie tocara una línea de código. Se calcula
+  -- sobre la hora de CHILE y cae siempre en lunes, que es lo que las
+  -- reglas de horario de más abajo dan por supuesto.
+  v_lunes    date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date;
+  v_sabado   date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date + 5;
   v_res      uuid;
   v_j        json;
   v_n        integer;

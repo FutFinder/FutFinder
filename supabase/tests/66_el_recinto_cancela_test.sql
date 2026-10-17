@@ -64,6 +64,10 @@ begin
   -- ── Caso 1: la conversión de hora ──────────────────────────────
   -- Se comprueba el DESFASE, no un valor fijo: Chile cambia de hora y
   -- fijar 3 horas haría fallar la prueba media parte del año.
+  -- La fecha fija se queda: acá no se reserva nada, se COMPRUEBA UNA
+  -- CONVERSIÓN. No hace falta que sea futura y por eso no caduca, a
+  -- diferencia de las que se cambiaron el 2026-10-17 en otros ocho
+  -- arneses porque `crear_reserva` rechaza el pasado.
   v_desfase := public.inicio_de_reserva(date '2027-03-08', time '20:00')
                - (date '2027-03-08' + time '20:00') at time zone 'UTC';
   if v_desfase < interval '3 hours' or v_desfase > interval '4 hours' then

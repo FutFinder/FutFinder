@@ -47,7 +47,14 @@ declare
   v_complejo uuid := gen_random_uuid();
   v_cancha   uuid := gen_random_uuid();
   v_cancha43 uuid := gen_random_uuid();
-  v_fecha    date := date '2027-03-01';
+  -- EL LUNES DE DENTRO DE DOS SEMANAS, no una fecha de marzo de 2027
+  -- (2026-10-17). Estaba clavada en `date '2027-03-01'`, y a partir del
+  -- 2 de marzo de 2027 esa fecha es PASADO: `crear_reserva` la rechaza
+  -- —es la regla de la 84— y este arnés se habría puesto rojo, junto con
+  -- otros siete, sin que nadie tocara una línea de código. Se calcula
+  -- sobre la hora de CHILE y cae siempre en lunes, que es lo que las
+  -- reglas de horario de más abajo dan por supuesto.
+  v_fecha    date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date;
   v_res      uuid;
   v_res_canc uuid := gen_random_uuid();
   v_res_sin  uuid := gen_random_uuid();

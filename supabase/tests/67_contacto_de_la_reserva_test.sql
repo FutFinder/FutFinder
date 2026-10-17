@@ -74,6 +74,8 @@ begin
   raise notice 'OK (caso 2)';
 
   -- ── Caso 3: el partido que cruza la medianoche ─────────────────
+  -- Fechas fijas a propósito: lo que se comprueba es el cruce de la
+  -- medianoche, no que la reserva sea futura. No caduca.
   if public.fin_de_reserva(date '2027-03-08', time '23:00', time '00:00')
      <> public.inicio_de_reserva(date '2027-03-09', time '00:00') then
     raise exception 'FALLÓ (caso 3): un bloque 23:00-00:00 termina al día siguiente';
