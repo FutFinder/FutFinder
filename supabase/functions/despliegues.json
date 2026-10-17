@@ -5,14 +5,15 @@
     "No se compara por fecha: el patrón normal es desplegar y commitear un minuto después, así que el commit SIEMPRE es más nuevo que el despliegue y una comparación de fechas daría falso positivo siempre.",
     "`comparada` es el día en que ese contenido se trajo con get_edge_function y se verificó contra el repositorio. `null` significa que el hash es el del archivo de hoy y se dio por bueno sin traer la copia desplegada.",
     "AL DESPLEGAR: actualiza version, desplegada y los hashes. Es a propósito que haya que tocar esto a mano.",
-    "UN CAMBIO EN _shared/ NO ESTÁ EN PRODUCCIÓN HASTA REDESPLEGAR CADA FUNCIÓN QUE LO IMPORTA: la copia viaja dentro de cada despliegue."
+    "UN CAMBIO EN _shared/ NO ESTÁ EN PRODUCCIÓN HASTA REDESPLEGAR CADA FUNCIÓN QUE LO IMPORTA: la copia viaja dentro de cada despliegue.",
+    "Las seis se compararon contra la copia desplegada el 2026-10-16 y las seis coincidían con el repositorio, salvo send-push, que venía atrasada y se redesplegó. `comparada: null` sería un hash dado por bueno sin traer la copia desplegada; hoy no hay ninguna así."
   ],
   "proyecto": "jvfoendzblkoxvwvommz",
   "funciones": {
     "flow-confirmacion": {
       "version": 2,
       "desplegada": "2026-09-11T01:31:28Z",
-      "comparada": null,
+      "comparada": "2026-10-16",
       "archivos": {
         "flow-confirmacion/index.ts": "3ac337a8a8b2472ba7b65e2863a6fb5bc7c9488a0b2a20e027de784348ea4200",
         "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441"
@@ -21,7 +22,7 @@
     "flow-retorno": {
       "version": 2,
       "desplegada": "2026-09-11T01:28:33Z",
-      "comparada": null,
+      "comparada": "2026-10-16",
       "archivos": {
         "flow-retorno/index.ts": "f2e7ec30569db0fc7e37e71458c630f6c1541e1491b6b27408650d00e626e968"
       }
@@ -29,7 +30,7 @@
     "pagar-reserva": {
       "version": 2,
       "desplegada": "2026-09-11T01:30:08Z",
-      "comparada": null,
+      "comparada": "2026-10-16",
       "archivos": {
         "pagar-reserva/index.ts": "e80131c31ee790bfae95cc738d5c9b6e8a5b640f217a9e34047e2bdfabfc69bb",
         "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441"
