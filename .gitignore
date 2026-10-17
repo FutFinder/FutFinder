@@ -36,6 +36,11 @@ yarn-error.*
 # Local env files (NUNCA subas claves a git)
 .env*.local
 .env
+# El respaldo que `npm run web:local` hace del .env mientras corre. NO es un
+# archivo de ejemplo: es el .env de verdad con otro nombre. Sin esta línea un
+# `git add -A` lo sube — y pasó: el 2026-10-16 lo frenó la protección de
+# secretos de GitHub y no la revisión de nadie.
+.env.guardado-por-web-local
 !.env.example
 
 # Editors

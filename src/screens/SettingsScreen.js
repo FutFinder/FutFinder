@@ -57,7 +57,7 @@ import {
 } from '../services/settings';
 import { getProfileLoadStatus } from '../utils/profileEdit';
 import { APP_VERSION } from '../utils/appVersion';
-import { validarPassword } from '../utils/passwordStrength';
+import { validarPassword, PISTA_PASSWORD } from '../utils/passwordStrength';
 import { describeAuthError } from '../services/authPolicy';
 import { buildMyDataExport } from '../services/dataExport';
 import useConfirmacion from '../components/useConfirmacion';
@@ -958,6 +958,9 @@ export default function SettingsScreen({ navigation }) {
           onChangeText={setPasswordInput}
           secureTextEntry
         />
+        {/* Acá no había NADA: la regla se conocía después de apretar el
+            botón y que te la rechazaran. */}
+        <Text style={styles.pistaPassword}>{PISTA_PASSWORD}</Text>
         <Input
           style={[styles.input, { marginTop: 10 }]}
           placeholder="Repetir contraseña"
@@ -1120,6 +1123,10 @@ const styles = StyleSheet.create({
     fontFamily: F.medium, color: C.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 12,
   },
   forgotLink: { fontFamily: F.semiBold, color: C.green, fontSize: 13 },
+  pistaPassword: {
+    fontFamily: F.medium, color: C.textMuted, fontSize: 12,
+    marginTop: 6, marginLeft: 2,
+  },
   otpRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   otpBox: {
     width: 44, height: 54, borderRadius: R.iconBtn,

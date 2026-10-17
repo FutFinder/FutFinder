@@ -4,7 +4,19 @@
     {
       "name": "futfinder-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "web"],
+      "runtimeArgs": [
+        "run",
+        "web"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "futfinder-web-local",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "web:local"
+      ],
       "port": 8081
     }
   ]

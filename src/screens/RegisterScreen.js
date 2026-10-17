@@ -20,7 +20,12 @@ import { Card, IconButton, Button } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { registerWithEmail } from '../services/auth';
 import { validarFechaNacimiento, usernameDesdeNombre } from '../utils/fechaNacimiento';
-import { passwordStrength, MIN_PASSWORD, validarPassword } from '../utils/passwordStrength';
+import {
+  passwordStrength,
+  validarPassword,
+  PISTA_PASSWORD,
+  PISTA_PASSWORD_CORTA,
+} from '../utils/passwordStrength';
 import { saveRememberedAccount } from '../utils/rememberedAccount';
 import { isSupabaseConfigured } from '../services/supabase';
 
@@ -247,7 +252,7 @@ export default function RegisterScreen({ navigation }) {
             <View style={styles.passwordRow}>
               <TextInput
                 style={styles.passwordInput}
-                placeholder={`${MIN_PASSWORD}+ con mayúscula, número y símbolo`}
+                placeholder={PISTA_PASSWORD_CORTA}
                 placeholderTextColor={C.textMuted}
                 value={password}
                 onChangeText={setPassword}
@@ -266,7 +271,7 @@ export default function RegisterScreen({ navigation }) {
                 <View key={i} style={[styles.strengthBar, strength > i && styles.strengthBarOn]} />
               ))}
             </View>
-            <Text style={styles.strengthHint}>Usa una mayúscula y un número para reforzarla.</Text>
+            <Text style={styles.strengthHint}>{PISTA_PASSWORD}</Text>
           </Card>
 
           <Pressable

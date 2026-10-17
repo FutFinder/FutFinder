@@ -85,6 +85,27 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Resolución:** la migración **114** revocó `execute` sobre TODAS las rutinas de `public` a `public` y a `anon` —a los dos, que es la parte que las migraciones anteriores erraban— y la **115** puso un disparador de eventos para que lo que se cree mañana nazca igual de cerrado.
 - **Verificación de cierre (2026-09-18, contra `jvfoendzblkoxvwvommz`):** de 43 funciones de trigger en `public`, `anon` puede ejecutar **0** y ninguna conserva `EXECUTE` para `PUBLIC`. El advisor ya no devuelve ni un `anon_security_definer_function_executable`. Las 91 RPC que el cliente llama de verdad siguen accesibles (arnés de la 114, sacado de `grep .rpc(` sobre `src/`).
 
+## Resuelto el 2026-10-16 — la app ya se puede correr contra la base local, y lo primero que apareció
+
+**`npm run web:local`** levanta la app web contra `127.0.0.1:54321` en vez de contra producción. Hasta ahora la única forma de abrir FutFinder era contra `jvfoendzblkoxvwvommz`, así que probar un flujo de verdad —registrarse, crear un partido, escribir en el chat— significaba escribir en producción, y por eso no se hacía nunca.
+
+- **Dos trampas que costó descubrir, y están escritas en el script:**
+  1. `process.env.EXPO_PUBLIC_*` se **incrusta** en el bundle cuando Metro transforma. Un bundle cacheado de un `npm run web` anterior sigue trayendo dentro la URL de producción. Por eso el script pasa siempre `--clear`.
+  2. Pasar las variables en el proceso **no alcanza**: Expo mete los valores del archivo `.env` en un módulo del bundle que los asigna a `process.env` en tiempo de ejecución, y ése gana. Se vio leyendo el bundle servido: traía los DOS valores, y la app abrió con la sesión y los datos de producción. Ni `EXPO_NO_DOTENV=1` lo evitó. El script **aparta el `.env` mientras dura** y lo repone al salir, también con Ctrl-C, y si un corte dejó el respaldo tirado lo repone al arrancar.
+  - La comprobación que vale: el bundle servido tiene **cero** apariciones del proyecto de producción y una de `127.0.0.1:54321`.
+- **Y una tercera trampa, la peor, que se llevó un susto:** el respaldo del `.env` es el `.env` de verdad con otro nombre, y el patrón `.env*.local` del `.gitignore` NO lo tapaba. Un `git add -A` lo subió al commit. **Lo frenó la protección de secretos de GitHub, no la revisión de nadie.** Ahora está en el `.gitignore` por nombre propio y el script **comprueba con `git check-ignore` que lo esté antes de renombrar nada**: si esa línea desapareciera, se niega a arrancar en vez de dejar el archivo expuesto.
+
+### Lo primero que apareció al correrla: la pista de la contraseña mentía
+
+Debajo del campo de contraseña, «Crear cuenta» decía **«Usa una mayúscula y un número para reforzarla»**, y `validarPassword` exige **cuatro** tipos. Quien leía esa línea escribía `Futbol2026`, apretaba «Crear mi cuenta» y recién ahí se enteraba: «Te falta un símbolo». El marcador de posición sí decía la regla entera, pero **el marcador desaparece al escribir la primera letra**: lo único visible mientras tipeas era la frase incompleta. En Ajustes era peor — el campo de contraseña nueva no decía **nada**.
+
+- **Arreglo:** `PISTA_PASSWORD` se exporta desde `passwordStrength.js`, armada con `MIN_PASSWORD` y los cuatro tipos, y la usan las dos pantallas. `pistaPassword.test.js` falla si una pantalla vuelve a redactar la regla a mano o si la pista deja de nombrar alguno de los cuatro.
+- **De paso:** la pista nueva de Ajustes iba a salir con `F.regular`, que **no existe** en el tema (los pesos son `medium`, `semiBold`, `bold`, `extraBold`). Habría quedado con la tipografía del sistema sin que nada fallara. Corregido a `F.medium`.
+
+### Lo que todavía no se puede probar en local
+
+El registro **no deja una cuenta usable hasta verificar el código**: la contraseña se fija después, en `completeSignUpPassword`. El stack local manda el correo con el **enlace mágico** por omisión, no con `{{ .Token }}`, así que la pantalla de verificación no se puede completar y la cuenta de prueba queda sin contraseña. Hay que ajustar la plantilla del stack local para exercitar registro → verificación → sesión.
+
 ## Resuelto el 2026-10-16 — `send-push` llevaba dos meses corriendo código viejo
 
 **Un fallo real en producción, y de los que no se notan.** El commit del 17 de agosto (`feat(clubes): la Tarea 6.1 registra y confirma el resultado`) agregó tres tipos al mapa de preferencias de `pushLogic.ts` —`club_resultado_propuesto`, `club_resultado_confirmado` y `club_resultado_disputado`—. El último despliegue de `send-push` era del **15** de agosto. Dos días antes.
