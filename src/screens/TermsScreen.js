@@ -35,14 +35,35 @@ function CheckboxRow({ value, onToggle, label }) {
 export default function TermsScreen({ navigation }) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptNotifs, setAcceptNotifs] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
 
-  const canContinue = acceptTerms;
+  const canContinue = acceptTerms && !guardando;
 
+  /**
+   * SI NO SE PUDO GUARDAR, NO SE DICE «TODO LISTO» (2026-10-17).
+   *
+   * Esto hacía `await completeOnboarding()` y navegaba a `Success` pasara
+   * lo que pasara. Cuando la escritura falla —sin conexión, un 503 del
+   * servidor— el flag `onboarding_completed` se queda en false, la persona
+   * ve «¡Todo listo! Tu cuenta ha sido verificada y configurada
+   * correctamente»… y **la próxima vez que abra la app vuelve a pasar por
+   * el permiso de ubicación y por esta pantalla**. Para siempre, y sin un
+   * solo indicio de que algo falló.
+   *
+   * Se vio corriendo la app contra la base local con el API REST apagado:
+   * el registro llegaba hasta el final y el perfil quedaba sin marcar.
+   */
   const handleContinue = async () => {
     if (!canContinue) return;
-    // Marcamos onboarding como completado — el usuario nunca más
-    // tendrá que pasar por LocationPermission / Terms / Success.
-    await completeOnboarding();
+    setGuardando(true);
+    setError(null);
+    const { error: err } = await completeOnboarding();
+    setGuardando(false);
+    if (err) {
+      setError('No pudimos guardar tu aceptación. Revisa tu conexión e inténtalo de nuevo.');
+      return;
+    }
     navigation.navigate('Success');
   };
 
@@ -92,10 +113,13 @@ export default function TermsScreen({ navigation }) {
 
             <View style={{ height: 22 }} />
 
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
             <Button
               label="Aceptar y continuar"
               variant="primary"
               onPress={handleContinue}
+              loading={guardando}
               disabled={!canContinue}
             />
           </View>
@@ -183,6 +207,14 @@ const styles = StyleSheet.create({
     color: C.textPrimary,
     fontSize: 13,
     lineHeight: 18,
+  },
+  error: {
+    // Ojo: el token `danger` del tema es un objeto {soft, fg}, no un color.
+    color: C.red,
+    fontFamily: F.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   footer: {
     textAlign: 'center',

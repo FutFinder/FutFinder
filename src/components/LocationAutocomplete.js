@@ -68,6 +68,34 @@ async function suggestMapbox(q, proximity, sessionToken) {
   }));
 }
 
+/**
+ * LOS CANDIDATOS A COMUNA, DEL MÁS ESPECÍFICO AL MÁS GENERAL (2026-10-17).
+ *
+ * Esto antes elegía uno solo y empezaba por `city`. Para una dirección del
+ * Gran Santiago, Nominatim contesta `city: Santiago` y `suburb: Ñuñoa`: la
+ * COMUNA es la segunda. Con `city` primero, Irarrázaval 3000 se publicaba
+ * en «Santiago» en vez de en «Ñuñoa» — y la comuna es con lo que la app
+ * busca, filtra y arma «partidos cerca de ti», así que medio Gran Santiago
+ * terminaba en el mismo saco. Se probó contra Nominatim de verdad.
+ *
+ * Se devuelven TODOS en orden y quien recibe se queda con el primero que
+ * sea una comuna del catálogo (`matchComuna`). Un `suburb` que sea un
+ * barrio y no una comuna no coincide con nada y cede el turno al
+ * siguiente, que es exactamente lo que tiene que pasar en una ciudad donde
+ * la comuna sí es el `city`, como Puente Alto.
+ */
+function candidatosOsm(a = {}) {
+  return [
+    a.suburb,
+    a.city_district,
+    a.town,
+    a.village,
+    a.municipality,
+    a.city,
+    a.county,
+  ].filter(Boolean);
+}
+
 async function retrieveMapbox(mapboxId, sessionToken) {
   const url =
     `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?` +
@@ -82,6 +110,9 @@ async function retrieveMapbox(mapboxId, sessionToken) {
     lat: f.geometry?.coordinates?.[1],
     lng: f.geometry?.coordinates?.[0],
     address: p.full_address || p.place_formatted || p.name,
+    // En Mapbox el orden ya va de lo específico a lo general.
+    comunaCandidatos: [ctx.locality?.name, ctx.place?.name, ctx.neighborhood?.name]
+      .filter(Boolean),
     comunaRaw:
       ctx.place?.name ||
       ctx.locality?.name ||
@@ -133,8 +164,8 @@ export async function reverseGeocode({ lat, lng }) {
     const a = data?.address || {};
     return {
       address: data?.display_name || null,
-      comunaRaw:
-        a.city || a.town || a.village || a.suburb || a.municipality || a.county || null,
+      comunaCandidatos: candidatosOsm(a),
+      comunaRaw: candidatosOsm(a)[0] || null,
       regionRaw: a.state || a.region || null,
     };
   } catch (e) {
@@ -160,14 +191,8 @@ async function searchNominatim(q) {
         lat: parseFloat(item.lat),
         lng: parseFloat(item.lon),
         address: item.display_name,
-        comunaRaw:
-          a.city ||
-          a.town ||
-          a.village ||
-          a.suburb ||
-          a.municipality ||
-          a.county ||
-          null,
+        comunaCandidatos: candidatosOsm(a),
+        comunaRaw: candidatosOsm(a)[0] || null,
         regionRaw: a.state || a.region || null,
       },
     };
@@ -269,6 +294,9 @@ export default function LocationAutocomplete({
           lat: payload.lat,
           lng: payload.lng,
           address: payload.address,
+          // La lista ordenada es lo que de verdad decide la comuna;
+          // `comunaRaw` viaja sólo por compatibilidad.
+          comunaCandidatos: payload.comunaCandidatos || null,
           comunaRaw: payload.comunaRaw,
           regionRaw: payload.regionRaw,
           canchaName: payload.canchaName || null,

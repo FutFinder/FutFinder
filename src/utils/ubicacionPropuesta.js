@@ -49,10 +49,25 @@ export const UBICACION_VACIA = Object.freeze({
  */
 export function seleccionarLugar(estado = UBICACION_VACIA, seleccion = {}) {
   const base = estado || UBICACION_VACIA;
-  const { lat, lng, address, comunaRaw, regionRaw, canchaName } = seleccion || {};
+  const { lat, lng, address, comunaRaw, comunaCandidatos, regionRaw, canchaName } =
+    seleccion || {};
 
   const direccion = address || base.direccion;
-  const zona = matchComuna(comunaRaw) || matchComuna(regionRaw);
+  // EL PRIMER CANDIDATO QUE SEA UNA COMUNA DE VERDAD (2026-10-17). El
+  // buscador devuelve los nombres del más específico al más general, porque
+  // en el Gran Santiago Nominatim contesta `city: Santiago` y
+  // `suburb: Ñuñoa`: quedarse con el primero a secas publicaba en Santiago
+  // un partido de Ñuñoa, y la comuna es con lo que la app busca y filtra.
+  // Un barrio que no esté en el catálogo no coincide y cede el turno.
+  const candidatos = Array.isArray(comunaCandidatos) && comunaCandidatos.length > 0
+    ? comunaCandidatos
+    : [comunaRaw];
+  let zona = null;
+  for (const c of candidatos) {
+    zona = matchComuna(c);
+    if (zona) break;
+  }
+  if (!zona) zona = matchComuna(regionRaw);
 
   return {
     ...base,

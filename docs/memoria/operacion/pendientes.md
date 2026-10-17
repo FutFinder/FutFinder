@@ -99,6 +99,26 @@ Descubierto el 2026-10-16 al poner la base local con **los interruptores como lo
   - El arnés de la 134 contaba *todos* los eventos del partido y exigía 3; con la fase 2 encendida aparece un cuarto, el bono del organizador. Y su caso C08 clavaba la secuencia `{40, 5, 0}`, que con reincidencia es `{40, 0, 0}`. Lo que ese caso cuida es que llegar a cero **no suspenda la cuenta**, no la curva.
 - **Verificación: 126/126 con los interruptores de producción**, incluido el arnés nuevo.
 
+## Resuelto el 2026-10-17 — tres cosas que sólo se ven usando la app
+
+Siguiendo el recorrido real contra la base local —registrarse, entrar, publicar un partido— aparecieron tres fallos que ninguna prueba iba a encontrar.
+
+### 1. «¡Todo listo!» aunque no se guardara nada
+
+La pantalla de términos hacía `await completeOnboarding()` y navegaba a `Success` **pasara lo que pasara**. Si la escritura falla —sin conexión, un 503— el flag `onboarding_completed` se queda en false, la persona lee «Tu cuenta ha sido verificada y configurada correctamente» y **la próxima vez que abra la app vuelve a pasar por el permiso de ubicación y por los términos**. Para siempre, y sin un solo indicio de que algo falló.
+
+Se vio con el API REST del stack local apagado: el registro llegaba hasta el final y el perfil quedaba sin marcar. Ahora, si no se pudo guardar, se dice y no se avanza. `terminosNoMiente.test.js` falla si alguien vuelve a tirar el resultado a la basura.
+
+### 2. Un partido de Ñuñoa se publicaba en Santiago
+
+Publicando en «Avenida Irarrázaval 3000», la app lo dejó en la comuna **Santiago**. Esa dirección es de **Ñuñoa**. Nominatim contesta `city: Santiago` y `suburb: Ñuñoa` —la comuna es la segunda— y el buscador se quedaba con `city`.
+
+**La comuna es con lo que la app busca, filtra y arma «partidos cerca de ti»**, así que medio Gran Santiago habría terminado en el mismo saco. Los candidatos viajan ahora en orden, del más específico al más general, y gana **el primero que sea una comuna del catálogo**: un barrio que no lo sea cede el turno, que es lo que hace falta donde la comuna sí es el `city` (Puente Alto). Comprobado contra Nominatim de verdad y después en la app: ahora dice Ñuñoa.
+
+### 3. Un arnés que caducaba por los datos, no por la fecha
+
+El caso B1 de `45b_origen_compatibilidad` exigía que **todas** las filas de `attendees` fueran `legado`. Era cierto el día que se escribió —las 25 que había eran anteriores a la migración 45— y deja de serlo **con el primer partido que alguien publique**: su organizador entra como `organizador`. Saltó al publicar el partido de prueba. Ahora comprueba lo que la migración promete —que nadie se quede sin origen y que no se invente ninguno— y deja el reparto en el detalle.
+
 ## Resuelto el 2026-10-16 — la app ya se puede correr contra la base local, y lo primero que apareció
 
 **`npm run web:local`** levanta la app web contra `127.0.0.1:54321` en vez de contra producción. Hasta ahora la única forma de abrir FutFinder era contra `jvfoendzblkoxvwvommz`, así que probar un flujo de verdad —registrarse, crear un partido, escribir en el chat— significaba escribir en producción, y por eso no se hacía nunca.
