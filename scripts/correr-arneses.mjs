@@ -31,6 +31,12 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TESTS = path.join(RAIZ, 'supabase', 'tests');
 const FILTRO = process.argv[2] || '';
 
+// Puerto alternativo para el barrido del reloj: `PGPORT_ARNESES=5433` apunta
+// a un segundo postmaster levantado dentro del mismo contenedor con la hora
+// falseada (ver `scripts/barrido-reloj.mjs`). Sin la variable, todo sigue
+// igual que siempre.
+const PUERTO = process.env.PGPORT_ARNESES || '';
+
 function contenedor() {
   try {
     const n = execFileSync('docker',
@@ -73,6 +79,7 @@ for (const f of archivos) {
   try {
     execFileSync('docker',
       ['exec', '-i', CT, 'psql', '-U', 'postgres', '-d', 'postgres',
+       ...(PUERTO ? ['-p', PUERTO] : []),
        '-v', 'ON_ERROR_STOP=1', '-q'],
       { input: sql, stdio: ['pipe', 'ignore', 'pipe'] });
     n += 1;

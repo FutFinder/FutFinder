@@ -241,6 +241,28 @@ Lunes porque las reglas de horario de esos arneses lo dan por supuesto, y a dos 
 
 **El guardián:** `scripts/__tests__/arnesesSinFechaCaduca.test.js` falla si un arnés escribe una fecha del calendario a mano. La exención se declara en el propio archivo —un comentario con las palabras «no caduca»— y no en una lista que vive en otra parte y que nadie vuelve a leer. Control comprobado: una fecha de 2028 colada en el arnés de la 63 lo pone en rojo con el archivo y la línea.
 
+## El barrido del reloj, hecho de verdad (2026-10-17)
+
+La búsqueda de arriba fue leyendo los 126. Después se comprobó **moviendo el reloj**: `bash scripts/barrido-reloj.sh horas` y `… fechas`.
+
+**Resultado: 126/126 a las nueve horas del día** (00:30 a 23:30 de Chile) **y en las nueve fechas** probadas, de fin de año a 2029, pasando por el 2 de marzo de 2027 —el día en que habrían estallado las fechas clavadas—, los dos cambios de hora de Chile (abril y septiembre) y el 29 de febrero de 2028.
+
+**El control, que es lo que lo convierte en una prueba:** las versiones ANTERIORES de esos arneses, sacadas de git y corridas con el reloj en el 2027-03-02, fallan. El arnés 55 lo dice con todas sus letras:
+
+```
+FALLÓ (caso 1): crear_reserva completa debería aceptar,
+respondió {"ok": false, "reason": "Esa hora ya pasó. Elige otra."}
+```
+
+**Cómo se mueve el reloj, porque los dos caminos obvios no sirven:**
+
+- `date -s` a secas **no dura dos segundos**: `lima-guestagent` lo devuelve a la hora real. Hay que pararlo — y `docker` desde el host sigue funcionando sin él, comprobado.
+- `libfaketime` dentro del contenedor **revienta**: el postgres de la imagen es de Nix y la libfaketime de Alpine es musl. `Fatal glibc error: malloc.c`. No insistir.
+
+El script para el guestagent, mueve la hora, corre la suite entera a cada paso y **repone todo en un `trap`**, también si te vas con Ctrl-C. Al terminar deja el reloj sincronizado con el host.
+
+**Y encontró uno que la lectura no había visto.** El C09 del arnés de la **137** —«las cuentas reales no se movieron»— contaba cuántos perfiles de la base tenían un puntaje distinto de 75, excluyendo sus cuatro fixtures. Daba por hecho que cualquier otra cuenta vale 75: cierto en una base recién construida y en ninguna otra. Con el reloj en junio de 2027 y una cuenta de prueba creada por la app, el job de inactividad **hace exactamente su trabajo** —la cuenta lleva ocho meses sin jugar— y el arnés lo llamaba fallo. Ahora toma una foto de los perfiles ajenos antes de correr el job y comprueba que no se movió ninguno **que estuviera al día**. Es el mismo defecto que «no es autosuficiente», en otra forma: el caso se apoyaba en datos que no son suyos.
+
 ## La diferencia que no es de esquema: los interruptores (2026-10-16)
 
 Las siete huellas de la base construida cuadran con producción. **Los datos de configuración, no.** Una base nueva nace con **las cuatro fases de TrueScore apagadas** y producción las tiene encendidas desde el 2026-09-24.
