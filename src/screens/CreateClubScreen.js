@@ -37,7 +37,14 @@ export default function CreateClubScreen({ navigation }) {
   const [descripcion, setDescripcion] = useState('');
   const [region, setRegion] = useState(null);
   const [comuna, setComuna] = useState(null);
-  const [modalidad, setModalidad] = useState(null);
+  // MODALIDAD CON VALOR DE PARTIDA (2026-10-19). Empezaba en `null` y es uno
+  // de los cuatro datos que exige `listo`, así que el botón quedaba
+  // apagado sin que nada lo dijera: región y comuna traen su «Selecciona
+  // una…», pero las tres fichas de modalidad se quedan quietas y no se
+  // leen como obligatorias. Pasó al crear un club de prueba — formulario
+  // lleno, botón apretado, no pasaba nada. «Publicar partido», que es la
+  // otra pantalla larga de la app, arranca con `futbol7` por lo mismo.
+  const [modalidad, setModalidad] = useState('futbol7');
   const [tema, setTema] = useState(TEMA_CLUB_POR_DEFECTO);
   const [showRegiones, setShowRegiones] = useState(false);
   const [showComunas, setShowComunas] = useState(false);
@@ -202,8 +209,10 @@ export default function CreateClubScreen({ navigation }) {
                     key={op.value}
                     label={op.label}
                     active={activa}
-                    // Volver a tocar la opción activa la deselecciona.
-                    onPress={() => setModalidad(activa ? null : op.value)}
+                    // Se puede cambiar de modalidad, pero NO quedarse sin
+                    // ninguna: deseleccionar la activa dejaba el formulario
+                    // en el estado que apaga el botón sin decir por qué.
+                    onPress={() => setModalidad(op.value)}
                     style={styles.modalidadChip}
                   />
                 );

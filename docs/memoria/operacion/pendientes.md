@@ -99,6 +99,15 @@ Descubierto el 2026-10-16 al poner la base local con **los interruptores como lo
   - El arnés de la 134 contaba *todos* los eventos del partido y exigía 3; con la fase 2 encendida aparece un cuarto, el bono del organizador. Y su caso C08 clavaba la secuencia `{40, 5, 0}`, que con reincidencia es `{40, 0, 0}`. Lo que ese caso cuida es que llegar a cero **no suspenda la cuenta**, no la curva.
 - **Verificación: 126/126 con los interruptores de producción**, incluido el arnés nuevo.
 
+## Resuelto el 2026-10-19 — «Crear club» no hacía nada
+
+Formulario lleno —nombre, descripción, región, comuna, tema—, botón apretado, **no pasaba nada**. Ni un mensaje, ni una pista. Me fui a buscar un error 500 que no existía: no había ninguna petición, porque el botón estaba apagado.
+
+`modalidad` empezaba en `null` y es uno de los cuatro datos que exige `listo`. Región y comuna traen su «Selecciona una…»; **las tres fichas de modalidad se quedan quietas y no se leen como obligatorias**. Y encima, tocar la ficha activa la deseleccionaba, así que se podía volver al mismo pozo sin querer.
+
+- **Arreglo:** arranca en `futbol7` —como «Publicar partido», que es la otra pantalla larga de la app y preselecciona nivel, duración y modalidad— y tocar la activa ya no la apaga. `crearClubListo.test.js` lo fija, y avisa si alguien agrega un quinto requisito sin darle valor de partida.
+- **Lo que NO era:** el botón sí se ve apagado (`opacity: 0.45`). El problema no es que no se note el estado, es que **no hay forma de saber cuál de los cuatro datos falta**, y el que falta es el único sin marcador de «elige uno».
+
 ## Resuelto el 2026-10-19 — el chat decía la hora en otro idioma
 
 Siguiendo el recorrido entero contra la base local —publicar un partido, entrar con una segunda cuenta, unirse, abrir el chat— la cabecera del chat decía **«mar, 08:00 p m. · Ñuñoa»** mientras la tarjeta, la ficha del partido y la hora de cada mensaje decían **20:00**. Dos defectos en la misma línea:
