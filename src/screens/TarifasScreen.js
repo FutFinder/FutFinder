@@ -52,6 +52,10 @@ export default function TarifasScreen({ navigation, route }) {
 
   const [hoja, setHoja] = useState(false);
   const [editando, setEditando] = useState(null);
+  // La tarifa que se está por quitar: mientras no sea null, la hoja de
+  // confirmación está abierta. Mismo patrón que «Cobros adicionales».
+  const [porQuitar, setPorQuitar] = useState(null);
+  const [quitando, setQuitando] = useState(false);
   const [alcance, setAlcance] = useState('todos'); // 'todos' | 'dia'
   const [dia, setDia] = useState(6);
   const [desde, setDesde] = useState('11:00');
@@ -120,9 +124,20 @@ export default function TarifasScreen({ navigation, route }) {
     setHoja(true);
   };
 
-  const borrar = async (tarifaId) => {
-    const { error: err } = await eliminarTarifa(tarifaId);
+  /**
+   * Quitar una tarifa, PREGUNTANDO ANTES.
+   *
+   * No hay deshacer y lo que se borra no es un adorno: esas horas vuelven de
+   * inmediato al precio base, así que un toque sin querer en el basurero
+   * cambia lo que paga el jugador esa misma noche y nadie se entera. La
+   * pantalla hermana —«Cobros adicionales»— ya preguntaba; esta no.
+   */
+  const confirmarQuitar = async () => {
+    setQuitando(true);
+    const { error: err } = await eliminarTarifa(porQuitar.id);
+    setQuitando(false);
     if (err) { setError(err.message); return; }
+    setPorQuitar(null);
     cargar();
   };
 
@@ -195,7 +210,7 @@ export default function TarifasScreen({ navigation, route }) {
                     cancha={cancha}
                     regla={reglaDelDia}
                     onPress={() => abrirEdicion(t)}
-                    onBorrar={() => borrar(t.id)}
+                    onBorrar={() => setPorQuitar(t)}
                   />
                 ))}
               </View>
@@ -315,6 +330,32 @@ export default function TarifasScreen({ navigation, route }) {
           </View>
         </ScrollView>
       </Sheet>
+
+      <Sheet
+        visible={!!porQuitar}
+        onClose={() => setPorQuitar(null)}
+        title={porQuitar ? `¿Quitar la tarifa de ${rangoLegible(porQuitar.hora_desde, porQuitar.hora_hasta)}?` : 'Quitar tarifa'}
+      >
+        <Text style={styles.quitarTexto}>
+          Esas horas vuelven al precio base de {cancha ? formatCLP(cancha.precio_hora) : 'la cancha'}{' '}
+          desde ya, y quien reserve va a pagar eso. No se deshace: si la quieres de vuelta, hay que
+          cargarla otra vez. Las reservas ya hechas mantienen el precio que pagaron.
+        </Text>
+        <Button
+          label="Quitar tarifa"
+          variant="destructive"
+          style={{ marginTop: 16 }}
+          loading={quitando}
+          onPress={confirmarQuitar}
+        />
+        <Button
+          label="Mejor no"
+          variant="secondary"
+          style={{ marginTop: 9 }}
+          disabled={quitando}
+          onPress={() => setPorQuitar(null)}
+        />
+      </Sheet>
     </SafeAreaView>
   );
 }
@@ -377,34 +418,51 @@ function FilaTarifa({ tarifa, cancha, regla, onPress, onBorrar }) {
     duracionSlotMin: cancha?.duracion_slot_min,
   });
 
+  const rango = rangoLegible(tarifa.hora_desde, tarifa.hora_hasta);
+
+  // LA TARJETA NO ES EL BOTÓN, lo es su parte izquierda. El basurero vive
+  // dentro de la fila, así que dándole el onPress a la tarjeta entera
+  // quedaba un botón DENTRO de otro botón: en web eso es marcado inválido y
+  // React lo avisa en consola («cannot contain a nested button»). Separando
+  // los dos pulsables como hermanos se toca lo mismo y el marcado es válido.
+  //
+  // La cancha hace lo contrario y también sirve: en CanchasScreen la fila
+  // deja de ser pulsable justo cuando aparecen los botones de adentro.
   return (
-    <Card onPress={onPress}>
+    <Card>
       <View style={styles.tarifaCabecera}>
-        <View style={{ flex: 1 }}>
-          <View style={styles.tarifaTituloFila}>
-            <Text style={styles.tarifaRango}>{rangoLegible(tarifa.hora_desde, tarifa.hora_hasta)}</Text>
-            {esDeUnDia ? (
-              <Badge label={DIAS_SEMANA.find((d) => d.dia === tarifa.dia_semana)?.corto || ''} tone="green" />
-            ) : (
-              <Badge label="Todos los días" tone="neutral" />
-            )}
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={`Editar la tarifa de ${rango}`}
+          style={({ pressed }) => [styles.tarifaEditable, pressed && { opacity: 0.9 }]}
+        >
+          <View style={{ flex: 1 }}>
+            <View style={styles.tarifaTituloFila}>
+              <Text style={styles.tarifaRango}>{rango}</Text>
+              {esDeUnDia ? (
+                <Badge label={DIAS_SEMANA.find((d) => d.dia === tarifa.dia_semana)?.corto || ''} tone="green" />
+              ) : (
+                <Badge label="Todos los días" tone="neutral" />
+              )}
+            </View>
+            {dentro.length > 0 ? (
+              <Text style={styles.tarifaBloques} numberOfLines={2}>
+                Bloques que empiezan {dentro.map((h) => h.slice(0, 5)).join(', ')}
+              </Text>
+            ) : null}
           </View>
-          {dentro.length > 0 ? (
-            <Text style={styles.tarifaBloques} numberOfLines={2}>
-              Bloques que empiezan {dentro.map((h) => h.slice(0, 5)).join(', ')}
-            </Text>
-          ) : null}
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={styles.tarifaPrecio}>{formatCLP(tarifa.precio)}</Text>
-          {comision !== null ? (
-            <Text style={styles.tarifaComision}>Comisión desde {formatCLP(comision)}</Text>
-          ) : null}
-        </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={styles.tarifaPrecio}>{formatCLP(tarifa.precio)}</Text>
+            {comision !== null ? (
+              <Text style={styles.tarifaComision}>Comisión desde {formatCLP(comision)}</Text>
+            ) : null}
+          </View>
+        </Pressable>
         <Pressable
           onPress={onBorrar}
           accessibilityRole="button"
-          accessibilityLabel={`Quitar la tarifa de ${tarifa.hora_desde} a ${tarifa.hora_hasta}`}
+          accessibilityLabel={`Quitar la tarifa de ${rango}`}
           style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.8 }]}
         >
           <Trash2 color={C.textSecondary} size={15} strokeWidth={2.2} />
@@ -542,7 +600,9 @@ const styles = StyleSheet.create({
   barraPrecio: { fontFamily: F.extraBold, fontSize: 12, color: C.green },
   barraPie: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary, lineHeight: 16.5, marginTop: 10 },
 
+  quitarTexto: { fontFamily: F.medium, fontSize: 13, color: C.textSecondary, lineHeight: 19 },
   tarifaCabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
+  tarifaEditable: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
   tarifaTituloFila: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   tarifaRango: { fontFamily: F.extraBold, fontSize: 15, color: C.textPrimary },
   tarifaBloques: { fontFamily: F.medium, fontSize: 11.5, color: C.textSecondary, lineHeight: 16, marginTop: 5 },

@@ -121,7 +121,12 @@ export default function PagoReservaScreen({ navigation, route }) {
   const ejecutar = () => {
     if (accion?.accion === 'reserva') navigation.navigate('MisReservas');
     else if (accion?.accion === 'reintentar') navigation.goBack();
-    else if (accion?.accion === 'buscar') navigation.navigate('Main');
+    // A LA PESTAÑA DE RESERVAS, no a la portada. `navigate('Main')` sin
+    // `screen` cae en la pestaña por defecto, que es Inicio: el botón decía
+    // «Volver a buscar cancha» y dejaba a la persona en la portada, justo
+    // después de que el pago le fallara y cuando lo que quiere es
+    // reintentar. El resto de la app ya navega así.
+    else if (accion?.accion === 'buscar') navigation.navigate('Main', { screen: 'ReservasTab' });
     else navigation.goBack();
   };
 
