@@ -99,6 +99,17 @@ Descubierto el 2026-10-16 al poner la base local con **los interruptores como lo
   - El arnés de la 134 contaba *todos* los eventos del partido y exigía 3; con la fase 2 encendida aparece un cuarto, el bono del organizador. Y su caso C08 clavaba la secuencia `{40, 5, 0}`, que con reincidencia es `{40, 0, 0}`. Lo que ese caso cuida es que llegar a cero **no suspenda la cuenta**, no la curva.
 - **Verificación: 126/126 con los interruptores de producción**, incluido el arnés nuevo.
 
+## Resuelto el 2026-10-19 — el chat decía la hora en otro idioma
+
+Siguiendo el recorrido entero contra la base local —publicar un partido, entrar con una segunda cuenta, unirse, abrir el chat— la cabecera del chat decía **«mar, 08:00 p m. · Ñuñoa»** mientras la tarjeta, la ficha del partido y la hora de cada mensaje decían **20:00**. Dos defectos en la misma línea:
+
+- `toLocaleDateString('es-CL', { hour, minute })` **sin `hour12: false`** resuelve a 12 horas en este runtime. No es cosmético: sin fijarlo, el formato depende de los datos de ICU que traiga el teléfono, y la misma pantalla se ve distinta en dos dispositivos.
+- Y `replace('.', '')` se lleva **sólo el primer punto** —el de «mar.»—, así que lo que quedaba a la vista era «p m.», que no es nada.
+
+Arreglado ahí y en los otros dos sitios que pedían la hora sin fijar el formato (`TrustScoreHistoryScreen`, `ModeracionScreen`). `horaEnVeinticuatro.test.js` recorre `src/` y falla si alguien vuelve a pedir la hora sin `hour12: false`. Control comprobado.
+
+**El recorrido que ya camina entero**, y que hasta esta semana no se podía hacer sin escribir en producción: registro con código por correo → sesión → publicar un partido con dirección real, coordenadas y comuna correctas → segunda cuenta → unirse (el cupo baja, el origen queda `orden_llegada`, le llega el aviso al organizador) → chat del partido.
+
 ## Resuelto el 2026-10-17 — tres cosas que sólo se ven usando la app
 
 Siguiendo el recorrido real contra la base local —registrarse, entrar, publicar un partido— aparecieron tres fallos que ninguna prueba iba a encontrar.

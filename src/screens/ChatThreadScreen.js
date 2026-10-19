@@ -1425,10 +1425,18 @@ export default function ChatThreadScreen({ route, navigation }) {
     if (t?.type === 'match') {
       const m = context?.match;
       if (!m) return paramSubtitle || 'Chat del partido';
+      // `hour12: false` Y QUITAR TODOS LOS PUNTOS (2026-10-19). Sin lo
+      // primero, `es-CL` resuelve a 12 horas en este runtime y la cabecera
+      // decía «08:00 p. m.» mientras el resto de la app —la tarjeta, la
+      // ficha, la hora de cada mensaje— dice 20:00. Sin lo segundo,
+      // `replace('.', '')` se lleva SÓLO el primer punto, el de «mar.», y
+      // dejaba a la vista un «p m.» que no es nada.
       const fecha = m.hora
         ? new Date(m.hora)
-            .toLocaleDateString('es-CL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
-            .replace('.', '')
+            .toLocaleDateString('es-CL', {
+              weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+            })
+            .replace(/\./g, '')
         : null;
       return [fecha, m.comuna].filter(Boolean).join(' · ') || 'Chat del partido';
     }

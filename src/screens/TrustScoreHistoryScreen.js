@@ -52,7 +52,7 @@ function formatDate(iso) {
     const d = new Date(iso);
     return d.toLocaleDateString('es-CL', {
       day: '2-digit', month: 'short', year: 'numeric',
-    }) + ' · ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    }) + ' · ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
   } catch {
     return iso;
   }
