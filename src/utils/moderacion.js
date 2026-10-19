@@ -1,8 +1,9 @@
 /**
  * Lo que la pantalla de moderación necesita decidir, sin red.
  *
- * POR QUÉ EXISTE ESTE ARCHIVO. La pantalla muestra tres colas que vienen en
- * un solo `jsonb` de `moderacion_cola()` (migración 151) y tiene que decidir
+ * POR QUÉ EXISTE ESTE ARCHIVO. La pantalla muestra cuatro colas que vienen
+ * en un solo `jsonb` de `moderacion_cola()` (migraciones 151 y 164) y tiene
+ * que decidir
  * qué se puede resolver y qué no. Esa decisión no es cosmética: **moderar
  * reportes de usuario todavía no está diseñado** —estados, medidas y
  * apelación son una conversación pendiente— así que los reportes se muestran
@@ -14,7 +15,7 @@
  * lo que estás mirando son sanciones sin resolver.
  */
 
-/** Las tres colas, en el orden en que la pantalla las muestra. */
+/** Las cuatro colas, en el orden en que la pantalla las muestra. */
 export const COLAS = [
   {
     clave: 'revisiones_de_sancion',
@@ -37,7 +38,42 @@ export const COLAS = [
     accionable: false,
     nota: 'Se muestran para que no pasen desapercibidos. Resolverlos todavía no está diseñado: hace falta decidir estados, medidas y apelación.',
   },
+  {
+    clave: 'recintos_esperando',
+    titulo: 'Recintos esperando revisión',
+    // VA ÚLTIMA Y NO PRIMERA a propósito: las tres de arriba son conflictos
+    // entre personas y envejecen peor. Esta es un trámite.
+    vacio: 'Ningún recinto está esperando que lo miremos.',
+    accionable: true,
+    nota: 'Aprobar lo deja listo para que el dueño publique cuando quiera. Rechazar todavía no está: hace falta decidir el motivo, si se puede volver a pedir y qué ve el dueño.',
+  },
 ];
+
+/**
+ * Cuántos días lleva esperando un recinto.
+ *
+ * Es lo que convierte la cola en algo que se mira: «hace 35 días» pesa y una
+ * fecha suelta no. Se cuenta por días de calendario, no por múltiplos de 24
+ * horas: pedida ayer a las 23:00 y mirada hoy a las 09:00 es «ayer», que es
+ * lo que diría cualquiera.
+ */
+export function diasEsperando(pedidaAt, ahora = new Date()) {
+  if (!pedidaAt) return null;
+  const d = new Date(pedidaAt);
+  if (Number.isNaN(d.getTime())) return null;
+  const aMedianoche = (x) => Date.UTC(x.getFullYear(), x.getMonth(), x.getDate());
+  const dias = Math.round((aMedianoche(ahora) - aMedianoche(d)) / 86400000);
+  return dias < 0 ? 0 : dias;
+}
+
+/** «hoy», «ayer», «hace 35 días». Null si no hay fecha que contar. */
+export function esperaLegible(pedidaAt, ahora = new Date()) {
+  const dias = diasEsperando(pedidaAt, ahora);
+  if (dias === null) return null;
+  if (dias === 0) return 'hoy';
+  if (dias === 1) return 'ayer';
+  return `hace ${dias} días`;
+}
 
 /** Una cola del jsonb, siempre como arreglo. Nunca lanza. */
 export function filasDe(cola, clave) {

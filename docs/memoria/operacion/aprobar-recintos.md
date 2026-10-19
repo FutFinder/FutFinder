@@ -1,6 +1,8 @@
 # Aprobar recintos
 
-Cómo se pasa de «alguien quiere sumar su complejo» a «su recinto está en el buscador». No hay panel de administración: son dos consultas, y están acá para no reinventarlas cada vez.
+Cómo se pasa de «alguien quiere sumar su complejo» a «su recinto está en el buscador».
+
+**El segundo paso ya tiene pantalla** (migración 164): los recintos que piden revisión aparecen en la cola de moderación, dentro de la app, y se aprueban desde ahí. El primero sigue siendo a mano, con las consultas que están acá.
 
 **Son dos permisos distintos y conviene no confundirlos.** El primero deja CREAR el recinto; el segundo deja PUBLICARLO. Tener el primero no acerca al segundo, y los dos los da FutFinder a mano.
 
@@ -58,6 +60,18 @@ Desde ese momento, en «Mis recintos» esa persona ve **«Ya puedes crear tu rec
 
 El dueño carga sus canchas, horarios y precios, y cuando tiene al menos una cancha activa con horario puede apretar **«Mandar a revisión»**. Eso escribe `complejos.revision_pedida_at`.
 
+**Se mira desde la app**, en Ajustes → Moderación, cuarta cola: «Recintos esperando revisión». Trae el nombre, la comuna, la dirección, cuántas canchas reservables tiene y **cuántos días lleva esperando**, y se aprueba con un botón. Sólo la ve quien está en `public.moderadores`.
+
+**Esto nació de un fallo y conviene recordar cuál.** Hasta la migración 164, apretar «Mandar a revisión» escribía la fecha y nada más: ni disparador, ni correo, ni cola. La app le decía al dueño «te avisamos» y no había dónde verlo. En producción, «los mojojo» lo apretó el 2026-09-14 y seguía esperando 35 días después. La otra puerta —«quiero sumar mi recinto»— sí avisa, porque pasa por una Edge Function que manda un correo; esta segunda, la de quien YA tiene recinto cargado, nació sin aviso.
+
+Antes de aprobar conviene mirar la ficha como la va a ver un jugador: nombre, dirección, foto, precios. **Y sobre todo el punto del mapa** — es lo único que el dueño fija por su cuenta y lo que más rompe el buscador si está mal.
+
+**Rechazar todavía no existe**, y es a propósito: hace falta decidir el motivo, si se puede volver a pedir y qué ve el dueño. Es la misma decisión que dejó los reportes de usuario sin resolver en la 151.
+
+**Al dueño no se le avisa cuando lo aprueban.** Lo ve al abrir su panel, que pasa a decir «Aprobado, y todavía sin publicar». Avisarle necesitaría un tipo nuevo en `notifications_type_check` y un texto que alguien tiene que escribir.
+
+Si hace falta hacerlo a mano —sin estar en el padrón, o desde el editor de SQL— sigue siendo lo de siempre:
+
 ```sql
 -- Lo que está esperando revisión.
 select c.id, c.nombre, c.comuna, c.revision_pedida_at,
@@ -67,11 +81,7 @@ select c.id, c.nombre, c.comuna, c.revision_pedida_at,
  where c.revision_pedida_at is not null
    and not c.aprobado_futfinder
  order by c.revision_pedida_at;
-```
 
-Antes de aprobar conviene mirar la ficha como la va a ver un jugador: nombre, dirección, foto, precios. **Y sobre todo el punto del mapa** — es lo único que el dueño fija por su cuenta y lo que más rompe el buscador si está mal.
-
-```sql
 update public.complejos
    set aprobado_futfinder = true
  where id = '<complejo_id>';

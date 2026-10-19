@@ -1,10 +1,10 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
 /**
- * La pieza de moderación (migraciones 151 y 47c).
+ * La pieza de moderación (migraciones 151, 164 y 47c).
  *
  * LA AUTORIDAD ES EL SERVIDOR, y acá más que en ningún otro servicio.
- * `es_moderador()` decide, y las tres RPC lo vuelven a comprobar por su
+ * `es_moderador()` decide, y las cuatro RPC lo vuelven a comprobar por su
  * cuenta antes de hacer nada: `soyModerador()` sirve para pintar la pantalla
  * y esconder la entrada del menú, **no** para autorizar. Quien llame la RPC
  * sin estar en el padrón recibe `NO_MODERA` (42501) pase lo que pase.
@@ -38,7 +38,7 @@ export async function soyModerador() {
 }
 
 /**
- * Las tres colas en una llamada.
+ * Las cuatro colas en una llamada.
  *
  * `{ data, error }` y no sólo `data`: una cola vacía y una cola que no se
  * pudo leer se ven igual en pantalla si quien llama no puede distinguirlas,
@@ -94,6 +94,29 @@ export async function reabrirResultado(challengeId, nota = null) {
   });
   if (error) {
     console.error('[FutFinder] reabrirResultado:', error);
+    return { data: null, error };
+  }
+  return { data, error: null };
+}
+
+/**
+ * Marca un recinto como aprobado por FutFinder (migración 164).
+ *
+ * NO LO PUBLICA, y la diferencia importa: publicar lo decide el dueño desde
+ * su panel. Aprobar sólo abre esa puerta —`admin_publicar_complejo()` exige
+ * la aprobación y seguirá exigiéndola—. Un recinto aprobado que nadie
+ * publica no aparece en el buscador y está bien así.
+ *
+ * Devuelve `{ ok, ya_estaba, nombre }` o `{ ok:false, reason }` por `data`:
+ * aprobar dos veces no es un error, y un recinto borrado tampoco revienta.
+ */
+export async function aprobarRecinto(complejoId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
+  const { data, error } = await supabase.rpc('moderacion_aprobar_recinto', {
+    p_complejo_id: complejoId,
+  });
+  if (error) {
+    console.error('[FutFinder] aprobarRecinto:', error);
     return { data: null, error };
   }
   return { data, error: null };

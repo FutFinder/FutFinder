@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Gavel, RotateCcw, ShieldAlert, TriangleAlert } from 'lucide-react-native';
+import { ArrowLeft, Building2, Check, Gavel, RotateCcw, ShieldAlert, TriangleAlert } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
 import Banner from '../components/Banner';
@@ -19,6 +19,7 @@ import {
   getColaModeracion,
   resolverRevision,
   reabrirResultado,
+  aprobarRecinto,
 } from '../services/moderacion';
 import {
   COLAS,
@@ -28,11 +29,12 @@ import {
   tipoSancionLegible,
   totalPendiente,
   puedeResolver,
+  esperaLegible,
   NOTA_MAX,
 } from '../utils/moderacion';
 
 /**
- * Las tres colas de moderación (migración 151).
+ * Las cuatro colas de moderación (migraciones 151 y 164).
  *
  * QUIÉN LLEGA ACÁ. Sólo quien está en `public.moderadores`, y el padrón no se
  * lee desde la app: nombrar a alguien es un `insert` desde el panel. La
@@ -50,6 +52,11 @@ import {
  * desafío que modera** —`chat_puede_ver_desafio()` exige pertenecer a uno de
  * los dos clubes, y no pertenecer es justo lo que lo hace imparcial—. Por eso
  * la revisión muestra el `contexto`, que es el expediente copiado al pedirla.
+ *
+ * LA CUARTA COLA (migración 164) son los recintos que pidieron revisión. No
+ * nació con las otras tres y por eso llegó tarde: la app le decía al dueño
+ * «te avisamos» y no había dónde verlo. En producción hubo uno esperando 35
+ * días. Acá se aprueba y nada más; rechazar sigue sin estar diseñado.
  */
 
 function fechaCorta(iso) {
@@ -126,6 +133,17 @@ export default function ModeracionScreen({ navigation }) {
         ? 'La sanción se levanta y el club queda sin castigo por este encuentro.'
         : 'La sanción se confirma y el club la cumple.',
       () => aplicar(rev.id, () => resolverRevision(rev.id, decision, nota), 'Revisión resuelta')
+    );
+  };
+
+  const aprobar = (k) => {
+    const espera = esperaLegible(k.pedida_at);
+    confirmar(
+      `Aprobar ${k.nombre}`,
+      'Queda listo para que el dueño lo publique cuando quiera. No lo publicamos nosotros: '
+      + 'mientras no lo publique él, no aparece en el buscador.'
+      + (espera ? ` Lo pidió ${espera}.` : ''),
+      () => aplicar(k.id, () => aprobarRecinto(k.id), 'Recinto aprobado')
     );
   };
 
@@ -306,6 +324,46 @@ export default function ModeracionScreen({ navigation }) {
                       {rep.elemento ? (
                         <Text style={styles.filaTexto}>{String(rep.elemento)}</Text>
                       ) : null}
+                    </View>
+                  ))
+                : null}
+
+              {estado === 'con-filas' && def.clave === 'recintos_esperando'
+                ? filas.map((k) => (
+                    <View key={k.id} style={styles.fila}>
+                      <View style={styles.filaIcono}>
+                        <Building2 color={C.green} size={15} strokeWidth={2} />
+                        <Text style={styles.filaTitulo}>{k.nombre}</Text>
+                      </View>
+                      {/* CUÁNTO LLEVA ESPERANDO va primero que la fecha: es
+                          lo que hace que se mire. */}
+                      <Text style={styles.filaFecha}>
+                        Lo pidió {esperaLegible(k.pedida_at) || 'hace un tiempo'}
+                        {' · '}{fechaCorta(k.pedida_at)}
+                      </Text>
+                      <Text style={styles.filaTexto}>
+                        {[k.comuna, k.region].filter(Boolean).join(', ') || 'Sin comuna'}
+                      </Text>
+                      {k.direccion ? (
+                        <Text style={styles.filaTexto} numberOfLines={2}>{k.direccion}</Text>
+                      ) : null}
+                      <Text style={styles.filaTexto}>
+                        {Number(k.canchas) || 0}{' '}
+                        {Number(k.canchas) === 1 ? 'cancha reservable' : 'canchas reservables'}
+                      </Text>
+
+                      <View style={styles.acciones}>
+                        <Pressable
+                          onPress={() => aprobar(k)}
+                          disabled={enCurso === k.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Aprobar ${k.nombre}`}
+                          style={({ pressed }) => [styles.btn, styles.btnPrimario, pressed && styles.pressed]}
+                        >
+                          <Check color="#0B0D0B" size={15} strokeWidth={2.3} />
+                          <Text style={styles.btnPrimarioTexto}>Aprobar recinto</Text>
+                        </Pressable>
+                      </View>
                     </View>
                   ))
                 : null}

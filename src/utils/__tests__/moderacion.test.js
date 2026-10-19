@@ -15,25 +15,80 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const M = require('../moderacion.js');
 
-test('son tres colas y sólo dos se pueden resolver desde acá', () => {
-  assert.equal(M.COLAS.length, 3);
+const MIGRACIONES = path.join(__dirname, '..', '..', '..', 'supabase', 'migrations');
+
+/**
+ * Las claves que `moderacion_cola()` devuelve DE VERDAD, leídas de la última
+ * migración que la declara.
+ *
+ * Antes estaban copiadas a mano en esta prueba, fijadas contra la 151: la
+ * 164 agregó una cuarta cola y lo único que pasó fue que la prueba se puso
+ * roja pidiendo que se actualizara el número. Leyéndolas de la migración,
+ * una cola nueva en el servidor que nadie cableó en la app se delata sola,
+ * que es el fallo que esta prueba vino a cazar. Mismo criterio que
+ * `avisosCompletos`.
+ */
+function clavesDeLaCola() {
+  const archivo = fs.readdirSync(MIGRACIONES)
+    .filter((f) => f.endsWith('.sql'))
+    .filter((f) => /create or replace function public\.moderacion_cola/
+      .test(fs.readFileSync(path.join(MIGRACIONES, f), 'utf8')))
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+    .pop();
+  assert.ok(archivo, 'ninguna migración declara moderacion_cola()');
+
+  const src = fs.readFileSync(path.join(MIGRACIONES, archivo), 'utf8');
+  const cuerpo = src.slice(src.indexOf('jsonb_build_object'));
+  // Las claves son los literales que abren cada par de `jsonb_build_object`
+  // en la primera columna del return, siempre al principio de su línea.
+  return [...cuerpo.matchAll(/^\s{4}'([a-z_]+)',/gm)].map((m) => m[1]).sort();
+}
+
+test('las claves de COLAS son las que devuelve moderacion_cola()', () => {
+  // Un nombre mal escrito acá deja una cola permanentemente vacía sin que
+  // falle nada, y una cola nueva en el servidor pasaría desapercibida.
+  assert.deepEqual(M.COLAS.map((c) => c.clave).sort(), clavesDeLaCola());
+});
+
+test('los reportes se muestran y no se tocan; el resto sí se resuelve', () => {
   const reportes = M.COLAS.find((c) => c.clave === 'reportes_sin_mirar');
   assert.equal(reportes.accionable, false, 'los reportes NO se resuelven todavía');
   assert.ok(reportes.nota, 'y la pantalla tiene que decir por qué, no sólo no traer botones');
-  for (const clave of ['revisiones_de_sancion', 'resultados_en_disputa']) {
+  for (const clave of ['revisiones_de_sancion', 'resultados_en_disputa', 'recintos_esperando']) {
     assert.equal(M.COLAS.find((c) => c.clave === clave).accionable, true);
   }
+  // Toda cola tiene su texto de vacía: sin él, «no hay nada» se lee como
+  // «no se pudo leer».
+  for (const c of M.COLAS) assert.ok(c.vacio, `${c.clave} sin texto de cola vacía`);
 });
 
-test('las tres claves son las que devuelve moderacion_cola()', () => {
-  // Fijadas contra la migración 151. Un nombre mal escrito acá deja una cola
-  // permanentemente vacía sin que falle nada.
-  assert.deepEqual(M.COLAS.map((c) => c.clave).sort(), [
-    'reportes_sin_mirar', 'resultados_en_disputa', 'revisiones_de_sancion',
-  ]);
+test('la espera se cuenta en días de calendario y se lee en español', () => {
+  // LAS FECHAS SE ARMAN EN HORA LOCAL, no con cadenas en Z. La cuenta es de
+  // días de CALENDARIO —el de quien mira la pantalla— así que una cadena UTC
+  // haría que esta prueba pasara en Santiago y fallara en otro huso, o al
+  // revés. Con `new Date(a, m, d, h)` la intención no depende de dónde corra.
+  const local = (a, m, d, h = 12) => new Date(a, m - 1, d, h, 0, 0);
+  const ahora = local(2026, 10, 19, 12);
+
+  assert.equal(M.diasEsperando(local(2026, 10, 19, 1), ahora), 0);
+  assert.equal(M.esperaLegible(local(2026, 10, 19, 1), ahora), 'hoy');
+  // Pedida ayer a las 23:00 y mirada hoy a las 09:00 es «ayer», aunque no
+  // hayan pasado 24 horas.
+  assert.equal(M.esperaLegible(local(2026, 10, 18, 23), local(2026, 10, 19, 9)), 'ayer');
+  assert.equal(M.esperaLegible(local(2026, 9, 14, 13), ahora), 'hace 35 días');
+  // También acepta la cadena ISO que llega de la base.
+  assert.equal(M.diasEsperando(local(2026, 10, 18, 10).toISOString(), ahora), 1);
+  // Nada de esto puede reventar con lo que llegue de la base.
+  assert.equal(M.diasEsperando(null, ahora), null);
+  assert.equal(M.esperaLegible(null, ahora), null);
+  assert.equal(M.esperaLegible('no es fecha', ahora), null);
+  // Un reloj atrasado no puede dar días negativos.
+  assert.equal(M.diasEsperando(local(2026, 10, 25), ahora), 0);
 });
 
 test('filasDe aguanta cualquier cosa que llegue', () => {
@@ -45,12 +100,13 @@ test('filasDe aguanta cualquier cosa que llegue', () => {
   assert.deepEqual(M.filasDe({ a: null }, 'a'), []);
 });
 
-test('el total suma las tres colas', () => {
+test('el total suma todas las colas', () => {
   assert.equal(M.totalPendiente({
     revisiones_de_sancion: [1],
     resultados_en_disputa: [1, 2],
     reportes_sin_mirar: [1, 2, 3],
-  }), 6);
+    recintos_esperando: [1, 2, 3, 4],
+  }), 10);
   assert.equal(M.totalPendiente({}), 0);
   assert.equal(M.totalPendiente(null), 0);
 });
