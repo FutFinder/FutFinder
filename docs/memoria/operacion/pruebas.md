@@ -258,7 +258,30 @@ Con `npm run web:local` se puede usar FutFinder sin escribir en producción, as�
 
 **Cuatro fallos de interfaz salieron de este recorrido** —la pista de la contraseña que mentía, el «¡Todo listo!» que no guardaba nada, la hora en 12 horas y el botón de crear club que no hacía nada— y **los cuatro comparten forma**: la app hace algo distinto de lo que dice, o no dice nada. Ninguno se encuentra leyendo código ni corriendo arneses.
 
-**Lo que todavía no se ha caminado:** el desafío entre clubes de punta a punta (hace falta un segundo club), confirmar la asistencia al terminar un partido, las valoraciones, y el vertical de Reservas entero —que necesita sembrar un recinto, porque una base recién construida no trae ninguno—.
+### El vertical de Reservas, entero (2026-10-19)
+
+Era el que **nunca había transaccionado**: producción tiene 13 canchas, 19 tarifas y 73 reglas de horario, y **cero reservas y cero pagos**. Se caminó completo contra la base local, de las dos puntas: el dueño y el jugador.
+
+| Paso | Comprobado en la base, no sólo en pantalla |
+|---|---|
+| «Quiero sumar mi recinto» | queda en `solicitudes_recinto`, el teléfono normalizado a `+569…`, `avisada_at` en null (sin proveedor de correo local, que es el «no falla, sólo no avisa» de diseño) |
+| Autorización y crear el recinto | la autorización se gasta en la misma transacción (`usada_at` **y** `complejo_id`, que es lo que exige el CHECK), el complejo queda con comuna y coordenadas, y el dueño entra en `complejo_admins` |
+| Cargar una cancha | `canchas_reservables`, con el aviso correcto de que sin horario no es reservable ni se puede publicar |
+| Horarios y tarifas | 7 reglas 09:00–23:00, y una tarifa 19:00–23:00 que la pantalla desglosa bien: «10 bloques a $28.000 y 4 a $34.000», con la comisión del 5 % |
+| Mandar a revisión → aprobar → publicar | `revision_pedida_at`, luego `aprobado_futfinder`, luego `publicado`; aprobar **no** publica |
+| El jugador busca y elige hora | `buscar_complejos` lo trae con su «desde» y su próxima hora libre; las horas pasadas no se ofrecen y **cada bloque trae el precio de SU franja** |
+| Reservar | la reserva se crea con `precio_total = 34000` **calculado por el servidor**, no por el precio que mandó el cliente |
+| El pago | se detiene donde tiene que detenerse: sin pasarela, «No pudimos iniciar el pago · no se te descontó nada». La reserva queda en `procesando` y **no bloquea la hora** — sigue ofreciéndose, que es lo que el resumen le promete al jugador |
+
+**Cinco cosas salieron de este recorrido**, y ninguna la encuentra un arnés:
+
+1. **El buscador se quedaba pegado** en lo que vio al abrir la app: la lista se pedía sólo al montar, y en un navegador de pestañas esa pantalla vive toda la sesión.
+2. **La dirección del recinto quedaba tapada** por el botón «Ver horarios», sin forma de destaparla.
+3. **Quitar una tarifa no preguntaba nada**, y esas horas vuelven al precio base de inmediato.
+4. **El basurero era un botón dentro de otro botón**, marcado inválido en web.
+5. **Nadie se enteraba cuando un recinto pedía revisión** — el más grave, y el único que ya estaba pasando en producción: 35 días de espera. Ver [Aprobar recintos](aprobar-recintos.md).
+
+**Lo que todavía no se ha caminado:** el desafío entre clubes de punta a punta (hace falta un segundo club), confirmar la asistencia al terminar un partido, y las valoraciones. Del vertical de Reservas quedan sin caminar las partes que no se pueden sin pasarela: el pago dividido entre jugadores, cancelar con devolución y la agenda del dueño con reservas de verdad.
 
 ## El barrido del reloj, hecho de verdad (2026-10-17)
 
