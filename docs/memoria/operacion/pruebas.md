@@ -241,6 +241,25 @@ Lunes porque las reglas de horario de esos arneses lo dan por supuesto, y a dos 
 
 **El guardián:** `scripts/__tests__/arnesesSinFechaCaduca.test.js` falla si un arnés escribe una fecha del calendario a mano. La exención se declara en el propio archivo —un comentario con las palabras «no caduca»— y no en una lista que vive en otra parte y que nadie vuelve a leer. Control comprobado: una fecha de 2028 colada en el arnés de la 63 lo pone en rojo con el archivo y la línea.
 
+## El recorrido de la app, caminado de verdad (2026-10-17 al 19)
+
+Con `npm run web:local` se puede usar FutFinder sin escribir en producción, así que se caminó el recorrido real con **dos cuentas**. Esto es lo que ya está comprobado de punta a punta, para no repetirlo:
+
+| Paso | Comprobado en la base, no sólo en pantalla |
+|---|---|
+| Registro con código por correo | la cuenta queda confirmada y **la contraseña fijada** (se pide un token a `/auth/v1/token`) |
+| Publicar un partido | dirección real, coordenadas y **comuna correcta**; la cancha se registra en `canchas` |
+| Segunda cuenta se une | `cupos_disponibles` baja, el inscrito queda con `origen = orden_llegada`, al organizador le llega `match_join` |
+| Chat del partido | el mensaje queda en `messages` con su `match_id` |
+| Crear club | queda con comuna, modalidad y tema, y el fundador entra como `admin` |
+| Solicitar unirse / aceptar | `club_join_requests` pasa a `approved`, el jugador entra como `jugador`, y salen **dos** avisos: «fue aceptada» a quien pidió y «se unió» al club |
+| `/todos` en el chat del club | el mensaje queda con `mention_all`, y el aviso le llega al OTRO integrante y **no a quien lo escribió** — que es justo lo que afirma el arnés 39, ahora visto en la app |
+| Bandeja de avisos | filtra por categoría con sus conteos y marca la solicitud ya resuelta |
+
+**Cuatro fallos de interfaz salieron de este recorrido** —la pista de la contraseña que mentía, el «¡Todo listo!» que no guardaba nada, la hora en 12 horas y el botón de crear club que no hacía nada— y **los cuatro comparten forma**: la app hace algo distinto de lo que dice, o no dice nada. Ninguno se encuentra leyendo código ni corriendo arneses.
+
+**Lo que todavía no se ha caminado:** el desafío entre clubes de punta a punta (hace falta un segundo club), confirmar la asistencia al terminar un partido, las valoraciones, y el vertical de Reservas entero —que necesita sembrar un recinto, porque una base recién construida no trae ninguno—.
+
 ## El barrido del reloj, hecho de verdad (2026-10-17)
 
 La búsqueda de arriba fue leyendo los 126. Después se comprobó **moviendo el reloj**: `bash scripts/barrido-reloj.sh horas` y `… fechas`.
