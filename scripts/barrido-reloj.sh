@@ -21,8 +21,18 @@
 #     Nix y la libfaketime de Alpine es musl; el proceso revienta con
 #     «Fatal glibc error: malloc.c». No insistas.
 #
-# DEJA LA MÁQUINA COMO ESTABA aunque te vayas con Ctrl-C: repone la hora y
-# vuelve a levantar el guestagent y el NTP en un `trap`.
+# DEJA LA MÁQUINA COMO ESTABA aunque te vayas con Ctrl-C: repone la hora,
+# vuelve a levantar el guestagent y el NTP, y REINICIA POSTGRES, en un
+# `trap`.
+#
+# LO DE POSTGRES NO ES POR GUSTO. pg_cron se queda COLGADO después del
+# viaje en el tiempo: anota corridas con fecha futura y deja de disparar
+# —comprobado el 2026-10-19, 37 horas sin ejecutar ninguna de las 12
+# tareas, con 99 corridas fechadas en 2028 y 2029 en el registro—. No se
+# nota enseguida, y lo que se pierde en silencio son los recordatorios, el
+# cierre de los partidos sin confirmar y el vencimiento de las reservas.
+# Reiniciar el contenedor levanta de nuevo el lanzador de pg_cron y todo
+# vuelve a su hora.
 #
 # Uso:
 #   bash scripts/barrido-reloj.sh horas     # nueve horas del día de hoy
@@ -39,6 +49,16 @@ restaurar() {
   sleep 5
   echo "VM:   $(colima ssh -- date -u 2>&1 | tail -1)"
   echo "host: $(date -u)"
+
+  # pg_cron se queda colgado tras el viaje en el tiempo (ver la cabecera).
+  local ct
+  ct=$(docker ps --filter 'name=supabase_db_' --format '{{.Names}}' 2>/dev/null | head -1)
+  if [ -n "$ct" ]; then
+    echo "Reiniciando $ct para que pg_cron vuelva a disparar…"
+    docker restart "$ct" >/dev/null 2>&1
+    until docker exec "$ct" psql -U postgres -At -c 'select 1' >/dev/null 2>&1; do sleep 3; done
+    echo "Postgres arriba."
+  fi
 }
 trap restaurar EXIT INT TERM
 

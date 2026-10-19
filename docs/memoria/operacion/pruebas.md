@@ -261,6 +261,8 @@ respondió {"ok": false, "reason": "Esa hora ya pasó. Elige otra."}
 
 El script para el guestagent, mueve la hora, corre la suite entera a cada paso y **repone todo en un `trap`**, también si te vas con Ctrl-C. Al terminar deja el reloj sincronizado con el host.
 
+**Y REINICIA POSTGRES, que no es por gusto.** `pg_cron` se queda colgado después del viaje en el tiempo: anota corridas con fecha futura y deja de disparar. Se vio el 2026-10-19 —**37 horas sin ejecutar ninguna de las 12 tareas**, con 99 corridas fechadas en 2028 y 2029 en el registro—. No se nota enseguida, y lo que se pierde en silencio son los recordatorios, el cierre de los partidos sin confirmar y el vencimiento de las reservas. Reiniciar el contenedor levanta de nuevo el lanzador y todo vuelve a su hora.
+
 **Y encontró uno que la lectura no había visto.** El C09 del arnés de la **137** —«las cuentas reales no se movieron»— contaba cuántos perfiles de la base tenían un puntaje distinto de 75, excluyendo sus cuatro fixtures. Daba por hecho que cualquier otra cuenta vale 75: cierto en una base recién construida y en ninguna otra. Con el reloj en junio de 2027 y una cuenta de prueba creada por la app, el job de inactividad **hace exactamente su trabajo** —la cuenta lleva ocho meses sin jugar— y el arnés lo llamaba fallo. Ahora toma una foto de los perfiles ajenos antes de correr el job y comprueba que no se movió ninguno **que estuviera al día**. Es el mismo defecto que «no es autosuficiente», en otra forma: el caso se apoyaba en datos que no son suyos.
 
 ## La diferencia que no es de esquema: los interruptores (2026-10-16)
