@@ -19,6 +19,7 @@ const {
   comoCancha,
   totalDeReserva,
   reservaLista,
+  horasLibresDeHoy,
 } = require('../reservasJugador.js');
 
 test('nombreDeTipo traduce los tres tipos y no revienta con uno nuevo', () => {
@@ -120,4 +121,46 @@ test('reservaLista exige lo mismo que el servidor: bloque, nombre y teléfono', 
   assert.equal(reservaLista({ ...base, contactoNombre: 'V' }), false);
   assert.equal(reservaLista({ ...base, contactoTelefono: '  ' }), false);
   assert.equal(reservaLista({}), false);
+});
+
+test('horasLibresDeHoy sale de la lista que ya se pidió, sin consultar de nuevo', () => {
+  const complejos = [
+    { id: 'a', nombre: 'Uno', proximaHoraLibre: '14:00', tipos: ['Fútbol 7'], desde: 28000 },
+    { id: 'b', nombre: 'Dos', proximaHoraLibre: null, tipos: ['Fútbol 5'], desde: 20000 },
+    { id: 'c', nombre: 'Tres', proximaHoraLibre: '21:00', tipos: ['Fútbol 5', 'Fútbol 7'], desde: null },
+  ];
+  const hoy = horasLibresDeHoy(complejos);
+  // El que no tiene hora libre no aparece: el bloque se llama «juega hoy».
+  assert.deepEqual(hoy.map((h) => h.complejoId), ['a', 'c']);
+  assert.deepEqual(hoy[0], {
+    id: 'hoy-a', hora: '14:00', complejoId: 'a', nombre: 'Uno',
+    meta: 'Fútbol 7', precio: 28000,
+  });
+  // Sin precio se pasa null en vez de inventar un cero.
+  assert.equal(hoy[1].precio, null);
+  assert.equal(hoy[1].meta, 'Fútbol 5 · Fútbol 7');
+  // El límite recorta, y nada de esto revienta sin lista.
+  assert.equal(horasLibresDeHoy(complejos, 1).length, 1);
+  assert.deepEqual(horasLibresDeHoy(null), []);
+  assert.deepEqual(horasLibresDeHoy([null, undefined]), []);
+});
+
+test('el buscador de reservas se recarga al volver a la pestaña', () => {
+  // Regresión del 2026-10-19: la pantalla quedaba montada toda la sesión y
+  // la lista se pedía una sola vez, así que «juega hoy» seguía ofreciendo
+  // una hora ya pasada o ya reservada, y un recinto recién publicado no
+  // aparecía nunca. Lo que se clava es que la carga cuelga del foco.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'ReservasScreen.js'), 'utf8',
+  );
+  assert.ok(
+    !/useEffect\(/.test(src),
+    'ReservasScreen no debe cargar el buscador en un useEffect de montaje',
+  );
+  assert.ok(
+    /useFocusEffect\([\s\S]*listComplejosCerca\(\)/.test(src),
+    'listComplejosCerca debe pedirse dentro de un useFocusEffect',
+  );
 });

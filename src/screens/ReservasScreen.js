@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,11 +21,12 @@ import ClubHeaderButton from '../components/club/ClubHeaderButton';
 import FiltrosSheet from '../components/reservas/FiltrosSheet';
 import { Card, Button, Chip, Badge, NoticeCard, Foto } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
-import { listComplejosCerca, listHorasLibresHoy } from '../services/reservas';
+import { listComplejosCerca } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { misRecintos, agendaDelDia, miAutorizacionRecinto } from '../services/recinto';
 import { misReservas } from '../services/reservas';
 import { separaReservas } from '../utils/misReservas';
+import { horasLibresDeHoy } from '../utils/reservasJugador';
 import { miSolicitudPendiente } from '../services/solicitudRecinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO } from '../utils/recintoPantallas';
@@ -74,17 +75,28 @@ export default function ReservasScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [mapSel, setMapSel] = useState(null); // índice del pin elegido en la vista de mapa
 
-  useEffect(() => {
-    (async () => {
-      const [{ data: cs }, { data: hs }] = await Promise.all([
-        listComplejosCerca(),
-        listHorasLibresHoy(),
-      ]);
-      setComplejos(cs || []);
-      setHorasHoy(hs || []);
-      setLoading(false);
-    })();
-  }, []);
+  // SE VUELVE A PEDIR AL VOLVER A LA PESTAÑA, no solo al montar. En un
+  // navegador de pestañas esta pantalla queda montada toda la sesión, así
+  // que pidiéndola solo al montar la lista envejecía en pantalla: «juega
+  // hoy» seguía ofreciendo las 14:00 a las 19:00, y una hora que otro
+  // acababa de reservar se seguía ofreciendo hasta que alguien recargaba la
+  // app entera. Un recinto recién publicado tampoco aparecía nunca.
+  //
+  // Es UNA sola llamada: «juega hoy» es un filtro sobre la misma lista, y
+  // antes se pedía la misma RPC dos veces para pintar dos vistas de lo mismo.
+  useFocusEffect(
+    useCallback(() => {
+      let vivo = true;
+      (async () => {
+        const { data: cs } = await listComplejosCerca();
+        if (!vivo) return;
+        setComplejos(cs || []);
+        setHorasHoy(horasLibresDeHoy(cs));
+        setLoading(false);
+      })();
+      return () => { vivo = false; };
+    }, []),
+  );
 
   // Acceso de administración (artboards 1a y 1b): solo aparece si de verdad
   // administras algún recinto. Con uno se entra directo al panel; con dos o
