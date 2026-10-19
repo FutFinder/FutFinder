@@ -85,7 +85,10 @@ export default function ComplejoDetailScreen({ navigation, route }) {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, hayCanchas && styles.scrollConBarra]}
+        showsVerticalScrollIndicator={false}
+      >
         <Galeria fotos={complejo.fotos} nombre={complejo.nombre}>
           <IconButton
             icon={ArrowLeft}
@@ -267,6 +270,13 @@ function Galeria({ fotos = [], nombre, children }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: 24 },
+  // La barra de «Ver horarios» va en absoluto sobre el contenido, así que
+  // sin este hueco tapa la última fila para siempre: la DIRECCIÓN del
+  // recinto, que es justo lo que la sección «Ubicación» viene a decir. No se
+  // podía leer ni bajando del todo. Los 110 son los mismos que ya usan las
+  // otras pantallas con barra fija. Solo cuando la barra existe: sin canchas
+  // no se dibuja, y el hueco sería un vacío sin motivo.
+  scrollConBarra: { paddingBottom: 110 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   errorText: { fontFamily: F.medium, color: C.textSecondary, fontSize: 13 },
   header: { paddingHorizontal: 16, paddingTop: 10 },
