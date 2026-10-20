@@ -72,3 +72,20 @@ test('toda pantalla con barra fija reserva el hueco en su scroll', () => {
     + `hueco al scroll (paddingBottom >= ${MINIMO}), así que tapan su última fila`,
   );
 });
+
+/**
+ * La otra mitad del mismo problema: el hueco al final sirve cuando el scroll
+ * llegó abajo, pero MIENTRAS se baja el contenido pasa por detrás de la
+ * barra. Si la barra no tiene fondo, se ve a través: en la ficha del recinto
+ * «Ver horarios» quedaba encima del precio de otra cancha, y en el resumen
+ * «Continuar al pago» encima de «¿Necesitas algo más?» (recorrido del
+ * 2026-10-20). El componente decía tener «el degradado del handoff» y no
+ * tenía ni degradado ni fondo.
+ */
+test('la barra fija tiene fondo propio', () => {
+  const ui = fs.readFileSync(path.join(__dirname, '../../components/reservas/ui.js'), 'utf8');
+  const estilo = ui.match(/\n\s*stickyFooter:\s*\{([^}]*)\}/);
+  assert.ok(estilo, 'no encontré el estilo `stickyFooter` en components/reservas/ui.js');
+  assert.match(estilo[1], /backgroundColor:\s*C\.bg/,
+    'la barra fija no tiene fondo: el contenido se ve a través de ella al hacer scroll');
+});

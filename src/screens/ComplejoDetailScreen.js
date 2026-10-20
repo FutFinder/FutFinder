@@ -150,10 +150,19 @@ export default function ComplejoDetailScreen({ navigation, route }) {
             <View style={{ gap: 11 }}>
               {complejo.canchas.map((k) => (
                 <View key={k.id} style={styles.canchaRow}>
-                  <View style={styles.canchaThumb} />
+                  <Foto
+                    uri={k.fotoUrl}
+                    style={styles.canchaThumb}
+                    iconSize={20}
+                    alt={`Foto de ${k.nombre}`}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.canchaNombre}>{k.nombre}</Text>
-                    <Text style={styles.canchaNota} numberOfLines={1}>{k.tipo} · {k.nota}</Text>
+                    {/* Dos líneas y no una: al lado del botón la columna es
+                        angosta y «bloques de 60 min» se cortaba en «bloques
+                        de 6…», que es justo el dato que distingue una cancha
+                        de 60 de una de 90. */}
+                    <Text style={styles.canchaNota} numberOfLines={2}>{k.tipo} · {k.nota}</Text>
                     <Text style={styles.canchaPrecio}>
                       {formatCLP(k.total)}<Text style={styles.canchaPrecioSub}> / hora</Text>
                     </Text>
@@ -179,7 +188,7 @@ export default function ComplejoDetailScreen({ navigation, route }) {
               <View style={styles.mapDot} />
             </View>
             <View style={styles.direccionRow}>
-              <Text style={styles.direccionText} numberOfLines={1}>{complejo.direccion}</Text>
+              <Text style={styles.direccionText} numberOfLines={3}>{complejo.direccion}</Text>
               <Pressable
                 onPress={() => proximamente('Muy pronto vas a poder trazar la ruta desde aquí.')}
                 style={({ pressed }) => [styles.comoLlegarBtn, pressed && { opacity: 0.85 }]}
@@ -308,7 +317,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 13,
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: R.row, padding: 13,
   },
-  canchaThumb: { width: 62, height: 62, borderRadius: 15, flexShrink: 0, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border },
+  canchaThumb: {
+    width: 62, height: 62, borderRadius: 15, flexShrink: 0, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
   canchaNombre: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 15.5 },
   canchaNota: { fontFamily: F.medium, color: C.textSecondary, fontSize: 12, marginTop: 3 },
   canchaPrecio: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 14, marginTop: 6 },

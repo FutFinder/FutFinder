@@ -39,7 +39,9 @@ test('jugadoresDeTipo es una sugerencia, no un límite', () => {
 });
 
 test('notaDeCancha usa la duración real del bloque', () => {
-  assert.equal(notaDeCancha({ tipo: 'futbol_7', duracion_slot_min: 90 }), 'bloques de 90 min');
+  // Espacios duros en «de 90 min»: si la línea se parte, que no deje el
+  // número en una línea y «min» en la otra.
+  assert.equal(notaDeCancha({ tipo: 'futbol_7', duracion_slot_min: 90 }), 'bloques de\u00A090\u00A0min');
   // Sin duración legible, al menos el tipo.
   assert.equal(notaDeCancha({ tipo: 'futbol_7' }), 'Fútbol 7');
   assert.equal(notaDeCancha(null), null);

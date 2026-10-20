@@ -47,7 +47,8 @@ export function notaDeCancha(cancha) {
   if (!cancha) return null;
   const min = Number(cancha.duracion_slot_min);
   if (!Number.isFinite(min) || min <= 0) return nombreDeTipo(cancha.tipo);
-  return `bloques de ${min} min`;
+  // Espacios duros: al partirse la línea, «de 60 min» viaja junto.
+  return `bloques de\u00A0${min}\u00A0min`;
 }
 
 /**
