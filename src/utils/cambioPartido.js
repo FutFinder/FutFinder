@@ -56,6 +56,26 @@ export function puedePedirCambios(horaPartido, ahora = new Date()) {
   return hora.getTime() - ref.getTime() > MARGEN_MS;
 }
 
+/**
+ * ¿El partido ya empezó?
+ *
+ * `puedePedirCambios` devuelve `false` por dos motivos muy distintos —faltan
+ * menos de dos horas, o el partido YA PASÓ— y durante un tiempo el hilo
+ * contaba sólo el primero: en el hilo de un encuentro terminado hacía tres
+ * horas, la barra decía «Faltan menos de 2 horas para el partido». Esto
+ * separa los dos casos para que el texto diga el que corresponde.
+ *
+ * Falla CERRADO igual que `puedePedirCambios`: sin hora legible se da por
+ * empezado, que es lo que no abre ninguna puerta.
+ */
+export function partidoYaEmpezo(horaPartido, ahora = new Date()) {
+  const hora = aFecha(horaPartido);
+  if (!hora) return true;
+  const ref = aFecha(ahora);
+  if (!ref) return true;
+  return hora.getTime() <= ref.getTime();
+}
+
 function esTextoConContenido(v) {
   return typeof v === 'string' && v.trim().length > 0;
 }
@@ -491,7 +511,13 @@ export function accionesDeCambio({
   const enPlazo = puedePedirCambios(p.hora, ahora);
   const AMBOS_CLUBES =
     'Administras los dos clubes de este partido: no puedes pedir un cambio en nombre de uno y responderlo en nombre del otro.';
-  const FUERA_DE_PLAZO = `Faltan menos de ${MARGEN_CAMBIO_HORAS} horas para el partido: ya no se pueden pedir cambios.`;
+  // DOS MOTIVOS, DOS FRASES. Fuera de plazo puede ser «falta poco» o «ya
+  // pasó», y decir lo primero sobre un partido que terminó hace rato es
+  // simplemente falso.
+  const yaEmpezo = partidoYaEmpezo(p.hora, ahora);
+  const FUERA_DE_PLAZO = yaEmpezo
+    ? 'El partido ya empezó: no se pueden pedir cambios.'
+    : `Faltan menos de ${MARGEN_CAMBIO_HORAS} horas para el partido: ya no se pueden pedir cambios.`;
 
   if (!soyAdmin) {
     salida.bloqueoPedir = 'Solo un administrador de alguno de los dos clubes puede pedir cambios.';
@@ -521,7 +547,9 @@ export function accionesDeCambio({
     } else if (!abierto) {
       salida.bloqueoResponder = 'Este partido ya no admite cambios.';
     } else if (!enPlazo) {
-      salida.bloqueoResponder = `Faltan menos de ${MARGEN_CAMBIO_HORAS} horas para el partido: esta solicitud ya no puede aplicarse.`;
+      salida.bloqueoResponder = yaEmpezo
+        ? 'El partido ya empezó: esta solicitud ya no puede aplicarse.'
+        : `Faltan menos de ${MARGEN_CAMBIO_HORAS} horas para el partido: esta solicitud ya no puede aplicarse.`;
     }
     salida.puedeResponder = !salida.bloqueoResponder;
   }
