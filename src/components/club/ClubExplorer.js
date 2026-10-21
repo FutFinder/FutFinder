@@ -43,6 +43,7 @@ import {
   listRivalCandidates,
 } from '../../services/clubs';
 import { idsConDesafioPendiente } from '../../services/clubChallenges';
+import { estadoDelExplorador } from '../../utils/rivalClubsQuery';
 import { NOMBRES_REGIONES } from '../../data/regiones-chile';
 
 /**
@@ -91,7 +92,11 @@ export default function ClubExplorer({
   const [picker, setPicker] = useState(null); // null | 'region' | 'comuna'
   // Si alguna vez, SIN filtros, hubo al menos un club — para distinguir «no
   // hay ningún club en FutFinder» de «no hay resultados para esta búsqueda».
-  const [hasAnyClub, setHasAnyClub] = useState(true);
+  // OJO CON EL NOMBRE: esto NO es «la persona tiene club». Es «la consulta
+  // SIN filtros trajo algo», o sea si el catálogo que esta pantalla mira
+  // está vacío. Se llamaba `hasAnyClub` y ese nombre equivocado se filtró al
+  // texto que ve la gente — ver el estado vacío de más abajo.
+  const [catalogoConClubes, setCatalogoConClubes] = useState(true);
 
   // `fetchClubs` lee el texto/región/comuna vigentes por referencia, igual
   // que `PartidosScreen`: así no se reconstruye (ni dispara el efecto de
@@ -126,7 +131,7 @@ export default function ClubExplorer({
     setError(Boolean(err));
     setClubs(found || []);
     if (!filtros.query.trim() && !filtros.region && !filtros.comuna) {
-      setHasAnyClub((found || []).length > 0);
+      setCatalogoConClubes((found || []).length > 0);
     }
     return found || [];
   }, [modoRival, retadorClubId]);
@@ -225,8 +230,20 @@ export default function ClubExplorer({
 
   const filtersActive = Boolean(regionSel || comunaSel);
   const hasQuery = query.length > 0;
-  const showEmptyNoClubs = !loading && !error && clubs.length === 0 && !hasQuery && !filtersActive && !hasAnyClub;
-  const showEmptyNoResults = !loading && !error && clubs.length === 0 && (hasQuery || filtersActive || hasAnyClub);
+  // La decisión vive en `utils/rivalClubsQuery.js`, no acá: ya se equivocó
+  // una vez y el componente no es el lugar donde eso se puede probar.
+  const estadoVacio = estadoDelExplorador({
+    cargando: loading,
+    error,
+    cantidad: clubs.length,
+    hayTexto: hasQuery,
+    hayFiltros: filtersActive,
+    modoRival,
+    catalogoConClubes,
+  });
+  const showEmptyNoRivals = estadoVacio === 'sin-rivales';
+  const showEmptyNoClubs = estadoVacio === 'sin-clubes';
+  const showEmptyNoResults = estadoVacio === 'sin-resultados';
 
   const clearFilters = () => {
     setRegionSel('');
@@ -449,6 +466,17 @@ export default function ClubExplorer({
                 >
                   <Text style={styles.retryText}>Reintentar</Text>
                 </Pressable>
+              </View>
+            ) : showEmptyNoRivals ? (
+              <View style={styles.stateBox}>
+                <View style={styles.stateIconWrap}>
+                  <Shield color={C.green} size={34} strokeWidth={2} />
+                </View>
+                <Text style={styles.stateTitle}>No hay clubes para desafiar</Text>
+                <Text style={styles.stateText}>
+                  Por ahora no encontramos otros clubes. Los tuyos no cuentan como rival, y
+                  los que se creen van a aparecer acá.
+                </Text>
               </View>
             ) : showEmptyNoClubs ? (
               <View style={styles.stateBox}>

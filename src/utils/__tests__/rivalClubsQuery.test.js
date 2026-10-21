@@ -12,7 +12,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { buildRivalClubsQuery, RIVAL_CLUB_COLUMNS } = require('../rivalClubsQuery.js');
+const {
+  buildRivalClubsQuery, RIVAL_CLUB_COLUMNS, estadoDelExplorador,
+} = require('../rivalClubsQuery.js');
 
 function createFakeQuery(rows) {
   let result = rows;
@@ -184,4 +186,61 @@ test('la tarjeta de un rival trae SU tema, para no pintarla con el color del clu
       .includes('tema'),
     `falta la columna tema en «${RIVAL_CLUB_COLUMNS}»`
   );
+});
+
+/* ── Qué estado vacío le toca al explorador ─────────────────────────────── */
+
+test('en modo rival, «no vino ninguno» NUNCA es «no tienes clubes»', () => {
+  // Regresión del 2026-10-21, encontrada usando la app: un integrante de
+  // Atlético Ñuñoa entró a «Buscar rivales» y la pantalla le dijo «Todavía
+  // no tienes clubes — crea tu club», dos toques después de ver su club en
+  // la portada. La causa: `catalogoConClubes` se llamaba `hasAnyClub` y
+  // significa «la consulta sin filtros trajo algo»; en modo rival esa
+  // consulta excluye los clubes propios A PROPÓSITO.
+  assert.equal(
+    estadoDelExplorador({ cantidad: 0, modoRival: true, catalogoConClubes: false }),
+    'sin-rivales',
+  );
+  // Y da igual lo que diga esa bandera: en modo rival no significa nada.
+  assert.equal(
+    estadoDelExplorador({ cantidad: 0, modoRival: true, catalogoConClubes: true }),
+    'sin-rivales',
+  );
+});
+
+test('fuera del modo rival el catálogo vacío sí invita a crear un club', () => {
+  assert.equal(
+    estadoDelExplorador({ cantidad: 0, catalogoConClubes: false }),
+    'sin-clubes',
+  );
+  // Catálogo con clubes y cero resultados sin filtros no debería pasar
+  // —es la misma consulta— pero si pasa, «no calza» miente menos que
+  // «no existe».
+  assert.equal(
+    estadoDelExplorador({ cantidad: 0, catalogoConClubes: true }),
+    'sin-resultados',
+  );
+});
+
+test('con texto o filtros puestos, «no hay» es siempre «no calza»', () => {
+  for (const modoRival of [false, true]) {
+    assert.equal(
+      estadoDelExplorador({ cantidad: 0, hayTexto: true, modoRival, catalogoConClubes: false }),
+      'sin-resultados',
+      'con búsqueda escrita el botón que corresponde es limpiar, no crear',
+    );
+    assert.equal(
+      estadoDelExplorador({ cantidad: 0, hayFiltros: true, modoRival, catalogoConClubes: false }),
+      'sin-resultados',
+    );
+  }
+});
+
+test('cargando y no-se-pudo-leer mandan sobre cualquier vacío', () => {
+  assert.equal(estadoDelExplorador({ cargando: true, cantidad: 0 }), 'cargando');
+  assert.equal(estadoDelExplorador({ error: true, cantidad: 0 }), 'error');
+  // Un corte de red con la lista ya pintada tampoco puede leerse como vacío.
+  assert.equal(estadoDelExplorador({ error: true, cantidad: 5 }), 'error');
+  assert.equal(estadoDelExplorador({ cantidad: 5 }), 'con-filas');
+  assert.equal(estadoDelExplorador(), 'sin-resultados');
 });
