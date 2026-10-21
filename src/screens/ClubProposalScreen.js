@@ -37,10 +37,16 @@ import {
   getPropuestaVigente,
   nuevoClientToken,
 } from '../services/clubProposals';
+// NIVELES VIVE EN `matchRules`, no acá. `clubChallengeRules` lo importa
+// para validar el borrador pero NO lo reexporta, así que pedírselo devolvía
+// `undefined` y la pantalla reventaba al dibujar la fila de niveles — el
+// error decía «Cannot read properties of undefined (reading 'map')» y no
+// nombraba el archivo equivocado. Es el mismo agujero que `importaciones`
+// ya cuidaba para `src/utils` y que ahora cuida también para `src/services`.
+import { NIVELES } from '../services/matchRules';
 import {
   DURACIONES,
   MODALIDADES,
-  NIVELES,
   METODOS_INSCRIPCION,
   CUPOS_POR_CLUB,
   INSTRUCCIONES_MAX,
