@@ -1037,3 +1037,52 @@ test('mapThreadRow: una base sin la migración 131 no rompe la bandeja', () => {
   assert.equal(t.subtitle, 'Amigos');
   assert.equal(t.friend_status, null);
 });
+
+/* ── El título de la cabecera del hilo ──────────────────────────────────── */
+
+const { threadHeaderTitle } = require('../chatMeta.js');
+
+test('el título que viene por parámetro manda sobre cualquier derivación', () => {
+  assert.equal(
+    threadHeaderTitle({ paramTitle: 'Los Tigres vs Deportivo Sur', tipo: 'challenge' }),
+    'Los Tigres vs Deportivo Sur',
+  );
+  // Un parámetro en blanco no es un título: hay que derivar igual.
+  assert.equal(threadHeaderTitle({ paramTitle: '   ', tipo: 'club' }), 'Chat del club');
+});
+
+test('entrar desde un aviso ya no deja la cabecera en «Chat» a secas', () => {
+  // Regresión del 2026-10-21: aceptar un reto desde la bandeja de avisos
+  // navega sólo con el threadKey, y el hilo de negociación entre dos clubes
+  // se abría titulado «Chat» — con el subtítulo prometiendo que el título
+  // decía qué dos clubes se enfrentaban.
+  assert.equal(threadHeaderTitle({ tipo: 'challenge' }), 'Desafío entre clubes');
+  assert.equal(
+    threadHeaderTitle({
+      tipo: 'challenge',
+      challenge: {
+        club_retador: { nombre: 'Deportivo La Reina' },
+        club_retado: { nombre: 'Atlético Ñuñoa' },
+      },
+    }),
+    'Deportivo La Reina vs Atlético Ñuñoa',
+  );
+  assert.equal(
+    threadHeaderTitle({ tipo: 'club', context: { club: { nombre: 'Atlético Ñuñoa' } } }),
+    'Atlético Ñuñoa',
+  );
+  assert.equal(
+    threadHeaderTitle({ tipo: 'match', context: { match: { titulo: 'Pichanga del martes' } } }),
+    'Pichanga del martes',
+  );
+});
+
+test('sin contexto cargado cada tipo cae en algo cierto, nunca inventado', () => {
+  assert.equal(threadHeaderTitle({ tipo: 'club' }), 'Chat del club');
+  assert.equal(threadHeaderTitle({ tipo: 'match' }), 'Chat del partido');
+  assert.equal(threadHeaderTitle({ tipo: 'match', context: { match: {} } }), 'Chat del partido');
+  // El DM se sigue titulando con el @usuario que pasa quien navega, así que
+  // acá no hay nada que derivar y 'Chat' es lo correcto.
+  assert.equal(threadHeaderTitle({ tipo: 'dm' }), 'Chat');
+  assert.equal(threadHeaderTitle(), 'Chat');
+});

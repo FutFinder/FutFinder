@@ -115,6 +115,7 @@ import {
   attachCachedSender,
   needsSenderFetch,
   isGroupType,
+  threadHeaderTitle,
 } from '../utils/chatMeta';
 import useConnection from '../utils/useConnection';
 
@@ -173,6 +174,21 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [context, setContext] = useState(null); // info del club / partido
   const [clubChallenge, setClubChallenge] = useState(null);
+
+  // EL TÍTULO NO SIEMPRE VIENE POR PARÁMETRO. La bandeja de chats y la de
+  // desafíos lo pasan ya calculado; entrar desde un AVISO navega sólo con el
+  // `threadKey`, y entonces la cabecera decía 'Chat' a secas — hasta en el
+  // hilo de negociación entre dos clubes. Se deriva de lo ya cargado.
+  const headerTitle = useMemo(
+    () => threadHeaderTitle({
+      paramTitle: route?.params?.title,
+      tipo: t?.type,
+      context,
+      challenge: clubChallenge,
+    }),
+    [route?.params?.title, t?.type, context, clubChallenge],
+  );
+
   const [challengeEvents, setChallengeEvents] = useState([]);
   const [challengeProposal, setChallengeProposal] = useState(null);
   const [prorrogaReplies, setProrrogaReplies] = useState([]);
@@ -674,8 +690,8 @@ export default function ChatThreadScreen({ route, navigation }) {
   const openIdentity = useCallback(() => {
     if (!t?.id) return;
     if (t.type === 'dm') navigation.navigate('UserProfile', { userId: t.id });
-    else navigation.navigate('ChatDetails', { threadKey, title: paramTitle, fotoUrl });
-  }, [t?.id, t?.type, navigation, threadKey, paramTitle, fotoUrl]);
+    else navigation.navigate('ChatDetails', { threadKey, title: headerTitle, fotoUrl });
+  }, [t?.id, t?.type, navigation, threadKey, headerTitle, fotoUrl]);
 
   const handleRateMatch = () => t?.id && navigation.navigate('RateMatch', { matchId: t.id });
 
@@ -1412,8 +1428,8 @@ export default function ChatThreadScreen({ route, navigation }) {
 
   const headerSubtitle = useMemo(() => {
     if (t?.type === 'challenge') {
-      // El estado del ciclo es lo que de verdad orienta acá: el título ya
-      // dice qué dos clubes se enfrentan.
+      // El estado del ciclo es lo que de verdad orienta acá: el título dice
+      // qué dos clubes se enfrentan, o al menos que esto es un desafío.
       if (!clubChallenge) return paramSubtitle || 'Negociación del desafío';
       const admins = myClubIds.length > 0 ? 'Administradores de ambos clubes' : 'Solo lectura';
       return `${estadoLabel(clubChallenge.estado)} · ${admins}`;
@@ -1546,7 +1562,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
           <ChatThreadHeader
             type={t?.type}
-            title={paramTitle}
+            title={headerTitle}
             subtitle=""
             fotoUrl={fotoUrl}
             connection={connection}
@@ -1572,7 +1588,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <ChatThreadHeader
           type={t?.type}
-          title={paramTitle}
+          title={headerTitle}
           subtitle={headerSubtitle}
           fotoUrl={fotoUrl}
           muted={muted}

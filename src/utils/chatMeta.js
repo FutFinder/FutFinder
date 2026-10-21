@@ -443,6 +443,38 @@ export function threadKindLabel(thread) {
   return 'Amigos';
 }
 
+/**
+ * El título de la CABECERA de un hilo abierto.
+ *
+ * POR QUÉ NO BASTA CON EL PARÁMETRO. Dos de los tres caminos que abren un
+ * hilo le pasan el título ya calculado —la bandeja de chats y la de
+ * desafíos—, pero el tercero no: entrar desde un AVISO navega sólo con el
+ * `threadKey`, así que la cabecera caía en un 'Chat' genérico. Se vio el
+ * 2026-10-21 al aceptar un reto desde la bandeja de avisos: el hilo de
+ * negociación entre dos clubes se abría titulado «Chat», con el subtítulo
+ * prometiendo que «el título ya dice qué dos clubes se enfrentan».
+ *
+ * Así que el título se deriva de lo que la pantalla YA cargó, y sólo cuando
+ * no vino por parámetro. Para el desafío se reutiliza
+ * `challengeThreadTitle`, que es la misma función que usa la bandeja: sin
+ * los nombres de los clubes devuelve «Desafío entre clubes», que es
+ * genérico pero cierto, y 'Chat' no lo era.
+ */
+export function threadHeaderTitle({
+  paramTitle = '',
+  tipo = null,
+  context = null,
+  challenge = null,
+} = {}) {
+  const dado = String(paramTitle || '').trim();
+  if (dado) return dado;
+
+  if (tipo === 'challenge') return challengeThreadTitle(challenge);
+  if (tipo === 'club') return context?.club?.nombre || 'Chat del club';
+  if (tipo === 'match') return context?.match?.titulo || 'Chat del partido';
+  return 'Chat';
+}
+
 // ============================================================
 // AGRUPACIÓN DE BURBUJAS
 // ============================================================
