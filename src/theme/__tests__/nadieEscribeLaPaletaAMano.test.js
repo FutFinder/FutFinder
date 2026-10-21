@@ -44,6 +44,29 @@ const path = require('node:path');
  */
 
 const RAIZ = path.resolve(__dirname, '../..');
+const RAIZ_REPO = path.resolve(RAIZ, '..');
+
+/**
+ * Y MIRA TAMBIÉN LA CONFIG DE LA RAÍZ, que es el agujero por el que se coló
+ * la tercera vez. `archivosDeFuente()` sólo recorre `src/`, así que durante
+ * casi un mes `app.config.js` siguió declarando el verde oliva legado en tres
+ * sitios: el `color` de `notification`, el `themeColor` del PWA y el `color`
+ * del plugin `expo-notifications`. Ese último es el tinte del ícono de
+ * notificación en Android, o sea que lo veía cualquiera que recibiera un
+ * push: el color viejo estaba en el lugar más visible de todos, justo donde
+ * nadie estaba mirando.
+ *
+ * Son los dos archivos de la raíz que pintan: `app.config.js` porque declara
+ * colores de la app nativa y del PWA, y `tailwind.config.js` porque declara
+ * las clases con nombre. El resto (`App.js`, `index.js`, `babel.config.js`,
+ * `metro.config.js`) no nombra colores; si algún día lo hace, se agrega acá.
+ *
+ * `app.config.js` no puede importar de `src/theme/colors.js`: lo evalúa Node
+ * antes del bundler y `colors.js` es un módulo ES. Por eso ahí el hex va
+ * escrito, con un comentario que dice de dónde sale — y por eso esta prueba
+ * es lo único que lo mantiene sincronizado con la paleta.
+ */
+const CONFIG_DE_RAIZ = ['app.config.js', 'tailwind.config.js'];
 
 /**
  * Los colores de las paletas que se borraron, con dónde vivía cada uno y su
@@ -83,12 +106,17 @@ function archivosDeFuente(dir = RAIZ, acc = []) {
   return acc;
 }
 
-test('ningún color de las paletas borradas está escrito a mano en src/', () => {
+/** Todo lo que pinta: `src/` y los archivos de configuración de la raíz. */
+function archivosConPaleta() {
+  return [...archivosDeFuente(), ...CONFIG_DE_RAIZ.map((n) => path.join(RAIZ_REPO, n))];
+}
+
+test('ningún color de las paletas borradas está escrito a mano en src/ ni en la config de la raíz', () => {
   const hallazgos = [];
 
-  for (const archivo of archivosDeFuente()) {
+  for (const archivo of archivosConPaleta()) {
     const codigo = fs.readFileSync(archivo, 'utf8');
-    const relativo = path.relative(RAIZ, archivo);
+    const relativo = path.relative(RAIZ_REPO, archivo);
     for (const [hex, { origen, rgb }] of Object.entries(PROHIBIDOS)) {
       const formas = [new RegExp(hex, 'gi')];
       // `rgba( 90 , 224 , 106 , .12 )` es el mismo color que `#5AE06A`, así
@@ -128,9 +156,9 @@ const A_MANO = {
 
 test('la paleta actual tampoco se escribe a mano: para eso está alfa()', () => {
   const hallazgos = [];
-  for (const archivo of archivosDeFuente()) {
+  for (const archivo of archivosConPaleta()) {
     const codigo = fs.readFileSync(archivo, 'utf8');
-    const relativo = path.relative(RAIZ, archivo);
+    const relativo = path.relative(RAIZ_REPO, archivo);
     for (const [rgb, nombre] of Object.entries(A_MANO)) {
       const [r, g, b] = rgb.split(',');
       const re = new RegExp(`rgba?\\(\\s*${r}\\s*,\\s*${g}\\s*,\\s*${b}\\s*[,)]`, 'g');
@@ -150,7 +178,7 @@ test('tailwind expone la paleta con nombre, para que nadie escriba un hex', () =
   // La otra mitad del arreglo: mientras `theme.extend.colors` estuviera vacío,
   // la única forma de pintar algo con NativeWind era el valor arbitrario
   // `bg-[#...]`, que es exactamente lo que se nos escapó.
-  const config = require(path.resolve(RAIZ, '..', 'tailwind.config.js'));
+  const config = require(path.join(RAIZ_REPO, 'tailwind.config.js'));
   const colores = config.theme?.extend?.colors || {};
   const { paleta } = require('../colors.js');
 
@@ -160,4 +188,22 @@ test('tailwind expone la paleta con nombre, para que nadie escriba un hex', () =
     Object.keys(colores).length >= 6,
     'tailwind tiene que exponer la paleta, no un par de colores sueltos'
   );
+});
+
+test('app.config.js pinta con el verde de la paleta, no con una copia vieja', () => {
+  // La otra mitad del arreglo. El test de arriba caza los colores BORRADOS,
+  // así que el día que `paleta.green` cambie de valor no diría nada: el hex de
+  // `app.config.js` se quedaría en el verde de hoy, que no está prohibido,
+  // y volveríamos a tener dos verdes. Como ese archivo no puede importar
+  // `colors.js` (ver el comentario de `VERDE` ahí: lo evalúa el prebuild, en
+  // un Node cuya versión no fijamos), lo que une las dos copias es esto.
+  const { expo } = require(path.join(RAIZ_REPO, 'app.config.js'));
+  const { paleta } = require('../colors.js');
+  const plugin = expo.plugins.find((p) => Array.isArray(p) && p[0] === 'expo-notifications');
+
+  // El tinte del ícono de notificación en Android: el sitio más visible de
+  // los tres, porque lo ve cualquiera que reciba un push.
+  assert.equal(plugin[1].color, paleta.green, 'el plugin expo-notifications');
+  assert.equal(expo.notification.color, paleta.green, 'notification.color');
+  assert.equal(expo.web.themeColor, paleta.green, 'el themeColor del PWA');
 });

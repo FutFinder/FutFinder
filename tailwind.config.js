@@ -4,7 +4,7 @@
  *
  * LOS COLORES SALEN DE `src/theme/colors.js`, NO DE ACÁ. Mientras
  * `theme.extend` estuvo vacío, la única forma de pintar algo era el valor
- * arbitrario —`bg-[#00FF66]`— y eso dejó la paleta escrita a mano en doce
+ * arbitrario —`bg-[#...]`— y eso dejó la paleta escrita a mano en doce
  * archivos. Cuando la app se unificó en una sola estética, esos hex no los vio
  * nadie: no son imports, así que ni el lint ni la migración de tokens los
  * tocaron, y el verde flúor del rediseño anterior sobrevivió en 41 lugares.
