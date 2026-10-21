@@ -281,7 +281,36 @@ Era el que **nunca había transaccionado**: producción tiene 13 canchas, 19 tar
 4. **El basurero era un botón dentro de otro botón**, marcado inválido en web.
 5. **Nadie se enteraba cuando un recinto pedía revisión** — el más grave, y el único que ya estaba pasando en producción: 35 días de espera. Ver [Aprobar recintos](aprobar-recintos.md).
 
-**Lo que todavía no se ha caminado:** el desafío entre clubes de punta a punta (hace falta un segundo club), confirmar la asistencia al terminar un partido, y las valoraciones. Del vertical de Reservas quedan sin caminar las partes que no se pueden sin pasarela: el pago dividido entre jugadores, cancelar con devolución y la agenda del dueño con reservas de verdad.
+### El ciclo de desafíos entre clubes, entero (2026-10-21)
+
+Con **dos sesiones a la vez** —`localhost:8081` y `127.0.0.1:8081`, que para el navegador son dos orígenes y por eso cada una guarda su propia sesión—, cada cuenta administrando un club distinto.
+
+| Paso | Comprobado en la base, no sólo en pantalla |
+|---|---|
+| Crear el segundo club | queda con comuna, modalidad y tema propios, y quien lo crea entra como `admin` |
+| Salir del otro club | la membresía se borra y al rival le llega `club_member_left` |
+| Mandar el reto | `club_challenges` en `pendiente`, con zona y mensaje; el aviso `club_challenge` va al admin del club RETADO, no a quien lo manda |
+| Aceptar desde el aviso | pasa a `negociacion` con `negociacion_vence_at` a 72 h y abre el hilo `challenge:<id>` |
+| Propuesta oficial | cancha ubicada en el mapa (lat/lng reales), modalidad, nivel, cupos, cuota e instrucciones, todo en `club_challenge_proposals` |
+| Aprobar y publicar | `matches` con `cupos_totales = 2 × cupos_por_club`, `nivel` y `precio_cuota`; el desafío pasa a `publicado` y sale `club_match_published` a los integrantes de los dos clubes |
+| Las dos nóminas | cada sesión se inscribe por SU club, el conteo dice «de tu club» del lado correcto, y la otra sesión lo ve **sin recargar** |
+| El reloj | movida la fecha del fixture, `refrescar_desafio()` lleva `publicado → en_juego → esperando_resultado` |
+| Registrar el marcador | 3-1 con un jugador destildado: queda `no_asistio` en `attendees` y **el TrueScore de las dos cuentas se queda en 75** — la garantía de la migración 50, vista de verdad y no sólo en el arnés |
+| Confirmar desde el club contrario | desafío y partido en `finalizado`, resultado `confirmado`, y `club_estadisticas()` devuelve 1-0-0 con 3-1 para La Reina y 0-0-1 con 1-3 para Ñuñoa: el marcador se lee desde el club que se mira |
+
+**Cinco fallos salieron de este recorrido**, y el primero es de los que no se pueden ignorar:
+
+1. **«Crear propuesta oficial» reventaba al abrirse**, siempre y para todos — el paso que convierte un desafío en partido. Un `NIVELES` pedido al módulo equivocado; la guarda de importaciones existía pero sólo miraba `src/utils` y éste venía de `src/services`.
+2. **Dos burbujas mudas** —«Hubo una novedad en el desafío», dos veces— donde iban «empezó el partido» y «terminó, registren el marcador».
+3. **«Faltan menos de 2 horas para el partido»** en el hilo de un encuentro terminado hacía tres.
+4. **El aviso seguía pidiendo confirmar** un resultado ya confirmado, al lado de un reto que sí aparecía cerrado.
+5. **«Buscar rivales» decía «todavía no tienes clubes»** a un integrante, por una variable mal nombrada cuyo nombre se filtró al texto.
+
+Y dos cosas que quien aprueba no veía y ahora sí: la **modalidad** y el **nivel** del partido que estaba a punto de publicar.
+
+**Lo que todavía no se ha caminado:** confirmar la asistencia al terminar un partido normal, y las valoraciones. Del vertical de Reservas quedan sin caminar las partes que no se pueden sin pasarela: el pago dividido entre jugadores, cancelar con devolución y la agenda del dueño con reservas de verdad. Del ciclo de clubes quedan las ramas tristes —rechazar el reto, pedir cambios, la prórroga, cancelar el encuentro y la incomparecencia—, que sí tienen arnés pero no recorrido.
+
+**Una pregunta abierta que dejó el recorrido:** un partido entre clubes no suma a `profiles.partidos_jugados`. Quien jugó y quedó `confirmado_gps` sigue viendo «0 partidos jugados» en su perfil. Puede ser correcto —la 50 cerró a propósito la puerta genérica que tocaba la reputación— pero conviene decidirlo, no heredarlo.
 
 ## El barrido del reloj, hecho de verdad (2026-10-17)
 
