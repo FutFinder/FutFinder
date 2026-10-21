@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, FileText, MapPin, Users, Wallet, Clock } from 'lucide-react-native';
+import { X, FileText, MapPin, Users, Wallet, Clock, Trophy } from 'lucide-react-native';
 
 import {
   paleta as C,
@@ -43,7 +43,7 @@ import {
 // error decía «Cannot read properties of undefined (reading 'map')» y no
 // nombraba el archivo equivocado. Es el mismo agujero que `importaciones`
 // ya cuidaba para `src/utils` y que ahora cuida también para `src/services`.
-import { NIVELES } from '../services/matchRules';
+import { NIVELES, modalidadLabel, nivelLabel } from '../services/matchRules';
 import {
   DURACIONES,
   MODALIDADES,
@@ -400,6 +400,18 @@ export default function ClubProposalScreen({ navigation, route }) {
                   <Row icon={<MapPin color={C.green} size={16} strokeWidth={2} />} label="Dónde">
                     {`${propuesta.cancha_nombre}\n${propuesta.direccion}\n${propuesta.comuna}, ${propuesta.region}`}
                   </Row>
+                  {/* MODALIDAD Y NIVEL SE MUESTRAN ACÁ aunque no se negocien.
+                      El formulario los pide y la propuesta los guarda, pero
+                      esta pantalla no los enseñaba: quien aprueba estaba
+                      publicando un partido para los jugadores de SU club sin
+                      ver si era fútbol 7 u 11 —que decide quién puede
+                      jugar— ni con qué nivel iba a quedar clasificado. */}
+                  <Row icon={<Trophy color={C.green} size={16} strokeWidth={2} />} label="Partido">
+                    {[
+                      modalidadLabel(propuesta) || 'Modalidad sin definir',
+                      propuesta.nivel ? nivelLabel(propuesta.nivel) : 'Sin nivel declarado',
+                    ].join(' · ')}
+                  </Row>
                   <Row icon={<Users color={C.green} size={16} strokeWidth={2} />} label="Cupos">
                     {`${cuposLabel(propuesta.cupos_por_club)} · ${metodoLabel(
                       propuesta.metodo_inscripcion
@@ -487,6 +499,10 @@ export default function ClubProposalScreen({ navigation, route }) {
                           </Text>
                           <Text style={styles.confirmLinea}>
                             · {propuesta.cancha_nombre}, {propuesta.comuna}
+                          </Text>
+                          <Text style={styles.confirmLinea}>
+                            · {modalidadLabel(propuesta) || 'Modalidad sin definir'}
+                            {propuesta.nivel ? ` · ${nivelLabel(propuesta.nivel)}` : ''}
                           </Text>
                           <Text style={styles.confirmLinea}>
                             · {cuposLabel(propuesta.cupos_por_club)} ·{' '}
