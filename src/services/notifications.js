@@ -207,11 +207,12 @@ export async function listNotifications({ limit = 50 } = {}) {
 
 /**
  * Estado actual de las solicitudes que originaron estos avisos (amistad,
- * solicitud de club, reto), para que la bandeja no ofrezca «Aceptar» sobre
- * algo que ya se respondió — aquí, desde otra pantalla o en otro
- * dispositivo. Devuelve `{ friendships, requests, challenges }`, cada uno un
- * `Map` id → estado, o `null` si alguna consulta falló: en ese caso la
- * bandeja deja las tarjetas como están.
+ * solicitud de club, reto, resultado propuesto), para que la bandeja no
+ * ofrezca «Aceptar» —ni afirme que algo sigue pendiente— sobre algo que ya
+ * se respondió, aquí, desde otra pantalla o en otro dispositivo. Devuelve
+ * `{ friendships, requests, challenges, resultados }`, cada uno un `Map`
+ * id → estado, o `null` si alguna consulta falló: en ese caso la bandeja
+ * deja las tarjetas como están.
  */
 export async function getEstadosDeOrigen(items) {
   if (!isSupabaseConfigured) return null;
@@ -227,12 +228,13 @@ export async function getEstadosDeOrigen(items) {
     return new Map((data || []).map((r) => [r.id, r[columna]]));
   };
   try {
-    const [friendships, requests, challenges] = await Promise.all([
+    const [friendships, requests, challenges, resultados] = await Promise.all([
       consultar('friendships', 'status', ids('friend_request', 'friendshipId')),
       consultar('club_join_requests', 'status', ids('club_request', 'requestId')),
       consultar('club_challenges', 'estado', ids('club_challenge', 'challengeId')),
+      consultar('club_match_results', 'estado', ids('club_resultado_propuesto', 'resultId')),
     ]);
-    return { friendships, requests, challenges };
+    return { friendships, requests, challenges, resultados };
   } catch (e) {
     console.error('[FutFinder] getEstadosDeOrigen:', e?.message || e);
     return null;

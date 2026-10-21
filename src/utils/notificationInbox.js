@@ -106,6 +106,11 @@ const ESTADOS = {
   friend_request: { pending: null, accepted: 'aceptada', rejected: 'rechazada' },
   club_request: { pending: null, approved: 'aceptada', rejected: 'rechazada' },
   club_challenge: { pendiente: null, aceptado: 'aceptada', rechazado: 'rechazada' },
+  // Migración 48. El aviso dice «Hay un resultado por confirmar · confírmalo
+  // o recházalo», así que una vez respondido queda mintiendo igual que una
+  // solicitud ya aceptada. `resultado_en_disputa` es el rechazo: la fila
+  // queda en 'rechazado' y sólo la moderación la reabre (48b).
+  club_resultado_propuesto: { propuesto: null, confirmado: 'aceptada', rechazado: 'rechazada' },
 };
 
 /**
@@ -126,6 +131,9 @@ export function textoResolucion(n) {
   if (!r) return null;
   if (r === 'cerrada') return 'Ya no está pendiente';
   if (n.type === 'club_challenge') return r === 'aceptada' ? 'Reto aceptado' : 'Reto rechazado';
+  if (n.type === 'club_resultado_propuesto') {
+    return r === 'aceptada' ? 'Resultado confirmado' : 'Resultado rechazado';
+  }
   return r === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud rechazada';
 }
 
@@ -133,7 +141,7 @@ export function textoResolucion(n) {
  * Marca como respondidas las tarjetas cuya solicitud ya no está pendiente.
  *
  * `estados` trae, por id, el estado actual de cada fila de origen
- * (`friendships`, `requests`, `challenges`), o `null` si no se pudo
+ * (`friendships`, `requests`, `challenges`, `resultados`), o `null` si no se pudo
  * averiguar — y entonces no se toca nada: mejor ofrecer los botones que
  * esconderlos sin saber.
  *
@@ -154,6 +162,11 @@ export function conResoluciones(items, estados) {
       if (estado === undefined) return n;
     } else if (n.type === 'club_challenge' && data.challengeId) {
       estado = estados.challenges?.get(data.challengeId);
+      if (estado === undefined) return n;
+    } else if (n.type === 'club_resultado_propuesto' && data.resultId) {
+      estado = estados.resultados?.get(data.resultId);
+      // Ausente es «no sé», igual que el reto: puede ser la RLS —dejé de
+      // administrar el club— y no que el resultado haya desaparecido.
       if (estado === undefined) return n;
     } else {
       return n;

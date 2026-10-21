@@ -290,3 +290,42 @@ test('conResoluciones sin estados deja la lista intacta', () => {
   const items = [{ id: 1, type: 'friend_request', data: { friendshipId: 'f1' } }];
   assert.deepEqual(conResoluciones(items, null), items);
 });
+
+/* ── El resultado ya confirmado deja de pedir confirmación ──────────────── */
+
+test('un resultado ya respondido no sigue diciendo «por confirmar»', () => {
+  // Regresión del 2026-10-21, caminando el ciclo de desafíos con dos
+  // cuentas: después de CONFIRMAR el 3-1, la bandeja seguía mostrando «Hay
+  // un resultado por confirmar · Confírmalo o recházalo» como si quedara
+  // algo que hacer. `conResoluciones` cubría tres tipos y éste no estaba.
+  const items = [
+    { id: 1, type: 'club_resultado_propuesto', data: { resultId: 'res-1' } },
+    { id: 2, type: 'club_resultado_propuesto', data: { resultId: 'res-2' } },
+    { id: 3, type: 'club_resultado_propuesto', data: { resultId: 'res-3' } },
+    // Sin resultId no hay nada que mirar: se deja como está.
+    { id: 4, type: 'club_resultado_propuesto', data: {} },
+    // Y uno cuyo resultado no se pudo leer (RLS): tampoco se toca.
+    { id: 5, type: 'club_resultado_propuesto', data: { resultId: 'res-ajeno' } },
+  ];
+  const estados = {
+    friendships: new Map(),
+    requests: new Map(),
+    challenges: new Map(),
+    resultados: new Map([
+      ['res-1', 'confirmado'],
+      ['res-2', 'rechazado'],
+      ['res-3', 'propuesto'],
+    ]),
+  };
+  const [a, b, c, d, e] = conResoluciones(items, estados);
+
+  assert.equal(a._actionsResolved, true);
+  assert.equal(textoResolucion(a), 'Resultado confirmado');
+  assert.equal(b._actionsResolved, true);
+  assert.equal(textoResolucion(b), 'Resultado rechazado');
+  // Todavía propuesto: sigue pendiente de verdad.
+  assert.equal(c._actionsResolved, undefined);
+  assert.equal(textoResolucion(c), null);
+  assert.equal(d, items[3]);
+  assert.equal(e, items[4]);
+});
