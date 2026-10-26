@@ -30,6 +30,7 @@ import {
   ChevronRight,
   SlidersHorizontal,
   FileLock,
+  Cookie,
   AlertTriangle,
   ShieldOff,
   Download,
@@ -63,7 +64,6 @@ import { buildMyDataExport } from '../services/dataExport';
 import useConfirmacion from '../components/useConfirmacion';
 
 const TERMS_URL = 'https://futfinder.cl/terminos';
-const PRIVACY_URL = 'https://futfinder.cl/privacidad';
 
 // ── Custom slider (no deps externos) ─────────────────────────────
 // onValueChange: llama en cada movimiento (UI en tiempo real)
@@ -806,8 +806,14 @@ export default function SettingsScreen({ navigation }) {
             icon={FileLock}
             title="Política de privacidad"
             showChevron
+            onPress={() => navigation.navigate('Privacidad')}
+          />
+          <Row
+            icon={Cookie}
+            title="Política de cookies"
+            showChevron
             last
-            onPress={() => openURL(PRIVACY_URL)}
+            onPress={() => navigation.navigate('Cookies')}
           />
         </Card>
 

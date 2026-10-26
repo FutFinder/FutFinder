@@ -30,7 +30,6 @@ import { saveRememberedAccount } from '../utils/rememberedAccount';
 import { isSupabaseConfigured } from '../services/supabase';
 
 const TERMS_URL = 'https://futfinder.cl/terminos';
-const PRIVACY_URL = 'https://futfinder.cl/privacidad';
 
 function GoogleIcon({ size = 19 }) {
   return (
@@ -287,7 +286,7 @@ export default function RegisterScreen({ navigation }) {
               Acepto los{' '}
               <Text style={styles.termsLink} onPress={() => openURL(TERMS_URL)}>Términos</Text>
               {' '}y la{' '}
-              <Text style={styles.termsLink} onPress={() => openURL(PRIVACY_URL)}>Política de Privacidad</Text>
+              <Text style={styles.termsLink} onPress={() => navigation.navigate('Privacidad')}>Política de Privacidad</Text>
               {' '}de FutFinder.
             </Text>
           </Pressable>

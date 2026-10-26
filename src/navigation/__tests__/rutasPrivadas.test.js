@@ -38,6 +38,10 @@ const PUBLICAS = new Set([
   'Verification',
   'LocationPermission',
   'Terms',
+  // Políticas de privacidad y cookies: texto fijo que se lee antes de
+  // crear la cuenta.
+  'Privacidad',
+  'Cookies',
   'Success',
   // Galería interna de QA de las primitivas de Reservas: no importa ningún
   // servicio ni el cliente de Supabase, no lee datos de nadie y no está en la

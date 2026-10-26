@@ -33,6 +33,7 @@ import { getMatchById } from './src/services/matches';
 import { getClubById } from './src/services/clubs';
 import AvisosHost from './src/components/AvisosHost';
 import NotificationToastHost from './src/components/NotificationToastHost';
+import AvisoCookies from './src/components/AvisoCookies';
 
 // Ids de notificación (fila real de `notifications`, no el id efímero del
 // push) ya procesados en esta sesión de la app. `getLastNotificationResponseAsync`
@@ -200,6 +201,11 @@ export default function App() {
                 con la pantalla que lo lanzó. */}
             <AvisosHost />
             <NotificationToastHost />
+            <AvisoCookies
+              onVerDetalle={() => {
+                if (navigationRef.isReady()) navigationRef.navigate('Cookies');
+              }}
+            />
           </AuthProvider>
         </SafeAreaProvider>
       </ActionSheetProvider>

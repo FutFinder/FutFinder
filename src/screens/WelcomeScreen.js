@@ -19,7 +19,6 @@ import { paleta as C, fuentes as F } from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
 
 const TERMS_URL = 'https://futfinder.cl/terminos';
-const PRIVACY_URL = 'https://futfinder.cl/privacidad';
 
 // El héroe arranca ocupando toda la pantalla (logo, titular, hint de scroll)
 // y se contrae a medida que se scrollea, revelando el resto — igual que el
@@ -297,7 +296,7 @@ export default function WelcomeScreen({ navigation }) {
                 Al continuar aceptas nuestros{' '}
                 <Text style={styles.legalLink} onPress={() => openURL(TERMS_URL)}>Términos</Text>
                 {' '}y{' '}
-                <Text style={styles.legalLink} onPress={() => openURL(PRIVACY_URL)}>Política de Privacidad</Text>
+                <Text style={styles.legalLink} onPress={() => navigation.navigate('Privacidad')}>Política de Privacidad</Text>
               </Text>
             </View>
           </View>

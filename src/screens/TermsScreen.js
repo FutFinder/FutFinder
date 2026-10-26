@@ -97,6 +97,12 @@ export default function TermsScreen({ navigation }) {
 
             <View style={styles.legalBox}>
               <Text style={styles.legalText}>{TERMS_TEXT}</Text>
+              <Text style={styles.legalLinks}>
+                Lee la{' '}
+                <Text style={styles.legalLink} onPress={() => navigation.navigate('Privacidad')}>Política de privacidad</Text>
+                {' '}y la{' '}
+                <Text style={styles.legalLink} onPress={() => navigation.navigate('Cookies')}>Política de cookies</Text>.
+              </Text>
             </View>
 
             <CheckboxRow
@@ -181,6 +187,16 @@ const styles = StyleSheet.create({
     color: C.textSecondary,
     fontSize: 13,
     lineHeight: 19,
+  },
+  legalLinks: {
+    color: C.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 10,
+  },
+  legalLink: {
+    color: C.green,
+    fontFamily: F.semiBold,
   },
   checkRow: {
     flexDirection: 'row',

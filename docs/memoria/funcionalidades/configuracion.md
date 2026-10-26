@@ -1,6 +1,6 @@
 # Configuración
 
-Última revisión: 2026-09-24 (Teléfono sin SMS; los dos flags siguen apagados)
+Última revisión: 2026-10-26 (políticas de privacidad y cookies dentro de la app)
 
 ## Propósito
 
@@ -15,6 +15,8 @@ Centralizar preferencias de cuenta, privacidad, radio y categorías de avisos, a
 **Cambiar email es de tres pasos, no uno.** (1) Contraseña actual + email nuevo, con `verifyPassword()`. (2) `requestEmailChangeOtp()` manda un código de 6 dígitos al correo ACTUAL (`supabase.auth.signInWithOtp({ email: currentEmail, options: { shouldCreateUser: false } })`) — la persona tiene que seguir teniendo acceso a esa casilla, no a la nueva. La pantalla lo pide con seis casillas (`OtpBoxes`, propio de `SettingsScreen.js`) y un reenvío con cooldown de 60 s, mismo patrón que ya usa "¿Olvidaste tu contraseña?". (3) Sólo si `verifyEmailChangeOtp()` (`supabase.auth.verifyOtp({ email: currentEmail, token, type: 'email' })`) valida el código, se llama a `changeEmail()` — que sigue siendo `updateUser({ email: nuevo })` y por lo tanto Supabase manda ADEMÁS su propia confirmación al correo nuevo (link), sin cambios ahí. El código al correo actual es una capa nueva y adicional, no un reemplazo de esa confirmación — así que el cambio completo sigue necesitando abrir el correo nuevo al final, y la pantalla lo dice en el banner de éxito. Si `changeEmail()` falla después de un código válido, la pantalla vuelve al paso 1 porque el código ya se consumió (de un solo uso).
 
 "Bloqueados" abre `BlockedUsersScreen`, que lista quién bloqueó el usuario (vía `blockedUsers.listBlockedUsers()`) y permite desbloquear. "Idioma" y "Tema" son filas fijas (Español / Oscuro): no son ajustables todavía, se muestran sin flecha a propósito para no insinuar que se puede tocar. La versión de la app (`APP_VERSION`, de `expo.version`) se muestra centrada bajo Soporte.
+
+**Privacidad y cookies.** Las dos políticas viven dentro de la app: `LegalScreen` dibuja el texto de `src/data/legal.js` en dos rutas públicas, `Privacidad` (`/privacidad`) y `Cookies` (`/cookies`), sin `withAuthGuard` porque se leen antes de tener cuenta. Antes Bienvenida, Registro y Ajustes abrían `https://futfinder.cl/privacidad`, que no respondía (comprobado el 2026-10-26); ahora navegan a la pantalla, y Ajustes → Soporte suma «Política de cookies». `TermsScreen` enlaza las dos. En web, `AvisoCookies` (montado en `App.js`, fuera del navegador) muestra un aviso abajo hasta que se toca «Entendido» o «Ver detalle»; guarda `futfinder.avisoCookies` con `VERSION_AVISO_COOKIES` (`utils/avisoCookies.js`). Es aviso y no consentimiento porque la app no crea cookies propias y sólo usa almacenamiento local necesario (sesión de Supabase, cuenta recordada, club activo, lecturas de chat de club, bienvenida del panel de recinto, caché de partidos); lo único de terceros es el identificador anónimo de Mapbox al abrir el mapa web. Si se agrega medición o publicidad, el aviso debe pasar a pedir permiso con lo opcional apagado. `src/data/__tests__/legal.test.js` exige que la política de cookies nombre cada archivo que escribe en `AsyncStorage`. Pendiente legal: el texto no dice razón social ni RUT del responsable (sólo `futfindercl@gmail.com`), y `TERMS_URL` (`futfinder.cl/terminos`) sigue apuntando a una web que no responde.
 
 "Exportar mis datos" arma un JSON con `dataExport.buildMyDataExport()` (perfil, historial de partidos, amigos, clubes — sin mensajes de chat) y lo entrega copiándolo al portapapeles en web o con `Share.share` en nativo, igual que el patrón ya usado para compartir el perfil.
 
@@ -34,7 +36,7 @@ El bloqueo de usuarios (migración 51) vive en `blocked_users`, no en `friendshi
 
 ## Pantallas y dependencias
 
-- Pantallas: `SettingsScreen`, `TermsScreen`, `TrustScoreHistoryScreen`, `BlockedUsersScreen` y `ReportarProblemaScreen`.
+- Pantallas: `SettingsScreen`, `TermsScreen`, `LegalScreen` (`Privacidad`/`Cookies`), `TrustScoreHistoryScreen`, `BlockedUsersScreen` y `ReportarProblemaScreen`.
 - Código: `src/services/settings.js`, `profile.js`, `auth.js`, `blockedUsers.js`, `dataExport.js`, `supportTickets.js`, `storage.js` (`uploadSupportScreenshot`/`removeSupportScreenshotFile`), `src/utils/notificationPreferences.js` y `src/utils/appVersion.js`.
 - Backend: `profiles`, historial de Trust Score, avisos/tokens, `delete_my_account` (migración 21), `blocked_users`/`bloquear_usuario`/`desbloquear_usuario` (migración 51), `support_tickets` + bucket `support-screenshots` (migración 52) y la Edge Function `reportar-problema` (correo del reporte vía `_shared/correoReporte.ts`).
 
