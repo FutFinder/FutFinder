@@ -1,15 +1,16 @@
 /**
- * Política de privacidad y política de cookies de FutFinder.
+ * Términos y condiciones, política de privacidad y política de cookies.
  *
- * Viven acá y no en una web aparte porque `futfinder.cl/privacidad`, a donde
- * apuntaban Bienvenida, Registro y Ajustes, no respondía: aceptar una
- * política que no se puede leer no es aceptar nada. Como datos puros se
+ * Viven acá y no en una web aparte porque `futfinder.cl/terminos` y
+ * `futfinder.cl/privacidad`, a donde apuntaban Bienvenida, Registro y
+ * Ajustes, no respondían: aceptar algo que no se puede leer no es aceptar
+ * nada. Como datos puros se
  * pueden probar sin montar la pantalla y `LegalScreen` las dibuja igual en
  * web y en el teléfono.
  *
  * CADA FRASE TIENE QUE SER VERDAD EN EL CÓDIGO. Antes de cambiar un servicio
- * externo, una clave del almacenamiento local o qué entra en «Exportar mis
- * datos», revisa la sección que lo nombra. Si cambia algo de fondo, sube
+ * externo, una clave del almacenamiento local, qué entra en «Exportar mis
+ * datos» o una regla de reservas o de clubes, revisa la sección que lo nombra. Si cambia algo de fondo, sube
  * `ACTUALIZADO` y, para cookies, `VERSION_AVISO_COOKIES` en
  * `utils/avisoCookies.js`, que vuelve a mostrar el aviso en web.
  */
@@ -169,4 +170,109 @@ const cookies = {
   ],
 };
 
-export const DOCUMENTOS_LEGALES = { privacidad, cookies };
+const terminos = {
+  titulo: 'Términos y condiciones',
+  resumen:
+    'Las reglas para usar FutFinder: juega limpio, cumple lo que te comprometes a jugar y trata bien a los demás. Al crear tu cuenta aceptas estos términos.',
+  secciones: [
+    {
+      titulo: 'Qué es FutFinder',
+      parrafos: [
+        'FutFinder es una aplicación para encontrar y organizar partidos de fútbol amateur, armar clubes, conversar con otros jugadores y reservar canchas en Chile. Al crear una cuenta o usar la app aceptas estos términos y nuestra Política de privacidad. Si no estás de acuerdo, no uses la app.',
+      ],
+    },
+    {
+      titulo: 'Tu cuenta',
+      lista: [
+        'Puedes usar FutFinder desde los 12 años. Si tienes menos de 14, necesitas la autorización de tu madre, padre o tutor.',
+        'Los datos de tu perfil deben ser verdaderos. No puedes hacerte pasar por otra persona.',
+        'Tu cuenta es personal: cuida tu contraseña y no la compartas. Eres responsable de lo que se haga con ella.',
+        'Puedes eliminar tu cuenta cuando quieras desde Ajustes → Cuenta.',
+      ],
+    },
+    {
+      titulo: 'Partidos',
+      lista: [
+        'Quien publica un partido es su organizador: define la cancha, la hora, los cupos, la cuota y los requisitos, y confirma después quién asistió.',
+        'Al inscribirte te comprometes a ir. Salirte, llegar tarde o no presentarte afecta tu puntaje de reputación según las reglas que la app muestra antes de cada acción.',
+        'Si un partido tiene una cuota, se acuerda y se paga entre los jugadores y el organizador fuera de la app, salvo que se trate de una reserva pagada en FutFinder. FutFinder no cobra ni garantiza esas cuotas.',
+      ],
+    },
+    {
+      titulo: 'Reputación',
+      parrafos: [
+        'Tu puntaje de reputación (Trust Score o TrueScore) y las calificaciones de tus compañeros reflejan tu asistencia, puntualidad y juego limpio. Los calcula el sistema a partir de lo que ocurre en los partidos; nadie puede editar el suyo. Un organizador puede exigir un puntaje mínimo para entrar a su partido.',
+      ],
+    },
+    {
+      titulo: 'Clubes y desafíos',
+      lista: [
+        'Puedes pertenecer hasta a tres clubes. Cada club admite hasta 26 integrantes y 3 administradores.',
+        'Los administradores gestionan el club, sus integrantes y sus desafíos, y son responsables de su uso.',
+        'El resultado de un desafío lo proponen los administradores de un club y lo confirma el otro. Si no hay acuerdo, el resultado queda en disputa hasta que lo revise FutFinder.',
+        'Un club que cancela un desafío con menos de 2 horas de aviso puede quedar sancionado para nuevos desafíos durante 14 días.',
+      ],
+    },
+    {
+      titulo: 'Reservas de canchas y pagos',
+      lista: [
+        'Las canchas las administra cada recinto. FutFinder te permite ver su disponibilidad, reservar y pagar, pero no es dueño de las canchas ni responde por su estado o por lo que ocurra en ellas.',
+        'Los pagos con tarjeta los procesa Flow. Los montos se muestran en pesos chilenos antes de pagar.',
+        'Puedes cancelar una reserva confirmada hasta 12 horas antes de su inicio; lo pagado vuelve a tu Balance FutFinder. Después de ese plazo no se puede cancelar desde la app.',
+        'Si pagaste y la reserva no alcanzó a confirmarse, por ejemplo porque otro grupo tomó el horario antes, te devolvemos el monto completo.',
+        'Lo que tengas en tu Balance solo se usa para pagar reservas dentro de FutFinder.',
+      ],
+    },
+    {
+      titulo: 'Recintos',
+      parrafos: [
+        'Si administras un recinto en FutFinder, te comprometes a publicar información real sobre tus canchas, precios y horarios, y a respetar las reservas confirmadas. Revisamos cada recinto antes de publicarlo y podemos retirarlo si no cumple estos términos.',
+      ],
+    },
+    {
+      titulo: 'Convivencia y contenido',
+      parrafos: [
+        'Eres responsable de lo que publicas: mensajes, fotos, nombres de clubes y descripciones. No está permitido:',
+      ],
+      lista: [
+        'Insultar, acosar, amenazar o discriminar a otras personas.',
+        'Publicar contenido sexual, violento, ilegal o que no te pertenezca.',
+        'Hacer spam, estafas o vender productos sin autorización.',
+        'Crear cuentas falsas, manipular la reputación o los resultados, o intentar acceder a datos de otros.',
+        'Agredir a otros jugadores dentro o fuera de la cancha.',
+      ],
+      parrafosFinales: [
+        'Puedes bloquear a otro jugador o reportar su cuenta desde su perfil, y reportar un problema de la app desde Ajustes.',
+      ],
+    },
+    {
+      titulo: 'Moderación y suspensión',
+      parrafos: [
+        'Podemos revisar reportes, ocultar contenido y suspender o cerrar cuentas que no cumplan estos términos. Si crees que nos equivocamos, escríbenos y revisaremos tu caso.',
+      ],
+    },
+    {
+      titulo: 'Responsabilidad',
+      parrafos: [
+        'El fútbol es un deporte de contacto. Cada jugador participa bajo su propia responsabilidad y debe cuidar su salud y la de los demás. FutFinder pone en contacto a jugadores, clubes y recintos, pero no organiza los partidos ni está presente en ellos, por lo que no responde por lesiones, daños, pérdidas o conflictos entre usuarios, salvo en lo que la ley no permita excluir.',
+        'Hacemos lo posible para que la app funcione siempre, pero puede tener interrupciones o errores. Podemos cambiar, agregar o quitar funciones.',
+        'Nada de esto limita los derechos que te da la Ley N° 19.496 de protección de los derechos de los consumidores.',
+      ],
+    },
+    {
+      titulo: 'Cambios y ley aplicable',
+      parrafos: [
+        'Si cambiamos algo importante de estos términos, te lo avisaremos antes de que aplique. Seguir usando la app después significa que aceptas los cambios.',
+        'Estos términos se rigen por las leyes de Chile.',
+      ],
+    },
+    {
+      titulo: 'Contacto',
+      parrafos: [
+        `Si tienes dudas sobre estos términos escríbenos a ${CORREO_PRIVACIDAD} o usa «Reportar un problema» en Ajustes.`,
+      ],
+    },
+  ],
+};
+
+export const DOCUMENTOS_LEGALES = { terminos, privacidad, cookies };

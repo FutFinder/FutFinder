@@ -8,7 +8,6 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Eye, EyeOff, Check } from 'lucide-react-native';
@@ -29,7 +28,6 @@ import {
 import { saveRememberedAccount } from '../utils/rememberedAccount';
 import { isSupabaseConfigured } from '../services/supabase';
 
-const TERMS_URL = 'https://futfinder.cl/terminos';
 
 function GoogleIcon({ size = 19 }) {
   return (
@@ -71,7 +69,6 @@ export default function RegisterScreen({ navigation }) {
 
   const showBanner = (type, title, message = '') => setBanner({ type, title, message });
 
-  const openURL = (url) => { Linking.openURL(url).catch(() => {}); };
 
   const showComingSoon = (proveedor) => {
     showBanner('info', `Muy pronto`, `El registro con ${proveedor} todavía no está disponible.`);
@@ -284,7 +281,7 @@ export default function RegisterScreen({ navigation }) {
             </View>
             <Text style={styles.termsText}>
               Acepto los{' '}
-              <Text style={styles.termsLink} onPress={() => openURL(TERMS_URL)}>Términos</Text>
+              <Text style={styles.termsLink} onPress={() => navigation.navigate('Terminos')}>Términos</Text>
               {' '}y la{' '}
               <Text style={styles.termsLink} onPress={() => navigation.navigate('Privacidad')}>Política de Privacidad</Text>
               {' '}de FutFinder.

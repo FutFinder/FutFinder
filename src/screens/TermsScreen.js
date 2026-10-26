@@ -98,7 +98,9 @@ export default function TermsScreen({ navigation }) {
             <View style={styles.legalBox}>
               <Text style={styles.legalText}>{TERMS_TEXT}</Text>
               <Text style={styles.legalLinks}>
-                Lee la{' '}
+                Lee los{' '}
+                <Text style={styles.legalLink} onPress={() => navigation.navigate('Terminos')}>Términos y condiciones</Text>
+                , la{' '}
                 <Text style={styles.legalLink} onPress={() => navigation.navigate('Privacidad')}>Política de privacidad</Text>
                 {' '}y la{' '}
                 <Text style={styles.legalLink} onPress={() => navigation.navigate('Cookies')}>Política de cookies</Text>.

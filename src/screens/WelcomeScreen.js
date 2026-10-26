@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Animated,
   ActivityIndicator,
-  Linking,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +17,6 @@ import { Card, SectionLabel, Button } from '../components/reservas/ui';
 import { paleta as C, fuentes as F } from '../theme/colors';
 import { getOnboardingState } from '../services/profile';
 
-const TERMS_URL = 'https://futfinder.cl/terminos';
 
 // El héroe arranca ocupando toda la pantalla (logo, titular, hint de scroll)
 // y se contrae a medida que se scrollea, revelando el resto — igual que el
@@ -208,7 +206,6 @@ export default function WelcomeScreen({ navigation }) {
     return () => { cancelled = true; };
   }, [navigation]);
 
-  const openURL = (url) => { Linking.openURL(url).catch(() => {}); };
 
   if (checking) {
     return (
@@ -294,7 +291,7 @@ export default function WelcomeScreen({ navigation }) {
               <Button label="Siguiente" onPress={() => navigation.navigate('Tutorial')} />
               <Text style={styles.legal}>
                 Al continuar aceptas nuestros{' '}
-                <Text style={styles.legalLink} onPress={() => openURL(TERMS_URL)}>Términos</Text>
+                <Text style={styles.legalLink} onPress={() => navigation.navigate('Terminos')}>Términos</Text>
                 {' '}y{' '}
                 <Text style={styles.legalLink} onPress={() => navigation.navigate('Privacidad')}>Política de Privacidad</Text>
               </Text>

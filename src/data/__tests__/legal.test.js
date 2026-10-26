@@ -9,8 +9,8 @@ const { debeMostrarseAviso, VERSION_AVISO_COOKIES } = require('../../utils/aviso
 const RAIZ = path.join(__dirname, '..', '..', '..');
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 
-test('las dos políticas existen y cada sección tiene algo que leer', () => {
-  assert.deepEqual(Object.keys(DOCUMENTOS_LEGALES).sort(), ['cookies', 'privacidad']);
+test('los tres documentos existen y cada sección tiene algo que leer', () => {
+  assert.deepEqual(Object.keys(DOCUMENTOS_LEGALES).sort(), ['cookies', 'privacidad', 'terminos']);
   for (const [clave, doc] of Object.entries(DOCUMENTOS_LEGALES)) {
     assert.ok(doc.titulo && doc.resumen, `${clave}: falta título o resumen`);
     assert.ok(doc.secciones.length > 0, `${clave}: sin secciones`);
@@ -43,11 +43,28 @@ test('la política de cookies nombra cada clave que la app guarda en el disposit
   }
 });
 
-test('la app no enlaza más a la política en una web externa que no responde', () => {
+test('la app no enlaza más a términos ni políticas en una web externa que no responde', () => {
   for (const archivo of ['src/screens/SettingsScreen.js', 'src/screens/RegisterScreen.js', 'src/screens/WelcomeScreen.js']) {
-    assert.ok(!leer(archivo).includes('futfinder.cl/privacidad'), `${archivo} sigue abriendo futfinder.cl/privacidad`);
-    assert.ok(leer(archivo).includes("navigate('Privacidad')"), `${archivo} no lleva a la pantalla de privacidad`);
+    const fuente = leer(archivo);
+    for (const [web, ruta] of [['futfinder.cl/privacidad', 'Privacidad'], ['futfinder.cl/terminos', 'Terminos']]) {
+      assert.ok(!fuente.includes(web), `${archivo} sigue abriendo ${web}`);
+      assert.ok(fuente.includes(`navigate('${ruta}')`), `${archivo} no lleva a la pantalla ${ruta}`);
+    }
   }
+});
+
+test('Ajustes abre los términos para leer, no el paso del registro que marca el onboarding', () => {
+  // `Terms` llama a completeOnboarding() y termina en «¡Todo listo!»: no es
+  // un lugar al que se llega desde Ajustes con la cuenta ya creada.
+  assert.ok(!leer('src/screens/SettingsScreen.js').includes("navigate('Terms')"));
+});
+
+test('los términos dicen las mismas reglas de reservas y clubes que el código', () => {
+  const texto = JSON.stringify(DOCUMENTOS_LEGALES.terminos);
+  const reglas = leer('src/services/reservasRules.js');
+  const horas = reglas.match(/CANCELLATION_WINDOW_HOURS = (\d+)/)[1];
+  assert.ok(texto.includes(`hasta ${horas} horas antes`), 'el plazo de cancelación de reservas no coincide');
+  assert.ok(texto.includes('hasta a tres clubes') && texto.includes('26 integrantes'), 'los topes de clubes no coinciden');
 });
 
 test('el aviso de cookies se muestra hasta que se ve la versión vigente', () => {

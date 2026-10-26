@@ -7,7 +7,6 @@ import {
   Pressable,
   TextInput,
   Platform,
-  Linking,
   ActivityIndicator,
   PanResponder,
   Share,
@@ -63,7 +62,6 @@ import { describeAuthError } from '../services/authPolicy';
 import { buildMyDataExport } from '../services/dataExport';
 import useConfirmacion from '../components/useConfirmacion';
 
-const TERMS_URL = 'https://futfinder.cl/terminos';
 
 // ── Custom slider (no deps externos) ─────────────────────────────
 // onValueChange: llama en cada movimiento (UI en tiempo real)
@@ -629,12 +627,6 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
-  const openURL = (url) => {
-    Linking.openURL(url).catch(() =>
-      showBanner('error', 'No se pudo abrir el enlace', url)
-    );
-  };
-
   if (loadStatus === 'loading') {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
@@ -797,10 +789,7 @@ export default function SettingsScreen({ navigation }) {
             icon={FileText}
             title="Términos y condiciones"
             showChevron
-            onPress={() => {
-              if (Platform.OS === 'web') { openURL(TERMS_URL); }
-              else { navigation.navigate('Terms'); }
-            }}
+            onPress={() => navigation.navigate('Terminos')}
           />
           <Row
             icon={FileLock}

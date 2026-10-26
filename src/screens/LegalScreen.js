@@ -8,7 +8,7 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, FileLock, Cookie, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, FileText, FileLock, Cookie, ChevronRight } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
@@ -16,15 +16,23 @@ import { APP_VERSION } from '../utils/appVersion';
 import { ACTUALIZADO, CORREO_PRIVACIDAD, DOCUMENTOS_LEGALES } from '../data/legal';
 
 /**
- * Política de privacidad (`Privacidad`) y de cookies (`Cookies`).
+ * Términos y condiciones (`Terminos`), política de privacidad (`Privacidad`)
+ * y de cookies (`Cookies`).
  *
- * Una sola pantalla para las dos rutas: la ruta elige el documento. Son
+ * Una sola pantalla para las tres rutas: la ruta elige el documento. Son
  * públicas a propósito —se leen ANTES de crear la cuenta, desde Bienvenida y
- * Registro— y tienen URL propia (`/privacidad`, `/cookies`), así que también
- * se abren escribiendo la dirección sin sesión, como cualquier sitio.
+ * Registro— y tienen URL propia (`/terminos`, `/privacidad`, `/cookies`), así
+ * que también se abren escribiendo la dirección sin sesión, como cualquier
+ * sitio.
+ *
+ * No confundir con `Terms`: ésa es el paso del registro donde se ACEPTA, y
+ * al aceptar marca el onboarding como completo. Ésta sólo se lee.
  */
-const DOC_POR_RUTA = { Privacidad: 'privacidad', Cookies: 'cookies' };
-const OTRA_RUTA = { Privacidad: 'Cookies', Cookies: 'Privacidad' };
+const RUTAS = [
+  { ruta: 'Terminos', doc: 'terminos', Icono: FileText },
+  { ruta: 'Privacidad', doc: 'privacidad', Icono: FileLock },
+  { ruta: 'Cookies', doc: 'cookies', Icono: Cookie },
+];
 
 function Parrafos({ textos }) {
   return (textos || []).map((t) => (
@@ -33,10 +41,10 @@ function Parrafos({ textos }) {
 }
 
 export default function LegalScreen({ navigation, route }) {
-  const doc = DOCUMENTOS_LEGALES[DOC_POR_RUTA[route.name] || 'privacidad'];
-  const otra = OTRA_RUTA[route.name] || 'Cookies';
-  const otroDoc = DOCUMENTOS_LEGALES[DOC_POR_RUTA[otra]];
-  const Icono = route.name === 'Cookies' ? Cookie : FileLock;
+  const actual = RUTAS.find((r) => r.ruta === route.name) || RUTAS[0];
+  const doc = DOCUMENTOS_LEGALES[actual.doc];
+  const Icono = actual.Icono;
+  const otras = RUTAS.filter((r) => r !== actual);
 
   // Abierta directo por URL no hay a dónde volver: Splash decide si toca
   // Bienvenida o Inicio según la sesión.
@@ -102,14 +110,20 @@ export default function LegalScreen({ navigation, route }) {
             </Pressable>
           </View>
 
-          <Pressable
-            onPress={() => navigation.navigate(otra)}
-            accessibilityRole="link"
-            style={({ pressed }) => [styles.otroDoc, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={styles.otroDocTexto}>Ver {otroDoc.titulo.toLowerCase()}</Text>
-            <ChevronRight color={C.textSecondary} size={18} />
-          </Pressable>
+          {otras.map((r) => (
+            <Pressable
+              key={r.ruta}
+              onPress={() => navigation.navigate(r.ruta)}
+              accessibilityRole="link"
+              style={({ pressed }) => [styles.otroDoc, pressed && { opacity: 0.7 }]}
+            >
+              <View style={styles.otroDocFila}>
+                <r.Icono color={C.green} size={18} />
+                <Text style={styles.otroDocTexto}>{DOCUMENTOS_LEGALES[r.doc].titulo}</Text>
+              </View>
+              <ChevronRight color={C.textSecondary} size={18} />
+            </Pressable>
+          ))}
 
           <Text style={styles.footer}>FutFinder{APP_VERSION ? ` v${APP_VERSION}` : ''} · © 2026</Text>
         </ScrollView>
@@ -210,7 +224,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   otroDoc: {
-    marginTop: 14,
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -221,6 +235,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderSoft,
   },
+  otroDocFila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   otroDocTexto: {
     color: C.textPrimary,
     fontFamily: F.semiBold,

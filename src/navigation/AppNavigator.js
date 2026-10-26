@@ -112,8 +112,9 @@ const SafeLoginScreen = withErrorBoundary(LoginScreen, 'Login');
 const SafeVerificationScreen = withErrorBoundary(VerificationScreen, 'Verification');
 const SafeLocationPermissionScreen = withErrorBoundary(LocationPermissionScreen, 'LocationPermission');
 const SafeTermsScreen = withErrorBoundary(TermsScreen, 'Terms');
-// Las políticas se leen antes de tener cuenta (Bienvenida, Registro), así
-// que tampoco pasan por la guarda. Son texto fijo: no leen datos de nadie.
+// Términos y políticas se leen antes de tener cuenta (Bienvenida, Registro),
+// así que tampoco pasan por la guarda. Son texto fijo: no leen datos de nadie.
+const SafeTerminosScreen = withErrorBoundary(LegalScreen, 'Terminos');
 const SafePrivacidadScreen = withErrorBoundary(LegalScreen, 'Privacidad');
 const SafeCookiesScreen = withErrorBoundary(LegalScreen, 'Cookies');
 const SafeSuccessScreen = withErrorBoundary(SuccessScreen, 'Success');
@@ -248,8 +249,9 @@ const linking = {
       // No muestra datos de nadie: son las primitivas con textos de
       // ejemplo (por eso tampoco pasa por `withAuthGuard`).
       ReservasUiGallery: 'ui-reservas',
-      // Las políticas, en la misma dirección a la que ya apuntaban los
-      // enlaces de la app (`futfinder.cl/privacidad`).
+      // Términos y políticas, en las mismas direcciones a las que ya
+      // apuntaban los enlaces de la app (`futfinder.cl/terminos`, …).
+      Terminos: 'terminos',
       Privacidad: 'privacidad',
       Cookies: 'cookies',
     },
@@ -301,8 +303,9 @@ export default function AppNavigator() {
         <Stack.Screen name="Verification" component={SafeVerificationScreen} />
         <Stack.Screen name="LocationPermission" component={SafeLocationPermissionScreen} />
         <Stack.Screen name="Terms" component={SafeTermsScreen} />
-        <Stack.Screen name="Privacidad" component={SafePrivacidadScreen} />
-        <Stack.Screen name="Cookies" component={SafeCookiesScreen} />
+        <Stack.Screen name="Terminos" component={SafeTerminosScreen} options={{ title: 'Términos y condiciones' }} />
+        <Stack.Screen name="Privacidad" component={SafePrivacidadScreen} options={{ title: 'Política de privacidad' }} />
+        <Stack.Screen name="Cookies" component={SafeCookiesScreen} options={{ title: 'Política de cookies' }} />
         <Stack.Screen name="Success" component={SafeSuccessScreen} options={{ animation: 'fade' }} />
 
         {/* Una vez logueado, el usuario vive dentro de Main (tabs) */}

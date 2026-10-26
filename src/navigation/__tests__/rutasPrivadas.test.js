@@ -38,8 +38,9 @@ const PUBLICAS = new Set([
   'Verification',
   'LocationPermission',
   'Terms',
-  // Políticas de privacidad y cookies: texto fijo que se lee antes de
-  // crear la cuenta.
+  // Términos y políticas de privacidad y cookies: texto fijo que se lee
+  // antes de crear la cuenta.
+  'Terminos',
   'Privacidad',
   'Cookies',
   'Success',
