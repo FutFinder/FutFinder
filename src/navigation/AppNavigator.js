@@ -264,11 +264,15 @@ const linking = {
  * Estructura de la app:
  *
  *  RootStack
- *  ├── Welcome (initial)
- *  ├── Tutorial / Register / Login / Verification / LocationPermission / Terms / Success  (onboarding)
- *  ├── Main         ← BottomTabs (HomeTab, SearchTab, CreateTab*, ChatTab, ProfileTab)
- *  ├── CreateMatch  (modal-style, oculta tab bar)
- *  └── EditProfile  (modal-style, oculta tab bar)
+ *  ├── Splash (initial) → decide entre Welcome, LocationPermission o Main
+ *  ├── Welcome / Tutorial / Register / Login / Verification /
+ *  │   LocationPermission / Terms / Success  (onboarding; Terms es el paso
+ *  │   de aceptar las condiciones, no la página legal)
+ *  ├── Terminos / Privacidad / Cookies  (páginas legales públicas)
+ *  ├── Main         ← BottomTabs (HomeTab, SearchTab, ClubsTab, CreateTab*,
+ *  │                  ReservasTab, ChatTab, ProfileTab)
+ *  └── Pantallas de detalle sobre las tabs (CreateMatch, EditProfile,
+ *      MatchDetail, ChatThread…): ocultan la tab bar.
  *
  *  * CreateTab intercepta el press y navega al stack CreateMatch.
  */

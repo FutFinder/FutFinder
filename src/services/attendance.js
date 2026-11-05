@@ -5,12 +5,15 @@ import { getCurrentLocation } from './location';
  * Confirma la asistencia del usuario actual a un partido leyendo su GPS
  * y llamando al RPC `confirm_attendance_gps` en la base de datos.
  *
- * Lógica del Trust Score (en SQL):
- *   - Distancia ≤ 200m de la cancha
- *   - Dentro de la ventana [hora-30min, hora+90min]
- *   → marca attendees.estado = 'confirmado_gps'
- *   → +1 al profile.trust_score (cap 100)
- *   → +1 a profile.asistencias_confirmadas
+ * Lo que hace la RPC (migración 134):
+ *   - Distancia ≤ 200 m de la cancha.
+ *   - Ventana [hora − 30 min, fin del partido + 30 min], con fin = hora +
+ *     duracion_min (90 si falta).
+ *   → marca attendees.estado = 'confirmado_gps' y suma 1 a
+ *     profiles.asistencias_confirmadas.
+ *   → Con TrueScore (fase 1) no mueve el puntaje: `trust_delta` llega en 0 y
+ *     los puntos los aplica después el organizador al marcar asistencia.
+ *     Sin TrueScore, +1 al trust_score (tope 100).
  *
  * Devuelve un objeto { ok, reason, distance? }.
  */

@@ -107,9 +107,9 @@ export default function App() {
   // Guardamos el último userId para poder borrar su token al hacer logout
   const lastUserIdRef = useRef(null);
 
-  // Manrope es la única fuente que no es `System` en toda la app — la pide
-  // el handoff de Reservas (theme/colors.js: reservasFonts). El resto de la
-  // app no depende de esto y sigue rindiendo con `System` mientras carga.
+  // Manrope es la tipografía de toda la app (theme/colors.js: `fuentes`).
+  // Se espera a que cargue antes de pintar nada: ver `if (!fontsLoaded)`
+  // más abajo.
   const [fontsLoaded] = useFonts({
     Manrope_500Medium,
     Manrope_600SemiBold,
@@ -178,7 +178,7 @@ export default function App() {
     };
   }, []);
 
-  // Sin esto, un componente de Reservas podría montarse un instante antes de
+  // Sin esto, cualquier pantalla podría montarse un instante antes de
   // que Manrope esté lista y quedar con la fuente por defecto hasta el
   // siguiente re-render. La espera es breve (son 4 pesos, ya cacheados tras
   // la primera carga) y el splash animado de la app cubre visualmente esta
