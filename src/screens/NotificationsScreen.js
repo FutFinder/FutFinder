@@ -30,11 +30,19 @@ import {
   deleteNotification,
   deleteAllNotifications,
   subscribeToNotifications,
+  contarAvisos,
   getEstadosDeOrigen,
 } from '../services/notifications';
 import { navigateToNotification } from '../utils/notificationTargets';
 import { puedeResponderDesafio } from '../utils/permisosDesafio';
 import { avisoDelClub } from '../utils/clubsHomeSources';
+import {
+  AVISOS_POR_PAGINA,
+  cursorDeAvisos,
+  sumarPaginaDeAvisos,
+  tiposDeCategoria,
+} from '../utils/consultaDeAvisos';
+import { crearSecuencia } from '../utils/paginacionPartidos';
 import {
   getInboxStatus,
   createRequestGuard,
@@ -53,8 +61,10 @@ import useConfirmacion from '../components/useConfirmacion';
 
 /**
  * Pantalla de inbox de notificaciones — "Avisos".
- * - Carga las últimas 50 al entrar, agrupadas por fecha (Hoy / Esta semana / Anteriores).
- * - Filtro por categoría (Todos / Clubes / Partidos / Social).
+ * - Carga una página del filtro activo, agrupada por fecha (Hoy / Esta semana /
+ *   Anteriores), y «Ver avisos anteriores» trae la siguiente.
+ * - Filtro por categoría (Todos / Clubes / Partidos / Social), aplicado en la
+ *   consulta y no después: ver utils/consultaDeAvisos.js (C06).
  * - Realtime: INSERT/UPDATE del usuario se refleja en caliente.
  * - Acciones inline (Aceptar/Rechazar) para desafíos de club, solicitudes de
  *   club y solicitudes de amistad — el resto solo navega al tocar, igual que antes.
@@ -189,6 +199,16 @@ export default function NotificationsScreen({ navigation, route }) {
   const [busyIds, setBusyIds] = useState(() => new Set());
   const navigatingIds = useRef(new Set());
   const actionGuard = useRef(createRequestGuard()).current;
+  // Paginación (C06): la categoría y el club se piden al servidor, y lo que
+  // quede más atrás se trae con «Ver avisos anteriores».
+  const [hayMas, setHayMas] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const [conteos, setConteos] = useState(null);
+  const secuencia = useRef(crearSecuencia()).current;
+
+  // Con club activo la categoría queda fija en «clubes»: no se ofrece
+  // cambiar a partidos ni social, para no contradecir «Actividad reciente».
+  const filtroEfectivo = clubIdActivo ? 'clubes' : filter;
 
   const setBusy = useCallback((id, isBusy) => {
     setBusyIds((prev) => {
@@ -199,11 +219,30 @@ export default function NotificationsScreen({ navigation, route }) {
     });
   }, []);
 
+  // Los chips cuentan en el servidor: la lista trae sólo una página del
+  // filtro activo, así que contar lo cargado mentiría. Con club activo no
+  // hay chips.
+  const recargarConteos = useCallback(async () => {
+    if (clubIdActivo) return;
+    const pares = await Promise.all(
+      FILTERS.map(async (f) => [f.key, await contarAvisos({ tipos: tiposDeCategoria(f.key, CATEGORY) })])
+    );
+    setConteos(Object.fromEntries(pares));
+  }, [clubIdActivo]);
+
   const load = useCallback(async () => {
-    const [{ data, error }, clubResult] = await Promise.all([
-      listNotifications({ limit: 50 }),
+    const turno = secuencia.abrir();
+    const [{ data, hasMore, error }, clubResult] = await Promise.all([
+      listNotifications({
+        limit: AVISOS_POR_PAGINA,
+        tipos: tiposDeCategoria(filtroEfectivo, CATEGORY),
+        clubId: clubIdActivo || null,
+      }),
       getMisClubesConPermiso(['pubChallenge', 'answerChallenge']),
+      recargarConteos(),
     ]);
+    // Cambiar de filtro con una carga en el aire: la vieja no pisa la nueva.
+    if (!secuencia.vigente(turno)) return;
     if (error) {
       // No pisamos `items`: si ya había una lista cargada, se queda ahí
       // debajo del estado de error hasta el próximo reintento exitoso.
@@ -214,14 +253,41 @@ export default function NotificationsScreen({ navigation, route }) {
     // Lo ya respondido llega sin botones y con su resultado, aunque se haya
     // respondido desde otra pantalla u otro dispositivo.
     const estados = await getEstadosDeOrigen(data || []);
+    if (!secuencia.vigente(turno)) return;
     setItems(conResoluciones(data || [], estados));
+    setHayMas(!!hasMore);
     setClubesAdmin(clubResult?.data ?? null);
-  }, []);
+  }, [filtroEfectivo, clubIdActivo, recargarConteos, secuencia]);
 
   useEffect(() => {
     setLoading(true);
     load().finally(() => setLoading(false));
   }, [load]);
+
+  const cargarMas = async () => {
+    if (cargandoMas || !hayMas) return;
+    const turno = secuencia.abrir();
+    setCargandoMas(true);
+    const { data, hasMore, error } = await listNotifications({
+      limit: AVISOS_POR_PAGINA,
+      tipos: tiposDeCategoria(filtroEfectivo, CATEGORY),
+      clubId: clubIdActivo || null,
+      cursor: cursorDeAvisos(items),
+    });
+    if (!secuencia.vigente(turno)) {
+      setCargandoMas(false);
+      return;
+    }
+    if (error) {
+      setCargandoMas(false);
+      setBanner({ type: 'error', title: 'No pudimos cargar más avisos', message: error.message || '' });
+      return;
+    }
+    const estados = await getEstadosDeOrigen(data || []);
+    setItems((prev) => sumarPaginaDeAvisos(prev, conResoluciones(data || [], estados)));
+    setHayMas(!!hasMore);
+    setCargandoMas(false);
+  };
 
   const status = getInboxStatus({ loading, loadError });
 
@@ -233,10 +299,12 @@ export default function NotificationsScreen({ navigation, route }) {
       if (!user?.id) return;
       unsubscribe = subscribeToNotifications(user.id, (notif) => {
         setItems((prev) => fusionarAvisoEnVivo(prev, notif));
+        // Uno nuevo o uno borrado cambia lo que cuentan los chips.
+        if (notif?._eventType === 'INSERT' || notif?._eventType === 'DELETE') recargarConteos();
       });
     })();
     return () => unsubscribe();
-  }, []);
+  }, [recargarConteos]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -396,13 +464,12 @@ export default function NotificationsScreen({ navigation, route }) {
     const base = clubIdActivo ? items.filter((n) => avisoDelClub(n, clubIdActivo)) : items;
     return FILTERS.map((f) => ({
       ...f,
-      count: f.key === 'todos' ? base.length : base.filter((n) => CATEGORY[n.type] === f.key).length,
+      // El conteo del servidor; si no se pudo, lo cargado (mejor que nada).
+      count:
+        conteos?.[f.key] ??
+        (f.key === 'todos' ? base.length : base.filter((n) => CATEGORY[n.type] === f.key).length),
     }));
-  }, [items, clubIdActivo]);
-
-  // Con club activo la categoría queda fija en «clubes»: no se ofrece
-  // cambiar a partidos ni social, para no contradecir «Actividad reciente».
-  const filtroEfectivo = clubIdActivo ? 'clubes' : filter;
+  }, [items, clubIdActivo, conteos]);
 
   const sections = useMemo(() => {
     const visible = items
@@ -540,6 +607,19 @@ export default function NotificationsScreen({ navigation, route }) {
                 onSecondary={(n) => respond(n, false)}
               />
             )}
+            ListFooterComponent={
+              hayMas && items.length > 0 ? (
+                <Pressable
+                  onPress={cargarMas}
+                  disabled={cargandoMas}
+                  accessibilityRole="button"
+                  className="mt-4 h-11 flex-row items-center justify-center gap-2 rounded-[13px] border border-white/12 bg-black/45 active:opacity-70"
+                >
+                  {cargandoMas ? <ActivityIndicator size="small" color={C.green} /> : null}
+                  <Text className="text-[13px] font-bold text-white/85">Ver avisos anteriores</Text>
+                </Pressable>
+              ) : null
+            }
             ListEmptyComponent={
               <View className="mt-10 items-center gap-3 rounded-[20px] border border-dashed border-verde/28 bg-verde/5 px-5 py-7">
                 <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-verde/30 bg-verde/8">

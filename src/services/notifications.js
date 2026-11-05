@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 // El multiplexado de un canal Realtime es lógica pura y ya estaba resuelta
 // para el chat: se reutiliza en vez de escribir una segunda versión.
 import { createSharedChannel } from '../utils/chatMeta';
+import { aplicarFiltrosDeAvisos, filtroDeClub, paginaDeAvisos } from '../utils/consultaDeAvisos.js';
 
 /**
  * Servicio de notificaciones push de FutFinder.
@@ -193,16 +194,34 @@ export function addNotificationListeners({ onReceived, onTapped } = {}) {
  * chequea `user` explícitamente para distinguir ambos casos, igual que ya
  * hace `deleteAllNotifications` en este mismo archivo.
  */
-export async function listNotifications({ limit = 50 } = {}) {
-  if (!isSupabaseConfigured) return { data: [], error: null };
+export async function listNotifications({ limit = 50, tipos = null, clubId = null, cursor = null } = {}) {
+  if (!isSupabaseConfigured) return { data: [], hasMore: false, error: null };
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: [], error: { message: 'No autenticado' } };
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  return { data: data || [], error };
+  if (!user) return { data: [], hasMore: false, error: { message: 'No autenticado' } };
+  // Categoría y club van en la consulta, antes del límite, y se pagina por
+  // (created_at, id): filtrar después de traer 50 dejaba fuera para siempre
+  // lo que estuviera más atrás (C06, ver utils/consultaDeAvisos.js).
+  const { data, error } = await aplicarFiltrosDeAvisos(
+    supabase.from('notifications').select('*'),
+    { tipos, clubId, cursor }
+  ).limit(limit + 1);
+  if (error) return { data: [], hasMore: false, error };
+  return { ...paginaDeAvisos(data, limit), error: null };
+}
+
+/**
+ * Cuántos avisos hay con esos filtros, contados en el servidor (los chips de
+ * la bandeja). Contar lo cargado ya no sirve: la bandeja trae sólo una
+ * página del filtro activo. `null` si no se pudo contar.
+ */
+export async function contarAvisos({ tipos = null, clubId = null } = {}) {
+  if (!isSupabaseConfigured) return null;
+  let q = supabase.from('notifications').select('id', { count: 'exact', head: true });
+  if (Array.isArray(tipos)) q = q.in('type', tipos);
+  if (clubId) q = q.or(filtroDeClub(clubId));
+  const { count, error } = await q;
+  if (error) return null;
+  return count ?? null;
 }
 
 /**
