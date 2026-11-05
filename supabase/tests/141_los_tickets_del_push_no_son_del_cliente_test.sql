@@ -139,7 +139,11 @@ begin
     if not has_table_privilege('authenticated', 'public.push_tokens', v_priv) then
       raise exception 'CASO 8 FALLA: push_tokens perdió % para authenticated — esta migración no debía tocarla', v_priv;
     end if;
-    if not has_table_privilege('authenticated', 'public.notifications', v_priv) then
+    -- La 165 dejó UPDATE de notifications sólo sobre `read` (privilegio por
+    -- columna): la pregunta por la tabla entera ya no es la correcta.
+    if not (has_table_privilege('authenticated', 'public.notifications', v_priv)
+            or (v_priv = 'update'
+                and has_column_privilege('authenticated', 'public.notifications', 'read', 'update'))) then
       raise exception 'CASO 8 FALLA: notifications perdió % para authenticated — esta migración no debía tocarla', v_priv;
     end if;
   end loop;

@@ -491,9 +491,14 @@ begin
   update public.matches set hora = now() - interval '1 hour', estado = 'finalizado'
    where id = v_match_id;
 
+  -- El armado es cosa del servidor: la 165 deja que `authenticated` sólo
+  -- rechace, cancele y vincule el partido por la API, así que este
+  -- estado se escribe como el dueño y se vuelve a la sesión después.
+  reset role;
   update public.club_challenges
      set estado = 'esperando_resultado', match_id = v_match_id
    where id = v_challenge_id;
+  set local role authenticated;
 
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_a, 'role', 'authenticated')::text);
   v_res := public.proponer_resultado(v_challenge_id, 3, 1, null);
