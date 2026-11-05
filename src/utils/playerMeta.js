@@ -182,10 +182,8 @@ export function trustDisplay(profile, { ts = false } = {}) {
  *
  * @returns {{ value: string, pct: number|null, hint: string, confirmadas: number, cerradas: number }}
  */
-export function attendanceDisplay(history) {
-  const rows = history || [];
-  const confirmadas = rows.filter((h) => h.estado === 'confirmado_gps').length;
-  const ausencias = rows.filter((h) => h.estado === 'no_asistio').length;
+export function attendanceDisplay(history, conteo = null) {
+  const { confirmadas, ausencias } = contadoresDeAsistencia(history, conteo);
   const cerradas = confirmadas + ausencias;
 
   if (cerradas === 0) {
@@ -358,4 +356,25 @@ export function pistaDeValoracion(rating) {
   if (rating?.desconocido) return 'No pudimos cargar las evaluaciones';
   if (rating?.hasRatings) return `${rating.count} ${rating.count === 1 ? 'evaluación' : 'evaluaciones'}`;
   return 'Sin evaluaciones todavía';
+}
+
+/**
+ * Confirmadas y ausencias del jugador (P01). Con el conteo del servidor
+ * (`getConteoDeAsistencias`) se usa ése: el historial cargado son sólo las
+ * últimas 20 filas, y contar ahí dejaba fuera ausencias viejas. Sin conteo
+ * (falló), lo cargado, como antes.
+ */
+export function contadoresDeAsistencia(history, conteo = null) {
+  if (
+    conteo &&
+    Number.isFinite(Number(conteo.confirmadas)) &&
+    Number.isFinite(Number(conteo.ausencias))
+  ) {
+    return { confirmadas: Number(conteo.confirmadas), ausencias: Number(conteo.ausencias) };
+  }
+  const rows = history || [];
+  return {
+    confirmadas: rows.filter((h) => h.estado === 'confirmado_gps').length,
+    ausencias: rows.filter((h) => h.estado === 'no_asistio').length,
+  };
 }
