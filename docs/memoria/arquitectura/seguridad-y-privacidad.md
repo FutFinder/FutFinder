@@ -135,10 +135,10 @@ Hoy el registro usa OTP de correo pero el login era sólo contraseña. Se implem
 - **Obligatoria para el personal** (moderadores y administradores de recinto): **migración 167**, `mfa_ok_para_staff()` pegada a `es_moderador`, `es_admin_complejo/cancha/de_reserva`, `puede_en_complejo`, `admin_mis_complejos` y las cinco RPC de dueño (exigen `aal2` en el JWT). **Nace apagada** (`feature_flags.mfa_obligatoria_staff = false`): sin actualizaciones por aire, encenderla antes de que el personal tenga la pantalla los dejaría sin panel. Con la bandera apagada nada cambia (lo prueba el arnés de 16 casos). `AvisoMfaPersonal` en Inicio les explica por qué desaparecen sus secciones.
 - **Sin códigos de recuperación**: Supabase no los trae. Quien pierda su app de autenticación debe pedir al equipo que le quiten el factor (`delete from auth.mfa_factors where user_id = …` desde el panel). **Falta definir el canal de soporte** y ponerlo en el texto de la pantalla (hoy dice «escríbenos desde el correo de tu cuenta» sin dirección).
 
-### Qué falta aplicar o desplegar (nada de esto está en producción)
+### Qué falta aplicar o desplegar (lo que sigue pendiente)
 
-1. **Migraciones 165, 166 y 167** (aplicadas sólo a la base local; probadas con sus arneses y todos los demás: 126/130, ver abajo). Orden libre. La 149 sigue sin aplicar a propósito.
-2. **Edge Functions** (5): `supabase-js` fijado y `reportar-problema` con el tope de correo. `despliegues.json` las lista en `pendiente` con el hash exacto; al desplegar, mover los hashes a `archivos`. Se pueden desplegar antes o después de la 166 (la función ignora la RPC si no existe).
+1. **Migraciones 165 y 166: aplicadas en producción el 2026-11-05** con autorización de Vicente y verificadas por catálogo después (privilegios por columna, políticas de `club_photos`, 11 disparadores de límite, límite inyectado en `buscar_jugadores` y `registrar_telefono`, cron de limpieza a las 03:15). No se corrió el arnés contra producción. **La 167 sigue sólo en la base local** (espera el build de MFA). La 149 sigue sin aplicar a propósito.
+2. **Edge Functions** (5): `supabase-js` fijado y `reportar-problema` con el tope de correo. `despliegues.json` las lista en `pendiente` con el hash exacto; al desplegar, mover los hashes a `archivos`. La 166 ya está en producción, así que `reportar-problema` encontrará su RPC.
 3. **Vercel**: las cabeceras de `vercel.json` salen con el próximo despliegue de la web.
 4. **Build** de la app con las pantallas de MFA (iOS y Android; esta Mac no tiene SDK nativo, sólo se probó en web). Recién después: que cada administrador y moderador active su código, y recién entonces `update feature_flags set activo = true where nombre = 'mfa_obligatoria_staff'`.
 5. **Panel de Supabase**: confirmar que *MFA → TOTP* está habilitado (enroll y verify), límites de Auth, *JWT expiry*, rotación del refresh token y OTP a 900 s.
@@ -164,7 +164,7 @@ Arneses al 2026-11-05: 126 de 130 pasan; los cuatro que fallan **ya fallaban ant
 - La sesión sigue en `localStorage` (sin servidor propio no hay cookie `httpOnly`); la CSP reduce la probabilidad de XSS y el TOTP reduce el daño de una contraseña robada, pero **un XSS que ocurriera igual se llevaría la sesión**.
 - Los límites de Auth y la rotación del refresh token dependen del panel y nadie los ha leído desde el repositorio.
 - Sin códigos de recuperación de TOTP, hay un riesgo de bloqueo de cuentas que se resuelve a mano.
-- Hasta que se aplique la 165 en producción, **los siete problemas de autorización de arriba siguen abiertos allá** (el de `club_photos` es el más grave: cualquier admin de club escribe en la galería de todos).
+- La 165 ya está en producción (2026-11-05): los siete problemas de autorización de arriba quedaron cerrados allá. No se corrió el arnés contra producción; se verificó por catálogo.
 
 ## Notas relacionadas
 
