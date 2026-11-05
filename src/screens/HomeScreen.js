@@ -11,6 +11,7 @@ import MatchCard from '../components/home/MatchCard';
 import EmptyMatchesCard from '../components/home/EmptyMatchesCard';
 import SectionHeader from '../components/home/SectionHeader';
 import Banner from '../components/Banner';
+import AvisoMfaPersonal from '../components/AvisoMfaPersonal';
 import MatchPreviewSheet from '../components/MatchPreviewSheet';
 
 import {
@@ -325,6 +326,8 @@ export default function HomeScreen({ navigation }) {
             verified={verified}
             clubRoleLabel={clubRoleLabel}
           />
+
+          <AvisoMfaPersonal navigation={navigation} />
 
           {banner && (
             <View style={{ paddingHorizontal: 18, marginBottom: 4 }}>

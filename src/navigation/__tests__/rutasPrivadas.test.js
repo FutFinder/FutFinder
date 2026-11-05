@@ -161,6 +161,7 @@ test('las pantallas con datos de usuario, partidos, clubes y reservas están ent
     'Resumen',
     'ElegirCancha',
     'BlockedUsers',
+    'MfaSetup',
     'TrustScoreHistory',
     'VerificarTelefono',
   ]) {

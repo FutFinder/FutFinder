@@ -16,10 +16,12 @@ import FutFinderMark from '../components/FutFinderMark';
 import Banner from '../components/Banner';
 import { Card, IconButton, Button } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
-import { loginWithEmail, requestPasswordResetForEmail, getCurrentProfile } from '../services/auth';
+import { loginWithEmail, requestPasswordResetForEmail, getCurrentProfile, signOut } from '../services/auth';
+import { verificarCodigoDeEntrada } from '../services/mfa';
+import { necesitaSegundoPaso, nivelDesdeSesion, normalizarCodigo, codigoCompleto } from '../services/mfaPolicy';
 import { decideAuthDestination, isValidEmail, MENSAJES } from '../services/authPolicy';
 import { getOnboardingState } from '../services/profile';
-import { isSupabaseConfigured } from '../services/supabase';
+import { isSupabaseConfigured, supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getRememberedAccount, saveRememberedAccount } from '../utils/rememberedAccount';
 
@@ -44,8 +46,21 @@ export default function LoginScreen({ navigation }) {
   const [resetting, setResetting] = useState(false);
   const [banner, setBanner] = useState(null);
   const [remembered, setRemembered] = useState(null);
-  const { consumePendingDestination } = useAuth();
+  // Segundo paso: quien activó la verificación en dos pasos presenta el código
+  // de su app de autenticación después de la contraseña.
+  const [paso, setPaso] = useState('credenciales'); // 'credenciales' | 'codigo'
+  const [codigo, setCodigo] = useState('');
+  const [verificando, setVerificando] = useState(false);
+  const { consumePendingDestination, mfaPendiente } = useAuth();
   const passwordRef = useRef(null);
+  const codigoRef = useRef(null);
+
+  // Una sesión que entró sólo con la contraseña y todavía debe el código (se
+  // cerró la app a mitad de camino, o el guard nos mandó acá): se sigue desde
+  // el código, no se vuelve a pedir la contraseña.
+  useEffect(() => {
+    if (mfaPendiente) setPaso('codigo');
+  }, [mfaPendiente]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,11 +100,24 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
+    // Con la verificación en dos pasos activada, la contraseña sola no entra:
+    // falta el código. (La sesión ya existe, pero `AuthContext` no la da por
+    // autenticada hasta que suba a `aal2`.)
+    if (necesitaSegundoPaso(nivelDesdeSesion(result.session))) {
+      setCodigo('');
+      setPaso('codigo');
+      return;
+    }
+
+    await terminarEntrada({ session: result.session, email: result.email || email });
+  };
+
+  const terminarEntrada = async ({ session, email }) => {
     const done = await getOnboardingState();
-    const destino = decideAuthDestination({ session: result.session, onboardingDone: done });
+    const destino = decideAuthDestination({ session, onboardingDone: done });
 
     if (destino === 'verify-email') {
-      navigation.navigate('Verification', { email: result.email });
+      navigation.navigate('Verification', { email });
       return;
     }
 
@@ -118,6 +146,39 @@ export default function LoginScreen({ navigation }) {
     } else {
       navigation.reset({ index: 0, routes: [{ name: 'Main', params: pending?.params }] });
     }
+  };
+
+  const handleCodigo = async (valor = codigo) => {
+    if (verificando) return;
+    setBanner(null);
+    if (!codigoCompleto(valor)) {
+      showBanner('error', 'Código incompleto', 'Ingresa los 6 dígitos que muestra tu app de autenticación.');
+      return;
+    }
+    setVerificando(true);
+    const { error } = await verificarCodigoDeEntrada({ codigo: valor });
+    if (error) {
+      setVerificando(false);
+      setCodigo('');
+      showBanner('error', 'No pudimos verificar el código', error.message);
+      codigoRef.current?.focus();
+      return;
+    }
+    // La sesión ya subió a `aal2`; se sigue como después de una contraseña.
+    const { data } = await supabase.auth.getSession();
+    setVerificando(false);
+    await terminarEntrada({
+      session: data?.session,
+      email: data?.session?.user?.email || identifier.trim(),
+    });
+  };
+
+  const handleOtraCuenta = async () => {
+    await signOut();
+    setCodigo('');
+    setPassword('');
+    setBanner(null);
+    setPaso('credenciales');
   };
 
   const handleForgotPassword = async () => {
@@ -155,6 +216,50 @@ export default function LoginScreen({ navigation }) {
 
           {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
+          {paso === 'codigo' ? (
+            <>
+              <Text style={styles.title}>Verifica que{'\n'}eres tú</Text>
+              <Text style={styles.codigoAyuda}>
+                Abre tu app de autenticación e ingresa el código de 6 dígitos de FutFinder.
+              </Text>
+              <Card style={{ marginTop: 20 }}>
+                <Text style={styles.fieldLabel}>Código de verificación</Text>
+                <TextInput
+                  ref={codigoRef}
+                  style={[styles.input, styles.codigoInput]}
+                  placeholder="000000"
+                  placeholderTextColor={C.textMuted}
+                  value={codigo}
+                  onChangeText={(t) => {
+                    const limpio = normalizarCodigo(t);
+                    setCodigo(limpio);
+                    if (limpio.length === 6) handleCodigo(limpio);
+                  }}
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  textContentType="oneTimeCode"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  autoFocus
+                  accessibilityLabel="Código de 6 dígitos de tu app de autenticación"
+                />
+              </Card>
+              <View style={{ marginTop: 22, gap: 10 }}>
+                <Button
+                  label={verificando ? 'Verificando…' : 'Verificar'}
+                  onPress={() => handleCodigo()}
+                  loading={verificando}
+                />
+                <View style={styles.footerRow}>
+                  <Text style={styles.footerLink} onPress={handleOtraCuenta}>Usar otra cuenta</Text>
+                </View>
+                <Text style={styles.codigoAyudaChica}>
+                  ¿Perdiste el acceso a tu app de autenticación? Escríbenos desde el correo de tu cuenta y te ayudamos a recuperarla.
+                </Text>
+              </View>
+            </>
+          ) : (
+          <>
           <Text style={styles.title}>Qué bueno verte{'\n'}de vuelta</Text>
 
           {remembered && (
@@ -250,6 +355,9 @@ export default function LoginScreen({ navigation }) {
             </View>
           </View>
 
+          </>
+          )}
+
           {!isSupabaseConfigured && (
             <Text style={styles.demoHint}>
               ⚠️ Faltan las variables de entorno de Supabase, así que no se
@@ -319,6 +427,10 @@ const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   footerText: { fontFamily: F.semiBold, fontSize: 13, color: C.textSecondary },
   footerLink: { fontFamily: F.extraBold, fontSize: 13, color: C.textPrimary },
+
+  codigoAyuda: { fontFamily: F.medium, fontSize: 13.5, lineHeight: 20, color: C.textSecondary, marginTop: 12 },
+  codigoAyudaChica: { fontFamily: F.medium, fontSize: 11.5, lineHeight: 17, color: C.textMuted, textAlign: 'center', marginTop: 6 },
+  codigoInput: { fontSize: 24, letterSpacing: 8, textAlign: 'center', height: 56 },
 
   demoHint: { fontFamily: F.medium, fontSize: 11, lineHeight: 16, color: C.textMuted, textAlign: 'center', marginTop: 18 },
 });

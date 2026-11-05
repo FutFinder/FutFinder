@@ -1,8 +1,11 @@
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured, crearClienteEfimero } from './supabase';
 
 export async function verifyPassword(email, password) {
   if (!isSupabaseConfigured) return { error: null };
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  // Con un cliente aparte: `signInWithPassword` reemplaza la sesión, y para
+  // quien tiene la verificación en dos pasos eso la deja en `aal1` (fuera de
+  // su cuenta). Ver `crearClienteEfimero`.
+  const { error } = await crearClienteEfimero().auth.signInWithPassword({ email, password });
   if (error) return { error: { message: 'Contraseña actual incorrecta' } };
   return { error: null };
 }

@@ -33,3 +33,27 @@ export const supabase = createClient(
 );
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+/**
+ * Un cliente aparte, sin sesión guardada, para comprobar una contraseña.
+ *
+ * `signInWithPassword` REEMPLAZA la sesión del cliente. Con la verificación
+ * en dos pasos eso es un problema: volver a entrar «sólo para confirmar la
+ * contraseña» devuelve una sesión `aal1` y deja a la persona fuera de su
+ * propia cuenta. Un cliente efímero comprueba la contraseña sin tocar la
+ * sesión de verdad.
+ */
+export function crearClienteEfimero() {
+  return createClient(
+    SUPABASE_URL || 'http://placeholder.supabase.co',
+    SUPABASE_ANON_KEY || 'placeholder-key',
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'futfinder-comprobar-password',
+      },
+    }
+  );
+}

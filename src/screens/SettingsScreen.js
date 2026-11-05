@@ -35,6 +35,7 @@ import {
   Download,
   Smartphone,
   Gavel,
+  ShieldCheck,
 } from 'lucide-react-native';
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -813,6 +814,13 @@ export default function SettingsScreen({ navigation }) {
         <Card padded={false} style={styles.card}>
           <Row icon={Mail} title="Cambiar email" showChevron onPress={() => setModal('email')} />
           <Row icon={Lock} title="Cambiar contraseña" showChevron onPress={() => setModal('password')} />
+          <Row
+            icon={ShieldCheck}
+            title="Verificación en dos pasos"
+            subtitle="Un código de tu app de autenticación además de la contraseña"
+            showChevron
+            onPress={() => navigation.navigate('MfaSetup')}
+          />
           <Row
             icon={Smartphone}
             title="Teléfono"

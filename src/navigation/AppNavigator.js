@@ -64,6 +64,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
 import VerificarTelefonoScreen from '../screens/VerificarTelefonoScreen';
 import BlockedUsersScreen from '../screens/BlockedUsersScreen';
+import MfaSetupScreen from '../screens/MfaSetupScreen';
 import ReservasUiGalleryScreen from '../screens/ReservasUiGalleryScreen';
 import ComplejoDetailScreen from '../screens/ComplejoDetailScreen';
 import ElegirCanchaScreen from '../screens/ElegirCanchaScreen';
@@ -162,6 +163,7 @@ const GuardedSettingsScreen = withAuthGuard(SettingsScreen, 'Settings');
 const GuardedTrustScoreHistoryScreen = withAuthGuard(TrustScoreHistoryScreen, 'TrustScoreHistory');
 const GuardedVerificarTelefonoScreen = withAuthGuard(VerificarTelefonoScreen, 'VerificarTelefono');
 const GuardedBlockedUsersScreen = withAuthGuard(BlockedUsersScreen, 'BlockedUsers');
+const GuardedMfaSetupScreen = withAuthGuard(MfaSetupScreen, 'MfaSetup');
 const GuardedComplejoDetailScreen = withAuthGuard(ComplejoDetailScreen, 'ComplejoDetail');
 const GuardedElegirCanchaScreen = withAuthGuard(ElegirCanchaScreen, 'ElegirCancha');
 const GuardedFechaHoraScreen = withAuthGuard(FechaHoraScreen, 'FechaHora');
@@ -490,6 +492,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="BlockedUsers"
           component={GuardedBlockedUsersScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="MfaSetup"
+          component={GuardedMfaSetupScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
