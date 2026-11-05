@@ -1,6 +1,6 @@
 # Navegación
 
-Última revisión: 2026-08-20
+Última revisión: 2026-11-05
 
 ## Propósito
 
@@ -14,11 +14,13 @@ Las rutas operativas del stack (partidos, chat, perfil, clubes, ajustes, avisos 
 
 ## Enlaces y avisos
 
-- `linking` acepta el esquema de la app y los dominios web; enlaza `p/:matchId` a detalle de partido y define rutas de gestión, cupo, solicitud, edición y publicación.
+- `linking` acepta el esquema de la app y los dominios web; enlaza `p/:matchId` a detalle de partido y define rutas de gestión, cupo, solicitud, edición y publicación. Las tabs con URL propia son `inicio`, `partidos`, `clubes`, `chat` y `perfil`; **`ReservasTab` no tiene entrada en `linking`** aunque es una tab (en web no tiene una dirección propia). También enlaza `chat/:threadKey`, `clubes/:clubId` y `clubes/:clubId/editar`, `ui-reservas` (galería de QA, sin guarda de sesión) y las públicas `terminos`, `privacidad` y `cookies`.
+- `Terminos`, `Privacidad` y `Cookies` son tres rutas del stack que montan la misma `LegalScreen`, sin `withAuthGuard`: se leen sin sesión (se enlazan desde Registro, `Terms` y Ajustes). `Terms` es la pantalla de aceptación del onboarding, distinta de `Terminos`.
 **El Splash tiene techo para la animación, no para la sesión** (2026-09-11). Navegaba recién cuando terminaban las dos, y la animación del logo se mueve con `requestAnimationFrame`, que el navegador **suspende mientras la página no se dibuja** — una pestaña en segundo plano, por ejemplo. Ahí la secuencia no termina nunca y lo único que se ve es el logo quieto; se arregla solo al mirar la pestaña, pero dejaba una animación decorativa como el único motivo por el que alguien no puede entrar. `conTecho()` (`src/utils/conTecho.js`, 5 pruebas) le pone 3 s de tope. **La sesión se sigue esperando sin techo a propósito**: soltarla antes mandaría a la portada a alguien que sí tiene cuenta. Verificado con la página oculta, que es justo la condición que antes colgaba: llega a `Welcome`.
 
 - `navigationRef` y la promesa de disponibilidad permiten que `App.js` espere el fin de Splash antes de abrir el destino de un push. Los destinos se resuelven una sola vez por identificador de aviso para evitar dobles navegaciones en arranque frío.
-- `NotifTab` y `ChatTab` renderizan respectivamente la bandeja de avisos y la bandeja de chat dentro de `Main`. El stack añade la ruta `Notifications` y los detalles `ChatThread` y `ChatDetails`; los badges se actualizan desde las suscripciones de sus dominios.
+- `ChatTab` renderiza la bandeja de chat dentro de `Main` (`NotifTab` ya no existe: la bandeja de avisos es la ruta `Notifications` del stack, a la que se llega desde `NotificationBell`). El stack añade además los detalles `ChatThread` y `ChatDetails`. Los badges de la barra son el de Chat (mensajes sin leer) y el de Clubes (pendientes con acción); los de avisos viven en la campana.
+- `Moderacion` es una ruta del stack a la que se llega desde Ajustes → Moderación; la entrada sólo se dibuja para quien está en el padrón de moderadores (la autoridad es el servidor, no la pantalla).
 - `ClubProposal` es la propuesta oficial de un desafío y se abre desde la cabecera del hilo `challenge:<id>` con `{ challengeId, modo: 'crear' | 'revisar', proposalId? }`. La cabecera sólo dibuja botón para las acciones que la app sabe ejecutar; el resto del estado se muestra como información.
 - `ClubMatchRoster` recibe `{ matchId }` y es la superficie operativa de U3: inscripción/postulación, confirmación/rechazo y salida por club. `MatchDetail` deriva allí sólo los partidos formales con propuesta y reparto por club; los partidos de clubes antiguos conservan el flujo normal. `club_match_reserva_omitida` también apunta a esta ruta.
 - El descubrimiento del vertical Reservas encadena `ComplejoDetail { complejoId }` → `ElegirCancha { complejoId, canchaId? }` → `FechaHora { complejoId, canchaId }` → `Resumen { complejoId, canchaId, fechaLabel, horaInicio, horaFin, duracion }`, las cuatro con `withAuthGuard`. Se pasan ids y valores ya resueltos, no objetos completos — cada pantalla vuelve a pedir el complejo por id en vez de arrastrarlo por parámetros. Ver [Reservas](../funcionalidades/reservas.md).

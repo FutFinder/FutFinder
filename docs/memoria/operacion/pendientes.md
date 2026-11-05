@@ -1,10 +1,59 @@
 # Pendientes
 
-Última revisión: 2026-10-16
+Última revisión: 2026-11-05
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
-La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Avisos y Ajustes el 2026-09-23 está en [`PENDIENTES_CALIDAD_2026-09-23.md`](../../../PENDIENTES_CALIDAD_2026-09-23.md). Ese documento distingue los casos reproducidos de los detectados por flujo de código y no los considera corregidos.
+La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Avisos y Ajustes el 2026-09-23 está en [`PENDIENTES_CALIDAD_2026-09-23.md`](../../../PENDIENTES_CALIDAD_2026-09-23.md), y la auditoría de chats y avisos que la alimenta, en [`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`](../../../ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt). Los casos TrueScore y teléfono (T01–T07), el hallazgo G01 y P06 ya están cerrados; **el resto sigue abierto** y se resume abajo. Los dos informes no se borran porque todavía tienen ítems vivos: cuando se cierre el último, se borran y esta nota conserva el resultado.
+
+## Abiertos al 2026-11-05
+
+Lo que sigue vivo, contrastado contra el código el 2026-11-05. Los números de línea de los informes están corridos: cuando se arregle uno, buscar por el nombre de la función.
+
+### De los informes del 2026-09-23
+
+C01–C10 vienen de la auditoría de chats y avisos (`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`, donde C01 es el error 1, y así hasta el 10); el resto, de la lista de calidad (`PENDIENTES_CALIDAD_2026-09-23.md`), que lleva para cada ID los pasos de cierre. Re-verificados uno por uno el 2026-11-05 (lectura del código, nada se ejecutó): **siguen abiertos todos** los de la tabla.
+
+| ID | Sigue abierto porque… |
+| --- | --- |
+| C01 | `ChatThreadScreen` llama `markThreadAsRead` (~línea 341) aunque `page.error` haya mostrado «No pudimos cargar los mensajes». |
+| C02 | El callback de Realtime marca leído (~línea 531) sin mirar foco, app activa ni scroll. |
+| C03 | `listThreadMessages` pagina sólo por `created_at` (`messages.js` ~línea 729): se pierden mensajes con la misma fecha. |
+| C04 | `mark_chat_read` (migración 32) no toca `notifications`: leer un DM no cierra su aviso `message_new` y el siguiente mensaje no genera INSERT ni push. |
+| C05 | Silenciar un hilo no frena push ni popup: `send-push` y `NotificationToastHost` no consultan `chat_mutes`. |
+| C06 | `listNotifications({ limit: 50 })` y los filtros se aplican después del límite; no hay paginación. |
+| C07 | `runOptimistic` revierte con el arreglo entero (`notificationInbox.js`) y puede borrar avisos llegados en el intertanto. |
+| C08 | Tocar un aviso lo deja leído en pantalla aunque `markAsRead` falle. |
+| C09 | El canal de avisos escucha INSERT y UPDATE, no DELETE; la campana no se entera de los borrados. |
+| C10 | `limpiarToasts` sólo la usan las pruebas: un popup sobrevive al cierre de sesión. |
+| C11–C16 | Bandeja sin versión de solicitud, aviso «últimos mensajes guardados» sin caché, Detalles que cuenta los `pendiente` como inscritos, el hilo de desafío rotulado «Mensaje directo», y errores de participantes y solicitudes tragados. Sin cambios a simple vista; no se re-verificaron a fondo. |
+| I01 | Inicio pide 20 partidos globales y después aplica el radio. |
+| I02 | Inicio descarta el `error` de `listOpenMatches` y muestra «sin partidos». |
+| I03 | La tarjeta de reputación lee `profiles.partidos_jugados` (que nada incrementa) y `profile.reportes` (columna que no existe). |
+| I04 | `load()` de Inicio puede correr dos veces y no descarta respuestas antiguas. |
+| I06 | «ADMIN · N CLUBES» cuenta todas las membresías. |
+| I07 | El resumen cuenta `matches.length`, la lista usa `partidosCerca`: puede decir «1 partido cerca» y «Sin partidos en tu radio». |
+| P01 | El historial trae 20 filas por `inscrito_at` y recién después ordena por hora del partido. |
+| P03 | «Ver todo» de Últimas participaciones navega a `SearchTab`, no a un historial. |
+| P04 | Si falla la consulta de estado de cuenta, el servicio devuelve `suspended: false` y la tarjeta dice «buen estado». |
+| P05 | Si falla la consulta de valoraciones, se devuelven ceros y Perfil dice «Sin evaluaciones todavía». |
+| A01 | Al fallar el guardado del radio, `radiusKm` conserva el valor nuevo. |
+| A02 | El rollback de un interruptor puede pisar el cambio siguiente (`toggleField`); sin reproducir. |
+
+**Cerrados:** P06 (commit `70d6569`, «Invitar a mi club desde un perfil invita directo a ese jugador», en `main`), P02, T01–T07 y G01. I05 y P07 estaban «falta confirmarlo en web»: T01 y T02 los confirmaron en vivo el 2026-09-29. **Sobrevive un rótulo:** `MatchDetailScreen.js` (~líneas 1321 y 1713), `MatchSpotScreen.js` (~394) y `ManageMatchScreen.js` (~1124) todavía dicen «Trust Score» en la rama con TrueScore apagado; con la fase 1 encendida, como en producción, el texto es el nuevo, así que hoy sólo se vería si alguien apaga el interruptor.
+
+### Otros pendientes, verificados el 2026-11-05
+
+- **Devolución a una tarjeta que no existe.** Cancelar una reserva pagada con Flow no devuelve nada: `cancelar_reserva_interna` (migración 100) y `admin_cancelar_reserva` (66) devuelven sólo lo que `balance_movimientos` registra como `cobro_reserva`, y `confirmar_pago` (78) deja el pago con tarjeta en `pagos`, sin movimiento de saldo; la 66 lo anotó como «límite conocido». Peor: el aviso dice «te la devolvimos a tu saldo». **Hay que cerrarlo antes de abrir la pasarela**; hoy no pasa porque no hay ni un pago.
+- **`cargar_balance` revocada (migración 73) deja inservible el pago dividido y la reserva de capitanes** salvo para quien tenga saldo sembrado a mano: no hay cómo cargar saldo hasta que exista la pasarela (decisión de Vicente: las credenciales de Flow van a nombre de la empresa, no personales, y esperan a que exista). La pantalla lo dice y deja el botón apagado.
+- **Posible token de push huérfano al cerrar sesión — sospecha, no verificada.** `App.js` (~línea 169) llama `unregisterPushToken` en `SIGNED_OUT`, con la sesión ya cerrada; el `delete` sobre `push_tokens` depende de la política `auth.uid() = user_id` y, sin sesión, borraría cero filas sin dar error. Se comprueba sólo en un teléfono físico (ver el P1 de push, más abajo).
+- **El estado `failed` de `send-push` no tiene reintento.** La función sólo reclama filas `pending` o `sending` vencidas; una notificación que quedó en `failed` no se vuelve a tomar nunca, aunque el comentario de `index.ts` diga que «es recuperable».
+- **`motivo_cancelacion` huérfano.** `cancelMatchWithReason` (`src/services/matches.js`) escribe el motivo antes de cancelar y no lo deshace si la cancelación falla, ni mira el error de esa escritura: un partido que no se canceló puede quedar con «Motivo del organizador».
+- **Texto técnico visible.** La rama `canceledGone` de `ManageMatchScreen.js` le dice al organizador «`cancel_match` elimina el registro… hay que aplicar la migración 34 en Supabase». Es un mensaje de desarrollador en una pantalla de usuario, y las migraciones posteriores a la 34 ya conservan el partido como `cancelado`.
+- **Color olivo en `app.config.js`.** `notification.color`, `web.themeColor` y el plugin `expo-notifications` siguen en `#71B533`, contra «una sola paleta» (`#55DF69`). Ya está anotado como excepción en [Sistema visual](../diseno/sistema-visual.md); falta decidir si se unifica.
+- **Texto legal que promete lo que el registro no hace.** La política y los términos (`src/data/legal.js`) dicen que con menos de 14 años hace falta la autorización de madre, padre o tutor, pero el registro sólo exige edad ≥ 12 (`EDAD_MIN` en `fechaNacimiento.js`) y no captura ninguna autorización. Y los términos no traen razón social ni RUT (sólo el correo de contacto); ya figuraba como «pendiente legal» en [Configuración](../funcionalidades/configuracion.md).
+- **Comentarios y mensajes de código desactualizados** (una sola deuda, sin urgencia): `eslint.config.mjs` y su mensaje de `no-restricted-imports` y un comentario de `App.js` (~111) nombran `reservas`/`reservasRadius`/`reservasSizes`/`reservasFonts`, que ya no existen (hoy `paleta`, `radios`, `medidas`, `fuentes`); `services/attendance.js` habla de la ventana «hora+90min» y de «+1 Trust Score» cuando la RPC usa hasta 30 min después de terminar y, con TrueScore, los puntos los aplica el organizador; `supabase/functions/send-push/index.ts` dice «Database Webhook» y `supabase/config.toml` dice que el webhook manda la service key, cuando desde la 118 manda la clave publicable guardada en Vault; y en `config.toml` no hay entrada `[functions.reportar-problema]`. (`tailwind.config.js` ya no nombra `reservas`.)
+- **Pregunta de producto abierta: un partido entre clubes no suma a `profiles.partidos_jugados`.** Quien jugó y quedó `confirmado_gps` sigue viendo «0 partidos jugados». Puede ser correcto —la migración 50 cerró a propósito la puerta genérica que tocaba la reputación—, pero hay que decidirlo; ver [Pruebas](pruebas.md), recorrido del 2026-10-21, y el I03 de arriba.
 
 ## Repaso del 2026-09-30
 
@@ -253,7 +302,7 @@ La 159 restauró la **regla**; faltaban las dos frases que la gente sí lee. Mis
 ## Resuelto el 2026-10-14 — ya hay quien modera, y pantalla para hacerlo
 
 - **La decisión (Vicente): modera él, y solo él.** Con 32 usuarios no hace falta más, y no reparte un poder que después cuesta quitar. Queda **una fila** en `public.moderadores`, puesta desde el panel porque la tabla no tiene políticas ni privilegios de cliente: la app ni lee el padrón ni puede nombrar a nadie.
-- **La pantalla** (`src/screens/ModeracionScreen.js`) muestra las tres colas de `moderacion_cola()` y resuelve dos: retirar o mantener una sanción revisada, y reabrir un resultado en disputa. Se llega por Configuración → Moderación, y **esa entrada sólo se dibuja para quien está en el padrón**.
+- **La pantalla** (`src/screens/ModeracionScreen.js`) muestra las tres colas de `moderacion_cola()` y resuelve dos: retirar o mantener una sanción revisada, y reabrir un resultado en disputa. **Actualización del 2026-11-05:** desde la migración **164** (aplicada el 2026-10-19) hay una **cuarta cola, «Recintos esperando revisión»** (`recintos_esperando`), con un botón «Aprobar recinto» que llama a `moderacion_aprobar_recinto()` (misma puerta de `es_moderador()`, idempotente, no publica: publicar sigue siendo del dueño). Nació de un hueco real: `admin_solicitar_revision_complejo()` sólo marcaba `revision_pedida_at` y no avisaba a nadie; «los mojojo» llevaba 35 días esperando. **Rechazar un recinto sigue sin existir a propósito** (motivo, si se puede volver a pedir, qué ve el dueño: decisión de producto, igual que los reportes). Arnés `164_recinto_esperando_revision_test.sql`, no re-ejecutado el 2026-11-05. Detalle operativo en [Aprobar recintos](aprobar-recintos.md). Se llega por Configuración → Moderación, y **esa entrada sólo se dibuja para quien está en el padrón**.
 - **Esconder la entrada es cosmética y el código lo dice.** `es_moderador()` decide en el servidor y las tres RPC lo comprueban por su cuenta; la pantalla nunca es la autoridad.
 - **Los reportes se muestran y no se tocan**, y la pantalla lo explica en vez de limitarse a no traer botones: resolverlos exige decidir estados, medidas y apelación, que sigue abierto (ver el P2). Esa decisión vive en `COLAS` de `src/utils/moderacion.js` con una prueba que se pone roja si alguien agrega el botón sin darse cuenta.
 - **«Vacía» y «no se pudo leer» se dibujan distinto.** En una pantalla de sanciones sin resolver, confundirlas es grave: la primera dice que no hay nada, la segunda ofrece reintentar.
@@ -289,7 +338,7 @@ La 159 restauró la **regla**; faltaban las dos frases que la gente sí lee. Mis
 - **Hicieron falta DOS migraciones, y la segunda no es un detalle.** La **156** da dónde elegirlo y lo lleva al partido. Pero `historial_club()` devolvía `m.nivel`, y con el `default` de `matches` un encuentro anterior a la 156 es **indistinguible** de uno donde alguien eligió «recreativo»: volver a pintarlo leyendo de ahí habría repetido el fallo con una migración de respaldo que lo hacía parecer cierto. La **157** hace que el historial tome el nivel de **la propuesta**, que sí admite nulo. Es literalmente lo que pedía la verificación de este pendiente: «uno anterior a ese cambio no miente».
 - **Las dos parchean los cuerpos DESPLEGADOS** de `crear_propuesta_oficial` (7 KB), `aprobar_propuesta` (12 KB) e `historial_club`, con anclas que fallan si no existen o aparecen más de una vez. Transcribir funciones de ese tamaño es la forma más fácil de meter un error que nadie nota.
 - **Verificación: arnés de la 156 6/6 y el de la 157 2/2**, en ensayo revertido, recorriendo el flujo real —desafío → aceptar → proponer con `competitivo` → aprobar— y comprobando que el partido sale `competitivo` y no el valor de la tabla. **El control de la 157 es el que más dice:** con la función vieja en pie, el único encuentro del historial devolvía «recreativo», un nivel que nadie había elegido; después devuelve `null`. Más **1694 pruebas** en verde, incluidas las dos que fijaban la conducta anterior y se reescribieron en vez de borrarse.
-- **Lo que queda sin comprobar, y conviene saberlo:** el selector de nivel en `ClubProposalScreen` **no se ha visto en pantalla**. No hay ningún desafío en negociación en producción y crear uno entre dos clubes de Vicente para mirarlo habría sido escribir en producción sin pedirlo. Lo que sí está probado es que el borrador lleva el nivel, que el payload usa el nombre de columna correcto y que la pantalla compila y la app levanta con el cambio dentro.
+- **Lo que quedaba sin comprobar (actualizado el 2026-11-05):** el selector de nivel en `ClubProposalScreen` **no se había visto en pantalla** el 2026-10-14. No había ningún desafío en negociación en producción y crear uno entre dos clubes de Vicente para mirarlo habría sido escribir en producción sin pedirlo. **Ese pendiente se cerró en buena parte el 2026-10-21**, caminando el ciclo de desafíos entero contra la base local: la propuesta oficial se llenó con modalidad y nivel, el partido salió con ese `nivel` y la pantalla de aprobación los muestra desde el commit `be57dd4` (ver [Pruebas](pruebas.md)); además apareció que la pantalla reventaba al abrirse y se arregló. **Sigue abierto el paso 7** del historial (resultado rechazado que deja el desafío en disputa) y las ramas tristes del ciclo, que tienen arnés pero no recorrido. Lo que sí está probado es que el borrador lleva el nivel, que el payload usa el nombre de columna correcto y que la pantalla compila y la app levanta con el cambio dentro.
 
 ## P4 — `historial_publico_club()` quedó sin consumidor
 

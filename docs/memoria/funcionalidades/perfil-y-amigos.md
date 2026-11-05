@@ -1,6 +1,6 @@
 # Perfil y amigos
 
-Última revisión: 2026-09-22
+Última revisión: 2026-11-05
 
 ## Propósito
 
@@ -20,17 +20,17 @@ Perfil muestra datos propios o públicos, participación, reputación, club y ac
 
 ## Reglas y permisos
 
-El perfil sólo se actualiza a sí mismo; búsqueda omite perfiles que desactivaron visibilidad. Una solicitud de amistad requiere que el destinatario permita solicitudes en RLS. Reportes sólo permiten al emisor leer los propios; no hay moderación, sanción ni apelación implementada. Los buckets de media son públicos para lectura y sus políticas limitan altas/bajas al dueño.
+El perfil sólo se actualiza a sí mismo. **Un perfil ya no es público** (migración 143): `anon` no lee `profiles`, y una cuenta con sesión lee el propio, los que su dueño dejó descubribles (`privacy_visible_in_search`) y los que tienen una relación (amistad, club, partido, desafío, lista de espera, bloqueo o co-administración de un recinto, vía `perfil_relacionado()`). La búsqueda de jugadores es la RPC `buscar_jugadores()` (142), que aplica la visibilidad en el servidor, y el nombre de quien organiza un partido abierto llega por `organizadores_publicos()` (144, sólo usuario, foto y puntaje). **El cliente nunca hace `select('*')` en `profiles`:** pide `COLUMNAS_PUBLICAS` (`src/services/perfilColumnas.js`) y trae las nueve preferencias propias (`notif_*`, `pref_*`, `search_radius_km`, `privacy_*`) con la RPC `mis_ajustes()` (148); el teléfono y la ubicación propios viven en tablas privadas (`perfil_telefonos`, 138; `perfil_ubicaciones`, 139) y se leen con `mi_telefono()` y `mi_ubicacion()`. La migración 149, que revoca el `select` de tabla sobre esas nueve columnas, **no está aplicada a propósito** hasta distribuir un build; ver [Base de datos](../arquitectura/base-de-datos.md). Una solicitud de amistad requiere que el destinatario permita solicitudes en RLS (hoy por `perfil_acepta_solicitudes()`). Reportes sólo permiten al emisor leer los propios; **resolverlos sigue sin existir**: la cola de `ModeracionScreen` (migración 151) los muestra para que no pasen desapercibidos, pero no hay estados, sanción ni apelación para un reporte de usuario. Los buckets de media son públicos para lectura y sus políticas limitan altas/bajas al dueño.
 
 ## Pantallas y dependencias
 
 - Pantallas: `ProfileScreen`, `EditProfileScreen`, `FriendsScreen`, historial de Trust Score y componentes de `player/`.
 - Código: `src/services/profile.js`, `friends.js`, `gallery.js`, `storage.js`, `reports.js` y `src/utils/profileEdit.js`.
-- Backend: perfiles, amistades, fotos, historial, reportes y Storage; migraciones 21, 23, 30, 31 y 35.
+- Backend: perfiles, amistades, fotos, historial, reportes y Storage; migraciones 21, 23, 30, 31 y 35 para la base, y 138, 139, 142, 143, 144, 148 y 149 para la privacidad del perfil (teléfono, ubicación, búsqueda, lectura por relación, organizador público y preferencias).
 
 ## Estados, errores y problemas conocidos
 
-Editar distingue carga, error y formulario listo para no mostrar datos vacíos. La privacidad bloqueada se traduce a un mensaje útil. Si faltan migraciones 30 o 31, el servicio degrada campos nuevos o reportes con un aviso; el repositorio no contiene un flujo de moderación posterior al reporte.
+Editar distingue carga, error y formulario listo para no mostrar datos vacíos. La privacidad bloqueada se traduce a un mensaje útil. Si faltan migraciones 30 o 31, el servicio degrada campos nuevos o reportes con un aviso; el repositorio no contiene un flujo de moderación posterior al reporte de un usuario (sí existe la pantalla de moderación para sanciones, resultados en disputa y recintos). **Quien agregue una columna a `profiles` tiene que agregarla a `COLUMNAS_PUBLICAS`** (una prueba la compara contra la migración 149) y, cuando la 149 esté aplicada, concederla.
 
 ## Notas relacionadas
 

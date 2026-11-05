@@ -1,6 +1,6 @@
 # Estado actual
 
-Última revisión: 2026-10-16
+Última revisión: 2026-11-05
 
 ## Qué es esta nota
 
@@ -14,12 +14,18 @@ Autenticación y onboarding, navegación protegida, partidos, clubes, chat,
 avisos, perfil, amistades, reputación, preferencias y el vertical de reservas
 de canchas. `src/services/` concentra las llamadas de dominio.
 
-- **Ninguna pantalla consulta la base directamente.** Catorce de las 74
-  importan algo de `services/supabase`, pero ocho sólo traen
-  `isSupabaseConfigured` y las otras seis usan `supabase.auth` para saber
-  quién es el usuario. **Cero `supabase.from(` en `src/screens/`** — la nota
-  anterior decía que `HomeScreen` consultaba `attendees` y `matches` y que
-  `ChatThreadScreen` leía perfiles; eso se limpió y ya no es cierto.
+- **Casi ninguna pantalla consulta la base directamente, pero cuatro sí.**
+  Catorce de las 76 pantallas de `src/screens/` importan algo de
+  `services/supabase`: ocho sólo traen `isSupabaseConfigured`, dos
+  (`ClubMatchRosterScreen` y `ClubResultScreen`) usan `supabase.auth` para saber
+  quién es el usuario, y **cuatro hacen `supabase.from(...)` directo**:
+  `HomeScreen` (`attendees` y `matches`), `ChatThreadScreen` (`club_members` y
+  `profiles`), `ClubMatchChangeScreen` y `ClubProposalScreen` (las dos sobre
+  `club_members`). Son seis consultas, contadas con un grep multilínea el
+  2026-11-05; un `grep '\.from('` en una sola línea no las ve porque el `.from(`
+  va en la línea siguiente a `supabase`. La versión anterior de esta nota
+  decía «cero» y que `HomeScreen` y `ChatThreadScreen` ya no consultaban:
+  no era cierto.
 - **Partidos**: descubrimiento, filtros, publicación, cupos y solicitudes,
   cola de espera, asistencia por GPS, gestión y registro final. Desde octubre
   hay **mapa también en web** (Mapbox GL cargado del CDN, no como
@@ -42,26 +48,42 @@ de canchas. `src/services/` concentra las llamadas de dominio.
   navegación. El push externo depende de token, permisos, preferencias y la
   Edge Function `send-push`.
 - **Moderación**: la migración 151 dejó el mecanismo —padrón, colas y las
-  puertas para resolver— con el **padrón vacío a propósito**. Mientras nadie
-  esté en él, no cambia nada.
+  puertas para resolver— con el padrón vacío a propósito; el 2026-10-14 se
+  nombró a un solo moderador (Vicente) y `ModeracionScreen` (Configuración →
+  Moderación, sólo visible para quien está en el padrón) dibuja las colas. La
+  migración **164** (aplicada el 2026-10-19, está en el registro de
+  producción) sumó la **cuarta cola, «Recintos esperando revisión»**
+  (`recintos_esperando` en `moderacion_cola()`, `src/services/moderacion.js`) y
+  `moderacion_aprobar_recinto()`, con botón «Aprobar recinto»: antes el
+  recinto que pedía revisión no avisaba a nadie. Aprobar no publica; rechazar
+  sigue fuera a propósito. El padrón no se volvió a leer el 2026-11-05.
 - **Informes de error**: `@sentry/react-native` instalado desde el 2026-10-14
   y **apagado** hasta que exista `EXPO_PUBLIC_SENTRY_DSN`. Detalle y política
   de privacidad en [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md).
 
 ## Base de datos
 
-- **175 archivos de migración** en el repositorio. Con la **162** y la
-  **163** aplicadas el 2026-10-16, **la única que el repositorio tiene y producción no es la
+- **176 archivos de migración** en el repositorio (la última, la **164**; la
+  numeración tiene sufijos como 44b o 105b, por eso no son 164). Con la
+  **162** y la **163** aplicadas el 2026-10-16 y la **164** el 2026-10-19,
+  **la única que el repositorio tiene y producción no es la
   149**, que lleva en su cabecera «no aplicar hasta distribuir un build» y
   espera ahí a propósito. No es una cuenta: es el resultado de construir
   una base desde cero con `--sin-149` y comparar las dos huella por huella
-  (ver [Pruebas](pruebas.md)).
-- **72 tablas, 285 funciones, 118 políticas y 12 tareas cron.** La nota
+  (ver [Pruebas](pruebas.md)); esa comparación es del 2026-10-16 y no se
+  repitió con la 164, aunque el registro de producción sí la lista.
+- **72 tablas, 286 funciones, 118 políticas y 12 tareas cron**, medidas en
+  producción el 2026-11-05. La función de más respecto de la comparación del
+  2026-10-16 (285) es `moderacion_aprobar_recinto`, de la 164. La nota
   anterior decía 147 políticas; son 118 en `public`, medidas sobre
   `pg_policy`.
-- **126 arneses SQL** en `supabase/tests/`, **126 en verde** contra una
-  base construida desde cero con el repositorio **y con los interruptores
-  de producción** (2026-10-17). Lo segundo no es un detalle: con las fases
+- **127 arneses SQL** y **3 de concurrencia `.cjs`** en `supabase/tests/`
+  (contados con `ls` el 2026-11-05). Los **126 en verde** son de antes de la
+  migración 164: se midieron contra una base construida desde cero con el
+  repositorio **y con los interruptores de producción** (2026-10-17). **El
+  arnés número 127, `164_recinto_esperando_revision_test.sql`, no se
+  re-ejecutó en esta revisión**, así que «127 de 127» no está medido. Lo
+  segundo no es un detalle: con las fases
   de TrueScore apagadas —como las deja una base recién construida— seis
   arneses daban verde midiendo la regla anterior. No se
   ejecutan con `npm test`: corren con `node scripts/correr-arneses.mjs`, o
@@ -91,7 +113,8 @@ en producción el 2026-10-14:
   reglas de horario ya cargadas. El vertical entero está armado y nunca ha
   transaccionado.
 - **Un solo token de push** entre los 32 usuarios.
-- **Cero moderadores**, con 2 reportes de usuario sin mirar.
+- **Cero moderadores**, con 2 reportes de usuario sin mirar (la medición es
+  anterior a que se nombrara el moderador ese mismo día; ver Moderación arriba).
 
 No es un diagnóstico de calidad: es que el producto no se ha puesto delante de
 nadie. Casi todo lo que queda abierto en [Pendientes](pendientes.md) espera a
@@ -112,8 +135,10 @@ eso o a una decisión de producto, no a más código.
   de lo que ejecuta el cliente llevan `set local role authenticated`.
 - **El push en un teléfono físico sigue sin comprobarse**, y `tsc --noEmit` no
   sirve como chequeo en este repositorio (desbordamiento de pila preexistente).
-- **`npm run verify`**: 1716 pruebas en verde y cero errores de lint al cerrar
-  esta revisión. Los avisos de lint son deuda conocida y no bloquean.
+- **`npm run verify`**: 1716 pruebas en verde y cero errores de lint, medido
+  el 2026-10-16; **no se volvió a medir el 2026-11-05**, y desde entonces
+  entraron cambios (por ejemplo, los términos y la política dentro de la app).
+  Los avisos de lint son deuda conocida y no bloquean.
 
 ## Notas relacionadas
 

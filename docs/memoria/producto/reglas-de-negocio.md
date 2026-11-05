@@ -1,6 +1,6 @@
 # Reglas de negocio
 
-Última revisión: 2026-10-02
+Última revisión: 2026-11-05
 
 ## Propósito
 
@@ -14,7 +14,7 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 
 - La ubicación de un partido es la de la dirección escrita, nunca la del teléfono: el GPS del dispositivo solo ordena las sugerencias del buscador. Las coordenadas viajan junto a la dirección de la que salieron (`src/utils/ubicacionPropuesta.js`) y dejan de valer en cuanto el texto cambia sin confirmar una ubicación nueva.
 
-## Clubes y planes
+## Clubes
 
 - La regla histórica de un solo club por usuario fue reemplazada por la migración 24: una persona puede pertenecer como máximo a **tres clubes** y solo una vez a cada club. No debe reintroducirse el límite anterior.
 - Todo club admite hasta 26 integrantes y 3 administradores; no hay planes de club (se retiraron en la migración 152). El trigger `check_club_limits` valida estos topes.
@@ -39,7 +39,7 @@ Las reglas de partidos se centralizan en `src/services/matchRules.js` y su espej
 
 ## TrueScore (reemplaza al Trust Score cuando se active)
 
-La fuente de verdad es `docs/truescore-spec.md`, incluida su sección 8 de decisiones. **Al 2026-09-25 los flags `truescore_fase1`, `truescore_fase2` y `truescore_fase3` están ACTIVOS en producción** —comprobado con `truescore_ajustes()`, que además devuelve `puntaje_inicial` 75 y `telefono_obligatorio` apagado—, así que rige lo de esta sección y no el Trust Score descrito más abajo. Ese apartado se conserva porque la app mantiene los dos caminos: con los flags apagados vuelve a regir. Con el flag activo:
+La fuente de verdad es `docs/truescore-spec.md`, incluida su sección 8 de decisiones. **Según la última medición documentada (2026-09-25, con `truescore_ajustes()`), los flags `truescore_fase1`, `truescore_fase2` y `truescore_fase3` estaban ACTIVOS en producción** —la misma medición devolvió `puntaje_inicial` 75 y `telefono_obligatorio` apagado—, así que rige lo de esta sección y no el Trust Score descrito más abajo. Las migraciones 134 a 137 sólo crean los flags y los dejan **apagados al nacer**: encenderlos es una acción aparte (`truescore_activar_faseN()`), de modo que el repositorio no dice por sí solo en qué estado está cada uno; antes de apoyarte en esto, vuelve a consultar `truescore_ajustes()`. Ese apartado se conserva porque la app mantiene los dos caminos: con los flags apagados vuelve a regir. Con el flag activo:
 
 - Hay **un solo puntaje global**, entre 0 y 100, y todos parten en 75. Asistir a tiempo suma según la racha (+6, +8, +10, +12); llegar tarde resta 8 y no ir sin avisar resta 35, y los dos rompen la racha. Salirse cuesta según las horas de aviso, interpolado en la tabla de la spec (5 h = −13, 2 h = −23, 48 h = −1), igual para quien entró desde la lista de espera; con 24 h o más no rompe la racha.
 - El organizador **confirma la asistencia una sola vez** y a toda la nómina (Asistió, Llegó tarde, No fue) dentro de las 24 h desde el fin del partido. Si no lo hace, el partido queda neutro para los jugadores y el organizador pierde 10.
@@ -50,11 +50,11 @@ La fuente de verdad es `docs/truescore-spec.md`, incluida su sección 8 de decis
 - Los encuentros entre clubes quedan fuera de TrueScore.
 - **El nombre del puntaje sale de un solo sitio** (`nombrePuntajeDe` / `nombrePuntaje` en `src/utils/trueScore.js`): «TrueScore» con el flag encendido y «Trust Score» con el flag apagado. Los componentes lo derivan del `fase1` del hook, para que el rótulo se repinte al llegar los ajustes; las reglas puras de `matchRules.js` y `matches.js` leen el valor que `getTrueScoreAjustes()` dejó recordado, y así escriben el nombre correcto sin importar React ni cambiar sus firmas. No confundir con los textos que describen el flujo ANTIGUO —la penalización fija de salida, el «+1» del GPS—: esos son la rama del flag apagado y siguen nombrando el Trust Score a propósito.
 
-Con `truescore_fase2` activo (migración 135, también apagada): la tardanza vale −15 si ya hay 2 en los últimos 10 eventos, y el plantón −35 × (1 + 0,5 × plantones previos), contando sólo eventos ocurridos con la fase 2 activa. El jugador marcado tarde o ausente puede reclamar dentro de 48 h desde la marca; si 2 compañeros que asistieron lo confirman en ese mismo plazo, se aplica «Asistió», se rehacen puntaje, racha y reincidencia desde ese punto y el organizador pierde 20. El organizador gana +5 si confirma la asistencia antes de 12 h desde el fin, o +2 entre 12 y 24 h, siempre que alguien haya asistido. En la lista de espera, «Muy confiable» va primero.
+Con `truescore_fase2` activo (migración 135; nace apagada y estaba activa en la última medición): la tardanza vale −15 si ya hay 2 en los últimos 10 eventos, y el plantón −35 × (1 + 0,5 × plantones previos), contando sólo eventos ocurridos con la fase 2 activa. El jugador marcado tarde o ausente puede reclamar dentro de 48 h desde la marca; si 2 compañeros que asistieron lo confirman en ese mismo plazo, se aplica «Asistió», se rehacen puntaje, racha y reincidencia desde ese punto y el organizador pierde 20. El organizador gana +5 si confirma la asistencia antes de 12 h desde el fin, o +2 entre 12 y 24 h, siempre que alguien haya asistido. En la lista de espera, «Muy confiable» va primero.
 
-Con `truescore_fase3` (migración 136, apagada): el fair play es un puntaje aparte, de 0 a 100, que parte en 100. Hasta 48 h después del partido se puede reportar a un compañero una vez; el reporte vale si quien reporta jugó y tenía TrueScore 75 o más. Al cerrar ese plazo: sin reportes válidos, +1; con 3 o más, −15; con 1 o 2, nada. Una agresión física reportada y confirmada por el organizador resta 40 y deja la cuenta en revisión.
+Con `truescore_fase3` (migración 136; nace apagada y estaba activa en la última medición): el fair play es un puntaje aparte, de 0 a 100, que parte en 100. Hasta 48 h después del partido se puede reportar a un compañero una vez; el reporte vale si quien reporta jugó y tenía TrueScore 75 o más. Al cerrar ese plazo: sin reportes válidos, +1; con 3 o más, −15; con 1 o 2, nada. Una agresión física reportada y confirmada por el organizador resta 40 y deja la cuenta en revisión.
 
-Con `truescore_fase4` (migración 137, apagada): una vez al mes, quien lleva 6 meses sin partidos se acerca a 65 de a 2 puntos, sin pasarse, y sin tocar su racha.
+Con `truescore_fase4` (migración 137; nace apagada y no figura entre las activas de esa medición): una vez al mes, quien lleva 6 meses sin partidos se acerca a 65 de a 2 puntos, sin pasarse, y sin tocar su racha.
 
 ## Trust Score
 

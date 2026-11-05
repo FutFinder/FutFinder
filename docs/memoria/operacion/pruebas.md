@@ -1,6 +1,6 @@
 # Pruebas
 
-Última revisión: 2026-09-23
+Última revisión: 2026-11-05
 
 ## Comprobaciones locales del proyecto
 
@@ -8,7 +8,7 @@
 npm test
 ```
 
-Ejecuta las pruebas de Node de `src/**/__tests__/*.test.js`: utilidades de chat, privacidad de amistades, bandeja y preferencias de avisos, destinos de avisos, edición de perfil, rutas y búsqueda.
+Ejecuta las pruebas de Node de `src/**/__tests__/*.test.js` y de `scripts/__tests__/*.test.js` (orden de migraciones, despliegues de Edge Functions, fechas de los arneses): utilidades de chat, privacidad de amistades, bandeja y preferencias de avisos, destinos de avisos, edición de perfil, rutas y búsqueda.
 
 ```bash
 npm run build:web
@@ -64,7 +64,7 @@ Cada archivo se abre con `begin;` y termina en `rollback;`, así que ejecutarlo 
 
 La verificación U3 del 2026-08-13 compuso también cada migración con su arnés dentro de una transacción exterior: 44e sola 8/8, 45 sola 14/14, ambas juntas 45b 13/13, 45c 18/18 y 45d 5/5. Se probó una carrera real con dos sesiones: la segunda recibió `lock_not_available` mientras la primera retenía la fila de `matches`, y ambas hicieron rollback. Tras aplicar 44e y 45 en producción se repitieron los arneses seguros —todos con su propio `BEGIN/ROLLBACK`— con los mismos resultados, más 44d 16/16. El catálogo confirmó 25 asistentes `legado`, cero NULL, ACL, Realtime y orden de triggers; la consulta final confirmó cero fixtures, objetos temporales, avisos duplicados y sesiones `idle in transaction`.
 
-La comprobación local posterior al despliegue pasó `npm run lint` con 0 errores y 25 advertencias conocidas, `npm test` 376/376, Deno 13/13 y `npm run build:web`.
+La comprobación local posterior al despliegue (2026-08-13; las cifras son de ese día, no las de hoy) pasó `npm run lint` con 0 errores y 25 advertencias conocidas, `npm test` 376/376, Deno 13/13 y `npm run build:web`.
 
 La prueba manual autenticada se hizo el 2026-08-13, con dos sesiones a la vez, y encontró un fallo de cliente que ninguna prueba SQL podía ver: la nómina pedía `profiles.nombre`, columna inexistente, y PostgREST rechazaba la consulta entera con `400 / 42703`. Corregido y cubierto por `src/utils/__tests__/nominaQuery.test.js`, que contrasta cada columna pedida contra `schema.sql` y las migraciones. Repetida la comprobación, pasó entera, incluido el corte de 720 px en Chrome a 390 × 845. Todo lo verificado es web; el render nativo en un dispositivo físico no tiene evidencia. `45_inscripcion_por_club_test.sql` se volvió a ejecutar contra producción, 14/14, y se verificó después que su `ROLLBACK` dejó la nómina idéntica fila por fila, sin usuarios ni partidos de fixture.
 
@@ -94,6 +94,8 @@ deno test supabase/functions/send-push/pushLogic.test.ts
 ```
 
 Esa suite cubre clasificación de tickets y recibos, deduplicación/validez de tokens y preferencias de push. No invoca Expo ni un proyecto Supabase reales.
+
+Hoy las pruebas de Deno son cuatro archivos —`send-push/pushLogic.test.ts` y, en `_shared/`, `correoReporte.test.ts`, `correoSolicitud.test.ts` y `flowLogic.test.ts`— y se corren todas juntas con `npm run test:edge`, que desde el 2026-10-16 forma parte de `npm run verify`. **Medido el 2026-11-05: 49 pasaron, 0 fallaron.**
 
 ## Flujos manuales autenticados
 
@@ -380,6 +382,14 @@ No amplía nada que no se pudiera hacer: el organizador ya sube con `upsert: tru
 **Lo que también se comparó y SÍ cuadraba:** las 12 tareas de `cron` (nombre, horario, comando y activas), los 8 buckets de `storage` con sus límites y tipos, los privilegios de las 72 tablas, los de las 41 columnas con ACL propia, y los privilegios por omisión de `public` y `storage` —los de la 115—. Los `pg_default_acl` de los esquemas que administra Supabase (`cron`, `extensions`, `graphql`, `realtime`, `auth`, `supabase_functions`) sí difieren, y eso es del alojamiento, no del repositorio: no se persigue.
 
 **La prueba de que la 162 cierra el círculo:** contenedores nuevos, base vacía, `node scripts/construir-base.mjs --sin-149` (schema.sql + 173 migraciones), y las siete huellas iguales a producción. Después, **124/124 arneses** contra esa base recién construida. La 162 se aplicó a producción el 2026-10-16 y **no cambió ni una huella**, que era justamente lo que tenía que pasar: lo que arregla es la base que el repositorio levanta, no la que está corriendo.
+
+## Cuántos arneses hay hoy, y cuántos están medidos (2026-11-05)
+
+Contados con `ls supabase/tests` el 2026-11-05: **127 arneses `.sql` y 3 de concurrencia `.cjs`** (los tres de la carrera real: salida, agenda del jugador y membresías de club). Las cifras de arriba —123, 124 y 126— fueron ciertas el día que se midieron y el conteo después creció.
+
+**El 127 es `164_recinto_esperando_revision_test.sql`**, de la migración 164 (la cuarta cola de moderación, «Recintos esperando revisión»). Cubre seis cosas: que quien no está en el padrón no ve la cola ni aprueba (`NO_MODERA`, 42501); que un recinto que pidió revisión y no está aprobado aparece con su comuna y sus canchas activas con horario; el control negativo —uno aprobado y uno que nunca pidió revisión **no** aparecen—; que aprobar lo saca de la cola y **no lo publica**; que aprobar dos veces no es un error y aprobar algo inexistente devuelve `ok:false`; y que las tres colas de la 151 siguen estando.
+
+**Qué está medido y qué no:** el «126 de 126 con los interruptores de producción» es del 2026-10-17 y es **anterior a la migración 164** (2026-10-19). El arnés de la 164 **no se re-ejecutó en esta revisión**, ni se volvió a correr la suite entera, así que «127 de 127» no es un dato medido. Sí se midieron el 2026-11-05 las 49 pruebas de Deno (ver arriba).
 
 ## Notas relacionadas
 

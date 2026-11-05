@@ -1,6 +1,6 @@
 # Stack y estructura
 
-Última revisión: 2026-08-08
+Última revisión: 2026-11-05
 
 ## Propósito
 
@@ -8,30 +8,31 @@ Describir el stack y los límites entre capas para orientar cambios técnicos si
 
 ## Estado verificado
 
-FutFinder usa Expo SDK 54 (`expo` `~54.0.36`) sobre React Native `0.81.5` y React `19.1.0`; Expo exporta también la web mediante Metro. La navegación es React Navigation 7 y la aplicación usa Supabase para Auth, Postgres, Realtime, Storage y Edge Functions.
+FutFinder usa Expo SDK 54 (`expo` `~54.0.37`) sobre React Native `0.81.5` y React `19.1.0`; Expo exporta también la web mediante Metro. La navegación es React Navigation 7 y la aplicación usa Supabase para Auth, Postgres, Realtime, Storage y Edge Functions.
 
 ## Dependencias de aplicación
 
 - Navegación e interfaz: `@react-navigation/native`, `@react-navigation/native-stack`, `@react-navigation/bottom-tabs`, `react-native-screens`, `react-native-safe-area-context`, `react-native-gesture-handler`, `@expo/react-native-action-sheet`, `expo-status-bar`, `lucide-react-native` y `rn-emoji-keyboard`.
-- Capacidades Expo: `expo-constants`, `expo-device`, `expo-image-manipulator`, `expo-image-picker`, `expo-linear-gradient`, `expo-location` y `expo-notifications`.
+- Capacidades Expo: `expo-constants`, `expo-device`, `expo-font`, `expo-image-manipulator`, `expo-image-picker`, `expo-linear-gradient`, `expo-location` y `expo-notifications`.
+- Tipografía y observabilidad: `@expo-google-fonts/manrope` (la familia `fuentes` de `src/theme/colors.js`, cargada en `App.js` con `expo-font`) y `@sentry/react-native` (informes de error; no arranca sin `EXPO_PUBLIC_SENTRY_DSN`, ver [Despliegue y entornos](despliegue-y-entornos.md)).
 - Datos y persistencia local: `@supabase/supabase-js`, `@react-native-async-storage/async-storage` y `react-native-url-polyfill`.
 - Plataforma, estilos y mapas: `react-native-web`, `react-dom`, `react-native-maps`, `react-native-reanimated`, `react-native-worklets`, `nativewind`, `tailwindcss`, `react-native-css-interop`, `react-native-svg` y `@expo/metro-runtime`.
 
-Los scripts versionados son `start`, `android`, `ios`, `web`, `build:web` y `test`; consulta `package.json` para sus comandos exactos.
+Los scripts versionados son `start`, `android`, `ios`, `web`, `web:local` (la app contra la base local), `build:web`, `build:android` y `build:ios` (perfil `preview` de EAS vía `npx eas-cli@latest`), `build:store` (perfil `production`), `test`, `lint`, `lint:fix`, `test:edge` (pruebas de las Edge Functions con Deno) y `verify` (lint + pruebas de Node + Deno, lo mínimo antes de dar algo por terminado); consulta `package.json` para sus comandos exactos.
 
 ## Estructura actual
 
 | Ruta | Responsabilidad |
 |---|---|
 | `src/screens/` | Pantallas de onboarding, partidos, clubes, chat, avisos, perfil y ajustes. |
-| `src/components/` | Componentes compartidos y por dominio: `chat`, `club`, `ds`, `home`, `notifications`, `partidos` y `player`. |
-| `src/services/` | Frontera del cliente con Supabase, ubicación, almacenamiento local y datos de demostración. |
+| `src/components/` | Componentes compartidos y por dominio: `chat`, `club`, `clubes`, `ds`, `home`, `notifications`, `partidos`, `player` y `reservas`. |
+| `src/services/` | Frontera del cliente con Supabase, ubicación, almacenamiento local y retornos de demostración. |
 | `src/navigation/` | Stack principal, pestañas, enlaces profundos y guardas de sesión. |
 | `src/contexts/` | Estado compartido de autenticación. |
 | `src/data/` | Datos estáticos, incluidos regiones y comunas chilenas. |
 | `src/theme/` | Tokens visuales compartidos. |
 | `src/utils/` | Transformaciones y utilidades; sus pruebas de Node están en `src/utils/__tests__/`. |
-| `supabase/` | Esquema, 40 migraciones numeradas, pruebas SQL y la Edge Function `send-push`. |
+| `supabase/` | Esquema, 176 archivos de migración (numerados hasta la 164, con sufijos `b`/`c` en algunas), pruebas SQL en `supabase/tests/` y seis Edge Functions: `send-push`, `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, `solicitud-recinto` y `reportar-problema` (más `_shared/`). |
 
 ## Resolución por plataforma
 
@@ -41,19 +42,19 @@ Metro selecciona `MatchMap.native.js` o `MatchMap.web.js` al importar `MatchMap`
 
 - Las pantallas y componentes consumen funciones asíncronas de `src/services/`; esa capa no debe repartirse en llamadas directas a Supabase desde la UI.
 - `src/services/supabase.js` crea el cliente y determina `isSupabaseConfigured`; Auth persiste con AsyncStorage en nativo y usa el comportamiento web de Supabase en web.
-- Los servicios de partidos, clubes, mensajes, avisos, amistades, perfil, almacenamiento, galerías, calificaciones y ajustes encapsulan consultas, RPC y sus retornos de demostración.
-- PostgreSQL y las migraciones imponen integridad, RLS y RPC; `supabase/functions/send-push/` separa el envío de push del cliente.
+- Los servicios de partidos, clubes, mensajes, avisos, amistades, perfil, almacenamiento, galerías, calificaciones y ajustes encapsulan consultas, RPC y sus retornos de demostración. Esos retornos no abren la app: sin `isSupabaseConfigured` no hay sesión y las rutas privadas mandan a Login (ver [Autenticación](../funcionalidades/autenticacion.md)).
+- PostgreSQL y las migraciones imponen integridad, RLS y RPC; `supabase/functions/send-push/` separa el envío de push del cliente, y las demás Edge Functions cubren el pago de reservas con Flow y los avisos por correo.
 
 ## Rutas de código relacionadas
 
 - `package.json`, `App.js`, `metro.config.js`, `babel.config.js` y `tailwind.config.js`
 - `src/navigation/AppNavigator.js`, `src/navigation/MainTabs.js` y `src/contexts/AuthContext.js`
 - `src/components/MatchMap.native.js`, `src/components/MatchMap.web.js` y `src/services/supabase.js`
-- `supabase/schema.sql`, `supabase/migrations/` y `supabase/functions/send-push/`
+- `supabase/schema.sql`, `supabase/migrations/` y `supabase/functions/` (`send-push/`, `_shared/` y `despliegues.json`)
 
 ## Limitaciones conocidas
 
-El repositorio prueba utilidades y la lógica de push, pero la disponibilidad de servicios remotos depende de Supabase y de las variables de entorno del entorno que se ejecute.
+El repositorio prueba utilidades, servicios, la lógica de las Edge Functions (Node y Deno) y las migraciones con arneses SQL, pero la disponibilidad de servicios remotos depende de Supabase y de las variables de entorno del entorno que se ejecute.
 
 ## Notas relacionadas
 

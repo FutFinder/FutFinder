@@ -1,6 +1,6 @@
 # Configuración
 
-Última revisión: 2026-10-26 (términos, privacidad y cookies dentro de la app)
+Última revisión: 2026-11-05 (privacidad de la búsqueda, ajustes por RPC y entrada de Moderación; 2026-10-26: términos, privacidad y cookies dentro de la app)
 
 ## Propósito
 
@@ -8,7 +8,7 @@ Centralizar preferencias de cuenta, privacidad, radio y categorías de avisos, a
 
 ## Flujos actuales
 
-`SettingsScreen` carga el perfil, persiste toggles y radio, y revierte un toggle si la escritura falla. Permite cambiar correo o contraseña tras verificar la contraseña actual, solicitar recuperación, editar ubicación/preferencias, cerrar sesión, exportar los datos propios y solicitar borrado de cuenta. Los valores se guardan en el perfil del usuario actual mediante una lista permitida de campos.
+`SettingsScreen` carga el perfil, persiste toggles y radio, y revierte un toggle si la escritura falla. Permite cambiar correo o contraseña tras verificar la contraseña actual, solicitar recuperación, editar ubicación/preferencias, cerrar sesión, exportar los datos propios y solicitar borrado de cuenta. Los valores se guardan en el perfil del usuario actual mediante una lista permitida de campos (`updateMyProfile()`, UPDATE directo). **La lectura de las nueve preferencias** (`notif_*`, `pref_region`, `pref_comuna`, `search_radius_km`, `privacy_*`) **va por la RPC `mis_ajustes()`** (migración 148, `misAjustes()` en `profile.js`) y no por `select('*')`: el perfil se pide con `COLUMNAS_PUBLICAS`. La migración 149, que quita esas nueve columnas del `select` de tabla, **está sin aplicar a propósito** hasta distribuir un build (sin actualizaciones por aire, las apps instaladas todavía piden `*`); lo mismo espera la regla de contraseña por tipo de carácter. La ubicación propia ya no vive en `profiles`: se lee con `mi_ubicacion()` (`getMyLocation()`, migración 139). Quien está en el padrón de moderación ve además Ajustes → Moderación (`soyModerador()`, migración 151); ocultar la fila es cosmético y el servidor vuelve a comprobar.
 
 **Teléfono.** Ajustes → Teléfono abre `VerificarTelefonoScreen`; `registrar_telefono` guarda un celular chileno único en `perfil_telefonos` y `mi_telefono` devuelve sólo su máscara a la cuenta. No se pide SMS mientras `telefono_verificacion_sms` esté apagado. `telefono_obligatorio` también estaba apagado en la comprobación autenticada del 2026-09-24. Si falla `mi_telefono`, la pantalla hoy trata el error como «sin número» (T07 en el listado de calidad).
 
@@ -26,7 +26,7 @@ Centralizar preferencias de cuenta, privacidad, radio y categorías de avisos, a
 
 ## Reglas y permisos
 
-`privacy_friend_requests` controla RLS de inserción de amistad; `privacy_visible_in_search` **lo aplica el servidor desde la migración 142**, dentro de `buscar_jugadores()`, que es la única puerta de búsqueda de la app (`searchPlayers()` la llama y ya no arma la consulta). Antes el filtro vivía sólo en el cliente y se omitía consultando `profiles` directo. Por eso el interruptor dice ahora «Apareces al buscar jugadores. Tu perfil sigue visible desde clubes, partidos y chats»: mientras `profiles_read_all` sea `using (true)`, la promesa no puede ser la invisibilidad.
+`privacy_friend_requests` controla RLS de inserción de amistad; `privacy_visible_in_search` **lo aplica el servidor desde la migración 142**, dentro de `buscar_jugadores()`, que es la única puerta de búsqueda de la app (`searchPlayers()` la llama y ya no arma la consulta). Antes el filtro vivía sólo en el cliente y se omitía consultando `profiles` directo. Por eso el interruptor dice «Apareces al buscar jugadores. Tu perfil sigue visible desde clubes, partidos y chats». **Desde la migración 143 esa frase es literal también en la base:** `profiles_read_all` desapareció y un perfil sólo lo lee su dueño, quien lo dejó descubrible o alguien con una relación (amistad, club, partido, desafío, lista de espera, bloqueo o co-administración de un recinto); `anon` no lee `profiles`. Apagar el interruptor ya no sólo saca a la persona de la lista: los desconocidos dejan de poder leerla, y quienes la conocen siguen viéndola.
 
 Al mover la búsqueda al servidor cambiaron dos comportamientos, los dos para mejor, y los fijan los casos 9 y 10 del arnés. **Quien busca se excluye ahora ANTES del límite:** el cliente pedía 30 y se sacaba a sí mismo después, en JavaScript, así que quien estaba entre los 30 primeros veía 29 —medido con datos reales el 2026-09-30, le pasaba a dos de cada cuatro cuentas—. Y **el orden es repetible:** las 32 cuentas tienen el mismo `trust_score`, así que el `order by trust_score desc` a secas elegía un conjunto arbitrario entre los empatados y podía cambiar entre dos llamadas iguales; el desempate por `id` lo vuelve estable. `notif_matches`, `notif_clubs`, `notif_chat` y `notif_friends` son la única fuente para elegir el push externo de cada tipo, no para borrar avisos internos. La RPC de borrado actúa sobre la identidad autenticada y elimina/ajusta datos relacionados antes de la cuenta.
 

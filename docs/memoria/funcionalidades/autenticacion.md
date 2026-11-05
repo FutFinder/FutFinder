@@ -1,6 +1,6 @@
 # Autenticación
 
-Última revisión: 2026-09-10
+Última revisión: 2026-11-05
 
 ## Propósito
 
@@ -28,13 +28,19 @@ La creación del perfil depende del trigger `handle_new_user`. La migración 59 
 
 ## Pantallas y dependencias
 
-- Pantallas: `SplashScreen`, `WelcomeScreen`, `TutorialScreen`, `LoginScreen`, `RegisterScreen`, `VerificationScreen`, `LocationPermissionScreen`, `TermsScreen` y `SuccessScreen`.
+- Pantallas: `SplashScreen`, `WelcomeScreen`, `TutorialScreen`, `LoginScreen`, `RegisterScreen`, `VerificationScreen`, `LocationPermissionScreen`, `TermsScreen` y `SuccessScreen`, más `LegalScreen`, que sirve las tres rutas públicas `Terminos`, `Privacidad` y `Cookies` (con URL propia `/terminos`, `/privacidad` y `/cookies`; el texto vive en `src/data/legal.js`). `Terms` es el paso del registro donde se acepta; `Terminos` sólo se lee.
 - Código: `src/services/authPolicy.js` (política pura), `src/services/auth.js`, `src/services/profile.js`, `src/contexts/AuthContext.js`, `src/navigation/withAuthGuard.js` y `src/utils/routing.js`.
 - Backend: Supabase Auth, `profiles` y el trigger del esquema.
 
 ## Estados, errores y problemas conocidos
 
-Login valida correo/contraseña, traduce los errores de Auth a mensajes propios y ofrece reenvío de OTP. Un correo inexistente y una contraseña incorrecta reciben el mismo mensaje, para no permitir averiguar qué correos están registrados. La guarda cubre `Main` y las pantallas operativas del stack; `LocationPermission`, `Terms` y `Success` quedan públicas a propósito (son el onboarding posterior al registro, no exponen datos y no están en la config de deep links), igual que la galería de QA `ReservasUiGallery`. El enlace «¿La olvidaste?» de `LoginScreen` sí llama a `requestPasswordResetForEmail` (real). Las opciones visuales de Google y Apple, en `RegisterScreen`, muestran un aviso «muy pronto» y no tienen acción implementada.
+Login valida correo/contraseña, traduce los errores de Auth a mensajes propios y ofrece reenvío de OTP. Un correo inexistente y una contraseña incorrecta reciben el mismo mensaje, para no permitir averiguar qué correos están registrados. La guarda cubre `Main` y las pantallas operativas del stack; `LocationPermission`, `Terms` y `Success` quedan públicas a propósito (son el onboarding posterior al registro, no exponen datos y no están en la config de deep links), igual que la galería de QA `ReservasUiGallery` y las tres rutas legales `Terminos`, `Privacidad` y `Cookies` (éstas sí tienen deep link: se leen antes de crear la cuenta). El enlace «¿La olvidaste?» de `LoginScreen` sí llama a `requestPasswordResetForEmail` (real). Las opciones visuales de Google y Apple, en `RegisterScreen`, muestran un aviso «muy pronto» y no tienen acción implementada.
+
+## Pendiente de decisión: edad mínima y menores de 14
+
+El registro sólo valida que la edad calculada desde la fecha de nacimiento esté entre **12 y 99** (`src/utils/fechaNacimiento.js`, el mismo rango de `profiles.edad`). La política de privacidad y los términos (`src/data/legal.js`, actualizados el 2026-10-26) dicen además que quien tiene **menos de 14** necesita la autorización de su madre, padre o tutor. En el código no hay ningún paso que la pida ni la registre: hoy esa frase es una promesa del texto, no una regla de la app. Falta decidir si se pide la autorización al registrarse o si se ajusta el texto.
+
+Relacionado y también sin resolver: el texto corto de `TermsScreen` (`TERMS_TEXT`) afirma que los datos de ubicación «no se compartirán con terceros sin tu consentimiento» y habla de «Términos de Servicios», mientras que la política completa lista encargados de tratamiento (Supabase, Mapbox y Nominatim, Expo, Resend, Sentry, Flow) y describe la ubicación como una posición aproximada que sólo se usa con permiso. No se comprobó que sean contradictorios en la práctica; conviene alinear ambos textos cuando se decida lo anterior.
 
 ## Un solo mínimo de contraseña: 8
 

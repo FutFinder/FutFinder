@@ -1,6 +1,31 @@
 FUTFINDER — AUDITORÍA DE CHATS Y NOTIFICACIONES
 Fecha de cierre: 23-09-2026
-Código contrastado: 28162c9.
+Código contrastado: 28162c9 (el del 23-09-2026; las referencias de archivo y
+línea de este informe son de esa fecha y hoy están corridas).
+
+ESTADO AL 05-11-2026
+Se re-verificó el estado de cada error contra el código vigente (lectura, no
+se ejecutó nada). SIGUEN ABIERTOS LOS DIEZ:
+  1 (C01) abierto: ChatThreadScreen llama markThreadAsRead (~línea 341) aunque
+          page.error haya mostrado el banner.
+  2 (C02) abierto: el callback de Realtime marca leído (~línea 531) sin mirar
+          foco, app activa ni scroll.
+  3 (C03) abierto: listThreadMessages ordena y pagina sólo por created_at
+          (messages.js ~línea 729).
+  4 (C04) abierto: mark_chat_read (migración 32) no toca notifications; ninguna
+          migración posterior lo cambió.
+  5 (C05) abierto: ni send-push ni NotificationToastHost consultan chat_mutes.
+  6 (C06) abierto: listNotifications({ limit: 50 }) y los filtros van después.
+  7 (C07) abierto: runOptimistic revierte con el arreglo entero.
+  8 (C08) abierto: handlePress deja read=true aunque markAsRead falle.
+  9 (C09) abierto: el canal de avisos sólo escucha INSERT y UPDATE.
+ 10 (C10) abierto: limpiarToasts sólo la usan las pruebas.
+Los archivos /tmp que cita la sección «EVIDENCIA LOCAL TEMPORAL» ya no existen
+(comprobado el 05-11-2026: no queda ninguno de los citados);
+los pasos y los resultados quedan en el cuerpo de este informe. El resumen vivo
+está en docs/memoria/operacion/pendientes.md y los pasos de cierre de cada
+caso, en PENDIENTES_CALIDAD_2026-09-23.md. Este informe no se borra mientras
+quede un error abierto.
 
 RESUMEN
 Se encontraron 10 errores. Priorizar lectura real, recepción de nuevos avisos

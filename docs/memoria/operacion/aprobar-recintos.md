@@ -60,9 +60,9 @@ Desde ese momento, en «Mis recintos» esa persona ve **«Ya puedes crear tu rec
 
 El dueño carga sus canchas, horarios y precios, y cuando tiene al menos una cancha activa con horario puede apretar **«Mandar a revisión»**. Eso escribe `complejos.revision_pedida_at`.
 
-**Se mira desde la app**, en Ajustes → Moderación, cuarta cola: «Recintos esperando revisión». Trae el nombre, la comuna, la dirección, cuántas canchas reservables tiene y **cuántos días lleva esperando**, y se aprueba con un botón. Sólo la ve quien está en `public.moderadores`.
+**Se mira desde la app**, en Ajustes → Moderación, cuarta cola: «Recintos esperando revisión». Trae el nombre, la comuna, la dirección, cuántas canchas reservables tiene (sólo cuentan las activas y con horario, que es lo que exige la 82 para pedir la revisión) y **cuánto lleva esperando**, y se aprueba con un botón. Sólo la ve quien está en `public.moderadores`.
 
-**Esto nació de un fallo y conviene recordar cuál.** Hasta la migración 164, apretar «Mandar a revisión» escribía la fecha y nada más: ni disparador, ni correo, ni cola. La app le decía al dueño «te avisamos» y no había dónde verlo. En producción, «los mojojo» lo apretó el 2026-09-14 y seguía esperando 35 días después. La otra puerta —«quiero sumar mi recinto»— sí avisa, porque pasa por una Edge Function que manda un correo; esta segunda, la de quien YA tiene recinto cargado, nació sin aviso.
+**Esto nació de un fallo y conviene recordar cuál.** Hasta la migración 164, apretar «Mandar a revisión» escribía la fecha y nada más: ni disparador, ni correo, ni cola. La app le decía al dueño «te avisamos» y no había dónde verlo. En producción, «los mojojo» lo apretó el 2026-09-14 y seguía esperando 35 días después. La otra puerta —«quiero sumar mi recinto»— sí está pensada para avisar, porque pasa por una Edge Function que manda un correo (la clave del proveedor se cargó el 2026-09-19; que el aviso llegue de punta a punta no está confirmado, ver [Reservas](../funcionalidades/reservas.md)); esta segunda, la de quien YA tiene recinto cargado, nació sin aviso.
 
 Antes de aprobar conviene mirar la ficha como la va a ver un jugador: nombre, dirección, foto, precios. **Y sobre todo el punto del mapa** — es lo único que el dueño fija por su cuenta y lo que más rompe el buscador si está mal.
 
@@ -70,7 +70,7 @@ Antes de aprobar conviene mirar la ficha como la va a ver un jugador: nombre, di
 
 **Al dueño no se le avisa cuando lo aprueban.** Lo ve al abrir su panel, que pasa a decir «Aprobado, y todavía sin publicar». Avisarle necesitaría un tipo nuevo en `notifications_type_check` y un texto que alguien tiene que escribir.
 
-Si hace falta hacerlo a mano —sin estar en el padrón, o desde el editor de SQL— sigue siendo lo de siempre:
+Si hace falta hacerlo a mano —sin estar en el padrón, o desde el editor de SQL— sigue siendo lo de siempre (la misma consulta de la cola está en [Revisión diaria](revision-diaria.md)):
 
 ```sql
 -- Lo que está esperando revisión.
