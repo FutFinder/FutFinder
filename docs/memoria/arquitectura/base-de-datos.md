@@ -266,6 +266,13 @@ La 119 (permisos del club: `tiene_permiso_de_club()` y nueve áreas por rol) ree
 - `messages` (migración 04) y, desde la 45, `attendees` son las ÚNICAS tablas que las migraciones añaden a la publicación `supabase_realtime`. Las pantallas se suscriben además a `notifications`, `friendships` y `club_join_requests` mediante canales de cambios, pero **ninguna migración ni `schema.sql` publica esas tablas**: si hoy emiten, fue por una configuración hecha a mano en el panel, que no se puede comprobar desde el repositorio (consúltese `pg_publication_tables` en el proyecto). `club_challenge_events` y `club_match_changes` no emiten nada y el hilo de desafío se refresca por sondeo.
 - RLS está habilitado para las tablas versionadas que contienen datos de usuario. Las políticas y RPC son parte del contrato, no un detalle del cliente.
 
+## Rendimiento con mucha gente a la vez (migración 170, 2026-11-05)
+
+- **Toda política de `public` usa `(select auth.uid())`, no `auth.uid()` a secas.** A secas se evalúa una vez por fila; envuelto, una vez por consulta. Pesa sobre todo en Realtime, donde cada cambio se revisa contra la RLS por cada suscriptor. La 170 reescribió las 96 que lo usaban a secas con un bloque sobre `pg_policies` (comprobado antes en una transacción abortada: sin el envoltorio, cada política es carácter por carácter la anterior). **Una política nueva se escribe ya envuelta**; si no, el aviso `auth_rls_initplan` vuelve y `170_..._test.sql` (caso E1) falla.
+- **Toda llave foránea de `public` tiene un índice que la cubre** (71 creados en la 170, `<tabla>_<columna>_idx`). Una llave foránea nueva lleva su índice en la misma migración; el caso E2 lo vigila.
+- Quedan a propósito: `multiple_permissive_policies` (10 tablas; fusionarlas cambia la expresión y merece revisión propia) y `unused_index` (los 71 nuevos salen como «sin uso» porque recién se crearon).
+- El chat todavía escucha `messages` entera por `postgres_changes` (`services/messages.js`, canal compartido); es el siguiente cuello de botella con muchos conectados, y la salida que recomienda Supabase es Broadcast por hilo.
+
 ## Convención de cambio
 
 `supabase/schema.sql` es una base idempotente; `supabase/migrations/NN_*.sql` mantiene cambios incrementales. Crea una migración nueva y una prueba SQL cuando corresponda; no edites ni reordenes migraciones ya aplicadas. La presencia de un archivo no confirma que esté aplicado en un proyecto remoto.

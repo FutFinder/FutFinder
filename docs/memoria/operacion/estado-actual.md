@@ -59,11 +59,14 @@ de canchas. `src/services/` concentra las llamadas de dominio.
 
 ## Base de datos
 
-- **179 archivos de migración** en el repositorio (la última, la **167**; la
-  numeración tiene sufijos como 44b o 105b, por eso no son 167). Con la
-  **162** y la **163** aplicadas el 2026-10-16, la **164** el 2026-10-19 y la
-  **165** y la **166** el 2026-11-05 (hardening; ver
-  [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md)),
+- **182 archivos de migración** versionados (la última, la **170**; la
+  numeración tiene sufijos como 44b o 105b, por eso no son 170). Con la
+  **162** y la **163** aplicadas el 2026-10-16, la **164** el 2026-10-19, la
+  **165**, la **166**, la **168** y la **169** el 2026-11-05 (hardening; ver
+  [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md)) y la
+  **170** el mismo día (rendimiento: RLS e índices, ver
+  [Base de datos](../arquitectura/base-de-datos.md); arnés 12/12 contra
+  producción, con control negativo previo y el de la 143 en 15/15 después),
   **las que el repositorio tiene y producción no son dos, y las dos
   esperan a propósito**: la **149** («no aplicar hasta distribuir un build»,
   por las reglas de contraseña) y la **167** (verificación en dos pasos del
