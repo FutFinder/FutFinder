@@ -9,6 +9,7 @@ import {
   fuentes as F,
   alfa,
 } from '../../theme/colors';
+import { encabezadoEstadoDeCuenta } from '../../utils/playerMeta';
 
 /**
  * "Estado de la cuenta": cabecera verde (buen estado) o coral (sanción activa),
@@ -30,38 +31,48 @@ export default function AccountStatusCard({
   stats,
   reportesRecibidos = 0,
   isOwnProfile,
+  desconocido = false,
 }) {
   const [abierto, setAbierto] = useState(false);
 
   const hasta = suspendedUntil ? fechaLegible(suspendedUntil) : null;
   const ausencias = stats?.ausencias_historial ?? 0;
+  // Sin el dato no se afirma «buen estado» (P04).
+  const enc = encabezadoEstadoDeCuenta({ suspended, desconocido, hasta, ausencias });
+  const duda = enc.tono === 'desconocido';
 
   return (
     <View style={[styles.card, suspended && styles.cardSanction]}>
-      <View style={[styles.header, suspended ? styles.headerSanction : styles.headerOk]}>
-        <View style={[styles.headerIcon, suspended ? styles.iconSanction : styles.iconOk]}>
-          {suspended ? (
+      <View
+        style={[
+          styles.header,
+          duda ? styles.headerDuda : suspended ? styles.headerSanction : styles.headerOk,
+        ]}
+      >
+        <View
+          style={[
+            styles.headerIcon,
+            duda ? styles.iconDuda : suspended ? styles.iconSanction : styles.iconOk,
+          ]}
+        >
+          {duda ? (
+            <AlertCircle color={C.textSecondary} size={18} strokeWidth={2} />
+          ) : suspended ? (
             <AlertCircle color={C.loss} size={18} strokeWidth={2} />
           ) : (
             <ShieldCheck color={C.green} size={18} strokeWidth={2} />
           )}
         </View>
         <View style={styles.headerTexts}>
-          <Text style={[styles.headerTitle, { color: suspended ? C.loss : C.green }]}>
-            {suspended ? 'Sanción activa' : 'Cuenta en buen estado'}
+          <Text
+            style={[
+              styles.headerTitle,
+              { color: duda ? C.textSecondary : suspended ? C.loss : C.green },
+            ]}
+          >
+            {enc.titulo}
           </Text>
-          <Text style={styles.headerSub}>
-            {suspended
-              ? [
-                  hasta ? `No puede inscribirse hasta el ${hasta}` : 'No puede inscribirse',
-                  ausencias > 0
-                    ? `${ausencias} ${ausencias === 1 ? 'ausencia' : 'ausencias'}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              : 'Sin sanciones ni restricciones activas'}
-          </Text>
+          <Text style={styles.headerSub}>{enc.sub}</Text>
         </View>
       </View>
 
@@ -86,7 +97,7 @@ export default function AccountStatusCard({
               <Row label="Ausencias acumuladas" value={String(ausencias)} />
               <Row
                 label="Sanciones activas"
-                value={suspended ? '1' : '0'}
+                value={duda ? '—' : suspended ? '1' : '0'}
                 danger={suspended}
               />
               <Row label="Reportes recibidos" value={String(reportesRecibidos)} />
@@ -183,6 +194,8 @@ const styles = StyleSheet.create({
   },
   iconOk: { backgroundColor: alfa(C.green, 0.14) },
   iconSanction: { backgroundColor: alfa(C.red, 0.14) },
+  headerDuda: { backgroundColor: alfa(C.textSecondary, 0.06) },
+  iconDuda: { backgroundColor: alfa(C.textSecondary, 0.12) },
   headerTexts: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 13.5, fontFamily: F.bold },
   headerSub: { color: C.textSecondary, fontSize: 11.5, marginTop: 2 },

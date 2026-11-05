@@ -312,3 +312,36 @@ export function lineaDeReputacion(partidos, reportes) {
   const r = Number(reportes);
   return `${linea} · ${r} ${r === 1 ? 'reporte' : 'reportes'}`;
 }
+
+/**
+ * Encabezado de la tarjeta «Estado de la cuenta» de Perfil.
+ *
+ * P04: si la consulta fallaba, el servicio devolvía `suspended: false` y la
+ * tarjeta afirmaba «Cuenta en buen estado · Sin sanciones ni restricciones
+ * activas». Ahora un fallo llega como `desconocido` y se dice eso.
+ *
+ * @returns {{ tono: 'ok'|'sancion'|'desconocido', titulo: string, sub: string }}
+ */
+export function encabezadoEstadoDeCuenta({ suspended = false, desconocido = false, hasta = null, ausencias = 0 } = {}) {
+  if (desconocido) {
+    return {
+      tono: 'desconocido',
+      titulo: 'No pudimos comprobar el estado de la cuenta',
+      sub: 'Revisa tu conexión y vuelve a abrir el perfil',
+    };
+  }
+  if (suspended) {
+    const n = Number(ausencias) || 0;
+    return {
+      tono: 'sancion',
+      titulo: 'Sanción activa',
+      sub: [
+        hasta ? `No puede inscribirse hasta el ${hasta}` : 'No puede inscribirse',
+        n > 0 ? `${n} ${n === 1 ? 'ausencia' : 'ausencias'}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    };
+  }
+  return { tono: 'ok', titulo: 'Cuenta en buen estado', sub: 'Sin sanciones ni restricciones activas' };
+}

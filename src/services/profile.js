@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { buildBuscarJugadoresParams } from '../utils/buscarJugadoresParams';
 import { COLUMNAS_PUBLICAS } from './perfilColumnas';
+import { esFaltaDeEsquema } from '../utils/cambioRpc.js';
 
 /**
  * Servicio de perfil del jugador.
@@ -329,10 +330,12 @@ export async function getAccountStatusFor(userId) {
     .maybeSingle();
 
   if (error) {
-    // `estado` / `suspended_until` pueden no existir en entornos antiguos:
-    // en ese caso asumimos cuenta sin sanciones en vez de romper la pantalla.
     console.warn('[FutFinder] getAccountStatusFor:', error.message || error);
-    return { suspended: false, suspended_until: null };
+    // `estado` / `suspended_until` pueden no existir en entornos antiguos:
+    // ahí no hay sanciones que leer. Cualquier otro fallo es «no lo sabemos»
+    // y la tarjeta no puede afirmar buen estado (P04).
+    if (esFaltaDeEsquema(error)) return { suspended: false, suspended_until: null };
+    return { suspended: false, suspended_until: null, desconocido: true, error };
   }
 
   const suspended =

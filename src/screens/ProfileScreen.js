@@ -673,6 +673,7 @@ export default function ProfileScreen({ navigation, route }) {
         <AccountStatusCard
           suspended={accountStatus.suspended}
           suspendedUntil={accountStatus.suspended_until}
+          desconocido={!!accountStatus.desconocido}
           stats={stats}
           reportesRecibidos={reportesRecibidos}
           isOwnProfile={isOwnProfile}
