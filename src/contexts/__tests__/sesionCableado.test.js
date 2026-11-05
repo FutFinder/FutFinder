@@ -48,7 +48,10 @@ test('el cliente de Supabase persiste y refresca la sesión (se recupera al reca
   const fuente = leer('services/supabase.js');
   assert.match(fuente, /persistSession:\s*true/, 'persistSession debe estar activo');
   assert.match(fuente, /autoRefreshToken:\s*true/, 'autoRefreshToken debe estar activo');
-  assert.match(fuente, /AsyncStorage/, 'en nativo la sesión se guarda en AsyncStorage');
+  // Desde el lote C la sesión va al almacén seguro del teléfono (Keychain /
+  // Keystore), no a AsyncStorage sin cifrar: ver utils/almacenSeguro.js.
+  assert.match(fuente, /storage: Platform\.OS === 'web' \? undefined : almacenDeSesion/,
+    'en nativo la sesión se guarda en el almacén seguro');
 });
 
 test('el contexto pide la sesión guardada al montar y escucha los cambios', () => {

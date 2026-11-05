@@ -36,11 +36,21 @@ export function AuthProvider({ children }) {
 
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data?.session ?? null);
-      setIsReady(true);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setSession(data?.session ?? null);
+        setIsReady(true);
+      })
+      // Si leer la sesión falla (el almacén seguro del teléfono no responde,
+      // un dato corrupto), es «sin sesión» y a Login. Sin esto `isReady` no
+      // llegaba nunca a true y la app se quedaba en blanco.
+      .catch((e) => {
+        console.warn('[FutFinder] getSession falló, se sigue sin sesión:', e?.message || e);
+        if (!mounted) return;
+        setSession(null);
+        setIsReady(true);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;

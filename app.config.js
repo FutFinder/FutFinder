@@ -95,6 +95,14 @@ module.exports = {
         },
       ],
       [
+        // La sesión vive en el almacén seguro (src/services/supabase.js). El
+        // plugin saca esos datos del respaldo automático de Android: restaurados
+        // en otro teléfono no se pueden descifrar. `faceIDPermission: false`
+        // porque no se usa biometría y el permiso por omisión viene en inglés.
+        'expo-secure-store',
+        { configureAndroidBackup: true, faceIDPermission: false },
+      ],
+      [
         'expo-notifications',
         {
           color: '#55DF69',
