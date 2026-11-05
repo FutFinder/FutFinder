@@ -3,6 +3,7 @@ import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
 import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
 import { aplicarOrdenYCursor } from '../utils/paginacionPartidos.js';
 import { nombrePuntaje } from '../utils/trueScore.js';
+import { cancelarConMotivo } from '../utils/motivoDeCancelacion.js';
 import { aceptaACualquiera, rangoDeFecha } from './matchRules';
 
 /**
@@ -985,19 +986,29 @@ export async function getMatchAttendees(matchId) {
  * el partido siga en el historial y el chat quede en solo lectura.
  */
 export async function cancelMatchWithReason(matchId, motivo = null, tipo = null) {
-  // El motivo se escribe ANTES de cancelar. La RPC `cancel_match` que está
-  // corriendo en la base es una versión anterior a este repo (la migración 33
-  // no la sobrescribe a propósito) y no sabemos con certeza si cambia el
-  // `estado` o borra la fila. Escribiendo primero, el motivo queda guardado en
-  // el caso en que el registro sobreviva, y no se pierde nada si no.
-  if (motivo && isSupabaseConfigured) {
-    await supabase
-      .from('matches')
-      .update({ motivo_cancelacion: motivo })
-      .eq('id', matchId);
-  }
-
-  const res = await cancelMatch(matchId, tipo);
+  // El motivo se escribe ANTES de cancelar porque `cancel_match` lo lee para
+  // el aviso a los jugadores, y se DESHACE si la cancelación falla: antes
+  // quedaba huérfano en un partido que seguía vivo. Ver
+  // utils/motivoDeCancelacion.js.
+  const res = await cancelarConMotivo({
+    motivo: isSupabaseConfigured ? motivo : null,
+    leerMotivo: async () => {
+      const { data, error } = await supabase
+        .from('matches')
+        .select('motivo_cancelacion')
+        .eq('id', matchId)
+        .maybeSingle();
+      return { data: data?.motivo_cancelacion ?? null, error };
+    },
+    escribirMotivo: async (valor) => {
+      const { error } = await supabase
+        .from('matches')
+        .update({ motivo_cancelacion: valor })
+        .eq('id', matchId);
+      return { error };
+    },
+    cancelar: () => cancelMatch(matchId, tipo),
+  });
   if (!res?.ok) return res;
 
   // ¿Quedó como 'cancelado' en el historial, o desapareció?
