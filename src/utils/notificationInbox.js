@@ -43,23 +43,59 @@ export function createRequestGuard() {
 }
 
 /**
- * Aplica `apply(items)` de inmediato (para que la UI reaccione al toque sin
- * esperar la red), ejecuta `action()` — que debe resolver `{ error }`, el
- * mismo contrato que ya usan los servicios — y si falla revierte `items` a
- * como estaba antes de tocar nada.
+ * Aplica `apply` de inmediato (para que la UI reaccione al toque sin esperar
+ * la red), ejecuta `action()` — que debe resolver `{ error }`, el mismo
+ * contrato que ya usan los servicios — y si falla aplica `revert`.
+ *
+ * `apply` y `revert` reciben el estado ACTUAL, no una foto del de antes
+ * (C07): la bandeja sigue recibiendo avisos por Realtime mientras la
+ * petición viaja, y restaurar la foto entera borraba esas novedades o
+ * resucitaba avisos que otra acción ya había borrado bien. Cada acción
+ * deshace sólo su propio cambio (`deshacerBorrado`, `deshacerLeidos`).
  *
  * Devuelve `{ error }` para que el llamador decida qué mostrar (banner,
- * etc.); el propio `items` ya quedó correcto (optimista u original) cuando
- * esta promesa resuelve.
+ * etc.); la lista ya quedó correcta cuando esta promesa resuelve.
  */
-export async function runOptimistic({ items, apply, action, setItems }) {
-  setItems(apply(items));
+export async function runOptimistic({ apply, revert, action, setItems }) {
+  setItems((prev) => apply(prev));
   const { error } = await action();
   if (error) {
-    setItems(items);
+    setItems((prev) => revert(prev));
     return { error };
   }
   return { error: null };
+}
+
+const fechaDe = (n) => (n && n.created_at) || '';
+
+/**
+ * Devuelve a la lista los avisos que un borrado fallido había sacado, en su
+ * lugar por fecha (más nuevo primero). Lo que ya está en la lista manda: si
+ * llegó una versión más nueva de ese aviso por Realtime, no se pisa.
+ */
+export function deshacerBorrado(items, borrados = []) {
+  const presentes = new Set(items.map((n) => n.id));
+  const faltan = (borrados || []).filter((n) => n && !presentes.has(n.id));
+  if (faltan.length === 0) return items;
+  return [...items, ...faltan]
+    .map((n, i) => ({ n, i }))
+    .sort((x, y) => {
+      const fx = fechaDe(x.n);
+      const fy = fechaDe(y.n);
+      if (fx !== fy) return fx < fy ? 1 : -1;
+      return x.i - y.i;
+    })
+    .map(({ n }) => n);
+}
+
+/**
+ * Vuelve a «sin leer» sólo los avisos que lo estaban antes de un «marcar»
+ * fallido. Los que ya no están (otra acción los borró) no reaparecen.
+ */
+export function deshacerLeidos(items, ids = []) {
+  const set = new Set(ids);
+  if (set.size === 0) return items;
+  return items.map((n) => (set.has(n.id) ? { ...n, read: false } : n));
 }
 
 // Transformaciones puras reutilizadas como `apply` de runOptimistic.

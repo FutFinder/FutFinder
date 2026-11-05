@@ -43,6 +43,8 @@ import {
   withoutId,
   withActionsResolved,
   fusionarAvisoEnVivo,
+  deshacerBorrado,
+  deshacerLeidos,
   conResoluciones,
   textoResolucion,
 } from '../utils/notificationInbox';
@@ -276,9 +278,10 @@ export default function NotificationsScreen({ navigation, route }) {
   const handleDelete = async (id) => {
     if (!actionGuard.begin(id)) return;
     setBusy(id, true);
+    const borrado = items.find((p) => p.id === id);
     const { error } = await runOptimistic({
-      items,
       apply: (list) => withoutId(list, id),
+      revert: (list) => deshacerBorrado(list, borrado ? [borrado] : []),
       action: () => deleteNotification(id),
       setItems,
     });
@@ -293,9 +296,10 @@ export default function NotificationsScreen({ navigation, route }) {
     if (items.length === 0) return;
     if (!actionGuard.begin(MARK_ALL_ID)) return;
     setBusy(MARK_ALL_ID, true);
+    const sinLeer = items.filter((p) => !p.read).map((p) => p.id);
     const { error } = await runOptimistic({
-      items,
       apply: withAllRead,
+      revert: (list) => deshacerLeidos(list, sinLeer),
       action: () => markAllAsRead(),
       setItems,
     });
@@ -321,9 +325,10 @@ export default function NotificationsScreen({ navigation, route }) {
   const borrarTodas = async () => {
     if (!actionGuard.begin(CLEAR_ALL_ID)) return;
     setBusy(CLEAR_ALL_ID, true);
+    const borrados = items;
     const { error } = await runOptimistic({
-      items,
       apply: () => [],
+      revert: (list) => deshacerBorrado(list, borrados),
       action: () => deleteAllNotifications(),
       setItems,
     });

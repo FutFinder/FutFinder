@@ -20,6 +20,8 @@ const {
   textoResolucion,
   conResoluciones,
   fusionarAvisoEnVivo,
+  deshacerBorrado,
+  deshacerLeidos,
 } = require('../notificationInbox.js');
 
 // ---------------------------------------------------------------------------
@@ -99,81 +101,156 @@ test('doble pulsación de punta a punta: la segunda invocación no repite la acc
 
 // ---------------------------------------------------------------------------
 // runOptimistic — éxito y rollback
+//
+// C07 (auditoría de chats y avisos, 2026-09-23): el rollback restauraba el
+// arreglo ENTERO que había antes de la petición, y se llevaba por delante lo
+// que hubiera llegado por Realtime mientras tanto. Ahora se aplica y se
+// revierte sólo el cambio propio, siempre sobre el estado actual.
 // ---------------------------------------------------------------------------
 
+/** Un `setItems` como el de React: acepta valor o función del estado actual. */
+function estado(inicial) {
+  const s = { actual: inicial };
+  s.setItems = (u) => {
+    s.actual = typeof u === 'function' ? u(s.actual) : u;
+  };
+  return s;
+}
+
+/** Una acción que no resuelve hasta que la prueba lo decide. */
+function accionPendiente() {
+  let resolver;
+  const promesa = new Promise((r) => { resolver = r; });
+  return { action: () => promesa, resolver: (v) => resolver(v) };
+}
+
 test('runOptimistic (éxito): el cambio optimista queda aplicado y no hay error', async () => {
-  let current = [{ id: 1 }, { id: 2 }];
-  const setItems = (next) => {
-    current = next;
-  };
-
+  const s = estado([{ id: 1 }, { id: 2 }]);
   const { error } = await runOptimistic({
-    items: current,
     apply: (items) => withoutId(items, 2),
+    revert: (items) => deshacerBorrado(items, [{ id: 2 }]),
     action: async () => ({ error: null }),
-    setItems,
+    setItems: s.setItems,
   });
-
   assert.equal(error, null);
-  assert.deepEqual(current, [{ id: 1 }]);
+  assert.deepEqual(s.actual, [{ id: 1 }]);
 });
 
-test('runOptimistic (error): revierte a los items originales y devuelve el error', async () => {
-  const original = [{ id: 1 }, { id: 2 }];
-  let current = original;
-  const setItems = (next) => {
-    current = next;
-  };
-
+test('runOptimistic (error): revierte el cambio y devuelve el error', async () => {
+  const s = estado([{ id: 1 }, { id: 2 }]);
   const { error } = await runOptimistic({
-    items: current,
     apply: (items) => withoutId(items, 2),
+    revert: (items) => deshacerBorrado(items, [{ id: 2 }]),
     action: async () => ({ error: { message: 'Supabase no respondió' } }),
-    setItems,
+    setItems: s.setItems,
   });
-
   assert.equal(error.message, 'Supabase no respondió');
-  assert.deepEqual(current, original);
-  // Mismo array de referencia, no una copia — el rollback no inventa datos.
-  assert.equal(current, original);
+  assert.deepEqual(s.actual.map((n) => n.id).sort(), [1, 2]);
 });
 
-test('runOptimistic (rollback): "marcar todo como leído" vuelve a los estados de lectura previos si falla', async () => {
-  const original = [
+test('C07: un aviso que llega mientras se borra otro sobrevive al rollback', async () => {
+  const viejo = { id: 'a', created_at: '2026-09-22T10:00:00Z' };
+  const otro = { id: 'b', created_at: '2026-09-22T09:00:00Z' };
+  const s = estado([viejo, otro]);
+  const pend = accionPendiente();
+
+  const corrida = runOptimistic({
+    apply: (items) => withoutId(items, 'a'),
+    revert: (items) => deshacerBorrado(items, [viejo]),
+    action: pend.action,
+    setItems: s.setItems,
+  });
+  // Llega una novedad por Realtime mientras el borrado está en vuelo.
+  const nueva = { id: 'nueva', created_at: '2026-09-22T11:00:00Z' };
+  s.setItems((prev) => fusionarAvisoEnVivo(prev, nueva));
+  pend.resolver({ error: { message: 'falló' } });
+  await corrida;
+
+  assert.deepEqual(
+    s.actual.map((n) => n.id),
+    ['nueva', 'a', 'b'],
+    'el rollback se llevó la novedad o no devolvió el aviso a su lugar'
+  );
+});
+
+test('C07: el rollback no resucita un aviso que otra acción ya borró bien', async () => {
+  const a = { id: 'a', created_at: '2026-09-22T10:00:00Z', read: false };
+  const b = { id: 'b', created_at: '2026-09-22T09:00:00Z', read: false };
+  const s = estado([a, b]);
+  const pend = accionPendiente();
+
+  const corrida = runOptimistic({
+    apply: withAllRead,
+    revert: (items) => deshacerLeidos(items, ['a', 'b']),
+    action: pend.action,
+    setItems: s.setItems,
+  });
+  // Mientras «leer todo» viaja, otro borrado de «b» sale bien.
+  s.setItems((prev) => withoutId(prev, 'b'));
+  pend.resolver({ error: { message: 'falló' } });
+  await corrida;
+
+  assert.deepEqual(s.actual, [{ ...a, read: false }], '«b» volvió a aparecer');
+});
+
+test('C07: «marcar todo» que falla vuelve a no leído sólo lo que estaba sin leer', async () => {
+  const s = estado([
     { id: 1, read: false },
     { id: 2, read: true },
     { id: 3, read: false },
-  ];
-  let current = original;
-  const setItems = (next) => {
-    current = next;
-  };
-
-  await runOptimistic({
-    items: current,
+  ]);
+  const pend = accionPendiente();
+  const corrida = runOptimistic({
     apply: withAllRead,
-    action: async () => ({ error: { message: 'fail' } }),
-    setItems,
+    revert: (items) => deshacerLeidos(items, [1, 3]),
+    action: pend.action,
+    setItems: s.setItems,
   });
-
-  assert.deepEqual(current, original);
+  s.setItems((prev) => fusionarAvisoEnVivo(prev, { id: 4, read: false }));
+  pend.resolver({ error: { message: 'fail' } });
+  await corrida;
+  assert.deepEqual(s.actual, [
+    { id: 4, read: false },
+    { id: 1, read: false },
+    { id: 2, read: true },
+    { id: 3, read: false },
+  ]);
 });
 
-test('runOptimistic (rollback): "limpiar todo" restaura la lista completa si el borrado falla', async () => {
-  const original = [{ id: 1 }, { id: 2 }, { id: 3 }];
-  let current = original;
-  const setItems = (next) => {
-    current = next;
-  };
-
-  await runOptimistic({
-    items: current,
+test('C07: «limpiar todo» que falla devuelve lo borrado y conserva lo que llegó', async () => {
+  const previos = [
+    { id: 1, created_at: '2026-09-22T10:00:00Z' },
+    { id: 2, created_at: '2026-09-22T09:00:00Z' },
+  ];
+  const s = estado(previos);
+  const pend = accionPendiente();
+  const corrida = runOptimistic({
     apply: () => [],
-    action: async () => ({ error: { message: 'fail' } }),
-    setItems,
+    revert: (items) => deshacerBorrado(items, previos),
+    action: pend.action,
+    setItems: s.setItems,
   });
+  assert.deepEqual(s.actual, []);
+  s.setItems((prev) => fusionarAvisoEnVivo(prev, { id: 3, created_at: '2026-09-22T11:00:00Z' }));
+  pend.resolver({ error: { message: 'fail' } });
+  await corrida;
+  assert.deepEqual(s.actual.map((n) => n.id), [3, 1, 2]);
+});
 
-  assert.deepEqual(current, original);
+test('C07: la bandeja ya no revierte con el arreglo entero', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'NotificationsScreen.js'),
+    'utf8'
+  );
+  const llamadas = src.split('runOptimistic({').slice(1);
+  assert.ok(llamadas.length >= 3, 'no se encontraron las acciones optimistas de la bandeja');
+  for (const l of llamadas) {
+    const cuerpo = l.slice(0, l.indexOf('});'));
+    assert.match(cuerpo, /revert:/, 'una acción optimista no dice cómo deshacer sólo su cambio');
+    assert.ok(!/^\s*items,\s*$/m.test(cuerpo), 'una acción optimista vuelve a pasar el arreglo entero');
+  }
 });
 
 // ---------------------------------------------------------------------------
