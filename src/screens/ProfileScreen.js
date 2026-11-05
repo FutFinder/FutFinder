@@ -285,9 +285,14 @@ export default function ProfileScreen({ navigation, route }) {
   );
   const badges = useMemo(() => playerBadges(profile), [profile]);
 
+  // «Ver todo» despliega aquí mismo el historial ya cargado (P03): antes
+  // mandaba a Buscar partidos, que no es ningún historial.
+  const [verTodasLasParticipaciones, setVerTodasLasParticipaciones] = useState(false);
+  const conPartido = useMemo(() => history.filter((h) => h.match), [history]);
+  const hayMasParticipaciones = conPartido.length > MAX_PARTICIPACIONES;
   const participaciones = useMemo(
-    () => history.filter((h) => h.match).slice(0, MAX_PARTICIPACIONES),
-    [history]
+    () => (verTodasLasParticipaciones ? conPartido : conPartido.slice(0, MAX_PARTICIPACIONES)),
+    [conPartido, verTodasLasParticipaciones]
   );
 
   // ── Acciones propias ──
@@ -619,9 +624,11 @@ export default function ProfileScreen({ navigation, route }) {
         {/* ── Últimas participaciones ── */}
         <SectionHeader
           title="Últimas participaciones"
-          actionLabel={participaciones.length > 0 ? 'Ver todo' : null}
+          actionLabel={
+            hayMasParticipaciones ? (verTodasLasParticipaciones ? 'Ver menos' : 'Ver todo') : null
+          }
           onAction={
-            participaciones.length > 0 ? () => navigation.navigate('SearchTab') : null
+            hayMasParticipaciones ? () => setVerTodasLasParticipaciones((v) => !v) : null
           }
         />
         {participaciones.length === 0 ? (
