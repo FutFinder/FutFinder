@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, ScrollView, RefreshControl, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -40,6 +40,7 @@ import { seleccionInicio } from '../services/clubMatchRules';
 import { useTrueScoreAjustes } from '../services/trueScore';
 import { etiquetaTier, nombrePuntajeDe } from '../utils/trueScore';
 import { etiquetaAdminDeClubes } from '../utils/clubsHomeSources';
+import { crearSecuencia } from '../utils/paginacionPartidos';
 
 function greetingFor(d = new Date()) {
   const h = d.getHours();
@@ -102,13 +103,19 @@ export default function HomeScreen({ navigation }) {
     if (type === 'success') setTimeout(() => setBanner(null), 6000);
   }, []);
 
+  // Una carga por turno (I04): load corre al enfocar, al refrescar y tras
+  // inscribirse, y una respuesta vieja que llega tarde no pisa a la nueva.
+  const secuenciaCarga = useRef(crearSecuencia()).current;
+
   const load = useCallback(async () => {
+    const turno = secuenciaCarga.abrir();
     const [prof, user, misClubes, userCoords] = await Promise.all([
       getCurrentProfile(),
       getCurrentUser(),
       getMyClubIds().catch(() => ({ data: [] })),
       getMyLocation().catch(() => null),
     ]);
+    if (!secuenciaCarga.vigente(turno)) return;
     const userId = user?.id || null;
     const radiusKm = prof?.search_radius_km ?? 10;
     // Con ubicación, la consulta ya trae sólo lo que cae cerca: pedir 20 del
@@ -117,6 +124,7 @@ export default function HomeScreen({ navigation }) {
       limit: 20,
       cerca: userCoords ? { ...userCoords, km: radiusKm } : null,
     });
+    if (!secuenciaCarga.vigente(turno)) return;
     const filtered = userCoords
       ? applyFilters(list || [], { maxKm: radiusKm }, userCoords)
       : list || [];
@@ -125,9 +133,14 @@ export default function HomeScreen({ navigation }) {
     if (userId && isSupabaseConfigured) {
       // Los reportes recibidos, como los cuenta Perfil. No frena la portada.
       countReportsAgainst(userId)
-        .then((r) => setReportesRecibidos(r?.error ? null : r?.data ?? null))
-        .catch(() => setReportesRecibidos(null));
+        .then((r) => {
+          if (secuenciaCarga.vigente(turno)) setReportesRecibidos(r?.error ? null : r?.data ?? null);
+        })
+        .catch(() => {
+          if (secuenciaCarga.vigente(turno)) setReportesRecibidos(null);
+        });
       const { inscritos, proximo } = await getMisInscripcionesYProximo(userId);
+      if (!secuenciaCarga.vigente(turno)) return;
       joinedIds = new Set(inscritos);
       setNextMatch(proximo);
     }
@@ -141,11 +154,12 @@ export default function HomeScreen({ navigation }) {
     // Después del resto: necesita los ids de mis clubes, y nada de lo de
     // arriba necesita esperarla.
     const { data: deClub } = await listPartidosDeMisClubes(clubIds).catch(() => ({ data: [] }));
+    if (!secuenciaCarga.vigente(turno)) return;
     setPartidosDeClub(deClub || []);
 
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [secuenciaCarga]);
 
   // Al volver a Inicio, no sólo al montarlo. El navegador de pestañas deja
   // esta pantalla montada, así que un partido de club publicado durante la
