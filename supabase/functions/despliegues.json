@@ -77,9 +77,10 @@
       },
       "pendiente": {
         "desde": "2026-11-05",
-        "motivo": "Fija @supabase/supabase-js a 2.119.0 en el import (hoy flota con @2; es la misma versión que resuelve esm.sh ahora, así que no cambia el comportamiento, sólo cierra la puerta a una actualización no revisada).",
+        "motivo": "Fija @supabase/supabase-js a 2.119.0 en el import (hoy flota con @2; es la misma versión que resuelve esm.sh ahora, así que no cambia el comportamiento, sólo cierra la puerta a una actualización no revisada). Y respeta chat_mutes antes de mandar (C05, push_status 'skipped_muted'): desplegar DESPUÉS de aplicar la migración 169.",
         "archivos": {
-          "send-push/index.ts": "1e81d28871a63036903d1c7efff36d4746928e327e9f03b8f5553384c2716f35"
+          "send-push/index.ts": "714856c2134cbc360208d86e0748056fe0677e8a14662ee4a66b8c992def4557",
+          "send-push/pushLogic.ts": "770f329fef0097e964102660e8e19d5a63f4b86040c4c08e1913e73582f93592"
         }
       }
     },

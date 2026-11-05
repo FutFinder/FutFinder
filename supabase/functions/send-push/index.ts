@@ -32,6 +32,7 @@ import {
   classifyTickets,
   dedupeValidTokens,
   getPreferenceColumn,
+  hiloQueSilencia,
   isPushAllowed,
   maskToken,
   summarizePushStatus,
@@ -154,6 +155,39 @@ Deno.serve(async (req) => {
           .update({ push_status: "skipped_preference" })
           .eq("id", notif.id);
         return json({ skipped: "preference_disabled", preference: preferenceColumn });
+      }
+    }
+
+    // 1b) Respetar el silencio del hilo (C05). La migración 169 ya no crea
+    // el aviso de un hilo silenciado, pero el silencio puede llegar entre
+    // el aviso y este envío. Si la consulta falla, se sigue (igual que la
+    // preferencia): mejor un push de más que uno perdido.
+    const hilo = hiloQueSilencia(notif);
+    if (hilo) {
+      const { data: silencio, error: muteErr } = await admin
+        .from("chat_mutes")
+        .select("thread_key")
+        .eq("user_id", notif.user_id)
+        .eq("thread_key", hilo)
+        .maybeSingle();
+      if (muteErr) {
+        console.error("[send-push] chat_mutes error:", muteErr.message);
+      } else if (silencio) {
+        console.log(`[send-push] push omitido: hilo ${hilo} silenciado (notif ${notif.id})`);
+        const { error: estadoErr } = await admin
+          .from("notifications")
+          .update({ push_status: "skipped_muted" })
+          .eq("id", notif.id);
+        // `skipped_muted` lo agrega la migración 169. Si la función llegara
+        // a desplegarse antes que la migración, no se deja la fila colgada
+        // en 'sending': se anota como omitida por preferencia.
+        if (estadoErr) {
+          await admin
+            .from("notifications")
+            .update({ push_status: "skipped_preference" })
+            .eq("id", notif.id);
+        }
+        return json({ skipped: "thread_muted" });
       }
     }
 
