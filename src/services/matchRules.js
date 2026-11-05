@@ -662,6 +662,17 @@ export function accesoAlChatDelPartido(inscripcion, partido) {
 }
 
 /**
+ * ¿Esta inscripción es de alguien que está DENTRO del chat del partido?
+ * Lo usa Detalles del chat para listar participantes (C13): antes contaba a
+ * todos los que no estaban `cancelado`, `pendiente` incluido, y los llamaba
+ * «inscritos» aunque el chat no los deje entrar. Es la misma regla que abre
+ * el chat (`accesoAlChatDelPartido`), no una copia.
+ */
+export function participaEnElChatDelPartido(estado) {
+  return accesoAlChatDelPartido({ estado }, null).canRead;
+}
+
+/**
  * Qué mostrar en «Mi cupo» (`MatchSpotScreen`), derivado del estado real.
  *
  * EL FALLO: la pantalla se abría por URL y saludaba con «Cupo confirmado»,

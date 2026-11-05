@@ -63,7 +63,7 @@ export {
 } from '../utils/chatMeta';
 import { canUseMentionAll, mapThreadRow, createSharedChannel, isGroupType } from '../utils/chatMeta';
 import { esEstadoActivo, estadoLabel } from './clubChallengeRules';
-import { accesoAlChatDelPartido } from './matchRules';
+import { accesoAlChatDelPartido, participaEnElChatDelPartido } from './matchRules';
 // `blockedUsers` no importa nada de acá, así que no hay ciclo.
 import { isBlockedByMe } from './blockedUsers';
 
@@ -967,7 +967,10 @@ export async function getThreadParticipants(threadKeyStr) {
       console.error('[FutFinder] getThreadParticipants(match):', error);
       return { data: [], error };
     }
-    const rows = await hydrateProfiles((attendees || []).map((a) => a.id_jugador));
+    // Sólo quienes de verdad están en el chat: una solicitud `pendiente` no
+    // es un «inscrito» (C13). Misma regla que abre el chat.
+    const dentro = (attendees || []).filter((a) => participaEnElChatDelPartido(a.estado));
+    const rows = await hydrateProfiles(dentro.map((a) => a.id_jugador));
     const organizerId = match?.id_organizador || null;
     return {
       data: decorate(rows, (r) => (r.user_id === organizerId ? 'organizador' : 'jugador')),
