@@ -50,6 +50,7 @@ import {
   alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
+import { cargaPermiteMarcarLeido } from '../utils/lecturaDeHilo';
 import {
   listThreadMessages,
   sendMessage,
@@ -338,7 +339,8 @@ export default function ChatThreadScreen({ route, navigation }) {
           });
         }
         setLoading(false);
-        markThreadAsRead(threadKey).catch(() => {});
+        // Sólo se da por leído lo que llegó: con error no hay nada en pantalla.
+        if (cargaPermiteMarcarLeido(page)) markThreadAsRead(threadKey).catch(() => {});
       } catch (e) {
         console.error('[FutFinder] ChatThread load:', e);
         if (!mountedRef.current) return;
