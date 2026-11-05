@@ -802,3 +802,19 @@ export function solicitudesTrasCargar(previas, res) {
   if (!res || res.error) return previas || [];
   return res.data || [];
 }
+
+/**
+ * El subtítulo de Detalles del chat según el tipo de hilo.
+ *
+ * C14: el hilo de un desafío (`challenge:<id>`) caía en «Mensaje directo»,
+ * aunque es un grupo entre los dos clubes.
+ */
+export function subtituloDeDetalles({ tipo, cuantos = 0 } = {}) {
+  const n = Number(cuantos) || 0;
+  if (tipo === 'club') return `Chat del club · ${n} ${n === 1 ? 'jugador' : 'jugadores'}`;
+  if (tipo === 'match') return `Chat del partido · ${n} ${n === 1 ? 'inscrito' : 'inscritos'}`;
+  if (tipo === 'challenge') {
+    return `Desafío entre clubes · ${n} ${n === 1 ? 'participante' : 'participantes'}`;
+  }
+  return 'Mensaje directo';
+}

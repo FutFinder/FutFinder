@@ -29,7 +29,7 @@ import {
 import { getClubById } from '../services/clubs';
 import { getMatchById } from '../services/matches';
 import { notify } from '../utils/notify';
-import { playerLine } from '../utils/chatMeta';
+import { playerLine, subtituloDeDetalles } from '../utils/chatMeta';
 
 const PREVIEW_COUNT = 6;
 
@@ -104,16 +104,10 @@ export default function ChatDetailsScreen({ route, navigation }) {
     }
   }, [muted, muteBusy, threadKey]);
 
-  const subtitle = useMemo(() => {
-    const n = participants.length;
-    if (t?.type === 'club') {
-      return `Chat del club · ${n} ${n === 1 ? 'jugador' : 'jugadores'}`;
-    }
-    if (t?.type === 'match') {
-      return `Chat del partido · ${n} ${n === 1 ? 'inscrito' : 'inscritos'}`;
-    }
-    return 'Mensaje directo';
-  }, [t?.type, participants.length]);
+  const subtitle = useMemo(
+    () => subtituloDeDetalles({ tipo: t?.type, cuantos: participants.length }),
+    [t?.type, participants.length]
+  );
 
   const shown = expanded ? participants : participants.slice(0, PREVIEW_COUNT);
 
