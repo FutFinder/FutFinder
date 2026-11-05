@@ -30,3 +30,27 @@ test('C11: cada carga pide turno y una vieja no escribe la lista', () => {
   assert.ok(esperas >= 1);
   assert.equal(chequeos, esperas, 'hay una espera en load sin chequeo de turno después');
 });
+
+// ---------------------------------------------------------------------------
+// C16: si fallaba `listIncomingRequests`, la bandeja ponía `requests = []` y
+// la tarjeta de solicitudes desaparecía con su contador, como si no hubiera
+// ninguna. Un fallo conserva lo último que se supo.
+// ---------------------------------------------------------------------------
+
+const { solicitudesTrasCargar } = require('../../utils/chatMeta.js');
+
+test('C16: un fallo de las solicitudes conserva las que ya se mostraban', () => {
+  const previas = [{ id: 'f1' }, { id: 'f2' }];
+  assert.deepEqual(solicitudesTrasCargar(previas, { data: null, error: { message: 'red' } }), previas);
+});
+
+test('C16: sin error, manda lo que llegó (también una lista vacía de verdad)', () => {
+  assert.deepEqual(solicitudesTrasCargar([{ id: 'f1' }], { data: [], error: null }), []);
+  assert.deepEqual(solicitudesTrasCargar([], { data: [{ id: 'f3' }], error: null }), [{ id: 'f3' }]);
+});
+
+test('C16: la bandeja ya no convierte el error en una lista vacía', () => {
+  const load = cuerpoDeLoad();
+  assert.ok(!/catch\(\(\) => \(\{ data: \[\], error: null \}\)\)/.test(load), 'el error vuelve a disfrazarse de «sin solicitudes»');
+  assert.match(load, /setRequests\(\(previas\) => solicitudesTrasCargar\(previas, reqsRes\)\)/);
+});

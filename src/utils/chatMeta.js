@@ -790,3 +790,15 @@ export function initialOf(nameOrProfile) {
   const clean = String(base).replace(/^@/, '').trim();
   return clean ? clean[0].toUpperCase() : '?';
 }
+
+/**
+ * Las solicitudes de amistad de la bandeja después de pedirlas (C16).
+ *
+ * Si la consulta falla, se conservan las que ya se mostraban: antes el error
+ * se convertía en `[]` y la tarjeta de solicitudes desaparecía con su
+ * contador, como si no hubiera ninguna. Sin error, manda lo que llegó.
+ */
+export function solicitudesTrasCargar(previas, res) {
+  if (!res || res.error) return previas || [];
+  return res.data || [];
+}

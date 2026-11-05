@@ -22,7 +22,12 @@ import {
 import { listMyThreads, subscribeToMessages } from '../services/messages';
 import { listIncomingRequests, subscribeToFriendships } from '../services/friends';
 import { isSupabaseConfigured } from '../services/supabase';
-import { filterThreads, filterCounts, sortThreadsByActivity } from '../utils/chatMeta';
+import {
+  filterThreads,
+  filterCounts,
+  solicitudesTrasCargar,
+  sortThreadsByActivity,
+} from '../utils/chatMeta';
 import { crearSecuencia } from '../utils/paginacionPartidos';
 import useConnection from '../utils/useConnection';
 
@@ -39,8 +44,8 @@ import useConnection from '../utils/useConnection';
  * veinte consultas seguidas.
  *
  * Un fallo de la carga secundaria (solicitudes de amistad) NO bloquea la
- * pantalla: la bandeja se muestra igual y solo se pierde la tarjeta de
- * solicitudes.
+ * pantalla: la bandeja se muestra igual y la tarjeta de solicitudes conserva
+ * lo último que se supo.
  */
 export default function ChatScreen({ navigation }) {
   const [filter, setFilter] = useState('todos');
@@ -65,9 +70,9 @@ export default function ChatScreen({ navigation }) {
 
     const [threadsRes, reqsRes] = await Promise.all([
       listMyThreads(),
-      // La carga secundaria no puede tumbar la bandeja: su error se ignora a
-      // propósito y sólo se pierde la tarjeta de solicitudes.
-      listIncomingRequests().catch(() => ({ data: [], error: null })),
+      // La carga secundaria no puede tumbar la bandeja; si falla, la tarjeta
+      // de solicitudes conserva lo último que se supo (C16).
+      listIncomingRequests().catch((e) => ({ data: null, error: e })),
     ]);
 
     if (!mountedRef.current || !secuencia.vigente(turno)) return;
@@ -88,7 +93,7 @@ export default function ChatScreen({ navigation }) {
       setThreads(sortThreadsByActivity(threadsRes.data || []));
     }
 
-    setRequests(reqsRes?.data || []);
+    setRequests((previas) => solicitudesTrasCargar(previas, reqsRes));
     setNow(new Date());
     setLoading(false);
     setRefreshing(false);
