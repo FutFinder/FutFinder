@@ -30,7 +30,7 @@
 // SECRETS: los de `_shared/correoSolicitud.ts`.
 
 // deno-lint-ignore-file no-explicit-any
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 import { enviarCorreo, leerConfigCorreo, type Solicitud } from "../_shared/correoSolicitud.ts";
 
 const corsHeaders = {

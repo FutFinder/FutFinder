@@ -25,7 +25,7 @@
 // SECRETS: los de `_shared/correoReporte.ts`.
 
 // deno-lint-ignore-file no-explicit-any
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 import { enviarCorreo, leerConfigCorreo, type Ticket } from "../_shared/correoReporte.ts";
 
 const corsHeaders = {
@@ -83,6 +83,17 @@ Deno.serve(async (req) => {
   const config = leerConfigCorreo((k) => Deno.env.get(k));
   if (!config) {
     console.log(`[reportar-problema] ticket ${id} guardado; sin proveedor de correo configurado.`);
+    return json({ ok: true, avisado: false });
+  }
+
+  // Un mismo ticket no puede disparar correos sin fin: el id ya guardado
+  // sigue sirviendo, y repetir la llamada repetía el aviso al equipo. La
+  // base (migración 166) deja pasar 5 por hora y persona; el ticket queda
+  // guardado igual, sólo que sin correo. Si la RPC todavía no existe (la
+  // función se despliega antes que la migración) se manda como siempre.
+  const { data: cabe, error: eLimite } = await comoUsuario.rpc("limite_correo_de_reporte");
+  if (!eLimite && cabe === false) {
+    console.warn(`[reportar-problema] ${user.id} pasó el tope de correos; ticket ${id} guardado sin aviso.`);
     return json({ ok: true, avisado: false });
   }
 

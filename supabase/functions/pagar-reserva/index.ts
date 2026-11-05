@@ -27,7 +27,7 @@
 // mientras no exista la cuenta de la empresa.
 
 // deno-lint-ignore-file no-explicit-any
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 import { asuntoDelPago, firmados, leerConfig, urlDePago } from "../_shared/flowLogic.ts";
 
 const corsHeaders = {

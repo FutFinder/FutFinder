@@ -56,6 +56,23 @@ verify_jwt = true
 
 [auth.email]
 enable_confirmations = true
+# Un correo con código por dirección cada minuto, y el código vale 15 minutos
+# (el valor por omisión es 1 hora: una ventana larga para adivinar 6 dígitos).
+max_frequency = "1m0s"
+otp_length = 6
+otp_expiry = 900
+
+# Límites de Supabase Auth por IP y por cinco minutos (login, registro, OTP y
+# renovación de sesión). Son los valores de referencia del proyecto: los de
+# PRODUCCIÓN viven en el panel (Authentication → Rate Limits) y no se pueden
+# versionar ni cambiar por migración; ver seguridad-y-privacidad.md.
+[auth.rate_limit]
+email_sent = 30
+sms_sent = 30
+anonymous_users = 30
+token_refresh = 150
+sign_in_sign_ups = 30
+token_verifications = 30
 
 [auth.email.template.confirmation]
 subject = "Tu código de FutFinder"

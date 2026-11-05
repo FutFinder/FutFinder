@@ -25,7 +25,7 @@
 //   EXPO_ACCESS_TOKEN  → si decides usar Push Security en Expo (recomendado en producción)
 
 // deno-lint-ignore-file no-explicit-any
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 import {
   buildExpoMessage,
   chunk,

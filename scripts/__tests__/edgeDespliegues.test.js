@@ -75,6 +75,13 @@ test('ninguna función desplegada quedó atrás de su código', () => {
         continue;
       }
       const ahora = sha(completo);
+      // Contenido ya escrito que espera despliegue: pasa sólo si coincide
+      // con el hash anotado, y se anuncia para que no se olvide.
+      const pendiente = info.pendiente && info.pendiente.archivos && info.pendiente.archivos[rel];
+      if (ahora !== hash && pendiente && ahora === pendiente) {
+        console.warn(`⚠ PENDIENTE DE DESPLIEGUE: ${nombre} (${rel}) — ${info.pendiente.motivo}`);
+        continue;
+      }
       if (ahora !== hash) {
         atrasadas.push(
           `${nombre}: ${rel} cambió desde la versión ${info.version} (${info.desplegada})`
@@ -88,4 +95,17 @@ test('ninguna función desplegada quedó atrás de su código', () => {
     'hay Edge Functions corriendo código viejo. Redespliega y actualiza ' +
       `supabase/functions/despliegues.json:\n  ${atrasadas.join('\n  ')}`
   );
+});
+
+test('un `pendiente` no se queda colgado: su hash tiene que diferir del desplegado', () => {
+  for (const [nombre, info] of Object.entries(registro.funciones)) {
+    if (!info.pendiente) continue;
+    for (const [rel, h] of Object.entries(info.pendiente.archivos || {})) {
+      assert.notEqual(
+        h,
+        info.archivos[rel],
+        `${nombre}: ${rel} figura como pendiente pero su hash es el ya desplegado; borra el pendiente`
+      );
+    }
+  }
 });

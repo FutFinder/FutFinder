@@ -42,6 +42,15 @@
 
 begin;
 
+-- La 166 limita los mensajes (60 por minuto) y los partidos (15 por hora) por
+-- persona. Este arnés siembra más que eso con el mismo remitente u organizador
+-- dentro de una sola transacción, así que apaga esos dos disparadores (sólo
+-- acá, y la transacción termina en ROLLBACK).
+-- Lo que prueba la bandeja no tiene que ver con el límite; el límite lo prueba
+-- el arnés de la 166.
+alter table public.messages disable trigger trg_limite_de_uso_alta;
+alter table public.matches disable trigger trg_limite_de_uso_alta;
+
 do $$
 declare
   v_me          uuid := gen_random_uuid();
