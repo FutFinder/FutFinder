@@ -58,6 +58,7 @@ import {
 } from '../services/settings';
 import { getProfileLoadStatus } from '../utils/profileEdit';
 import { crearSecuencia } from '../utils/paginacionPartidos';
+import { crearGuardadoDeAjustes } from '../utils/guardadoDeAjustes';
 import { APP_VERSION } from '../utils/appVersion';
 import { validarPassword, PISTA_PASSWORD } from '../utils/passwordStrength';
 import { describeAuthError } from '../services/authPolicy';
@@ -267,6 +268,20 @@ export default function SettingsScreen({ navigation }) {
   const { confirmar, dialogo } = useConfirmacion();
 
   const [profile, setProfile] = useState(null);
+  // Copia síncrona del perfil para el guardado optimista: dos toques en el
+  // mismo render tienen que ver el valor que dejó el primero.
+  const profileRef = useRef(null);
+  profileRef.current = profile;
+  const guardadoDeAjustes = useRef(
+    crearGuardadoDeAjustes({
+      leer: (campo) => profileRef.current?.[campo],
+      escribir: (campo, valor) => {
+        profileRef.current = { ...(profileRef.current || {}), [campo]: valor };
+        setProfile((p) => ({ ...p, [campo]: valor }));
+      },
+      guardar: (campo, valor) => updateMyProfile({ [campo]: valor }),
+    })
+  ).current;
   const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -361,12 +376,10 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const toggleField = async (field, value) => {
-    setProfile((p) => ({ ...p, [field]: value }));
-    const { error } = await updateMyProfile({ [field]: value });
-    if (error) {
-      setProfile((p) => ({ ...p, [field]: !value }));
-      showBanner('error', 'No se pudo guardar', error.message);
-    }
+    // Turno por campo y rollback al valor anterior (A02): ver
+    // utils/guardadoDeAjustes.js.
+    const { error } = await guardadoDeAjustes.cambiar(field, value);
+    if (error) showBanner('error', 'No se pudo guardar', error.message);
   };
 
   // A01: si el guardado falla, el radio vuelve al que quedó en la base;
