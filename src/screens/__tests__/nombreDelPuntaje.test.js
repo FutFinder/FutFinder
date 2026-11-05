@@ -31,3 +31,18 @@ for (const archivo of PANTALLAS) {
     assert.deepEqual(lineas, [], `rótulos fijos: usa nombreTS (nombrePuntajeDe)`);
   });
 }
+
+// Lote C: los que quedaban fuera de las tres pantallas de partido.
+const OTROS = [
+  ['screens', 'TrustScoreHistoryScreen.js'],
+  ['components', 'home', 'TrustScoreCard.js'],
+  ['services', 'matchRules.js'],
+];
+
+for (const partes of OTROS) {
+  test(`${partes.join('/')} no escribe «Trust Score» a mano`, () => {
+    const src = sinComentarios(fs.readFileSync(path.join(__dirname, '..', '..', ...partes), 'utf8'));
+    const lineas = src.split('\n').filter((l) => /Trust Score/.test(l));
+    assert.deepEqual(lineas, [], 'rótulos fijos: usa nombrePuntaje / nombrePuntajeDe');
+  });
+}

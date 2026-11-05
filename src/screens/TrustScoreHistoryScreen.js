@@ -218,7 +218,7 @@ export default function TrustScoreHistoryScreen({ navigation }) {
         <Text style={styles.scoreHint}>
           {ts
             ? 'Tu TrueScore sube cada vez que asistes a tiempo, y más con cada partido seguido. Baja si te sales, llegas tarde o no vas sin avisar.'
-            : 'El Trust Score refleja tu confiabilidad como jugador. Aumenta al confirmar asistencia por GPS.'}
+            : `El ${nombreTS} refleja tu confiabilidad como jugador. Aumenta al confirmar asistencia por GPS.`}
         </Text>
       </View>
 

@@ -195,14 +195,14 @@ export function textoConfirmacionGps(res) {
   if (Number.isFinite(delta) && delta > 0) {
     return {
       titulo: 'Asistencia confirmada',
-      detalle: [metros, `+${delta} de Trust Score.`].filter(Boolean).join(' '),
+      detalle: [metros, `+${delta} de ${nombrePuntaje()}.`].filter(Boolean).join(' '),
     };
   }
   if (Number.isFinite(delta) && delta === 0) {
     // No es un error: el puntaje ya está en el máximo.
     return {
       titulo: 'Asistencia confirmada',
-      detalle: [metros, 'Tu Trust Score ya está al máximo.'].filter(Boolean).join(' '),
+      detalle: [metros, `Tu ${nombrePuntaje()} ya está al máximo.`].filter(Boolean).join(' '),
     };
   }
 
@@ -327,8 +327,8 @@ export function timeUntilLabel(hora) {
 export function leaveRuleText(hora) {
   const free = isPenaltyFree(hora);
   return free
-    ? `Salir ahora resta ${PENALTY.leaveEarly} puntos de Trust Score. Desde ${PENALTY.freeHours} h antes del partido son ${PENALTY.leaveLate}.`
-    : `Falta menos de ${PENALTY.freeHours} h: salir ahora resta ${PENALTY.leaveLate} puntos de Trust Score.`;
+    ? `Salir ahora resta ${PENALTY.leaveEarly} puntos de ${nombrePuntaje()}. Desde ${PENALTY.freeHours} h antes del partido son ${PENALTY.leaveLate}.`
+    : `Falta menos de ${PENALTY.freeHours} h: salir ahora resta ${PENALTY.leaveLate} puntos de ${nombrePuntaje()}.`;
 }
 
 /**

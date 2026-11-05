@@ -5,6 +5,7 @@ import {
   paleta as C,
 } from '../../theme/colors';
 import { lineaDeReputacion } from '../../utils/playerMeta';
+import { nombrePuntaje } from '../../utils/trueScore';
 
 /**
  * La reputación del jugador en la portada.
@@ -18,7 +19,7 @@ import { lineaDeReputacion } from '../../utils/playerMeta';
  * TrueScore está activo y de la tabla de niveles del servidor.
  */
 export default function TrustScoreCard({
-  score, max = 100, nombre = 'Tu Trust Score', matchesPlayed, reports = null, tierLabel, onPress,
+  score, max = 100, nombre = `Tu ${nombrePuntaje()}`, matchesPlayed, reports = null, tierLabel, onPress,
 }) {
   const n = Number(score);
   const hay = score !== null && score !== undefined && Number.isFinite(n);
