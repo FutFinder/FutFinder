@@ -22,6 +22,7 @@ const {
   fusionarAvisoEnVivo,
   deshacerBorrado,
   deshacerLeidos,
+  leerAlAbrir,
 } = require('../notificationInbox.js');
 
 // ---------------------------------------------------------------------------
@@ -251,6 +252,57 @@ test('C07: la bandeja ya no revierte con el arreglo entero', () => {
     assert.match(cuerpo, /revert:/, 'una acción optimista no dice cómo deshacer sólo su cambio');
     assert.ok(!/^\s*items,\s*$/m.test(cuerpo), 'una acción optimista vuelve a pasar el arreglo entero');
   }
+});
+
+// ---------------------------------------------------------------------------
+// C08 — abrir un aviso no puede dejarlo «leído» si el guardado falló
+// ---------------------------------------------------------------------------
+
+test('C08: si markAsRead falla, el aviso vuelve a «sin leer»', async () => {
+  const s = estado([{ id: 'a', read: false }, { id: 'b', read: false }]);
+  const { error } = await leerAlAbrir({
+    id: 'a',
+    markAsRead: async () => ({ error: { message: 'sin red' } }),
+    setItems: s.setItems,
+  });
+  assert.equal(error.message, 'sin red');
+  assert.deepEqual(s.actual, [{ id: 'a', read: false }, { id: 'b', read: false }]);
+});
+
+test('C08: si markAsRead revienta, también se revierte', async () => {
+  const s = estado([{ id: 'a', read: false }]);
+  const { error } = await leerAlAbrir({
+    id: 'a',
+    markAsRead: async () => { throw new Error('Network request failed'); },
+    setItems: s.setItems,
+  });
+  assert.ok(error);
+  assert.deepEqual(s.actual, [{ id: 'a', read: false }]);
+});
+
+test('C08: si se guarda, queda leído', async () => {
+  const s = estado([{ id: 'a', read: false }]);
+  const { error } = await leerAlAbrir({
+    id: 'a',
+    markAsRead: async () => ({ error: null }),
+    setItems: s.setItems,
+  });
+  assert.equal(error, null);
+  assert.deepEqual(s.actual, [{ id: 'a', read: true }]);
+});
+
+test('C08: la bandeja marca leído al abrir con leerAlAbrir, no a ciegas', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'NotificationsScreen.js'),
+    'utf8'
+  );
+  const ini = src.indexOf('const handlePress = async (n) => {');
+  assert.ok(ini > 0, 'no se encontró handlePress');
+  const cuerpo = src.slice(ini, src.indexOf('const handleDelete', ini));
+  assert.match(cuerpo, /leerAlAbrir\(\{/);
+  assert.ok(!/^\s*markAsRead\(n\.id\);/m.test(cuerpo), 'handlePress vuelve a llamar markAsRead sin mirar el resultado');
 });
 
 // ---------------------------------------------------------------------------

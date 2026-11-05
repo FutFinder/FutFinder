@@ -98,6 +98,28 @@ export function deshacerLeidos(items, ids = []) {
   return items.map((n) => (set.has(n.id) ? { ...n, read: false } : n));
 }
 
+/**
+ * Abrir un aviso lo marca leído en el acto, pero sólo se queda así si el
+ * servidor lo guardó (C08). Antes la tarjeta quedaba leída aunque
+ * `markAsRead` fallara: la campana, la tarjeta y otra sesión discrepaban y al
+ * recargar el aviso volvía a estar pendiente sin explicación. La navegación
+ * no espera esto: se puede abrir el destino aunque el marcado falle.
+ */
+export async function leerAlAbrir({ id, markAsRead, setItems }) {
+  return runOptimistic({
+    apply: (items) => withRead(items, id),
+    revert: (items) => deshacerLeidos(items, [id]),
+    action: async () => {
+      try {
+        return (await markAsRead(id)) || { error: null };
+      } catch (e) {
+        return { error: e };
+      }
+    },
+    setItems,
+  });
+}
+
 // Transformaciones puras reutilizadas como `apply` de runOptimistic.
 export const withRead = (items, id) =>
   items.map((p) => (p.id === id ? { ...p, read: true } : p));

@@ -45,6 +45,7 @@ import {
   fusionarAvisoEnVivo,
   deshacerBorrado,
   deshacerLeidos,
+  leerAlAbrir,
   conResoluciones,
   textoResolucion,
 } from '../utils/notificationInbox';
@@ -257,8 +258,9 @@ export default function NotificationsScreen({ navigation, route }) {
     navigatingIds.current.add(n.id);
 
     if (!n.read) {
-      setItems((prev) => prev.map((p) => (p.id === n.id ? { ...p, read: true } : p)));
-      markAsRead(n.id);
+      // Se ve leído al toque, pero si el servidor no lo guarda vuelve a
+      // «sin leer» (C08). No se espera: abrir el destino no depende de esto.
+      leerAlAbrir({ id: n.id, markAsRead, setItems });
     }
     // Desde una tab, los screens del root stack se alcanzan subiendo al padre.
     const root = navigation.getParent() || navigation;
