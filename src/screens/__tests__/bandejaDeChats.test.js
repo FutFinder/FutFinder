@@ -54,3 +54,18 @@ test('C16: la bandeja ya no convierte el error en una lista vacía', () => {
   assert.ok(!/catch\(\(\) => \(\{ data: \[\], error: null \}\)\)/.test(load), 'el error vuelve a disfrazarse de «sin solicitudes»');
   assert.match(load, /setRequests\(\(previas\) => solicitudesTrasCargar\(previas, reqsRes\)\)/);
 });
+
+// ---------------------------------------------------------------------------
+// C12: el aviso sin conexión decía «Estás viendo los últimos mensajes
+// guardados», pero la bandeja no guarda nada entre arranques: sólo conserva
+// lo que la pantalla ya tenía cargado. Abierta sin red, no había nada
+// «guardado» que ver.
+// ---------------------------------------------------------------------------
+
+test('C12: el aviso sin conexión no promete mensajes guardados', () => {
+  const estados = fs.readFileSync(path.join(__dirname, '..', '..', 'components', 'chat', 'ChatStates.js'), 'utf8');
+  const ini = estados.indexOf('export function OfflineBanner');
+  const banner = estados.slice(ini, estados.indexOf('\n}\n', ini));
+  assert.ok(!/guardad/i.test(banner), 'el aviso vuelve a prometer una copia guardada que no existe');
+  assert.match(banner, /lo último que alcanzó a cargar/);
+});
