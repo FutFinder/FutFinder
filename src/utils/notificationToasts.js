@@ -75,5 +75,26 @@ export function toastsDelUsuario(toasts, userId) {
   return (toasts || []).filter((n) => !n?.user_id || n.user_id === userId);
 }
 
+// Los avisos que nacen de un hilo de chat y que, por eso, el silencio de
+// ese hilo (`chat_mutes`) tiene que callar.
+const AVISOS_DE_CHAT = new Set(['message_new', 'chat_mention_all']);
+
+/**
+ * ¿Este aviso es de un hilo que la persona silenció? (C05, parte de cliente)
+ *
+ * Silenciar prometía «Silenciado hasta que lo reactives» y el popup se abría
+ * igual. Ahora no se abre. La excepción es la regla del producto: lo marcado
+ * importante sigue llegando, si el aviso trae esa marca. El push y la fila en
+ * `notifications` los decide el servidor (`send-push`, el disparador), y eso
+ * sigue pendiente: necesita migración y Edge Function.
+ */
+export function avisoSilenciado(notif, silenciados) {
+  if (!notif || !AVISOS_DE_CHAT.has(notif.type)) return false;
+  const threadKey = notif.data?.threadKey || notif.data?.threadId;
+  if (!threadKey || !silenciados || typeof silenciados.has !== 'function') return false;
+  if (notif.data?.important === true || notif.data?.is_important === true) return false;
+  return silenciados.has(threadKey);
+}
+
 /** Cuánto dura en pantalla antes de irse solo. */
 export const DURACION_TOAST_MS = 5000;

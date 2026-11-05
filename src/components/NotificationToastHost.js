@@ -6,12 +6,13 @@ import { Bell, X } from 'lucide-react-native';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeToNotifications } from '../services/notifications';
+import { listMutedThreads } from '../services/messages';
 import { navigateToNotification } from '../utils/notificationTargets';
 import { getMatchById } from '../services/matches';
 import { getClubById } from '../services/clubs';
 import { ICON, TAG, FALLBACK_TAG } from './notifications/NotificationCard';
 import {
-  empujarToast, quitarToast, limpiarToasts, suscribirseAToasts, toastsDelUsuario, DURACION_TOAST_MS,
+  empujarToast, quitarToast, limpiarToasts, suscribirseAToasts, toastsDelUsuario, avisoSilenciado, DURACION_TOAST_MS,
 } from '../utils/notificationToasts';
 import { navigationRef } from '../navigation/AppNavigator';
 
@@ -42,6 +43,7 @@ export default function NotificationToastHost() {
     // Cerrar sesión o cambiar de cuenta: nada de la anterior queda arriba (C10).
     limpiarToasts();
     if (!user?.id) return undefined;
+    let vigente = true;
     const desuscribir = subscribeToNotifications(user.id, (notif) => {
       // Un aviso borrado no puede seguir flotando arriba (C09).
       if (notif._eventType === 'DELETE') {
@@ -51,9 +53,25 @@ export default function NotificationToastHost() {
       }
       if (notif._eventType !== 'INSERT') return;
       if (navigationRef.getCurrentRoute?.()?.name === 'Notifications') return;
-      empujarToast(notif);
+      // Un hilo silenciado no abre popups (C05). Se pregunta en el momento
+      // —es raro y barato— para no depender de una caché que quede vieja
+      // cuando alguien silencia o reactiva desde Detalles del chat.
+      (async () => {
+        if (notif.type === 'message_new' || notif.type === 'chat_mention_all') {
+          let silenciados = null;
+          try {
+            ({ data: silenciados } = await listMutedThreads());
+          } catch {
+            // Sin saber, se muestra: mejor un popup de más que uno perdido.
+          }
+          if (!vigente) return;
+          if (avisoSilenciado(notif, silenciados)) return;
+        }
+        empujarToast(notif);
+      })();
     });
     return () => {
+      vigente = false;
       desuscribir();
       limpiarToasts();
     };
