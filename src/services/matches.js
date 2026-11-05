@@ -4,6 +4,7 @@ import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
 import { aplicarOrdenYCursor } from '../utils/paginacionPartidos.js';
 import { nombrePuntaje } from '../utils/trueScore.js';
 import { cancelarConMotivo } from '../utils/motivoDeCancelacion.js';
+import { cajaDeBusqueda } from '../utils/cajaDeBusqueda.js';
 import { aceptaACualquiera, rangoDeFecha } from './matchRules';
 
 /**
@@ -73,7 +74,12 @@ export async function getMisInscripcionesYProximo(userId) {
  * Lista partidos abiertos cerca del usuario, ordenados por hora.
  * Si pasas comuna filtra por comuna.
  */
-export async function listOpenMatches({ comuna = null, limit = 50, estados = ['abierto'] } = {}) {
+export async function listOpenMatches({
+  comuna = null,
+  limit = 50,
+  estados = ['abierto'],
+  cerca = null,
+} = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), error: null };
 
   // Mostramos solo partidos cuya hora oficial todavía NO haya pasado.
@@ -94,6 +100,17 @@ export async function listOpenMatches({ comuna = null, limit = 50, estados = ['a
     .limit(limit);
 
   if (comuna) q = q.eq('comuna', comuna);
+  // `cerca: { lat, lng, km }`: sólo los partidos dentro de una caja alrededor
+  // del jugador, ANTES del límite. Sin esto Inicio pedía los N más próximos
+  // de todo el país y aplicaba el radio después (I01, ver cajaDeBusqueda.js).
+  const caja = cerca ? cajaDeBusqueda(cerca, cerca.km) : null;
+  if (caja) {
+    q = q
+      .gte('latitud', caja.latMin)
+      .lte('latitud', caja.latMax)
+      .gte('longitud', caja.lngMin)
+      .lte('longitud', caja.lngMax);
+  }
   const { data, error } = await q;
   if (error) {
     console.error('[FutFinder] listOpenMatches error:', error);

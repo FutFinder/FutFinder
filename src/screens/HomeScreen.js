@@ -103,8 +103,7 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [{ data: list }, prof, user, misClubes, userCoords] = await Promise.all([
-      listOpenMatches({ limit: 20 }),
+    const [prof, user, misClubes, userCoords] = await Promise.all([
       getCurrentProfile(),
       getCurrentUser(),
       getMyClubIds().catch(() => ({ data: [] })),
@@ -112,6 +111,12 @@ export default function HomeScreen({ navigation }) {
     ]);
     const userId = user?.id || null;
     const radiusKm = prof?.search_radius_km ?? 10;
+    // Con ubicación, la consulta ya trae sólo lo que cae cerca: pedir 20 del
+    // país y filtrar después dejaba fuera al partido cercano (I01).
+    const { data: list } = await listOpenMatches({
+      limit: 20,
+      cerca: userCoords ? { ...userCoords, km: radiusKm } : null,
+    });
     const filtered = userCoords
       ? applyFilters(list || [], { maxKm: radiusKm }, userCoords)
       : list || [];
