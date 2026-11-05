@@ -57,6 +57,7 @@ import {
   verifyEmailChangeOtp,
 } from '../services/settings';
 import { getProfileLoadStatus } from '../utils/profileEdit';
+import { crearSecuencia } from '../utils/paginacionPartidos';
 import { APP_VERSION } from '../utils/appVersion';
 import { validarPassword, PISTA_PASSWORD } from '../utils/passwordStrength';
 import { describeAuthError } from '../services/authPolicy';
@@ -306,6 +307,7 @@ export default function SettingsScreen({ navigation }) {
 
   // Preferences
   const [radiusKm, setRadiusKm] = useState(10);
+  const secuenciaRadio = useRef(crearSecuencia()).current;
 
   // Forgot password cooldown (seconds remaining)
   const [forgotCooldown, setForgotCooldown] = useState(0);
@@ -367,11 +369,21 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
+  // A01: si el guardado falla, el radio vuelve al que quedó en la base;
+  // antes la pantalla se quedaba con el nuevo y la app buscaba con el viejo.
+  // Un guardado que vuelve tarde no pisa a uno más nuevo.
   const handleRadiusRelease = async (km) => {
+    const turno = secuenciaRadio.abrir();
+    const anterior = profile?.search_radius_km ?? 10;
     setRadiusKm(km);
     const { error } = await updateMyProfile({ search_radius_km: km });
-    if (error) showBanner('error', 'No se pudo guardar el radio', error.message);
-    else setProfile((p) => ({ ...p, search_radius_km: km }));
+    if (!secuenciaRadio.vigente(turno)) return;
+    if (error) {
+      setRadiusKm(anterior);
+      showBanner('error', 'No se pudo guardar el radio', error.message);
+    } else {
+      setProfile((p) => ({ ...p, search_radius_km: km }));
+    }
   };
 
   // ── Cambiar email ──────────────────────────────────────────────
