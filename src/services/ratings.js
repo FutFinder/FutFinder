@@ -232,6 +232,8 @@ export async function getUserRatingSummary(userId) {
       avg_nivel: 0,
       count: 0,
       overall: 0,
+      // Un fallo no es «sin evaluaciones»: Perfil lo dice distinto (P05).
+      ...(error ? { desconocido: true, error } : {}),
     };
   }
 

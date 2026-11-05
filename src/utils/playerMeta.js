@@ -110,6 +110,10 @@ export function modalidadInline(modalidad) {
  *   value: '4,6' | 'N.A.'   filled: estrellas llenas (0 si no hay evaluaciones)
  */
 export function ratingDisplay(summary) {
+  // P05: un resumen que no llegó no es «cero evaluaciones».
+  if (summary?.desconocido) {
+    return { value: 'N.A.', hasRatings: false, count: 0, filled: 0, desconocido: true };
+  }
   const count = summary?.count ?? 0;
   const overall = Number(summary?.overall ?? 0);
   if (!count || !Number.isFinite(overall) || overall <= 0) {
@@ -344,4 +348,14 @@ export function encabezadoEstadoDeCuenta({ suspended = false, desconocido = fals
     };
   }
   return { tono: 'ok', titulo: 'Cuenta en buen estado', sub: 'Sin sanciones ni restricciones activas' };
+}
+
+/**
+ * La pista bajo las estrellas de «Reputación». Distingue «no hay
+ * evaluaciones» de «no pudimos cargarlas» (P05).
+ */
+export function pistaDeValoracion(rating) {
+  if (rating?.desconocido) return 'No pudimos cargar las evaluaciones';
+  if (rating?.hasRatings) return `${rating.count} ${rating.count === 1 ? 'evaluación' : 'evaluaciones'}`;
+  return 'Sin evaluaciones todavía';
 }
