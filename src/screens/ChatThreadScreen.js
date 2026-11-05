@@ -69,12 +69,13 @@ import {
   setThreadMuted,
   isThreadMuted,
   parseComposerCommand,
+  getRemitente,
   suggestCommands,
   canUseMentionAll,
 } from '../services/messages';
 import { getMatchById, getMatchAttendees, withClubs } from '../services/matches';
 import { enVentanaGps, puedeCalificar, textoConfirmacionGps } from '../services/matchRules';
-import { getClubById, listMembers } from '../services/clubs';
+import { getClubById, getMisMembresiasEn, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import {
   getChallenge,
@@ -472,11 +473,10 @@ export default function ChatThreadScreen({ route, navigation }) {
       setChallengeProposal(prop || null);
 
       if (!user?.id) return;
-      const { data: membresias } = await supabase
-        .from('club_members')
-        .select('club_id, rol')
-        .eq('user_id', user.id)
-        .in('club_id', [data.club_retador_id, data.club_retado_id]);
+      const { data: membresias } = await getMisMembresiasEn(user.id, [
+        data.club_retador_id,
+        data.club_retado_id,
+      ]);
       if (alive) {
         const filas = membresias || [];
         setMyClubIds(filas.filter((m) => m.rol === 'admin').map((m) => m.club_id));
@@ -519,11 +519,7 @@ export default function ChatThreadScreen({ route, navigation }) {
     if (fetchingSendersRef.current.has(senderId)) return;
     fetchingSendersRef.current.add(senderId);
     (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, username, foto_url')
-        .eq('id', senderId)
-        .maybeSingle();
+      const { data } = await getRemitente(senderId);
       fetchingSendersRef.current.delete(senderId);
       if (!data || !mountedRef.current) return;
       profilesRef.current.set(senderId, data);

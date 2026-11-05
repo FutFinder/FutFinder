@@ -35,6 +35,41 @@ export function haversineKm(a, b) {
 }
 
 /**
+ * Para Inicio: los partidos donde estoy inscrito (o confirmé por GPS) y el
+ * próximo de ellos que no esté cancelado.
+ *
+ * Vivía como dos consultas sueltas en `HomeScreen`. Conserva lo que hacía
+ * allá: un fallo no rompe la portada, deja `proximo` en `null` y los
+ * `inscritos` que alcanzaron a llegar.
+ */
+export async function getMisInscripcionesYProximo(userId) {
+  if (!isSupabaseConfigured || !userId) return { inscritos: [], proximo: null };
+  let inscritos = [];
+  try {
+    const ahora = new Date().toISOString();
+    const { data: filas } = await supabase
+      .from('attendees')
+      .select('id_partido')
+      .eq('id_jugador', userId)
+      .in('estado', ['inscrito', 'confirmado_gps']);
+    inscritos = (filas || []).map((r) => r.id_partido);
+    if (inscritos.length === 0) return { inscritos, proximo: null };
+    const { data: proximo } = await supabase
+      .from('matches')
+      .select('id, titulo, hora, cancha_nombre, comuna')
+      .in('id', inscritos)
+      .gt('hora', ahora)
+      .neq('estado', 'cancelado')
+      .order('hora', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return { inscritos, proximo: proximo || null };
+  } catch {
+    return { inscritos, proximo: null };
+  }
+}
+
+/**
  * Lista partidos abiertos cerca del usuario, ordenados por hora.
  * Si pasas comuna filtra por comuna.
  */

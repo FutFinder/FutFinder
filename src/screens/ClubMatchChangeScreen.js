@@ -25,6 +25,7 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 import { supabase } from '../services/supabase';
 import { getMatchById, getClubMatchLocation } from '../services/matches';
 import { nuevoClientToken } from '../services/clubProposals';
+import { getMisMembresiasEn } from '../services/clubs';
 import { getCambioPendiente, proponerCambioPartido } from '../services/clubMatchChanges';
 import { accionesDeCambio, construirCampos, filasDeComparacion } from '../utils/cambioPartido';
 import {
@@ -168,11 +169,10 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
     setUserId(uid);
 
     if (uid && (m.club_local_id || m.club_visitante_id)) {
-      const { data: membresias } = await supabase
-        .from('club_members')
-        .select('club_id, rol')
-        .eq('user_id', uid)
-        .in('club_id', [m.club_local_id, m.club_visitante_id].filter(Boolean));
+      const { data: membresias } = await getMisMembresiasEn(uid, [
+        m.club_local_id,
+        m.club_visitante_id,
+      ]);
       if (mountedRef.current) {
         const filas = membresias || [];
         setClubesAdmin(filas.filter((f) => f.rol === 'admin').map((f) => f.club_id));

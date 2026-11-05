@@ -786,6 +786,21 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
 }
 
 /**
+ * Nombre y foto de quien escribió en un hilo, para un mensaje que llegó por
+ * Realtime sin `sender` (la fila cruda no trae el join). Mismas columnas que
+ * `listThreadMessages` usa para los remitentes de la carga inicial.
+ */
+export async function getRemitente(senderId) {
+  if (!isSupabaseConfigured || !senderId) return { data: null, error: null };
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, foto_url')
+    .eq('id', senderId)
+    .maybeSingle();
+  return { data: data || null, error };
+}
+
+/**
  * Envía un mensaje al hilo. El timestamp y el autor los pone el servidor.
  *
  * @param {string} threadKeyStr

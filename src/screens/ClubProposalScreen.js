@@ -30,6 +30,7 @@ import {
 } from '../utils/ubicacionPropuesta';
 import { supabase } from '../services/supabase';
 import { getChallenge } from '../services/clubChallenges';
+import { getMisMembresiasEn } from '../services/clubs';
 import {
   crearPropuestaOficial,
   aprobarPropuesta,
@@ -202,11 +203,10 @@ export default function ClubProposalScreen({ navigation, route }) {
       setPropuesta(prop || null);
 
       if (ch && user?.id) {
-        const { data: membresias } = await supabase
-          .from('club_members')
-          .select('club_id, rol')
-          .eq('user_id', user.id)
-          .in('club_id', [ch.club_retador_id, ch.club_retado_id]);
+        const { data: membresias } = await getMisMembresiasEn(user.id, [
+          ch.club_retador_id,
+          ch.club_retado_id,
+        ]);
         if (alive) {
           const filas = membresias || [];
           setMisClubIds(filas.filter((m) => m.rol === 'admin').map((m) => m.club_id));

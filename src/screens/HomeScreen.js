@@ -27,10 +27,11 @@ import {
   requestJoinMatch,
   applyFilters,
   listPartidosDeMisClubes,
+  getMisInscripcionesYProximo,
 } from '../services/matches';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { getMyLocation } from '../services/profile';
-import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { isSupabaseConfigured } from '../services/supabase';
 import { getMyClubIds } from '../services/clubs';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
@@ -113,32 +114,9 @@ export default function HomeScreen({ navigation }) {
 
     let joinedIds = new Set();
     if (userId && isSupabaseConfigured) {
-      try {
-        const now = new Date().toISOString();
-        const { data: attRows } = await supabase
-          .from('attendees')
-          .select('id_partido')
-          .eq('id_jugador', userId)
-          .in('estado', ['inscrito', 'confirmado_gps']);
-        const matchIds = (attRows || []).map((r) => r.id_partido);
-        joinedIds = new Set(matchIds);
-        if (matchIds.length > 0) {
-          const { data: upcoming } = await supabase
-            .from('matches')
-            .select('id, titulo, hora, cancha_nombre, comuna')
-            .in('id', matchIds)
-            .gt('hora', now)
-            .neq('estado', 'cancelado')
-            .order('hora', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-          setNextMatch(upcoming || null);
-        } else {
-          setNextMatch(null);
-        }
-      } catch {
-        setNextMatch(null);
-      }
+      const { inscritos, proximo } = await getMisInscripcionesYProximo(userId);
+      joinedIds = new Set(inscritos);
+      setNextMatch(proximo);
     }
 
     const clubIds = misClubes?.data || [];
