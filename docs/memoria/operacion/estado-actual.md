@@ -63,12 +63,17 @@ de canchas. `src/services/` concentra las llamadas de dominio.
 
 ## Base de datos
 
-- **176 archivos de migración** en el repositorio (la última, la **164**; la
-  numeración tiene sufijos como 44b o 105b, por eso no son 164). Con la
-  **162** y la **163** aplicadas el 2026-10-16 y la **164** el 2026-10-19,
-  **la única que el repositorio tiene y producción no es la
-  149**, que lleva en su cabecera «no aplicar hasta distribuir un build» y
-  espera ahí a propósito. No es una cuenta: es el resultado de construir
+- **179 archivos de migración** en el repositorio (la última, la **167**; la
+  numeración tiene sufijos como 44b o 105b, por eso no son 167). Con la
+  **162** y la **163** aplicadas el 2026-10-16, la **164** el 2026-10-19 y la
+  **165** y la **166** el 2026-11-05 (hardening; ver
+  [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md)),
+  **las que el repositorio tiene y producción no son dos, y las dos
+  esperan a propósito**: la **149** («no aplicar hasta distribuir un build»,
+  por las reglas de contraseña) y la **167** (verificación en dos pasos del
+  personal, que nace con su bandera apagada y espera el build con la pantalla
+  de MFA). La comparación huella por huella que sigue es anterior y no
+  incluye la 165 ni la 166. No es una cuenta: es el resultado de construir
   una base desde cero con `--sin-149` y comparar las dos huella por huella
   (ver [Pruebas](pruebas.md)); esa comparación es del 2026-10-16 y no se
   repitió con la 164, aunque el registro de producción sí la lista.
