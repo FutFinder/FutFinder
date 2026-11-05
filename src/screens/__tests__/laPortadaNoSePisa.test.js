@@ -56,3 +56,22 @@ test('I02: Inicio lee el error de listOpenMatches y no pisa la lista con él', (
   assert.match(SRC, /vistaDePartidosCerca\(/);
   assert.match(SRC, /No pudimos cargar los partidos/);
 });
+
+// ---------------------------------------------------------------------------
+// I07: si el único partido cercano subía a «Tu club juega», Inicio decía
+// arriba «1 partido cerca de ti» y abajo «Sin partidos en tu radio».
+// ---------------------------------------------------------------------------
+
+test('I07: sin otros partidos pero con uno destacado, la vista lo dice', () => {
+  assert.equal(vistaDePartidosCerca({ cuantos: 0, error: null, destacados: 1 }), 'vacio-con-destacados');
+  assert.equal(vistaDePartidosCerca({ cuantos: 0, error: null, destacados: 0 }), 'vacio');
+  assert.equal(vistaDePartidosCerca({ cuantos: 2, error: null, destacados: 1 }), 'lista');
+  assert.equal(vistaDePartidosCerca({ cuantos: 0, error: { message: 'red' }, destacados: 1 }), 'error');
+});
+
+test('I07: Inicio pasa los destacados y la tarjeta vacía no contradice el resumen', () => {
+  assert.match(SRC, /vistaDePartidosCerca\(\{[^}]*destacados: partidosDeMiClub\.length/);
+  assert.match(SRC, /soloDestacados=\{vistaCerca === 'vacio-con-destacados'\}/);
+  const tarjeta = fs.readFileSync(path.join(__dirname, '..', '..', 'components', 'home', 'EmptyMatchesCard.js'), 'utf8');
+  assert.match(tarjeta, /No hay otros partidos cerca/);
+});

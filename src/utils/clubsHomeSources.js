@@ -309,7 +309,10 @@ export function etiquetaAdminDeClubes(rolEnClubActivo, membresias) {
  *                       muestran con un aviso.
  *   · 'vacio' / 'lista' lo de siempre.
  */
-export function vistaDePartidosCerca({ cuantos = 0, error = null } = {}) {
+export function vistaDePartidosCerca({ cuantos = 0, error = null, destacados = 0 } = {}) {
   if (error) return cuantos > 0 ? 'lista-con-error' : 'error';
-  return cuantos > 0 ? 'lista' : 'vacio';
+  if (cuantos > 0) return 'lista';
+  // I07: el único cercano subió a «Tu club juega». Decir «Sin partidos en
+  // tu radio» contradecía al resumen de arriba («1 partido cerca de ti»).
+  return destacados > 0 ? 'vacio-con-destacados' : 'vacio';
 }

@@ -299,7 +299,11 @@ export default function HomeScreen({ navigation }) {
     misClubIds
   );
   // Lista, vacío o error: un fallo de red no se dibuja como «sin partidos» (I02).
-  const vistaCerca = vistaDePartidosCerca({ cuantos: partidosCerca.length, error: errorPartidos });
+  const vistaCerca = vistaDePartidosCerca({
+    cuantos: partidosCerca.length,
+    error: errorPartidos,
+    destacados: partidosDeMiClub.length,
+  });
 
   const renderMatch = useCallback(
     (m) => (
@@ -454,6 +458,7 @@ export default function HomeScreen({ navigation }) {
               ) : (
                 <EmptyMatchesCard
                   comuna={profile?.comuna}
+                  soloDestacados={vistaCerca === 'vacio-con-destacados'}
                   onCreate={() => navigation.navigate('CreateMatch', club ? { clubId: club.id } : {})}
                 />
               )}
