@@ -80,7 +80,7 @@ import {
   EDAD_PRESETS,
   MODALIDADES,
   NIVELES,
-  TRUST_OPTS,
+  opcionesDeTrustMinimo,
   combineDateTime,
   cuotaLabel,
   validarRangoEdad,
@@ -100,7 +100,8 @@ import {
  */
 export default function EditMatchScreen({ route, navigation }) {
   // Cómo se llama el puntaje, según el flag que responde el servidor.
-  const nombreTS = nombrePuntajeDe(!!useTrueScoreAjustes().fase1);
+  const ajustesTS = useTrueScoreAjustes();
+  const nombreTS = nombrePuntajeDe(!!ajustesTS.fase1);
 
   const matchId = route?.params?.matchId;
   const insets = useSafeAreaInsets();
@@ -728,7 +729,10 @@ export default function EditMatchScreen({ route, navigation }) {
 
             <Field label={`${nombreTS} mínimo`}>
               <View style={styles.wrap}>
-                {TRUST_OPTS.map((t) => (
+                {opcionesDeTrustMinimo(
+                  ajustesTS.fase1 ? ajustesTS.niveles : [],
+                  original?.min_trust_score
+                ).map((t) => (
                   <OptionChip
                     key={t.value}
                     label={t.label}

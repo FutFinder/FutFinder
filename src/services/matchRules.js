@@ -57,13 +57,55 @@ export const MODALIDADES = [
   { value: 'futbol11', label: 'Fútbol 11' },
 ];
 
-/** Opciones de Trust Score mínimo. */
+/**
+ * Opciones de puntaje mínimo: respaldo para cuando todavía no llega la tabla
+ * de niveles del servidor. Cortan donde corta `truescore_config.niveles`
+ * (migración 134): 50 «En observación», 75 «Confiable», 90 «Muy confiable».
+ * Antes ofrecía 70 y 85, que no son ningún nivel: «70 o más» dejaba entrar a
+ * gente que el resto de la app rotula «En observación».
+ */
 export const TRUST_OPTS = [
   { value: 0, label: 'Sin mínimo', desc: 'Cualquier jugador puede unirse' },
-  { value: 50, label: '50 o más', desc: 'Filtra cuentas con historial de faltas' },
-  { value: 70, label: '70 o más', desc: 'Solo jugadores con buen historial' },
-  { value: 85, label: '85 o más', desc: 'Muy exigente, pocos jugadores calificarán' },
+  { value: 50, label: '50 o más', desc: 'Deja fuera a los «Poco confiable»' },
+  { value: 75, label: '75 o más', desc: 'Sólo «Confiable» o «Muy confiable»' },
+  { value: 90, label: '90 o más', desc: 'Sólo «Muy confiable»: pocos jugadores calificarán' },
 ];
+
+/**
+ * Las opciones de mínimo según la tabla de niveles del servidor
+ * (`useTrueScoreAjustes().niveles`): un corte por nivel, con su nombre. Sin
+ * tabla, el respaldo `TRUST_OPTS`. Si el partido ya tenía un mínimo que no
+ * es un corte (los viejos 70 u 85), se agrega para que se vea al editarlo.
+ */
+export function opcionesDeTrustMinimo(niveles = [], actual = null) {
+  const validos = (Array.isArray(niveles) ? niveles : [])
+    .filter((n) => Number.isInteger(Number(n?.desde)) && Number(n.desde) > 0 && n?.nombre)
+    .sort((a, b) => Number(a.desde) - Number(b.desde));
+
+  let opciones = TRUST_OPTS;
+  if (validos.length > 0) {
+    opciones = [
+      TRUST_OPTS[0],
+      ...validos.map((n, i) => {
+        const mejores = validos.slice(i).map((x) => `«${x.nombre}»`);
+        const desc =
+          mejores.length === 1
+            ? `Sólo ${mejores[0]}: pocos jugadores calificarán`
+            : `Sólo ${mejores.slice(0, -1).join(', ')} o ${mejores[mejores.length - 1]}`;
+        return { value: Number(n.desde), label: `${Number(n.desde)} o más`, desc };
+      }),
+    ];
+  }
+
+  const v = Number(actual);
+  if (Number.isInteger(v) && v > 0 && v <= 100 && !opciones.some((o) => o.value === v)) {
+    opciones = [
+      ...opciones,
+      { value: v, label: `${v} o más`, desc: 'El mínimo que ya tenía este partido' },
+    ].sort((a, b) => a.value - b.value);
+  }
+  return opciones;
+}
 
 /** Presets de rango de edad. `null` = sin restricción. */
 export const EDAD_PRESETS = [
@@ -868,7 +910,10 @@ export function validateDraft(draft, step = null) {
     if (!DURACIONES.includes(Number(draft.duracion))) {
       e.duracion = 'Elige una duración';
     }
-    if (!TRUST_OPTS.some((t) => t.value === Number(draft.minTrust))) {
+    // Cualquier entero de 0 a 100 (lo que acepta `matches_min_trust_score_check`):
+    // las opciones salen de la tabla de niveles del servidor y pueden cambiar.
+    const minTrust = Number(draft.minTrust);
+    if (draft.minTrust === '' || !Number.isInteger(minTrust) || minTrust < 0 || minTrust > 100) {
       e.minTrust = `Elige un ${nombrePuntaje()} mínimo válido`;
     }
 

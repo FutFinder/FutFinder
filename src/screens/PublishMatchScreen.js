@@ -80,7 +80,7 @@ import {
   FIELD_ORDER,
   MODALIDADES,
   NIVELES,
-  TRUST_OPTS,
+  opcionesDeTrustMinimo,
   combineDateTime,
   cuotaLabel,
   edadLabel,
@@ -141,7 +141,11 @@ function initialDraft() {
  */
 export default function PublishMatchScreen({ navigation, route }) {
   // Cómo se llama el puntaje, según el flag que responde el servidor.
-  const nombreTS = nombrePuntajeDe(!!useTrueScoreAjustes().fase1);
+  const ajustesTS = useTrueScoreAjustes();
+  const nombreTS = nombrePuntajeDe(!!ajustesTS.fase1);
+  // Los mínimos salen de los niveles del servidor (truescore_config), no de
+  // una lista fija que ya no calzaba con ellos.
+  const opcionesTrust = opcionesDeTrustMinimo(ajustesTS.fase1 ? ajustesTS.niveles : []);
 
   const insets = useSafeAreaInsets();
   const online = useOnline();
@@ -617,7 +621,7 @@ export default function PublishMatchScreen({ navigation, route }) {
               </Field>
 
               <Field label={`${nombreTS} mínimo para unirse`} onLayout={registerPos('minTrust')}>
-                {TRUST_OPTS.map((t) => (
+                {opcionesTrust.map((t) => (
                   <RadioRow
                     key={t.value}
                     label={t.label}
