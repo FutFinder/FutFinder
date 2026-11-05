@@ -24,13 +24,23 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-push]
-# La dispara un Database Webhook de Supabase, que sí manda la service key.
+# La llama el disparador `notificar_push` (AFTER INSERT en `notifications`,
+# migraciones 117 y 118) con `pg_net`. La cabecera lleva la clave PUBLICABLE
+# guardada en Vault, que sólo sirve para pasar esta verificación: la función
+# no la lee y trabaja con la service key que le inyecta la plataforma.
 verify_jwt = true
 
 [functions.solicitud-recinto]
 # La llama la app con la sesión de quien manda el formulario, y la función
 # usa ese mismo token para crear la solicitud: sin sesión no tiene nada que
 # hacer. El correo al equipo lo manda después, con sus propios secretos.
+verify_jwt = true
+
+[functions.reportar-problema]
+# La llama la app con la sesión de quien reporta: la función usa ese token
+# para guardar el ticket como esa persona (RLS) y leer su correo con
+# `auth.getUser()`. El correo al equipo lo manda después, con su propio
+# secreto, y con el tope de la migración 166 (`limite_correo_de_reporte`).
 verify_jwt = true
 
 # ── Correo del stack LOCAL ───────────────────────────────────────
