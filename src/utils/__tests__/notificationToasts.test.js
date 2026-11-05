@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   empujarToast, quitarToast, toastsActuales, suscribirseAToasts, limpiarToasts, DURACION_TOAST_MS,
+  toastsDelUsuario,
 } = require('../notificationToasts.js');
 
 test('una notificación se encola y se puede leer', () => {
@@ -72,4 +73,49 @@ test('desuscribirse deja de recibir', () => {
 
 test('DURACION_TOAST_MS da tiempo a leer el título y el cuerpo', () => {
   assert.ok(DURACION_TOAST_MS >= 3000);
+});
+
+// ---------------------------------------------------------------------------
+// C10 (auditoría de chats y avisos, 2026-09-23): la cola es global al módulo
+// y `limpiarToasts` sólo la llamaban estas pruebas. Un popup recibido justo
+// antes de cerrar sesión seguía en la pantalla de acceso hasta expirar, con
+// el título y el cuerpo de la cuenta anterior.
+// ---------------------------------------------------------------------------
+
+test('C10: sin sesión no se muestra ningún popup', () => {
+  const cola = [{ id: 'n1', user_id: 'u1', title: 'De la cuenta anterior' }];
+  assert.deepEqual(toastsDelUsuario(cola, null), []);
+  assert.deepEqual(toastsDelUsuario(cola, undefined), []);
+});
+
+test('C10: sólo se muestran los avisos de la cuenta actual', () => {
+  const cola = [
+    { id: 'n1', user_id: 'u1', title: 'Mío' },
+    { id: 'n2', user_id: 'u2', title: 'De otra cuenta' },
+  ];
+  assert.deepEqual(toastsDelUsuario(cola, 'u1').map((n) => n.id), ['n1']);
+});
+
+test('C10: el host limpia la cola al cerrar o cambiar de sesión', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'components', 'NotificationToastHost.js'),
+    'utf8'
+  );
+  const ini = src.indexOf('useEffect(() => {');
+  const efecto = src.slice(ini, src.indexOf('}, [user?.id]);', ini));
+  assert.ok(efecto.length > 0, 'no se encontró el efecto que depende de la sesión');
+  // Al entrar al efecto (cambio de cuenta o cierre) y en su limpieza.
+  assert.match(
+    efecto,
+    /limpiarToasts\(\);\s*if \(!user\?\.id\) return undefined;/,
+    'cerrar sesión no limpia la cola de popups'
+  );
+  assert.match(
+    efecto,
+    /return \(\) => \{[^}]*limpiarToasts\(\);/,
+    'cambiar de cuenta no limpia la cola de la anterior'
+  );
+  assert.match(src, /toastsDelUsuario\(toasts, user\?\.id\)/, 'el host pinta avisos sin mirar de quién son');
 });

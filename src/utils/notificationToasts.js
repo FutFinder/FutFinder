@@ -53,10 +53,26 @@ export function suscribirseAToasts(fn) {
   return () => { suscriptores = suscriptores.filter((f) => f !== fn); };
 }
 
-/** Para las pruebas y para cuando se cierra sesión. */
+/**
+ * Vacía la cola. La llama `NotificationToastHost` al cerrar sesión y al
+ * cambiar de cuenta (C10): la cola es global al módulo y el host sigue
+ * montado en la pantalla de acceso, así que sin esto un popup de la cuenta
+ * anterior seguía arriba hasta expirar.
+ */
 export function limpiarToasts() {
+  if (cola.length === 0) return;
   cola = [];
   avisar();
+}
+
+/**
+ * Lo que se puede pintar para esta sesión: nada sin sesión, y sólo los
+ * avisos de la cuenta actual. Segunda barrera por si algo de la cuenta
+ * anterior quedara en la cola entre el cambio y la limpieza.
+ */
+export function toastsDelUsuario(toasts, userId) {
+  if (!userId) return [];
+  return (toasts || []).filter((n) => !n?.user_id || n.user_id === userId);
 }
 
 /** Cuánto dura en pantalla antes de irse solo. */

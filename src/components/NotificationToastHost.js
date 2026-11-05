@@ -11,7 +11,7 @@ import { getMatchById } from '../services/matches';
 import { getClubById } from '../services/clubs';
 import { ICON, TAG, FALLBACK_TAG } from './notifications/NotificationCard';
 import {
-  empujarToast, quitarToast, limpiarToasts, suscribirseAToasts, DURACION_TOAST_MS,
+  empujarToast, quitarToast, limpiarToasts, suscribirseAToasts, toastsDelUsuario, DURACION_TOAST_MS,
 } from '../utils/notificationToasts';
 import { navigationRef } from '../navigation/AppNavigator';
 
@@ -39,8 +39,10 @@ export default function NotificationToastHost() {
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
+    // Cerrar sesión o cambiar de cuenta: nada de la anterior queda arriba (C10).
+    limpiarToasts();
     if (!user?.id) return undefined;
-    return subscribeToNotifications(user.id, (notif) => {
+    const desuscribir = subscribeToNotifications(user.id, (notif) => {
       // Un aviso borrado no puede seguir flotando arriba (C09).
       if (notif._eventType === 'DELETE') {
         if (notif.todos) limpiarToasts();
@@ -51,6 +53,10 @@ export default function NotificationToastHost() {
       if (navigationRef.getCurrentRoute?.()?.name === 'Notifications') return;
       empujarToast(notif);
     });
+    return () => {
+      desuscribir();
+      limpiarToasts();
+    };
   }, [user?.id]);
 
   useEffect(() => suscribirseAToasts(setToasts), []);
@@ -61,7 +67,8 @@ export default function NotificationToastHost() {
     return () => relojes.forEach(clearTimeout);
   }, [toasts]);
 
-  if (toasts.length === 0) return null;
+  const visibles = toastsDelUsuario(toasts, user?.id);
+  if (visibles.length === 0) return null;
 
   const abrir = async (n) => {
     quitarToast(n.id);
@@ -77,7 +84,7 @@ export default function NotificationToastHost() {
 
   return (
     <View style={[styles.capa, { top: insets.top + 8 }]} pointerEvents="box-none">
-      {toasts.map((n) => {
+      {visibles.map((n) => {
         const Icon = ICON[n.type] || Bell;
         const tag = TAG[n.type] || FALLBACK_TAG;
         return (
