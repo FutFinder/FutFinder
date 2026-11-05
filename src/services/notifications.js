@@ -279,6 +279,7 @@ export async function deleteNotification(notificationId) {
     .from('notifications')
     .delete()
     .eq('id', notificationId);
+  if (!error) difundirBorrado({ id: notificationId });
   return { error };
 }
 
@@ -291,6 +292,7 @@ export async function deleteAllNotifications() {
     .from('notifications')
     .delete()
     .eq('user_id', user.id);
+  if (!error) difundirBorrado({ id: null, todos: true });
   return { error };
 }
 
@@ -354,6 +356,21 @@ function canalDeNotificaciones(userId) {
 
   canalesPorUsuario.set(userId, compartido);
   return compartido;
+}
+
+/**
+ * Cuenta un borrado a quienes escuchan el canal de avisos (C09): la campana
+ * recarga su contador, la bandeja saca la tarjeta y el popup se cierra.
+ *
+ * No se escucha el DELETE de Realtime porque Supabase no deja filtrarlo por
+ * `user_id` (la fila ya no existe para aplicar el filtro ni la RLS): sería
+ * recibir los borrados de todos. Lo hecho en otro dispositivo lo recoge la
+ * campana al volver la app a primer plano (`useUnreadNotifications`).
+ */
+function difundirBorrado({ id, todos = false }) {
+  for (const canal of canalesPorUsuario.values()) {
+    canal.difundir({ id, todos, _eventType: 'DELETE' });
+  }
 }
 
 export function subscribeToNotifications(userId, onEvent) {

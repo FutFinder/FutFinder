@@ -148,6 +148,11 @@ export const withActionsResolved = (items, id, resolucion = null) =>
  * single JSON object»: la solicitud ya no estaba pendiente.
  */
 export function fusionarAvisoEnVivo(items, notif) {
+  // Un borrado difundido por la propia app (C09): `todos` es «borrar todo».
+  if (notif?._eventType === 'DELETE') {
+    if (notif.todos) return items.length === 0 ? items : [];
+    return items.some((p) => p.id === notif.id) ? withoutId(items, notif.id) : items;
+  }
   const idx = items.findIndex((p) => p.id === notif.id);
   if (idx < 0) return [notif, ...items];
   const previo = items[idx];

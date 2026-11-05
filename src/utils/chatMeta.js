@@ -701,6 +701,15 @@ export function createSharedChannel({ open, close }) {
   };
 
   return {
+    /**
+     * Entrega un evento propio de la app a quienes ya escuchan, sin pasar
+     * por la red ni abrir el canal. Lo usa el borrado de avisos (C09): un
+     * DELETE de Realtime no se puede filtrar por usuario, así que quien
+     * borra lo cuenta él mismo.
+     */
+    difundir(payload) {
+      emit(payload);
+    },
     subscribe(onEvent, { onStatus } = {}) {
       listeners.set(onEvent, { onStatus });
       if (!handle) handle = open({ emit, emitStatus });

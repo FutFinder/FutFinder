@@ -11,7 +11,7 @@ import { getMatchById } from '../services/matches';
 import { getClubById } from '../services/clubs';
 import { ICON, TAG, FALLBACK_TAG } from './notifications/NotificationCard';
 import {
-  empujarToast, quitarToast, suscribirseAToasts, DURACION_TOAST_MS,
+  empujarToast, quitarToast, limpiarToasts, suscribirseAToasts, DURACION_TOAST_MS,
 } from '../utils/notificationToasts';
 import { navigationRef } from '../navigation/AppNavigator';
 
@@ -41,6 +41,12 @@ export default function NotificationToastHost() {
   useEffect(() => {
     if (!user?.id) return undefined;
     return subscribeToNotifications(user.id, (notif) => {
+      // Un aviso borrado no puede seguir flotando arriba (C09).
+      if (notif._eventType === 'DELETE') {
+        if (notif.todos) limpiarToasts();
+        else quitarToast(notif.id);
+        return;
+      }
       if (notif._eventType !== 'INSERT') return;
       if (navigationRef.getCurrentRoute?.()?.name === 'Notifications') return;
       empujarToast(notif);
