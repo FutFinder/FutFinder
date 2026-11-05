@@ -544,7 +544,9 @@ export async function eliminarBloqueo(bloqueoId) {
  * Devuelve `{ devuelto }` con el total que volvió a los balances. La
  * devolución va a CADA persona que puso plata, no al organizador: en un pago
  * dividido entre diez, los ocho que ya pagaron reciben lo suyo. Y no se cobra
- * comisión.
+ * comisión. Desde la migración 168 trae también `tarjeta_por_devolver`: los
+ * pagos con tarjeta que quedaron en `reversar` (se devuelven a la tarjeta,
+ * no al saldo, y lo anota `marcar_pago_reversado`).
  *
  * Se puede cancelar también una reserva sin confirmar, y hay que poder: en el
  * pago dividido cada parte se cobra al aceptar unirse, así que un grupo a medio
