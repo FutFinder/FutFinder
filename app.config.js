@@ -61,7 +61,7 @@ module.exports = {
       // (tampoco existe carpeta `assets/`). Sin este campo, Android/iOS usan
       // su ícono de notificación por defecto en vez de fallar el build por
       // apuntar a un archivo inexistente.
-      color: '#71B533',
+      color: '#55DF69',
       androidMode: 'default',
       androidCollapsedTitle: 'FutFinder',
       iosDisplayInForeground: true,
@@ -70,7 +70,7 @@ module.exports = {
       bundler: 'metro',
       name: 'FutFinder',
       shortName: 'FutFinder',
-      themeColor: '#71B533',
+      themeColor: '#55DF69',
       backgroundColor: '#0A0C0A',
     },
     plugins: [
@@ -97,7 +97,7 @@ module.exports = {
       [
         'expo-notifications',
         {
-          color: '#71B533',
+          color: '#55DF69',
           defaultChannel: 'default',
           sounds: [],
         },
