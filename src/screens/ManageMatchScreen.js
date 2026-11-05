@@ -143,9 +143,9 @@ export default function ManageMatchScreen({ route, navigation }) {
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [reason, setReason] = useState('');
   const [canceling, setCanceling] = useState(false);
-  // Si la RPC preexistente `cancel_match` borra la fila en vez de dejarla como
-  // 'cancelado', el partido deja de existir. Guardamos el resultado para
-  // mostrar un cierre claro en vez del error genérico de «no encontramos».
+  // Desde la migración 34 `cancel_match` deja el partido como 'cancelado'.
+  // Si aun así no se puede volver a leer después de cancelar, se muestra un
+  // cierre claro en vez del error genérico de «no encontramos».
   const [canceledGone, setCanceledGone] = useState(false);
 
   const load = useCallback(async () => {
@@ -422,9 +422,8 @@ export default function ManageMatchScreen({ route, navigation }) {
               text="Avisamos a los jugadores confirmados y a quienes tenían una solicitud pendiente. El partido ya no aparece en Partidos."
             />
             <Note>
-              En esta base de datos `cancel_match` elimina el registro, así que el partido no
-              queda en tu historial. Para conservarlo como «cancelado» —con su chat y su
-              motivo— hay que aplicar la migración 34 en Supabase.
+              No pudimos mostrarte este partido después de cancelarlo, así que no lo vas a
+              encontrar en tu historial. La cancelación sí quedó hecha.
             </Note>
             <PrimaryButton
               label="Volver a Partidos"
