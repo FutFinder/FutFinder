@@ -1120,7 +1120,7 @@ export default function ManageMatchScreen({ route, navigation }) {
             />
           ) : (
             <Bullet
-              text={`Tu Trust Score baja ${cancelPenaltyFor(match.hora)} puntos${isPenaltyFree(match.hora) ? '' : ' — estás cancelando con poca antelación'}`}
+              text={`Tu ${nombreTS} baja ${cancelPenaltyFor(match.hora)} puntos${isPenaltyFree(match.hora) ? '' : ' — estás cancelando con poca antelación'}`}
             />
           )}
           <Bullet text="El partido no se borra: queda en el historial como cancelado" />

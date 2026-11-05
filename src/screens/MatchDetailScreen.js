@@ -1318,7 +1318,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                     sub={
                       ts
                         ? 'Confirmar la asistencia a tiempo cuida tu TrueScore'
-                        : 'Organizar también suma Trust Score'
+                        : `Organizar también suma ${nombreTS}`
                     }
                     onPress={() => navigation.navigate('CreateMatch')}
                   />
@@ -1710,7 +1710,7 @@ export default function MatchDetailScreen({ route, navigation }) {
                   : costo.estado === 'cargando'
                   ? 'Calculando lo que te cuesta salir ahora…'
                   : costo.error
-                : `Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
+                : `Tu ${nombreTS} baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
             }
           />
           {ts && costo.estado === 'error' ? (

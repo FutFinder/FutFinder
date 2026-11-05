@@ -42,6 +42,7 @@ import { goBackOrPartidos } from '../utils/navigation';
 import { useCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
 import {
   TEXTO_REGLA_SALIDA_TS,
+  nombrePuntajeDe,
   sufijoCosto,
   textoCostoSalida,
   textoEfectoGps,
@@ -81,6 +82,7 @@ export default function MatchSpotScreen({ route, navigation }) {
   // Con TrueScore el costo de salirse lo calcula el servidor: hasta que
   // llegue, no se puede confirmar una salida cuyo precio no se conoce.
   const ts = !!useTrueScoreAjustes().fase1;
+  const nombreTS = nombrePuntajeDe(ts);
   const costo = useCostoSalida(matchId, { activo: ts && sheet === 'leave' });
   const costoListo = !ts || costo.estado === 'listo';
 
@@ -391,7 +393,7 @@ export default function MatchSpotScreen({ route, navigation }) {
                   : costo.estado === 'cargando'
                   ? 'Calculando lo que te cuesta salir ahora…'
                   : costo.error
-                : `Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
+                : `Tu ${nombreTS} baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
             }
           />
           {ts && costo.estado === 'error' ? (
