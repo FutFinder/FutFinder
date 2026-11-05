@@ -116,8 +116,8 @@ export function OfflineBanner() {
       <WifiOff color={C.amber} size={17} strokeWidth={1.9} />
       <View style={{ flex: 1 }}>
         <Text style={styles.offlineTitle}>Sin conexión</Text>
-        {/* No hay copia guardada entre arranques (C12): sólo queda lo que la
-            pantalla ya tenía cargado. */}
+        {/* La bandeja no persiste nada entre arranques (C12): sólo queda lo
+            que la pantalla ya tenía cargado. */}
         <Text style={styles.offlineText}>
           Estás viendo lo último que alcanzó a cargar. Se actualiza cuando vuelva la conexión.
         </Text>
