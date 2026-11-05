@@ -8,6 +8,8 @@ import {
   olvidarPasswordPendiente,
 } from './pendingSignUp';
 import { olvidarIntencion } from '../utils/intencionDeReserva';
+import { cerrarSesionEnOrden } from '../utils/cierreDeSesion';
+import { unregisterPushToken } from './notifications';
 
 /**
  * Servicio de autenticación de FutFinder.
@@ -142,8 +144,16 @@ export async function signOut() {
   // podía ver el aviso con el partido y el club rival de la cuenta anterior.
   olvidarIntencion();
   if (!isSupabaseConfigured) return { error: null };
-  const { error } = await supabase.auth.signOut();
-  return { error };
+  // El token de push se da de baja ANTES de soltar la sesión: después, el
+  // delete sale como anon y la base lo rechaza (ver utils/cierreDeSesion.js).
+  return cerrarSesionEnOrden({
+    usuarioActual: async () => (await supabase.auth.getSession())?.data?.session?.user?.id ?? null,
+    darDeBajaToken: (uid) => unregisterPushToken(uid),
+    cerrar: async () => {
+      const { error } = await supabase.auth.signOut();
+      return { error };
+    },
+  });
 }
 
 export async function getCurrentUser() {

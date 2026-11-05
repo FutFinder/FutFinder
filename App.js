@@ -6,7 +6,7 @@ import './global.css';
 import { iniciarObservabilidad } from './src/services/observabilidad';
 
 iniciarObservabilidad();
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -25,7 +25,6 @@ import ErrorBoundary from './src/components/ErrorBoundary';
 import { supabase, isSupabaseConfigured } from './src/services/supabase';
 import {
   registerForPushNotifications,
-  unregisterPushToken,
   addNotificationListeners,
 } from './src/services/notifications';
 import { navigateToNotification } from './src/utils/notificationTargets';
@@ -104,9 +103,6 @@ async function handleNotificationTap(response) {
 }
 
 export default function App() {
-  // Guardamos el último userId para poder borrar su token al hacer logout
-  const lastUserIdRef = useRef(null);
-
   // Manrope es la tipografía de toda la app (theme/colors.js: `fuentes`).
   // Se espera a que cargue antes de pintar nada: ver `if (!fontsLoaded)`
   // más abajo.
@@ -152,7 +148,6 @@ export default function App() {
       const { data } = await supabase.auth.getSession();
       const user = data?.session?.user;
       if (user?.id) {
-        lastUserIdRef.current = user.id;
         registerForPushNotifications(user.id);
       }
     })();
@@ -162,14 +157,12 @@ export default function App() {
       const userId = session?.user?.id ?? null;
 
       if (event === 'SIGNED_IN' && userId) {
-        lastUserIdRef.current = userId;
         registerForPushNotifications(userId);
       }
 
-      if (event === 'SIGNED_OUT' && lastUserIdRef.current) {
-        unregisterPushToken(lastUserIdRef.current);
-        lastUserIdRef.current = null;
-      }
+      // El token de push NO se borra en SIGNED_OUT: cuando llega ese evento la
+      // sesión ya no existe y el delete sale como anon (42501). Lo da de baja
+      // `signOut` antes de cerrar (services/auth.js, utils/cierreDeSesion.js).
     });
 
     return () => {
