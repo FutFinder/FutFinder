@@ -39,6 +39,7 @@ import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
 import { useTrueScoreAjustes } from '../services/trueScore';
 import { etiquetaTier, nombrePuntajeDe } from '../utils/trueScore';
+import { etiquetaAdminDeClubes } from '../utils/clubsHomeSources';
 
 function greetingFor(d = new Date()) {
   const h = d.getHours();
@@ -234,20 +235,10 @@ export default function HomeScreen({ navigation }) {
     : null;
 
   /**
-   * «ADMIN · 2 CLUBES». El número estuvo escrito a mano —siempre «1 CLUB»—
-   * desde que se dibujó la cabecera, así que a quien administra dos clubes
-   * leía en su propia portada que administra uno. La cuenta real ya venía
-   * cargada en `misClubIds`; lo único que faltaba era usarla.
-   *
-   * Las dos caídas son para el instante en que una de las dos fuentes todavía
-   * no respondió: si administra un club, administra al menos uno, y «ADMIN ·
-   * 0 CLUBES» sería peor que esperar.
+   * «ADMIN · 2 CLUBES»: cuenta sólo los clubes que administro, no todas mis
+   * membresías (I06). Ver `etiquetaAdminDeClubes`.
    */
-  const cuantosClubes = (misMembresias || []).length || misClubIds.length || 1;
-  const clubRoleLabel =
-    club?.role === 'admin'
-      ? `ADMIN · ${cuantosClubes} ${cuantosClubes === 1 ? 'CLUB' : 'CLUBES'}`
-      : undefined;
+  const clubRoleLabel = etiquetaAdminDeClubes(club?.role, misMembresias);
 
   const summary = matches.length
     ? `${matches.length} ${matches.length === 1 ? 'partido cerca de ti' : 'partidos cerca de ti'}`

@@ -43,3 +43,37 @@ test('I03: la tarjeta arma su línea con lineaDeReputacion', () => {
   );
   assert.match(src, /lineaDeReputacion\(matchesPlayed, reports\)/);
 });
+
+// ---------------------------------------------------------------------------
+// I06: «ADMIN · N CLUBES» contaba TODAS las membresías. Quien administra un
+// club y juega en otro leía «ADMIN · 2 CLUBES».
+// ---------------------------------------------------------------------------
+
+const { etiquetaAdminDeClubes } = require('../clubsHomeSources.js');
+
+test('I06: cuenta sólo los clubes que administro', () => {
+  const membresias = [
+    { club: { id: 'a' }, miRol: 'admin' },
+    { club: { id: 'b' }, miRol: 'jugador' },
+  ];
+  assert.equal(etiquetaAdminDeClubes('admin', membresias), 'ADMIN · 1 CLUB');
+  assert.equal(
+    etiquetaAdminDeClubes('admin', [...membresias, { club: { id: 'c' }, miRol: 'admin' }]),
+    'ADMIN · 2 CLUBES'
+  );
+});
+
+test('I06: sin rol de administrador en el club activo, no hay etiqueta', () => {
+  assert.equal(etiquetaAdminDeClubes('jugador', [{ club: { id: 'a' }, miRol: 'admin' }]), undefined);
+});
+
+test('I06: si las membresías no llegaron, administra al menos el activo', () => {
+  assert.equal(etiquetaAdminDeClubes('admin', []), 'ADMIN · 1 CLUB');
+  assert.equal(etiquetaAdminDeClubes('admin', null), 'ADMIN · 1 CLUB');
+});
+
+test('I06: Inicio usa etiquetaAdminDeClubes', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'screens', 'HomeScreen.js'), 'utf8');
+  assert.match(src, /etiquetaAdminDeClubes\(/);
+  assert.ok(!/\(misMembresias \|\| \[\]\)\.length \|\| misClubIds\.length/.test(src), 'vuelve a contar todas las membresías');
+});

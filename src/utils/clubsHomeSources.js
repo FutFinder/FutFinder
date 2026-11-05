@@ -283,3 +283,18 @@ export function rivalesPorCercania(rivales, { club = null, distancia = null } = 
     return a.distanciaKm - b.distanciaKm;
   });
 }
+
+/**
+ * «ADMIN · 2 CLUBES» en la cabecera de Inicio, o `undefined` si en el club
+ * activo no soy administrador.
+ *
+ * I06: contaba TODAS las membresías, así que quien administra un club y
+ * juega en otro leía «ADMIN · 2 CLUBES». Ahora cuenta sólo las de rol
+ * `admin`. Si las membresías todavía no llegaron, administra al menos el
+ * club activo: «ADMIN · 0 CLUBES» sería peor que esperar.
+ */
+export function etiquetaAdminDeClubes(rolEnClubActivo, membresias) {
+  if (rolEnClubActivo !== 'admin') return undefined;
+  const n = (Array.isArray(membresias) ? membresias : []).filter((m) => m?.miRol === 'admin').length || 1;
+  return `ADMIN · ${n} ${n === 1 ? 'CLUB' : 'CLUBES'}`;
+}
