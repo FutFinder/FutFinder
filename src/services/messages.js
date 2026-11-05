@@ -1081,9 +1081,10 @@ async function hydrateProfiles(ids) {
 // con un canal falso, sin Supabase real. Acá solo se cablea con el canal
 // verdadero.
 const messagesSharedChannel = createSharedChannel({
-  open: ({ emit, emitStatus }) =>
+  open: ({ emit, emitStatus, apertura }) =>
     supabase
-      .channel('messages-shared')
+      // Nombre único por apertura: ver `createSharedChannel`.
+      .channel(`messages-shared-${apertura}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, emit)
       .subscribe(emitStatus),
   close: (channel) => {

@@ -345,7 +345,7 @@ function canalDeNotificaciones(userId) {
   if (compartido) return compartido;
 
   compartido = createSharedChannel({
-    open: ({ emit }) => {
+    open: ({ emit, apertura }) => {
       const filtro = {
         schema: 'public',
         table: 'notifications',
@@ -358,7 +358,8 @@ function canalDeNotificaciones(userId) {
       // popup de NotificationToastHost, que no debe abrirse por un simple
       // recuento de mensajes agrupados— pueda hacerlo sin un canal aparte.
       return supabase
-        .channel(`notif-${userId}`)
+        // Nombre único por apertura: ver `createSharedChannel` (chatMeta.js).
+        .channel(`notif-${userId}-${apertura}`)
         .on('postgres_changes', { ...filtro, event: 'INSERT' }, (p) => emit({ ...p.new, _eventType: p.eventType }))
         .on('postgres_changes', { ...filtro, event: 'UPDATE' }, (p) => emit({ ...p.new, _eventType: p.eventType }))
         .subscribe();

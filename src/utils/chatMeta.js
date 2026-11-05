@@ -681,6 +681,12 @@ export function createSharedChannel({ open, close }) {
   const listeners = new Map(); // onEvent -> { onStatus }
   let handle = null;
   let lastStatus = null;
+  // Sube cada vez que el canal se vuelve a abrir. `open` lo pone en el nombre
+  // del canal: `removeChannel` es asíncrono, y con un nombre fijo una
+  // reapertura inmediata recibía de supabase-js el canal VIEJO, ya suscrito,
+  // y el `.on(...)` reventaba («cannot add postgres_changes callbacks …
+  // after subscribe()»).
+  let apertura = 0;
 
   const safeCall = (fn, arg) => {
     if (!fn) return;
@@ -712,7 +718,10 @@ export function createSharedChannel({ open, close }) {
     },
     subscribe(onEvent, { onStatus } = {}) {
       listeners.set(onEvent, { onStatus });
-      if (!handle) handle = open({ emit, emitStatus });
+      if (!handle) {
+        apertura += 1;
+        handle = open({ emit, emitStatus, apertura });
+      }
       // Quien se suscribe después de que el canal ya esté abierto no debe
       // quedarse "sin estado" hasta el próximo cambio real.
       if (lastStatus !== null) safeCall(onStatus, lastStatus);
