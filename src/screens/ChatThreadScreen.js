@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -50,7 +51,11 @@ import {
   alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
-import { cargaPermiteMarcarLeido } from '../utils/lecturaDeHilo';
+import {
+  appEstaActiva,
+  cargaPermiteMarcarLeido,
+  crearAcuseDeLectura,
+} from '../utils/lecturaDeHilo';
 import {
   listThreadMessages,
   sendMessage,
@@ -281,6 +286,40 @@ export default function ChatThreadScreen({ route, navigation }) {
   const isPrependingRef = useRef(false);
   const didInitialScrollRef = useRef(false);
 
+  // ── Acuse de lectura (C02): sólo lo que de verdad está a la vista ──
+  // Un mensaje que llega con Detalles encima, la app en segundo plano o la
+  // lista más arriba queda pendiente y se marca cuando vuelve a verse.
+  const enfocadoRef = useRef(navigation?.isFocused?.() ?? true);
+  const appActivaRef = useRef(appEstaActiva(AppState.currentState));
+  const acuseRef = useRef(null);
+  const estadoDeLectura = useCallback(
+    () => ({
+      enfocado: enfocadoRef.current,
+      appActiva: appActivaRef.current,
+      cercaDelFinal: nearBottomRef.current,
+    }),
+    []
+  );
+
+  useEffect(() => {
+    const alEnfocar = navigation?.addListener?.('focus', () => {
+      enfocadoRef.current = true;
+      acuseRef.current?.revisar(estadoDeLectura());
+    });
+    const alDesenfocar = navigation?.addListener?.('blur', () => {
+      enfocadoRef.current = false;
+    });
+    const alCambiarApp = AppState.addEventListener('change', (estado) => {
+      appActivaRef.current = appEstaActiva(estado);
+      acuseRef.current?.revisar(estadoDeLectura());
+    });
+    return () => {
+      try { alEnfocar?.(); } catch {}
+      try { alDesenfocar?.(); } catch {}
+      try { alCambiarApp?.remove?.(); } catch {}
+    };
+  }, [navigation, estadoDeLectura]);
+
   const { connection, reportChannelStatus } = useConnection();
 
   const canWrite = access ? access.canWrite : true;
@@ -305,6 +344,9 @@ export default function ChatThreadScreen({ route, navigation }) {
     didInitialScrollRef.current = false;
     firmaChallengeRef.current = '';
     expedienteRef.current = EXPEDIENTE_VACIO;
+    acuseRef.current = crearAcuseDeLectura(() => {
+      markThreadAsRead(threadKey).catch(() => {});
+    });
 
     (async () => {
       try {
@@ -530,7 +572,7 @@ export default function ChatThreadScreen({ route, navigation }) {
             return [...prev, enrichedRow];
           });
           if (row.sender_id !== myId) {
-            markThreadAsRead(threadKey).catch(() => {});
+            acuseRef.current?.llegoAjeno(estadoDeLectura());
             if (needsSenderFetch(row, { isGroup, myId, profilesById: profilesRef.current })) {
               fetchAndAttachSender(row.sender_id);
             }
@@ -545,7 +587,7 @@ export default function ChatThreadScreen({ route, navigation }) {
     return () => {
       try { unsubscribe(); } catch {}
     };
-  }, [threadKey, myId, canRead, isGroup, reportChannelStatus, fetchAndAttachSender]);
+  }, [threadKey, myId, canRead, isGroup, reportChannelStatus, fetchAndAttachSender, estadoDeLectura]);
 
   // ── Cargar mensajes anteriores ───────────────────────────────
   const loadEarlier = useCallback(async () => {
@@ -1704,6 +1746,8 @@ export default function ChatThreadScreen({ route, navigation }) {
               const distanceFromBottom =
                 contentSize.height - contentOffset.y - layoutMeasurement.height;
               nearBottomRef.current = distanceFromBottom < 120;
+              // Bajar hasta lo último cuenta como leerlo.
+              acuseRef.current?.revisar(estadoDeLectura());
             }}
             scrollEventThrottle={32}
             onContentSizeChange={(_w, newHeight) => {
