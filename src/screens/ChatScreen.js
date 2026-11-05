@@ -23,6 +23,7 @@ import { listMyThreads, subscribeToMessages } from '../services/messages';
 import { listIncomingRequests, subscribeToFriendships } from '../services/friends';
 import { isSupabaseConfigured } from '../services/supabase';
 import { filterThreads, filterCounts, sortThreadsByActivity } from '../utils/chatMeta';
+import { crearSecuencia } from '../utils/paginacionPartidos';
 import useConnection from '../utils/useConnection';
 
 /**
@@ -54,8 +55,12 @@ export default function ChatScreen({ navigation }) {
 
   const mountedRef = useRef(true);
   const reloadTimerRef = useRef(null);
+  // Una carga por turno (C11): la bandeja carga al montar, al volver el foco,
+  // al refrescar y con Realtime; una respuesta vieja no pisa a la nueva.
+  const secuencia = useRef(crearSecuencia()).current;
 
   const load = useCallback(async ({ silent = false } = {}) => {
+    const turno = secuencia.abrir();
     if (!silent) setError(null);
 
     const [threadsRes, reqsRes] = await Promise.all([
@@ -65,7 +70,7 @@ export default function ChatScreen({ navigation }) {
       listIncomingRequests().catch(() => ({ data: [], error: null })),
     ]);
 
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || !secuencia.vigente(turno)) return;
 
     if (threadsRes.error) {
       const msg = threadsRes.error.message || String(threadsRes.error);
@@ -87,7 +92,7 @@ export default function ChatScreen({ navigation }) {
     setNow(new Date());
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [secuencia]);
 
   /** Recarga agrupada: varias señales seguidas producen una sola consulta. */
   const scheduleReload = useCallback(() => {
