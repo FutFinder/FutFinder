@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   paleta as C,
 } from '../../theme/colors';
+import { lineaDeReputacion } from '../../utils/playerMeta';
 
 /**
  * La reputación del jugador en la portada.
@@ -17,7 +18,7 @@ import {
  * TrueScore está activo y de la tabla de niveles del servidor.
  */
 export default function TrustScoreCard({
-  score, max = 100, nombre = 'Tu Trust Score', matchesPlayed, reports = 0, tierLabel, onPress,
+  score, max = 100, nombre = 'Tu Trust Score', matchesPlayed, reports = null, tierLabel, onPress,
 }) {
   const n = Number(score);
   const hay = score !== null && score !== undefined && Number.isFinite(n);
@@ -58,7 +59,7 @@ export default function TrustScoreCard({
         <View className="mt-3 flex-row items-center justify-between">
           <Text className="text-[12.5px] text-white/45">
             {hay
-              ? `${matchesPlayed} partidos jugados · ${reports} reportes`
+              ? lineaDeReputacion(matchesPlayed, reports)
               : 'No pudimos cargar tu reputación'}
           </Text>
           {tierLabel ? (

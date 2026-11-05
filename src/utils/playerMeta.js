@@ -297,3 +297,18 @@ export function perfilIncompleto({ profile, history, photos }) {
   const sinFotos = (photos || []).length === 0;
   return sinFoto && sinBio && sinPosicion && sinActividad && sinFotos;
 }
+
+/**
+ * La línea de la tarjeta de reputación de Inicio: «3 partidos jugados · 2
+ * reportes». Los partidos son `asistencias_confirmadas` (lo mismo que cuenta
+ * Perfil: `partidos_jugados` no lo incrementa nada) y los reportes, los de
+ * `count_reports_against`. Si los reportes no se pudieron contar (`null`) se
+ * omiten: un cero inventado se lee como «nadie te reportó» (I03).
+ */
+export function lineaDeReputacion(partidos, reportes) {
+  const p = Number(partidos) || 0;
+  const linea = `${p} ${p === 1 ? 'partido jugado' : 'partidos jugados'}`;
+  if (reportes === null || reportes === undefined || !Number.isFinite(Number(reportes))) return linea;
+  const r = Number(reportes);
+  return `${linea} · ${r} ${r === 1 ? 'reporte' : 'reportes'}`;
+}

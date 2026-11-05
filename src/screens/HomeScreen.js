@@ -33,6 +33,7 @@ import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { getMyLocation } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
 import { getMyClubIds } from '../services/clubs';
+import { countReportsAgainst } from '../services/reports';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
@@ -79,6 +80,8 @@ export default function HomeScreen({ navigation }) {
   const [busyMatchId, setBusyMatchId] = useState(null);
   const [previewMatchId, setPreviewMatchId] = useState(null);
   const [nextMatch, setNextMatch] = useState(null);
+  // `null` es «no se pudo contar»: la tarjeta lo omite en vez de decir 0.
+  const [reportesRecibidos, setReportesRecibidos] = useState(null);
   // Los partidos de MIS clubes, pedidos club por club a la base. No salen de
   // la tanda general de `listOpenMatches()`: esa trae los N partidos abiertos
   // más próximos de toda la app, así que con la app llena los partidos ajenos
@@ -114,6 +117,10 @@ export default function HomeScreen({ navigation }) {
 
     let joinedIds = new Set();
     if (userId && isSupabaseConfigured) {
+      // Los reportes recibidos, como los cuenta Perfil. No frena la portada.
+      countReportsAgainst(userId)
+        .then((r) => setReportesRecibidos(r?.error ? null : r?.data ?? null))
+        .catch(() => setReportesRecibidos(null));
       const { inscritos, proximo } = await getMisInscripcionesYProximo(userId);
       joinedIds = new Set(inscritos);
       setNextMatch(proximo);
@@ -195,8 +202,10 @@ export default function HomeScreen({ navigation }) {
   const trustScore = Number.isFinite(Number(profile?.trust_score))
     ? Number(profile.trust_score)
     : null;
-  const partidosJugados = profile?.partidos_jugados ?? 0;
-  const reports = profile?.reportes ?? 0;
+  // Lo mismo que cuenta Perfil (I03): `partidos_jugados` no lo incrementa
+  // nada y `profiles.reportes` no existe; los reportes salen de la RPC.
+  const partidosJugados = profile?.asistencias_confirmadas ?? 0;
+  const reports = reportesRecibidos;
   const username = profile?.username || 'jugador';
   /*
    * «VERIFICADO» sólo cuando algo está verificado de verdad. Con TrueScore el
