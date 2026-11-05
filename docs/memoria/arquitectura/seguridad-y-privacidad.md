@@ -78,6 +78,94 @@ La palanca que sí funciona es `alter extension ... set schema extensions`, porq
 
 **Lo que no cubre, con números: 22 de las 78 extensiones no son reubicables**, y entre ellas está `postgis`. A ésas `alter extension ... set schema` responde `0A000: does not support SET SCHEMA`, y sacarlas exigiría `drop extension`, que arrastra en cascada. El barrido las avisa en el registro y las deja. La forma de no llegar ahí es escribir siempre `with schema extensions`.
 
+## Informe de hardening (2026-11-05)
+
+Revisión de cinco puntos que llegaron como una lista genérica. Se verificó cada uno contra el código y la base antes de actuar; **dos no eran lo que decían** (PHP, «admin en el frontend» como tal) y los otros tres sí tenían trabajo. Criterio de referencia: SOC 2 (seguridad, confidencialidad), ISO/IEC 27701 (privacidad) y buenas prácticas CIS/CISSP.
+
+### 1. PHP, runtimes y dependencias
+
+**No hay PHP en ningún lado**: ni `*.php`, ni `composer.json`, ni Dockerfile, ni `.htaccess` (la pila es Expo + Supabase + Edge Functions Deno, desplegada en Vercel). Lo que sí se revisó y se hizo:
+
+- `npm audit fix` sin `--force`: **30 → 15 avisos, y los 12 altos y el crítico (`shell-quote`) pasan a 2 altos y 0 críticos**. Los que quedan (`postcss` anidado en `@expo/metro-config`, `brace-expansion`/`image-size` en herramientas de build, `glob`/`minimatch` de Expo CLI) sólo se arreglan bajando Expo a la SDK 52: **riesgo aceptado**, son herramientas de compilación que no se empaquetan en la app ni procesan entrada de usuarios.
+- `@supabase/supabase-js` 2.105 → 2.119; `engines.node >= 20.19.4` en `package.json` (lo que pide Expo 54).
+- Las 5 Edge Functions importaban `supabase-js@2` flotante desde esm.sh: se fijó en `@2.119.0` (es la versión que resuelve hoy, así que no cambia el comportamiento). **Pendiente de despliegue**, ver abajo.
+- **Falta** (decisión de Vicente): subir a Expo 55+ cierra los avisos de build; no se tocó por ser un cambio mayor que exige build y regresión de las dos plataformas.
+
+### 2. La sesión en localStorage (web)
+
+`supabase-js` guarda el JWT y el refresh token en `localStorage` en web. El riesgo real es **XSS**: un script inyectado lee la sesión entera. **Cookies `httpOnly` no son viables** acá: la web es una SPA estática en Vercel sin servidor propio, y `@supabase/ssr` necesita un servidor que ponga y lea las cookies; hacerlo implica un backend nuevo que hoy no existe. Lo que se hizo para que el XSS no llegue a ocurrir y, si ocurre, no pueda sacar nada:
+
+- **CSP estricta y cabeceras en `vercel.json`**: `script-src 'self' https://api.mapbox.com` (sin `unsafe-inline` ni `unsafe-eval`; el export de Expo es un único script externo), `connect-src` sólo a Supabase (HTTP y WebSocket), Mapbox, Nominatim y Sentry, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, HSTS, `nosniff`, `X-Frame-Options`, `Referrer-Policy` y `Permissions-Policy`. **Probada de verdad**: se sirvió `dist` con esas cabeceras y se comprobó en el navegador que cargan el mapa de Mapbox (con su worker), Supabase y las fuentes sin ninguna violación, y que un script ajeno y un `fetch` ajeno se bloquean.
+- Guarda `scripts/__tests__/cabecerasSeguridad.test.js`: falla si alguien le pone `'unsafe-inline'` a `script-src`, abre `connect-src` a `*`, quita Supabase, o si el código web llama a un servidor que la CSP no permite (eso rompería producción sin avisar). También falla ante `dangerouslySetInnerHTML`, `innerHTML =`, `eval` o `new Function` en `src/`.
+- `style-src` conserva `'unsafe-inline'`: React Native Web inyecta estilos en línea. Es un riesgo menor (no ejecuta código) y **aceptado**.
+- **Falta en el panel de Supabase** (no se puede versionar ni cambiar por migración): confirmar *JWT expiry* en 3600 s (valor por omisión; más corto = más renovaciones), *Refresh token rotation* **activada** y *reuse interval* en 10 s, y bajar la vigencia del código OTP de correo de 3600 s a 900 s (`supabase/config.toml` ya lo documenta para el stack local). Los avisos de seguridad de Supabase hoy sólo marcan la protección de contraseñas filtradas (plan Pro).
+- **Se ve en producción cuando Vercel despliegue este commit.** Si algo se rompiera en la web, la reversión es quitar el bloque `headers` de `vercel.json`.
+
+### 3. «Admin en el frontend»
+
+Las pantallas de moderación, el panel del recinto y los permisos del club ya decidían en el servidor (`es_moderador()`, `puede_en_complejo()`, `tiene_permiso_de_club()`, RPC `security definer`; el `AppNavigator` lo dice y las tres RPC de moderación lo comprueban). Esconder la entrada del menú es cosmético y así debe seguir. El problema real estaba **debajo**: políticas que autorizan la fila pero privilegios de UPDATE sobre todas las columnas, el mismo patrón de la migración 129. Todo se reprodujo con la API de tablas (clave pública + sesión) y se cerró con la **migración 165** (arnés de 29 casos; 19 fallan sin ella):
+
+- `club_photos`: las políticas decían `m.club_id = m.club_id` (tautología): el admin de **cualquier** club subía y borraba fotos de **todos** los clubes.
+- `ratings`: quien calificó podía reescribir a quién y con cuánto (saltándose la elegibilidad del INSERT). Ahora sólo `comentario`.
+- `friendships`: una solicitud podía nacer `accepted` (amistad sin consentimiento, que abre el DM) y el destinatario podía cambiar `requester_id`. Ahora el INSERT exige `pending` y el UPDATE sólo `status`/`responded_at`.
+- `club_challenges`: el club retador se daba solo la aceptación del desafío, o cambiaba el rival. Privilegio por columna + disparador que, sólo para el rol `authenticated`, deja pendiente→rechazado (club retado) y pendiente→cancelado (club retador). Las RPC (dueño `postgres`) no cambian.
+- `matches`: el privilegio de UPDATE pasa a la lista cerrada que ya manda `updateMatch` (ya no se puede apuntar un partido a la reserva o al club de otro).
+- `notifications`: el dueño sólo marca `read`.
+- `count_reports_against`: la interfaz decía «sólo el dueño ve el detalle» pero la RPC se lo contaba a cualquiera. Ahora responde a la propia persona y a quien modera.
+- `_sembrar_permisos_actuales`, `recalc_user_ratings` y `cuota_de_reserva` sólo las usan funciones `security definer`: sin EXECUTE para el cliente (mismo criterio de la 140).
+
+Se verificó que no rompe las apps instaladas: cada escritura directa del cliente a esas tablas usa sólo las columnas que se conservan, y ninguna función `invoker` actualiza esas tablas. **Lección**: el arnés tiene que probar el código de error esperado (`42501`), no «algo falló».
+
+### 4. Límites de tasa
+
+No había ninguno: una cuenta nueva es gratis y podía mandar solicitudes de amistad (cada una dispara aviso y push), reportes, tickets, mensajes, solicitudes de recinto (cada una manda un correo), reservas (retienen la hora) o recorrer `buscar_jugadores`. `registrar_telefono` además contesta «ese número ya está registrado»: sin tope era un oráculo para saber qué celulares tienen cuenta. **Migración 166**: contador `rate_limit_hits` por (persona, cubo, ventana fija), disparadores BEFORE INSERT sobre las 10 tablas donde nace cada cosa (miran `auth.uid()`, no `current_user`, así que cubren también las RPC `security definer`) y el límite inyectado en `buscar_jugadores` (60 cada 5 min) y `registrar_telefono` (10 por hora). Topes a propósito generosos (30 amistades/h, 10 reportes/h, 60 mensajes/min…) y la lista completa en la cabecera de la migración. Arnés de 16 casos; `limite_correo_de_reporte()` topa los correos de «reportar un problema» (la Edge Function mandaba un correo por cada llamada con el mismo id).
+
+Límites que **no** son de la base:
+
+- **Endpoints de Supabase Auth** (login, OTP, registro, recuperar contraseña): sus límites viven en el panel (Authentication → Rate Limits), no se pueden versionar. `supabase/config.toml` deja los valores de referencia (30 por IP/5 min; un correo por minuto por dirección). **Hay que revisarlos en el panel**.
+- **`flow-confirmacion`** (webhook público de Flow): no se limitó por IP, porque un tope mal puesto podría tirar la confirmación de un pago de verdad si Flow reintenta. La función no le cree al POST y consulta a Flow con una consulta firmada, así que abusarla cuesta una consulta a Flow. **Riesgo aceptado.**
+- Ventana fija, no deslizante: en el borde se puede llegar a 2 × el tope.
+
+### 5. Verificación en dos pasos (TOTP)
+
+Hoy el registro usa OTP de correo pero el login era sólo contraseña. Se implementó **TOTP de Supabase Auth** (app de autenticación; el OTP por correo en cada login se descartó: es más fricción y no resiste que alguien tenga el correo):
+
+- **Cliente** (necesita build, ver abajo): *Ajustes → Verificación en dos pasos* (`MfaSetupScreen`: QR, clave para teclear, confirmación con el primer código); `LoginScreen` pide el código tras la contraseña; `AuthContext` no da por autenticada una sesión `aal1` de quien activó el segundo paso (la manda a Login, directo al código). Textos en español de Chile; el error del servidor nunca se muestra en inglés. Probado en el navegador contra la base local con un TOTP calculado a mano (activar, código incorrecto, sesión de sólo contraseña mandada al código, entrar).
+- **Un hallazgo**: `verifyPassword` (confirmar la contraseña en Ajustes) llamaba a `signInWithPassword` y **reemplazaba la sesión**: con MFA eso la dejaba en `aal1` y expulsaba a la persona de su propia cuenta. Ahora usa un cliente efímero (`crearClienteEfimero`).
+- **Obligatoria para el personal** (moderadores y administradores de recinto): **migración 167**, `mfa_ok_para_staff()` pegada a `es_moderador`, `es_admin_complejo/cancha/de_reserva`, `puede_en_complejo`, `admin_mis_complejos` y las cinco RPC de dueño (exigen `aal2` en el JWT). **Nace apagada** (`feature_flags.mfa_obligatoria_staff = false`): sin actualizaciones por aire, encenderla antes de que el personal tenga la pantalla los dejaría sin panel. Con la bandera apagada nada cambia (lo prueba el arnés de 16 casos). `AvisoMfaPersonal` en Inicio les explica por qué desaparecen sus secciones.
+- **Sin códigos de recuperación**: Supabase no los trae. Quien pierda su app de autenticación debe pedir al equipo que le quiten el factor (`delete from auth.mfa_factors where user_id = …` desde el panel). **Falta definir el canal de soporte** y ponerlo en el texto de la pantalla (hoy dice «escríbenos desde el correo de tu cuenta» sin dirección).
+
+### Qué falta aplicar o desplegar (nada de esto está en producción)
+
+1. **Migraciones 165, 166 y 167** (aplicadas sólo a la base local; probadas con sus arneses y todos los demás: 126/130, ver abajo). Orden libre. La 149 sigue sin aplicar a propósito.
+2. **Edge Functions** (5): `supabase-js` fijado y `reportar-problema` con el tope de correo. `despliegues.json` las lista en `pendiente` con el hash exacto; al desplegar, mover los hashes a `archivos`. Se pueden desplegar antes o después de la 166 (la función ignora la RPC si no existe).
+3. **Vercel**: las cabeceras de `vercel.json` salen con el próximo despliegue de la web.
+4. **Build** de la app con las pantallas de MFA (iOS y Android; esta Mac no tiene SDK nativo, sólo se probó en web). Recién después: que cada administrador y moderador active su código, y recién entonces `update feature_flags set activo = true where nombre = 'mfa_obligatoria_staff'`.
+5. **Panel de Supabase**: confirmar que *MFA → TOTP* está habilitado (enroll y verify), límites de Auth, *JWT expiry*, rotación del refresh token y OTP a 900 s.
+
+Arneses al 2026-11-05: 126 de 130 pasan; los cuatro que fallan **ya fallaban antes** de estas migraciones (se comprobó): `134` (datos locales), `83` (un caso) y `157` y `44d`, que son intermitentes. Los de las migraciones 40, 98, 119, 136, 141 y 155 se ajustaron porque asumían privilegios de tabla completa o apagaban/necesitaban el límite; cada ajuste lo explica un comentario en el propio arnés.
+
+### Mapeo aproximado a controles
+
+| Control | Qué lo cubre |
+|---|---|
+| SOC 2 CC6.1 (acceso lógico) | 165 (privilegios por columna, RLS corregida), 167 (`aal2` para el personal) |
+| SOC 2 CC6.6 (límites del sistema) | CSP y cabeceras (`vercel.json`), 166 (límites de tasa) |
+| SOC 2 CC6.8 (software malicioso / cadena) | `npm audit fix`, `supabase-js` fijado, guarda contra HTML inyectado |
+| SOC 2 CC7.1–CC7.2 (detección) | los arneses de 165/166/167 y la guarda de cabeceras fallan ante una regresión |
+| SOC 2 CC8.1 (cambios) | `despliegues.json` con `pendiente` por hash: lo escrito y no desplegado queda visible |
+| SOC 2 A1.2 / disponibilidad | 166 (abuso de endpoints sin tope) |
+| ISO 27701 7.4.x (minimización y acceso a datos personales) | `count_reports_against`, `notifications`, `friendships`; el teléfono ya no es sondeable sin tope |
+| ISO 27701 / 27001 A.8.5 (autenticación segura) | TOTP opcional para todos, obligatorio para el personal |
+| ISO 27001 A.8.24 / A.8.20 (red y criptografía) | HSTS, CSP `connect-src` cerrada, `upgrade-insecure-requests` |
+
+### Riesgos que quedan, sin maquillar
+
+- La sesión sigue en `localStorage` (sin servidor propio no hay cookie `httpOnly`); la CSP reduce la probabilidad de XSS y el TOTP reduce el daño de una contraseña robada, pero **un XSS que ocurriera igual se llevaría la sesión**.
+- Los límites de Auth y la rotación del refresh token dependen del panel y nadie los ha leído desde el repositorio.
+- Sin códigos de recuperación de TOTP, hay un riesgo de bloqueo de cuentas que se resuelve a mano.
+- Hasta que se aplique la 165 en producción, **los siete problemas de autorización de arriba siguen abiertos allá** (el de `club_photos` es el más grave: cualquier admin de club escribe en la galería de todos).
+
 ## Notas relacionadas
 
 - [Autenticación](../funcionalidades/autenticacion.md)
