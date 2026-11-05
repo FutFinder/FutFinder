@@ -4,7 +4,7 @@
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
-La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Avisos y Ajustes el 2026-09-23 está en [`PENDIENTES_CALIDAD_2026-09-23.md`](../../../PENDIENTES_CALIDAD_2026-09-23.md), y la auditoría de chats y avisos que la alimenta, en [`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`](../../../ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt). Los casos TrueScore y teléfono (T01–T07), el hallazgo G01 y P06 ya están cerrados; **el resto sigue abierto** y se resume abajo. Los dos informes no se borran porque todavía tienen ítems vivos: cuando se cierre el último, se borran y esta nota conserva el resultado.
+La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Avisos y Ajustes el 2026-09-23 está en [`PENDIENTES_CALIDAD_2026-09-23.md`](../../../PENDIENTES_CALIDAD_2026-09-23.md), y la auditoría de chats y avisos que la alimenta, en [`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`](../../../ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt). Los casos TrueScore y teléfono (T01–T07), el hallazgo G01, P02 y P06, y desde el 2026-11-05 casi todos los de Chat, Avisos, Inicio, Perfil y Ajustes (ver «Cerrados el 2026-11-05» abajo) ya están cerrados; **el resto sigue abierto** y se resume abajo. Los dos informes no se borran porque todavía tienen ítems vivos: cuando se cierre el último, se borran y esta nota conserva el resultado.
 
 ## Abiertos al 2026-11-05
 
@@ -12,35 +12,34 @@ Lo que sigue vivo, contrastado contra el código el 2026-11-05. Los números de 
 
 ### De los informes del 2026-09-23
 
-C01–C10 vienen de la auditoría de chats y avisos (`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`, donde C01 es el error 1, y así hasta el 10); el resto, de la lista de calidad (`PENDIENTES_CALIDAD_2026-09-23.md`), que lleva para cada ID los pasos de cierre. Re-verificados uno por uno el 2026-11-05 (lectura del código, nada se ejecutó): **siguen abiertos todos** los de la tabla.
+C01–C10 vienen de la auditoría de chats y avisos (`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`, donde C01 es el error 1, y así hasta el 10); el resto, de la lista de calidad (`PENDIENTES_CALIDAD_2026-09-23.md`), que lleva para cada ID los pasos de cierre. Tras el lote del 2026-11-05 (lectura del código y de los commits; nada se ejecutó al escribir esta nota) **siguen abiertos sólo estos**:
 
 | ID | Sigue abierto porque… |
 | --- | --- |
-| C01 | `ChatThreadScreen` llama `markThreadAsRead` (~línea 341) aunque `page.error` haya mostrado «No pudimos cargar los mensajes». |
-| C02 | El callback de Realtime marca leído (~línea 531) sin mirar foco, app activa ni scroll. |
-| C03 | `listThreadMessages` pagina sólo por `created_at` (`messages.js` ~línea 729): se pierden mensajes con la misma fecha. |
-| C04 | `mark_chat_read` (migración 32) no toca `notifications`: leer un DM no cierra su aviso `message_new` y el siguiente mensaje no genera INSERT ni push. |
-| C05 | Silenciar un hilo no frena push ni popup: `send-push` y `NotificationToastHost` no consultan `chat_mutes`. |
-| C06 | `listNotifications({ limit: 50 })` y los filtros se aplican después del límite; no hay paginación. |
-| C07 | `runOptimistic` revierte con el arreglo entero (`notificationInbox.js`) y puede borrar avisos llegados en el intertanto. |
-| C08 | Tocar un aviso lo deja leído en pantalla aunque `markAsRead` falle. |
-| C09 | El canal de avisos escucha INSERT y UPDATE, no DELETE; la campana no se entera de los borrados. |
-| C10 | `limpiarToasts` sólo la usan las pruebas: un popup sobrevive al cierre de sesión. |
-| C11–C16 | Bandeja sin versión de solicitud, aviso «últimos mensajes guardados» sin caché, Detalles que cuenta los `pendiente` como inscritos, el hilo de desafío rotulado «Mensaje directo», y errores de participantes y solicitudes tragados. Sin cambios a simple vista; no se re-verificaron a fondo. |
-| I01 | Inicio pide 20 partidos globales y después aplica el radio. |
-| I02 | Inicio descarta el `error` de `listOpenMatches` y muestra «sin partidos». |
-| I03 | La tarjeta de reputación lee `profiles.partidos_jugados` (que nada incrementa) y `profile.reportes` (columna que no existe). |
-| I04 | `load()` de Inicio puede correr dos veces y no descarta respuestas antiguas. |
-| I06 | «ADMIN · N CLUBES» cuenta todas las membresías. |
+| C04 | `mark_chat_read` (migración 32) no toca `notifications`: leer un DM no cierra su aviso `message_new` y el siguiente mensaje no genera INSERT ni push. Es de servidor: necesita migración. |
+| C05 (servidor) | Silenciar un hilo ya no abre el popup (cliente, `eed4ffd`), pero ni `notify_message_new()` ni `send-push` consultan `chat_mutes`: el push y la fila de la bandeja siguen llegando. Necesita migración y redespliegue de la Edge Function. |
+| C11–C16 | Bandeja de Chats sin versión de solicitud, aviso «últimos mensajes guardados» sin caché, Detalles que cuenta los `pendiente` como inscritos, el hilo de desafío rotulado «Mensaje directo», y errores de participantes y solicitudes tragados. Sin cambios a simple vista; no se re-verificaron a fondo. |
 | I07 | El resumen cuenta `matches.length`, la lista usa `partidosCerca`: puede decir «1 partido cerca» y «Sin partidos en tu radio». |
-| P01 | El historial trae 20 filas por `inscrito_at` y recién después ordena por hora del partido. |
-| P03 | «Ver todo» de Últimas participaciones navega a `SearchTab`, no a un historial. |
-| P04 | Si falla la consulta de estado de cuenta, el servicio devuelve `suspended: false` y la tarjeta dice «buen estado». |
-| P05 | Si falla la consulta de valoraciones, se devuelven ceros y Perfil dice «Sin evaluaciones todavía». |
-| A01 | Al fallar el guardado del radio, `radiusKm` conserva el valor nuevo. |
 | A02 | El rollback de un interruptor puede pisar el cambio siguiente (`toggleField`); sin reproducir. |
 
-**Cerrados:** P06 (commit `70d6569`, «Invitar a mi club desde un perfil invita directo a ese jugador», en `main`), P02, T01–T07 y G01. I05 y P07 estaban «falta confirmarlo en web»: T01 y T02 los confirmaron en vivo el 2026-09-29. **Sobrevive un rótulo:** `MatchDetailScreen.js` (~líneas 1321 y 1713), `MatchSpotScreen.js` (~394) y `ManageMatchScreen.js` (~1124) todavía dicen «Trust Score» en la rama con TrueScore apagado; con la fase 1 encendida, como en producción, el texto es el nuevo, así que hoy sólo se vería si alguien apaga el interruptor.
+### Cerrados el 2026-11-05
+
+Cada uno con su commit en `main` y su prueba de Node (varias leen el texto de los archivos, no datos); el mensaje de algunos commits cuenta además una comprobación en web o contra la base local, que esta nota no repitió:
+
+- **Chat:** C01 `6deeddb` (no se marca leído un hilo cuya carga falló), C02 `a2e43a3` (el acuse espera foco, app activa y lista al final), C03 `8a5b9e6` (el historial pagina por `(created_at, id)`).
+- **Avisos:** C06 `264fa24` (categoría y club en la consulta, «Ver avisos anteriores», chips contados en el servidor), C07 `6228900` (el rollback deshace sólo su cambio), C08 `e02e53e` (abrir un aviso vuelve a «sin leer» si no se guardó), C09 `4978999` (borrar actualiza campana, bandeja y popup), C10 `d3e06bf` (los popups se limpian al cerrar sesión o cambiar de cuenta). C05 queda **partido**: `eed4ffd` cerró la parte de cliente (el popup respeta el silencio).
+- **Inicio:** I01 `efdd63e` (la caja de cercanía va en la consulta), I02 `cbed48d` (un fallo de red muestra error con «Reintentar», no «sin partidos»), I03 `c44bbe8` (la tarjeta de reputación usa `asistencias_confirmadas` y los reportes reales), I04 `f267f65` (una carga vieja no pisa a la nueva), I06 `1217d08` («ADMIN · N CLUBES» cuenta sólo clubes que se administran).
+- **Perfil y Ajustes:** P01 `c1f7607`, P03 `8f8c64a`, P04 `b7f5126`, P05 `99f87d3` y A01 `45b2984`.
+- **Partidos y deuda menor:** `dc52a29` (el motivo de cancelación ya no queda huérfano si falla la RPC), `31d4e2f` (el cierre de un partido cancelado ya no muestra jerga técnica), `3df6d0a` (los mínimos de puntaje salen de los niveles del servidor), `e4c20dc` (los rótulos de la rama sin TrueScore usan `nombrePuntajeDe`), `d11848d` (`app.config.js` deja el olivo por el `#55DF69`), `3e92dc1` (comentarios al día) y `6c653a5` (ninguna pantalla consulta una tabla directo).
+
+**Cerrados antes:** P06 (commit `70d6569`, «Invitar a mi club desde un perfil invita directo a ese jugador», en `main`), P02, T01–T07 y G01. I05 y P07 estaban «falta confirmarlo en web»: T01 y T02 los confirmaron en vivo el 2026-09-29.
+
+### Nuevos, del lote del 2026-11-05
+
+- **Error de Realtime al remontar el popup — visto una vez, sin reproducir.** A veces aparece «cannot add postgres_changes callbacks … after subscribe()» desde `NotificationToastHost` cuando el popup es el único que escucha el canal de avisos y se vuelve a montar. La sesión que corrigió C05–C10 lo vio sólo con recarga en caliente de Metro; **no se reprodujo ni se verificó acá**. La corrección que propuso esa sesión sería un nombre único de canal por apertura (hoy el topic es `notif-<userId>`, deterministo, y `close` llama `removeChannel` sin esperar). Ver «Canales Realtime» en [Chat](../funcionalidades/chat.md).
+- **`ClubsHomeContext` sigue pidiendo 50 avisos y filtrando después** (`listNotifications({ limit: 50 })` y `avisoDelClub`): la misma falla que C06 tenía en la bandeja. Un aviso del club más atrás de los 50 últimos no aparece en «Actividad reciente» de la portada de Clubes. La corrección natural es pasar `clubId` a `listNotifications`, que ya lo acepta.
+- **Quedan «Trust Score» escritos a mano** donde el servidor ya habla de TrueScore con la fase 1: `TrustScoreHistoryScreen.js` (~línea 221, el texto explicativo), `TrustScoreCard.js` (valor por defecto `nombre = 'Tu Trust Score'`) y, fuera de lo que anotó el lote, `matchRules.js` (el texto de la confirmación por GPS sin TrueScore y `leaveRuleText`). Las tres pantallas de partido ya usan `nombrePuntajeDe`.
+- **«Ver todo» de Perfil despliega sólo las últimas 20 participaciones** (`HISTORIAL_LIMITE` en `ProfileScreen.js`); si algún día hace falta el historial completo, habrá que paginarlo.
 
 ### Otros pendientes, verificados el 2026-11-05
 
@@ -48,12 +47,9 @@ C01–C10 vienen de la auditoría de chats y avisos (`ERRORES_CHATS_NOTIFICACION
 - **`cargar_balance` revocada (migración 73) deja inservible el pago dividido y la reserva de capitanes** salvo para quien tenga saldo sembrado a mano: no hay cómo cargar saldo hasta que exista la pasarela (decisión de Vicente: las credenciales de Flow van a nombre de la empresa, no personales, y esperan a que exista). La pantalla lo dice y deja el botón apagado.
 - **Posible token de push huérfano al cerrar sesión — sospecha, no verificada.** `App.js` (~línea 169) llama `unregisterPushToken` en `SIGNED_OUT`, con la sesión ya cerrada; el `delete` sobre `push_tokens` depende de la política `auth.uid() = user_id` y, sin sesión, borraría cero filas sin dar error. Se comprueba sólo en un teléfono físico (ver el P1 de push, más abajo).
 - **El estado `failed` de `send-push` no tiene reintento.** La función sólo reclama filas `pending` o `sending` vencidas; una notificación que quedó en `failed` no se vuelve a tomar nunca, aunque el comentario de `index.ts` diga que «es recuperable».
-- **`motivo_cancelacion` huérfano.** `cancelMatchWithReason` (`src/services/matches.js`) escribe el motivo antes de cancelar y no lo deshace si la cancelación falla, ni mira el error de esa escritura: un partido que no se canceló puede quedar con «Motivo del organizador».
-- **Texto técnico visible.** La rama `canceledGone` de `ManageMatchScreen.js` le dice al organizador «`cancel_match` elimina el registro… hay que aplicar la migración 34 en Supabase». Es un mensaje de desarrollador en una pantalla de usuario, y las migraciones posteriores a la 34 ya conservan el partido como `cancelado`.
-- **Color olivo en `app.config.js`.** `notification.color`, `web.themeColor` y el plugin `expo-notifications` siguen en `#71B533`, contra «una sola paleta» (`#55DF69`). Ya está anotado como excepción en [Sistema visual](../diseno/sistema-visual.md); falta decidir si se unifica.
 - **Texto legal que promete lo que el registro no hace.** La política y los términos (`src/data/legal.js`) dicen que con menos de 14 años hace falta la autorización de madre, padre o tutor, pero el registro sólo exige edad ≥ 12 (`EDAD_MIN` en `fechaNacimiento.js`) y no captura ninguna autorización. Y los términos no traen razón social ni RUT (sólo el correo de contacto); ya figuraba como «pendiente legal» en [Configuración](../funcionalidades/configuracion.md).
-- **Comentarios y mensajes de código desactualizados** (una sola deuda, sin urgencia): `eslint.config.mjs` y su mensaje de `no-restricted-imports` y un comentario de `App.js` (~111) nombran `reservas`/`reservasRadius`/`reservasSizes`/`reservasFonts`, que ya no existen (hoy `paleta`, `radios`, `medidas`, `fuentes`); `services/attendance.js` habla de la ventana «hora+90min» y de «+1 Trust Score» cuando la RPC usa hasta 30 min después de terminar y, con TrueScore, los puntos los aplica el organizador; `supabase/functions/send-push/index.ts` dice «Database Webhook» y `supabase/config.toml` dice que el webhook manda la service key, cuando desde la 118 manda la clave publicable guardada en Vault; y en `config.toml` no hay entrada `[functions.reportar-problema]`. (`tailwind.config.js` ya no nombra `reservas`.)
-- **Pregunta de producto abierta: un partido entre clubes no suma a `profiles.partidos_jugados`.** Quien jugó y quedó `confirmado_gps` sigue viendo «0 partidos jugados». Puede ser correcto —la migración 50 cerró a propósito la puerta genérica que tocaba la reputación—, pero hay que decidirlo; ver [Pruebas](pruebas.md), recorrido del 2026-10-21, y el I03 de arriba.
+- **Comentarios y mensajes de código desactualizados** (una sola deuda, sin urgencia): `supabase/functions/send-push/index.ts` dice «Database Webhook» y `supabase/config.toml` dice que el webhook manda la service key, cuando desde la 118 manda la clave publicable guardada en Vault; y en `config.toml` no hay entrada `[functions.reportar-problema]`. Comprobado el 2026-11-05: siguen así. Los demás (`eslint.config.mjs` y su mensaje de `no-restricted-imports`, `App.js`, `app.config.js`, `BrandMark`, `services/attendance.js` y el docstring de `AppNavigator`) los corrigió `3e92dc1`, con una prueba que exige que el mensaje del lint nombre exports reales de `colors.js`.
+- **Pregunta de producto abierta: un partido entre clubes no suma a `profiles.partidos_jugados`.** Quien jugó y quedó `confirmado_gps` sigue viendo «0 partidos jugados». Puede ser correcto —la migración 50 cerró a propósito la puerta genérica que tocaba la reputación—, pero hay que decidirlo; ver [Pruebas](pruebas.md), recorrido del 2026-10-21. Desde I03 (`c44bbe8`) Inicio cuenta `asistencias_confirmadas`, como Perfil, y ya no `profiles.partidos_jugados`; la pregunta de si un partido entre clubes debe sumar sigue abierta.
 
 ## Repaso del 2026-09-30
 

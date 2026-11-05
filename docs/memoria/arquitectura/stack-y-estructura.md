@@ -32,7 +32,7 @@ Los scripts versionados son `start`, `android`, `ios`, `web`, `web:local` (la ap
 | `src/data/` | Datos estáticos, incluidos regiones y comunas chilenas. |
 | `src/theme/` | Tokens visuales compartidos. |
 | `src/utils/` | Transformaciones y utilidades; sus pruebas de Node están en `src/utils/__tests__/`. |
-| `supabase/` | Esquema, 176 archivos de migración (numerados hasta la 164, con sufijos `b`/`c` en algunas), pruebas SQL en `supabase/tests/` y seis Edge Functions: `send-push`, `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, `solicitud-recinto` y `reportar-problema` (más `_shared/`). |
+| `supabase/` | Esquema, 179 archivos de migración (numerados hasta la 167, con sufijos `b`/`c` en algunas), pruebas SQL en `supabase/tests/` y seis Edge Functions: `send-push`, `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, `solicitud-recinto` y `reportar-problema` (más `_shared/`). |
 
 ## Resolución por plataforma
 
@@ -40,7 +40,7 @@ Metro selecciona `MatchMap.native.js` o `MatchMap.web.js` al importar `MatchMap`
 
 ## Límites de servicios
 
-- Las pantallas y componentes consumen funciones asíncronas de `src/services/`; esa capa no debe repartirse en llamadas directas a Supabase desde la UI.
+- Las pantallas y componentes consumen funciones asíncronas de `src/services/`; esa capa no debe repartirse en llamadas directas a Supabase desde la UI. Desde `6c653a5` ninguna pantalla consulta una tabla con `supabase.from(...)`: las seis consultas que quedaban en cuatro pantallas (Inicio, el hilo del chat, el cambio de partido de clubes y la propuesta de desafío) pasaron a `getMisInscripcionesYProximo()` (`matches.js`), `getMisMembresiasEn()` (`clubs.js`, la misma consulta de membresías que copiaban tres pantallas) y `getRemitente()` (`messages.js`). `src/screens/__tests__/lasPantallasNoConsultanTablas.test.js` falla si alguien vuelve a escribir `.from('tabla')` en una pantalla; revisa el texto de los archivos de `src/screens/` (no de las subcarpetas ni de `components/`) línea por línea, así que una consulta con el nombre de la tabla en la línea siguiente al `.from(` no la vería. Lo que sí siguen haciendo algunas pantallas es importar `isSupabaseConfigured` o usar `supabase.auth`.
 - `src/services/supabase.js` crea el cliente y determina `isSupabaseConfigured`; Auth persiste con AsyncStorage en nativo y usa el comportamiento web de Supabase en web.
 - Los servicios de partidos, clubes, mensajes, avisos, amistades, perfil, almacenamiento, galerías, calificaciones y ajustes encapsulan consultas, RPC y sus retornos de demostración. Esos retornos no abren la app: sin `isSupabaseConfigured` no hay sesión y las rutas privadas mandan a Login (ver [Autenticación](../funcionalidades/autenticacion.md)).
 - PostgreSQL y las migraciones imponen integridad, RLS y RPC; `supabase/functions/send-push/` separa el envío de push del cliente, y las demás Edge Functions cubren el pago de reservas con Flow y los avisos por correo.

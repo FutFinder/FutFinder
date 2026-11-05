@@ -8,7 +8,7 @@
 npm test
 ```
 
-Ejecuta las pruebas de Node de `src/**/__tests__/*.test.js` y de `scripts/__tests__/*.test.js` (orden de migraciones, despliegues de Edge Functions, fechas de los arneses): utilidades de chat, privacidad de amistades, bandeja y preferencias de avisos, destinos de avisos, edición de perfil, rutas y búsqueda.
+Ejecuta las pruebas de Node de `src/**/__tests__/*.test.js` y de `scripts/__tests__/*.test.js` (orden de migraciones, despliegues de Edge Functions, fechas de los arneses): utilidades de chat, privacidad de amistades, bandeja y preferencias de avisos, destinos de avisos, edición de perfil, rutas y búsqueda. **Última cifra, según la sesión que cerró el lote de arreglos de Chat, Avisos, Inicio, Perfil y Partidos el 2026-11-05** (no se volvió a medir al escribir esta nota): `npm run verify` dio 0 errores de lint (24 avisos), 1.879 pruebas de Node (eran 1.771 al empezar el lote) y las 49 de Deno.
 
 ```bash
 npm run build:web

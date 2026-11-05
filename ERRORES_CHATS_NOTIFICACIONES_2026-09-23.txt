@@ -4,22 +4,36 @@ Código contrastado: 28162c9 (el del 23-09-2026; las referencias de archivo y
 línea de este informe son de esa fecha y hoy están corridas).
 
 ESTADO AL 05-11-2026
-Se re-verificó el estado de cada error contra el código vigente (lectura, no
-se ejecutó nada). SIGUEN ABIERTOS LOS DIEZ:
-  1 (C01) abierto: ChatThreadScreen llama markThreadAsRead (~línea 341) aunque
-          page.error haya mostrado el banner.
-  2 (C02) abierto: el callback de Realtime marca leído (~línea 531) sin mirar
-          foco, app activa ni scroll.
-  3 (C03) abierto: listThreadMessages ordena y pagina sólo por created_at
-          (messages.js ~línea 729).
-  4 (C04) abierto: mark_chat_read (migración 32) no toca notifications; ninguna
-          migración posterior lo cambió.
-  5 (C05) abierto: ni send-push ni NotificationToastHost consultan chat_mutes.
-  6 (C06) abierto: listNotifications({ limit: 50 }) y los filtros van después.
-  7 (C07) abierto: runOptimistic revierte con el arreglo entero.
-  8 (C08) abierto: handlePress deja read=true aunque markAsRead falle.
-  9 (C09) abierto: el canal de avisos sólo escucha INSERT y UPDATE.
- 10 (C10) abierto: limpiarToasts sólo la usan las pruebas.
+Se re-verificó el estado de cada error contra el código vigente y los commits
+(lectura, no se ejecutó nada). QUEDAN ABIERTOS C04 Y LA PARTE DE SERVIDOR DE
+C05; los otros ocho errores y la parte de cliente de C05 ya están cerrados en
+main:
+  1 (C01) CERRADO en 6deeddb: la carga inicial sólo marca leído si
+          listThreadMessages llegó sin error.
+  2 (C02) CERRADO en a2e43a3: el acuse de lectura de un mensaje que llega por
+          Realtime exige hilo enfocado, app activa y lista cerca del final;
+          si no, queda pendiente.
+  3 (C03) CERRADO en 8a5b9e6: el historial ordena y pagina por
+          (created_at, id).
+  4 (C04) ABIERTO: mark_chat_read (migración 32) no toca notifications;
+          ninguna migración posterior lo cambió.
+  5 (C05) ABIERTO A MEDIAS: el popup de NotificationToastHost ya respeta el
+          silencio del hilo (cliente, eed4ffd); siguen sin consultar
+          chat_mutes send-push y el disparador notify_message_new, así que el
+          push y el aviso en la bandeja siguen llegando.
+  6 (C06) CERRADO en 264fa24: la bandeja filtra por categoría y club en la
+          consulta, antes del límite, pagina hacia atrás y cuenta los chips
+          en el servidor.
+  7 (C07) CERRADO en 6228900: el rollback deshace sólo su propio cambio, sobre
+          el estado actual.
+  8 (C08) CERRADO en e02e53e: abrir un aviso vuelve a «sin leer» si el
+          servidor no guardó la lectura.
+  9 (C09) CERRADO en 4978999: borrar avisos actualiza la campana, la bandeja y
+          el popup. No se escucha el DELETE de Realtime (no se puede filtrar
+          por usuario): el borrado se difunde por el canal compartido y la
+          campana recarga al volver la app a primer plano.
+ 10 (C10) CERRADO en d3e06bf: los popups se limpian al cerrar sesión o cambiar
+          de cuenta.
 Los archivos /tmp que cita la sección «EVIDENCIA LOCAL TEMPORAL» ya no existen
 (comprobado el 05-11-2026: no queda ninguno de los citados);
 los pasos y los resultados quedan en el cuerpo de este informe. El resumen vivo

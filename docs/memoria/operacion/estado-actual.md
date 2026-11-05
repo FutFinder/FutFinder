@@ -14,18 +14,14 @@ Autenticación y onboarding, navegación protegida, partidos, clubes, chat,
 avisos, perfil, amistades, reputación, preferencias y el vertical de reservas
 de canchas. `src/services/` concentra las llamadas de dominio.
 
-- **Casi ninguna pantalla consulta la base directamente, pero cuatro sí.**
-  Catorce de las 76 pantallas de `src/screens/` importan algo de
-  `services/supabase`: ocho sólo traen `isSupabaseConfigured`, dos
-  (`ClubMatchRosterScreen` y `ClubResultScreen`) usan `supabase.auth` para saber
-  quién es el usuario, y **cuatro hacen `supabase.from(...)` directo**:
-  `HomeScreen` (`attendees` y `matches`), `ChatThreadScreen` (`club_members` y
-  `profiles`), `ClubMatchChangeScreen` y `ClubProposalScreen` (las dos sobre
-  `club_members`). Son seis consultas, contadas con un grep multilínea el
-  2026-11-05; un `grep '\.from('` en una sola línea no las ve porque el `.from(`
-  va en la línea siguiente a `supabase`. La versión anterior de esta nota
-  decía «cero» y que `HomeScreen` y `ChatThreadScreen` ya no consultaban:
-  no era cierto.
+- **Ninguna pantalla consulta una tabla directamente (desde 2026-11-05).**
+  Las 76 pantallas de `src/screens/` ya no hacen `supabase.from(...)`: las seis
+  consultas que quedaban (`HomeScreen`, `ChatThreadScreen`, `ClubMatchChangeScreen`
+  y `ClubProposalScreen`) pasaron a `src/services/` en el commit `6c653a5`, y
+  una prueba (`src/screens/__tests__/lasPantallasNoConsultanTablas.test.js`)
+  impide que vuelvan. La prueba revisa línea por línea sólo `src/screens/`, sin
+  subcarpetas ni `components/`. Ojo con el grep: `grep '\.from('` en una sola
+  línea no las veía, porque el `.from(` va en la línea siguiente a `supabase`.
 - **Partidos**: descubrimiento, filtros, publicación, cupos y solicitudes,
   cola de espera, asistencia por GPS, gestión y registro final. Desde octubre
   hay **mapa también en web** (Mapbox GL cargado del CDN, no como
@@ -141,8 +137,10 @@ eso o a una decisión de producto, no a más código.
 - **El push en un teléfono físico sigue sin comprobarse**, y `tsc --noEmit` no
   sirve como chequeo en este repositorio (desbordamiento de pila preexistente).
 - **`npm run verify`**: 1716 pruebas en verde y cero errores de lint, medido
-  el 2026-10-16; **no se volvió a medir el 2026-11-05**, y desde entonces
-  entraron cambios (por ejemplo, los términos y la política dentro de la app).
+  el 2026-10-16. **Según la sesión que hizo el lote de arreglos del
+  2026-11-05** (no lo re-medí): 1.879 pruebas de Node, las 49 de Deno y cero
+  errores de lint (24 avisos). Desde el 10-16 entraron cambios (términos y
+  política dentro de la app, hardening y arreglos de cliente).
   Los avisos de lint son deuda conocida y no bloquean.
 
 ## Notas relacionadas

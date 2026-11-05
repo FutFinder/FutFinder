@@ -29,7 +29,7 @@ avisa.
 
 Diseño y fases: `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 
-**Excepción conocida:** el olivo `#71B533` ya no existe en `src/`, pero sigue en `app.config.js` (`notification.color`, `web.themeColor` y el plugin `expo-notifications`): es el color del ícono de las notificaciones y de la barra del navegador, fuera de la paleta de la interfaz y sin unificar con el verde `#55DF69`. El fondo `#0A0C0A` del splash nativo sí coincide con `paleta.bg`.
+**Ya no hay excepción:** el olivo `#71B533` sobrevivía en `app.config.js` (`notification.color`, `web.themeColor` y el plugin `expo-notifications`) y desde `d11848d` esos tres usan el verde `#55DF69` de la paleta. El archivo no puede importar `src/theme/colors.js` (lo lee Expo en Node, antes de Babel), así que los colores van escritos a mano; `src/theme/__tests__/appConfigEnLaPaleta.test.js` exige que todo color de `app.config.js` sea un valor de `paleta` y que esos tres sean `paleta.green`. Si falla, no se agrega una excepción: se usa el valor del token. **El color nativo de la notificación (Android) sólo se verá en el próximo build**, porque no hay actualizaciones por aire. El fondo `#0A0C0A` del splash nativo coincide con `paleta.bg`.
 
 ### Lo que NO se unificó, a propósito
 
