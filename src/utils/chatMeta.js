@@ -809,8 +809,12 @@ export function solicitudesTrasCargar(previas, res) {
  * C14: el hilo de un desafío (`challenge:<id>`) caía en «Mensaje directo»,
  * aunque es un grupo entre los dos clubes.
  */
-export function subtituloDeDetalles({ tipo, cuantos = 0 } = {}) {
+export function subtituloDeDetalles({ tipo, cuantos = 0, error = false } = {}) {
   const n = Number(cuantos) || 0;
+  // C15: con la consulta de participantes caída no se afirma un número.
+  if (error && (tipo === 'club' || tipo === 'match' || tipo === 'challenge')) {
+    return 'No pudimos cargar los participantes';
+  }
   if (tipo === 'club') return `Chat del club · ${n} ${n === 1 ? 'jugador' : 'jugadores'}`;
   if (tipo === 'match') return `Chat del partido · ${n} ${n === 1 ? 'inscrito' : 'inscritos'}`;
   if (tipo === 'challenge') {

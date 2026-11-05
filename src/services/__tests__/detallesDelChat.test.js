@@ -62,3 +62,23 @@ test('C14: la pantalla usa subtituloDeDetalles', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'screens', 'ChatDetailsScreen.js'), 'utf8');
   assert.match(src, /subtituloDeDetalles\(\{/);
 });
+
+// ---------------------------------------------------------------------------
+// C15: si getThreadParticipants devolvía { data: [], error }, Detalles
+// ignoraba el error y anunciaba «0 jugadores»: el chat parecía vacío.
+// ---------------------------------------------------------------------------
+
+test('C15: con error el subtítulo no afirma cuántos hay', () => {
+  for (const tipo of ['club', 'match', 'challenge']) {
+    const s = subtituloDeDetalles({ tipo, cuantos: 0, error: true });
+    assert.ok(!/\b0\b/.test(s), `${tipo}: vuelve a decir 0 con un error`);
+    assert.match(s, /No pudimos cargar los participantes/);
+  }
+});
+
+test('C15: la pantalla guarda el error de participantes y ofrece reintentar', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'screens', 'ChatDetailsScreen.js'), 'utf8');
+  assert.match(src, /setErrorParticipantes\(people\.error \|\| null\)/, 'el error de la consulta se vuelve a ignorar');
+  assert.match(src, /subtituloDeDetalles\(\{[^}]*error: !!errorParticipantes/);
+  assert.match(src, /Reintentar/);
+});
