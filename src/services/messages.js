@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getMisPermisosEnClub, getRolePermissions, getAllMemberOverrides, resolvePermisos } from './clubPermissions';
+import { aplicarOrdenYCursorDeMensajes } from '../utils/cursorDeMensajes';
 
 /**
  * Servicio de mensajería en tiempo real.
@@ -686,8 +687,10 @@ export async function listMyThreads() {
  * Historial de un hilo (antiguo → nuevo), paginado hacia atrás.
  *
  * @param {string} threadKeyStr
- * @param {{ limit?: number, before?: string }} opts
- *        `before` = created_at ISO del mensaje más antiguo ya cargado.
+ * @param {{ limit?: number, before?: { created_at: string, id: string } }} opts
+ *        `before` = el par (created_at, id) del mensaje más antiguo ya
+ *        cargado (`cursorDeHistorial`). Sólo la fecha perdía mensajes que
+ *        empataban justo en el corte: ver `utils/cursorDeMensajes.js`.
  * @returns {{ data: object[], hasMore: boolean, error }}
  */
 export async function listThreadMessages(threadKeyStr, { limit = 40, before = null } = {}) {
@@ -722,14 +725,12 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
         ? `${baseCols}, challenge_id`
         : baseCols;
 
-    // Pedimos uno de más para saber si quedan mensajes anteriores.
-    let q = supabase
-      .from('messages')
-      .select(cols)
-      .order('created_at', { ascending: false })
-      .limit(limit + 1);
-
-    if (before) q = q.lt('created_at', before);
+    // Pedimos uno de más para saber si quedan mensajes anteriores. Orden y
+    // cursor por el par (created_at, id), para no perder empates en el corte.
+    let q = aplicarOrdenYCursorDeMensajes(
+      supabase.from('messages').select(cols),
+      before
+    ).limit(limit + 1);
 
     if (t.type === 'dm') {
       q = q

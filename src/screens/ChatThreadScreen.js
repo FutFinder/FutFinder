@@ -56,6 +56,7 @@ import {
   cargaPermiteMarcarLeido,
   crearAcuseDeLectura,
 } from '../utils/lecturaDeHilo';
+import { cursorDeHistorial } from '../utils/cursorDeMensajes';
 import {
   listThreadMessages,
   sendMessage,
@@ -593,8 +594,9 @@ export default function ChatThreadScreen({ route, navigation }) {
   const loadEarlier = useCallback(async () => {
     if (loadingEarlier || messages.length === 0) return;
     setLoadingEarlier(true);
-    const oldest = messages[0]?.created_at;
-    const page = await listThreadMessages(threadKey, { limit: PAGE_SIZE, before: oldest });
+    // El par (created_at, id): sólo la fecha perdía mensajes empatados (C03).
+    const desde = cursorDeHistorial(messages);
+    const page = await listThreadMessages(threadKey, { limit: PAGE_SIZE, before: desde });
     if (!mountedRef.current) return;
     setLoadingEarlier(false);
     if (page.error) {
