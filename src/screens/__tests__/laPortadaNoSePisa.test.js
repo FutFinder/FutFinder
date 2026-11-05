@@ -33,3 +33,26 @@ test('I04: cada carga pide turno y una vieja no escribe', () => {
   assert.ok(esperas >= 3, 'cambió la forma de load: revisa esta prueba');
   assert.equal(chequeos, esperas, 'hay una espera en load sin chequeo de turno después');
 });
+
+// ---------------------------------------------------------------------------
+// I02 — un fallo no es «sin partidos»
+// ---------------------------------------------------------------------------
+
+const { vistaDePartidosCerca } = require('../../utils/clubsHomeSources.js');
+
+test('I02: con error y sin nada cargado, la vista es de error, no de vacío', () => {
+  assert.equal(vistaDePartidosCerca({ cuantos: 0, error: { message: 'red' } }), 'error');
+  assert.equal(vistaDePartidosCerca({ cuantos: 0, error: null }), 'vacio');
+});
+
+test('I02: con error y datos previos, se conservan y se avisa', () => {
+  assert.equal(vistaDePartidosCerca({ cuantos: 3, error: { message: 'red' } }), 'lista-con-error');
+  assert.equal(vistaDePartidosCerca({ cuantos: 3, error: null }), 'lista');
+});
+
+test('I02: Inicio lee el error de listOpenMatches y no pisa la lista con él', () => {
+  const load = cuerpoDeLoad();
+  assert.match(load, /const \{ data: list, error: errorLista \} = await listOpenMatches\(/);
+  assert.match(SRC, /vistaDePartidosCerca\(/);
+  assert.match(SRC, /No pudimos cargar los partidos/);
+});

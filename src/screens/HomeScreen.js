@@ -39,7 +39,7 @@ import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
 import { useTrueScoreAjustes } from '../services/trueScore';
 import { etiquetaTier, nombrePuntajeDe } from '../utils/trueScore';
-import { etiquetaAdminDeClubes } from '../utils/clubsHomeSources';
+import { etiquetaAdminDeClubes, vistaDePartidosCerca } from '../utils/clubsHomeSources';
 import { crearSecuencia } from '../utils/paginacionPartidos';
 
 function greetingFor(d = new Date()) {
@@ -82,6 +82,8 @@ export default function HomeScreen({ navigation }) {
   const [busyMatchId, setBusyMatchId] = useState(null);
   const [previewMatchId, setPreviewMatchId] = useState(null);
   const [nextMatch, setNextMatch] = useState(null);
+  // El fallo de la última carga de partidos (I02), o null.
+  const [errorPartidos, setErrorPartidos] = useState(null);
   // `null` es «no se pudo contar»: la tarjeta lo omite en vez de decir 0.
   const [reportesRecibidos, setReportesRecibidos] = useState(null);
   // Los partidos de MIS clubes, pedidos club por club a la base. No salen de
@@ -120,7 +122,7 @@ export default function HomeScreen({ navigation }) {
     const radiusKm = prof?.search_radius_km ?? 10;
     // Con ubicación, la consulta ya trae sólo lo que cae cerca: pedir 20 del
     // país y filtrar después dejaba fuera al partido cercano (I01).
-    const { data: list } = await listOpenMatches({
+    const { data: list, error: errorLista } = await listOpenMatches({
       limit: 20,
       cerca: userCoords ? { ...userCoords, km: radiusKm } : null,
     });
@@ -147,15 +149,27 @@ export default function HomeScreen({ navigation }) {
 
     const clubIds = misClubes?.data || [];
     setMisClubIds(clubIds);
-    setMatches(filtered.map((m) => ({ ...m, _joined: joinedIds.has(m.id) })));
+    // Con error no se pisa la lista: quedan los de la carga anterior y la
+    // vista avisa (I02). Antes el fallo se leía como «sin partidos».
+    if (errorLista) {
+      setErrorPartidos(errorLista);
+    } else {
+      setErrorPartidos(null);
+      setMatches(filtered.map((m) => ({ ...m, _joined: joinedIds.has(m.id) })));
+    }
     setProfile(prof);
     setMyUserId(userId);
 
     // Después del resto: necesita los ids de mis clubes, y nada de lo de
     // arriba necesita esperarla.
-    const { data: deClub } = await listPartidosDeMisClubes(clubIds).catch(() => ({ data: [] }));
+    const { data: deClub, error: errorClub } = await listPartidosDeMisClubes(clubIds).catch((e) => ({
+      data: null,
+      error: e,
+    }));
     if (!secuenciaCarga.vigente(turno)) return;
-    setPartidosDeClub(deClub || []);
+    // Igual que arriba: un fallo conserva los partidos de club que había.
+    if (errorClub) setErrorPartidos((prev) => prev || errorClub);
+    else setPartidosDeClub(deClub || []);
 
     setLoading(false);
     setRefreshing(false);
@@ -261,6 +275,8 @@ export default function HomeScreen({ navigation }) {
 
   const summary = matches.length
     ? `${matches.length} ${matches.length === 1 ? 'partido cerca de ti' : 'partidos cerca de ti'}`
+    : errorPartidos
+    ? 'No pudimos cargar los partidos'
     : 'Sin partidos cerca';
 
   // Con TrueScore la etiqueta sale de la tabla de niveles del servidor
@@ -282,6 +298,8 @@ export default function HomeScreen({ navigation }) {
     matches,
     misClubIds
   );
+  // Lista, vacío o error: un fallo de red no se dibuja como «sin partidos» (I02).
+  const vistaCerca = vistaDePartidosCerca({ cuantos: partidosCerca.length, error: errorPartidos });
 
   const renderMatch = useCallback(
     (m) => (
@@ -408,7 +426,23 @@ export default function HomeScreen({ navigation }) {
                 actionLabel="Ver todos"
                 onAction={() => navigation.navigate('Main', { screen: 'SearchTab' })}
               />
-              {partidosCerca.length ? (
+              {vistaCerca === 'error' || vistaCerca === 'lista-con-error' ? (
+                <View className="mb-3 flex-row items-center gap-3 rounded-[16px] border border-rojo/30 bg-rojo/8 px-4 py-3">
+                  <Text className="flex-1 text-[13px] leading-5 text-white/75">
+                    {vistaCerca === 'error'
+                      ? 'No pudimos cargar los partidos. Revisa tu conexión.'
+                      : 'No pudimos actualizar los partidos; estos son los últimos que cargamos.'}
+                  </Text>
+                  <Pressable
+                    onPress={() => { setRefreshing(true); load(); }}
+                    accessibilityRole="button"
+                    className="h-9 items-center justify-center rounded-[11px] bg-verde px-3 active:opacity-80"
+                  >
+                    <Text className="text-[12.5px] font-bold text-verde-ink">Reintentar</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              {vistaCerca === 'error' ? null : partidosCerca.length ? (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}

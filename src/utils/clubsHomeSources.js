@@ -298,3 +298,18 @@ export function etiquetaAdminDeClubes(rolEnClubActivo, membresias) {
   const n = (Array.isArray(membresias) ? membresias : []).filter((m) => m?.miRol === 'admin').length || 1;
   return `ADMIN · ${n} ${n === 1 ? 'CLUB' : 'CLUBES'}`;
 }
+
+/**
+ * Qué muestra el bloque «Partidos cerca de ti» de Inicio (I02).
+ *
+ * Un fallo de `listOpenMatches` se tiraba y la portada decía «Sin partidos
+ * en tu radio»: sin red parecía que no había partidos. Ahora:
+ *   · 'error'           nada cargado y la consulta falló: error con reintento.
+ *   · 'lista-con-error' falló, pero quedan los de la carga anterior: se
+ *                       muestran con un aviso.
+ *   · 'vacio' / 'lista' lo de siempre.
+ */
+export function vistaDePartidosCerca({ cuantos = 0, error = null } = {}) {
+  if (error) return cuantos > 0 ? 'lista-con-error' : 'error';
+  return cuantos > 0 ? 'lista' : 'vacio';
+}
