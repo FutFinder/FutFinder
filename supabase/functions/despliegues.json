@@ -86,9 +86,9 @@
       },
       "pendiente": {
         "desde": "2026-11-05",
-        "motivo": "Fija @supabase/supabase-js a 2.119.0 en el import (hoy flota con @2; es la misma versión que resuelve esm.sh ahora, así que no cambia el comportamiento, sólo cierra la puerta a una actualización no revisada).",
+        "motivo": "Fija @supabase/supabase-js a 2.119.0 en el import (hoy flota con @2; es la misma versión que resuelve esm.sh ahora, así que no cambia el comportamiento, sólo cierra la puerta a una actualización no revisada). Y la lista de columnas de la lectura queda como un solo literal: con la concatenación, los tipos de supabase-js 2.119 no compilaban (sin cambio en ejecución).",
         "archivos": {
-          "solicitud-recinto/index.ts": "cd5b431adbc943d4f6d0f5f7418e9a741f4b081ffec7037427782527d3526645"
+          "solicitud-recinto/index.ts": "cd6919e9ce1870575fede9e41a4fd87723f083a993846aa0d4e3ffea43a63621"
         }
       }
     }

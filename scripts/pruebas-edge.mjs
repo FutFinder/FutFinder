@@ -17,7 +17,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,4 +40,18 @@ if (hayDeno.error || hayDeno.status !== 0) {
 }
 
 const r = spawnSync('deno', ['test'], { cwd: dir, stdio: 'inherit' });
-process.exit(r.status ?? 1);
+if (r.status !== 0) process.exit(r.status ?? 1);
+
+// Y LOS TIPOS DE CADA FUNCIÓN. `deno test` sólo compila los archivos de
+// prueba y lo que importan; los `index.ts` no los toca nadie hasta el
+// despliegue. Así pasó con `solicitud-recinto` al fijar supabase-js 2.119:
+// su lista de columnas armada con `+` dejó de tipar y nada lo vio.
+const funciones = readdirSync(dir, { withFileTypes: true })
+  .filter((d) => d.isDirectory() && !d.name.startsWith('_') && existsSync(path.join(dir, d.name, 'index.ts')))
+  .map((d) => path.join(d.name, 'index.ts'));
+const c = spawnSync('deno', ['check', ...funciones], { cwd: dir, stdio: 'inherit' });
+if (c.status !== 0) {
+  console.log('');
+  console.log(`✖ deno check falló en alguna de: ${funciones.join(', ')}`);
+}
+process.exit(c.status ?? 1);

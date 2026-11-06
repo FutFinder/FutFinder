@@ -114,9 +114,10 @@ Deno.serve(async (req) => {
   const admin = createClient(url, servicio);
   const { data: fila, error: eFila } = await admin
     .from("solicitudes_recinto")
+    // UN SOLO LITERAL, sin `+`: supabase-js (fijado en 2.119) deduce el tipo
+    // de la fila leyendo este texto, y con una concatenación ya no puede.
     .select(
-      "id, nombre_recinto, direccion, comuna, nombre_dueno, telefono, correo, mensaje, " +
-        "n_canchas, fotos, servicios, created_at, avisada_at",
+      "id, nombre_recinto, direccion, comuna, nombre_dueno, telefono, correo, mensaje, n_canchas, fotos, servicios, created_at, avisada_at",
     )
     .eq("id", id)
     .maybeSingle();
