@@ -1,6 +1,6 @@
 # Seguridad y privacidad
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-09
 
 ## Propósito
 
@@ -165,6 +165,30 @@ Arneses al 2026-11-05: 126 de 130 pasan; los cuatro que fallan **ya fallaban ant
 - Los límites de Auth y la rotación del refresh token dependen del panel y nadie los ha leído desde el repositorio.
 - Sin códigos de recuperación de TOTP, hay un riesgo de bloqueo de cuentas que se resuelve a mano.
 - La 165 ya está en producción (2026-11-05): los siete problemas de autorización de arriba quedaron cerrados allá. No se corrió el arnés contra producción; se verificó por catálogo.
+
+## Segunda pasada (2026-11-09): lo que se lee sin cuenta y lo que una función contesta de más
+
+Auditoría sobre producción después de la 165–170, con tres fuentes: los avisos de seguridad de Supabase, el catálogo (`pg_policies`, `pg_proc`, `storage.buckets`) y una prueba **desde fuera**, con la clave pública y sin sesión, contra `/rest/v1/<tabla>`. La prueba desde fuera es la que manda: dice lo que de verdad responde la API, no lo que uno cree que dicen las políticas.
+
+**Lo que está bien, comprobado ese día:** `anon` no ejecuta ninguna función de `public` (0), ninguna tabla está sin RLS, ninguna política de escritura es `true`, toda función `security definer` fija su `search_path`, ninguna función de trigger es ejecutable, y las cabeceras de `vercel.json` (CSP, HSTS, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`) **ya salen en la web** (`curl -I` a la URL de Vercel). Los avisos de Supabase quedan en tres: 12 tablas con RLS y sin política (son las privadas a propósito: sólo se llega por RPC), 143 funciones `security definer` ejecutables con sesión (es el diseño de «una sola puerta»; se revisaron, ver abajo) y la protección de contraseñas filtradas, que es del plan Pro.
+
+**Tres huecos, que cierra la migración 171 — escrita y probada, SIN aplicar en producción:**
+
+1. **Sin cuenta se leía quién juega dónde.** Con la clave pública sola respondían con filas `attendees` (32), `club_members` (15) y `profile_photos` (10): quién va a cada partido, quién está en cada club y las fotos de galería de cada persona. Las políticas de lectura eran para el rol `public`, que incluye a `anon`. La 171 las pasa a `authenticated` (sólo cambia el rol; con sesión se lee lo mismo). Es la misma decisión de la 143 para `profiles`, una capa más abajo.
+2. **`is_blocked_pair(a, b)` contestaba por cualquier par** a cualquiera con cuenta: se podía dibujar el grafo de bloqueos entero, cuando `blocked_users` sólo deja ver un bloqueo a quien lo hizo. Ahora sólo contesta si quien pregunta es una de las dos personas (los dos únicos usos, la política `friendships_insert` y `desbloquear_usuario()`, lo cumplen).
+3. **`profile-gallery` aceptaba cualquier archivo de cualquier tamaño**: único bucket sin `file_size_limit` ni `allowed_mime_types`, y público. Queda en 5 MB e imágenes, como `avatars`.
+
+**Cómo se probó:** arnés `171_..._test.sql`, 23 casos como `anon` y como `authenticated` con el `sub` de cada persona. Sin la migración fallan 6 (control negativo visto); con ella, 23/23 en la base local. La batería completa queda en 129/134 y los cinco que fallan **fallan igual sin la 171** (se revirtió en local y se corrieron tres veces: ver [Pruebas](../operacion/pruebas.md)). **Ensayada contra producción** en una transacción con `rollback` (23/23, y después se comprobó que no quedó nada). **No se aplicó**: aplicar es un despliegue a producción y espera la autorización de Vicente.
+
+**Lo que NO se tocó, y por qué:**
+
+- **`matches` sigue legible sin cuenta** (los partidos normales; los de clubes son privados desde la 44d), y también `clubs`, `club_photos` y todo lo de recintos. El arnés de la 44d exige de forma explícita que `anon` vea los partidos normales, y es justo lo que mostraría una vitrina pública. **Ojo: la fila de `matches` trae `id_organizador`.** Es parte de la decisión de producto que sigue abierta («¿superficie pública sin cuenta?», en [Pendientes](../operacion/pendientes.md)).
+- **`lista_de_espera(p_match_id)`** es `security definer` y no mira si quien llama puede ver el partido: devuelve la cola (ids y prioridad) también de un partido de clubes ajeno. Bajo riesgo (hay que conocer el id del partido), anotado como pendiente.
+- **`perfil_acepta_solicitudes(p_user)`, `tiene_permiso_de_club(club, user, permiso)`, `es_participante_de_reserva` y `es_organizador_de_reserva`** aceptan el id de otra persona y contestan sí o no. Las usan políticas con el rol de quien consulta, así que el EXECUTE no se puede quitar; atarlas a `auth.uid()` exige revisar cada llamada desde funciones `definer`. Lo que dejan saber es poco (una preferencia, un permiso de club, y lo de reservas pide conocer el id de la reserva). Pendiente, sin urgencia.
+- **`support-screenshots` es un bucket público**: una captura que alguien adjunta a «reportar un problema» queda legible por URL. La ruta no es adivinable, pero una captura puede traer datos personales. Pasarlo a privado exige cambiar cómo el correo de soporte enlaza la imagen. Pendiente.
+- **`anon` y `authenticated` conservan `REFERENCES` y `TRIGGER`** sobre las tablas (privilegios por omisión). Por la API no se puede crear ni una llave ni un disparador, así que no abren nada; quitarlos sería higiene.
+
+**Mapeo:** SOC 2 CC6.1 y ISO 27701 7.4.x (minimización y acceso a datos personales) para los puntos 1 y 2; SOC 2 CC6.6/CC6.8 para el 3.
 
 ## Notas relacionadas
 

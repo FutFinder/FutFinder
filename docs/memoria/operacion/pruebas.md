@@ -1,6 +1,6 @@
 # Pruebas
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-09
 
 ## Comprobaciones locales del proyecto
 
@@ -390,6 +390,16 @@ Contados con `ls supabase/tests` el 2026-11-05: **127 arneses `.sql` y 3 de conc
 **El 127 es `164_recinto_esperando_revision_test.sql`**, de la migración 164 (la cuarta cola de moderación, «Recintos esperando revisión»). Cubre seis cosas: que quien no está en el padrón no ve la cola ni aprueba (`NO_MODERA`, 42501); que un recinto que pidió revisión y no está aprobado aparece con su comuna y sus canchas activas con horario; el control negativo —uno aprobado y uno que nunca pidió revisión **no** aparecen—; que aprobar lo saca de la cola y **no lo publica**; que aprobar dos veces no es un error y aprobar algo inexistente devuelve `ok:false`; y que las tres colas de la 151 siguen estando.
 
 **Qué está medido y qué no:** el «126 de 126 con los interruptores de producción» es del 2026-10-17 y es **anterior a la migración 164** (2026-10-19). El arnés de la 164 **no se re-ejecutó en esta revisión**, ni se volvió a correr la suite entera, así que «127 de 127» no es un dato medido. Sí se midieron el 2026-11-05 las 49 pruebas de Deno (ver arriba).
+
+## La batería completa el 2026-11-09 (134 arneses), y cómo se supo qué no rompió la 171
+
+Contados con `ls`: **134 arneses `.sql`** (entraron los de las migraciones 165 a 171). Corrida entera contra la base local con la 170 y la 171 aplicadas: **129 de 134**. Los cinco que fallan son `134` (datos locales), `83` (un caso), `157`, `44d` y `45`.
+
+**Ninguno falla por la 171, y se comprobó en vez de suponerlo:** se revirtió la 171 en la base local (políticas de vuelta a `public`, función anterior, bucket sin tope) y se corrieron `44d` y `45` tres veces en cada estado. Fallan igual con y sin ella. `44d` cambia de caso entre corridas (4, 10 u OK) porque toma un partido de clubes que ya exista en la base local: cuando ese partido ya pasó, `request_join` contesta `{ok:false}` en vez de lanzar y el caso 10 lo cuenta como «dejó entrar». Se miró con un diagnóstico: **no inscribe a nadie** (cero filas en `attendees`). Es el arnés, no la base. Queda en [Pendientes](pendientes.md).
+
+**Lo que sí estuvo a punto de romper la 171:** su primera versión cerraba también `matches` a `anon`, y el caso 12 de `44d` («anon dejó de ver los partidos normales») lo marcó. Ese caso es una decisión escrita, no un accidente, así que la 171 dejó `matches` como estaba. Correr la batería entera antes de aplicar sirvió para eso.
+
+**La base local no tenía la 170** aunque producción sí: su arnés fallaba (96 políticas sin envolver y 71 llaves sin índice) hasta que se aplicó en local ese día. Antes de leer un fallo de la batería como regresión, comprobar que la base local está al día con el repositorio.
 
 ## Notas relacionadas
 

@@ -1,6 +1,6 @@
 # Estado actual
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-09
 
 ## Qué es esta nota
 
@@ -59,8 +59,15 @@ de canchas. `src/services/` concentra las llamadas de dominio.
 
 ## Base de datos
 
-- **182 archivos de migración** versionados (la última, la **170**; la
-  numeración tiene sufijos como 44b o 105b, por eso no son 170). Con la
+- **183 archivos de migración** versionados (la última, la **171**; la
+  numeración tiene sufijos como 44b o 105b, por eso no son 171). **La 171
+  (2026-11-09: sin cuenta no se lee quién juega, `is_blocked_pair` sólo
+  contesta a quien es parte, tope en `profile-gallery`) está escrita,
+  probada en local y ensayada contra producción con `rollback`, pero NO
+  aplicada**: es la tercera que el repositorio tiene y producción no, y a
+  diferencia de la 149 y la 167 no espera un build, sólo la autorización de
+  Vicente (ver [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md)).
+  Lo que sigue describe el estado hasta la 170. Con la
   **162** y la **163** aplicadas el 2026-10-16, la **164** el 2026-10-19, la
   **165**, la **166**, la **168** y la **169** el 2026-11-05 (hardening; ver
   [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md)) y la

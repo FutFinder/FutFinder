@@ -1,6 +1,6 @@
 # Base de datos
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-09
 
 ## Propósito
 
@@ -272,6 +272,14 @@ La 119 (permisos del club: `tiene_permiso_de_club()` y nueve áreas por rol) ree
 - **Toda llave foránea de `public` tiene un índice que la cubre** (71 creados en la 170, `<tabla>_<columna>_idx`). Una llave foránea nueva lleva su índice en la misma migración; el caso E2 lo vigila.
 - Quedan a propósito: `multiple_permissive_policies` (10 tablas; fusionarlas cambia la expresión y merece revisión propia) y `unused_index` (los 71 nuevos salen como «sin uso» porque recién se crearon).
 - El chat todavía escucha `messages` entera por `postgres_changes` (`services/messages.js`, canal compartido); es el siguiente cuello de botella con muchos conectados, y la salida que recomienda Supabase es Broadcast por hilo.
+
+## Lo que no necesita cuenta no lee a las personas (migración 171, 2026-11-09 — sin aplicar en producción)
+
+- **Una política de lectura sobre una tabla con ids de personas se escribe `to authenticated`, no para `public`.** `public` incluye a `anon`, y `anon` conserva el `SELECT` de tabla: lo único que lo frena es la política. La 171 pasó a `authenticated` las de `attendees`, `club_members` y `profile_photos`, que respondían con filas a quien tuviera sólo la clave pública. `profiles` ya estaba así desde la 143.
+- **`is_blocked_pair(a, b)` sólo contesta si `auth.uid()` es `a` o `b`**; a un tercero le dice `false`. Sin sesión (cron, `service_role`) contesta la verdad. No se le puede quitar el `EXECUTE` a `authenticated`: la evalúa la política `friendships_insert`.
+- **Todo bucket lleva `file_size_limit` y `allowed_mime_types`.** `profile-gallery` era el único sin ellos (migración 23).
+- **Siguen legibles sin cuenta, a propósito:** `matches` (los normales), `clubs`, `club_photos` y lo de recintos. Es la decisión de producto pendiente sobre la superficie pública; ver [Seguridad y privacidad](seguridad-y-privacidad.md).
+- **Cómo comprobarlo de verdad:** con la clave pública y sin sesión, `GET /rest/v1/<tabla>?select=*` con `Prefer: count=exact`. Leer `pg_policies` no alcanza: hay que mirar también los `grant`.
 
 ## Convención de cambio
 

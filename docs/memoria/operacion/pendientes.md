@@ -1,6 +1,6 @@
 # Pendientes
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-09
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
@@ -40,6 +40,18 @@ Cada uno con su commit en `main` y su prueba de Node (varias leen el texto de lo
 - **`ClubsHomeContext` sigue pidiendo 50 avisos y filtrando después** (`listNotifications({ limit: 50 })` y `avisoDelClub`): la misma falla que C06 tenía en la bandeja. Un aviso del club más atrás de los 50 últimos no aparece en «Actividad reciente» de la portada de Clubes. La corrección natural es pasar `clubId` a `listNotifications`, que ya lo acepta.
 - **Quedan «Trust Score» escritos a mano** donde el servidor ya habla de TrueScore con la fase 1: `TrustScoreHistoryScreen.js` (~línea 221, el texto explicativo), `TrustScoreCard.js` (valor por defecto `nombre = 'Tu Trust Score'`) y, fuera de lo que anotó el lote, `matchRules.js` (el texto de la confirmación por GPS sin TrueScore y `leaveRuleText`). Las tres pantallas de partido ya usan `nombrePuntajeDe`.
 - **«Ver todo» de Perfil despliega sólo las últimas 20 participaciones** (`HISTORIAL_LIMITE` en `ProfileScreen.js`); si algún día hace falta el historial completo, habrá que paginarlo.
+
+### De la segunda pasada de seguridad (2026-11-09)
+
+Detalle y evidencia en [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md), «Segunda pasada».
+
+- **Aplicar la migración 171 en producción.** Está en el repositorio, probada en local (23/23, con control negativo) y ensayada contra producción con `rollback`. Cierra tres cosas que hoy siguen abiertas allá: sin cuenta se lee `attendees`, `club_members` y `profile_photos`; `is_blocked_pair` contesta por cualquier par; `profile-gallery` no tiene tope. No necesita build ni cambia nada para quien tiene sesión. **Falta sólo la autorización de Vicente** (aplicar es un despliegue a producción). Después, repetir la prueba desde fuera: con la clave pública y sin sesión, esas tres tablas tienen que responder cero filas.
+- **Desplegar las 4 Edge Functions que siguen en `pendiente`** en `despliegues.json` (`pagar-reserva`, `flow-confirmacion`, `solicitud-recinto` y `reportar-problema`): `supabase-js` fijado y el tope de correos de reportes. Mismo motivo: es un despliegue a producción.
+- **`matches` se lee sin cuenta, con `id_organizador` incluido** (también `clubs`, `club_photos` y lo de recintos). No se cerró a propósito: es la decisión de «superficie pública sin cuenta» de más abajo, y el arnés de la 44d exige que `anon` vea los partidos normales. Si la respuesta es «no hay vitrina», se cierran igual que las tres de la 171; si es «sí», que sea por una función que devuelva sólo lo que se muestra.
+- **`lista_de_espera()` no mira si quien llama puede ver el partido**: devuelve la cola de un partido de clubes ajeno si se conoce su id.
+- **Funciones que contestan sobre otra persona** (`perfil_acepta_solicitudes`, `tiene_permiso_de_club`, `es_participante_de_reserva`, `es_organizador_de_reserva`): poco que saber, pero convendría atarlas a `auth.uid()` revisando cada llamada.
+- **`support-screenshots` es un bucket público**: las capturas de «reportar un problema» quedan legibles por URL.
+- **Dos arneses dependen de los datos que haya en la base local, no de la base:** `44d` (caso 10: si el partido de clubes que toma ya pasó, `request_join` contesta `{ok:false, «El partido no está abierto»}` en vez de lanzar, y el arnés lo lee como «dejó entrar»; comprobado el 2026-11-09 que **no inscribe a nadie**: cero filas) y `45` (caso 4, «el club B tiene 2»). Fallan igual con y sin la 171. Hay que hacerlos sembrar su propio partido futuro.
 
 ### Otros pendientes, verificados el 2026-11-05
 

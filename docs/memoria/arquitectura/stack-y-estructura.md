@@ -1,6 +1,6 @@
 # Stack y estructura
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-09
 
 ## Propósito
 
@@ -32,7 +32,7 @@ Los scripts versionados son `start`, `android`, `ios`, `web`, `web:local` (la ap
 | `src/data/` | Datos estáticos, incluidos regiones y comunas chilenas. |
 | `src/theme/` | Tokens visuales compartidos. |
 | `src/utils/` | Transformaciones y utilidades; sus pruebas de Node están en `src/utils/__tests__/`. |
-| `supabase/` | Esquema, 179 archivos de migración (numerados hasta la 167, con sufijos `b`/`c` en algunas), pruebas SQL en `supabase/tests/` y seis Edge Functions: `send-push`, `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, `solicitud-recinto` y `reportar-problema` (más `_shared/`). |
+| `supabase/` | Esquema, 183 archivos de migración (numerados hasta la 171, con sufijos `b`/`c` en algunas), pruebas SQL en `supabase/tests/` y seis Edge Functions: `send-push`, `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, `solicitud-recinto` y `reportar-problema` (más `_shared/`). |
 
 ## Resolución por plataforma
 
