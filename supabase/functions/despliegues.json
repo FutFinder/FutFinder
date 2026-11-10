@@ -6,25 +6,18 @@
     "`comparada` es el día en que ese contenido se trajo con get_edge_function y se verificó contra el repositorio. `null` significa que el hash es el del archivo de hoy y se dio por bueno sin traer la copia desplegada.",
     "AL DESPLEGAR: actualiza version, desplegada y los hashes. Es a propósito que haya que tocar esto a mano.",
     "UN CAMBIO EN _shared/ NO ESTÁ EN PRODUCCIÓN HASTA REDESPLEGAR CADA FUNCIÓN QUE LO IMPORTA: la copia viaja dentro de cada despliegue.",
-    "Las seis se compararon contra la copia desplegada el 2026-10-16 y las seis coincidían con el repositorio, salvo send-push, que venía atrasada y se redesplegó. `comparada: null` sería un hash dado por bueno sin traer la copia desplegada; hoy no hay ninguna así.",
+    "Las seis se compararon contra la copia desplegada el 2026-10-16 y las seis coincidían con el repositorio, salvo send-push, que venía atrasada y se redesplegó. Desde el 2026-11-09 hay cuatro con `comparada: null` (pagar-reserva, flow-confirmacion, solicitud-recinto y reportar-problema): se desplegaron ese día por el MCP desde el contenido del repositorio y el hash es el del archivo, pero la copia desplegada no se comparó por hash (la de reportar-problema se trajo y se leyó igual). La próxima comparación con get_edge_function les pone fecha.",
     "`pendiente` (opcional, por función) = contenido YA escrito en el repositorio que todavía NO se desplegó, con el sha256 exacto de cada archivo. La guarda lo deja pasar —y lo anuncia— mientras el archivo coincida con ese hash; si se edita otra vez, vuelve a fallar. AL DESPLEGAR: mueve esos hashes a `archivos`, sube `version`/`desplegada` y borra `pendiente`."
   ],
   "proyecto": "jvfoendzblkoxvwvommz",
   "funciones": {
     "flow-confirmacion": {
-      "version": 2,
-      "desplegada": "2026-09-11T01:31:28Z",
-      "comparada": "2026-10-16",
+      "version": 3,
+      "desplegada": "2026-11-10T01:25:02Z",
+      "comparada": null,
       "archivos": {
-        "flow-confirmacion/index.ts": "3ac337a8a8b2472ba7b65e2863a6fb5bc7c9488a0b2a20e027de784348ea4200",
+        "flow-confirmacion/index.ts": "19eb6c8ca1c4d50f1c2fe84847cbe897e020d8992d3e22402b90b307e79914dc",
         "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441"
-      },
-      "pendiente": {
-        "desde": "2026-11-05",
-        "motivo": "Fija @supabase/supabase-js a 2.119.0 en el import (hoy flota con @2; es la misma versión que resuelve esm.sh ahora, así que no cambia el comportamiento, sólo cierra la puerta a una actualización no revisada).",
-        "archivos": {
-          "flow-confirmacion/index.ts": "19eb6c8ca1c4d50f1c2fe84847cbe897e020d8992d3e22402b90b307e79914dc"
-        }
       }
     },
     "flow-retorno": {
@@ -36,35 +29,21 @@
       }
     },
     "pagar-reserva": {
-      "version": 2,
-      "desplegada": "2026-09-11T01:30:08Z",
-      "comparada": "2026-10-16",
+      "version": 3,
+      "desplegada": "2026-11-10T01:24:07Z",
+      "comparada": null,
       "archivos": {
-        "pagar-reserva/index.ts": "e80131c31ee790bfae95cc738d5c9b6e8a5b640f217a9e34047e2bdfabfc69bb",
+        "pagar-reserva/index.ts": "0f22b5a96238f9b72c8baadd9b3dc7cf08779999bb3994df1fd37d072c294ad2",
         "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441"
-      },
-      "pendiente": {
-        "desde": "2026-11-05",
-        "motivo": "Fija @supabase/supabase-js a 2.119.0 en el import (hoy flota con @2; es la misma versión que resuelve esm.sh ahora, así que no cambia el comportamiento, sólo cierra la puerta a una actualización no revisada).",
-        "archivos": {
-          "pagar-reserva/index.ts": "0f22b5a96238f9b72c8baadd9b3dc7cf08779999bb3994df1fd37d072c294ad2"
-        }
       }
     },
     "reportar-problema": {
-      "version": 1,
-      "desplegada": "2026-09-22T23:55:09Z",
-      "comparada": "2026-10-16",
+      "version": 2,
+      "desplegada": "2026-11-10T01:21:44Z",
+      "comparada": null,
       "archivos": {
-        "reportar-problema/index.ts": "793a06c6fb02ff4a1a8b1408fc43c4ddee932317d462a8fee7108e17e25d3b39",
+        "reportar-problema/index.ts": "4c169477a7ac3448c554d12520ec5d5adc856eec9e9fcc0498f3c8fd9efbb993",
         "_shared/correoReporte.ts": "088822374fd4016699c9c46633eb9729084f61c205f8f76e31e6bebeabf3963d"
-      },
-      "pendiente": {
-        "desde": "2026-11-05",
-        "motivo": "Fija @supabase/supabase-js a 2.119.0 en el import (hoy flota con @2; es la misma versión que resuelve esm.sh ahora, así que no cambia el comportamiento, sólo cierra la puerta a una actualización no revisada). Además, antes de mandar el correo pregunta a `limite_correo_de_reporte()` (migración 166, requiere que esté aplicada o la ignora).",
-        "archivos": {
-          "reportar-problema/index.ts": "4c169477a7ac3448c554d12520ec5d5adc856eec9e9fcc0498f3c8fd9efbb993"
-        }
       }
     },
     "send-push": {
@@ -77,19 +56,12 @@
       }
     },
     "solicitud-recinto": {
-      "version": 7,
-      "desplegada": "2026-09-21T11:10:18Z",
-      "comparada": "2026-10-16",
+      "version": 8,
+      "desplegada": "2026-11-10T01:23:05Z",
+      "comparada": null,
       "archivos": {
-        "solicitud-recinto/index.ts": "40e393edd7eb9f5e440f3970a847e058ac7e80ee388a8778be3f3ff76f252f38",
+        "solicitud-recinto/index.ts": "cd6919e9ce1870575fede9e41a4fd87723f083a993846aa0d4e3ffea43a63621",
         "_shared/correoSolicitud.ts": "b0f4ba51d671685ac01caacfbf109487f816668b2844cd4562decbc835071593"
-      },
-      "pendiente": {
-        "desde": "2026-11-05",
-        "motivo": "Fija @supabase/supabase-js a 2.119.0 en el import (hoy flota con @2; es la misma versión que resuelve esm.sh ahora, así que no cambia el comportamiento, sólo cierra la puerta a una actualización no revisada). Y la lista de columnas de la lectura queda como un solo literal: con la concatenación, los tipos de supabase-js 2.119 no compilaban (sin cambio en ejecución).",
-        "archivos": {
-          "solicitud-recinto/index.ts": "cd6919e9ce1870575fede9e41a4fd87723f083a993846aa0d4e3ffea43a63621"
-        }
       }
     }
   }
