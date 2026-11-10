@@ -43,8 +43,9 @@
 -- para probar el borde sin crear dieciocho usuarios.
 --
 -- Cómo correr: pega este archivo completo en Supabase → SQL Editor.
--- Todo corre en una transacción que termina en ROLLBACK. Usa el partido
--- de clubes que ya exista en la base; no crea uno nuevo.
+-- Todo corre en una transacción que termina en ROLLBACK. Siembra su
+-- propio partido de clubes (futuro) y sus dos clubes: no depende de lo
+-- que haya en la base.
 -- =============================================================
 
 begin;
@@ -114,12 +115,18 @@ begin
     perform public.aprobar_propuesta(v_sprop.id, p_me_inscribo => false);
     execute 'reset role';
     execute 'set local request.jwt.claims to ''{}''';
+
+    -- EL PARTIDO ES EL QUE SE ACABA DE SEMBRAR (2026-11-09). La siembra de
+    -- arriba existía, pero después se tomaba «el primero que hubiera» con
+    -- un `limit 1` sin orden: en una base con historia salía uno viejo, con
+    -- la nómina que le hubiera quedado, y el conteo del caso 4 («el club B
+    -- tiene 2») contaba inscritos de otra vida.
+    select id, club_local_id, club_visitante_id into v_m, v_cl, v_cv
+      from public.matches where challenge_proposal_id = v_sprop.id;
   end;
 
-  select id, club_local_id, club_visitante_id into v_m, v_cl, v_cv
-    from public.matches where challenge_proposal_id is not null limit 1;
   if v_m is null then
-    raise exception 'No hay ningún partido de clubes en la base contra el que probar';
+    raise exception 'La siembra no dejó un partido de clubes contra el que probar';
   end if;
   select user_id into v_adminA from public.club_members where club_id=v_cl and rol='admin' limit 1;
   select user_id into v_adminB from public.club_members where club_id=v_cv and rol='admin' limit 1;

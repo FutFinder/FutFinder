@@ -35,8 +35,9 @@
 -- devolviendo el usuario del bloque anterior.
 --
 -- Cómo correr: pega este archivo completo en Supabase → SQL Editor.
--- Todo corre en una transacción que termina en ROLLBACK. Usa el
--- partido de clubes que ya exista en la base; no crea uno nuevo.
+-- Todo corre en una transacción que termina en ROLLBACK. Siembra su
+-- propio partido de clubes (futuro), sus dos clubes, su externo y su
+-- partido normal: no depende de lo que haya en la base.
 -- =============================================================
 
 begin;
@@ -47,7 +48,8 @@ do $$
 declare
   v_m uuid; v_cl uuid; v_cv uuid; v_normal uuid;
   v_local uuid; v_visit uuid; v_jug uuid := gen_random_uuid(); v_ext uuid;
-  v_count int; v_ok boolean; v_err text; v_json json; v_tit text;
+  v_count int; v_ok boolean; v_err text; v_err2 text; v_json json; v_tit text;
+  v_resp jsonb;
 begin
   -- ── SIEMBRA SU PROPIO PARTIDO DE CLUBES (2026-10-15) ──────────
   -- Antes tomaba el primero que hubiera en la base, lo que ataba este
@@ -89,7 +91,8 @@ begin
     insert into public.matches (id_organizador, titulo, comuna, cancha_nombre,
       latitud, longitud, hora, cupos_totales, cupos_disponibles)
     values (v_sx, 'Pichanga '||v_smarca, 'Ñuñoa', 'Cancha normal '||v_smarca,
-            -33.4569, -70.6483, now() + interval '5 days', 10, 8);
+            -33.4569, -70.6483, now() + interval '5 days', 10, 8)
+    returning id into v_normal;
 
     insert into public.club_challenges (club_retador_id, club_retado_id, creado_por, estado)
     values (v_sca, v_scb, v_sa, 'pendiente') returning id into v_sch;
@@ -114,18 +117,25 @@ begin
     perform public.aprobar_propuesta(v_sprop.id, p_me_inscribo => false);
     execute 'reset role';
     execute 'set local request.jwt.claims to ''{}''';
+
+    -- EL PARTIDO ES EL QUE SE ACABA DE SEMBRAR (2026-11-09). La siembra de
+    -- arriba existía, pero después se tomaba «el primero que hubiera» con
+    -- un `limit 1` sin orden: en una base con historia salía uno viejo, ya
+    -- jugado, y el caso 10 leía un «El partido no está abierto» como si
+    -- hubiera dejado entrar. Lo mismo el externo —cualquiera de la base,
+    -- que podía ser de OTRO club con sus propios partidos (caso 4)— y el
+    -- partido normal —cualquiera abierto, aunque su hora ya hubiera pasado
+    -- (caso 13)—. Ahora los tres son los de esta corrida.
+    select id, club_local_id, club_visitante_id into v_m, v_cl, v_cv
+      from public.matches where challenge_proposal_id = v_sprop.id;
+    v_ext := v_sx;
   end;
 
-  select id, club_local_id, club_visitante_id into v_m, v_cl, v_cv
-    from public.matches where challenge_proposal_id is not null limit 1;
   if v_m is null then
-    raise exception 'No hay ningún partido de clubes en la base contra el que probar';
+    raise exception 'La siembra no dejó un partido de clubes contra el que probar';
   end if;
   select user_id into v_local from public.club_members where club_id=v_cl and rol='admin' limit 1;
   select user_id into v_visit from public.club_members where club_id=v_cv and rol='admin' limit 1;
-  select id into v_ext from auth.users
-   where id not in (select user_id from public.club_members where club_id in (v_cl,v_cv)) limit 1;
-  select id into v_normal from public.matches where challenge_proposal_id is null and estado='abierto' limit 1;
 
   -- Un integrante SIN rol administrativo, temporal.
   insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,
@@ -216,23 +226,41 @@ begin
   if (v_json->>'ok')::boolean then raise exception 'FALLÓ 9: un integrante entró por join_match'; end if;
   insert into t44d values (9,'integrante · RPC join_match', format('también rechazado: la inscripción por club llega en U3 — %s', v_json->>'reason'));
 
-  v_ok := false;
+  -- Un rechazo tiene DOS formas y las dos valen: la excepción del trigger,
+  -- o un `{ok:false}` de la propia función (que mira el estado, los cupos y
+  -- la hora antes de llegar al insert). Lo que NO vale es que quede una
+  -- fila: eso se cuenta aparte, como `postgres`, para que no dependa de lo
+  -- que el externo alcance a ver.
+  v_ok := false; v_err := null;
   begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L', json_build_object('sub',v_ext,'role','authenticated')::text);
-    perform public.request_join(v_m);
+    v_resp := public.request_join(v_m);
     execute 'reset role';
+    if not coalesce((v_resp->>'ok')::boolean, false) then
+      v_ok := true; v_err := 'ok=false — ' || coalesce(v_resp->>'reason', 'sin motivo');
+    end if;
   exception when others then execute 'reset role'; v_err := sqlerrm; v_ok := true; end;
-  if not v_ok then raise exception 'FALLÓ 10: request_join dejó entrar'; end if;
-  v_ok := false;
+  select count(*) into v_count from public.attendees where id_partido=v_m and id_jugador=v_ext;
+  if not v_ok or v_count<>0 then
+    raise exception 'FALLÓ 10: request_join dejó entrar (respuesta %, % filas en attendees)', v_resp, v_count;
+  end if;
+  v_ok := false; v_err2 := null; v_resp := null;
   begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L', json_build_object('sub',v_ext,'role','authenticated')::text);
-    perform public.join_waitlist(v_m);
+    v_resp := public.join_waitlist(v_m);
     execute 'reset role';
-  exception when others then execute 'reset role'; v_ok := true; end;
-  if not v_ok then raise exception 'FALLÓ 10: join_waitlist dejó entrar'; end if;
-  insert into t44d values (10,'request_join y join_waitlist', format('el trigger las atrapa aunque sean security definer — %s', v_err));
+    if not coalesce((v_resp->>'ok')::boolean, false) then
+      v_ok := true; v_err2 := 'ok=false — ' || coalesce(v_resp->>'reason', 'sin motivo');
+    end if;
+  exception when others then execute 'reset role'; v_err2 := sqlerrm; v_ok := true; end;
+  select count(*) into v_count from public.match_waitlist where id_partido=v_m and id_jugador=v_ext;
+  if not v_ok or v_count<>0 then
+    raise exception 'FALLÓ 10: join_waitlist dejó entrar (respuesta %, % filas en la cola)', v_resp, v_count;
+  end if;
+  insert into t44d values (10,'request_join y join_waitlist',
+    format('rechazadas las dos y sin dejar fila — request_join: %s · join_waitlist: %s', v_err, v_err2));
 
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L', json_build_object('sub',v_jug,'role','authenticated')::text);
