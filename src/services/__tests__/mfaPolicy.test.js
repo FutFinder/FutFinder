@@ -110,3 +110,49 @@ test('el QR de data URI se convierte en XML', () => {
   assert.equal(xmlDelQr(`data:image/svg+xml;utf-8,${encodeURIComponent(svg)}`), svg);
   assert.equal(xmlDelQr('otra cosa'), null);
 });
+
+// ── A dónde escribir si se pierde el segundo paso ────────────────────
+//
+// Supabase no trae códigos de recuperación: quien pierde su app de
+// autenticación sólo vuelve a entrar si el equipo le quita el paso. Las dos
+// pantallas que lo avisan decían «escríbenos» (o ni eso) sin decir A DÓNDE,
+// justo en el momento en que la persona no puede entrar a la app a buscarlo.
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { MFA_AYUDA } = require('../mfaPolicy.js');
+const { CORREO_PRIVACIDAD } = require('../../data/legal.js');
+
+const fuente = (rel) => fs.readFileSync(path.join(__dirname, '..', '..', rel), 'utf8');
+
+test('los dos avisos de recuperación dicen a qué correo escribir', () => {
+  assert.ok(CORREO_PRIVACIDAD.includes('@'), 'legal.js ya no exporta un correo de contacto');
+  for (const [donde, texto] of Object.entries(MFA_AYUDA)) {
+    assert.ok(texto.includes(`escríbenos a ${CORREO_PRIVACIDAD}`) || texto.includes(`Escríbenos a ${CORREO_PRIVACIDAD}`),
+      `el aviso «${donde}» no dice a dónde escribir`);
+    // El equipo verifica quién es por el remitente: eso no se puede perder.
+    assert.match(texto, /desde el correo de tu cuenta/, `el aviso «${donde}» ya no pide escribir desde el correo de la cuenta`);
+  }
+  assert.deepEqual(Object.keys(MFA_AYUDA).sort(), ['alActivar', 'alEntrar']);
+});
+
+test('el correo de contacto sale de legal.js: nadie lo escribe a mano', () => {
+  // Si mañana cambia la casilla, se cambia en un solo lugar.
+  for (const rel of ['services/mfaPolicy.js', 'screens/LoginScreen.js', 'screens/MfaSetupScreen.js']) {
+    assert.ok(!fuente(rel).includes(CORREO_PRIVACIDAD), `${rel} trae el correo escrito a mano`);
+  }
+  assert.match(fuente('services/mfaPolicy.js'), /import \{ CORREO_PRIVACIDAD \} from '\.\.\/data\/legal\.js';/);
+});
+
+test('las dos pantallas muestran ese aviso y no una frase propia', () => {
+  assert.match(fuente('screens/LoginScreen.js'), /\{MFA_AYUDA\.alEntrar\}/);
+  assert.match(fuente('screens/MfaSetupScreen.js'), /\{MFA_AYUDA\.alActivar\}/);
+  assert.doesNotMatch(fuente('screens/LoginScreen.js'), /Escríbenos desde el correo/);
+  assert.doesNotMatch(fuente('screens/MfaSetupScreen.js'), /si pierdes tu teléfono/);
+});
+
+test('el aviso al activar conserva lo que advertía: sin respaldo no se entra, y hay que guardar la clave', () => {
+  assert.match(MFA_AYUDA.alActivar, /si pierdes tu teléfono o desinstalas la app sin respaldo/);
+  assert.match(MFA_AYUDA.alActivar, /hasta que el equipo de FutFinder verifique que eres tú y te quite este paso/);
+  assert.match(MFA_AYUDA.alActivar, /Guarda la clave de arriba en un lugar seguro/);
+});

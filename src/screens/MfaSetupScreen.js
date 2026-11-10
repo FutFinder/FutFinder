@@ -26,7 +26,7 @@ import {
   miRequisitoMfa,
   misFactoresTotp,
 } from '../services/mfa';
-import { claveEnGrupos, codigoCompleto, normalizarCodigo, xmlDelQr } from '../services/mfaPolicy';
+import { MFA_AYUDA, claveEnGrupos, codigoCompleto, normalizarCodigo, xmlDelQr } from '../services/mfaPolicy';
 
 /**
  * Activar o desactivar la verificación en dos pasos (app de autenticación).
@@ -265,7 +265,7 @@ export default function MfaSetupScreen({ navigation, route }) {
             </Card>
 
             <Text style={styles.nota}>
-              Importante: si pierdes tu teléfono o desinstalas la app sin respaldo, no podrás entrar a tu cuenta hasta que el equipo de FutFinder verifique que eres tú y te quite este paso. Guarda la clave de arriba en un lugar seguro.
+              {MFA_AYUDA.alActivar}
             </Text>
 
             <View style={{ marginTop: 18, gap: 10 }}>

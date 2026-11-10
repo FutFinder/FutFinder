@@ -13,6 +13,26 @@
  * `nextLevel` es `aal2` y `currentLevel` no, falta presentar el código.
  */
 
+import { CORREO_PRIVACIDAD } from '../data/legal.js';
+
+/**
+ * Qué hacer si se pierde el segundo paso, dicho en las dos pantallas donde
+ * importa: al activarlo (antes de que pase) y al pedir el código (cuando ya
+ * pasó y la persona no puede entrar a la app a buscar el contacto).
+ *
+ * Supabase no trae códigos de recuperación: sólo el equipo puede quitar el
+ * paso, y verifica quién es por el remitente — por eso «desde el correo de
+ * tu cuenta». El correo es el de contacto de los textos legales; se toma de
+ * ahí para que cambiar la casilla sea cambiar un solo lugar.
+ */
+export const MFA_AYUDA = {
+  alEntrar:
+    `¿Perdiste el acceso a tu app de autenticación? Escríbenos a ${CORREO_PRIVACIDAD} desde el correo de tu cuenta y te ayudamos a recuperarla.`,
+  alActivar:
+    'Importante: si pierdes tu teléfono o desinstalas la app sin respaldo, no podrás entrar a tu cuenta hasta que el equipo de FutFinder verifique que eres tú y te quite este paso. ' +
+    `Si te pasa, escríbenos a ${CORREO_PRIVACIDAD} desde el correo de tu cuenta. Guarda la clave de arriba en un lugar seguro.`,
+};
+
 export const MFA_MENSAJES = {
   codigoIncorrecto:
     'El código no es correcto. Revisa que sea el último que muestra tu app de autenticación e inténtalo de nuevo.',

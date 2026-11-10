@@ -18,7 +18,7 @@ import { Card, IconButton, Button } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { loginWithEmail, requestPasswordResetForEmail, getCurrentProfile, signOut } from '../services/auth';
 import { verificarCodigoDeEntrada } from '../services/mfa';
-import { necesitaSegundoPaso, nivelDesdeSesion, normalizarCodigo, codigoCompleto } from '../services/mfaPolicy';
+import { MFA_AYUDA, necesitaSegundoPaso, nivelDesdeSesion, normalizarCodigo, codigoCompleto } from '../services/mfaPolicy';
 import { decideAuthDestination, isValidEmail, MENSAJES } from '../services/authPolicy';
 import { getOnboardingState } from '../services/profile';
 import { isSupabaseConfigured, supabase } from '../services/supabase';
@@ -254,7 +254,7 @@ export default function LoginScreen({ navigation }) {
                   <Text style={styles.footerLink} onPress={handleOtraCuenta}>Usar otra cuenta</Text>
                 </View>
                 <Text style={styles.codigoAyudaChica}>
-                  ¿Perdiste el acceso a tu app de autenticación? Escríbenos desde el correo de tu cuenta y te ayudamos a recuperarla.
+                  {MFA_AYUDA.alEntrar}
                 </Text>
               </View>
             </>
