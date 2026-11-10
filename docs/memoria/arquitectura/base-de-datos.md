@@ -273,7 +273,7 @@ La 119 (permisos del club: `tiene_permiso_de_club()` y nueve áreas por rol) ree
 - Quedan a propósito: `multiple_permissive_policies` (10 tablas; fusionarlas cambia la expresión y merece revisión propia) y `unused_index` (los 71 nuevos salen como «sin uso» porque recién se crearon).
 - El chat todavía escucha `messages` entera por `postgres_changes` (`services/messages.js`, canal compartido); es el siguiente cuello de botella con muchos conectados, y la salida que recomienda Supabase es Broadcast por hilo.
 
-## Lo que no necesita cuenta no lee a las personas (migración 171, 2026-11-09 — sin aplicar en producción)
+## Lo que no necesita cuenta no lee a las personas (migración 171, aplicada el 2026-11-09)
 
 - **Una política de lectura sobre una tabla con ids de personas se escribe `to authenticated`, no para `public`.** `public` incluye a `anon`, y `anon` conserva el `SELECT` de tabla: lo único que lo frena es la política. La 171 pasó a `authenticated` las de `attendees`, `club_members` y `profile_photos`, que respondían con filas a quien tuviera sólo la clave pública. `profiles` ya estaba así desde la 143.
 - **`is_blocked_pair(a, b)` sólo contesta si `auth.uid()` es `a` o `b`**; a un tercero le dice `false`. Sin sesión (cron, `service_role`) contesta la verdad. No se le puede quitar el `EXECUTE` a `authenticated`: la evalúa la política `friendships_insert`.
