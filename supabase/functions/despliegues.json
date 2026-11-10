@@ -44,6 +44,14 @@
       "archivos": {
         "reportar-problema/index.ts": "4c169477a7ac3448c554d12520ec5d5adc856eec9e9fcc0498f3c8fd9efbb993",
         "_shared/correoReporte.ts": "088822374fd4016699c9c46633eb9729084f61c205f8f76e31e6bebeabf3963d"
+      },
+      "pendiente": {
+        "desde": "2026-11-09",
+        "motivo": "La captura del reporte va en el correo como enlace firmado (7 días), con el token de quien reporta y sin clave de servicio. Entiende la ruta que guarda la app nueva y la URL pública que guardan los tickets viejos y las apps ya instaladas. ORDEN: esta función se despliega PRIMERO (funciona con el bucket público y con el privado); después la app nueva; la migración 174, que cierra el bucket support-screenshots, va AL FINAL. Mientras no se despliegue, el correo de un reporte hecho desde la app nueva lleva la ruta de la captura en vez de un enlace.",
+        "archivos": {
+          "reportar-problema/index.ts": "72c15fd4c8bd4a586169d3894d46031d3a7c3aa347810aa9c9fdb85a24b5aeed",
+          "_shared/correoReporte.ts": "66fe8c0874f6eaf22cb7d03f8ac0d474b74754af41c50054d9eda9dbba63dee2"
+        }
       }
     },
     "send-push": {

@@ -33,7 +33,16 @@ export type Ticket = {
   category: string;
   title: string;
   description: string | null;
+  // EL ENLACE QUE VA EN EL CORREO, no lo que guarda la columna: quien llama
+  // lo arma con `resolverCaptura`. Desde la migración 174 el bucket es
+  // privado y la columna trae una ruta (o, en tickets viejos y apps ya
+  // instaladas, una URL pública que ya no abre).
   screenshot_url: string | null;
+  // Dónde está la captura dentro del bucket, cuando es de las nuestras: el
+  // enlace firmado vence, y el equipo tiene que poder encontrarla después.
+  screenshot_ruta?: string | null;
+  // Si `screenshot_url` es un enlace firmado (vence) o el que guardó la app.
+  screenshot_firmado?: boolean;
   app_version: string | null;
   platform: string | null;
   created_at: string;
@@ -65,6 +74,111 @@ const CATEGORIA_LABEL: Record<string, string> = {
   comportamiento_jugador: "Comportamiento de un jugador",
   sugerencia: "Sugerencia o comentario",
 };
+
+/** El bucket de las capturas. Privado desde la migración 174. */
+export const BUCKET_CAPTURAS = "support-screenshots";
+
+/**
+ * Cuánto dura el enlace firmado del correo: una semana, igual que las fotos
+ * de `solicitud-recinto`. Es lo que tarda en el peor caso alguien del equipo
+ * en abrir el correo; pasado eso, la captura sigue en el bucket.
+ */
+export const VIGENCIA_ENLACE_S = 60 * 60 * 24 * 7;
+
+/**
+ * Lo que puede traer `support_tickets.screenshot_url`, ya entendido:
+ *  - `ninguna`: no adjuntó captura.
+ *  - `ruta`:    una captura de nuestro bucket. Hay que firmarla. `original`
+ *               es la URL tal como se guardó, cuando lo que se guardó fue
+ *               una URL (sirve de respaldo si no se pudiera firmar).
+ *  - `externa`: una URL que no es de nuestro bucket. Se manda tal cual.
+ */
+export type Captura =
+  | { tipo: "ninguna" }
+  | { tipo: "ruta"; ruta: string; original: string | null }
+  | { tipo: "externa"; url: string };
+
+/**
+ * Entiende las DOS formas en que la app guarda la captura.
+ *
+ * La app nueva guarda la ruta dentro del bucket (`<user_id>/<marca>.jpg`).
+ * Los tickets anteriores a la migración 174, y los de cualquier app ya
+ * instalada —no hay OTA—, guardan la URL pública completa, con su `?t=` de
+ * caché. Las dos tienen que terminar en un enlace que abra, así que de la
+ * URL se saca la ruta. Pura: no toca red.
+ */
+export function leerCaptura(valor: string | null | undefined): Captura {
+  const v = (valor ?? "").trim();
+  if (!v) return { tipo: "ninguna" };
+
+  if (/^https?:\/\//i.test(v)) {
+    try {
+      const m = new URL(v).pathname.match(
+        /^\/storage\/v1\/object\/(?:public|sign|authenticated)\/support-screenshots\/(.+)$/,
+      );
+      if (m) return { tipo: "ruta", ruta: decodeURIComponent(m[1]), original: v };
+    } catch {
+      // Una URL que no se deja leer se manda como vino: mejor un enlace raro
+      // en el correo que un reporte que dice que no traía captura.
+    }
+    return { tipo: "externa", url: v };
+  }
+
+  return { tipo: "ruta", ruta: v.replace(/^\/+/, ""), original: null };
+}
+
+/** Firma una ruta del bucket por tantos segundos, o `null` si no pudo. */
+export type Firmador = (ruta: string, segundos: number) => Promise<string | null>;
+
+/**
+ * De lo que guarda la columna a lo que va en el correo.
+ *
+ * `firmar` viene de fuera para que esto se pueda probar sin Storage: en la
+ * función es `createSignedUrl` con el token de quien reporta.
+ *
+ * SI NO SE PUEDE FIRMAR, EL CORREO SALE IGUAL. Con una URL guardada se manda
+ * esa (abre mientras el bucket siga público); con una ruta, se dice dónde
+ * está. Nunca se contesta «no adjuntó captura» sobre un ticket que sí traía.
+ */
+export async function resolverCaptura(
+  valor: string | null | undefined,
+  firmar: Firmador,
+): Promise<Pick<Ticket, "screenshot_url" | "screenshot_ruta" | "screenshot_firmado">> {
+  const c = leerCaptura(valor);
+  if (c.tipo === "ninguna") return { screenshot_url: null, screenshot_ruta: null, screenshot_firmado: false };
+  if (c.tipo === "externa") return { screenshot_url: c.url, screenshot_ruta: null, screenshot_firmado: false };
+
+  let firmada: string | null = null;
+  try {
+    firmada = await firmar(c.ruta, VIGENCIA_ENLACE_S);
+  } catch {
+    firmada = null;
+  }
+  if (firmada) return { screenshot_url: firmada, screenshot_ruta: c.ruta, screenshot_firmado: true };
+  return { screenshot_url: c.original, screenshot_ruta: c.ruta, screenshot_firmado: false };
+}
+
+/** El párrafo de la captura, según lo que se haya conseguido. */
+function parrafoDeCaptura(t: Ticket): string {
+  const donde = t.screenshot_ruta ? `Storage → ${BUCKET_CAPTURAS} → ${t.screenshot_ruta}` : null;
+  if (t.screenshot_url && t.screenshot_firmado) {
+    return [
+      "Captura de pantalla (enlace privado, vence en 7 días):",
+      t.screenshot_url,
+      ...(donde ? [`Pasado ese plazo queda en ${donde}`] : []),
+    ].join("\n");
+  }
+  if (t.screenshot_url && donde) {
+    return [
+      "Captura de pantalla (no se pudo firmar el enlace; éste es el que guardó la app y sólo abre si el bucket sigue público):",
+      t.screenshot_url,
+      `Está en ${donde}`,
+    ].join("\n");
+  }
+  if (t.screenshot_url) return `Captura de pantalla:\n${t.screenshot_url}`;
+  if (donde) return `Adjuntó una captura, pero no se pudo generar el enlace.\nEstá en ${donde}`;
+  return "No adjuntó captura de pantalla.";
+}
 
 /**
  * Los secretos, o `null` si todavía no están cargados.
@@ -119,7 +233,7 @@ export function cuerpoDeReporte(t: Ticket): string {
     "",
     t.description ? t.description : "No dejó una descripción.",
     "",
-    t.screenshot_url ? `Captura de pantalla:\n${t.screenshot_url}` : "No adjuntó captura de pantalla.",
+    parrafoDeCaptura(t),
   ].join("\n");
 }
 

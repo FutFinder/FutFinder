@@ -95,16 +95,25 @@ export async function submitSupportTicket({ category, title, description, screen
   const me = await getMe();
   if (!me) return { data: null, error: { message: 'No autenticado' } };
 
-  let screenshotUrl = null;
+  // LA CAPTURA SE GUARDA POR SU RUTA dentro del bucket
+  // (`<userId>/<marca de tiempo>.<ext>`), no por una dirección para abrirla:
+  // el bucket `support-screenshots` es privado (migración 174) y una captura
+  // puede traer lo que la persona tenía en pantalla. El enlace lo firma la
+  // Edge Function `reportar-problema`, con vencimiento, al avisar al equipo.
+  //
+  // Va en la columna de siempre, `screenshot_url`, y no en una nueva: así
+  // esta app no depende de que una migración ya esté aplicada (un insert
+  // con una columna que no existe perdería el reporte entero). La función
+  // distingue la ruta de la dirección completa que guardaban las versiones
+  // anteriores.
   let screenshotPath = null;
   if (screenshotAsset) {
     onStep?.('screenshot');
-    const { url, path, error: uploadError } = await uploadSupportScreenshot(screenshotAsset, me);
+    const { path, error: uploadError } = await uploadSupportScreenshot(screenshotAsset, me);
     if (uploadError) {
       console.error('[FutFinder] submitSupportTicket screenshot:', uploadError);
       return { data: null, error: { message: 'No pudimos subir la captura de pantalla' } };
     }
-    screenshotUrl = url;
     screenshotPath = path;
   }
 
@@ -116,7 +125,7 @@ export async function submitSupportTicket({ category, title, description, screen
       category,
       title: asunto,
       description: desc || null,
-      screenshot_url: screenshotUrl,
+      screenshot_url: screenshotPath,
       app_version: APP_VERSION,
       platform: Platform.OS,
     })
