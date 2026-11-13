@@ -41,6 +41,10 @@ export default function PagoReservaScreen({ navigation, route }) {
   const [pago, setPago] = useState(null);
   const [detalle, setDetalle] = useState(null);
   const [abandonada, setAbandonada] = useState(false);
+  // La pasarela en modo de prueba (Flow sandbox): se dice en pantalla para
+  // que nadie confunda una reserva confirmada con tarjeta de prueba con una
+  // pagada de verdad, y para que se note si quedó así en producción.
+  const [dePrueba, setDePrueba] = useState(false);
 
   // En refs y no en estado: el bucle de consulta se arma una vez y no puede
   // depender de valores que se renderizan, o quedaría preguntando con datos
@@ -86,7 +90,16 @@ export default function PagoReservaScreen({ navigation, route }) {
         setPago({ reason: error.message });
         return;
       }
+      setDePrueba(data?.ambiente === 'sandbox');
       desde.current = Date.now();
+      // El intento anterior ya se había cobrado y el aviso todavía no llegaba:
+      // `pagar-reserva` lo registró. No hay a dónde mandar a pagar; se espera
+      // a que la reserva se vea confirmada.
+      if (data?.yaPagado) {
+        fijarFase('esperando');
+        consultar().then(programar);
+        return;
+      }
       fijarFase('pagando');
       try {
         await Linking.openURL(data.url);
@@ -98,7 +111,7 @@ export default function PagoReservaScreen({ navigation, route }) {
       programar();
     })();
     return () => { vivo.current = false; clearTimeout(timer.current); };
-  }, [reservaId, fijarFase, programar]);
+  }, [reservaId, fijarFase, programar, consultar]);
 
   // ── Volver a la app es la mejor señal que tenemos ────────────
   useEffect(() => {
@@ -181,6 +194,12 @@ export default function PagoReservaScreen({ navigation, route }) {
               </View>
             ) : null}
           </Card>
+        ) : null}
+
+        {dePrueba ? (
+          <NoticeCard tone="warning">
+            Pagos en modo de prueba: no se cobra dinero real y la reserva no vale como pagada.
+          </NoticeCard>
         ) : null}
 
         {esperando ? (

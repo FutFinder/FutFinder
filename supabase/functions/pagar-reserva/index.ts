@@ -19,8 +19,19 @@
 // SECRETS (Supabase → Edge Functions → Secrets). Ninguno va en el repo:
 //   FLOW_API_KEY        · de la cuenta de comercio
 //   FLOW_SECRET_KEY     · idem — es la que firma, nunca viaja
-//   FLOW_AMBIENTE       · 'sandbox' (omisión) o 'produccion'
+//   FLOW_AMBIENTE       · 'sandbox' o 'produccion', OBLIGATORIO desde el
+//                         2026-11-13: sin él la pasarela queda «no conectada»
+//                         (ver `leerConfig` en `_shared/flowLogic.ts`)
 //   FUNCTIONS_BASE_URL  · opcional, solo si hay dominio propio
+//
+// REINTENTAR NO REUSA LA ORDEN EN FLOW (2026-11-13). `iniciar_pago_reserva`
+// devuelve el pago pendiente propio para no crear dos cobros, y antes acá se
+// pedía OTRA transacción a Flow con esa misma orden: o Flow la rechazaba —y
+// esa reserva no se podía pagar nunca más— o quedaban dos enlaces vivos para
+// un mismo cobro. Ahora se le pregunta a Flow por el token anterior y se
+// decide con `queHacerConPendiente`: si ya se cobró, se registra; si sigue
+// pendiente por el mismo monto, se devuelve el MISMO enlace; si no, se cierra
+// en la base y se arma una orden nueva.
 //
 // SIN CREDENCIALES NO FALLA: contesta 200 con `configurada: false` y la app
 // muestra que la pasarela todavía no está conectada. Es el estado real
@@ -28,7 +39,16 @@
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
-import { asuntoDelPago, firmados, leerConfig, urlDePago } from "../_shared/flowLogic.ts";
+import {
+  accionSegunEstado,
+  asuntoDelPago,
+  firmados,
+  type FlowConfig,
+  leerConfig,
+  queHacerConPendiente,
+  urlDePago,
+} from "../_shared/flowLogic.ts";
+import { registrarCobro } from "../_shared/flowPagos.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +58,23 @@ const corsHeaders = {
 // Cuánto vive el enlace de pago. Quince minutos es lo que tarda alguien en
 // buscar la tarjeta; más que eso y el bloque queda dando vueltas.
 const MINUTOS_DE_PAGO = 15;
+
+/** Lo que Flow dice hoy de un token, o `null` si no se le pudo preguntar. */
+async function estadoEnFlow(token: string, config: FlowConfig): Promise<any | null> {
+  try {
+    const params = await firmados({ token }, config);
+    const resp = await fetch(`${config.apiBase}/payment/getStatus?${params.toString()}`);
+    const estado = await resp.json().catch(() => null);
+    if (!resp.ok || !estado?.commerceOrder) {
+      console.error("[flow] getStatus", resp.status, estado?.code ?? "", estado?.message ?? "");
+      return null;
+    }
+    return estado;
+  } catch (_e) {
+    console.error("[flow] getStatus no respondió");
+    return null;
+  }
+}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -94,15 +131,80 @@ Deno.serve(async (req) => {
   const email = usuario?.user?.email;
   if (!email) return json({ ok: false, reason: "No autenticado" }, 401);
 
-  // ── 1. La base crea (o reusa) el pago pendiente ────────────────
-  const { data: inicio, error: errInicio } = await comoJugador
-    .rpc("iniciar_pago_reserva", { p_reserva_id: reservaId });
+  const comoServicio = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const iniciar = () => comoJugador.rpc("iniciar_pago_reserva", { p_reserva_id: reservaId });
 
+  // ── 1. La base crea (o reusa) el pago pendiente ────────────────
+  let { data: inicio, error: errInicio } = await iniciar();
   if (errInicio) {
-    console.error("[flow] iniciar_pago_reserva:", errInicio.message);
+    console.error("[flow] iniciar_pago_reserva:", errInicio.code);
     return json({ ok: false, reason: "No se pudo iniciar el pago." }, 500);
   }
   if (!inicio?.ok) return json({ ok: false, reason: inicio?.reason || "No se pudo iniciar el pago." });
+
+  // ── 1b. Si reusa un pendiente, ¿qué pasó con él en Flow? ───────
+  if (inicio.reusado) {
+    const { data: previo } = await comoServicio
+      .from("pagos")
+      .select("orden_comercio, referencia_externa, datos")
+      .eq("id", inicio.pago_id)
+      .maybeSingle();
+    const tokenPrevio: string | null = previo?.referencia_externa ?? null;
+
+    let estadoPrevio: any = null;
+    if (tokenPrevio) {
+      estadoPrevio = await estadoEnFlow(tokenPrevio, config);
+      // Sin saber qué pasó con el cobro anterior NO se arma otro: podría
+      // estar pagado.
+      if (!estadoPrevio) {
+        return json({ ok: false, reason: "No pudimos revisar tu intento de pago anterior. Inténtalo de nuevo en un momento." }, 502);
+      }
+    }
+
+    const decision = queHacerConPendiente({
+      status: estadoPrevio ? Number(estadoPrevio.status) : null,
+      montoEnFlow: (previo?.datos as any)?.montoFlow,
+      montoAhora: inicio.monto,
+      url: (previo?.datos as any)?.url,
+    });
+
+    if (decision === "confirmar") {
+      const r = await registrarCobro({
+        leerPago: (o) => comoServicio.from("pagos").select("id, monto, estado").eq("orden_comercio", o).maybeSingle() as any,
+        rpc: (fn, args) => comoServicio.rpc(fn, args) as any,
+      }, { orden: inicio.orden_comercio, token: tokenPrevio!, estado: estadoPrevio });
+      if (r.http !== 200) return json({ ok: false, reason: "No se pudo registrar tu pago. Inténtalo de nuevo." }, 500);
+      return json({ ok: true, yaPagado: true, pagoId: inicio.pago_id, ambiente: config.ambiente });
+    }
+
+    if (decision === "mismo_enlace") {
+      return json({
+        ok: true,
+        pagoId: inicio.pago_id,
+        ordenComercio: inicio.orden_comercio,
+        monto: inicio.monto,
+        ambiente: config.ambiente,
+        url: urlDePago((previo!.datos as any).url, tokenPrevio!),
+      });
+    }
+
+    // cerrar_y_crear: el pendiente se cierra y se pide uno nuevo.
+    const accion = estadoPrevio ? accionSegunEstado(Number(estadoPrevio.status)) : "expirar";
+    const { error: errCerrar } = await comoServicio.rpc("rechazar_pago", {
+      p_orden_comercio: inicio.orden_comercio,
+      p_estado: accion === "rechazar" ? "fallido" : "expirado",
+      p_datos: estadoPrevio ?? previo?.datos ?? null,
+    });
+    if (errCerrar) {
+      console.error("[flow] rechazar_pago del pendiente:", errCerrar.code);
+      return json({ ok: false, reason: "No se pudo iniciar el pago." }, 500);
+    }
+    ({ data: inicio, error: errInicio } = await iniciar());
+    if (errInicio || !inicio?.ok || inicio.reusado) {
+      console.error("[flow] iniciar_pago_reserva tras cerrar el pendiente:", errInicio?.code ?? inicio?.reason);
+      return json({ ok: false, reason: inicio?.reason || "No se pudo iniciar el pago." }, errInicio ? 500 : 200);
+    }
+  }
 
   const { orden_comercio: orden, monto, pago_id: pagoId } = inicio;
 
@@ -144,11 +246,11 @@ Deno.serve(async (req) => {
     if (!resp.ok || !creado?.url || !creado?.token) {
       // El mensaje de Flow va al log, no al jugador: puede traer detalles de
       // la cuenta de comercio.
-      console.error("[flow] payment/create", resp.status, JSON.stringify(creado));
+      console.error("[flow] payment/create", resp.status, creado?.code ?? "", creado?.message ?? "");
       return json({ ok: false, reason: "El proveedor de pago rechazó la operación." }, 502);
     }
   } catch (e) {
-    console.error("[flow] payment/create no respondió:", e);
+    console.error("[flow] payment/create no respondió:", e instanceof Error ? e.name : "error");
     return json({ ok: false, reason: "No pudimos contactar al proveedor de pago." }, 502);
   }
 
@@ -156,14 +258,15 @@ Deno.serve(async (req) => {
   // DESPUÉS de crear y antes de devolver: si esto falla, el jugador no se va
   // a Flow, porque un pago que no vamos a poder reconocer es peor que uno que
   // no empezó.
-  const comoServicio = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  // `url` y `montoFlow` se guardan para poder devolver ESTE enlace si la
+  // persona vuelve a tocar «pagar» mientras sigue vigente (ver 1b).
   const { error: errRef } = await comoServicio.rpc("anotar_referencia_pago", {
     p_orden_comercio: orden,
     p_referencia: creado.token,
-    p_datos: { flowOrder: creado.flowOrder ?? null, ambiente: config.ambiente },
+    p_datos: { flowOrder: creado.flowOrder ?? null, ambiente: config.ambiente, url: creado.url, montoFlow: monto },
   });
   if (errRef) {
-    console.error("[flow] anotar_referencia_pago:", errRef.message, "orden:", orden);
+    console.error("[flow] anotar_referencia_pago:", errRef.code, "orden:", orden);
     return json({ ok: false, reason: "No se pudo registrar el pago. No se te cobró nada." }, 500);
   }
 

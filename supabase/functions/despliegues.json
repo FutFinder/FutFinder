@@ -26,7 +26,16 @@
       "comparada": null,
       "archivos": {
         "flow-confirmacion/index.ts": "19eb6c8ca1c4d50f1c2fe84847cbe897e020d8992d3e22402b90b307e79914dc",
-        "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441"
+        "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441",
+        "_shared/flowPagos.ts": "sin-desplegar"
+      },
+      "pendiente": {
+        "motivo": "Pagos con Flow (2026-11-13): reintentar ya no reusa la orden en Flow, un cobro confirmado que no confirma reserva queda para devolver (migración 178, ya aplicada), FLOW_AMBIENTE obligatorio, tope por IP y 400 para tokens sin forma. Las versiones desplegadas siguen funcionando con la 178.",
+        "archivos": {
+          "flow-confirmacion/index.ts": "fda6e3fc1da2d1cddbbb8729bf425673181c637be073fad0c4724ce0e6337dc6",
+          "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
+          "_shared/flowPagos.ts": "24bc537ee7a06914de96d37ee5681706cf9ea677397eb8c0cf5ee936872c8571"
+        }
       }
     },
     "flow-retorno": {
@@ -43,7 +52,16 @@
       "comparada": null,
       "archivos": {
         "pagar-reserva/index.ts": "0f22b5a96238f9b72c8baadd9b3dc7cf08779999bb3994df1fd37d072c294ad2",
-        "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441"
+        "_shared/flowLogic.ts": "6cd9dc8bc1c0cf2e925dd775f39991db43f86605b15af33bbd0d8cb8dddde441",
+        "_shared/flowPagos.ts": "sin-desplegar"
+      },
+      "pendiente": {
+        "motivo": "Pagos con Flow (2026-11-13): reintentar ya no reusa la orden en Flow, un cobro confirmado que no confirma reserva queda para devolver (migración 178, ya aplicada), FLOW_AMBIENTE obligatorio, tope por IP y 400 para tokens sin forma. Las versiones desplegadas siguen funcionando con la 178.",
+        "archivos": {
+          "pagar-reserva/index.ts": "63b233731af32fa63605622db500d81ccd4e2e74afc0b88e922a22f5fc91d80e",
+          "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
+          "_shared/flowPagos.ts": "24bc537ee7a06914de96d37ee5681706cf9ea677397eb8c0cf5ee936872c8571"
+        }
       }
     },
     "reportar-problema": {

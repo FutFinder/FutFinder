@@ -63,8 +63,17 @@ export async function iniciarPagoReserva(reservaId) {
     }
     return { data, error: null };
   } catch (e) {
-    console.error('[FutFinder] iniciarPagoReserva:', e);
-    return { data: null, error: { message: 'No se pudo iniciar el pago. No se te cobró nada.' } };
+    console.error('[FutFinder] iniciarPagoReserva:', e?.context?.status ?? e?.name);
+    // Con un error HTTP la función igual manda su motivo, y a veces importa:
+    // «No pudimos revisar tu intento de pago anterior» NO es «no se te cobró
+    // nada» (ese intento pudo haberse pagado).
+    let motivo = null;
+    try {
+      motivo = (await e?.context?.json?.())?.reason || null;
+    } catch {
+      // sin cuerpo legible
+    }
+    return { data: null, error: { message: motivo || 'No se pudo iniciar el pago. No se te cobró nada.' } };
   }
 }
 

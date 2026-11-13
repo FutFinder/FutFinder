@@ -24,18 +24,31 @@
 // CUÁNDO CONTESTAMOS 200 Y CUÁNDO NO. 200 = «ya está anotado, no insistas».
 // Si no pudimos preguntarle a Flow o la base falló, devolvemos 500 A
 // PROPÓSITO, para que Flow reintente: perder un aviso de pago es perder una
-// reserva pagada.
+// reserva pagada. Un token sin forma, o uno que Flow no reconoce, es 400: no
+// viene de Flow y reintentarlo no cambia nada.
+//
+// LA URL ES PÚBLICA Y CADA POST ERA UNA LLAMADA FIRMADA A FLOW (2026-11-13).
+// Con basura en el token se gastaba el límite de la API del comercio y se
+// devolvía 500. Ahora: la forma del token se mira antes, y hay un tope por IP
+// en la base (`limite_aviso_de_pago`, migración 178).
+//
+// UN COBRO CONFIRMADO NUNCA SE PIERDE: ver `_shared/flowPagos.ts`.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
-import { accionSegunEstado, firmados, leerConfig, montoCoincide } from "../_shared/flowLogic.ts";
+import { accionSegunEstado, firmados, leerConfig, tokenConForma } from "../_shared/flowLogic.ts";
+import { registrarCobro } from "../_shared/flowPagos.ts";
+
+const texto = (cuerpo: string, status: number) => new Response(cuerpo, { status });
 
 Deno.serve(async (req) => {
+  if (req.method !== "POST") return texto("solo POST", 405);
+
   const config = leerConfig((k) => Deno.env.get(k));
   if (!config) {
     // Nadie debería estar llamando esto todavía.
     console.error("[flow] llegó un aviso y no hay credenciales configuradas");
-    return new Response("sin configurar", { status: 503 });
+    return texto("sin configurar", 503);
   }
 
   // Flow manda `application/x-www-form-urlencoded`. Se acepta JSON también
@@ -43,38 +56,55 @@ Deno.serve(async (req) => {
   let token = "";
   try {
     const tipo = req.headers.get("content-type") || "";
-    if (tipo.includes("json")) token = (await req.json())?.token || "";
+    if (tipo.includes("json")) token = String((await req.json())?.token || "");
     else token = String((await req.formData()).get("token") || "");
   } catch {
     token = "";
   }
-  if (!token) return new Response("falta token", { status: 400 });
+  if (!tokenConForma(token)) return texto("token inválido", 400);
+
+  const supa = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  // ── 0. Tope por IP, antes de gastar una llamada a Flow ─────────
+  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "sin-ip";
+  const { data: permitido, error: errLimite } = await supa.rpc("limite_aviso_de_pago", { p_ip: ip });
+  if (errLimite) {
+    // Si el tope no responde se sigue: perder un aviso real es peor.
+    console.error("[flow] limite_aviso_de_pago no respondió");
+  } else if (permitido === false) {
+    return texto("demasiados avisos", 429);
+  }
 
   // ── 1. Preguntarle a Flow, que es lo único que vale ────────────
   let estado: any;
   try {
     const params = await firmados({ token }, config);
     const resp = await fetch(`${config.apiBase}/payment/getStatus?${params.toString()}`);
-    estado = await resp.json();
-    if (!resp.ok || !estado?.commerceOrder) {
-      console.error("[flow] getStatus", resp.status, JSON.stringify(estado));
-      return new Response("getStatus falló", { status: 500 });
+    estado = await resp.json().catch(() => null);
+    if (resp.status === 400) {
+      // Flow no conoce ese token: no es un aviso suyo.
+      return texto("token desconocido", 400);
     }
-  } catch (e) {
-    console.error("[flow] getStatus no respondió:", e);
-    return new Response("getStatus no respondió", { status: 500 });
+    if (!resp.ok || !estado?.commerceOrder) {
+      // Sólo código y mensaje: la respuesta completa puede traer el correo
+      // de quien paga.
+      console.error("[flow] getStatus", resp.status, estado?.code ?? "", estado?.message ?? "");
+      return texto("getStatus falló", 500);
+    }
+  } catch (_e) {
+    console.error("[flow] getStatus no respondió");
+    return texto("getStatus no respondió", 500);
   }
 
   const orden: string = estado.commerceOrder;
   const accion = accionSegunEstado(Number(estado.status));
-  const supa = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
 
   if (accion === "esperar") {
     // Estado 1 (pendiente) o algo que Flow inventó después. No se toca nada.
-    return new Response("sin cambios", { status: 200 });
+    return texto("sin cambios", 200);
   }
 
   if (accion !== "confirmar") {
@@ -84,54 +114,16 @@ Deno.serve(async (req) => {
       p_datos: estado,
     });
     if (error) {
-      console.error("[flow] rechazar_pago:", error.message, "orden:", orden);
-      return new Response("error", { status: 500 });
+      console.error("[flow] rechazar_pago falló. orden:", orden);
+      return texto("error", 500);
     }
-    return new Response("ok", { status: 200 });
+    return texto("ok", 200);
   }
 
-  // ── 2. Pagada: el monto tiene que ser el nuestro ───────────────
-  // `confirmar_pago` no compara montos —no los recibe— así que la
-  // comparación es responsabilidad de acá. En la práctica no puede fallar
-  // (el monto va firmado en el `payment/create` y Flow cobra ese), pero es
-  // la diferencia entre cobrar lo que corresponde y cobrar lo que nos digan.
-  const { data: pago, error: errPago } = await supa
-    .from("pagos").select("id, monto, estado").eq("orden_comercio", orden).maybeSingle();
-  if (errPago) {
-    console.error("[flow] no se pudo leer el pago:", errPago.message, "orden:", orden);
-    return new Response("error", { status: 500 });
-  }
-  if (!pago) {
-    // Una orden que no es nuestra. No es un error nuestro: 200 para que Flow
-    // no siga reintentando algo que nunca vamos a reconocer.
-    console.error("[flow] aviso de una orden desconocida:", orden);
-    return new Response("orden desconocida", { status: 200 });
-  }
-  if (!montoCoincide(pago.monto, estado.amount)) {
-    // NO SE CONFIRMA. El pago queda pendiente y esto queda gritado en el log:
-    // es una anomalía que tiene que mirar una persona, no algo que se resuelve
-    // solo. Confirmar una reserva por un monto que no es el nuestro sería
-    // regalar una cancha o cobrar de más.
-    console.error(
-      "[flow][ALERTA] el monto no coincide. orden:", orden,
-      "esperado:", pago.monto, "recibido:", estado.amount,
-    );
-    return new Response("monto no coincide", { status: 200 });
-  }
-
-  const { data: res, error } = await supa.rpc("confirmar_pago", {
-    p_orden_comercio: orden,
-    p_referencia: token,
-    p_datos: estado,
-  });
-  if (error) {
-    console.error("[flow] confirmar_pago:", error.message, "orden:", orden);
-    return new Response("error", { status: 500 });
-  }
-  if (res?.resultado === "reversar") {
-    // Pagó y no hay cancha. Queda en la tabla para devolver; acá solo se deja
-    // dicho en el log, porque es lo que uno busca cuando reclaman.
-    console.error("[flow][REVERSAR] hay que devolver el pago. orden:", orden);
-  }
-  return new Response("ok", { status: 200 });
+  // ── 2. Pagada ──────────────────────────────────────────────────
+  const r = await registrarCobro({
+    leerPago: (o) => supa.from("pagos").select("id, monto, estado").eq("orden_comercio", o).maybeSingle() as any,
+    rpc: (fn, args) => supa.rpc(fn, args) as any,
+  }, { orden, token, estado });
+  return texto(r.resultado, r.http);
 });
