@@ -830,7 +830,9 @@ export async function buscarUsuarioPorUsername(username) {
   const { data, error } = await supabase
     .from('profiles')
     .select('id, username, foto_url, created_at')
-    .ilike('username', u)
+    // `ilike` sin comodines: un `%` o un `_` escritos a mano encontraban a
+    // cualquier cuenta, que después se podía sumar como administradora.
+    .ilike('username', u.replace(/[\\%_]/g, (c) => `\\${c}`))
     .limit(1)
     .maybeSingle();
   if (error) {

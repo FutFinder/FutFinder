@@ -123,6 +123,7 @@ export default function EditProfileScreen({ navigation }) {
   const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
   const [loadError, setLoadError] = useState(null);
   const [initialProfile, setInitialProfile] = useState(null);
+  const edadFija = initialProfile?.edad != null;
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
 
@@ -335,7 +336,9 @@ export default function EditProfileScreen({ navigation }) {
       updateProfile: ({ foto_url, banner_url }) => {
         const patch = {
           username: username.trim(),
-          edad: edad ? parseInt(edad, 10) : null,
+          // Con la edad ya registrada no se manda: el servidor rechaza
+          // cualquier cambio, incluso borrarla.
+          ...(edadFija ? {} : { edad: edad ? parseInt(edad, 10) : null }),
           bio: bio.trim() || null,
           posicion_preferida: posiciones,
           flanco,
@@ -533,7 +536,13 @@ export default function EditProfileScreen({ navigation }) {
                       value={edad}
                       onChangeText={(v) => setEdad(v.replace(/\D/g, '').slice(0, 2))}
                       keyboardType="number-pad"
+                      // Una vez registrada, la edad no se cambia desde la app
+                      // (migración 177): era la forma de saltarse el rango de
+                      // edad de un partido.
+                      editable={!edadFija}
+                      accessibilityHint={edadFija ? 'Tu edad ya quedó registrada. Si está mal, escríbenos.' : undefined}
                     />
+                    {edadFija ? <Text style={styles.fieldHint}>Si está mal, escríbenos.</Text> : null}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <FieldLabel>Flanco preferido</FieldLabel>

@@ -190,6 +190,20 @@ Auditoría sobre producción después de la 165–170, con tres fuentes: los avi
 
 **Mapeo:** SOC 2 CC6.1 y ISO 27701 7.4.x (minimización y acceso a datos personales) para los puntos 1 y 2; SOC 2 CC6.6/CC6.8 para el 3.
 
+## Tercera pasada (2026-11-13): lo que se abre con una cuenta normal (migración 177)
+
+Aplicada en producción el 2026-11-13; arnés `177_..._test.sql` en verde contra producción, con la migración dentro de la transacción revertida, y comprobado desde fuera (la API sin cuenta responde 200 con el pre-request activo, los buckets devuelven `[]` al listarlos sin cuenta y las URL públicas siguen sirviendo).
+
+- **El bloqueo se respeta.** `trg_friendships_transiciones` sólo deja `pending → accepted|rejected` desde el cliente (antes el bloqueado se desbloqueaba solo), y `messages_insert`/`messages_read` miran `is_blocked_pair` en los DM (también los de desafío). `chat_destinatarios` (175) también, parchada sobre el cuerpo desplegado.
+- **Alta de partidos con columnas contadas**: las que manda `createMatch` y ninguna más (fuera `reserva_id`, `estado`, asistencia, cancelación…). `club_local_id`, `club_visitante_id` y `challenge_id` siguen concedidas porque las apps instaladas las mandan (en nulo); las valida `aa_matches_alta_desde_el_cliente` con `_puede_publicar_partido_de_desafio`.
+- **Desafíos abiertos**: la respuesta sólo actualiza `estado`, la publicación sólo sus campos editables y `estado`; transiciones cerradas (una publicación no se reabre, una respuesta no revive si la publicación cerró).
+- **Invitaciones**: una solicitud respondida no se vuelve a responder (el expulsado ya no vuelve solo).
+- **Buckets públicos sin listado**: fuera las seis políticas SELECT `using (bucket_id = …)`; cada uno lista lo que puede borrar o reemplazar (`remove` y `upsert` lo necesitan). Servir por URL pública no pasa por políticas.
+- **Dos pasos en el servidor**: `mfa_cumplida()` y el pre-request de PostgREST `exigir_mfa_por_peticion` (`alter role authenticator set pgrst.db_pre_request`): a quien tiene un factor verificado, la API le exige `aal2` en cada petición (tablas y RPC). El tiempo real y Storage no pasan por PostgREST: políticas RESTRICTIVAS `mfa_exigida` en `messages`, `notifications`, `attendees` y `storage.objects`, y la del canal Broadcast del chat. Sin factor no cambia nada (hoy, ninguna cuenta tiene). La app registra el token de push sólo con la sesión que ya entró (`App.js`, `sesionQueEntro`).
+- **Menores**: con edad < 18 no se aparece en búsquedas (se fuerza al poner la edad y se rechaza encenderlo); la edad, una vez puesta, no la cambia el cliente (Editar perfil la muestra fija). La única cuenta menor de producción quedó oculta.
+- **`complejo_calificaciones`** se lee sólo con cuenta. El buscador de administradores escapa `%` y `_`.
+- **Regla aprendida:** un disparador con la guarda `current_user <> 'authenticated'` **no puede ser `security definer`**: adentro, `current_user` es el dueño y la guarda deja pasar todo. Si necesita leer saltándose la RLS, que llame a una función definer aparte. Lo vigila `src/services/__tests__/huecosDeUnaCuentaNormal.test.js` para la 177.
+
 ## Notas relacionadas
 
 - [Autenticación](../funcionalidades/autenticacion.md)

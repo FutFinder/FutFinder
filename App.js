@@ -23,6 +23,16 @@ import AppNavigator, { navigationRef, navigationReadyPromise } from './src/navig
 import { AuthProvider } from './src/contexts/AuthContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { supabase, isSupabaseConfigured } from './src/services/supabase';
+import { isSessionUsable } from './src/services/authPolicy';
+import { necesitaSegundoPaso, nivelDesdeSesion } from './src/services/mfaPolicy';
+
+// El token de push se registra sólo con una sesión que ya entró del todo: con
+// la verificación en dos pasos activada, la contraseña sola deja una sesión
+// `aal1` que NO es acceso (AuthContext), y registrar el token ahí dejaba el
+// teléfono de quien sabía la contraseña recibiendo los avisos de la cuenta.
+// Desde la migración 177 el servidor además rechaza esa petición.
+const sesionQueEntro = (session) =>
+  isSessionUsable(session) && !necesitaSegundoPaso(nivelDesdeSesion(session));
 import {
   registerForPushNotifications,
   addNotificationListeners,
@@ -146,9 +156,9 @@ export default function App() {
     // 4) Registrar token cuando ya hay sesión al arrancar la app
     (async () => {
       const { data } = await supabase.auth.getSession();
-      const user = data?.session?.user;
-      if (user?.id) {
-        registerForPushNotifications(user.id);
+      const session = data?.session;
+      if (sesionQueEntro(session)) {
+        registerForPushNotifications(session.user.id);
       }
     })();
 
@@ -156,7 +166,8 @@ export default function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       const userId = session?.user?.id ?? null;
 
-      if (event === 'SIGNED_IN' && userId) {
+      // `MFA_CHALLENGE_VERIFIED` es cuando una sesión `aal1` sube a `aal2`.
+      if ((event === 'SIGNED_IN' || event === 'MFA_CHALLENGE_VERIFIED') && userId && sesionQueEntro(session)) {
         registerForPushNotifications(userId);
       }
 

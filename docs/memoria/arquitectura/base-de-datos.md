@@ -288,6 +288,10 @@ La 119 (permisos del club: `tiene_permiso_de_club()` y nueve áreas por rol) ree
 - **Un organizador nulo no abre puertas.** Con el autor en nulo, `if x.id_organizador <> v_uid then <rechazar>` da NULL y la guarda se salta. La 176 cambió `<>` por `is distinct from` en las **21 funciones** que comparaban así, parchando el cuerpo desplegado (no transcribiéndolo) y fallando si alguna no tenía el patrón. **Regla desde ahora: toda comparación con un autor que puede ser nulo se escribe con `is distinct from`.** El caso C3 del arnés 176 la vigila en toda la base.
 - Arnés `176_borrar_la_cuenta_de_verdad_test.sql`: 17/17 contra producción, con la migración dentro de la transacción y revertida, más un control negativo sin la migración (el borrado fallaba con 23503 y el club del fundador desaparecía).
 
+## Cuenta normal, sin atajos (migración 177, aplicada el 2026-11-13)
+
+Transiciones cerradas desde el cliente en `friendships`, `club_join_requests`, `club_open_challenges` y sus respuestas; alta de `matches` por columnas; pre-request de PostgREST que exige `aal2` a quien tiene factor; restrictivas `mfa_exigida`; menores fuera de búsquedas y edad fija. Detalle en [Seguridad y privacidad](seguridad-y-privacidad.md), «Tercera pasada».
+
 ## Convención de cambio
 
 `supabase/schema.sql` es una base idempotente; `supabase/migrations/NN_*.sql` mantiene cambios incrementales. Crea una migración nueva y una prueba SQL cuando corresponda; no edites ni reordenes migraciones ya aplicadas. La presencia de un archivo no confirma que esté aplicado en un proyecto remoto.
