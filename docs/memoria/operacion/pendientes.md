@@ -13,7 +13,7 @@ Revisión de qué falta para publicar en las tiendas: base de datos, Edge Functi
 ### Los cinco bloqueos, cerrados ese día
 
 - **Token de GitHub en el remoto de git** (texto plano en `.git/config` de una de las Macs): se movió al Llavero de macOS y el remoto quedó sin token. **Falta revocarlo en GitHub y crear uno nuevo** (lo hace una persona; la otra Mac puede tener el mismo token guardado igual).
-- **Borrar la cuenta**: migración 176 aplicada y Edge Function `eliminar-cuenta` escrita. **Falta desplegar la función** (`despliegues.json` la tiene como `pendiente`); hasta entonces la app cae a la RPC y los archivos esperan en `cuentas_por_limpiar`. Ver [Base de datos](../arquitectura/base-de-datos.md), «Borrar la cuenta».
+- **Borrar la cuenta**: migración 176 aplicada y Edge Function `eliminar-cuenta` **desplegada el 2026-11-13 (v1)**, comparada por contenido con el repositorio y probada desde fuera sin sesión (401 sin cabecera, 401 «Inicia sesión…» con la clave publicable, 405 por GET). No se probó un borrado real con una cuenta: hacerlo exige una cuenta desechable con fotos. Las apps ya instaladas siguen llamando la RPC directo; sus archivos quedan en `cuentas_por_limpiar` y los limpia la función en su siguiente uso (hasta 10 por pasada). Ver [Base de datos](../arquitectura/base-de-datos.md), «Borrar la cuenta».
 - **Recuperar la contraseña**: flujo con código de 6 dígitos; ver [Autenticación](../funcionalidades/autenticacion.md).
 - **Íconos e imagen de inicio**, y **permisos sobrantes** (micrófono, cámara, ubicación «siempre», textos en inglés): ver [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md). Llegan con el próximo build.
 
