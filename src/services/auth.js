@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { COLUMNAS_PUBLICAS } from './perfilColumnas';
 import { misAjustes } from './profile';
 import { performLogin, performSignUp, describeAuthError, MENSAJES } from './authPolicy';
+import { pedirCodigo, verificarCodigo, fijarNuevaPassword } from './recuperacionPolicy';
 import {
   guardarPasswordPendiente,
   consumirPasswordPendiente,
@@ -124,16 +125,24 @@ export async function resendOtp({ email }) {
 }
 
 /**
- * Envía el correo de recuperación de contraseña a un email arbitrario, SIN
- * requerir sesión — a diferencia de `requestPasswordReset()` en
- * `settings.js`, que lee el email de la sesión activa (sirve para "olvidé
- * mi contraseña" desde Ajustes, ya logueado). Esta es la variante para el
- * link "¿La olvidaste?" de IniciarSesión, antes de tener sesión.
+ * «Olvidé mi contraseña» en tres pasos, con código de 6 dígitos (la lógica y
+ * el porqué están en `recuperacionPolicy.js`; la pantalla es
+ * `RecuperarContrasenaScreen`). Sirve igual desde Iniciar sesión, sin sesión,
+ * que desde Ajustes, con sesión pero sin recordar la actual.
  */
-export async function requestPasswordResetForEmail(email) {
-  if (!isSupabaseConfigured) return { error: null };
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
-  return { error: error ? { message: describeAuthError(error) } : null };
+export async function pedirCodigoDeRecuperacion(email) {
+  if (!isSupabaseConfigured) return faltaConfiguracion();
+  return pedirCodigo(email, supabase.auth);
+}
+
+export async function verificarCodigoDeRecuperacion({ email, codigo }) {
+  if (!isSupabaseConfigured) return { ...faltaConfiguracion(), session: null, necesitaMfa: false };
+  return verificarCodigo({ email, codigo }, supabase.auth);
+}
+
+export async function fijarPasswordRecuperada({ password, confirmacion }) {
+  if (!isSupabaseConfigured) return faltaConfiguracion();
+  return fijarNuevaPassword({ password, confirmacion }, supabase.auth);
 }
 
 export async function signOut() {

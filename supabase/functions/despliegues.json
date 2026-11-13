@@ -11,6 +11,22 @@
   ],
   "proyecto": "jvfoendzblkoxvwvommz",
   "funciones": {
+    "eliminar-cuenta": {
+      "version": 0,
+      "desplegada": null,
+      "comparada": null,
+      "archivos": {
+        "eliminar-cuenta/index.ts": "sin-desplegar",
+        "_shared/borrarCuenta.ts": "sin-desplegar"
+      },
+      "pendiente": {
+        "motivo": "Nueva (2026-11-13): borra las carpetas de Storage de quien elimina su cuenta, después de delete_my_account (migración 176, ya aplicada). Hasta desplegarla, la app cae a la RPC directa y los archivos esperan en cuentas_por_limpiar.",
+        "archivos": {
+          "eliminar-cuenta/index.ts": "a8db72cf11dea2a59b5b6409bf88ef04f4a22cc8084824b94aafb83e0339e8c2",
+          "_shared/borrarCuenta.ts": "72a023768af957d007127208ccecf2e94ce64dcb94eb16bc08c4462ad5033d81"
+        }
+      }
+    },
     "flow-confirmacion": {
       "version": 3,
       "desplegada": "2026-11-10T01:25:02Z",

@@ -1,10 +1,29 @@
 # Pendientes
 
-Última revisión: 2026-11-09
+Última revisión: 2026-11-13
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
 La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Avisos y Ajustes el 2026-09-23 está en [`PENDIENTES_CALIDAD_2026-09-23.md`](../../../PENDIENTES_CALIDAD_2026-09-23.md), y la auditoría de chats y avisos que la alimenta, en [`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`](../../../ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt). Los casos TrueScore y teléfono (T01–T07), el hallazgo G01, P02 y P06, y desde el 2026-11-05 casi todos los de Chat, Avisos, Inicio, Perfil y Ajustes (ver «Cerrados el 2026-11-05» abajo) ya están cerrados; **el resto sigue abierto** y se resume abajo. Los dos informes no se borran porque todavía tienen ítems vivos: cuando se cierre el último, se borran y esta nota conserva el resultado.
+
+## Auditoría de lanzamiento (2026-11-13)
+
+Revisión de qué falta para publicar en las tiendas: base de datos, Edge Functions, cliente, tiendas y operación. Lo comprobable se contrastó contra producción con consultas de sólo lectura.
+
+### Los cinco bloqueos, cerrados ese día
+
+- **Token de GitHub en el remoto de git** (texto plano en `.git/config` de una de las Macs): se movió al Llavero de macOS y el remoto quedó sin token. **Falta revocarlo en GitHub y crear uno nuevo** (lo hace una persona; la otra Mac puede tener el mismo token guardado igual).
+- **Borrar la cuenta**: migración 176 aplicada y Edge Function `eliminar-cuenta` escrita. **Falta desplegar la función** (`despliegues.json` la tiene como `pendiente`); hasta entonces la app cae a la RPC y los archivos esperan en `cuentas_por_limpiar`. Ver [Base de datos](../arquitectura/base-de-datos.md), «Borrar la cuenta».
+- **Recuperar la contraseña**: flujo con código de 6 dígitos; ver [Autenticación](../funcionalidades/autenticacion.md).
+- **Íconos e imagen de inicio**, y **permisos sobrantes** (micrófono, cámara, ubicación «siempre», textos en inglés): ver [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md). Llegan con el próximo build.
+
+### Lo que sigue abierto de esa auditoría
+
+- **Seguridad, con cuenta normal:** quien fue bloqueado puede volver `friendships.status` a `accepted` (sin `WITH CHECK` ni trigger de transiciones) y `messages_insert` no mira `is_blocked_pair`; el INSERT de `matches` no limita columnas (un `reserva_id` ajeno + `cancel_match` cancela la reserva de otro); `club_open_challenge_responses` deja cambiar `club_id`; quien entró por invitación puede volver tras ser expulsado (`approved→pending→approved`); los buckets públicos se pueden LISTAR sin cuenta (sobran sus políticas SELECT); la verificación en dos pasos sólo se exige en el cliente para la gente común y el push se registra antes del código.
+- **Flow, antes de las claves de producción:** reintentar un pago reusa `commerceOrder`; cobros confirmados que se pierden en silencio (monto distinto, pago no pendiente); nada separa sandbox de producción; `flow-confirmacion` sin tope de llamadas.
+- **Tiendas y producto:** `eas.json` (`appVersionSource: local` + `autoIncrement` con config dinámica), sin `expo-updates`, enlaces universales sin configurar, reportes que no se resuelven en la app, menores descubribles por defecto y la autorización bajo 14 años que el registro no pide, razón social y RUT en los términos.
+- **Operación:** plan gratuito de Supabase (sin respaldos restaurables ni HaveIBeenPwned), sin CI, Deno sin instalar (las pruebas de Edge Functions no corren), Sentry sin DSN.
+- **En esta Mac hay trabajo sin commitear que no es de esta auditoría:** `153_las_escrituras_directas_que_sobraban.sql` (repite el número de una ya commiteada y hace fallar `ordenMigraciones.test.js`) y `175_el_chat_llega_por_broadcast.sql` con sus cambios de cliente, **aunque la 175 ya está aplicada en producción desde el 2026-11-10**.
 
 ## Abiertos al 2026-11-05
 

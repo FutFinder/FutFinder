@@ -36,6 +36,12 @@ verify_jwt = true
 # hacer. El correo al equipo lo manda después, con sus propios secretos.
 verify_jwt = true
 
+[functions.eliminar-cuenta]
+# La llama la app con la sesión de quien se borra: la función usa ese token
+# para `delete_my_account()` (migración 176) y recién después, con
+# service_role, borra sus carpetas de Storage, que SQL no puede tocar.
+verify_jwt = true
+
 [functions.reportar-problema]
 # La llama la app con la sesión de quien reporta: la función usa ese token
 # para guardar el ticket como esa persona (RLS) y leer su correo con

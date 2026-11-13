@@ -25,7 +25,12 @@ module.exports = {
     version: '1.0.0',
     orientation: 'portrait',
     userInterfaceStyle: 'dark',
+    // Íconos e imagen de inicio: los dibuja `scripts/generar-iconos.mjs` a
+    // partir de la marca (`FutFinderMark`). Sin `icon`, App Store Connect
+    // rechaza el build y Android muestra el ícono genérico.
+    icon: './assets/icon.png',
     splash: {
+      image: './assets/splash-icon.png',
       resizeMode: 'contain',
       backgroundColor: '#0A0C0A',
     },
@@ -39,17 +44,41 @@ module.exports = {
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
           'FutFinder usa tu ubicación para mostrarte partidos cerca y confirmar tu asistencia.',
+        // Todo va por HTTPS (Supabase, Mapbox, Sentry). Sin cargas
+        // arbitrarias por HTTP, que App Review pide justificar; la red local
+        // queda abierta sólo para el servidor de desarrollo.
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: false,
+          NSAllowsLocalNetworking: true,
+        },
       },
     },
     android: {
       package: 'com.futfinder.app',
+      adaptiveIcon: {
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#0A0C0A',
+      },
       permissions: [
         'android.permission.ACCESS_FINE_LOCATION',
         'android.permission.ACCESS_COARSE_LOCATION',
         'android.permission.RECEIVE_BOOT_COMPLETED',
         'android.permission.VIBRATE',
         'android.permission.WAKE_LOCK',
+      ],
+      // La app no graba audio, no usa la cámara (las fotos salen de la
+      // galería) ni pide ubicación en segundo plano. Se bloquean para que
+      // ninguna dependencia los vuelva a meter en el manifiesto: un permiso
+      // declarado y sin uso es motivo de rechazo en Google Play.
+      blockedPermissions: [
         'android.permission.RECORD_AUDIO',
+        'android.permission.CAMERA',
+        'android.permission.ACCESS_BACKGROUND_LOCATION',
+        // Vienen de la plantilla de Expo y la app no los usa. Lo que SÍ queda
+        // es READ_EXTERNAL_STORAGE: `requestMediaLibraryPermissionsAsync`
+        // (services/storage.js) lo pide en Android 12 o anterior.
+        'android.permission.SYSTEM_ALERT_WINDOW',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
       ],
       // Local: cae a ./google-services.json (no versionado, ver .gitignore).
       // EAS Build: viene de la variable de entorno inyectada por el secreto
@@ -57,10 +86,9 @@ module.exports = {
       ...(googleServicesFile ? { googleServicesFile } : {}),
     },
     notification: {
-      // Sin `icon`: no hay un ícono de notificación real en el repo todavía
-      // (tampoco existe carpeta `assets/`). Sin este campo, Android/iOS usan
-      // su ícono de notificación por defecto en vez de fallar el build por
-      // apuntar a un archivo inexistente.
+      // Android pinta el ícono de notificación sólo por su alfa: tiene que ser
+      // una silueta blanca sobre transparente, no el ícono de la app.
+      icon: './assets/notification-icon.png',
       color: '#55DF69',
       androidMode: 'default',
       androidCollapsedTitle: 'FutFinder',
@@ -68,6 +96,7 @@ module.exports = {
     },
     web: {
       bundler: 'metro',
+      favicon: './assets/favicon.png',
       name: 'FutFinder',
       shortName: 'FutFinder',
       themeColor: '#55DF69',
@@ -82,8 +111,14 @@ module.exports = {
       [
         'expo-location',
         {
-          locationAlwaysAndWhenInUsePermission:
+          // Sólo «mientras se usa la app» (`requestForegroundPermissionsAsync`
+          // en services/location.js). Con `false` el plugin NO escribe las
+          // claves de «siempre», que si no llegan con su texto en inglés y
+          // App Review pregunta para qué se pide ubicación en segundo plano.
+          locationWhenInUsePermission:
             'FutFinder usa tu ubicación para mostrarte partidos cerca y confirmar tu asistencia.',
+          locationAlwaysPermission: false,
+          locationAlwaysAndWhenInUsePermission: false,
         },
       ],
       [
@@ -91,7 +126,11 @@ module.exports = {
         {
           photosPermission:
             'FutFinder necesita acceso a tus fotos para que puedas subir tu foto de perfil y portadas de partidos.',
-          cameraPermission: 'FutFinder usa tu cámara para que puedas tomar fotos de perfil.',
+          // Las fotos se eligen de la galería; nunca se abre la cámara ni se
+          // graba audio. Sin estos `false` el plugin agrega RECORD_AUDIO en
+          // Android y los textos de cámara y micrófono en inglés en iOS.
+          cameraPermission: false,
+          microphonePermission: false,
         },
       ],
       [
@@ -105,6 +144,7 @@ module.exports = {
       [
         'expo-notifications',
         {
+          icon: './assets/notification-icon.png',
           color: '#55DF69',
           defaultChannel: 'default',
           sounds: [],

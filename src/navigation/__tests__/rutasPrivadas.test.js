@@ -36,6 +36,9 @@ const PUBLICAS = new Set([
   'Login',
   'Register',
   'Verification',
+  // «Olvidé mi contraseña»: se usa justamente sin poder iniciar sesión. Sólo
+  // muestra datos de la cuenta después de que el código del correo la abre.
+  'RecuperarContrasena',
   'LocationPermission',
   'Terms',
   // Términos y políticas de privacidad y cookies: texto fijo que se lee

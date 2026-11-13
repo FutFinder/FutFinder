@@ -16,7 +16,7 @@ import FutFinderMark from '../components/FutFinderMark';
 import Banner from '../components/Banner';
 import { Card, IconButton, Button } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
-import { loginWithEmail, requestPasswordResetForEmail, getCurrentProfile, signOut } from '../services/auth';
+import { loginWithEmail, getCurrentProfile, signOut } from '../services/auth';
 import { verificarCodigoDeEntrada } from '../services/mfa';
 import { MFA_AYUDA, necesitaSegundoPaso, nivelDesdeSesion, normalizarCodigo, codigoCompleto } from '../services/mfaPolicy';
 import { decideAuthDestination, isValidEmail, MENSAJES } from '../services/authPolicy';
@@ -24,6 +24,7 @@ import { getOnboardingState } from '../services/profile';
 import { isSupabaseConfigured, supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getRememberedAccount, saveRememberedAccount } from '../utils/rememberedAccount';
+import { guardarCorreoParaRecuperar } from '../utils/correoParaRecuperar';
 
 function inicialDe(texto) {
   const t = (texto || '').trim();
@@ -43,7 +44,6 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [banner, setBanner] = useState(null);
   const [remembered, setRemembered] = useState(null);
   // Segundo paso: quien activó la verificación en dos pasos presenta el código
@@ -181,24 +181,13 @@ export default function LoginScreen({ navigation }) {
     setPaso('credenciales');
   };
 
-  const handleForgotPassword = async () => {
+  // Lleva al flujo con código de 6 dígitos (RecuperarContrasenaScreen). Antes
+  // mandaba un enlace que la app no sabía abrir y quien olvidaba la
+  // contraseña quedaba fuera de su cuenta.
+  const handleForgotPassword = () => {
     const email = identifier.trim();
-    if (!email) {
-      showBanner('error', 'Falta tu correo', 'Escribe tu correo arriba para enviarte el enlace de recuperación.');
-      return;
-    }
-    if (!isValidEmail(email)) {
-      showBanner('error', 'Correo inválido', MENSAJES.correoInvalido);
-      return;
-    }
-    setResetting(true);
-    const { error } = await requestPasswordResetForEmail(email);
-    setResetting(false);
-    if (error) {
-      showBanner('error', 'No se pudo enviar el correo', error.message || '');
-      return;
-    }
-    showBanner('success', 'Revisa tu bandeja', `Te enviamos un enlace para recuperar tu contraseña a ${email}.`);
+    guardarCorreoParaRecuperar(isValidEmail(email) ? email : '');
+    navigation.navigate('RecuperarContrasena');
   };
 
   return (
@@ -306,10 +295,10 @@ export default function LoginScreen({ navigation }) {
             <View style={styles.passwordLabelRow}>
               <Text style={styles.fieldLabel}>Contraseña</Text>
               <Text
-                style={[styles.forgotLink, resetting && { opacity: 0.5 }]}
-                onPress={resetting ? undefined : handleForgotPassword}
+                style={styles.forgotLink}
+                onPress={handleForgotPassword}
               >
-                {resetting ? 'Enviando…' : '¿La olvidaste?'}
+                ¿La olvidaste?
               </Text>
             </View>
             <View style={styles.passwordRow}>

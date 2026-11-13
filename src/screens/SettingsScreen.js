@@ -52,7 +52,6 @@ import {
   changePassword,
   deleteAccount,
   verifyPassword,
-  requestPasswordReset,
   requestEmailChangeOtp,
   verifyEmailChangeOtp,
 } from '../services/settings';
@@ -324,13 +323,8 @@ export default function SettingsScreen({ navigation }) {
   const [radiusKm, setRadiusKm] = useState(10);
   const secuenciaRadio = useRef(crearSecuencia()).current;
 
-  // Forgot password cooldown (seconds remaining)
-  const [forgotCooldown, setForgotCooldown] = useState(0);
-  const forgotTimerRef = useRef(null);
-
   useEffect(() => {
     return () => {
-      if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
       if (emailOtpTimerRef.current) clearInterval(emailOtpTimerRef.current);
     };
   }, []);
@@ -537,34 +531,15 @@ export default function SettingsScreen({ navigation }) {
     showBanner('success', 'Contraseña actualizada');
   };
 
-  const handleForgotPassword = async () => {
-    if (forgotCooldown > 0) return;
-
-    const { error, email } = await requestPasswordReset();
-
-    // Siempre mostrar feedback (Supabase no revela si el email existe)
-    if (error) {
-      showBanner('error', 'No se pudo enviar el email', error.message);
-      return;
-    }
-    showBanner(
-      'success',
-      'Email de recuperación enviado',
-      `Revisá la bandeja de ${email || 'tu email registrado'}. Si no llega, revisa el spam.`
-    );
-
-    // Cooldown de 60 segundos para evitar rebotes
-    let remaining = 60;
-    setForgotCooldown(remaining);
-    if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
-    forgotTimerRef.current = setInterval(() => {
-      remaining -= 1;
-      setForgotCooldown(remaining);
-      if (remaining <= 0) {
-        clearInterval(forgotTimerRef.current);
-        forgotTimerRef.current = null;
-      }
-    }, 1000);
+  // Quien no recuerda la contraseña actual no puede usar el formulario de
+  // arriba (la pide). Antes esto mandaba un enlace que la app no sabía abrir;
+  // ahora lleva al mismo flujo con código de Iniciar sesión.
+  const handleForgotPassword = () => {
+    setModal(null);
+    setCurrentPwdInput('');
+    setPasswordInput('');
+    setPassword2Input('');
+    navigation.navigate('RecuperarContrasena', { desdeAjustes: true });
   };
 
   const handleSaveLocation = async () => {
@@ -612,7 +587,10 @@ export default function SettingsScreen({ navigation }) {
   const handleDeleteAccount = () => {
     confirmar(
       '¿Eliminar tu cuenta?',
-      'Esta acción es permanente e irreversible. Se borrarán todos tus datos, partidos, mensajes y membresías.',
+      // Lo que hace de verdad `delete_my_account` (migración 176): lo que no
+      // se borra es lo de otros, y el registro de pagos, que la política de
+      // privacidad ya dice que se conserva.
+      'Es permanente. Se borrarán tu perfil, tus fotos, tus mensajes, tus amistades y tus clubes. Los partidos y reservas que organizabas por jugar se cancelarán con aviso. Los partidos ya jugados y los registros de pagos se conservan sin tu nombre.',
       async () => {
         setSaving(true);
         const { error } = await deleteAccount();
@@ -969,15 +947,11 @@ export default function SettingsScreen({ navigation }) {
           autoFocus
         />
         <Pressable
-          onPress={forgotCooldown > 0 ? undefined : handleForgotPassword}
+          onPress={handleForgotPassword}
           style={{ marginTop: 8, marginBottom: 4 }}
-          disabled={forgotCooldown > 0}
+          accessibilityRole="link"
         >
-          <Text style={[styles.forgotLink, forgotCooldown > 0 && { color: C.textMuted }]}>
-            {forgotCooldown > 0
-              ? `Reenviar en ${forgotCooldown}s...`
-              : '¿Olvidaste tu contraseña?'}
-          </Text>
+          <Text style={styles.forgotLink}>¿Olvidaste tu contraseña?</Text>
         </Pressable>
         <Input
           style={[styles.input, { marginTop: 10 }]}

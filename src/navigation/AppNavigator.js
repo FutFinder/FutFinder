@@ -24,6 +24,7 @@ import WelcomeScreen from '../screens/WelcomeScreen';
 import TutorialScreen from '../screens/TutorialScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import LoginScreen from '../screens/LoginScreen';
+import RecuperarContrasenaScreen from '../screens/RecuperarContrasenaScreen';
 import VerificationScreen from '../screens/VerificationScreen';
 import LocationPermissionScreen from '../screens/LocationPermissionScreen';
 import TermsScreen from '../screens/TermsScreen';
@@ -111,6 +112,8 @@ const SafeTutorialScreen = withErrorBoundary(TutorialScreen, 'Tutorial');
 const SafeRegisterScreen = withErrorBoundary(RegisterScreen, 'Register');
 const SafeLoginScreen = withErrorBoundary(LoginScreen, 'Login');
 const SafeVerificationScreen = withErrorBoundary(VerificationScreen, 'Verification');
+// «Olvidé mi contraseña»: por definición se usa sin poder iniciar sesión.
+const SafeRecuperarContrasenaScreen = withErrorBoundary(RecuperarContrasenaScreen, 'RecuperarContrasena');
 const SafeLocationPermissionScreen = withErrorBoundary(LocationPermissionScreen, 'LocationPermission');
 const SafeTermsScreen = withErrorBoundary(TermsScreen, 'Terms');
 // Términos y políticas se leen antes de tener cuenta (Bienvenida, Registro),
@@ -307,6 +310,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Register" component={SafeRegisterScreen} />
         <Stack.Screen name="Login" component={SafeLoginScreen} />
         <Stack.Screen name="Verification" component={SafeVerificationScreen} />
+        <Stack.Screen name="RecuperarContrasena" component={SafeRecuperarContrasenaScreen} />
         <Stack.Screen name="LocationPermission" component={SafeLocationPermissionScreen} />
         <Stack.Screen name="Terms" component={SafeTermsScreen} />
         <Stack.Screen name="Terminos" component={SafeTerminosScreen} options={{ title: 'Términos y condiciones' }} />
