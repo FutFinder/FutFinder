@@ -8,6 +8,8 @@ La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Av
 
 ## Auditoría de lanzamiento (2026-11-13)
 
+> Lo que se cambió en esta tanda y **falta probar** está junto en [Por probar](por-probar.md): se prueba todo al final.
+
 Revisión de qué falta para publicar en las tiendas: base de datos, Edge Functions, cliente, tiendas y operación. Lo comprobable se contrastó contra producción con consultas de sólo lectura.
 
 ### Los cinco bloqueos, cerrados ese día

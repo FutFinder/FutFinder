@@ -42,6 +42,7 @@ Esta bóveda documenta la configuración, el código y las migraciones versionad
 | Revisión diaria: plata por devolver, solicitudes | [Revisión diaria](operacion/revision-diaria.md) | [Aprobar recintos](operacion/aprobar-recintos.md) |
 | Aprobar un recinto nuevo | [Aprobar recintos](operacion/aprobar-recintos.md) | [Reservas](funcionalidades/reservas.md), [Base de datos](arquitectura/base-de-datos.md) |
 | Estado, pendientes o pruebas | [Estado actual](operacion/estado-actual.md) | [Pendientes](operacion/pendientes.md), [Pruebas](operacion/pruebas.md) |
+| Lo cambiado que falta probar (se prueba todo junto al final) | [Por probar](operacion/por-probar.md) | La nota del dominio de cada ítem |
 | Lint, calidad o errores de render | [Calidad y lint](operacion/calidad-y-lint.md) | [Pruebas](operacion/pruebas.md) |
 
 ## Política de actualización
