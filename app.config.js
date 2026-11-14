@@ -11,6 +11,7 @@
  * no el contenido del archivo.
  */
 const fs = require('fs');
+const { DOMINIO, datosDeAndroid } = require('./scripts/enlacesUniversales.js');
 
 // Sin el archivo, el build igual sale: se omite `googleServicesFile` en vez
 // de apuntar a una ruta que no existe, que hace fallar el prebuild. El costo
@@ -41,6 +42,11 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.futfinder.app',
+      // Enlaces universales: `https://www.futfinder.cl/p/<id>` abre la app.
+      // Apple lo confirma leyendo `/.well-known/apple-app-site-association`
+      // del dominio (lo escribe `scripts/enlaces-universales.mjs`). Sin ese
+      // archivo el enlace sigue abriendo la web, sin error.
+      associatedDomains: [`applinks:${DOMINIO}`],
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
           'FutFinder usa tu ubicación para mostrarte partidos cerca y confirmar tu asistencia.',
@@ -55,6 +61,17 @@ module.exports = {
     },
     android: {
       package: 'com.futfinder.app',
+      // Enlaces universales (App Links): mismo dominio y mismas rutas que en
+      // iOS. Con `autoVerify`, Android lee `/.well-known/assetlinks.json` y,
+      // si la huella del certificado calza, abre la app sin preguntar.
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: true,
+          data: datosDeAndroid(),
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#0A0C0A',

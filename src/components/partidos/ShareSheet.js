@@ -28,7 +28,9 @@ import { cuotaLabel } from '../../services/matchRules';
  * Nunca la ubicación del usuario ni datos personales de los jugadores.
  */
 
-const BASE_URL = 'https://futfinder.cl/p/';
+// `www` y no la raíz: `futfinder.cl` redirige a `www`, y un enlace que pasa
+// por una redirección no abre la app (ver scripts/enlacesUniversales.js).
+const BASE_URL = 'https://www.futfinder.cl/p/';
 
 export function matchShareUrl(match) {
   return BASE_URL + (match?.id || '');

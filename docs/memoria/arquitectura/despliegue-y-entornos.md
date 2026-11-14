@@ -16,7 +16,7 @@ La configuración del repositorio define exportación web con Vercel, builds nat
 - El resultado se publica desde `dist`.
 - La regla de reescritura dirige todas las rutas a `index.html`, necesaria para las rutas de una aplicación de una sola página. Los archivos que existen en `dist` se sirven antes que la reescritura.
 - **Dominio propio desde el 2026-11-13**: `futfinder.cl`, inscrito a nombre de Vicente en NIC Chile, con los servidores de nombre de Vercel (`ns1`/`ns2.vercel-dns.com`), así que **el DNS se administra en Vercel** (Domains → futfinder.cl → DNS Records). `futfinder.cl` redirige con 308 a `www.futfinder.cl`. El DNS ya trae los registros de Resend para `envios.futfinder.cl` (ver [Autenticación](../funcionalidades/autenticacion.md)); los CAA los puso Vercel para el certificado y no se tocan.
-- `public/` se copia tal cual al export web. Hoy sólo tiene `public/correo/logo.png` (el ícono a 192 px), que usan las plantillas de correo de Auth.
+- `public/` se copia tal cual al export web, incluida la carpeta `.well-known` (comprobado). Hoy tiene `public/correo/logo.png` (el ícono a 192 px), que usan las plantillas de correo de Auth; los dos archivos de enlaces universales irán en `public/.well-known/` cuando se corra `scripts/enlaces-universales.mjs` (ver [Navegación](navegacion.md)). `vercel.json` sirve `apple-app-site-association` con `Content-Type: application/json`.
 
 ## Builds nativos con EAS
 

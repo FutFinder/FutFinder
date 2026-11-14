@@ -20,6 +20,12 @@
         { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
         { "key": "Permissions-Policy", "value": "geolocation=(self), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()" }
       ]
+    },
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" }
+      ]
     }
   ]
 }

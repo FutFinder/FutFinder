@@ -1,6 +1,6 @@
 # Navegación
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-13
 
 ## Propósito
 
@@ -24,6 +24,8 @@ Las rutas operativas del stack (partidos, chat, perfil, clubes, ajustes, avisos 
 - `ClubProposal` es la propuesta oficial de un desafío y se abre desde la cabecera del hilo `challenge:<id>` con `{ challengeId, modo: 'crear' | 'revisar', proposalId? }`. La cabecera sólo dibuja botón para las acciones que la app sabe ejecutar; el resto del estado se muestra como información.
 - `ClubMatchRoster` recibe `{ matchId }` y es la superficie operativa de U3: inscripción/postulación, confirmación/rechazo y salida por club. `MatchDetail` deriva allí sólo los partidos formales con propuesta y reparto por club; los partidos de clubes antiguos conservan el flujo normal. `club_match_reserva_omitida` también apunta a esta ruta.
 - El descubrimiento del vertical Reservas encadena `ComplejoDetail { complejoId }` → `ElegirCancha { complejoId, canchaId? }` → `FechaHora { complejoId, canchaId }` → `Resumen { complejoId, canchaId, fechaLabel, horaInicio, horaFin, duracion }`, las cuatro con `withAuthGuard`. Se pasan ids y valores ya resueltos, no objetos completos — cada pantalla vuelve a pedir el complejo por id en vez de arrastrarlo por parámetros. Ver [Reservas](../funcionalidades/reservas.md).
+
+- **Enlaces universales (preparados el 2026-11-13, faltan dos datos):** `https://www.futfinder.cl/...` abre la app en vez del navegador para `p/*`, `clubes`, `clubes/*`, `chat`, `chat/*`, `inicio`, `partidos`, `perfil` y `publicar` (términos, políticas y `ui-reservas` quedan en el navegador). Una sola fuente, `scripts/enlacesUniversales.js`, alimenta `app.config.js` (`ios.associatedDomains`, `android.intentFilters` con `autoVerify`) y `scripts/enlaces-universales.mjs`, que escribe `public/.well-known/apple-app-site-association` y `assetlinks.json`. **Falta correr ese script** con el Team ID de Apple y la huella SHA-256 del certificado de Android (`eas credentials`; más la de Play Console si se usa la firma de apps de Play), y que llegue un build nuevo. El dominio es `www` a propósito: `futfinder.cl` redirige a `www` y ni Apple ni Google siguen redirecciones; por eso «Compartir partido» (`ShareSheet.js`) ya arma `https://www.futfinder.cl/p/<id>`. La prueba `scripts/__tests__/enlacesUniversales.test.js` vigila que las cuatro piezas calcen.
 
 ## Fuentes principales
 
