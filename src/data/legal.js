@@ -15,7 +15,7 @@
  * `utils/avisoCookies.js`, que vuelve a mostrar el aviso en web.
  */
 
-export const ACTUALIZADO = '26 de octubre de 2026';
+export const ACTUALIZADO = '14 de noviembre de 2026';
 export const CORREO_PRIVACIDAD = 'futfindercl@gmail.com';
 
 const privacidad = {
@@ -60,7 +60,8 @@ const privacidad = {
       titulo: 'Qué ven los demás',
       parrafos: [
         'Tu perfil público (nombre de usuario, foto, portada, edad, comuna, posición, nivel, estadísticas y Trust Score) lo pueden ver otros jugadores dentro de clubes, partidos y chats. En Ajustes → Privacidad decides si apareces en la búsqueda de jugadores y quién puede enviarte solicitudes de amistad.',
-        'Las fotos que subes (perfil, portada, galerías de clubes y capturas de reportes) se guardan con un enlace público: quien tenga el enlace puede verlas. No subas imágenes con información confidencial.',
+        'Las fotos que subes a tu perfil, tu portada y las galerías (tuyas o de tus clubes) se guardan con un enlace público: quien tenga el enlace puede verlas. No subas imágenes con información confidencial.',
+        'La captura que adjuntas a un reporte a soporte no es pública: se guarda en un espacio privado y solo la ve el equipo de FutFinder, a través de un enlace temporal.',
         'El resultado de un partido entre clubes ya finalizado es público. La hora exacta y la cancha solo las ven los integrantes de esos clubes.',
       ],
     },

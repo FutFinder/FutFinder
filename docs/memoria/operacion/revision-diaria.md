@@ -33,7 +33,7 @@ Solo corre con `service_role` (desde el editor SQL de Supabase). No se puede mar
 
 **Devolver la plata sigue siendo a mano.** Cuando Flow esté conectado, la Edge Function va a llamar a su API de devolución y después a esta misma función. Hasta entonces, la transferencia la haces tú.
 
-**Esta consulta no ve todo lo que hay que devolver.** Sólo muestra lo que `confirmar_pago` y el cron dejaron en `reversar`. Una reserva `confirmada` pagada con tarjeta que se cancela (el jugador, el recinto o el partido que se cae) queda `cancelada` con el pago en `pagado`, sin devolución y sin marca: `cancelar_reserva_interna` y `admin_cancelar_reserva` sólo devuelven lo que está en `balance_movimientos`, y un pago con tarjeta no deja ahí ningún movimiento. Hoy no hay pagos reales, pero **antes de abrir la pasarela hay que cerrarlo** (ver «Límites conocidos» en [Reservas](../funcionalidades/reservas.md)); mientras tanto, esta otra consulta lista lo que esa grieta dejaría:
+**Desde la migración 168 esta consulta también ve las cancelaciones.** Una reserva pagada con tarjeta que se cancela (el jugador, el recinto o el partido que se cae) deja sus pagos en `reversar` y le avisa a quien pagó: `cancelar_reserva_interna` y `admin_cancelar_reserva` llaman a `reversar_pagos_de_reserva`, la misma que usan `confirmar_pago` y el cron. Antes de la 168 esos pagos quedaban en `pagado`, sin marca. La consulta que sigue es el control de que esa grieta sigue cerrada: **tiene que venir vacía**; si trae filas, hay un camino de cancelación que no pasa por la 168.
 
 ```sql
 select p.id, p.monto, p.orden_comercio, p.pagado_at, r.id as reserva_id, r.fecha, r.hora_inicio
