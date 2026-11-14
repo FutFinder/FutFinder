@@ -13,6 +13,12 @@ Dos workflows en `.github/workflows/`, los dos sin secretos:
 
 Para ver cómo salió: `gh run list --limit 5`.
 
+## Carrera de dos pagos por el mismo bloque (2026-11-14)
+
+`node scripts/carrera-dos-pagos.mjs [vueltas]`, sólo contra la base local (se niega con otro contenedor). Dos sesiones `psql` reales llaman a `confirmar_pago` por dos reservas de la **misma cancha, fecha y hora**: una vuelta orquestada (A retiene su transacción 1,5 s; B tiene que esperar y, al despertar, ver la hora tomada), varias libres lanzadas a la vez y una con avisos repetidos. En cada bloque exige exactamente una reserva `confirmada`, la otra `rechazada`, un pago `pagado`, el otro en `reversar` y un aviso a quien perdió. Crea su fixture y lo borra al terminar.
+
+Resultado: verde en las 10 vueltas; **no encontró ningún fallo en `confirmar_pago`**. Y sirve: con el `pg_advisory_xact_lock` quitado de la función (probado en local y restaurado) falla en todas las vueltas —el segundo pago revienta contra el índice único de reservas confirmadas y queda `pendiente`, sin marca de devolución—. O sea, el índice impide la doble reserva pero es el candado el que deja el pago perdedor identificable. No corre en CI ni con `npm test`: necesita el stack local.
+
 ## Comprobaciones locales del proyecto
 
 ```bash
