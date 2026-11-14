@@ -89,3 +89,16 @@ test('ninguna dependencia usa la cámara, el micrófono ni la ubicación en segu
     assert.ok(!todo.includes(api), `src usa ${api}: decláralo en app.config.js antes`);
   }
 });
+
+test('el número de build lo lleva EAS, porque app.config.js es dinámico', () => {
+  // Con `appVersionSource: "local"` EAS tiene que escribir el número nuevo en
+  // la configuración, y con `app.config.js` no puede: el build de tienda
+  // falla con «autoIncrement option is not supported when using app.config.js»
+  // (expo/eas-cli#2279). Con "remote", EAS guarda el buildNumber y el
+  // versionCode en sus servidores y los sube solo.
+  const eas = JSON.parse(fs.readFileSync(path.join(RAIZ, 'eas.json'), 'utf8'));
+  assert.ok(fs.existsSync(path.join(RAIZ, 'app.config.js')));
+  if (eas.build?.production?.autoIncrement) {
+    assert.equal(eas.cli?.appVersionSource, 'remote');
+  }
+});

@@ -58,9 +58,10 @@ hacer —no por probar— vive en [Pendientes](pendientes.md).
   un build (ícono en la pantalla de inicio de los dos sistemas, ícono
   adaptativo con máscara redonda, splash, ícono de notificación en Android) y
   que App Store Connect acepte el ícono sin canal alfa.
-- **Que el build de tienda salga.** `eas.json` combina `appVersionSource:
-  "local"` con `autoIncrement` y config dinámica: puede fallar (ver
-  [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md)).
+- **Que el build de tienda salga.** Desde el 2026-11-13 `eas.json` usa
+  `appVersionSource: "remote"` (con la config dinámica, `"local"` hacía
+  fallar el `autoIncrement`; ver [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md)).
+  Falta el primer build de `production` para verlo salir.
 
 ## 3. Seguridad con una cuenta normal (2026-11-13, migración 177, commit 2acfff2)
 
