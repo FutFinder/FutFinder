@@ -299,17 +299,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 22,
   },
+  // Las casillas se agrupan al centro: con `space-between`, en una pantalla
+  // ancha (web, tablet) quedaban de a una en cada punta, con huecos enormes.
   codeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 10,
     marginBottom: 18,
   },
+  // `textAlign` va en el estilo y no sólo como prop: react-native-web ignora
+  // la prop y el dígito quedaba pegado a la izquierda de su casilla.
   codeBox: {
     flex: 1,
     aspectRatio: 1,
     minWidth: 38,
     maxWidth: 56,
+    padding: 0,
+    textAlign: 'center',
     borderRadius: R.row,
     borderWidth: 1.5,
     borderColor: C.border,

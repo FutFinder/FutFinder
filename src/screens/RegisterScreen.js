@@ -181,7 +181,7 @@ export default function RegisterScreen({ navigation }) {
             <FieldLabel>Nombre y apellido</FieldLabel>
             <TextInput
               style={styles.input}
-              placeholder="Vicente Sedini"
+              placeholder="Tu Nombre"
               placeholderTextColor={C.textMuted}
               value={nombre}
               onChangeText={setNombre}
