@@ -4,7 +4,7 @@
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
-La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Avisos y Ajustes el 2026-09-23 está en [`PENDIENTES_CALIDAD_2026-09-23.md`](../../../PENDIENTES_CALIDAD_2026-09-23.md), y la auditoría de chats y avisos que la alimenta, en [`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`](../../../ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt). Los casos TrueScore y teléfono (T01–T07), el hallazgo G01, P02 y P06, y desde el 2026-11-05 casi todos los de Chat, Avisos, Inicio, Perfil y Ajustes (ver «Cerrados el 2026-11-05» abajo) ya están cerrados; **el resto sigue abierto** y se resume abajo. Los dos informes no se borran porque todavía tienen ítems vivos: cuando se cierre el último, se borran y esta nota conserva el resultado.
+Los dos informes del 2026-09-23 (`PENDIENTES_CALIDAD_2026-09-23.md`, la lista de calidad de Inicio, Chat, Perfil, Avisos y Ajustes, y `ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`, la auditoría de chats y avisos que la alimentaba) **se cerraron enteros y se borraron el 2026-11-13**: cada ítem quedó con su commit en `main`, listado abajo en «Cerrados de los informes del 2026-09-23». El texto completo sigue en el historial de git.
 
 ## Auditoría de lanzamiento (2026-11-13)
 
@@ -33,39 +33,20 @@ Revisión de qué falta para publicar en las tiendas: base de datos, Edge Functi
 - **Operación:** plan gratuito de Supabase (sin respaldos restaurables ni HaveIBeenPwned), sin CI, Deno instalado en una de las Macs desde el 2026-11-13 (`npm run test:edge`: 75 pruebas y `deno check` de las siete funciones; la otra Mac puede seguir sin él), Sentry sin DSN.
 - **En esta Mac hay trabajo sin commitear que no es de esta auditoría:** `153_las_escrituras_directas_que_sobraban.sql` (repite el número de una ya commiteada y hace fallar `ordenMigraciones.test.js`) y `175_el_chat_llega_por_broadcast.sql` con sus cambios de cliente, **aunque la 175 ya está aplicada en producción desde el 2026-11-10**.
 
-## Abiertos al 2026-11-05
+## Cerrados de los informes del 2026-09-23
 
-Lo que sigue vivo, contrastado contra el código el 2026-11-05. Los números de línea de los informes están corridos: cuando se arregle uno, buscar por el nombre de la función.
+Verificado el 2026-11-13 contra el historial: **no queda ningún ítem abierto** de los dos informes, por eso se borraron. Cada uno con su commit en `main` y su prueba de Node (varias leen el texto de los archivos, no datos); los mensajes de algunos commits cuentan además una comprobación en web o contra la base local que esta nota no repitió.
 
-### De los informes del 2026-09-23
+- **Chat:** C01 `6deeddb` (no se marca leído un hilo cuya carga falló), C02 `a2e43a3` (el acuse espera foco, app activa y lista al final), C03 `8a5b9e6` (el historial pagina por `(created_at, id)`), C11 `4b08e28` (una carga vieja de la bandeja no pisa a la nueva), C12 `b05a0fb` (el aviso sin conexión ya no promete mensajes guardados), C13 `f5aaac7` (Detalles no cuenta las solicitudes pendientes como inscritos), C14 `843da93` (Detalles de un desafío dice «Desafío entre clubes»), C15 `e3a37f6` (si fallan los participantes, Detalles no anuncia un chat vacío), C16 `c5a6968` (si fallan las solicitudes de amistad, la tarjeta no desaparece).
+- **Avisos:** C04 y C05 `793e993` (migración 169 y `send-push`: leer un hilo cierra su aviso y el silencio frena aviso y push; la 169 está en producción y `send-push` va en la v11, sin nada pendiente en `despliegues.json`), C05 en el cliente `eed4ffd`, C06 `264fa24`, C07 `6228900`, C08 `e02e53e`, C09 `4978999`, C10 `d3e06bf`.
+- **Inicio:** I01 `efdd63e`, I02 `cbed48d`, I03 `c44bbe8`, I04 `f267f65`, I06 `1217d08`, I07 `6131ade` (si el único partido cercano está en «Tu club juega», no se dice «Sin partidos»).
+- **Perfil y Ajustes:** P01 `c1f7607`, P03 `8f8c64a`, P04 `b7f5126`, P05 `99f87d3`, A01 `45b2984`, A02 `e0020f4` (dos toques rápidos de un interruptor ya no se pisan).
+- **Partidos y deuda menor:** `dc52a29` (el motivo de cancelación ya no queda huérfano si falla la RPC), `31d4e2f` (el cierre de un partido cancelado ya no muestra jerga técnica), `3df6d0a` (los mínimos de puntaje salen de los niveles del servidor), `e4c20dc` y `6ba71a4` (todos los rótulos de puntaje usan `nombrePuntaje`), `d11848d` (`app.config.js` deja el olivo por el `#55DF69`), `3e92dc1` (comentarios al día) y `6c653a5` (ninguna pantalla consulta una tabla directo).
+- **Cerrados antes:** P06 (`70d6569`), P02, T01–T07 y G01; I05 y P07 los confirmaron en vivo T01 y T02 el 2026-09-29.
 
-C01–C10 vienen de la auditoría de chats y avisos (`ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`, donde C01 es el error 1, y así hasta el 10); el resto, de la lista de calidad (`PENDIENTES_CALIDAD_2026-09-23.md`), que lleva para cada ID los pasos de cierre. Tras el lote del 2026-11-05 (lectura del código y de los commits; nada se ejecutó al escribir esta nota) **siguen abiertos sólo estos**:
+### Lo que dejó el lote del 2026-11-05
 
-| ID | Sigue abierto porque… |
-| --- | --- |
-| C04 | `mark_chat_read` (migración 32) no toca `notifications`: leer un DM no cierra su aviso `message_new` y el siguiente mensaje no genera INSERT ni push. Es de servidor: necesita migración. |
-| C05 (servidor) | Silenciar un hilo ya no abre el popup (cliente, `eed4ffd`), pero ni `notify_message_new()` ni `send-push` consultan `chat_mutes`: el push y la fila de la bandeja siguen llegando. Necesita migración y redespliegue de la Edge Function. |
-| C11–C16 | Bandeja de Chats sin versión de solicitud, aviso «últimos mensajes guardados» sin caché, Detalles que cuenta los `pendiente` como inscritos, el hilo de desafío rotulado «Mensaje directo», y errores de participantes y solicitudes tragados. Sin cambios a simple vista; no se re-verificaron a fondo. |
-| I07 | El resumen cuenta `matches.length`, la lista usa `partidosCerca`: puede decir «1 partido cerca» y «Sin partidos en tu radio». |
-| A02 | El rollback de un interruptor puede pisar el cambio siguiente (`toggleField`); sin reproducir. |
-
-### Cerrados el 2026-11-05
-
-Cada uno con su commit en `main` y su prueba de Node (varias leen el texto de los archivos, no datos); el mensaje de algunos commits cuenta además una comprobación en web o contra la base local, que esta nota no repitió:
-
-- **Chat:** C01 `6deeddb` (no se marca leído un hilo cuya carga falló), C02 `a2e43a3` (el acuse espera foco, app activa y lista al final), C03 `8a5b9e6` (el historial pagina por `(created_at, id)`).
-- **Avisos:** C06 `264fa24` (categoría y club en la consulta, «Ver avisos anteriores», chips contados en el servidor), C07 `6228900` (el rollback deshace sólo su cambio), C08 `e02e53e` (abrir un aviso vuelve a «sin leer» si no se guardó), C09 `4978999` (borrar actualiza campana, bandeja y popup), C10 `d3e06bf` (los popups se limpian al cerrar sesión o cambiar de cuenta). C05 queda **partido**: `eed4ffd` cerró la parte de cliente (el popup respeta el silencio).
-- **Inicio:** I01 `efdd63e` (la caja de cercanía va en la consulta), I02 `cbed48d` (un fallo de red muestra error con «Reintentar», no «sin partidos»), I03 `c44bbe8` (la tarjeta de reputación usa `asistencias_confirmadas` y los reportes reales), I04 `f267f65` (una carga vieja no pisa a la nueva), I06 `1217d08` («ADMIN · N CLUBES» cuenta sólo clubes que se administran).
-- **Perfil y Ajustes:** P01 `c1f7607`, P03 `8f8c64a`, P04 `b7f5126`, P05 `99f87d3` y A01 `45b2984`.
-- **Partidos y deuda menor:** `dc52a29` (el motivo de cancelación ya no queda huérfano si falla la RPC), `31d4e2f` (el cierre de un partido cancelado ya no muestra jerga técnica), `3df6d0a` (los mínimos de puntaje salen de los niveles del servidor), `e4c20dc` (los rótulos de la rama sin TrueScore usan `nombrePuntajeDe`), `d11848d` (`app.config.js` deja el olivo por el `#55DF69`), `3e92dc1` (comentarios al día) y `6c653a5` (ninguna pantalla consulta una tabla directo).
-
-**Cerrados antes:** P06 (commit `70d6569`, «Invitar a mi club desde un perfil invita directo a ese jugador», en `main`), P02, T01–T07 y G01. I05 y P07 estaban «falta confirmarlo en web»: T01 y T02 los confirmaron en vivo el 2026-09-29.
-
-### Nuevos, del lote del 2026-11-05
-
-- **Error de Realtime al remontar el popup — visto una vez, sin reproducir.** A veces aparece «cannot add postgres_changes callbacks … after subscribe()» desde `NotificationToastHost` cuando el popup es el único que escucha el canal de avisos y se vuelve a montar. La sesión que corrigió C05–C10 lo vio sólo con recarga en caliente de Metro; **no se reprodujo ni se verificó acá**. La corrección que propuso esa sesión sería un nombre único de canal por apertura (hoy el topic es `notif-<userId>`, deterministo, y `close` llama `removeChannel` sin esperar). Ver «Canales Realtime» en [Chat](../funcionalidades/chat.md).
-- **`ClubsHomeContext` sigue pidiendo 50 avisos y filtrando después** (`listNotifications({ limit: 50 })` y `avisoDelClub`): la misma falla que C06 tenía en la bandeja. Un aviso del club más atrás de los 50 últimos no aparece en «Actividad reciente» de la portada de Clubes. La corrección natural es pasar `clubId` a `listNotifications`, que ya lo acepta.
-- **Quedan «Trust Score» escritos a mano** donde el servidor ya habla de TrueScore con la fase 1: `TrustScoreHistoryScreen.js` (~línea 221, el texto explicativo), `TrustScoreCard.js` (valor por defecto `nombre = 'Tu Trust Score'`) y, fuera de lo que anotó el lote, `matchRules.js` (el texto de la confirmación por GPS sin TrueScore y `leaveRuleText`). Las tres pantallas de partido ya usan `nombrePuntajeDe`.
+- **Cerrados:** el error de Realtime al remontar el popup (`69c6ef9`, los canales compartidos usan un nombre nuevo en cada apertura) y «Actividad reciente» de Clubes, que pedía 50 avisos y filtraba después (`e623113`).
 - **«Ver todo» de Perfil despliega sólo las últimas 20 participaciones** (`HISTORIAL_LIMITE` en `ProfileScreen.js`); si algún día hace falta el historial completo, habrá que paginarlo.
 
 ### De la segunda pasada de seguridad (2026-11-09)
