@@ -1,6 +1,6 @@
 # Despliegue y entornos
 
-Última revisión: 2026-11-05 (sin variables de Supabase ya no hay sesión; estados fechados consolidados; reportar-problema y el disparador `notificar_push` en la tabla de Edge Functions)
+Última revisión: 2026-11-13 (dominio futfinder.cl con DNS en Vercel y `public/` en el export; sin variables de Supabase ya no hay sesión; estados fechados consolidados; reportar-problema y el disparador `notificar_push` en la tabla de Edge Functions)
 
 ## Propósito
 
@@ -14,7 +14,9 @@ La configuración del repositorio define exportación web con Vercel, builds nat
 
 - `vercel.json` ejecuta `npx expo export --platform web`.
 - El resultado se publica desde `dist`.
-- La regla de reescritura dirige todas las rutas a `index.html`, necesaria para las rutas de una aplicación de una sola página.
+- La regla de reescritura dirige todas las rutas a `index.html`, necesaria para las rutas de una aplicación de una sola página. Los archivos que existen en `dist` se sirven antes que la reescritura.
+- **Dominio propio desde el 2026-11-13**: `futfinder.cl`, inscrito a nombre de Vicente en NIC Chile, con los servidores de nombre de Vercel (`ns1`/`ns2.vercel-dns.com`), así que **el DNS se administra en Vercel** (Domains → futfinder.cl → DNS Records). `futfinder.cl` redirige con 308 a `www.futfinder.cl`. El DNS ya trae los registros de Resend para `envios.futfinder.cl` (ver [Autenticación](../funcionalidades/autenticacion.md)); los CAA los puso Vercel para el certificado y no se tocan.
+- `public/` se copia tal cual al export web. Hoy sólo tiene `public/correo/logo.png` (el ícono a 192 px), que usan las plantillas de correo de Auth.
 
 ## Builds nativos con EAS
 
@@ -142,7 +144,7 @@ Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cre
 
 - `RESEND_API_KEY` — del proveedor de correo. **Cargada el 2026-09-19**: hay cuenta de Resend (con el correo `futfindercl@gmail.com`) y la clave está puesta como secreto. Probada de forma aislada con un `curl` directo a `api.resend.com/emails` fuera de Supabase: responde `200` y entrega — la clave en sí funciona.
 - `SOLICITUDES_EMAIL_TO` — opcional. Pedido explícito: si no está, cae en `futfindercl@gmail.com` (`DESTINO_POR_OMISION` en `correoSolicitud.ts`). Sigue existiendo para el día que haga falta mandarlas a otra parte, o sumar un segundo destinatario, sin tocar código. Admite varias direcciones separadas por coma.
-- `SOLICITUDES_EMAIL_FROM` — opcional; el remitente verificado. Por omisión el de prueba del proveedor.
+- `SOLICITUDES_EMAIL_FROM` — opcional; el remitente verificado. Por omisión el de prueba del proveedor (`onboarding@resend.dev`), que **sólo entrega al dueño de la cuenta de Resend**: sirve mientras el destino sea ese mismo correo. Desde el 2026-11-13 hay dominio verificado (`envios.futfinder.cl`), así que conviene cargar este secreto y `REPORTES_EMAIL_FROM` con `FutFinder <no-responder@envios.futfinder.cl>`; el código los lee en cada llamada (`env(...)` dentro de la función), así que en principio no hace falta redesplegar; confirmarlo con una solicitud de prueba.
 
 **Tocar `_shared/` no cambia nada en producción hasta redesplegar la función que lo importa.** Las Edge Functions se despliegan con su copia de `_shared/` adentro, así que un commit que sólo toca `_shared/correoSolicitud.ts` deja el repo y el servidor diciendo cosas distintas. Pasó el 2026-09-18 con `DESTINO_POR_OMISION`: el commit estaba en `main` y la función desplegada seguía siendo la v4, sin el destino por omisión — con la clave ya cargada, dos solicitudes de prueba (02:13 y 00:51 UTC del 19) se guardaron pero `avisada_at` quedó `null` en las dos, porque la v4 exigía además `SOLICITUDES_EMAIL_TO`, que nadie había cargado (no hacía falta con el código nuevo). Se redesplegó dos veces ese día —v5 desde la otra Mac, v6 confirmando la misma fuente— y recién ahí la función quedó ejecutando lo que dice el repo. Al cambiar algo de `_shared/`, redesplegar TODAS las funciones que lo importan.
 

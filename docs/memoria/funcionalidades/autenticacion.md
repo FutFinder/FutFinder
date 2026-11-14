@@ -1,6 +1,6 @@
 # Autenticación
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-13
 
 ## Propósito
 
@@ -60,7 +60,15 @@ La protección de contraseñas filtradas (HaveIBeenPwned) que recomienda el advi
 
 La confirmación de correo está **desactivada** en el proyecto de Supabase: `signUp` autoconfirma y emite sesión al instante, y una cuenta creada así queda confirmada para siempre, así que después sirve para iniciar sesión con su contraseña. Por eso el registro dejó de usar `signUp`: ninguna validación en el cliente puede tapar eso. El camino OTP no depende de ese ajuste.
 
-Dependencia real de configuración: el **envío de correos**. Con el servicio incorporado de Supabase el envío está muy limitado y puede no llegar a direcciones fuera del equipo, así que el registro no funciona de verdad para usuarios reales hasta que haya un SMTP propio y la plantilla del código incluya `{{ .Token }}`.
+Dependencia real de configuración: el **envío de correos**. **Resuelto el 2026-11-13** con SMTP propio; antes de eso el servicio incorporado de Supabase dejaba **2 correos por hora para todo el proyecto**, así que la tercera persona que se registraba en una hora no recibía código. Estado actual, todo en el panel (no se puede versionar):
+
+- **SMTP**: Resend, remitente `FutFinder <no-responder@envios.futfinder.cl>`, `smtp.resend.com:465`, usuario `resend`, contraseña = clave de Resend `supabase-auth` (sólo envío, sólo ese dominio). El dominio `futfinder.cl` es de Vicente (NIC Chile), con DNS en Vercel; `envios.futfinder.cl` está verificado en Resend (DKIM, dos CNAME de envío y `_dmarc` con `p=none`). Ver [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md).
+- **Plantillas**: «Confirm sign up» **y** «Magic Link» llevan la misma, la de `supabase/plantillas-correo/confirmacion.html` (asunto «Tu código de FutFinder», logo desde `www.futfinder.cl/correo/logo.png`). Las dos importan: con la confirmación de correo apagada, el registro por OTP y el «Reenviar código» salen con «Magic Link», que hasta el 2026-11-13 era la de fábrica de Supabase —un enlace en inglés, sin código— y «Confirm sign up» escondía el `{{ .Token }}` dentro de un `href`.
+- **Largo del código**: la app espera **6** dígitos (`CODE_LENGTH` en `VerificationScreen.js`); producción llegó a tener *Email OTP length* en 8. Si un registro falla con «código incorrecto», mirar eso primero.
+- **Topes**: Supabase subió solo a 30 correos por hora al activar el SMTP propio; el plan gratis de Resend corta en **100 al día y 3.000 al mes**, compartidos con los avisos de las Edge Functions. Crecer más allá pide Resend Pro.
+- **Círculo del remitente**: Gmail no muestra logo sin BIMI (DMARC en `quarantine` o `reject` y un certificado VMC/CMC pagado). Postergado a propósito.
+
+Probado de punta a punta el 2026-11-13: registro en `www.futfinder.cl` con un Gmail distinto del de FutFinder, el código de 6 dígitos llegó y la app lo aceptó.
 
 Comprobado el 2026-08-27: `signInWithOtp` crea la cuenta **antes** de enviar el correo, y si el destino no existe falla en el envío (`email_address_invalid`) dejando la fila creada. Esas cuentas quedan sin contraseña usable, así que no permiten entrar, pero sí acumulan filas basura.
 
