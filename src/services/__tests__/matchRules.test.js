@@ -514,7 +514,9 @@ test('T05: una cuenta restringida no lee que su Trust Score llegó a 0', () => {
 test('T05: si hay fecha de reactivación, se conserva', () => {
   const block = R.getBlockReason({
     ...RESTRINGIDO,
-    myProfile: { suspended: true, suspended_until: '2026-10-15T15:00:00Z' },
+    // Mediodía UTC: sigue siendo 15 de octubre en cualquier zona horaria
+    // habitada. Con las 15:00Z, en Tokio ya era 16 y la prueba fallaba ahí.
+    myProfile: { suspended: true, suspended_until: '2026-10-15T12:00:00Z' },
   });
   // El formato exacto lo pone `toLocaleDateString('es-CL')` y varía entre
   // motores («15-octubre» / «15 de octubre»); lo que se prueba es que la

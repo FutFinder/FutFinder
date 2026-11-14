@@ -24,6 +24,12 @@
  * Se ejecutan con: npm test
  */
 
+// Estas pruebas comparan horas ya formateadas («20:00») contra fechas con
+// desfase de Chile, y la app formatea con la zona del dispositivo. Sin fijar
+// la zona pasaban en las Macs (Santiago) y fallaban en la integración
+// continua (UTC): se fija acá, antes de crear ninguna fecha.
+process.env.TZ = 'America/Santiago';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
