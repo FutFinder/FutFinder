@@ -34,6 +34,9 @@ export const MENSAJES_RECUPERACION = {
   faltaSegundoPaso:
     'Tu cuenta tiene verificación en dos pasos: ingresa primero el código de tu app de autenticación.',
   sinSesion: 'El código ya no sirve. Pide uno nuevo.',
+  crearPassword:
+    'Tu correo ya quedó verificado. Falta elegir la contraseña con la que vas a entrar a FutFinder.',
+  passwordRechazada: 'La contraseña que escribiste al registrarte no cumple las reglas. Elige otra.',
 };
 
 /**

@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ShieldCheck, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import Button from '../components/Button';
@@ -20,11 +20,20 @@ import {
   verifyEmailOtp,
   resendOtp,
   completeSignUpPassword,
+  hayRegistroPendiente,
   abandonSignUp,
+  signOut,
 } from '../services/auth';
 import { isSessionUsable } from '../services/authPolicy';
 import { updateMyProfile } from '../services/profile';
 import { isSupabaseConfigured } from '../services/supabase';
+import {
+  ESPERA_REENVIO,
+  MENSAJES_ALTA,
+  formatoEspera,
+  siguientePasoDelAlta,
+  repartirCodigo,
+} from '../utils/altaPorCorreo';
 
 const CODE_LENGTH = 6;
 
@@ -36,12 +45,22 @@ export default function VerificationScreen({ navigation, route }) {
   // vez que la verificación entrega una sesión real. Viaja como parámetro
   // desde RegisterScreen y se aplica acá, justo después de verificar.
   const edad = route?.params?.edad;
+  // Desde «Crear cuenta» la cuenta todavía no tiene contraseña; desde «Iniciar
+  // sesión» sí. Sólo en el primer caso tiene sentido pedir que cree una si la
+  // que escribió ya no está en memoria.
+  const esRegistro = Boolean(route?.params?.registro) || edad != null;
 
   const [digits, setDigits] = useState(Array(CODE_LENGTH).fill(''));
   const [channel, setChannel] = useState('Correo'); // Correo | SMS
   const [error, setError] = useState(null);
-  const [seconds, setSeconds] = useState(42);
+  const [aviso, setAviso] = useState(null);
+  const [seconds, setSeconds] = useState(ESPERA_REENVIO);
   const [loading, setLoading] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  // Con el código aceptado ya hay sesión y ese código no sirve otra vez: lo
+  // que quede por hacer (contraseña, edad) se reintenta sin volver a pedirlo.
+  const [verificado, setVerificado] = useState(false);
+  const progreso = useRef({ passwordFijada: false, edadGuardada: false });
   const inputs = useRef([]);
 
   useEffect(() => {
@@ -52,11 +71,9 @@ export default function VerificationScreen({ navigation, route }) {
 
   const handleChange = (val, idx) => {
     setError(null);
-    const clean = val.replace(/\D/g, '').slice(-1);
-    const next = [...digits];
-    next[idx] = clean;
-    setDigits(next);
-    if (clean && idx < CODE_LENGTH - 1) inputs.current[idx + 1]?.focus();
+    const { casillas, foco } = repartirCodigo(digits, idx, val, CODE_LENGTH);
+    setDigits(casillas);
+    if (foco !== idx) inputs.current[foco]?.focus();
   };
 
   const handleKey = (e, idx) => {
@@ -65,24 +82,87 @@ export default function VerificationScreen({ navigation, route }) {
     }
   };
 
+  // Hace, de a uno, lo que falta después de verificar. Cada fallo se muestra
+  // y deja el botón en «Reintentar», que vuelve a entrar acá y retoma desde
+  // el paso que falló (ver utils/altaPorCorreo.js).
+  const terminarAlta = async () => {
+    setError(null);
+    setAviso(null);
+    setLoading(true);
+    for (;;) {
+      const paso = siguientePasoDelAlta({
+        esRegistro,
+        edad,
+        hayPasswordPendiente: hayRegistroPendiente(email),
+        ...progreso.current,
+      });
+
+      if (paso === 'password') {
+        const resultado = await completeSignUpPassword({ email });
+        if (resultado.applied) {
+          progreso.current.passwordFijada = true;
+          continue;
+        }
+        // Rechazada por débil: ya no está en memoria y reintentar con la
+        // misma no sirve. El paso siguiente será pedirle otra.
+        if (resultado.rechazada) {
+          progreso.current.passwordRechazada = true;
+          continue;
+        }
+        setLoading(false);
+        setError(MENSAJES_ALTA.passwordNoGuardada(resultado.error?.message));
+        return;
+      }
+
+      if (paso === 'edad') {
+        const resultado = await updateMyProfile({ edad });
+        if (resultado?.error) {
+          setLoading(false);
+          setError(MENSAJES_ALTA.edadNoGuardada);
+          return;
+        }
+        progreso.current.edadGuardada = true;
+        continue;
+      }
+
+      setLoading(false);
+      if (paso === 'crearPassword') {
+        navigation.replace('RecuperarContrasena', {
+          crearPassword: true,
+          rechazada: Boolean(progreso.current.passwordRechazada),
+        });
+        return;
+      }
+      navigation.navigate('LocationPermission');
+      return;
+    }
+  };
+
   const handleVerify = async () => {
+    if (loading) return;
+    if (verificado) {
+      await terminarAlta();
+      return;
+    }
+
     const code = digits.join('');
     if (code.length < CODE_LENGTH) {
       setError('Ingresa los 6 dígitos');
       return;
     }
 
-    // Modo demo: si Supabase no está configurado, aceptamos 472000
+    // Modo demo: si Supabase no está configurado, aceptamos 472000. No hay
+    // perfil donde guardar la edad.
     if (!isSupabaseConfigured) {
       if (code !== '472000') {
         setError('Código incorrecto. Intente de nuevo');
         return;
       }
-      if (edad != null) await updateMyProfile({ edad });
       navigation.navigate('LocationPermission');
       return;
     }
 
+    setAviso(null);
     setLoading(true);
     const { error: err, session } = await verifyEmailOtp({ email, token: code });
 
@@ -99,32 +179,55 @@ export default function VerificationScreen({ navigation, route }) {
       return;
     }
 
-    // Recién ahora, con el correo demostrado, la cuenta recibe su contraseña.
-    const { error: errPassword } = await completeSignUpPassword({ email });
-    if (edad != null) await updateMyProfile({ edad });
-    setLoading(false);
-
-    if (errPassword) {
-      setError(
-        `Tu correo quedó verificado, pero no pudimos guardar tu contraseña: ${errPassword.message}`
-      );
-      return;
-    }
-
-    navigation.navigate('LocationPermission');
+    // Recién ahora, con el correo demostrado, la cuenta recibe su contraseña
+    // y su fecha de nacimiento.
+    setVerificado(true);
+    await terminarAlta();
   };
 
   const handleResend = async () => {
+    if (reenviando) return;
     setError(null);
-    setSeconds(42);
-    setDigits(Array(CODE_LENGTH).fill(''));
-    inputs.current[0]?.focus();
-    if (isSupabaseConfigured && email) {
-      await resendOtp({ email });
+    setAviso(null);
+    const limpiar = () => {
+      setSeconds(ESPERA_REENVIO);
+      setDigits(Array(CODE_LENGTH).fill(''));
+      inputs.current[0]?.focus();
+    };
+    if (!isSupabaseConfigured || !email) {
+      limpiar();
+      return;
     }
+
+    setReenviando(true);
+    const { error: err, esperar } = await resendOtp({ email });
+    setReenviando(false);
+
+    // Auth no deja pedir otro tan seguido: el reloj se ajusta a lo que falta
+    // de verdad y el código anterior sigue sirviendo, así que no se borra.
+    if (esperar > 0) {
+      setSeconds(esperar);
+      setError(MENSAJES_ALTA.esperaParaReenviar(esperar));
+      return;
+    }
+    if (err) {
+      setError(err.message || MENSAJES_ALTA.reenvioFallido);
+      return;
+    }
+    limpiar();
+    setAviso(MENSAJES_ALTA.reenviado);
   };
 
-  const fmt = `0:${seconds.toString().padStart(2, '0')}`;
+  const salir = async () => {
+    // Salir sin terminar descarta el registro a medias y borra la contraseña
+    // que estaba esperando en memoria. Si el código ya se había aceptado hay
+    // una sesión abierta: se cierra, para no dejar a nadie adentro a medias.
+    abandonSignUp();
+    if (verificado) await signOut();
+    navigation.goBack();
+  };
+
+  const fmt = formatoEspera(seconds);
 
   return (
     <KeyboardAvoidingView
@@ -139,12 +242,7 @@ export default function VerificationScreen({ navigation, route }) {
         >
           <View style={styles.header}>
             <Pressable
-              onPress={() => {
-                // Salir sin verificar descarta el registro a medias y borra la
-                // contraseña que estaba esperando en memoria.
-                abandonSignUp();
-                navigation.goBack();
-              }}
+              onPress={salir}
               hitSlop={12}
               style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
             >
@@ -181,7 +279,13 @@ export default function VerificationScreen({ navigation, route }) {
                   onChangeText={(v) => handleChange(v, i)}
                   onKeyPress={(e) => handleKey(e, i)}
                   keyboardType="number-pad"
-                  maxLength={1}
+                  // Largo completo, no 1: así cabe el código pegado o el que
+                  // autocompleta el teclado, y `handleChange` lo reparte.
+                  maxLength={CODE_LENGTH}
+                  inputMode="numeric"
+                  autoComplete={i === 0 ? 'one-time-code' : 'off'}
+                  textContentType={i === 0 ? 'oneTimeCode' : 'none'}
+                  editable={!verificado}
                   textAlign="center"
                   selectTextOnFocus
                 />
@@ -213,22 +317,37 @@ export default function VerificationScreen({ navigation, route }) {
                   );
                 })}
               </View>
-              <Pressable disabled={seconds > 0} onPress={handleResend} hitSlop={8}>
-                <Text
-                  style={[
-                    styles.resend,
-                    seconds === 0 && { color: C.green },
-                  ]}
+              {!verificado && (
+                <Pressable
+                  disabled={seconds > 0 || reenviando}
+                  onPress={handleResend}
+                  hitSlop={8}
+                  accessibilityRole="button"
                 >
-                  {seconds > 0 ? `Reenviar en ${fmt}` : 'Reenviar código'}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={[
+                      styles.resend,
+                      seconds === 0 && !reenviando && { color: C.green },
+                    ]}
+                  >
+                    {reenviando
+                      ? 'Enviando…'
+                      : seconds > 0
+                        ? `Reenviar en ${fmt}`
+                        : 'Reenviar código'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             <View style={{ height: 18 }} />
 
             <Button
-              label={loading ? 'Verificando…' : 'Verificar código'}
+              label={
+                verificado
+                  ? loading ? 'Guardando…' : 'Reintentar'
+                  : loading ? 'Verificando…' : 'Verificar código'
+              }
               variant="primary"
               onPress={handleVerify}
               loading={loading}
@@ -238,6 +357,13 @@ export default function VerificationScreen({ navigation, route }) {
               <View style={styles.errorBox}>
                 <AlertCircle color={C.red} size={16} />
                 <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            {aviso && !error && (
+              <View style={[styles.errorBox, styles.avisoBox]}>
+                <CheckCircle2 color={C.green} size={16} />
+                <Text style={[styles.errorText, { color: C.green }]}>{aviso}</Text>
               </View>
             )}
 
@@ -358,6 +484,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.red,
   },
+  avisoBox: { backgroundColor: C.greenSoft, borderColor: C.greenBorder },
   errorText: { color: C.red, fontSize: 13, fontFamily: F.semiBold, flex: 1 },
   hint: {
     color: C.textMuted,

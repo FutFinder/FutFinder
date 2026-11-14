@@ -10,7 +10,10 @@
  * Ese lugar es solo memoria del proceso: nada de AsyncStorage, localStorage
  * ni parámetros de navegación (en web la navegación puede quedar serializada
  * y una contraseña no tiene por qué aparecer ahí). Se guarda una sola a la
- * vez, es de un solo uso y se borra al consumirla o al abandonar el flujo.
+ * vez y se borra cuando el servidor confirma que la guardó, o al abandonar
+ * el flujo. Mirarla (`verPasswordPendiente`) no la borra: si `updateUser`
+ * falla por la red, tiene que seguir ahí para reintentar; borrarla antes de
+ * saber dejaba una cuenta verificada y sin contraseña.
  */
 
 let pendiente = null;
@@ -26,6 +29,13 @@ export function guardarPasswordPendiente(email, password) {
     return;
   }
   pendiente = { email: correo, password };
+}
+
+/** La contraseña que espera para ese correo, sin borrarla. */
+export function verPasswordPendiente(email) {
+  const correo = normalizar(email);
+  if (!pendiente || !correo || pendiente.email !== correo) return null;
+  return pendiente.password;
 }
 
 /** Devuelve la contraseña una única vez y la borra de memoria. */

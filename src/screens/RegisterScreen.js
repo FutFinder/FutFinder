@@ -131,7 +131,7 @@ export default function RegisterScreen({ navigation }) {
     // la contraseña recién se fija al verificar ese código
     // (`completeSignUpPassword`). La edad viaja como parámetro porque hasta
     // entonces no hay sesión con la que escribir en `profiles`.
-    navigation.navigate('Verification', { email: emailTrim, edad: fechaResult.edad });
+    navigation.navigate('Verification', { email: emailTrim, edad: fechaResult.edad, registro: true });
   };
 
   return (

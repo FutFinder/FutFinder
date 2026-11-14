@@ -45,17 +45,28 @@ const ESPERA_REENVIO = 60;
  * El correo NO llega por parámetro de navegación: en web eso lo escribe en la
  * URL. Desde Iniciar sesión viene en memoria (`correoParaRecuperar`); desde
  * Ajustes se lee de la sesión.
+ *
+ * También termina un alta que se quedó sin contraseña (`crearPassword`): la
+ * verificación del registro ya dejó una sesión abierta, pero la contraseña
+ * que la persona había escrito se perdió (recargó la página) o el servidor
+ * la rechazó. Entra directo al último paso; si esa sesión ya no está, parte
+ * desde el correo como cualquier recuperación.
  */
 export default function RecuperarContrasenaScreen({ navigation, route }) {
   const desdeAjustes = Boolean(route?.params?.desdeAjustes);
-  const [paso, setPaso] = useState('correo'); // correo | codigo | mfa | nueva
+  const crearPassword = Boolean(route?.params?.crearPassword);
+  const [paso, setPaso] = useState(crearPassword ? 'nueva' : 'correo'); // correo | codigo | mfa | nueva
   const [email, setEmail] = useState(() => consumirCorreoParaRecuperar());
   const [codigo, setCodigo] = useState('');
   const [password, setPassword] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
   const [verPassword, setVerPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
-  const [banner, setBanner] = useState(null);
+  const [banner, setBanner] = useState(() =>
+    crearPassword && route?.params?.rechazada
+      ? { type: 'error', title: 'Elige otra contraseña', message: MENSAJES_RECUPERACION.passwordRechazada }
+      : null
+  );
   const [espera, setEspera] = useState(0);
   const codigoRef = useRef(null);
 
@@ -69,6 +80,17 @@ export default function RecuperarContrasenaScreen({ navigation, route }) {
       vigente = false;
     };
   }, [desdeAjustes]);
+
+  useEffect(() => {
+    if (!crearPassword) return undefined;
+    let vigente = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (vigente && !data?.session) setPaso('correo');
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [crearPassword]);
 
   useEffect(() => {
     if (espera <= 0) return undefined;
@@ -291,9 +313,13 @@ export default function RecuperarContrasenaScreen({ navigation, route }) {
 
           {paso === 'nueva' && (
             <>
-              <Text style={styles.title}>Elige una{'\n'}contraseña nueva</Text>
+              <Text style={styles.title}>
+                {crearPassword ? 'Crea tu\ncontraseña' : 'Elige una\ncontraseña nueva'}
+              </Text>
               <Text style={styles.ayuda}>
-                Al guardarla se cerrará tu sesión en los demás dispositivos.
+                {crearPassword
+                  ? MENSAJES_RECUPERACION.crearPassword
+                  : 'Al guardarla se cerrará tu sesión en los demás dispositivos.'}
               </Text>
               <Card style={{ marginTop: 20 }}>
                 <Text style={styles.fieldLabel}>Contraseña nueva</Text>

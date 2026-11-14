@@ -1,6 +1,6 @@
 # Autenticación
 
-Última revisión: 2026-11-13
+Última revisión: 2026-11-14
 
 ## Propósito
 
@@ -11,6 +11,14 @@ Crear o iniciar una sesión por correo, confirmar cuentas y encaminar al usuario
 Iniciar sesión y registrarse son pantallas separadas (`LoginScreen` y `RegisterScreen`, handoff `Bienvenida.dc.html`), no un mismo formulario con modo. El login solo llama a `signInWithPassword`: nunca cae a registro.
 
 El registro **no usa `signUp`**: usa `signInWithOtp` con `shouldCreateUser: true`, así que crea la cuenta sin contraseña usable y manda un código de 6 dígitos. La contraseña escrita queda en memoria (`pendingSignUp.js`, de un solo uso, nunca en disco ni en parámetros de navegación) y se fija con `updateUser` recién después de verificar el código (`completeSignUpPassword`). Sin acceso al buzón no hay código, no hay sesión y no hay contraseña: la cuenta no sirve ni para registrarse ni para iniciar sesión después.
+
+**El alta se puede terminar aunque algo falle a mitad (2026-11-14).** Verificar el código, fijar la contraseña y guardar la edad son tres pasos, y `VerificationScreen` sólo miraba el resultado del primero. Ahora la decisión de qué falta es lógica pura (`src/utils/altaPorCorreo.js`, `siguientePasoDelAlta`) y la pantalla ejecuta de a un paso: si uno falla lo dice y el botón pasa a «Reintentar», que retoma desde ese paso sin volver a pedir el código (ya está gastado). Tres reglas que no son obvias:
+
+- **La contraseña sale de memoria recién cuando el servidor la aceptó** (`verPasswordPendiente` mira sin borrar; `completeSignUpPassword` la olvida al tener éxito). Antes se consumía antes de llamar a `updateUser`, y un fallo de red dejaba una cuenta verificada y sin contraseña.
+- **Si la contraseña ya no está** —el servidor la rechazó por débil, o la pantalla se quedó sin ella— no hay nada que reintentar: se abre `RecuperarContrasena` con `crearPassword`, que entra directo a elegir una contraseña con la sesión que acaba de abrir el código. Sólo pasa en un registro (`registro: true` desde `RegisterScreen`); quien llega desde Iniciar sesión ya tiene contraseña.
+- **Recargar la página en web a mitad del alta lleva a Portada**, no de vuelta a la verificación (`Verification` no tiene ruta propia). La cuenta queda creada sin contraseña y se termina por cualquiera de dos caminos que ya existían: registrarse de nuevo con el mismo correo (manda otro código y fija la contraseña nueva) o «¿La olvidaste?» en Iniciar sesión.
+
+El reenvío espera **60 s** (`ESPERA_REENVIO`), igual que el `max_frequency` de Auth; una prueba lee `supabase/config.toml` y falla si se separan. Eran 42 s, así que el botón se encendía antes de que el servidor aceptara y el rechazo se perdía. Si Auth igual rechaza por frecuencia, la pantalla lo dice y ajusta el reloj a los segundos que el servidor informa. Las seis casillas aceptan el código pegado o autocompletado (`repartirCodigo`); con `maxLength={1}` sólo quedaba el primer dígito.
 
 Una sesión con onboarding completo abre `Main`; una incompleta continúa en ubicación. `AuthProvider` resuelve la sesión antes de montar la navegación y escucha cambios. Una ruta guardada por `withAuthGuard` se consume después del login terminado.
 
