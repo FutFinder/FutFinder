@@ -14,6 +14,11 @@
  * la sensación de que algo se comprobó cuando no se comprobó nada. Es la
  * misma lección del glob de `npm test`, que se tragó ocho pruebas sin
  * decir una palabra.
+ *
+ * SALVO DONDE SE EXIGE. Con `EXIGIR_DENO=1` la falta de Deno es un fallo
+ * (sale con 1). Así corre la integración continua
+ * (`.github/workflows/ci.yml`): ahí no hay nadie leyendo el aviso, y un
+ * paso que «pasa» sin haber corrido es justo lo que no se quiere.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -36,6 +41,10 @@ if (hayDeno.error || hayDeno.status !== 0) {
   console.log('   Instálalo con `brew install deno` y vuelve a correr `npm run verify`.');
   console.log('   (Esto no bloquea el resto, pero tampoco está comprobado.)');
   console.log('');
+  if (process.env.EXIGIR_DENO === '1') {
+    console.log('✖ EXIGIR_DENO=1: acá Deno es obligatorio, así que esto cuenta como fallo.');
+    process.exit(1);
+  }
   process.exit(0);
 }
 
