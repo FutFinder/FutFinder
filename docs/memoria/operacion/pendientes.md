@@ -58,7 +58,7 @@ Detalle y evidencia en [Seguridad y privacidad](../arquitectura/seguridad-y-priv
 - **`lista_de_espera()` no mira si quien llama puede ver el partido**: devuelve la cola de un partido de clubes ajeno si se conoce su id.
 - **Funciones que contestan sobre otra persona** (`perfil_acepta_solicitudes`, `tiene_permiso_de_club`, `es_participante_de_reserva`, `es_organizador_de_reserva`): poco que saber, pero convendría atarlas a `auth.uid()` revisando cada llamada.
 - **`support-screenshots` es un bucket público**: las capturas de «reportar un problema» quedan legibles por URL.
-- **Dos arneses dependen de los datos que haya en la base local, no de la base:** `44d` (caso 10: si el partido de clubes que toma ya pasó, `request_join` contesta `{ok:false, «El partido no está abierto»}` en vez de lanzar, y el arnés lo lee como «dejó entrar»; comprobado el 2026-11-09 que **no inscribe a nadie**: cero filas) y `45` (caso 4, «el club B tiene 2»). Fallan igual con y sin la 171. Hay que hacerlos sembrar su propio partido futuro. (El 2026-11-13 pasaron los dos en una base recién construida: el problema sigue, sólo que no se ve sin datos viejos.)
+- **Cerrado (`05fea89`):** `44d` y `45` dependían de los datos que hubiera en la base local (tomaban «el primer partido que hubiera»); ahora prueban sobre el partido que siembran. El 2026-11-13 pasaron los dos, con la batería entera en 140 de 140 sobre una base recién construida.
 
 ### Otros pendientes, verificados el 2026-11-05
 

@@ -56,7 +56,7 @@ export default function ChatScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [now, setNow] = useState(() => new Date());
 
-  const { connection, isOffline, reportChannelStatus } = useConnection();
+  const { connection, reportChannelStatus } = useConnection();
 
   const mountedRef = useRef(true);
   const reloadTimerRef = useRef(null);

@@ -24,7 +24,6 @@ import {
   Clock,
   Info,
   ListChecks,
-  LogOut,
   MapPin,
   MessageSquare,
   Navigation,

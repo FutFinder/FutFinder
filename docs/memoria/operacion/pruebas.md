@@ -401,7 +401,7 @@ Contados con `ls`: **140 arneses `.sql`**. Base local borrada (`supabase stop --
 - `134` (C06) esperaba el error del disparador (`COLUMNA_PROTEGIDA`) y desde la 165 el privilegio por columna rechaza antes, con 42501. Acepta las dos capas, pero sólo con ese código y ese mensaje: que pase, o cualquier otro error, sigue siendo falla.
 - `176` tomaba «la primera cancha que haya» y una base nueva no tiene ninguna: ahora crea su recinto y su cancha.
 
-**Segunda corrida: 140 de 140.** `44d`, `45`, `83` y `157`, que fallaban en la base vieja, pasaron en la nueva: confirma que dependían de datos acumulados (ver [Pendientes](pendientes.md)).
+**Segunda corrida: 140 de 140.** `44d`, `45`, `83` y `157`, que fallaban en la base vieja, pasaron en la nueva (`44d` y `45` ya se habían corregido en `05fea89` para sembrar su propio partido).
 
 ## La batería completa el 2026-11-09 (134 arneses), y cómo se supo qué no rompió la 171
 

@@ -378,7 +378,6 @@ test('un aviso /importante marca la vista previa como importante', () => {
 });
 
 // ── Agrupación de burbujas ──────────────────────────────────────
-const base = '2026-08-05T20:00:00';
 const msgs = [
   { id: '1', sender_id: 'u2', content: 'Confirmen quién llega', created_at: '2026-08-05T20:04:00' },
   { id: '2', sender_id: 'u2', content: 'Yo llevo los petos', created_at: '2026-08-05T20:05:00' },

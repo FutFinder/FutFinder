@@ -6,7 +6,6 @@ import Sheet from './Sheet';
 import { GhostButton, PrimaryButton } from './ui';
 import {
   paleta as C,
-  radios as R,
   fuentes as F,
   alfa,
 } from '../../theme/colors';

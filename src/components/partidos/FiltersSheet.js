@@ -7,7 +7,6 @@ import PickerSheet from './PickerSheet';
 import { GhostButton, PrimaryButton, OptionChip, SectionLabel, Note, ErrorHint, SelectField } from './ui';
 import {
   paleta as C,
-  radios as R,
   fuentes as F,
   alfa,
 } from '../../theme/colors';

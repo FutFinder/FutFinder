@@ -2,7 +2,6 @@ import React, { useState, useCallback, useRef } from 'react';
 import { View, ScrollView, RefreshControl, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Search, Plus, Star, TrendingUp } from 'lucide-react-native';
 
 import TacticalHeader from '../components/home/TacticalHeader';
 import MyClubCard from '../components/home/MyClubCard';
@@ -77,11 +76,9 @@ export default function HomeScreen({ navigation }) {
   const [matches, setMatches] = useState([]);
   const [profile, setProfile] = useState(null);
   const [myUserId, setMyUserId] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState(null);
   const [previewMatchId, setPreviewMatchId] = useState(null);
-  const [nextMatch, setNextMatch] = useState(null);
   // El fallo de la última carga de partidos (I02), o null.
   const [errorPartidos, setErrorPartidos] = useState(null);
   // `null` es «no se pudo contar»: la tarjeta lo omite en vez de decir 0.
@@ -141,10 +138,9 @@ export default function HomeScreen({ navigation }) {
         .catch(() => {
           if (secuenciaCarga.vigente(turno)) setReportesRecibidos(null);
         });
-      const { inscritos, proximo } = await getMisInscripcionesYProximo(userId);
+      const { inscritos } = await getMisInscripcionesYProximo(userId);
       if (!secuenciaCarga.vigente(turno)) return;
       joinedIds = new Set(inscritos);
-      setNextMatch(proximo);
     }
 
     const clubIds = misClubes?.data || [];
@@ -171,7 +167,6 @@ export default function HomeScreen({ navigation }) {
     if (errorClub) setErrorPartidos((prev) => prev || errorClub);
     else setPartidosDeClub(deClub || []);
 
-    setLoading(false);
     setRefreshing(false);
   }, [secuenciaCarga]);
 
