@@ -11,6 +11,16 @@ aparecían como una pantalla en blanco: el lint y el error boundary.
 
 En cada Mac con `npm run verify` y, desde el 2026-11-14, en GitHub en cada push y PR a `main` (`.github/workflows/ci.yml`; detalle en [Pruebas](pruebas.md)). Un error de lint ahí deja el run en rojo.
 
+## Los seis avisos que quedan (2026-11-14)
+
+Todos son `react-hooks/exhaustive-deps` y se dejaron **a propósito**: arreglarlos cambia cuándo corre un efecto, y eso hay que mirarlo pantalla por pantalla, no en un barrido. (Eran 24; el 2026-11-13 se quitaron las importaciones sin uso y el 14 los tres que sólo pedían `navigation`, que es estable.)
+
+- `ChatThreadScreen` (`cacheSenders`) y `PartidosScreen` (`load`): son funciones que se crean en cada render; agregarlas hace que el efecto corra en cada render (recarga en bucle) salvo que antes se envuelvan en `useCallback` con sus propias dependencias bien puestas.
+- `MatchDetailScreen` (`match`): el efecto lee el partido pero no debe volver a correr cada vez que el partido se recarga.
+- `ProfileScreen` (`authUser?.id`, `isAuthenticated`): agregarlas recarga el perfil al cambiar la sesión; probablemente sea lo correcto, pero es un cambio de comportamiento y va con prueba en pantalla.
+- `HomeScreen` (`handleJoin`): pide envolver `handleJoin` en `useCallback`; toca la inscripción a un partido, el camino más usado de la app.
+- `SplashScreen`: el efecto corre una sola vez al montar y decide a dónde entra la app; no se toca sin poder probar el arranque en teléfono.
+
 ## ESLint
 
 `eslint.config.mjs`, flat config, con `npm run lint` y `npm run verify`

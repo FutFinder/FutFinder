@@ -1,12 +1,19 @@
 # Estado actual
 
-Última revisión: 2026-11-13
+Última revisión: 2026-11-14
 
 ## Qué es esta nota
 
 Una fotografía comprobable de dónde está FutFinder: qué existe, qué está
 aplicado y qué no se ha podido verificar. Lo que está **abierto** vive en
 [Pendientes](pendientes.md); acá no se repite.
+
+## Al 2026-11-14
+
+- **`npm run verify`**: 2.026 pruebas de Node, 82 de Deno y cero errores de lint (6 avisos, explicados en [Calidad y lint](calidad-y-lint.md)). Medido ese día.
+- **Integración continua en GitHub** desde ese día: lint, pruebas, Deno obligatorio y build web en cada push; los arneses SQL cuando cambia la base (ver [Pruebas](pruebas.md)).
+- **Arneses SQL: 143 de 143** en local con las migraciones 179, 180 y 181 aplicadas, y verdes también en GitHub.
+- **Producción tiene todo hasta la 178 salvo la 149.** Las **179** (pausa de pagos), **180** (columnas de `pagos`) y **181** (aceptación de términos) están escritas y probadas pero **sin aplicar**, y `pagar-reserva` tiene un cambio **sin desplegar**: ver «Preparado y sin aplicar» en [Pendientes](pendientes.md). Las cifras de más abajo son de mediciones anteriores.
 
 ## Lo construido
 

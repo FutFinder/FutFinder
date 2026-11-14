@@ -178,7 +178,7 @@ export default function PartidosScreen({ navigation, route }) {
       setMode(route.params.initialMode);
       navigation.setParams({ initialMode: undefined });
     }
-  }, [route.params?.initialMode]);
+  }, [route.params?.initialMode, navigation]);
 
   // Quien llega desde «Ver partidos sin mínimo» tiene que aterrizar con ese
   // filtro puesto, no en el buscador general con los mismos partidos que
@@ -188,7 +188,7 @@ export default function PartidosScreen({ navigation, route }) {
       setFilters((prev) => ({ ...prev, ...route.params.initialFilters }));
       navigation.setParams({ initialFilters: undefined });
     }
-  }, [route.params?.initialFilters]);
+  }, [route.params?.initialFilters, navigation]);
 
   // ------------------------------------------------------------- carga
 

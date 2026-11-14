@@ -177,7 +177,7 @@ export default function PublishMatchScreen({ navigation, route }) {
     if (route?.params?.matchId) {
       navigation.replace('EditMatch', { matchId: route.params.matchId });
     }
-  }, [route?.params?.matchId]);
+  }, [route?.params?.matchId, navigation]);
 
   // La ruta CreateMatch se reutiliza para cada «Publicar partido»: si la
   // pantalla no se remonta entre una publicación y la siguiente (recupera
