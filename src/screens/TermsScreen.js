@@ -13,6 +13,7 @@ import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { completeOnboarding } from '../services/profile';
+import { registrarAceptacionLegal } from '../services/aceptacionLegal';
 import { APP_VERSION } from '../utils/appVersion';
 
 const TERMS_TEXT =
@@ -58,6 +59,16 @@ export default function TermsScreen({ navigation }) {
     if (!canContinue) return;
     setGuardando(true);
     setError(null);
+    // Primero la aceptación (qué versión y cuándo, migración 181) y después
+    // el fin del onboarding: si la primera falla, la persona sigue acá y
+    // reintenta, en vez de quedar «lista» sin constancia de lo que aceptó.
+    // Si el servidor todavía no guarda aceptaciones, no hay error y se sigue.
+    const { error: errAceptacion } = await registrarAceptacionLegal();
+    if (errAceptacion) {
+      setGuardando(false);
+      setError(errAceptacion.message);
+      return;
+    }
     const { error: err } = await completeOnboarding();
     setGuardando(false);
     if (err) {

@@ -11,11 +11,17 @@
  * CADA FRASE TIENE QUE SER VERDAD EN EL CÓDIGO. Antes de cambiar un servicio
  * externo, una clave del almacenamiento local, qué entra en «Exportar mis
  * datos» o una regla de reservas o de clubes, revisa la sección que lo nombra. Si cambia algo de fondo, sube
- * `ACTUALIZADO` y, para cookies, `VERSION_AVISO_COOKIES` en
+ * `ACTUALIZADO` (y `VERSION_LEGAL`, que es la misma fecha) y, para cookies, `VERSION_AVISO_COOKIES` en
  * `utils/avisoCookies.js`, que vuelve a mostrar el aviso en web.
  */
 
 export const ACTUALIZADO = '14 de noviembre de 2026';
+/**
+ * La misma fecha, como la guarda el servidor al aceptar (`aceptar_terminos`,
+ * migración 181). Es la versión del texto: súbela junto con `ACTUALIZADO`
+ * cada vez que cambie algo de fondo. Una prueba falla si se separan.
+ */
+export const VERSION_LEGAL = '2026-11-14';
 export const CORREO_PRIVACIDAD = 'futfindercl@gmail.com';
 
 const privacidad = {
