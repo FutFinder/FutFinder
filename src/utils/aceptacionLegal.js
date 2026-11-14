@@ -36,6 +36,28 @@ export function interpretarAceptacion({ data, error } = {}) {
 export const MENSAJE_NO_GUARDADA =
   'No pudimos guardar tu aceptación. Revisa tu conexión e inténtalo de nuevo.';
 
+/** La tabla `aceptaciones_legales` no existe en el servidor (base sin la 181). */
+export function esTablaInexistente(error) {
+  if (!error) return false;
+  if (error.code === 'PGRST205' || error.code === '42P01') return true;
+  return /could not find the table|relation .* does not exist/i.test(String(error.message || ''));
+}
+
+/**
+ * Las aceptaciones propias, listas para «Exportar mis datos».
+ * Un servidor que todavía no las guarda es una lista vacía, no un error.
+ */
+export function interpretarAceptaciones({ data, error } = {}) {
+  if (error) {
+    if (esTablaInexistente(error)) return { data: [], error: null };
+    return { data: [], error: { message: 'No se pudieron leer tus aceptaciones.' } };
+  }
+  return {
+    data: (Array.isArray(data) ? data : []).map((f) => ({ version: f.version, aceptado_at: f.aceptado_at })),
+    error: null,
+  };
+}
+
 /** `'14 de noviembre de 2026'` → `'2026-11-14'`, o `null` si no se entiende. */
 export function fechaLargaAVersion(texto) {
   const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',

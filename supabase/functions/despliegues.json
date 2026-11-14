@@ -9,7 +9,7 @@
     "Las seis se compararon contra la copia desplegada el 2026-10-16 y las seis coincidían con el repositorio, salvo send-push, que venía atrasada y se redesplegó. El 2026-11-13 se trajeron con get_edge_function las cuatro que estaban con `comparada: null` (pagar-reserva, flow-confirmacion, solicitud-recinto y reportar-problema): los diez archivos dan el mismo sha256 que el repositorio y que este registro, `_shared` incluido.",
     "`pendiente` (opcional, por función) = contenido YA escrito en el repositorio que todavía NO se desplegó, con el sha256 exacto de cada archivo. La guarda lo deja pasar —y lo anuncia— mientras el archivo coincida con ese hash; si se edita otra vez, vuelve a fallar. AL DESPLEGAR: mueve esos hashes a `archivos`, sube `version`/`desplegada` y borra `pendiente`.",
     "La plataforma reporta en `version` UNO MÁS que el número de acá en las siete funciones (comprobado el 2026-11-13 con list_edge_functions): es otra numeración, no código viejo. Lo que manda es el hash; `updated_at` coincide con `desplegada` y `entrypoint_path` termina en el número de acá.",
-    "pagar-reserva se redesplegó el 2026-11-14 (la plataforma reporta version 6): mira el resultado de anotar_referencia_pago y consulta la pausa de la migración 179; trae _shared/pagarReserva.ts. `comparada` quedó en null: no se trajo la copia con get_edge_function; lo comprobado desde fuera es que la consulta de estado ya contesta el campo `pausada`. El primer intento falló al empaquetar por un 521 de esm.sh y no cambió nada."
+    "pagar-reserva se redesplegó el 2026-11-14 (la plataforma reporta version 6): mira el resultado de anotar_referencia_pago y consulta la pausa de la migración 179; trae _shared/pagarReserva.ts. Ese mismo día se trajo con get_edge_function y sus cuatro archivos dan el mismo sha256 que el repositorio. El primer intento falló al empaquetar por un 521 de esm.sh y no cambió nada."
   ],
   "proyecto": "jvfoendzblkoxvwvommz",
   "funciones": {
@@ -43,7 +43,7 @@
     "pagar-reserva": {
       "version": 5,
       "desplegada": "2026-11-14T10:46:26Z",
-      "comparada": null,
+      "comparada": "2026-11-14",
       "archivos": {
         "pagar-reserva/index.ts": "8f721f2d23afb27a50c21fe164f44c978b6afaec94ad82ef1eda218a23ed2738",
         "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",

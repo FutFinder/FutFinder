@@ -12,9 +12,8 @@ Con el sí de Vicente, ese día se aplicaron en producción las migraciones **17
 
 Lo que sigue abierto de ese trabajo:
 
-- **Términos.** Las cuentas que ya existían no tienen ninguna aceptación registrada: falta decidir si se les pide aceptar de nuevo. Falta también sumar esas filas a «Exportar mis datos» y mencionarlo en la política de privacidad. Y la app web ya la registra, pero **un teléfono sólo lo hará con un build nuevo**.
+- **Términos.** Las cuentas que ya existían no tienen ninguna aceptación registrada: **falta decidir (Vicente) si se les pide aceptar de nuevo**. La app web ya la registra, pero un teléfono sólo lo hará con un build nuevo. «Exportar mis datos» ya incluye las aceptaciones (`terminos_aceptados`) y la política de privacidad lo dice.
 - **Pausa de pagos.** Cómo se enciende está en el encabezado de `179_pausa_de_pagos.sql`. Sin probar de punta a punta: no hay Flow conectado (ver [Por probar](por-probar.md)).
-- **`pagar-reserva`** quedó con `comparada: null` en `despliegues.json`: no se trajo la copia desplegada para compararla byte a byte.
 
 ## Diseño propuesto: conciliar los pagos que quedaron `pendiente` (2026-11-14)
 

@@ -69,3 +69,30 @@ test('el paso de términos registra la aceptación antes de dar el onboarding po
   const servicio = fs.readFileSync(path.join(RAIZ, 'src/services/aceptacionLegal.js'), 'utf8');
   assert.match(servicio, /rpc\('aceptar_terminos', \{ p_version: VERSION_LEGAL \}\)/);
 });
+
+test('las aceptaciones entran en «Exportar mis datos», y un servidor sin la tabla es lista vacía', () => {
+  const { interpretarAceptaciones, esTablaInexistente } = require('../aceptacionLegal.js');
+  assert.deepEqual(
+    interpretarAceptaciones({ data: [{ version: '2026-11-14', aceptado_at: '2026-11-14T10:00:00Z', user_id: 'x' }], error: null }),
+    { data: [{ version: '2026-11-14', aceptado_at: '2026-11-14T10:00:00Z' }], error: null }
+  );
+  const sinTabla = { code: 'PGRST205', message: "Could not find the table 'public.aceptaciones_legales' in the schema cache" };
+  assert.equal(esTablaInexistente(sinTabla), true);
+  assert.deepEqual(interpretarAceptaciones({ data: null, error: sinTabla }), { data: [], error: null });
+  assert.ok(interpretarAceptaciones({ data: null, error: { message: 'Failed to fetch' } }).error);
+  assert.deepEqual(interpretarAceptaciones({ data: null, error: null }), { data: [], error: null });
+
+  const exportar = fs.readFileSync(path.join(RAIZ, 'src/services/dataExport.js'), 'utf8');
+  assert.match(exportar, /terminos_aceptados: aceptaciones\.data \|\| \[\]/);
+  // Sólo se piden columnas que la 181 concede.
+  const servicio = fs.readFileSync(path.join(RAIZ, 'src/services/aceptacionLegal.js'), 'utf8');
+  assert.match(servicio, /\.select\('version, aceptado_at'\)/);
+  const sql = fs.readFileSync(path.join(RAIZ, 'supabase/migrations/181_aceptacion_de_terminos.sql'), 'utf8');
+  assert.match(sql, /grant select \(version, aceptado_at, user_id\)/);
+});
+
+test('la política dice que se guarda la aceptación y que entra en el export', () => {
+  const legal = fs.readFileSync(path.join(RAIZ, 'src/data/legal.js'), 'utf8');
+  assert.match(legal, /la versión de los términos y de esta política que aceptaste/);
+  assert.match(legal, /las versiones de los términos que aceptaste/);
+});

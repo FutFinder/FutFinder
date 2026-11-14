@@ -46,7 +46,7 @@ Login valida correo/contraseña, traduce los errores de Auth a mensajes propios 
 
 ## Aceptación de términos con versión (desde el 2026-11-14)
 
-Hasta ahora el servidor sólo sabía que alguien terminó el onboarding, no qué texto aceptó ni cuándo. `TermsScreen` llama a `registrarAceptacionLegal()` (`src/services/aceptacionLegal.js`) antes de `completeOnboarding()`: guarda `VERSION_LEGAL` por la RPC `aceptar_terminos` de la migración 181. Si esa llamada falla de verdad, la persona se queda en la pantalla y reintenta; si la función no existiera en el servidor (la 181 se aplicó en producción el 2026-11-14; esto cubre una base sin ella), no hay error y todo sigue como antes (`src/utils/aceptacionLegal.js`). Subir `ACTUALIZADO` obliga a subir `VERSION_LEGAL`: una prueba falla si se separan. Estado: [Pendientes](../operacion/pendientes.md).
+Hasta ahora el servidor sólo sabía que alguien terminó el onboarding, no qué texto aceptó ni cuándo. `TermsScreen` llama a `registrarAceptacionLegal()` (`src/services/aceptacionLegal.js`) antes de `completeOnboarding()`: guarda `VERSION_LEGAL` por la RPC `aceptar_terminos` de la migración 181. Si esa llamada falla de verdad, la persona se queda en la pantalla y reintenta; si la función no existiera en el servidor (la 181 se aplicó en producción el 2026-11-14; esto cubre una base sin ella), no hay error y todo sigue como antes (`src/utils/aceptacionLegal.js`). «Exportar mis datos» las incluye (`misAceptacionesLegales`, en `terminos_aceptados`). Subir `ACTUALIZADO` obliga a subir `VERSION_LEGAL`: una prueba falla si se separan. Estado: [Pendientes](../operacion/pendientes.md).
 
 ## Pendiente de decisión: edad mínima y menores de 14
 

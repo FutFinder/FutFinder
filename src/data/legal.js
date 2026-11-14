@@ -40,6 +40,7 @@ const privacidad = {
       titulo: 'Qué datos guardamos',
       lista: [
         'Cuenta: correo, contraseña (cifrada por nuestro proveedor de autenticación; nunca la vemos) y, si lo registras, tu número de celular.',
+        'Aceptación de estos textos: la versión de los términos y de esta política que aceptaste al crear tu cuenta, y la fecha.',
         'Perfil: nombre de usuario, foto, portada, edad, biografía, región y comuna, posición, nivel y modalidad que prefieres.',
         'Ubicación: tu posición aproximada, solo si das permiso, para mostrarte partidos cercanos. Puedes usar la app eligiendo una comuna a mano.',
         'Actividad: partidos que publicas o a los que te unes, asistencia, clubes, amistades, bloqueos, reservas de canchas y las calificaciones que das y recibes, con las que se calcula tu Trust Score.',
@@ -101,7 +102,7 @@ const privacidad = {
       ],
       lista: [
         'Editar tu perfil y tus preferencias en cualquier momento.',
-        'Descargar tus datos con «Exportar mis datos» en Ajustes (perfil, partidos, amigos y clubes; los mensajes de chat no se incluyen).',
+        'Descargar tus datos con «Exportar mis datos» en Ajustes (perfil, partidos, amigos, clubes y las versiones de los términos que aceptaste; los mensajes de chat no se incluyen).',
         'Elegir qué notificaciones recibes y desactivar el permiso de ubicación desde tu teléfono o navegador.',
         'Eliminar tu cuenta desde Ajustes → Cuenta.',
       ],
