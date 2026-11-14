@@ -1,6 +1,6 @@
 # Despliegue y entornos
 
-Última revisión: 2026-11-13 (dominio futfinder.cl con DNS en Vercel y `public/` en el export; sin variables de Supabase ya no hay sesión; estados fechados consolidados; reportar-problema y el disparador `notificar_push` en la tabla de Edge Functions)
+Última revisión: 2026-11-14 (dominio futfinder.cl con DNS en Vercel y `public/` en el export; sin variables de Supabase ya no hay sesión; estados fechados consolidados; reportar-problema y el disparador `notificar_push` en la tabla de Edge Functions)
 
 ## Propósito
 
@@ -17,6 +17,14 @@ La configuración del repositorio define exportación web con Vercel, builds nat
 - La regla de reescritura dirige todas las rutas a `index.html`, necesaria para las rutas de una aplicación de una sola página. Los archivos que existen en `dist` se sirven antes que la reescritura.
 - **Dominio propio desde el 2026-11-13**: `futfinder.cl`, inscrito a nombre de Vicente en NIC Chile, con los servidores de nombre de Vercel (`ns1`/`ns2.vercel-dns.com`), así que **el DNS se administra en Vercel** (Domains → futfinder.cl → DNS Records). `futfinder.cl` redirige con 308 a `www.futfinder.cl`. El DNS ya trae los registros de Resend para `envios.futfinder.cl` (ver [Autenticación](../funcionalidades/autenticacion.md)); los CAA los puso Vercel para el certificado y no se tocan.
 - `public/` se copia tal cual al export web, incluida la carpeta `.well-known` (comprobado). Hoy tiene `public/correo/logo.png` (el ícono a 192 px), que usan las plantillas de correo de Auth; los dos archivos de enlaces universales irán en `public/.well-known/` cuando se corra `scripts/enlaces-universales.mjs` (ver [Navegación](navegacion.md)). `vercel.json` sirve `apple-app-site-association` con `Content-Type: application/json`.
+
+## Peso del bundle web (medido el 2026-11-14)
+
+El build web es **un solo archivo JS**. Pesaba **7,19 MB (1,52 MB con gzip)**; quedó en **5,50 MB (1,36 MB)**. La diferencia es Lucide: Metro no descarta lo que no se usa, así que importar un ícono desde la raíz de `lucide-react-native` arrastraba los ~1.500 (1,2 MB, más que todas las pantallas juntas). `scripts/babel/lucidePorIcono.js`, enchufado en `babel.config.js`, reescribe cada `import { X } from 'lucide-react-native'` a su archivo (`…/dist/esm/icons/x.js`) con la tabla que lee del propio paquete; lo que no conoce lo deja como estaba. **En el código se sigue importando desde la raíz, como siempre.** Una prueba falla si la app importa de Lucide algo que el plugin no sabe reescribir.
+
+Lo que sigue pesando, de mayor a menor (atribuido con el source map): las pantallas (0,9 MB), `react-native-reanimated` (0,63 MB; lo exige NativeWind), los componentes (0,35 MB), `react-native-web` (0,28 MB) y Sentry (unos 0,75 MB entre sus paquetes, con *replay* y *feedback* incluidos aunque esté apagado). No toqué nada de eso: partir el bundle por rutas o recortar Sentry cambia cómo carga la app y hay que probarlo en teléfono.
+
+Para volver a medir: `npx expo export --platform web --output-dir <carpeta> --dump-sourcemap` y mirar el `.js` de `_expo/static/js/web/`.
 
 ## Builds nativos con EAS
 

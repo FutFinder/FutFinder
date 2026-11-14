@@ -1,6 +1,6 @@
 # Por probar al final
 
-Última revisión: 2026-11-13
+Última revisión: 2026-11-14
 
 ## Qué es esta nota
 
@@ -135,6 +135,12 @@ carga de saldo.
 - **La migración 175** (chat por Broadcast) está aplicada en producción pero
   su archivo y los cambios del cliente siguen sin commitear en una de las
   Macs: probar el chat en tiempo real cuando ese trabajo se suba.
+
+## Trabajo del 2026-11-14 (informe técnico)
+
+- **Íconos en el build nativo** (plugin `lucidePorIcono`, commit de «peso del bundle»). *Comprobado:* en web cada pantalla abierta dibuja sus íconos y el bundle bajó de 7,19 a 5,50 MB; las pruebas del plugin. *Falta:* en un build de Android y de iOS, abrir Inicio, un partido, el chat y Ajustes y ver que no falte ningún ícono (el plugin corre igual para nativo, pero acá no hay cómo ejecutarlo). Si faltara alguno, quitar el plugin de `babel.config.js` devuelve todo a como estaba.
+- **Alta por correo recuperable** (commit `c9938cc`). *Comprobado:* en web contra la base local, con fallos simulados: falla al guardar la edad → aviso → «Reintentar»; reenvío rechazado por frecuencia; contraseña rechazada → «Crea tu contraseña»; código pegado. *Falta:* en un teléfono, que el teclado ofrezca el código del correo (autocompletado) y que llene las seis casillas.
+- **Pausa de pagos, columnas de `pagos` y aceptación de términos** (migraciones 179, 180 y 181, sin aplicar). *Comprobado:* arneses en local (143/143) y en GitHub. *Falta, después de aplicar cada una:* con Flow en sandbox, encender `pagos_en_pausa` y ver el aviso en el resumen y en la pantalla de pago; pagar una reserva y ver que la pantalla de pago sigue leyendo el estado (180); crear una cuenta y ver su fila en `aceptaciones_legales` (181).
 
 ## Notas relacionadas
 
