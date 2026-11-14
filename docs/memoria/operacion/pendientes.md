@@ -1,10 +1,17 @@
 # Pendientes
 
-Última revisión: 2026-11-13
+Última revisión: 2026-11-14
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
 Los dos informes del 2026-09-23 (`PENDIENTES_CALIDAD_2026-09-23.md`, la lista de calidad de Inicio, Chat, Perfil, Avisos y Ajustes, y `ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`, la auditoría de chats y avisos que la alimentaba) **se cerraron enteros y se borraron el 2026-11-13**: cada ítem quedó con su commit en `main`, listado abajo en «Cerrados de los informes del 2026-09-23». El texto completo sigue en el historial de git.
+
+## Preparado y sin aplicar (informe técnico, 2026-11-14)
+
+Trabajo escrito y probado en la base local que **no está en producción**. Cada uno espera lo mismo: **falta el sí de Vicente para aplicar/desplegar**.
+
+- **Migración 179, `179_pausa_de_pagos.sql` — interruptor para dejar de cobrar.** Bandera `pagos_en_pausa` (nace apagada), disparador `tg_pagos_en_pausa` antes de INSERT en `pagos` (rechaza con 55000) y `pagos_en_pausa()` sólo para `service_role`. No mira UPDATE: confirmar y devolver siguen funcionando con la bandera encendida. Arnés `179_pausa_de_pagos_test.sql`, 12/12 en local, y falla si se quita el disparador. Aplicarla no cambia nada mientras la bandera esté apagada. Cómo se enciende: ver el encabezado de la migración.
+- **Edge Function `pagar-reserva` — figura como `pendiente` en `despliegues.json`.** Dos cambios: (1) mira el **resultado** de `anotar_referencia_pago`, que contesta `{ ok: false }` con HTTP 200 cuando el pago ya no está pendiente —antes sólo se miraba el error de transporte y se mandaba a la persona a pagar un cobro cuyo token la base no conocía—; (2) consulta la pausa y contesta `pausada: true` con un motivo, también en la consulta de estado. Trae un archivo nuevo, `_shared/pagarReserva.ts` (hay que mandarlo en el despliegue). **Orden indiferente con la 179**: sin la migración la función no ve pausa; sin la función, la migración igual corta en la base y la app muestra el error genérico. La app ya entiende `pausada` (fase propia en `PagoReservaScreen`, botón apagado en `ResumenReservaScreen`) y tolera una función que no lo mande.
 
 ## Auditoría de lanzamiento (2026-11-13)
 

@@ -33,6 +33,16 @@
 // pendiente por el mismo monto, se devuelve el MISMO enlace; si no, se cierra
 // en la base y se arma una orden nueva.
 //
+// LA PAUSA (migración 179). Con la bandera `pagos_en_pausa` encendida no se
+// crea ningún cobro nuevo: se contesta 200 con `pausada: true` y un motivo,
+// ANTES de tocar la base o Flow. `flow-confirmacion` no la mira: lo que ya
+// se pagó se registra igual. La barrera de verdad es el disparador de la
+// base; esto es para decirlo claro (ver `_shared/pagarReserva.ts`).
+//
+// ANOTAR EL TOKEN PUEDE FALLAR SIN ERROR. `anotar_referencia_pago` contesta
+// `{ ok: false }` con HTTP 200 si el pago ya no está pendiente. Se mira el
+// resultado (`referenciaAnotada`), no sólo el error de transporte.
+//
 // SIN CREDENCIALES NO FALLA: contesta 200 con `configurada: false` y la app
 // muestra que la pasarela todavía no está conectada. Es el estado real
 // mientras no exista la cuenta de la empresa.
@@ -49,6 +59,7 @@ import {
   urlDePago,
 } from "../_shared/flowLogic.ts";
 import { registrarCobro } from "../_shared/flowPagos.ts";
+import { estaEnPausa, MOTIVO_PAUSA, referenciaAnotada } from "../_shared/pagarReserva.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,6 +98,11 @@ Deno.serve(async (req) => {
 
   const config = leerConfig((k) => Deno.env.get(k));
 
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const comoServicio = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  // Sin pasarela conectada no hay nada que pausar: ni se pregunta.
+  const pausada = config ? estaEnPausa(await comoServicio.rpc("pagos_en_pausa")) : false;
+
   // Consulta de estado: la app pregunta ANTES de dejar apretar el botón, para
   // no crear una reserva que después no se puede pagar.
   const url = new URL(req.url);
@@ -95,6 +111,7 @@ Deno.serve(async (req) => {
       ok: true,
       configurada: !!config,
       ambiente: config?.ambiente ?? null,
+      pausada,
     });
   }
 
@@ -104,6 +121,9 @@ Deno.serve(async (req) => {
       configurada: false,
       reason: "La pasarela de pago todavía no está conectada.",
     });
+  }
+  if (pausada) {
+    return json({ ok: false, configurada: true, pausada: true, reason: MOTIVO_PAUSA });
   }
   if (!config.functionsBase) {
     console.error("[flow] sin SUPABASE_URL ni FUNCTIONS_BASE_URL: Flow no sabría a dónde avisar");
@@ -121,7 +141,6 @@ Deno.serve(async (req) => {
   }
   if (!reservaId) return json({ ok: false, reason: "Falta la reserva" }, 400);
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   // Con la sesión del jugador: la base aplica RLS y sus propias reglas.
   const comoJugador = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { Authorization: auth } },
@@ -131,7 +150,6 @@ Deno.serve(async (req) => {
   const email = usuario?.user?.email;
   if (!email) return json({ ok: false, reason: "No autenticado" }, 401);
 
-  const comoServicio = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const iniciar = () => comoJugador.rpc("iniciar_pago_reserva", { p_reserva_id: reservaId });
 
   // ── 1. La base crea (o reusa) el pago pendiente ────────────────
@@ -260,13 +278,15 @@ Deno.serve(async (req) => {
   // no empezó.
   // `url` y `montoFlow` se guardan para poder devolver ESTE enlace si la
   // persona vuelve a tocar «pagar» mientras sigue vigente (ver 1b).
-  const { error: errRef } = await comoServicio.rpc("anotar_referencia_pago", {
+  const anotada = referenciaAnotada(await comoServicio.rpc("anotar_referencia_pago", {
     p_orden_comercio: orden,
     p_referencia: creado.token,
     p_datos: { flowOrder: creado.flowOrder ?? null, ambiente: config.ambiente, url: creado.url, montoFlow: monto },
-  });
-  if (errRef) {
-    console.error("[flow] anotar_referencia_pago:", errRef.code, "orden:", orden);
+  }));
+  if (!anotada.ok) {
+    // La orden quedó creada en Flow pero nadie recibe su enlace: vence sola
+    // a los MINUTOS_DE_PAGO sin que se pueda pagar.
+    console.error("[flow] anotar_referencia_pago:", anotada.motivo, "orden:", orden);
     return json({ ok: false, reason: "No se pudo registrar el pago. No se te cobró nada." }, 500);
   }
 

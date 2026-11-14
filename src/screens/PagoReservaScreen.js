@@ -10,6 +10,7 @@ import { IconButton, Card, Button, StickyFooter, NoticeCard } from '../component
 import { iniciarPagoReserva, estadoDePago } from '../services/pagos';
 import {
   faseDePago, sigueEsperando, esperaSiguiente, seAcaboLaEspera, textoDeFase, accionDeFase,
+  faseAlFallarElInicio,
 } from '../utils/pagosCliente';
 import { formatCLP } from '../services/reservasRules';
 
@@ -84,9 +85,9 @@ export default function PagoReservaScreen({ navigation, route }) {
       const { data, error } = await iniciarPagoReserva(reservaId);
       if (!vivo.current) return;
       if (error) {
-        // `configurada: false` es «la pasarela todavía no existe», que no es
-        // lo mismo que «falló»: se dice distinto porque es otra cosa.
-        fijarFase(data?.configurada === false ? 'nodisponible' : 'error');
+        // «Todavía no hay pasarela», «está en pausa» y «falló» son tres
+        // cosas distintas y se dicen distinto (ver `faseAlFallarElInicio`).
+        fijarFase(faseAlFallarElInicio(data));
         setPago({ reason: error.message });
         return;
       }
@@ -170,7 +171,7 @@ export default function PagoReservaScreen({ navigation, route }) {
             <Text style={[styles.estadoTitulo, { color }]}>{texto.titulo}</Text>
           </View>
           <Text style={styles.estadoCuerpo}>{texto.cuerpo}</Text>
-          {pago?.reason && fase !== 'nodisponible' ? (
+          {pago?.reason && fase !== 'nodisponible' && fase !== 'pausada' ? (
             <Text style={styles.estadoDetalle}>{pago.reason}</Text>
           ) : null}
         </Card>
@@ -215,6 +216,13 @@ export default function PagoReservaScreen({ navigation, route }) {
             Llevamos varios minutos sin novedades del banco. Eso no quiere decir que el pago haya
             fallado: si salió, tu reserva va a aparecer confirmada igual y te avisamos. Puedes
             revisarla en «Mis reservas».
+          </NoticeCard>
+        ) : null}
+
+        {fase === 'pausada' ? (
+          <NoticeCard tone="warning">
+            Tu reserva quedó guardada pero sin pagar, así que la hora no está tomada y se vence
+            sola. Vuelve a intentarlo en un rato.
           </NoticeCard>
         ) : null}
 

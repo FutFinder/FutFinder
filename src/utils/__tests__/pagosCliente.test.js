@@ -90,3 +90,34 @@ test('el texto de rechazada dice que no se cobró nada', () => {
   assert.match(textoDeFase('rechazada').cuerpo, /no se te descontó nada/i);
   assert.match(textoDeFase('expirada').cuerpo, /no se te descontó nada/i);
 });
+
+// ── Pausa de pagos (migración 179) ──────────────────────────────
+test('al fallar el inicio: sin pasarela, en pausa y error son tres cosas distintas', () => {
+  const { faseAlFallarElInicio } = require('../pagosCliente.js');
+  assert.equal(faseAlFallarElInicio({ configurada: false }), 'nodisponible');
+  assert.equal(faseAlFallarElInicio({ configurada: true, pausada: true }), 'pausada');
+  assert.equal(faseAlFallarElInicio({ configurada: true, pausada: false }), 'error');
+  // Una función desplegada sin el campo, o un fallo de red: no se inventa una pausa.
+  assert.equal(faseAlFallarElInicio({ configurada: true }), 'error');
+  assert.equal(faseAlFallarElInicio(null), 'error');
+  // Sin pasarela manda sobre la pausa: no hay nada que pausar.
+  assert.equal(faseAlFallarElInicio({ configurada: false, pausada: true }), 'nodisponible');
+});
+
+test('la pausa tiene texto propio, dice que no se cobró y no se queda esperando', () => {
+  assert.ok(FASES.includes('pausada'));
+  const t = textoDeFase('pausada');
+  assert.match(t.titulo, /pausa/i);
+  assert.match(t.cuerpo, /no se te cobró/i);
+  assert.equal(sigueEsperando('pausada'), false);
+  assert.deepEqual(accionDeFase('pausada'), { label: 'Volver', accion: 'atras' });
+});
+
+test('el servicio y las pantallas leen la pausa que contesta la función', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const leer = (p) => fs.readFileSync(path.join(__dirname, '..', '..', p), 'utf8');
+  assert.match(leer('services/pagos.js'), /pausada: data\?\.pausada === true/);
+  assert.match(leer('screens/PagoReservaScreen.js'), /faseAlFallarElInicio\(data\)/);
+  assert.match(leer('screens/ResumenReservaScreen.js'), /pasarela === false \|\| enPausa/);
+});

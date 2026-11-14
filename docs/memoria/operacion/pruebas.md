@@ -1,6 +1,17 @@
 # Pruebas
 
-Última revisión: 2026-11-13
+Última revisión: 2026-11-14
+
+## Integración continua (desde el 2026-11-14)
+
+Dos workflows en `.github/workflows/`, los dos sin secretos:
+
+- **`ci.yml`**, en cada push y PR a `main`: `npm ci`, lint, pruebas de Node, pruebas y tipos de Deno, y `npm run build:web`. **Deno es obligatorio ahí**: corre con `EXIGIR_DENO=1`, que hace que `scripts/pruebas-edge.mjs` falle si falta (en una Mac sin Deno sigue avisando sin bloquear). El build sale sin variables `EXPO_PUBLIC_*`, o sea en modo de demostración: prueba que el bundle se arma, no lo publica.
+- **`arneses.yml`**, sólo cuando cambian `supabase/schema.sql`, las migraciones, los arneses o los scripts que los aplican, y a mano desde Actions: levanta el stack de Supabase en el runner, construye la base con `construir-base.mjs --sin-149` y corre todos los arneses. El `config.toml` se escribe en una carpeta temporal sin `migrations/`, por la misma razón que en las Macs vive fuera del repositorio.
+
+**El runner está en UTC y eso es a propósito un canario.** El primer run falló en tres pruebas que comparaban horas formateadas contra fechas con desfase de Chile: pasaban sólo porque las Macs están en Santiago. Una prueba que formatea fechas fija su zona (`process.env.TZ = 'America/Santiago'` antes de crear ninguna fecha) o usa una hora que cae en el mismo día en cualquier zona.
+
+Para ver cómo salió: `gh run list --limit 5`.
 
 ## Comprobaciones locales del proyecto
 

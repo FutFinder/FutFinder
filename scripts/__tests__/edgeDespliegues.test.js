@@ -57,8 +57,13 @@ test('cada función registra su index.ts y TODO lo que importa de _shared', () =
     const fuente = fs.readFileSync(path.join(DIR, nombre, 'index.ts'), 'utf8');
     for (const m of fuente.matchAll(/from\s+"\.\.\/_shared\/([\w.-]+)"/g)) {
       const esperado = `_shared/${m[1]}`;
+      // Un archivo NUEVO de `_shared` todavía no tiene hash desplegado: basta
+      // con que esté en `pendiente`, que es donde se anota lo escrito y sin
+      // desplegar. Al desplegar pasa a `archivos` como los demás.
+      const registrado = info.archivos[esperado]
+        || (info.pendiente && info.pendiente.archivos && info.pendiente.archivos[esperado]);
       assert.ok(
-        info.archivos[esperado],
+        registrado,
         `${nombre}: importa ${esperado} y no está en despliegues.json`
       );
     }

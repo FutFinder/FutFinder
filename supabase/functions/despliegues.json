@@ -47,6 +47,14 @@
         "pagar-reserva/index.ts": "63b233731af32fa63605622db500d81ccd4e2e74afc0b88e922a22f5fc91d80e",
         "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
         "_shared/flowPagos.ts": "24bc537ee7a06914de96d37ee5681706cf9ea677397eb8c0cf5ee936872c8571"
+      },
+      "pendiente": {
+        "motivo": "Mira el resultado de anotar_referencia_pago (no sólo el error de transporte) y consulta la pausa de pagos de la migración 179. Importa un archivo nuevo, _shared/pagarReserva.ts. Sirve con o sin la 179 aplicada (sin ella, nunca hay pausa). Falta el sí de Vicente para desplegar.",
+        "desde": "2026-11-14",
+        "archivos": {
+          "pagar-reserva/index.ts": "8f721f2d23afb27a50c21fe164f44c978b6afaec94ad82ef1eda218a23ed2738",
+          "_shared/pagarReserva.ts": "51ce470c6dbf453aaf4cc15d2cc12ac2a400a63dc4e6623c730bbc7be8d9f92d"
+        }
       }
     },
     "reportar-problema": {

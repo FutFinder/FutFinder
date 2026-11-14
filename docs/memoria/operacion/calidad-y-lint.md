@@ -1,11 +1,15 @@
 # Calidad: lint y errores de render
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-14
 
 ## Propósito
 
 Dejar por escrito las dos redes que atrapan los fallos que antes solo
 aparecían como una pantalla en blanco: el lint y el error boundary.
+
+## Dónde corre
+
+En cada Mac con `npm run verify` y, desde el 2026-11-14, en GitHub en cada push y PR a `main` (`.github/workflows/ci.yml`; detalle en [Pruebas](pruebas.md)). Un error de lint ahí deja el run en rojo.
 
 ## ESLint
 

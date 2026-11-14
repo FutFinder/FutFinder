@@ -73,6 +73,8 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const [telefono, setTelefono] = useState('');
   const [loading, setLoading] = useState(true);
   const [pasarela, setPasarela] = useState(null);
+  // Los cobros con tarjeta están cortados por un momento (migración 179).
+  const [enPausa, setEnPausa] = useState(false);
   const [creando, setCreando] = useState(false);
   const [toast, setToast] = useState(null);
   // Si se viene desde un desafío de clubes, la reserva es de ese partido y
@@ -96,6 +98,7 @@ export default function ResumenReservaScreen({ navigation, route }) {
     // `null` si no se pudo comprobar: no es lo mismo que «no hay». Con `null`
     // el botón queda disponible y el error, si llega, aparece al tocarlo.
     setPasarela(ps ? !!ps.configurada : null);
+    setEnPausa(ps?.pausada === true);
     setLoading(false);
   }, [complejoId]);
 
@@ -420,6 +423,13 @@ export default function ResumenReservaScreen({ navigation, route }) {
           </NoticeCard>
         ) : null}
 
+        {!divide && pasarela !== false && enPausa ? (
+          <NoticeCard tone="warning">
+            Por un momento no estamos recibiendo pagos con tarjeta. Inténtalo de nuevo más tarde:
+            no se te cobró nada.
+          </NoticeCard>
+        ) : null}
+
         {saldoCorto ? (
           <NoticeCard tone="warning">
             Tu parte son {formatCLP(reparto.cuota)} y tu saldo es {formatCLP(saldo)}. Cargar saldo
@@ -435,7 +445,7 @@ export default function ResumenReservaScreen({ navigation, route }) {
           label={divide
             ? `${entreCapitanes ? 'Armar la reserva' : 'Armar el grupo'} · ${formatCLP(reparto.cuota)} c/u`
             : (listo ? `Continuar al pago · ${formatCLP(dinero.total)}` : 'Continuar al pago')}
-          disabled={!listo || (!divide && pasarela === false)}
+          disabled={!listo || (!divide && (pasarela === false || enPausa))}
           loading={creando}
           onPress={continuar}
         />
