@@ -17,6 +17,34 @@ Trabajo escrito y probado en la base local que **no está en producción**. Cada
 
 - **Migración 181, `181_aceptacion_de_terminos.sql` — qué versión de los términos aceptó cada persona.** Tabla `aceptaciones_legales` (una fila por persona y versión, hora del servidor, se borra con la cuenta) y RPC `aceptar_terminos(p_version)`, la única manera de escribir. La app ya la llama en el paso «Términos y condiciones» del onboarding, **antes** de `completeOnboarding`, con `VERSION_LEGAL` de `src/data/legal.js` (la misma fecha de `ACTUALIZADO`; una prueba las ata). **Tolera que la función no exista** (`PGRST202` → sigue como hasta hoy), así que build y migración pueden salir en cualquier orden. Arnés 20/20 en local y probada por la API local con una cuenta de prueba. Al aplicarla quedan tres cosas por decidir, que no hice: (1) las cuentas actuales no tienen ninguna aceptación registrada: ¿se les pide aceptar de nuevo al abrir la app?; (2) agregar estas filas a «Exportar mis datos»; (3) decirlo en la política de privacidad, que hoy no lo menciona porque en producción todavía no es verdad.
 
+## Diseño propuesto: conciliar los pagos que quedaron `pendiente` (2026-11-14)
+
+**Sólo diseño; no hay código.** Lo pide el informe técnico y depende de tres decisiones de Vicente (al final).
+
+**El hueco, comprobado.** Un pago pasa de `pendiente` a otro estado sólo si llega el aviso de Flow (`flow-confirmacion`) o si la misma persona vuelve a tocar «pagar» (`pagar-reserva` pregunta por el token anterior). Ninguna de las 13 tareas de `pg_cron` mira `pagos`: `vencer_reservas_pasadas` vence la reserva y manda a devolver los pagos `pagado`, pero deja los `pendiente` como están. Si alguien paga y el aviso se pierde —Flow reintenta, pero no para siempre— y no vuelve a la app, queda **plata cobrada con el pago en `pendiente` y sin ninguna marca**: no aparece en la revisión diaria, que sólo lista `reversar`. Hoy no hay pagos reales, así que no hay plata afectada.
+
+**La propuesta.**
+
+1. **Una Edge Function nueva, `conciliar-pagos`**, sin JWT de usuario y protegida por un secreto propio en la cabecera (el mismo patrón de `send-push`, con el secreto en Vault). Tiene que ser Edge Function y no SQL porque hay que firmar la consulta a Flow con la Secret Key, que no vive en la base.
+2. **La llama `pg_cron` cada 10 minutos** con `net.http_post` (ya se usa para el push).
+3. **Qué revisa en cada pasada:** los pagos `pendiente` con `referencia_externa` (token) cuya creación tenga más de N minutos (N = la vida del enlace, 15, más un margen), de a un lote chico (20) y los más viejos primero. Los `pendiente` **sin** token no se le preguntan a Flow —nunca llegó a existir un cobro que la persona pudiera pagar— y se cierran como `expirado` pasado el mismo plazo.
+4. **Qué hace con cada uno,** preguntando `payment/getStatus` por el token y reusando lo que ya existe, sin lógica nueva de dinero:
+   - Flow dice **pagado** → `registrarCobro` (`_shared/flowPagos.ts`), el mismo camino del aviso: confirma, o deja en `reversar` si la hora ya se la llevó otro o la reserva venció, o marca la diferencia de monto.
+   - Flow dice **rechazado o anulado** → `rechazar_pago` con `fallido`/`expirado` (`accionSegunEstado`).
+   - Flow dice **pendiente** → no se toca. **Un enlace puede seguir pagable**: marcarlo vencido de nuestro lado sin que Flow lo haya cerrado es justo como se pierde un cobro. Sólo se cuenta para la alerta.
+   - Flow **no contesta** → no se toca; se reintenta en la pasada siguiente.
+5. **Idempotente por construcción:** `confirmar_pago`, `pago_cobrado_sin_reserva` y `rechazar_pago` ya reconocen un pago resuelto, así que conciliar y recibir el aviso a la vez no duplica nada (lo ejercita `scripts/carrera-dos-pagos.mjs` para `confirmar_pago`).
+6. **No mira la pausa** (`pagos_en_pausa`): conciliar no crea cobros, y es justamente lo que tiene que seguir andando durante una pausa.
+7. **Qué deja a la vista:** una fila por pasada en una tabla chica (`conciliaciones`: cuándo, cuántos revisó, confirmados, cerrados, sin respuesta) y, en la [revisión diaria](revision-diaria.md), una consulta nueva: pagos `pendiente` con más de 24 horas, que con esto debería venir siempre vacía.
+
+**Cómo se prueba antes de aplicar:** la decisión por estado es lógica pura y va con pruebas de Deno; el recorrido completo, contra la base local con un Flow simulado (un servidor de mentira que contesta `getStatus`), más un arnés SQL para la selección del lote.
+
+**Decisiones que necesito de ti, Vicente:**
+
+- **¿Cuánto se espera antes de mirar un pendiente?** Propongo 20 minutos (15 del enlace + 5).
+- **¿Quién se entera, y cómo, cuando la conciliación encuentra plata cobrada sin reserva?** Hoy esos casos sólo aparecen en la consulta de la revisión diaria. ¿Basta eso, o quieres un correo al de contacto por cada uno?
+- **¿Un `pendiente` que Flow sigue informando como pendiente después de días se cierra a la fuerza?** Yo no lo cerraría sin que Flow lo dé por vencido; si quieres un tope (por ejemplo 48 horas), hay que confirmar antes con Flow que un cobro de esa edad ya no se puede pagar.
+
 ## Auditoría de lanzamiento (2026-11-13)
 
 > Lo que se cambió en esta tanda y **falta probar** está junto en [Por probar](por-probar.md): se prueba todo al final.
