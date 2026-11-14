@@ -6,8 +6,9 @@
     "`comparada` es el día en que ese contenido se trajo con get_edge_function y se verificó contra el repositorio. `null` significa que el hash es el del archivo de hoy y se dio por bueno sin traer la copia desplegada.",
     "AL DESPLEGAR: actualiza version, desplegada y los hashes. Es a propósito que haya que tocar esto a mano.",
     "UN CAMBIO EN _shared/ NO ESTÁ EN PRODUCCIÓN HASTA REDESPLEGAR CADA FUNCIÓN QUE LO IMPORTA: la copia viaja dentro de cada despliegue.",
-    "Las seis se compararon contra la copia desplegada el 2026-10-16 y las seis coincidían con el repositorio, salvo send-push, que venía atrasada y se redesplegó. Desde el 2026-11-09 hay cuatro con `comparada: null` (pagar-reserva, flow-confirmacion, solicitud-recinto y reportar-problema): se desplegaron ese día por el MCP desde el contenido del repositorio y el hash es el del archivo, pero la copia desplegada no se comparó por hash (la de reportar-problema se trajo y se leyó igual). La próxima comparación con get_edge_function les pone fecha.",
-    "`pendiente` (opcional, por función) = contenido YA escrito en el repositorio que todavía NO se desplegó, con el sha256 exacto de cada archivo. La guarda lo deja pasar —y lo anuncia— mientras el archivo coincida con ese hash; si se edita otra vez, vuelve a fallar. AL DESPLEGAR: mueve esos hashes a `archivos`, sube `version`/`desplegada` y borra `pendiente`."
+    "Las seis se compararon contra la copia desplegada el 2026-10-16 y las seis coincidían con el repositorio, salvo send-push, que venía atrasada y se redesplegó. El 2026-11-13 se trajeron con get_edge_function las cuatro que estaban con `comparada: null` (pagar-reserva, flow-confirmacion, solicitud-recinto y reportar-problema): los diez archivos dan el mismo sha256 que el repositorio y que este registro, `_shared` incluido.",
+    "`pendiente` (opcional, por función) = contenido YA escrito en el repositorio que todavía NO se desplegó, con el sha256 exacto de cada archivo. La guarda lo deja pasar —y lo anuncia— mientras el archivo coincida con ese hash; si se edita otra vez, vuelve a fallar. AL DESPLEGAR: mueve esos hashes a `archivos`, sube `version`/`desplegada` y borra `pendiente`.",
+    "La plataforma reporta en `version` UNO MÁS que el número de acá en las siete funciones (comprobado el 2026-11-13 con list_edge_functions): es otra numeración, no código viejo. Lo que manda es el hash; `updated_at` coincide con `desplegada` y `entrypoint_path` termina en el número de acá."
   ],
   "proyecto": "jvfoendzblkoxvwvommz",
   "funciones": {
@@ -23,7 +24,7 @@
     "flow-confirmacion": {
       "version": 4,
       "desplegada": "2026-11-13T23:22:17Z",
-      "comparada": null,
+      "comparada": "2026-11-13",
       "archivos": {
         "flow-confirmacion/index.ts": "fda6e3fc1da2d1cddbbb8729bf425673181c637be073fad0c4724ce0e6337dc6",
         "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
@@ -41,7 +42,7 @@
     "pagar-reserva": {
       "version": 4,
       "desplegada": "2026-11-13T23:23:48Z",
-      "comparada": null,
+      "comparada": "2026-11-13",
       "archivos": {
         "pagar-reserva/index.ts": "63b233731af32fa63605622db500d81ccd4e2e74afc0b88e922a22f5fc91d80e",
         "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
@@ -51,7 +52,7 @@
     "reportar-problema": {
       "version": 3,
       "desplegada": "2026-11-10T02:17:41Z",
-      "comparada": null,
+      "comparada": "2026-11-13",
       "archivos": {
         "reportar-problema/index.ts": "72c15fd4c8bd4a586169d3894d46031d3a7c3aa347810aa9c9fdb85a24b5aeed",
         "_shared/correoReporte.ts": "66fe8c0874f6eaf22cb7d03f8ac0d474b74754af41c50054d9eda9dbba63dee2"
@@ -69,7 +70,7 @@
     "solicitud-recinto": {
       "version": 8,
       "desplegada": "2026-11-10T01:23:05Z",
-      "comparada": null,
+      "comparada": "2026-11-13",
       "archivos": {
         "solicitud-recinto/index.ts": "cd6919e9ce1870575fede9e41a4fd87723f083a993846aa0d4e3ffea43a63621",
         "_shared/correoSolicitud.ts": "b0f4ba51d671685ac01caacfbf109487f816668b2844cd4562decbc835071593"
