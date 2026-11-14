@@ -481,6 +481,10 @@ begin
   -- existe `tipo` ni `creado_por`), y `tg_match_future_only` rechaza
   -- insertar un partido con hora pasada: se crea a futuro y se mueve al
   -- pasado con un update, que es lo que el disparador sí permite.
+  -- Desde la 177 el cliente sólo inserta en `matches` las columnas que manda
+  -- `createMatch` (ni `id` ni `cupos_por_club`): el partido de un desafío lo
+  -- arma el servidor, así que este armado también se hace como el dueño.
+  reset role;
   insert into public.matches (id, id_organizador, titulo, comuna, cancha_nombre,
       latitud, longitud, hora, cupos_totales, cupos_disponibles,
       duracion_min, cupos_por_club, club_local_id, club_visitante_id)
@@ -494,7 +498,6 @@ begin
   -- El armado es cosa del servidor: la 165 deja que `authenticated` sólo
   -- rechace, cancele y vincule el partido por la API, así que este
   -- estado se escribe como el dueño y se vuelve a la sesión después.
-  reset role;
   update public.club_challenges
      set estado = 'esperando_resultado', match_id = v_match_id
    where id = v_challenge_id;

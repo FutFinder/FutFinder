@@ -41,7 +41,10 @@ do $$
 declare v_n integer;
 begin
   -- ── Caso 1: control, las otras escrituras siguen ahí ──────────
-  if not (has_table_privilege('authenticated', 'public.matches', 'insert')
+  -- Desde la 177, `insert` sobre `matches` es por columna (sólo lo que manda
+  -- `createMatch`), igual que el `update` desde la 165: el control mira que
+  -- quede ALGUNA columna escribible, no la tabla entera.
+  if not (has_any_column_privilege('authenticated', 'public.matches', 'insert')
           and has_any_column_privilege('authenticated', 'public.matches', 'update')
           and has_table_privilege('authenticated', 'public.matches', 'delete')) then
     raise exception 'CASO 1 FALLA: se llevó por delante insert/update/delete. '

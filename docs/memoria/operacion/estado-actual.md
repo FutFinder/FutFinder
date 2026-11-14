@@ -1,6 +1,6 @@
 # Estado actual
 
-Última revisión: 2026-11-09
+Última revisión: 2026-11-13
 
 ## Qué es esta nota
 
@@ -87,7 +87,9 @@ de canchas. `src/services/` concentra las llamadas de dominio.
   2026-10-16 (285) es `moderacion_aprobar_recinto`, de la 164. La nota
   anterior decía 147 políticas; son 118 en `public`, medidas sobre
   `pg_policy`.
-- **127 arneses SQL** y **3 de concurrencia `.cjs`** en `supabase/tests/`
+- **140 arneses SQL, 140 de 140 en verde el 2026-11-13** contra una base
+  reconstruida desde cero igual a producción (ver [Pruebas](pruebas.md)).
+  Lo que sigue es la historia de esta línea: **127 arneses SQL** y **3 de concurrencia `.cjs`** en `supabase/tests/`
   (contados con `ls` el 2026-11-05). Los **126 en verde** son de antes de la
   migración 164: se midieron contra una base construida desde cero con el
   repositorio **y con los interruptores de producción** (2026-10-17). **El

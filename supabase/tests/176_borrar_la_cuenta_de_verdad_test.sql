@@ -106,7 +106,19 @@ begin
 
   -- Reservas. La pasada se crea a futuro (el pago no se acepta para el
   -- pasado) y después se corre al pasado.
-  select id into v_cancha from public.canchas_reservables limit 1;
+  -- Una cancha propia del arnés: tomar «la primera que haya» sólo andaba en
+  -- una base con datos, y en una base recién construida no hay ninguna.
+  declare
+    v_cpl176 uuid := gen_random_uuid();
+  begin
+    insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+    values (v_cpl176, 'Recinto arnés 176', 'Ñuñoa', -33.45, -70.60, true);
+    insert into public.canchas_reservables (complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
+    values (v_cpl176, 'Cancha arnés 176', 'futbol_7', 30000, 60, true)
+    returning id into v_cancha;
+    insert into public.cancha_horario_reglas (cancha_id, dia_semana, hora_apertura, hora_cierre)
+    select v_cancha, d, time '00:00', time '23:00' from generate_series(0, 6) as d;
+  end;
   insert into public.reservas (cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, modalidad, medio_pago, precio_cancha, estado)
   values (v_cancha, u1, current_date + 300, '05:17', '06:17', 30000, 'completa', 'tarjeta', 30000, 'confirmada') returning id into r_pasada;
   insert into public.pagos (user_id, reserva_id, monto, proveedor, orden_comercio, estado, pagado_at)

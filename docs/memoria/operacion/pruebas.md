@@ -1,6 +1,6 @@
 # Pruebas
 
-Última revisión: 2026-11-09
+Última revisión: 2026-11-13
 
 ## Comprobaciones locales del proyecto
 
@@ -390,6 +390,18 @@ Contados con `ls supabase/tests` el 2026-11-05: **127 arneses `.sql` y 3 de conc
 **El 127 es `164_recinto_esperando_revision_test.sql`**, de la migración 164 (la cuarta cola de moderación, «Recintos esperando revisión»). Cubre seis cosas: que quien no está en el padrón no ve la cola ni aprueba (`NO_MODERA`, 42501); que un recinto que pidió revisión y no está aprobado aparece con su comuna y sus canchas activas con horario; el control negativo —uno aprobado y uno que nunca pidió revisión **no** aparecen—; que aprobar lo saca de la cola y **no lo publica**; que aprobar dos veces no es un error y aprobar algo inexistente devuelve `ok:false`; y que las tres colas de la 151 siguen estando.
 
 **Qué está medido y qué no:** el «126 de 126 con los interruptores de producción» es del 2026-10-17 y es **anterior a la migración 164** (2026-10-19). El arnés de la 164 **no se re-ejecutó en esta revisión**, ni se volvió a correr la suite entera, así que «127 de 127» no es un dato medido. Sí se midieron el 2026-11-05 las 49 pruebas de Deno (ver arriba).
+
+## La batería completa el 2026-11-13: 140 de 140, sobre una base recién construida
+
+Contados con `ls`: **140 arneses `.sql`**. Base local borrada (`supabase stop --no-backup`) y reconstruida con `node scripts/construir-base.mjs --sin-149`: **188/188 migraciones**, o sea todo lo que tiene producción (hasta la 178, sin la 149). Auth local con lo mismo que producción: código de 6 dígitos, vigencia de 900 s y TOTP habilitado (en `~/.futfinder-local/supabase/config.toml`, fuera del repo).
+
+**Primera corrida: 135 de 140. Ninguna de las cinco era un fallo de la base ni de la app**, y se comprobó antes de tocarlas:
+
+- `112` (caso 14), `119` (armado de un partido de clubes) y `155` (caso 1, el control) eran **anteriores a la 177**, que pasó el `insert` de `matches`, `club_open_challenges` y `club_open_challenge_responses` a privilegios **por columna**. Se miró que el cliente (`createMatch`, `publishOpenChallenge`) sólo escribe columnas concedidas. Los arneses ahora arman como `postgres` lo que arma el servidor (`id`, `cupos_por_club`, `created_at`) y el control de la 155 mira `has_any_column_privilege`.
+- `134` (C06) esperaba el error del disparador (`COLUMNA_PROTEGIDA`) y desde la 165 el privilegio por columna rechaza antes, con 42501. Acepta las dos capas, pero sólo con ese código y ese mensaje: que pase, o cualquier otro error, sigue siendo falla.
+- `176` tomaba «la primera cancha que haya» y una base nueva no tiene ninguna: ahora crea su recinto y su cancha.
+
+**Segunda corrida: 140 de 140.** `44d`, `45`, `83` y `157`, que fallaban en la base vieja, pasaron en la nueva: confirma que dependían de datos acumulados (ver [Pendientes](pendientes.md)).
 
 ## La batería completa el 2026-11-09 (134 arneses), y cómo se supo qué no rompió la 171
 

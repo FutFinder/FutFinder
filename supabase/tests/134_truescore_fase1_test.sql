@@ -80,7 +80,7 @@ end $$;
 
 do $$
 declare
-  v_pre int; v_n int; v_ok boolean; v_txt text; v_res jsonb; v_gps json; v_err text;
+  v_pre int; v_n int; v_ok boolean; v_txt text; v_res jsonb; v_gps json; v_err text; v_estado text;
   v_seq int[];
   A uuid; B uuid; C uuid; C2 uuid; D uuid; E uuid; F uuid; G uuid; H uuid; I uuid;
   J uuid; K uuid; L uuid; N uuid; P uuid; Q uuid; R uuid; S uuid; T uuid;
@@ -351,7 +351,12 @@ begin
 
   -- ── Columnas protegidas ──────────────────────────────────────
   perform pg_temp.inscribir(m13, R);
+  -- Dos capas: el disparador (COLUMNA_PROTEGIDA / CANCELAR_CON_RPC) y, desde
+  -- la 165, el privilegio por columna, que rechaza antes con 42501 las
+  -- columnas que la app nunca escribe. Cualquiera de las dos cuenta como «no
+  -- escapa»; lo que no vale es que pase, ni otro error cualquiera.
   foreach v_txt in array array['asistencia_confirmada_at', 'estado', 'borrar', 'tipo_cancelacion'] loop
+    v_estado := null;
     begin
       perform pg_temp.como(O5); set local role authenticated;
       if v_txt = 'asistencia_confirmada_at' then
@@ -368,9 +373,11 @@ begin
     exception when others then
       reset role;
       v_err := sqlerrm;
+      v_estado := sqlstate;
     end;
     insert into r134 values ('C06 el organizador no escapa a mano: ' || v_txt,
-      v_err like '%COLUMNA_PROTEGIDA%' or v_err like '%CANCELAR_CON_RPC%', v_err);
+      v_err like '%COLUMNA_PROTEGIDA%' or v_err like '%CANCELAR_CON_RPC%'
+        or (v_estado = '42501' and v_err like 'permission denied for table matches%'), v_err);
   end loop;
 
   -- ── GPS ya no da puntos ──────────────────────────────────────
