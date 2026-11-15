@@ -135,7 +135,7 @@ carga de saldo.
 
 **Qué falta, y cómo** (esta Mac no tiene base local ni sesión de prueba, así que **ninguna pantalla nueva se recorrió con una cuenta**):
 
-- **La 182 no está aplicada en producción.** Hasta aplicarla, publicar un partido normal falla (la app llama a `publicar_partido_con_asientos`) y el detalle avisa que no pudo cargar los asientos. Se aplica antes de subir la app, no después.
+- La 182 ya está aplicada (2026-11-14). **La bandera `asientos_por_nombre` vence el 2026-12-30**: si el lanzamiento se mueve, hay que mover `feature_flags.termina_at`.
 - Con dos cuentas amigas y una tercera: publicar un partido de 14 con un amigo, dos nombres y seis reservas; ver «10/14» en la lista, en Inicio y en el detalle; abrir el link con la tercera cuenta y tomar un asiento; agotar las reservas y ver el mensaje; liberar un asiento y verlo libre; llenar el partido y verlo salir de la búsqueda.
 - El link abierto **sin sesión**, entrando por login y por registro completo: tiene que volver al partido con el botón «Tomar mi asiento».
 - El amigo asignado: recibe el aviso, ve costo 0 al salirse y el asiento queda libre.

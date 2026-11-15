@@ -13,8 +13,8 @@ aplicado y qué no se ha podido verificar. Lo que está **abierto** vive en
 - **`npm run verify`**: 2.026 pruebas de Node, 82 de Deno y cero errores de lint (6 avisos, explicados en [Calidad y lint](calidad-y-lint.md)). Medido ese día.
 - **Integración continua en GitHub** desde ese día: lint, pruebas, Deno obligatorio y build web en cada push; los arneses SQL cuando cambia la base (ver [Pruebas](pruebas.md)).
 - **Arneses SQL: 143 de 143** en local con las migraciones 179, 180 y 181 aplicadas, y verdes también en GitHub.
-- **La 182 (asientos de partido) está escrita y ensayada, pero NO aplicada en producción** al 2026-11-14: la app que la usa no debe publicarse antes de aplicarla. Ver [Por probar](por-probar.md).
-- **Producción tiene todo hasta la 181 salvo la 149** (y la 167 con su bandera apagada). Las **179** (pausa de pagos, apagada), **180** (columnas de `pagos`) y **181** (aceptación de términos) se aplicaron el 2026-11-14, y ese día se redesplegó `pagar-reserva`: ver [Pendientes](pendientes.md). Las cifras de más abajo son de mediciones anteriores.
+- **La 182 (asientos de partido) se aplicó en producción el 2026-11-14**, antes de subir la app que la usa. Comprobado después de aplicar: privilegios de las 16 funciones, las dos tablas cerradas a `anon`, la bandera `asientos_por_nombre` activa hasta el 2026-12-30 y el cron `futfinder-limpiar-asientos`. Las pantallas siguen sin recorrerse con una cuenta: ver [Por probar](por-probar.md).
+- **Producción tiene todo hasta la 182 salvo la 149** (y la 167 con su bandera apagada). Las **179** (pausa de pagos, apagada), **180** (columnas de `pagos`) y **181** (aceptación de términos) se aplicaron el 2026-11-14, y ese día se redesplegó `pagar-reserva`: ver [Pendientes](pendientes.md). Las cifras de más abajo son de mediciones anteriores.
 
 ## Lo construido
 
