@@ -118,6 +118,7 @@ function initialDraft() {
     // tiene ocupados o reservados (el suyo no va en la lista).
     total: 10,
     asientos: [],
+
     cuota: '5000',
     nivel: 'intermedio',
     duracion: 90,
@@ -335,7 +336,21 @@ export default function PublishMatchScreen({ navigation, route }) {
   const errorCount = Object.keys(errors).length;
 
   // ---------------------------------------------------- asientos del borrador
+  // El paso 1 pide el total y cuántos faltan; los confirmados (sin contar al
+  // creador) son la lista `draft.asientos`, que nace en «Reservado» y se
+  // completa en el último paso. Así el largo de la lista ES los confirmados.
   const libresPublicos = libresDelBorrador(draft.total, draft.asientos);
+  const faltan = libresPublicos;
+  const confirmados = draft.asientos.length + 1;
+  // Lleva la lista al largo pedido: corta por el final o agrega reservados.
+  const conLargo = (lista, n) =>
+    n <= lista.length
+      ? lista.slice(0, Math.max(n, 0))
+      : [...lista, ...Array.from({ length: n - lista.length }, () => ({ tipo: 'reservado' }))];
+  // Cambiar el total conserva a los confirmados (cambian los que faltan),
+  // salvo que ya no quepan: siempre tiene que quedar al menos un cupo libre.
+  const cambiarTotal = (v) => set({ total: v, asientos: conLargo(draft.asientos, Math.min(draft.asientos.length, v - 2)) });
+  const cambiarFaltan = (v) => set({ asientos: conLargo(draft.asientos, draft.total - 1 - v) });
   const reservados = draft.asientos.filter((a) => a.tipo === 'reservado').length;
   const listaDeAsientos = useMemo(
     () => asientosDelBorrador(draft.total, draft.asientos, creador),
@@ -352,7 +367,9 @@ export default function PublishMatchScreen({ navigation, route }) {
     else lista.push(asiento);
     set({ asientos: lista });
   };
-  const quitarAsiento = (a) => set({ asientos: draft.asientos.filter((_, i) => i !== a.indice) });
+  // Sacar a alguien de un asiento confirmado lo deja reservado: los que
+  // faltan sólo se cambian en el paso 1.
+  const quitarAsiento = (a) => ponerAsiento({ indice: a.indice }, { tipo: 'reservado' });
 
   const registerPos = (field) => (e) => {
     positions.current[field] = e.nativeEvent.layout.y;
@@ -641,50 +658,45 @@ export default function PublishMatchScreen({ navigation, route }) {
           {step === 1 ? (
             <View style={{ gap: 16 }}>
               {conAsientos ? (
-                <View onLayout={registerPos('cupos')} style={{ gap: 12 }}>
-                  <Card style={{ padding: 14, gap: 11 }}>
-                    <View>
-                      <Text style={styles.cardTitle}>Total de jugadores del partido</Text>
-                      <Text style={styles.cardSub}>
-                        Contándote a ti. Después marca los asientos de quienes ya están confirmados; los
-                        que queden libres son los que se publican.
-                      </Text>
+                <View onLayout={registerPos('cupos')}>
+                  <Card style={{ padding: 14, gap: 14 }}>
+                    <View style={{ gap: 11 }}>
+                      <View>
+                        <Text style={styles.cardTitle}>Jugadores del partido</Text>
+                        <Text style={styles.cardSub}>El total, contándote a ti.</Text>
+                      </View>
+                      <Stepper
+                        value={draft.total}
+                        onChange={cambiarTotal}
+                        unidad={['JUGADOR', 'JUGADORES']}
+                        min={TOTAL_JUGADORES.min}
+                        max={TOTAL_JUGADORES.max}
+                        error={!!errors.cupos}
+                      />
                     </View>
-                    <Stepper
-                      value={draft.total}
-                      onChange={(v) => set({ total: v })}
-                      min={TOTAL_JUGADORES.min}
-                      max={TOTAL_JUGADORES.max}
-                      error={!!errors.cupos}
-                    />
+                    <View style={{ height: 1, backgroundColor: C.hairline }} />
+                    <View style={{ gap: 11 }}>
+                      <View>
+                        <Text style={styles.cardTitle}>¿Cuántos te faltan?</Text>
+                        <Text style={styles.cardSub}>
+                          Los cupos que se publican para que se una gente nueva.
+                        </Text>
+                      </View>
+                      <Stepper
+                        value={faltan}
+                        onChange={cambiarFaltan}
+                        min={1}
+                        max={Math.max(draft.total - 1, 1)}
+                        error={!!errors.cupos}
+                      />
+                    </View>
                     <ErrorHint>{errors.cupos}</ErrorHint>
-                  </Card>
-
-                  <View style={{ gap: 8 }}>
-                    <FieldLabel
-                      right={`${draft.asientos.length + 1}/${draft.total} · ${libresPublicos} ${libresPublicos === 1 ? 'libre' : 'libres'}`}
-                    >
-                      Asientos
-                    </FieldLabel>
-                    <ListaDeAsientos
-                      asientos={listaDeAsientos}
-                      editable
-                      nombresActivos={nombresActivos}
-                      miId={creador?.user_id}
-                      onAmigo={(a) => setParaAmigo({ indice: a.indice })}
-                      onNombre={(a) => setParaNombre({ indice: a.indice, nombre: a.tipo === 'nombre' ? a.nombre : '' })}
-                      onReservar={() => ponerAsiento(null, { tipo: 'reservado' })}
-                      onLiberar={quitarAsiento}
-                    />
                     <Note>
-                      {nombresActivos
-                        ? 'En cada asiento: agrega a un amigo, escribe sólo un nombre (lápiz) o resérvalo (candado) para alguien que entrará con el link de invitación.'
-                        : 'En cada asiento: agrega a un amigo o resérvalo (candado) para alguien que entrará con el link de invitación.'}
-                      {reservados > 0
-                        ? ` Tienes ${reservados} ${reservados === 1 ? 'asiento reservado' : 'asientos reservados'}: al publicar podrás compartir el link.`
-                        : ''}
+                      {confirmados === 1
+                        ? `Por ahora vas solo: se publican ${faltan} cupos.`
+                        : `Ya tienes ${confirmados} confirmados, contándote. En el último paso eliges quiénes son.`}
                     </Note>
-                  </View>
+                  </Card>
                 </View>
               ) : (
               <View onLayout={registerPos('cupos')}>
@@ -1076,6 +1088,29 @@ export default function PublishMatchScreen({ navigation, route }) {
                   />
                 </Card>
               </Field>
+
+              {conAsientos ? (
+                <View style={{ gap: 8 }}>
+                  <FieldLabel right={`${confirmados}/${draft.total} · ${faltan} ${faltan === 1 ? 'libre' : 'libres'}`}>
+                    Tus jugadores
+                  </FieldLabel>
+                  <ListaDeAsientos
+                    asientos={listaDeAsientos}
+                    editable
+                    libresFijos
+                    nombresActivos={nombresActivos}
+                    miId={creador?.user_id}
+                    onAmigo={(a) => setParaAmigo({ indice: a.indice })}
+                    onNombre={(a) => setParaNombre({ indice: a.indice, nombre: a.tipo === 'nombre' ? a.nombre : '' })}
+                    onLiberar={quitarAsiento}
+                  />
+                  <Note>
+                    {confirmados > 1
+                      ? `${nombresActivos ? 'Agrega a un amigo o escribe sólo su nombre (lápiz).' : 'Agrega a un amigo.'} Los que dejes en «Reservado» entran con el link de invitación que podrás compartir al publicar. Los cupos libres son los que se publican.`
+                      : 'Los cupos libres son los que se publican. Si ya tienes jugadores confirmados, vuelve al paso 1 y baja los que faltan.'}
+                  </Note>
+                </View>
+              ) : null}
             </View>
           ) : null}
 

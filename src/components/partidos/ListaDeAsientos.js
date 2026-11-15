@@ -20,10 +20,15 @@ import { paleta as C, radios as R, fuentes as F } from '../../theme/colors';
  *   candado  reservarlo para el link      (`onReservar`)
  *   ✕        liberarlo                    (`onLiberar`)
  * Sin `editable`, los libres ofrecen `onUnirme` y las cuentas abren su perfil.
+ *
+ * Con `libresFijos` (armado al publicar) los libres no tienen acciones —se
+ * cambian con «¿Cuántos te faltan?»— y un reservado no se libera: ✕ sobre un
+ * amigo o un nombre lo devuelve a reservado.
  */
 export default function ListaDeAsientos({
   asientos = [],
   editable = false,
+  libresFijos = false,
   nombresActivos = false,
   ocupado = false,
   miId = null,
@@ -43,7 +48,8 @@ export default function ListaDeAsientos({
           numero={i + 1}
           asiento={a}
           ultimo={i === asientos.length - 1}
-          editable={editable}
+          editable={editable && !(libresFijos && a.tipo === 'libre')}
+          libresFijos={libresFijos}
           nombresActivos={nombresActivos}
           ocupado={ocupado}
           miId={miId}
@@ -65,6 +71,7 @@ function Fila({
   asiento: a,
   ultimo,
   editable,
+  libresFijos,
   nombresActivos,
   ocupado,
   miId,
@@ -107,7 +114,7 @@ function Fila({
   const puedeLiberar =
     editable &&
     onLiberar &&
-    (a.tipo === 'reservado' || a.tipo === 'nombre' || (a.tipo === 'cuenta' && a.asignado !== false && a.liberable !== false));
+    ((a.tipo === 'reservado' && !libresFijos) || a.tipo === 'nombre' || (a.tipo === 'cuenta' && a.asignado !== false && a.liberable !== false));
 
   const cuerpo = (
     <>
@@ -173,7 +180,7 @@ function Fila({
         <Accion icon={X} label="Liberar este asiento" onPress={() => onLiberar(a)} disabled={ocupado} tono="rojo" />
       ) : null}
 
-      {!editable && a.tipo === 'libre' && onUnirme ? (
+      {!editable && !libresFijos && a.tipo === 'libre' && onUnirme ? (
         <Pressable
           onPress={onUnirme}
           disabled={ocupado}

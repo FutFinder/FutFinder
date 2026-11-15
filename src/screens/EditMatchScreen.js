@@ -600,6 +600,7 @@ export default function EditMatchScreen({ route, navigation }) {
                 <Stepper
                   value={Number(form.cupos) + (usaAsientos ? 1 : 0)}
                   onChange={(v) => set({ cupos: usaAsientos ? v - 1 : v })}
+                  unidad={usaAsientos ? ['JUGADOR', 'JUGADORES'] : undefined}
                   min={CUPOS.min + (usaAsientos ? 1 : 0)}
                   max={CUPOS.max + (usaAsientos ? 1 : 0)}
                   error={!!errors.cupos}

@@ -519,7 +519,7 @@ export function CheckRow({ label, checked, onPress }) {
   );
 }
 
-export function Stepper({ value, onChange, min = 1, max = 30, error }) {
+export function Stepper({ value, onChange, min = 1, max = 30, error, unidad = ['CUPO', 'CUPOS'] }) {
   const dec = () => onChange(Math.max(min, value - 1));
   const inc = () => onChange(Math.min(max, value + 1));
   return (
@@ -547,7 +547,7 @@ export function Stepper({ value, onChange, min = 1, max = 30, error }) {
       <View style={{ flex: 1, alignItems: 'center' }}>
         <Text style={{ fontSize: 32, fontFamily: F.extraBold, color: C.textPrimary, lineHeight: 36 }}>{value}</Text>
         <Text style={{ fontSize: 10.5, fontFamily: F.semiBold, color: C.textFaint, letterSpacing: 0.6 }}>
-          {value === 1 ? 'CUPO' : 'CUPOS'}
+          {value === 1 ? unidad[0] : unidad[1]}
         </Text>
       </View>
       <Pressable
