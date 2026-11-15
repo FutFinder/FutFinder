@@ -25,6 +25,7 @@ import { isSupabaseConfigured, supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getRememberedAccount, saveRememberedAccount } from '../utils/rememberedAccount';
 import { guardarCorreoParaRecuperar } from '../utils/correoParaRecuperar';
+import { rutasTrasEntrar } from '../utils/routing';
 
 function inicialDe(texto) {
   const t = (texto || '').trim();
@@ -137,15 +138,7 @@ export default function LoginScreen({ navigation }) {
 
     // Si el guard nos mandó acá desde una ruta privada, volvemos a ella
     // en vez de caer siempre en el Home.
-    const pending = consumePendingDestination();
-    if (pending && pending.name && pending.name !== 'Main') {
-      navigation.reset({
-        index: 1,
-        routes: [{ name: 'Main' }, { name: pending.name, params: pending.params }],
-      });
-    } else {
-      navigation.reset({ index: 0, routes: [{ name: 'Main', params: pending?.params }] });
-    }
+    navigation.reset(rutasTrasEntrar(consumePendingDestination()));
   };
 
   const handleCodigo = async (valor = codigo) => {

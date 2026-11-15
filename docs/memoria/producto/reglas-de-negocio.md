@@ -1,6 +1,6 @@
 # Reglas de negocio
 
-Última revisión: 2026-11-05
+Última revisión: 2026-11-14 (asientos de partido)
 
 ## Propósito
 
@@ -77,6 +77,7 @@ Con `truescore_fase4` (migración 137; nace apagada y no figura entre las activa
 - `approve_join` comprueba el estado y la hora del partido dentro del bloqueo de fila: no se acepta a nadie en un partido cancelado ni después de su hora de inicio.
 - **Rechazar una solicitud no saca a quien ya está dentro** (migración 128). `reject_join` borraba por id lo que había leído como `pendiente`, sin bloquear el partido: aprobar y rechazar al mismo jugador a la vez dejaba al jugador aceptado y después borrado, con el cupo mal contado. Ahora toma el bloqueo del partido —el mismo orden que el resto— y el borrado exige que siga pendiente. `approve_join` hace lo simétrico: si el jugador retira su solicitud en ese instante, no se aprueba ni se le avisa que entró.
 - **Los cupos son las plazas para OTROS jugadores: el organizador está en `attendees` pero no ocupa una.** La guarda `matches_guard_cupos` lo excluye (salvo en partidos entre clubes, donde el organizador es un administrador del club rival y sí puede jugar) y, desde la migración 104, **deduce** `cupos_disponibles` de la nómina vigente en lugar de aceptar el conteo que manda el cliente.
+- **Un asiento reservado o por nombre ocupa plaza sin tener cuenta** (migración 182). La guarda los suma a la nómina al deducir `cupos_disponibles`; el público ve «confirmados/total», donde el total es `cupos_totales + 1`. Al publicar tiene que quedar al menos un asiento libre, un perfil no ocupa dos asientos y sólo el organizador arma los asientos ajenos. El link de invitación sólo da acceso a los reservados. Detalle en [Partidos](../funcionalidades/partidos.md).
 - `abierto` y `lleno` se deducen juntos con la disponibilidad: ampliar los cupos de un partido lleno vuelve a abrirlo, sin que nadie tenga que acordarse de cambiar el estado.
 - Un partido que ocupa la hora del jugador es el que está `abierto`, `lleno` o `en_curso`: ese conjunto vive en `estados_que_ocupan_horario()` y lo usan por igual la consulta (`get_schedule_conflict`) y la escritura (el trigger de elegibilidad).
 - **Mover la hora de un partido también mira la agenda de los inscritos** (migración 123). La protección de la 109 vive en `attendees` y sólo corre cuando alguien ENTRA; cambiar `matches.hora` no volvía a validar nada, así que el organizador podía correr su partido encima de otro y dejar a un inscrito en los dos. El trigger `tg_matches_reprogramar` toma los mismos bloqueos por jugador de la 109 y rechaza el cambio con `CHOQUE_AGENDA_INSCRITOS:<n>`. El organizador de un partido normal queda fuera de la regla, igual que en `tg_enforce_join_rules`.

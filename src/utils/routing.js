@@ -21,3 +21,19 @@ export function getInitialRouteName(onboardingState) {
 export function isPrivateRoute(routeName) {
   return routeName === 'Main' || routeName === 'LocationPermission';
 }
+
+/**
+ * A dónde se entra después de iniciar sesión o de terminar el registro.
+ *
+ * Si alguien abrió un link privado sin sesión —el de invitación a un partido,
+ * por ejemplo— el guard guardó ese destino; se vuelve a él con Main debajo
+ * para que «atrás» no saque de la app. Lo usan Login y el final del registro:
+ * antes sólo Login lo miraba, y quien se registraba desde un link de
+ * invitación terminaba en el Home sin su asiento.
+ */
+export function rutasTrasEntrar(pending) {
+  if (pending && pending.name && pending.name !== 'Main') {
+    return { index: 1, routes: [{ name: 'Main' }, { name: pending.name, params: pending.params }] };
+  }
+  return { index: 0, routes: [{ name: 'Main', params: pending?.params }] };
+}

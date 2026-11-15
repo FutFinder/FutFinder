@@ -18,6 +18,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Link2,
   Locate,
   MapPin,
   Share2,
@@ -57,7 +58,18 @@ import {
   nextWeekday,
   startOfDay,
 } from '../components/partidos/DateTimeSheets';
+import ListaDeAsientos from '../components/partidos/ListaDeAsientos';
+import { SelectorDeAmigos, NombreDeAsientoSheet } from '../components/partidos/SelectorDeAmigos';
 import LocationAutocomplete, { reverseGeocode } from '../components/LocationAutocomplete';
+import { publicarPartidoConAsientos, useNombresVigentes } from '../services/asientos';
+import { getMyProfile } from '../services/profile';
+import {
+  TOTAL_JUGADORES,
+  asientosDelBorrador,
+  libresDelBorrador,
+  resumenDeJugadores,
+  validarArmado,
+} from '../utils/asientos.js';
 import { createMatch, translateSchemaError } from '../services/matches';
 import { getChallenge, linkChallengeMatch } from '../services/clubChallenges';
 import { getCurrentLocation } from '../services/location';
@@ -100,7 +112,12 @@ function initialDraft() {
   const d = startOfDay(new Date());
   return {
     // Paso 1 · formato y cupos
+    // `cupos` sólo lo usa el flujo antiguo de clubes («jugadores que faltan»).
     cupos: 1,
+    // Partido normal: total de jugadores y los asientos que el creador ya
+    // tiene ocupados o reservados (el suyo no va en la lista).
+    total: 10,
+    asientos: [],
     cuota: '5000',
     nivel: 'intermedio',
     duracion: 90,
@@ -164,6 +181,14 @@ export default function PublishMatchScreen({ navigation, route }) {
   const [submitError, setSubmitError] = useState(null);
   const [sheet, setSheet] = useState(null); // 'region' | 'comuna' | 'fecha' | 'hora' | 'share'
   const [locBusy, setLocBusy] = useState(false);
+  // Asientos: a qué asiento va el amigo o el nombre que se está eligiendo
+  // (`{ indice }` reemplaza uno ya ocupado; `{}` toma uno libre).
+  const [paraAmigo, setParaAmigo] = useState(null);
+  const [paraNombre, setParaNombre] = useState(null);
+  const [creador, setCreador] = useState(null);
+  const nombresActivos = useNombresVigentes();
+  // El flujo antiguo de clubes sigue publicando «jugadores que faltan».
+  const conAsientos = !clubChallengeId;
   // Ubicación del teléfono. Sirve SOLO para ordenar las sugerencias del
   // buscador: nunca se publica como ubicación de la cancha.
   const [proximidad, setProximidad] = useState(null);
@@ -234,6 +259,32 @@ export default function PublishMatchScreen({ navigation, route }) {
     })();
   }, []);
 
+  // El asiento del creador se dibuja con su perfil.
+  useEffect(() => {
+    let vivo = true;
+    getMyProfile().then((p) => {
+      if (vivo && p?.id) setCreador({ username: p.username, foto_url: p.foto_url, user_id: p.id });
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  // Las reglas del borrador más las del armado de asientos, que se muestran
+  // en el mismo sitio que antes mostraba el error de cupos.
+  const validar = useCallback(
+    (d, s) => {
+      const e = validateDraft(d, s);
+      if (conAsientos && (s == null || s === 1)) {
+        const m = validarArmado(d.total, d.asientos);
+        if (m) e.cupos = m;
+        else delete e.cupos;
+      }
+      return e;
+    },
+    [conAsientos]
+  );
+
   const set = useCallback((patch) => {
     setDraft((d) => ({ ...d, ...patch }));
     // Tocar cualquier campo descarta el error del último intento de publicar:
@@ -244,7 +295,12 @@ export default function PublishMatchScreen({ navigation, route }) {
       if (!Object.keys(prev).length) return prev;
       const next = { ...prev };
       Object.keys(patch).forEach((k) => {
-        const field = k === 'edadMin' || k === 'edadMax' || k === 'edadPreset' ? 'edad' : k;
+        const field =
+          k === 'edadMin' || k === 'edadMax' || k === 'edadPreset'
+            ? 'edad'
+            : k === 'total' || k === 'asientos'
+            ? 'cupos'
+            : k;
         delete next[field];
       });
       return next;
@@ -271,12 +327,32 @@ export default function PublishMatchScreen({ navigation, route }) {
   // Revalida en vivo una vez que el usuario intentó avanzar.
   useEffect(() => {
     if (touchedStep == null) return;
-    setErrors(validateDraft(draft, touchedStep));
-  }, [draft, touchedStep]);
+    setErrors(validar(draft, touchedStep));
+  }, [draft, touchedStep, validar]);
 
   const comunas = useMemo(() => (draft.region ? getComunasOfRegion(draft.region) : []), [draft.region]);
   const dt = combineDateTime(draft.fecha, draft.hora);
   const errorCount = Object.keys(errors).length;
+
+  // ---------------------------------------------------- asientos del borrador
+  const libresPublicos = libresDelBorrador(draft.total, draft.asientos);
+  const reservados = draft.asientos.filter((a) => a.tipo === 'reservado').length;
+  const listaDeAsientos = useMemo(
+    () => asientosDelBorrador(draft.total, draft.asientos, creador),
+    [draft.total, draft.asientos, creador]
+  );
+  const amigosSentados = useMemo(
+    () => draft.asientos.filter((a) => a.tipo === 'amigo').map((a) => a.user_id),
+    [draft.asientos]
+  );
+  // Pone `asiento` en el lugar de `destino.indice`, o al final si era un libre.
+  const ponerAsiento = (destino, asiento) => {
+    const lista = [...draft.asientos];
+    if (destino?.indice != null) lista[destino.indice] = asiento;
+    else lista.push(asiento);
+    set({ asientos: lista });
+  };
+  const quitarAsiento = (a) => set({ asientos: draft.asientos.filter((_, i) => i !== a.indice) });
 
   const registerPos = (field) => (e) => {
     positions.current[field] = e.nativeEvent.layout.y;
@@ -292,7 +368,7 @@ export default function PublishMatchScreen({ navigation, route }) {
   };
 
   const goNext = () => {
-    const errs = validateDraft(draft, step);
+    const errs = validar(draft, step);
     setTouchedStep(step);
     setErrors(errs);
     if (Object.keys(errs).length) {
@@ -344,7 +420,7 @@ export default function PublishMatchScreen({ navigation, route }) {
 
   const publish = async () => {
     if (submitting || published) return; // doble pulsación
-    const errs = validateDraft(draft, null);
+    const errs = validar(draft, null);
     if (Object.keys(errs).length) {
       // Si el error está en un paso anterior, volvemos a ese paso.
       const stepOf = (f) =>
@@ -353,7 +429,7 @@ export default function PublishMatchScreen({ navigation, route }) {
       const target = first ? stepOf(first) : 1;
       setStep(target);
       setTouchedStep(target);
-      setErrors(validateDraft(draft, target));
+      setErrors(validar(draft, target));
       setTimeout(() => scrollToFirstError(errs), 60);
       return;
     }
@@ -383,7 +459,7 @@ export default function PublishMatchScreen({ navigation, route }) {
       latitud: ubicacionFijada(ubicacionDelFormulario(draft)) ? draft.coords.lat : null,
       longitud: ubicacionFijada(ubicacionDelFormulario(draft)) ? draft.coords.lng : null,
       hora: dt.toISOString(),
-      cupos_totales: Number(draft.cupos),
+      ...(conAsientos ? { jugadores_total: Number(draft.total) } : { cupos_totales: Number(draft.cupos) }),
       precio_cuota: draft.cuota === '' ? 0 : Number(draft.cuota),
       nivel: draft.nivel,
       duracion_min: Number(draft.duracion),
@@ -413,7 +489,9 @@ export default function PublishMatchScreen({ navigation, route }) {
       return;
     }
 
-    const { data, error, duplicate } = await createMatch(payload);
+    const { data, error, duplicate } = conAsientos
+      ? await publicarPartidoConAsientos(payload, draft.asientos)
+      : await createMatch(payload);
     setSubmitting(false);
 
     if (error) {
@@ -439,6 +517,8 @@ export default function PublishMatchScreen({ navigation, route }) {
     return (
       <PublishedView
         match={published}
+        reservados={conAsientos ? reservados : 0}
+        onInvitar={() => navigation.replace('ManageMatch', { matchId: published.id, tab: 'confirmados' })}
         onOpen={() => navigation.replace('MatchDetail', { matchId: published.id })}
         onShare={() => setSheet('share')}
         onBack={() => navigation.navigate('Main', { screen: 'SearchTab' })}
@@ -452,7 +532,9 @@ export default function PublishMatchScreen({ navigation, route }) {
 
   const stepTitle = ['Formato y cupos', 'Dónde y cuándo', 'Acceso y publicación'][step - 1];
   const stepSub = [
-    'Cuántos faltan, cuánto cuesta y a qué ritmo se juega',
+    conAsientos
+      ? 'Cuántos juegan, quiénes ya están y cuánto cuesta'
+      : 'Cuántos faltan, cuánto cuesta y a qué ritmo se juega',
     'La cancha, la comuna y el horario del partido',
     'Cómo entran los jugadores y qué avisos enviamos',
   ][step - 1];
@@ -480,7 +562,11 @@ export default function PublishMatchScreen({ navigation, route }) {
               {step === 1
                 ? 'Encuentra jugadores para completar tu partido'
                 : step === 2
-                ? `${MODALIDADES.find((m) => m.value === draft.modalidad)?.label} · ${draft.cupos} ${draft.cupos === 1 ? 'cupo' : 'cupos'}`
+                ? `${MODALIDADES.find((m) => m.value === draft.modalidad)?.label} · ${
+                    conAsientos
+                      ? `${draft.total} jugadores`
+                      : `${draft.cupos} ${draft.cupos === 1 ? 'cupo' : 'cupos'}`
+                  }`
                 : 'Último paso'}
             </Text>
           </View>
@@ -554,6 +640,53 @@ export default function PublishMatchScreen({ navigation, route }) {
           {/* =============== PASO 1 =============== */}
           {step === 1 ? (
             <View style={{ gap: 16 }}>
+              {conAsientos ? (
+                <View onLayout={registerPos('cupos')} style={{ gap: 12 }}>
+                  <Card style={{ padding: 14, gap: 11 }}>
+                    <View>
+                      <Text style={styles.cardTitle}>Total de jugadores del partido</Text>
+                      <Text style={styles.cardSub}>
+                        Contándote a ti. Después marca los asientos de quienes ya están confirmados; los
+                        que queden libres son los que se publican.
+                      </Text>
+                    </View>
+                    <Stepper
+                      value={draft.total}
+                      onChange={(v) => set({ total: v })}
+                      min={TOTAL_JUGADORES.min}
+                      max={TOTAL_JUGADORES.max}
+                      error={!!errors.cupos}
+                    />
+                    <ErrorHint>{errors.cupos}</ErrorHint>
+                  </Card>
+
+                  <View style={{ gap: 8 }}>
+                    <FieldLabel
+                      right={`${draft.asientos.length + 1}/${draft.total} · ${libresPublicos} ${libresPublicos === 1 ? 'libre' : 'libres'}`}
+                    >
+                      Asientos
+                    </FieldLabel>
+                    <ListaDeAsientos
+                      asientos={listaDeAsientos}
+                      editable
+                      nombresActivos={nombresActivos}
+                      miId={creador?.user_id}
+                      onAmigo={(a) => setParaAmigo({ indice: a.indice })}
+                      onNombre={(a) => setParaNombre({ indice: a.indice, nombre: a.tipo === 'nombre' ? a.nombre : '' })}
+                      onReservar={() => ponerAsiento(null, { tipo: 'reservado' })}
+                      onLiberar={quitarAsiento}
+                    />
+                    <Note>
+                      {nombresActivos
+                        ? 'En cada asiento: agrega a un amigo, escribe sólo un nombre (lápiz) o resérvalo (candado) para alguien que entrará con el link de invitación.'
+                        : 'En cada asiento: agrega a un amigo o resérvalo (candado) para alguien que entrará con el link de invitación.'}
+                      {reservados > 0
+                        ? ` Tienes ${reservados} ${reservados === 1 ? 'asiento reservado' : 'asientos reservados'}: al publicar podrás compartir el link.`
+                        : ''}
+                    </Note>
+                  </View>
+                </View>
+              ) : (
               <View onLayout={registerPos('cupos')}>
                 <Card style={{ padding: 14, gap: 11 }}>
                   <View>
@@ -572,6 +705,7 @@ export default function PublishMatchScreen({ navigation, route }) {
                   <ErrorHint>{errors.cupos}</ErrorHint>
                 </Card>
               </View>
+              )}
 
               <Field label="Cuota por jugador" right={cuotaLabel(draft.cuota === '' ? 0 : Number(draft.cuota))} onLayout={registerPos('cuota')}>
                 <Input
@@ -909,10 +1043,17 @@ export default function PublishMatchScreen({ navigation, route }) {
                     label="Cancha"
                     value={[draft.cancha, draft.comuna].filter(Boolean).join(' · ') || '—'}
                   />
-                  <DetailRow
-                    label="Jugadores que faltan"
-                    value={`${draft.cupos} ${draft.cupos === 1 ? 'cupo' : 'cupos'}`}
-                  />
+                  {conAsientos ? (
+                    <DetailRow
+                      label="Jugadores"
+                      value={`${draft.asientos.length + 1}/${draft.total} confirmados · ${libresPublicos} ${libresPublicos === 1 ? 'cupo libre' : 'cupos libres'}`}
+                    />
+                  ) : (
+                    <DetailRow
+                      label="Jugadores que faltan"
+                      value={`${draft.cupos} ${draft.cupos === 1 ? 'cupo' : 'cupos'}`}
+                    />
+                  )}
                   <DetailRow
                     label="Cuota"
                     value={cuotaLabel(draft.cuota === '' ? 0 : Number(draft.cuota))}
@@ -1012,13 +1153,31 @@ export default function PublishMatchScreen({ navigation, route }) {
         minDate={draft.fecha}
         onSelect={(v) => set({ hora: v })}
       />
+      <SelectorDeAmigos
+        visible={!!paraAmigo}
+        onClose={() => setParaAmigo(null)}
+        excluidos={amigosSentados}
+        onElegir={(f) => {
+          ponerAsiento(paraAmigo, { tipo: 'amigo', user_id: f.user_id, username: f.username, foto_url: f.foto_url });
+          setParaAmigo(null);
+        }}
+      />
+      <NombreDeAsientoSheet
+        visible={!!paraNombre}
+        onClose={() => setParaNombre(null)}
+        inicial={paraNombre?.nombre || ''}
+        onGuardar={(nombre) => {
+          ponerAsiento(paraNombre, { tipo: 'nombre', nombre });
+          setParaNombre(null);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 // ------------------------------------------------------------- éxito
 
-function PublishedView({ match, onOpen, onShare, onBack, shareOpen, onCloseShare }) {
+function PublishedView({ match, reservados = 0, onOpen, onShare, onInvitar, onBack, shareOpen, onCloseShare }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.root}>
@@ -1056,12 +1215,20 @@ function PublishedView({ match, onOpen, onShare, onBack, shareOpen, onCloseShare
               {[match?.cancha_nombre, match?.comuna].filter(Boolean).join(' · ')}
             </Row>
             <Row icon={ShieldCheck}>
-              {`${match?.cupos_disponibles} ${match?.cupos_disponibles === 1 ? 'cupo' : 'cupos'} · ${cuotaLabel(match?.precio_cuota)} · ${match?.aprobacion === 'manual' ? 'Aprobación manual' : 'Inscripción inmediata'} · ${edadLabel(match)}`}
+              {`${resumenDeJugadores(match) || `${match?.cupos_disponibles} ${match?.cupos_disponibles === 1 ? 'cupo' : 'cupos'}`} · ${cuotaLabel(match?.precio_cuota)} · ${match?.aprobacion === 'manual' ? 'Aprobación manual' : 'Inscripción inmediata'} · ${edadLabel(match)}`}
             </Row>
           </Card>
 
           <View style={{ gap: 9, marginTop: 20 }}>
             <PrimaryButton label="Ver mi partido" onPress={onOpen} height={52} />
+            {reservados > 0 ? (
+              <SurfaceButton
+                label={`Invitar a tus ${reservados} ${reservados === 1 ? 'reservado' : 'reservados'}`}
+                icon={Link2}
+                onPress={onInvitar}
+                height={48}
+              />
+            ) : null}
             <SurfaceButton label="Compartir el partido" icon={Share2} onPress={onShare} height={48} />
             <Pressable onPress={onBack} style={({ pressed }) => [{ height: 44, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.7 }]}>
               <Text style={{ fontSize: 13.5, fontFamily: F.bold, color: C.textSecondary }}>

@@ -4,6 +4,7 @@
 Última revisión de salida, asistencia, búsqueda y evaluaciones: 2026-09-21
 Última revisión de GPS, Trust Score y validación de edad: 2026-09-22
 Última revisión de TrueScore: 2026-09-24
+Última revisión de asientos y contador «confirmados/total»: 2026-11-14
 Última revisión de plazos de asistencia y límites conocidos (incluye mínimos de puntaje, cancelación con motivo e Inicio): 2026-11-05
 
 ## Propósito
@@ -32,6 +33,22 @@ El buscador pagina por el par `(hora, id)`, no sólo por la hora: dos partidos c
 
 «Calificar a los jugadores» no se ofrece en un partido cancelado (`puedeCalificar`), y `RateMatchScreen` distingue tres estados que antes eran uno solo: no se pudo cargar (con reintento), el partido no se jugó, y no hay compañeros elegibles.
 
+## Asientos: «10/14» en vez de «faltan 4» (migración 182, 2026-11-14)
+
+Un partido normal muestra **confirmados sobre total**. El total es `cupos_totales + 1` (las plazas más el organizador) y los confirmados `total - cupos_disponibles`: no hay columna nueva y los partidos anteriores se leen igual (uno de «falta 1» es «1/2»). Los partidos entre clubes no usan asientos.
+
+Cinco tipos de asiento. **Creador** y **cuenta** viven en `attendees`, como siempre; **reservado** e **invitado por nombre** son filas de `match_asientos` (lo que NO tiene cuenta); **libre** es lo que sobra. `matches_guard_cupos` sigue siendo el único sitio que cuenta y ahora resta también los asientos sin cuenta, así que ninguna RPC de ingreso o salida cambió su aritmética.
+
+- **Publicar** (`PublishMatchScreen`, paso 1): se pide el total y se arma la lista con `ListaDeAsientos`: «+» elige a un amigo (`SelectorDeAmigos`), el lápiz escribe sólo un nombre, el candado reserva. `publicar_partido_con_asientos` crea partido y asientos en una transacción (es `security invoker`: el INSERT corre con el GRANT por columnas, la RLS y los disparadores del alta directa) y exige que quede al menos un libre. El flujo antiguo de clubes (`clubChallengeId`) sigue con «Jugadores que faltan» y `createMatch`.
+- **Gestionar** (`AsientosDelPartido` en la pestaña Confirmados): asignar amigo, reservar, escribir o corregir un nombre, reemplazar un nombre o una reserva por la cuenta de un amigo, liberar. Liberar devuelve el cupo al público y avanza la lista de espera por el disparador de siempre.
+- **Link de invitación**: `https://www.futfinder.cl/p/<id>?inv=<token>`. El token vive en `match_invitaciones`, fuera de `matches`, porque la app lee partidos con `select *`. `tomar_asiento_reservado` convierte UNA reserva en inscripción y nunca toca los libres: sin reservas responde `SIN_RESERVAS`. El detalle muestra «Te guardaron un asiento» con el botón; quien llega sin sesión vuelve al link tras iniciar sesión **o registrarse** (`rutasTrasEntrar`, que ahora también consume `SuccessScreen`). El destino pendiente sigue en memoria: se pierde si la app se recarga entre medio.
+- **La gente del organizador no pasa por los filtros de los cupos libres**: amigo asignado (`origen = 'asiento_asignado'`) y quien entra por link (`asiento_link`) se saltan el mínimo de puntaje, el rango de edad y el turno de la lista de espera; expulsión, suspensión, teléfono y choque de horario siguen. Al amigo se le avisa (`join_approved`, «te sumó a su partido») y **bajarse no le cuesta puntos** (`leave_match_penalized` y `truescore_costo_salida`); quien entró por link sí paga como cualquiera.
+- **Nombres sólo durante el lanzamiento**: bandera `asientos_por_nombre` con `feature_flags.termina_at` (45 días desde que se aplica la migración). Se mueve o se apaga con un `UPDATE` de esa fila. Al vencer desaparece el lápiz y el servidor rechaza nombres nuevos; los ya escritos siguen hasta que su partido se juegue, y se pueden pasar a reservado, reemplazar o liberar.
+- **Los asientos mueren con su partido**: `limpiar_asientos_vencidos` (cron cada hora) borra nombres, reservas y link 24 horas después del término o al cancelarse. **La nómina con cuenta no se toca**: de `attendees` cuelgan historial, asistencia, TrueScore, fair play, calificaciones, chat y la exportación de datos.
+- **Búsqueda**: el filtro de disponibilidad nace en «Con cupos», así que un partido completo deja de salir; «Incluir completos» lo trae de vuelta para la lista de espera.
+
+La presentación pura está en `src/utils/asientos.js` (pruebas en `__tests__/asientos.test.js`), la frontera con el servidor en `src/services/asientos.js` y el arnés en `supabase/tests/182_asientos_de_partido_test.sql` (13 casos, con cambio de rol).
+
 ## TrueScore (fase 1, detrás de su flag)
 
 Las pantallas leen `useTrueScoreAjustes()` (`src/services/trueScore.js`) y cambian sólo con `truescore_fase1` activo. Gestionar partido confirma la asistencia en tres estados y una sola vez, con una hoja de confirmación, y ofrece sacar a un jugador desde la nómina; la cancelación pide el motivo (lluvia, cierre de cancha u otro) y muestra el costo que calcula `truescore_costo_salida`. El detalle y «Mi cupo» piden ese costo antes de salir, pero los botones siguen habilitados mientras se calcula o si falla: ver T04 en el listado de calidad. `TrueScoreChip` pinta el puntaje con el color de su nivel en solicitudes, lista de espera, nómina y organizador. La presentación pura vive en `src/utils/trueScore.js` (pruebas en `src/utils/__tests__/trueScore.test.js`) y **no calcula puntos**: todo número llega del servidor. Ajustes → Teléfono registra un celular chileno único sin SMS (migración 138); `telefono_obligatorio` y `telefono_verificacion_sms` siguen apagados en la comprobación de 2026-09-24.
@@ -44,7 +61,7 @@ Con `truescore_fase3`: «Calificar jugadores» ofrece «Reportar a este jugador�
 
 - Pantallas: `PartidosScreen`, `MatchDetailScreen`, `PublishMatchScreen`, `EditMatchScreen`, `ManageMatchScreen`, `MatchRequestStatusScreen` y `MatchSpotScreen`.
 - Código: `src/services/matches.js`, `attendance.js`, `matchRules.js` y `src/components/partidos/`.
-- Backend: `matches`, `attendees`, `match_waitlist`, perfiles, avisos y RPC de las migraciones 33 y 34.
+- Backend: `matches`, `attendees`, `match_waitlist`, `match_asientos`, `match_invitaciones`, perfiles, avisos y RPC de las migraciones 33, 34 y 182.
 
 ## Estados, errores y problemas conocidos
 

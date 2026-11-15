@@ -60,6 +60,9 @@ import {
   SurfaceButton,
   Tag,
 } from '../components/partidos/ui';
+import AsientosDelPartido from '../components/partidos/AsientosDelPartido';
+import { tomarAsientoReservado } from '../services/asientos';
+import { contadorDeJugadores, mensajeDelLink, tokenDeInvitacion } from '../utils/asientos.js';
 import Sheet from '../components/partidos/Sheet';
 import TrueScoreChip from '../components/TrueScoreChip';
 import ReclamosDelPartido from '../components/partidos/ReclamosDelPartido';
@@ -150,6 +153,11 @@ import { goBackOrPartidos, irAPestana } from '../utils/navigation';
  */
 export default function MatchDetailScreen({ route, navigation }) {
   const matchId = route?.params?.matchId;
+  // Link de invitación (`/p/<id>?inv=<token>`): da acceso sólo a los asientos
+  // reservados de este partido.
+  const invToken = tokenDeInvitacion(route?.params?.inv);
+  // Sube con cada recarga: los asientos sin cuenta se vuelven a leer con la nómina.
+  const [version, setVersion] = useState(0);
   const insets = useSafeAreaInsets();
   const online = useOnline();
 
@@ -267,6 +275,7 @@ export default function MatchDetailScreen({ route, navigation }) {
       cacheWrite(cacheKey, { match: attRes.match, attendees: attRes.data || [] });
     }
 
+    setVersion((v) => v + 1);
     setLoading(false);
     setRefreshing(false);
   }, [matchId, cacheKey]);
@@ -527,6 +536,21 @@ export default function MatchDetailScreen({ route, navigation }) {
       await load();
     });
 
+  // Toma uno de los asientos reservados con el link de invitación.
+  const doTomarAsiento = () =>
+    guard(async () => {
+      const m = mensajeDelLink(await tomarAsientoReservado(matchId, invToken));
+      if (m.tono === 'ok') {
+        say('success', m.texto, 'El chat del partido quedó habilitado.');
+        navigation.setParams({ inv: undefined });
+      } else {
+        say('error', m.tono === 'aviso' ? 'Sin asientos reservados' : 'No pudimos darte el asiento', m.texto);
+        // Un link que ya no sirve no se vuelve a ofrecer; uno que falló por red, sí.
+        if (!m.reintentar) navigation.setParams({ inv: undefined });
+      }
+      await load();
+    });
+
   const doRequest = () =>
     guard(async () => {
       const res = await requestJoinMatch(matchId);
@@ -746,6 +770,7 @@ export default function MatchDetailScreen({ route, navigation }) {
   const estado = estadoLabel(match);
   const modalidad = modalidadLabel(match);
   const closed = ['cancelado', 'finalizado'].includes(match.estado) || hasFinished(match);
+  const contador = contadorDeJugadores(match);
   const heroColors = closed || libres <= 0 ? C.heroNeutral : C.hero;
 
   return (
@@ -836,6 +861,20 @@ export default function MatchDetailScreen({ route, navigation }) {
             />
           ) : null}
 
+          {/* Llegó con el link de invitación y todavía no tiene asiento */}
+          {invToken && !isOrganizer && !usaNominaClub && !closed && (!myAttendee || myAttendee.estado === 'pendiente') ? (
+            <Card style={{ gap: 10 }}>
+              <View>
+                <Text style={styles.orgName}>Te guardaron un asiento</Text>
+                <Text style={[styles.metaText, { marginTop: 3 }]}>
+                  Este link es para los jugadores que el organizador ya tiene confirmados. Toma tu asiento
+                  y quedas dentro del partido.
+                </Text>
+              </View>
+              <PrimaryButton label="Tomar mi asiento" onPress={doTomarAsiento} loading={busy} disabled={busy} height={46} />
+            </Card>
+          ) : null}
+
           {/* Organizador: solicitudes por revisar */}
           {isOrganizer && pendingRequests.length > 0 ? (
             <Callout
@@ -897,11 +936,13 @@ export default function MatchDetailScreen({ route, navigation }) {
               value={
                 esDeClubes && match.cupos_por_club != null
                   ? String(match.cupos_por_club)
+                  : contador
+                  ? contador.texto
                   : libres <= 0
                   ? '0'
                   : String(libres)
               }
-              label={esDeClubes && match.cupos_por_club != null ? 'POR CLUB' : 'CUPOS'}
+              label={esDeClubes && match.cupos_por_club != null ? 'POR CLUB' : contador ? 'JUGADORES' : 'CUPOS'}
               highlight={libres > 0 && !closed}
             />
             <StatCell value={cuotaLabel(match.precio_cuota)} label="CUOTA" />
@@ -1150,7 +1191,38 @@ export default function MatchDetailScreen({ route, navigation }) {
           ) : null}
 
           {/* Jugadores */}
-          {!usaNominaClub ? <Section
+          {!usaNominaClub && contador ? (
+            <Section label="Jugadores" right={contador.completo ? 'Completo' : contador.resto}>
+              <AsientosDelPartido
+                match={match}
+                nomina={attendees}
+                miId={myId}
+                version={version}
+                onVerPerfil={(userId) => navigation.navigate('UserProfile', { userId })}
+                onUnirme={!closed && (cta?.kind === 'unirme' || cta?.kind === 'solicitar') ? onCta : undefined}
+                etiquetaUnirme={cta?.kind === 'solicitar' ? 'Solicitar' : 'Unirme'}
+              />
+              {chatOpen || isOrganizer || pendingRequests.length > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Text style={[styles.metaText, { flex: 1 }]}>
+                    {pendingRequests.length > 0 && (isOrganizer || match.aprobacion === 'manual')
+                      ? `${pendingRequests.length} ${pendingRequests.length === 1 ? 'solicitud' : 'solicitudes'} en revisión`
+                      : ''}
+                  </Text>
+                  {chatOpen || isOrganizer ? (
+                    <Pressable
+                      onPress={() => navigation.navigate('ManageMatch', { matchId, tab: 'confirmados' })}
+                      hitSlop={8}
+                    >
+                      <Text style={styles.link}>{isOrganizer ? 'Gestionar asientos' : 'Ver jugadores'}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </Section>
+          ) : null}
+
+          {!usaNominaClub && !contador ? <Section
             label="Jugadores"
             right={`${confirmed.length} en el plantel`}
           >

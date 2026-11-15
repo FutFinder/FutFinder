@@ -1,6 +1,6 @@
 # Base de datos
 
-Última revisión: 2026-11-09
+Última revisión: 2026-11-14 (asientos de partido, migración 182)
 
 ## Propósito
 
@@ -291,6 +291,10 @@ La 119 (permisos del club: `tiene_permiso_de_club()` y nueve áreas por rol) ree
 ## Cuenta normal, sin atajos (migración 177, aplicada el 2026-11-13)
 
 Transiciones cerradas desde el cliente en `friendships`, `club_join_requests`, `club_open_challenges` y sus respuestas; alta de `matches` por columnas; pre-request de PostgREST que exige `aal2` a quien tiene factor; restrictivas `mfa_exigida`; menores fuera de búsquedas y edad fija. Detalle en [Seguridad y privacidad](seguridad-y-privacidad.md), «Tercera pasada».
+
+## Asientos de partido (migración 182, SIN aplicar en producción al 2026-11-14)
+
+`match_asientos(id, id_partido, tipo 'reservado'|'nombre', nombre)` guarda los asientos sin cuenta; lectura para `authenticated` que ve el partido, escritura sólo por RPC. `match_invitaciones(id_partido, token)` no tiene ningún privilegio de cliente. `feature_flags` gana `termina_at` y `flag_activo()` la respeta. `attendees_origen_check` suma `asiento_asignado` y `asiento_link`. Se redefinen `matches_guard_cupos`, `tg_enforce_join_rules`, `tg_notify_match_join`, `leave_match_penalized` y `truescore_costo_salida` partiendo del cuerpo desplegado. Puertas nuevas: `publicar_partido_con_asientos` (invoker), `asientos_armar`, `asiento_asignar_amigo`, `asiento_agregar`, `asiento_cambiar`, `asiento_liberar`, `asiento_quitar_amigo`, `asientos_link`, `tomar_asiento_reservado` y `partidos_ajustes`; los ayudantes `_asiento_*` y `limpiar_asientos_vencidos` (cron `futfinder-limpiar-asientos`, cada hora) están cerrados también a `authenticated`. Ensayada entera contra producción en una transacción revertida: 13 de 13.
 
 ## Convención de cambio
 

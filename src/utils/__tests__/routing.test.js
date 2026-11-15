@@ -9,7 +9,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { getInitialRouteName, isPrivateRoute } = require('../routing.js');
+const { getInitialRouteName, isPrivateRoute, rutasTrasEntrar } = require('../routing.js');
 
 test('getInitialRouteName: con sesión y onboarding completo, va a la ruta privada Main', () => {
   assert.equal(getInitialRouteName(true), 'Main');
@@ -46,4 +46,20 @@ test('isPrivateRoute: consistente con lo que devuelve getInitialRouteName en cad
   assert.equal(isPrivateRoute(getInitialRouteName(true)), true);
   assert.equal(isPrivateRoute(getInitialRouteName(false)), true);
   assert.equal(isPrivateRoute(getInitialRouteName(null)), false);
+});
+
+test('rutasTrasEntrar: quien abrió un link de invitación sin sesión vuelve a él, con Main debajo', () => {
+  const pending = { name: 'MatchDetail', params: { matchId: 'm1', inv: 'tok' } };
+  assert.deepEqual(rutasTrasEntrar(pending), {
+    index: 1,
+    routes: [{ name: 'Main' }, { name: 'MatchDetail', params: { matchId: 'm1', inv: 'tok' } }],
+  });
+});
+
+test('rutasTrasEntrar: sin destino pendiente se entra al Home', () => {
+  assert.deepEqual(rutasTrasEntrar(null), { index: 0, routes: [{ name: 'Main', params: undefined }] });
+  assert.deepEqual(rutasTrasEntrar({ name: 'Main', params: { screen: 'SearchTab' } }), {
+    index: 0,
+    routes: [{ name: 'Main', params: { screen: 'SearchTab' } }],
+  });
 });

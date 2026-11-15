@@ -40,8 +40,8 @@ export const CUOTA_OPTS = [
 ];
 
 export const DISP_OPTS = [
-  { label: 'Todos', value: 'todos' },
   { label: 'Con cupos', value: 'con_cupos' },
+  { label: 'Incluir completos', value: 'todos' },
 ];
 
 /** Filtro neutro. La pantalla lo usa como estado inicial y como «Limpiar». */
@@ -56,7 +56,9 @@ export const EMPTY_FILTERS = {
   edadMin: '',
   edadMax: '',
   cuota: null,
-  disponibilidad: 'todos',
+  // Un partido completo deja de salir en la búsqueda; «Incluir completos» lo
+  // trae de vuelta para quien quiera anotarse en la lista de espera.
+  disponibilidad: 'con_cupos',
   /** Solo partidos que aceptan a cualquiera (`min_trust_score = 0`). */
   sinMinimoTrust: false,
 };
@@ -71,7 +73,7 @@ export function countActiveFilters(f) {
   if (f.nivel) n++;
   if (f.edadPreset !== 0) n++;
   if (f.cuota) n++;
-  if (f.disponibilidad !== 'todos') n++;
+  if (f.disponibilidad !== 'con_cupos') n++;
   if (f.sinMinimoTrust) n++;
   return n;
 }

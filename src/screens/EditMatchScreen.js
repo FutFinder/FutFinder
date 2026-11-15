@@ -64,6 +64,8 @@ import {
   translateSchemaError,
   updateMatch,
 } from '../services/matches';
+import { getAsientosSinCuenta } from '../services/asientos';
+import { contadorDeJugadores } from '../utils/asientos.js';
 import { pickImage, uploadMatchCover } from '../services/storage';
 import { getCurrentUser } from '../services/auth';
 import { getCurrentLocation } from '../services/location';
@@ -127,10 +129,11 @@ export default function EditMatchScreen({ route, navigation }) {
   const [uploadingCover, setUploadingCover] = useState(false);
 
   const load = useCallback(async () => {
-    const [attRes, reqRes, user] = await Promise.all([
+    const [attRes, reqRes, user, asientosRes] = await Promise.all([
       getMatchAttendees(matchId).catch((e) => ({ data: [], match: null, error: e })),
       getMatchRequests(matchId).catch(() => ({ data: [] })),
       getCurrentUser(),
+      getAsientosSinCuenta(matchId).catch(() => ({ data: [] })),
     ]);
     const m = attRes.match;
     if (!m) {
@@ -142,7 +145,10 @@ export default function EditMatchScreen({ route, navigation }) {
       (a) => a.estado !== 'pendiente' && a.estado !== 'cancelado'
     );
     setConfirmedCount(confirmados.length);
-    setOcupadas(confirmados.filter((a) => a.user_id !== m.id_organizador).length);
+    // Los asientos reservados y por nombre también ocupan plaza (migración 182).
+    setOcupadas(
+      confirmados.filter((a) => a.user_id !== m.id_organizador).length + (asientosRes.data || []).length
+    );
     setRequestCount((reqRes.data || []).length);
     setIsOrganizer(user?.id === m.id_organizador);
     setOriginal(m);
@@ -186,6 +192,9 @@ export default function EditMatchScreen({ route, navigation }) {
 
   // Cupos totales mínimos: los que ya están tomados por otros jugadores.
   const minCupos = Math.max(CUPOS.min, ocupadas);
+  // Partido normal: se edita el TOTAL de jugadores (plazas + el organizador).
+  // Los partidos entre clubes siguen con su conteo propio.
+  const usaAsientos = !!contadorDeJugadores(original);
 
   const dirty = useMemo(() => {
     if (!form || !original) return false;
@@ -237,7 +246,9 @@ export default function EditMatchScreen({ route, navigation }) {
     if (!Number.isFinite(cupos) || cupos < CUPOS.min) e.cupos = 'Necesitas al menos 1 cupo';
     else if (cupos > CUPOS.max) e.cupos = `El máximo es ${CUPOS.max} cupos`;
     else if (cupos < ocupadas) {
-      e.cupos = `Ya hay ${ocupadas} ${ocupadas === 1 ? 'cupo tomado' : 'cupos tomados'}: no puedes bajar de ahí sin sacar a alguien del plantel.`;
+      e.cupos = usaAsientos
+        ? `Ya hay ${ocupadas + 1} jugadores con asiento: no puedes bajar de ahí sin liberar un asiento.`
+        : `Ya hay ${ocupadas} ${ocupadas === 1 ? 'cupo tomado' : 'cupos tomados'}: no puedes bajar de ahí sin sacar a alguien del plantel.`;
     }
 
     const cuota = form.cuota === '' ? 0 : Number(form.cuota);
@@ -584,19 +595,21 @@ export default function EditMatchScreen({ route, navigation }) {
 
           {/* Cupos y cuota */}
           <Group label="Cupos y cuota">
-            <Field label="Cupos totales">
+            <Field label={usaAsientos ? 'Total de jugadores' : 'Cupos totales'}>
               <Card style={{ padding: 12 }}>
                 <Stepper
-                  value={Number(form.cupos)}
-                  onChange={(v) => set({ cupos: v })}
-                  min={CUPOS.min}
-                  max={CUPOS.max}
+                  value={Number(form.cupos) + (usaAsientos ? 1 : 0)}
+                  onChange={(v) => set({ cupos: usaAsientos ? v - 1 : v })}
+                  min={CUPOS.min + (usaAsientos ? 1 : 0)}
+                  max={CUPOS.max + (usaAsientos ? 1 : 0)}
                   error={!!errors.cupos}
                 />
               </Card>
               <ErrorHint>{errors.cupos}</ErrorHint>
               <Note>
-                {ocupadas > 0
+                {usaAsientos
+                  ? `Contándote a ti. Hay ${ocupadas + 1} ${ocupadas + 1 === 1 ? 'asiento ocupado o reservado' : 'asientos ocupados o reservados'}: subir el total abre cupos libres; los asientos se arman en Gestionar partido.`
+                  : ocupadas > 0
                   ? `El mínimo es ${minCupos} porque ya hay ${ocupadas} ${ocupadas === 1 ? 'cupo tomado' : 'cupos tomados'}. Subir el total abre cupos nuevos sin tocar a nadie.`
                   : 'Nadie ha tomado un cupo todavía, así que puedes ajustar el total libremente. Tú, como organizador, no ocupas uno.'}
               </Note>

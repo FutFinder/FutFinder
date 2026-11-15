@@ -20,6 +20,7 @@ import {
 } from '../../theme/colors';
 import { formatFechaCorta } from './DateTimeSheets';
 import { cuotaLabel } from '../../services/matchRules';
+import { resumenDeJugadores } from '../../utils/asientos.js';
 
 /**
  * Hoja de compartir del partido.
@@ -44,9 +45,10 @@ export function matchShareText(match) {
         .slice(0, 5)}`
     : '';
   const cupos =
-    match.cupos_disponibles != null
+    resumenDeJugadores(match) ||
+    (match.cupos_disponibles != null
       ? `${match.cupos_disponibles} ${match.cupos_disponibles === 1 ? 'cupo' : 'cupos'}`
-      : '';
+      : '');
   const partes = [
     `${match.titulo}`,
     when,

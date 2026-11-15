@@ -968,7 +968,7 @@ export async function getMatchAttendees(matchId) {
     // 1) Trae attendees
     const { data: atts, error: aErr } = await supabase
       .from('attendees')
-      .select('id, id_jugador, estado, inscrito_at, confirmado_at, asistencia')
+      .select('id, id_jugador, estado, inscrito_at, confirmado_at, asistencia, origen')
       .eq('id_partido', matchId)
       .order('inscrito_at', { ascending: true });
     if (aErr) {
@@ -1021,6 +1021,8 @@ export async function getMatchAttendees(matchId) {
         confirmado_at: a.confirmado_at,
         // Marca del organizador con TrueScore: 'asistio' | 'tarde' | 'no_fue'.
         asistencia: a.asistencia ?? null,
+        // Cómo llegó a la nómina; `asiento_asignado` = lo sentó el organizador.
+        origen: a.origen ?? null,
       };
     });
 

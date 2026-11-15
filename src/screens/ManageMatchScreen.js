@@ -47,6 +47,8 @@ import {
 import Sheet from '../components/partidos/Sheet';
 import TrueScoreChip from '../components/TrueScoreChip';
 import ShareSheet from '../components/partidos/ShareSheet';
+import AsientosDelPartido from '../components/partidos/AsientosDelPartido';
+import { contadorDeJugadores } from '../utils/asientos.js';
 import { InlineEmpty, LoadingList, ErrorState } from '../components/partidos/StateViews';
 import { formatFechaCorta } from '../components/partidos/DateTimeSheets';
 import {
@@ -123,6 +125,8 @@ export default function ManageMatchScreen({ route, navigation }) {
   const [requests, setRequests] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
   const [myId, setMyId] = useState(null);
+  // Sube con cada recarga: los asientos sin cuenta se vuelven a leer con la nómina.
+  const [version, setVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -170,6 +174,7 @@ export default function ManageMatchScreen({ route, navigation }) {
     });
     setMarks((prev) => ({ ...pre, ...prev }));
 
+    setVersion((v) => v + 1);
     setLoading(false);
     setRefreshing(false);
   }, [matchId]);
@@ -685,6 +690,17 @@ export default function ManageMatchScreen({ route, navigation }) {
           {/* ---------------- CONFIRMADOS ---------------- */}
           {tab === 'confirmados' ? (
             <View style={{ gap: 10 }}>
+              {contadorDeJugadores(match) ? (
+                <AsientosDelPartido
+                  match={match}
+                  nomina={attendees}
+                  editable={isOrganizer && ['abierto', 'lleno'].includes(match.estado) && new Date(match.hora).getTime() > Date.now()}
+                  miId={myId}
+                  version={version}
+                  onCambio={load}
+                  onVerPerfil={(userId) => navigation.navigate('UserProfile', { userId })}
+                />
+              ) : (
               <Card style={{ gap: 9 }} radius={16}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
                   <Text style={styles.planLabel}>Plantel del partido</Text>
@@ -699,6 +715,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                   {requests.length > 0 ? ` · ${requests.length} en revisión` : ''}
                 </Text>
               </Card>
+              )}
 
               {confirmed.length === 0 ? (
                 <InlineEmpty

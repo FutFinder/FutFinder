@@ -127,6 +127,20 @@ local): dos reservas del mismo jugador confirmadas a la vez con saldo para una
 sola, y dos cancelaciones del recinto a la vez. Sólo importa cuando exista la
 carga de saldo.
 
+## 6b. Asientos de partido (migración 182, 2026-11-14)
+
+**Qué se cambió:** contador «10/14», armado de asientos al publicar, gestión de asientos, link de invitación y período de nombres. Ver [Partidos](../funcionalidades/partidos.md).
+
+**Qué sí se comprobó:** el arnés SQL de la 182 (13 casos, con cambio de rol) contra producción en una transacción revertida; las pruebas de Node de `utils/asientos.js` y `rutasTrasEntrar`; lint en cero errores; el bundle web compila y carga.
+
+**Qué falta, y cómo** (esta Mac no tiene base local ni sesión de prueba, así que **ninguna pantalla nueva se recorrió con una cuenta**):
+
+- **La 182 no está aplicada en producción.** Hasta aplicarla, publicar un partido normal falla (la app llama a `publicar_partido_con_asientos`) y el detalle avisa que no pudo cargar los asientos. Se aplica antes de subir la app, no después.
+- Con dos cuentas amigas y una tercera: publicar un partido de 14 con un amigo, dos nombres y seis reservas; ver «10/14» en la lista, en Inicio y en el detalle; abrir el link con la tercera cuenta y tomar un asiento; agotar las reservas y ver el mensaje; liberar un asiento y verlo libre; llenar el partido y verlo salir de la búsqueda.
+- El link abierto **sin sesión**, entrando por login y por registro completo: tiene que volver al partido con el botón «Tomar mi asiento».
+- El amigo asignado: recibe el aviso, ve costo 0 al salirse y el asiento queda libre.
+- En el teléfono (build nativo): que `futfinder.cl/p/<id>?inv=…` abra la app con el parámetro, y la hoja de compartir del link.
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

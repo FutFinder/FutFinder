@@ -13,9 +13,14 @@ import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { APP_VERSION } from '../utils/appVersion';
+import { rutasTrasEntrar } from '../utils/routing';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function SuccessScreen({ navigation }) {
-  const goHome = () => navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+  const { consumePendingDestination } = useAuth();
+  // Quien llegó por un link (la invitación a un partido) y tuvo que crearse
+  // la cuenta vuelve a ese link al terminar, no al Home.
+  const goHome = () => navigation.reset(rutasTrasEntrar(consumePendingDestination()));
   const goProfile = () =>
     navigation.reset({
       index: 1,
