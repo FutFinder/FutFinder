@@ -71,11 +71,11 @@ grant update (status, responded_at) on public.friendships to authenticated;
 drop policy if exists club_photos_insert on public.club_photos;
 create policy club_photos_insert on public.club_photos
   for insert with check (
-    uploaded_by = auth.uid()
+    uploaded_by = (select auth.uid())
     and exists (
       select 1 from public.club_members m
        where m.club_id = club_photos.club_id
-         and m.user_id = auth.uid()
+         and m.user_id = (select auth.uid())
          and m.rol = 'admin'
     )
   );
@@ -86,7 +86,7 @@ create policy club_photos_delete on public.club_photos
     exists (
       select 1 from public.club_members m
        where m.club_id = club_photos.club_id
-         and m.user_id = auth.uid()
+         and m.user_id = (select auth.uid())
          and m.rol = 'admin'
     )
   );

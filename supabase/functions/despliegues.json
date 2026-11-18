@@ -61,18 +61,12 @@
       }
     },
     "send-push": {
-      "version": 11,
-      "desplegada": "2026-11-05T20:45:08Z",
-      "comparada": "2026-11-05",
+      "version": 13,
+      "desplegada": "2026-11-18T17:32:21Z",
+      "comparada": "2026-11-18",
       "archivos": {
         "send-push/index.ts": "6db7b7f16cc11a42de5f96e1de1e6a8a70c53a026fff72bfa5f6a797a58a752f",
-        "send-push/pushLogic.ts": "770f329fef0097e964102660e8e19d5a63f4b86040c4c08e1913e73582f93592"
-      },
-      "pendiente": {
-        "motivo": "188: el tipo club_invite (invitación a un club) cuenta como notificación de clubes. Sin redesplegar, ese push igual sale, pero no respeta a quien apagó los avisos de clubes.",
-        "archivos": {
-          "send-push/pushLogic.ts": "2707fa290adf464c3a0f6be7b1129b7f2dd5c5f16a9c8c36bcaf978c17c58a92"
-        }
+        "send-push/pushLogic.ts": "2707fa290adf464c3a0f6be7b1129b7f2dd5c5f16a9c8c36bcaf978c17c58a92"
       }
     },
     "solicitud-recinto": {

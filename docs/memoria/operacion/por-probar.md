@@ -170,7 +170,7 @@ carga de saldo.
 
 **Qué sí se comprobó:** en la web local con cuentas `*_v188`: la marca y el aviso de bloqueado en la hoja y en el partido completo; volver desde «Mi perfil» regresa a Integrantes; invitar → al invitado le llega el aviso, Aceptar lo deja como jugador y al admin le llega «aceptó tu invitación». Arnés de la 188 5/5 con control negativo.
 
-**Qué falta:** aplicar la 188 en producción y redesplegar `send-push`; ver la barra de «Mi perfil» con flecha a 375 px.
+**Qué falta:** la 188 y `send-push` v13 ya están en producción (2026-11-18): falta invitar a alguien en www.futfinder.cl y ver que le llegue el push al teléfono; ver la barra de «Mi perfil» con flecha a 375 px.
 
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
