@@ -116,6 +116,10 @@ Hasta ahora un fallo en el teléfono de alguien no dejaba rastro en ninguna part
 
 Sin el archivo de servicios válido, un prebuild o build Android que evalúe `googleServicesFile` no puede resolver esa entrada. La exportación web y Expo Go no usan ese archivo.
 
+## Limpieza antes del lanzamiento (preparada, sin correr)
+
+Decisión de Vicente (2026-11-18): borrar todo el contenido de prueba de producción —cuentas, partidos, clubes, mensajes, recintos, archivos— **justo antes del lanzamiento**, no antes, para no limpiar dos veces. Está lista en `scripts/limpieza-prelanzamiento/` (SQL + script de Storage + README con los pasos) y ensayada contra producción con rollback. Conserva la configuración y las cuentas que se pongan en la lista. Se frena sola si aparece una tabla nueva sin clasificar: al agregar una tabla a `public`, sumarla a una de las dos listas de `limpieza.sql`.
+
 ## Notas relacionadas
 
 - [Stack y estructura](stack-y-estructura.md)
