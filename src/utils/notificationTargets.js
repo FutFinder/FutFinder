@@ -66,6 +66,9 @@ export function resolveNotificationTarget(n) {
         : null;
 
     case 'club_request_rejected':
+    // Una invitación (188) se responde en la pestaña Clubes, donde ya está
+    // la lista de invitaciones; el detalle del club es para miembros.
+    case 'club_invite':
       return { screen: 'Main', params: { screen: 'ClubsTab' } };
 
     // Tu club quedó sancionado (migración 47). Va al CLUB y no al hilo del

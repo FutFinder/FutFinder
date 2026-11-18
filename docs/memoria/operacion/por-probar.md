@@ -164,6 +164,14 @@ carga de saldo.
 - **Aplicada en producción el 2026-11-18 con el sí de Vicente** (versión `20261118165539`), después de la 183 y del cliente nuevo, y tras ensayarla con su arnés contra producción en `begin … rollback` (8/8, sin restos). Comprobado por catálogo: las dos funciones son las nuevas, `anon` no publica y `authenticated` no ejecuta `_asiento_nombre_generico`. Con la 187 aplicada y el cliente viejo, la web manda asientos `reservado` y publicar falla con ASIENTO_SIN_IDENTIFICAR. El cliente nuevo con la base sin la 187 no rompe nada (sólo manda amigos y nombres).
 - En la web local no se llegó a probar el camino feliz con nombres ni un nombre genérico rechazado por pantalla (el límite de uso cortó la sesión): sólo el bloqueo.
 
+## 6e. Tres arreglos del 2026-11-18 (perfil, bloqueados en el partido, invitación a club)
+
+**Qué se cambió:** (1) «Mi perfil» abierto encima de otra pantalla (ruta `UserProfile`, p. ej. tocarte en Integrantes) trae flecha para volver, en lugar del pin y sin la campana; (2) en la lista de un partido —la hoja de vista previa y el partido completo— quien bloqueaste sale con «Bloqueado» en rojo y un aviso arriba; (3) migración 188: invitar a alguien a un club le manda un aviso `club_invite` con Aceptar y Rechazar. De paso, `Callout` sin `onPress` salía sin fondo ni borde (un `View` ignora el estilo-función): arreglado para todas las bandas.
+
+**Qué sí se comprobó:** en la web local con cuentas `*_v188`: la marca y el aviso de bloqueado en la hoja y en el partido completo; volver desde «Mi perfil» regresa a Integrantes; invitar → al invitado le llega el aviso, Aceptar lo deja como jugador y al admin le llega «aceptó tu invitación». Arnés de la 188 5/5 con control negativo.
+
+**Qué falta:** aplicar la 188 en producción y redesplegar `send-push`; ver la barra de «Mi perfil» con flecha a 375 px.
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

@@ -249,7 +249,10 @@ export async function getEstadosDeOrigen(items) {
   try {
     const [friendships, requests, challenges, resultados] = await Promise.all([
       consultar('friendships', 'status', ids('friend_request', 'friendshipId')),
-      consultar('club_join_requests', 'status', ids('club_request', 'requestId')),
+      consultar('club_join_requests', 'status', [
+        ...ids('club_request', 'requestId'),
+        ...ids('club_invite', 'requestId'),
+      ]),
       consultar('club_challenges', 'estado', ids('club_challenge', 'challengeId')),
       consultar('club_match_results', 'estado', ids('club_resultado_propuesto', 'resultId')),
     ]);

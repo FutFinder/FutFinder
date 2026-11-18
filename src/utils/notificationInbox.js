@@ -168,6 +168,7 @@ export function fusionarAvisoEnVivo(items, notif) {
 const ESTADOS = {
   friend_request: { pending: null, accepted: 'aceptada', rejected: 'rechazada' },
   club_request: { pending: null, approved: 'aceptada', rejected: 'rechazada' },
+  club_invite: { pending: null, approved: 'aceptada', rejected: 'rechazada' },
   club_challenge: { pendiente: null, aceptado: 'aceptada', rechazado: 'rechazada' },
   // Migración 48. El aviso dice «Hay un resultado por confirmar · confírmalo
   // o recházalo», así que una vez respondido queda mintiendo igual que una
@@ -197,6 +198,7 @@ export function textoResolucion(n) {
   if (n.type === 'club_resultado_propuesto') {
     return r === 'aceptada' ? 'Resultado confirmado' : 'Resultado rechazado';
   }
+  if (n.type === 'club_invite') return r === 'aceptada' ? 'Invitación aceptada' : 'Invitación rechazada';
   return r === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud rechazada';
 }
 
@@ -220,7 +222,7 @@ export function conResoluciones(items, estados) {
     let estado;
     if (n.type === 'friend_request' && data.friendshipId) {
       estado = estados.friendships?.get(data.friendshipId);
-    } else if (n.type === 'club_request' && data.requestId) {
+    } else if ((n.type === 'club_request' || n.type === 'club_invite') && data.requestId) {
       estado = estados.requests?.get(data.requestId);
       if (estado === undefined) return n;
     } else if (n.type === 'club_challenge' && data.challengeId) {

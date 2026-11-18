@@ -33,6 +33,7 @@ export const NOTIF_TYPE_TO_PREFERENCE = {
   club_member_joined: 'notif_clubs',
   club_member_left: 'notif_clubs',
   club_invite_accepted: 'notif_clubs',
+  club_invite: 'notif_clubs',
   club_challenge: 'notif_clubs',
   club_challenge_accepted: 'notif_clubs',
   club_challenge_rejected: 'notif_clubs',

@@ -167,7 +167,9 @@ function actionsFor(n, clubesAdmin) {
       ? ['Aceptar reto', 'Rechazar']
       : null;
   }
-  if (n.type === 'club_request' && data.requestId) {
+  // La solicitud la responde el admin; la invitación (188), el invitado:
+  // las dos son la misma fila de `club_join_requests`.
+  if ((n.type === 'club_request' || n.type === 'club_invite') && data.requestId) {
     return ['Aceptar', 'Rechazar'];
   }
   if (n.type === 'friend_request' && data.friendshipId) {
@@ -423,7 +425,7 @@ export default function NotificationsScreen({ navigation, route }) {
     let threadKey = null;
     if (n.type === 'club_challenge') {
       ({ error, threadKey } = await respondChallenge(data.challengeId, accept));
-    } else if (n.type === 'club_request') {
+    } else if (n.type === 'club_request' || n.type === 'club_invite') {
       ({ error } = await respondToRequest(data.requestId, accept));
     } else if (n.type === 'friend_request') {
       ({ error } = accept
