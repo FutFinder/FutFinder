@@ -161,7 +161,7 @@ carga de saldo.
 
 **Qué falta, y cómo:**
 
-- **Orden en producción:** 183 → subir el cliente → 187 (los dos primeros, hechos el 2026-11-18). Con la 187 aplicada y el cliente viejo, la web manda asientos `reservado` y publicar falla con ASIENTO_SIN_IDENTIFICAR. El cliente nuevo con la base sin la 187 no rompe nada (sólo manda amigos y nombres).
+- **Aplicada en producción el 2026-11-18 con el sí de Vicente** (versión `20261118165539`), después de la 183 y del cliente nuevo, y tras ensayarla con su arnés contra producción en `begin … rollback` (8/8, sin restos). Comprobado por catálogo: las dos funciones son las nuevas, `anon` no publica y `authenticated` no ejecuta `_asiento_nombre_generico`. Con la 187 aplicada y el cliente viejo, la web manda asientos `reservado` y publicar falla con ASIENTO_SIN_IDENTIFICAR. El cliente nuevo con la base sin la 187 no rompe nada (sólo manda amigos y nombres).
 - En la web local no se llegó a probar el camino feliz con nombres ni un nombre genérico rechazado por pantalla (el límite de uso cortó la sesión): sólo el bloqueo.
 
 ## 7. Lo que ya estaba sin probar antes de esta tanda
