@@ -35,6 +35,7 @@ export default function ListaDeAsientos({
   nombresActivos = false,
   ocupado = false,
   miId = null,
+  bloqueados = null,
   onAmigo,
   onNombre,
   onReservar,
@@ -56,6 +57,7 @@ export default function ListaDeAsientos({
           nombresActivos={nombresActivos}
           ocupado={ocupado}
           miId={miId}
+          bloqueado={Boolean(a.user_id && bloqueados?.has(a.user_id))}
           onAmigo={onAmigo}
           onNombre={onNombre}
           onReservar={onReservar}
@@ -78,6 +80,7 @@ function Fila({
   nombresActivos,
   ocupado,
   miId,
+  bloqueado = false,
   onAmigo,
   onNombre,
   onReservar,
@@ -99,6 +102,8 @@ function Fila({
 
   const etiqueta = a.falta
     ? { label: 'Falta', tone: 'danger' }
+    : bloqueado
+    ? { label: 'Bloqueado', tone: 'danger' }
     : a.tipo === 'creador'
       ? { label: 'Creador', tone: 'green' }
       : a.tipo === 'nombre'

@@ -303,24 +303,23 @@ export function Callout({ title, text, tone = 'gold', icon: Icon, onPress, style
     danger: { bg: alfa(C.red, 0.09), border: C.redBorder, fg: C.red },
     neutral: { bg: C.surface, border: C.border, fg: C.textStrong },
   }[tone];
+  const caja = {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: map.bg,
+    borderWidth: 1,
+    borderColor: map.border,
+    borderRadius: 16,
+    padding: 13,
+  };
+  // Sólo `Pressable` acepta un estilo-función: un `View` lo ignora entero y
+  // la banda salía sin fondo ni borde cuando no tenía `onPress`.
   const Wrapper = onPress ? Pressable : View;
   return (
     <Wrapper
       onPress={onPress}
-      style={({ pressed } = {}) => [
-        {
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          gap: 10,
-          backgroundColor: map.bg,
-          borderWidth: 1,
-          borderColor: map.border,
-          borderRadius: 16,
-          padding: 13,
-        },
-        pressed && { opacity: 0.85 },
-        style,
-      ]}
+      style={onPress ? ({ pressed }) => [caja, pressed && { opacity: 0.85 }, style] : [caja, style]}
     >
       {Icon ? <Icon color={map.fg} size={17} strokeWidth={2} style={{ marginTop: 1 }} /> : null}
       <View style={{ flex: 1 }}>

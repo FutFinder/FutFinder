@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Share, Platform } from 'react-native';
-import { Link2 } from 'lucide-react-native';
+import { Link2, Ban } from 'lucide-react-native';
 
 import ListaDeAsientos from './ListaDeAsientos';
 import { SelectorDeAmigos, NombreDeAsientoSheet } from './SelectorDeAmigos';
-import { Note, SurfaceButton } from './ui';
+import { Note, SurfaceButton, Callout } from './ui';
+import { idsQueBloquee } from '../../services/blockedUsers';
+import { bloqueadosDentro, avisoDeBloqueados } from '../../utils/bloqueadosEnPartido';
 import { paleta as C, fuentes as F } from '../../theme/colors';
 import {
   agregarNombre,
@@ -72,8 +74,21 @@ export default function AsientosDelPartido({
     cargar();
   }, [cargar, version]);
 
+  // A quién bloqueé: se marca en la lista y se avisa arriba.
+  const [bloqueados, setBloqueados] = useState(() => new Set());
+  useEffect(() => {
+    let vivo = true;
+    idsQueBloquee().then((s) => {
+      if (vivo) setBloqueados(s);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [version]);
+
   const contador = contadorDeJugadores(match);
   const asientos = useMemo(() => asientosDelPartido(match, nomina, sinCuenta), [match, nomina, sinCuenta]);
+  const avisoBloqueados = avisoDeBloqueados(bloqueadosDentro(asientos, bloqueados));
   const conAsiento = useMemo(
     () => nomina.filter((a) => ['inscrito', 'confirmado_gps', 'no_asistio'].includes(a.estado)).map((a) => a.user_id),
     [nomina]
@@ -149,8 +164,11 @@ export default function AsientosDelPartido({
         </Text>
       </View>
 
+      {avisoBloqueados ? <Callout tone="danger" icon={Ban} title="Jugador bloqueado" text={avisoBloqueados} /> : null}
+
       <ListaDeAsientos
         asientos={asientos}
+        bloqueados={bloqueados}
         editable={editable}
         nombresActivos={nombresActivos}
         ocupado={ocupado}

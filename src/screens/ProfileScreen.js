@@ -67,6 +67,7 @@ import {
 import { reportUser, countReportsAgainst, getMyPendingReportFor } from '../services/reports';
 import { isBlockedByMe, blockUser, unblockUser } from '../services/blockedUsers';
 import { isSupabaseConfigured } from '../services/supabase';
+import { goBackOrPartidos } from '../utils/navigation';
 import { useTrueScoreAjustes } from '../services/trueScore';
 import {
   playerBadges,
@@ -397,7 +398,7 @@ export default function ProfileScreen({ navigation, route }) {
     showBanner(
       'success',
       'Invitación enviada',
-      `@${profile?.username || 'jugador'} verá tu invitación a ${club.nombre} en su pestaña Clubes.`
+      `A @${profile?.username || 'jugador'} le llegó un aviso de tu invitación a ${club.nombre}, y la verá también en su pestaña Clubes.`
     );
   };
 
@@ -443,8 +444,9 @@ export default function ProfileScreen({ navigation, route }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <PlayerProfileTopBar
           isOwnProfile={isOwnProfile}
+          showBack={route?.name === 'UserProfile'}
           title={isOwnProfile ? 'Mi perfil' : 'Perfil'}
-          onBack={() => navigation.goBack()}
+          onBack={() => goBackOrPartidos(navigation)}
           onShare={() => {}}
           onEdit={canManageOwnProfile ? goEdit : undefined}
           onSettings={canManageOwnProfile ? goSettings : undefined}
@@ -460,8 +462,9 @@ export default function ProfileScreen({ navigation, route }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <PlayerProfileTopBar
           isOwnProfile={isOwnProfile}
+          showBack={route?.name === 'UserProfile'}
           title={isOwnProfile ? 'Mi perfil' : 'Perfil'}
-          onBack={() => navigation.goBack()}
+          onBack={() => goBackOrPartidos(navigation)}
           onShare={() => {}}
           onEdit={canManageOwnProfile ? goEdit : undefined}
           onSettings={canManageOwnProfile ? goSettings : undefined}
@@ -538,8 +541,11 @@ export default function ProfileScreen({ navigation, route }) {
     <SafeAreaView edges={['top']} style={styles.root}>
       <PlayerProfileTopBar
         isOwnProfile={isOwnProfile}
+        // La pestaña Perfil es raíz; `UserProfile` siempre se abre encima de
+        // otra pantalla, también cuando el perfil es el propio.
+        showBack={route?.name === 'UserProfile'}
         title={isOwnProfile ? 'Mi perfil' : `@${profile.username || 'jugador'}`}
-        onBack={() => navigation.goBack()}
+        onBack={() => goBackOrPartidos(navigation)}
         onShare={handleShare}
         onEdit={goEdit}
         onSettings={goSettings}

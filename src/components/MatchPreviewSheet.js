@@ -23,11 +23,14 @@ import {
   ArrowRight,
   Banknote,
   Trophy,
+  Ban,
 } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import MatchMap from './MatchMap';
 import { getMatchById, getMatchAttendees } from '../services/matches';
+import { idsQueBloquee } from '../services/blockedUsers';
+import { bloqueadosDentro, avisoDeBloqueados } from '../utils/bloqueadosEnPartido';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SHEET_H = Math.round(SCREEN_H * 0.88);
@@ -122,6 +125,8 @@ export default function MatchPreviewSheet({
 }) {
   const [match, setMatch] = useState(null);
   const [attendees, setAttendees] = useState([]);
+  // A quién bloqueé, para marcarlo en la lista y avisar que está dentro.
+  const [bloqueados, setBloqueados] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
 
   const slideY = useRef(new Animated.Value(SHEET_H)).current;
@@ -141,10 +146,11 @@ export default function MatchPreviewSheet({
     setLoading(true);
     setMatch(null);
     setAttendees([]);
-    Promise.all([getMatchById(matchId), getMatchAttendees(matchId)])
-      .then(([{ data: m }, { data: atts }]) => {
+    Promise.all([getMatchById(matchId), getMatchAttendees(matchId), idsQueBloquee()])
+      .then(([{ data: m }, { data: atts }, bloq]) => {
         setMatch(m || null);
         setAttendees(atts || []);
+        setBloqueados(bloq);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -197,6 +203,7 @@ export default function MatchPreviewSheet({
 
   // Derived state
   const isMine = !!(myUserId && match?.id_organizador === myUserId);
+  const avisoBloqueados = avisoDeBloqueados(bloqueadosDentro(attendees, bloqueados));
   const isAnotado = attendees.some(
     (a) => a.user_id === myUserId && ['inscrito', 'confirmado_gps'].includes(a.estado)
   );
@@ -378,6 +385,12 @@ export default function MatchPreviewSheet({
                     <Text style={styles.sectionLabel}>
                       Jugadores anotados ({attendees.length})
                     </Text>
+                    {avisoBloqueados ? (
+                      <View style={styles.bloqueadoAviso}>
+                        <Ban color={C.red} size={14} strokeWidth={2.2} />
+                        <Text style={styles.bloqueadoAvisoTexto}>{avisoBloqueados}</Text>
+                      </View>
+                    ) : null}
                     {attendees.map((a) => (
                       <View key={a.user_id} style={styles.playerRow}>
                         <Avatar uri={a.foto_url} name={a.username} size={36} />
@@ -386,6 +399,9 @@ export default function MatchPreviewSheet({
                             @{a.username}
                             {a.is_organizer ? (
                               <Text style={styles.organizerBadge}> · Org.</Text>
+                            ) : null}
+                            {bloqueados.has(a.user_id) ? (
+                              <Text style={styles.bloqueadoBadge}> · Bloqueado</Text>
                             ) : null}
                           </Text>
                           <Text style={styles.playerPos}>
@@ -644,6 +660,27 @@ const styles = StyleSheet.create({
   },
   organizerBadge: {
     color: C.green,
+    fontFamily: F.semiBold,
+  },
+  bloqueadoBadge: {
+    color: C.red,
+    fontFamily: F.semiBold,
+  },
+  bloqueadoAviso: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: C.redBorder,
+    borderRadius: R.chip,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 8,
+  },
+  bloqueadoAvisoTexto: {
+    flex: 1,
+    color: C.red,
+    fontSize: 12,
     fontFamily: F.semiBold,
   },
   playerPos: {
