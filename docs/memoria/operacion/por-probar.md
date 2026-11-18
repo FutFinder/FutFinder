@@ -183,7 +183,8 @@ carga de saldo.
 
 - **Actualizaciones por aire** (`expo-updates`, `runtimeVersion` por `fingerprint`, canales en `eas.json`) y **sólo teléfono** (`supportsTablet: false`). *Comprobado:* nada más que lint y pruebas. *Falta:* un build de producción que reciba una actualización publicada con `eas update --channel production`.
 - **Hoja de compartir:** el enlace sale de `utils/direccionPublica.js` (`https://www.futfinder.cl`) y los botones de WhatsApp y otros ya no preguntan `canOpenURL` antes de abrir. *Comprobado:* pruebas de Node; `www.futfinder.cl/p/<id>` responde 200. *Falta:* en un teléfono, cada botón de la hoja abre su app (o cae a compartir si no está).
-- **Migraciones 185 y 186** (escrituras directas; reportar contenido y edad mínima de 14) **sin aplicar**. *Falta:* aplicarlas y correr sus arneses (`supabase/tests/185_…` y `186_…`).
+- **185 aplicada** (2026-11-18; ver [Pendientes](pendientes.md)). *Falta:* en la web, rechazar y cancelar un desafío entre clubes y publicar el partido de un desafío aceptado (enlazarlo pasa ahora por el chequeo nuevo).
+- **186 sin aplicar**: espera el cliente con edad mínima 14; ver [Pendientes](pendientes.md).
 
 ## Notas relacionadas
 

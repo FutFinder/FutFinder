@@ -61,9 +61,11 @@ begin
   create temp table t153_m on commit drop as select * from public.matches limit 1;
   if exists (select 1 from t153_m) then
     update t153_m set id = gen_random_uuid(), id_organizador = a, challenge_id = null,
-      challenge_proposal_id = null, club_local_id = null, club_visitante_id = null, reserva_id = null;
+      challenge_proposal_id = null, club_local_id = null, club_visitante_id = null, reserva_id = null,
+      client_token = null,  -- único desde la 182
+      hora = now() + interval '10 days';  -- un partido nuevo no puede nacer en el pasado
     insert into public.matches select * from t153_m returning id into mid_a;
-    update t153_m set id = gen_random_uuid(), id_organizador = b;
+    update t153_m set id = gen_random_uuid(), id_organizador = b, client_token = null;
     insert into public.matches select * from t153_m returning id into mid_b;
   end if;
 
@@ -158,10 +160,12 @@ begin
   reset role;
 
   -- ── O: publicaciones abiertas ─────────────────────────────────
-  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
-  set local role authenticated;
+  -- Se crea como `postgres`: el alta directa ya no está abierta al cliente
+  -- (va por RPC). Lo que se prueba es la edición, que sí es directa.
   insert into public.club_open_challenges (club_id, creado_por, estado, modalidad, fecha_propuesta)
   values (club_x, a, 'abierto', 'futbol7', now() + interval '3 days') returning id into oc;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  set local role authenticated;
   ok := true;
   begin
     update public.club_open_challenges set club_id = club_y where id = oc;

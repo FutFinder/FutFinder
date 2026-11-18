@@ -96,74 +96,80 @@ create policy club_photos_delete on public.club_photos
 revoke update on public.club_photos from authenticated, anon;
 
 -- ── 3. club_challenges ─────────────────────────────────────────
+-- Al aplicarla (2026-11-18) la 165 ya había hecho casi todo esto: UPDATE
+-- sólo sobre estas cuatro columnas y el disparador
+-- `club_challenges_transiciones_directas`, que vigila quién rechaza, quién
+-- cancela y quién firma. Esta migración traía un segundo disparador casi
+-- igual; en vez de tener dos, se extiende el de la 165 con lo único que le
+-- faltaba: el partido que se enlaza tiene que existir y organizarlo quien
+-- enlaza (la app lo enlaza justo después de publicarlo, en
+-- `PublishMatchScreen`, así que siempre es suyo).
 revoke update on public.club_challenges from authenticated, anon;
 grant update (estado, responded_at, respondido_por, match_id)
   on public.club_challenges to authenticated;
 
-create or replace function public.club_challenges_escritura_directa()
+create or replace function public.club_challenges_transiciones_directas()
 returns trigger
 language plpgsql
 set search_path = public
 as $$
 begin
-    -- Las RPC son `security definer` y corren como su dueño: sólo se
-    -- vigila lo que escribe el cliente.
-    if current_user not in ('authenticated', 'anon') then
-        return new;
-    end if;
-
-    if new.estado is distinct from old.estado then
-        if old.estado <> 'pendiente' then
-            raise exception 'Este desafío ya no está pendiente'
-                using errcode = '42501';
-        end if;
-
-        if new.estado = 'rechazado' then
-            if not public.tiene_permiso_de_club(old.club_retado_id, auth.uid(), 'answerChallenge') then
-                raise exception 'Sólo el club desafiado puede rechazar el desafío'
-                    using errcode = '42501';
-            end if;
-        elsif new.estado = 'cancelado' then
-            if not public.tiene_permiso_de_club(old.club_retador_id, auth.uid(), 'pubChallenge') then
-                raise exception 'Sólo el club que desafió puede cancelar el desafío'
-                    using errcode = '42501';
-            end if;
-        else
-            -- Aceptar y todo lo demás va por su RPC.
-            raise exception 'Ese cambio de estado no se hace desde aquí'
-                using errcode = '42501';
-        end if;
-    end if;
-
-    if new.respondido_por is distinct from old.respondido_por
-       and new.respondido_por is distinct from auth.uid() then
-        raise exception 'Sólo puedes responder a tu nombre'
-            using errcode = '42501';
-    end if;
-
-    if new.match_id is distinct from old.match_id then
-        if old.match_id is not null
-           or new.match_id is null
-           or not exists (
-               select 1 from public.matches
-                where id = new.match_id
-                  and id_organizador = auth.uid()
-           ) then
-            raise exception 'Sólo puedes enlazar un partido que organizas tú'
-                using errcode = '42501';
-        end if;
-    end if;
-
+  if current_user <> 'authenticated' then
     return new;
+  end if;
+
+  if new.estado is distinct from old.estado then
+    if old.estado = 'pendiente' and new.estado = 'rechazado' then
+      -- Rechaza el club retado, con el permiso de responder.
+      if not public.tiene_permiso_de_club(old.club_retado_id, auth.uid(), 'answerChallenge') then
+        raise exception 'Sólo el club desafiado puede rechazar el desafío'
+          using errcode = 'insufficient_privilege';
+      end if;
+    elsif old.estado = 'pendiente' and new.estado = 'cancelado' then
+      -- Cancela el club retador, con el permiso de publicar.
+      if not public.tiene_permiso_de_club(old.club_retador_id, auth.uid(), 'pubChallenge') then
+        raise exception 'Sólo el club que lanzó el desafío puede cancelarlo'
+          using errcode = 'insufficient_privilege';
+      end if;
+    else
+      raise exception 'Ese cambio de estado del desafío sólo lo hace el servidor'
+        using errcode = 'insufficient_privilege';
+    end if;
+  end if;
+
+  if new.respondido_por is distinct from old.respondido_por
+     and new.respondido_por is distinct from auth.uid() then
+    raise exception 'La respuesta del desafío sólo puede firmarla quien responde'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  -- El partido se vincula una vez: ni se cambia ni se suelta.
+  if new.match_id is distinct from old.match_id and old.match_id is not null then
+    raise exception 'El partido de este desafío ya está vinculado'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  -- Y sólo con un partido que organiza quien lo vincula (185).
+  if new.match_id is distinct from old.match_id
+     and not exists (
+       select 1 from public.matches
+        where id = new.match_id
+          and id_organizador = auth.uid()
+     ) then
+    raise exception 'Sólo puedes enlazar un partido que organizas tú'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  return new;
 end;
 $$;
 
-revoke execute on function public.club_challenges_escritura_directa() from public, anon, authenticated;
+revoke all on function public.club_challenges_transiciones_directas() from public, anon, authenticated;
 
+-- El segundo disparador que traía la versión anterior de este archivo: si
+-- alguna base local lo alcanzó a crear, se quita.
 drop trigger if exists trg_club_challenges_escritura_directa on public.club_challenges;
-create trigger trg_club_challenges_escritura_directa
-    before update on public.club_challenges
-    for each row execute function public.club_challenges_escritura_directa();
+drop function if exists public.club_challenges_escritura_directa();
 
 -- ── 4. club_open_challenges ────────────────────────────────────
 revoke update on public.club_open_challenges from authenticated, anon;
