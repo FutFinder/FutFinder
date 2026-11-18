@@ -73,7 +73,7 @@ Revisión de qué falta para publicar en las tiendas: base de datos, Edge Functi
 - **Tiendas y producto:** `expo-updates` configurado (`runtimeVersion` por `fingerprint`, un canal por perfil en `eas.json`) pero sin probar en un build, enlaces universales preparados pero sin los dos datos que faltan (Team ID de Apple y huella SHA-256 de Android; ver [Navegación](../arquitectura/navegacion.md)), reportes que no se resuelven en la app, menores descubribles por defecto y la autorización bajo 14 años que el registro no pide, razón social y RUT en los términos.
 - **Operación:** plan gratuito de Supabase (sin respaldos restaurables ni HaveIBeenPwned), sin CI, Deno instalado en una de las Macs desde el 2026-11-13 (`npm run test:edge`: 75 pruebas y `deno check` de las siete funciones; la otra Mac puede seguir sin él), Sentry sin DSN.
 - **Migraciones 185 y 186 en el repositorio, sin aplicar en producción** (subidas el 2026-11-18 desde la Mac que las tenía sin commitear): `185_las_escrituras_directas_que_sobraban` (antes numerada 153, que ya era otra) y `186_reportar_contenido_y_edad_minima` (antes 179, que ya era la pausa de pagos). Ese mismo commit subió el archivo de la **175** (chat por Broadcast, aplicada en producción desde el 2026-11-10) y sus cambios de cliente.
-- **Migraciones 183 (Fútbol 5) y 187 (confirmados con nombre) sin aplicar en producción.** Orden: 183 → subir el cliente → 187; ver [Por probar](por-probar.md) §6c y §6d.
+- **Migración 187 (confirmados con nombre) sin aplicar en producción.** La 183 (Fútbol 5) ya está aplicada (2026-11-18) y el cliente de las dos ya está subido, así que la 187 puede ir cuando Vicente diga; ver [Por probar](por-probar.md) §6c y §6d.
 
 ## Cerrados de los informes del 2026-09-23
 

@@ -149,7 +149,7 @@ carga de saldo.
 
 **Qué falta, y cómo:**
 
-- **Aplicar la 183 en producción ANTES de subir el cliente** (con el sí de Vicente). Vercel publica `main` solo: con el cliente nuevo y la base vieja, la web ofrece Fútbol 5 y publicarlo choca con el CHECK. Al revés no rompe nada: la 183 sola sólo acepta un valor más.
+- ~~Aplicar la 183 en producción antes de subir el cliente~~: **aplicada el 2026-11-18 con el sí de Vicente** (versión `20261118165341`), después de ensayarla con su arnés contra producción en `begin … rollback` (6/6, sin restos). El cliente se subió después. Falta publicar un partido de Fútbol 5 en www.futfinder.cl.
 - Editar un partido a Fútbol 5 desde `EditMatchScreen` (el arnés lo cubre por SQL, no por pantalla).
 - En el teléfono (build nativo): los tres botones de modalidad y los cuatro del filtro en una pantalla angosta.
 
@@ -161,7 +161,7 @@ carga de saldo.
 
 **Qué falta, y cómo:**
 
-- **Orden en producción:** 183 → subir el cliente → 187. Con la 187 aplicada y el cliente viejo, la web manda asientos `reservado` y publicar falla con ASIENTO_SIN_IDENTIFICAR. El cliente nuevo con la base sin la 187 no rompe nada (sólo manda amigos y nombres).
+- **Orden en producción:** 183 → subir el cliente → 187 (los dos primeros, hechos el 2026-11-18). Con la 187 aplicada y el cliente viejo, la web manda asientos `reservado` y publicar falla con ASIENTO_SIN_IDENTIFICAR. El cliente nuevo con la base sin la 187 no rompe nada (sólo manda amigos y nombres).
 - En la web local no se llegó a probar el camino feliz con nombres ni un nombre genérico rechazado por pantalla (el límite de uso cortó la sesión): sólo el bloqueo.
 
 ## 7. Lo que ya estaba sin probar antes de esta tanda
