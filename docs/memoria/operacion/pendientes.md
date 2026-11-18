@@ -21,7 +21,7 @@ Lo que sigue abierto de ese trabajo:
 
 ## Diseño propuesto: conciliar los pagos que quedaron `pendiente` (2026-11-14)
 
-**Sólo diseño; no hay código.** Lo pide el informe técnico y depende de tres decisiones de Vicente (al final).
+**Construido el 2026-11-18, sin aplicar ni desplegar** (migración 190, Edge Function `conciliar-pagos`, lógica en `_shared/conciliarPagos.ts`). Probado: 14 pruebas de Deno, arnés `190_…_test.sql` 11/11 en local y contra producción con rollback, y de punta a punta en local con Flow simulado (`node scripts/conciliar-pagos-local/probar.mjs`: ocho casos, segunda pasada idempotente). Para encenderlo, ver el encabezado de la 190 (un secreto en la función y el mismo en Vault). Las tres decisiones de abajo se tomaron con lo propuesto: 20 minutos, sólo la revisión diaria, y ningún cierre a la fuerza.
 
 **El hueco, comprobado.** Un pago pasa de `pendiente` a otro estado sólo si llega el aviso de Flow (`flow-confirmacion`) o si la misma persona vuelve a tocar «pagar» (`pagar-reserva` pregunta por el token anterior). Ninguna de las 13 tareas de `pg_cron` mira `pagos`: `vencer_reservas_pasadas` vence la reserva y manda a devolver los pagos `pagado`, pero deja los `pendiente` como están. Si alguien paga y el aviso se pierde —Flow reintenta, pero no para siempre— y no vuelve a la app, queda **plata cobrada con el pago en `pendiente` y sin ninguna marca**: no aparece en la revisión diaria, que sólo lista `reversar`. Hoy no hay pagos reales, así que no hay plata afectada.
 
@@ -41,7 +41,7 @@ Lo que sigue abierto de ese trabajo:
 
 **Cómo se prueba antes de aplicar:** la decisión por estado es lógica pura y va con pruebas de Deno; el recorrido completo, contra la base local con un Flow simulado (un servidor de mentira que contesta `getStatus`), más un arnés SQL para la selección del lote.
 
-**Decisiones que necesito de ti, Vicente:**
+**Decisiones (tomadas el 2026-11-18 con lo propuesto; se pueden revisar):**
 
 - **¿Cuánto se espera antes de mirar un pendiente?** Propongo 20 minutos (15 del enlace + 5).
 - **¿Quién se entera, y cómo, cuando la conciliación encuentra plata cobrada sin reserva?** Hoy esos casos sólo aparecen en la consulta de la revisión diaria. ¿Basta eso, o quieres un correo al de contacto por cada uno?

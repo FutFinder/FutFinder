@@ -53,7 +53,12 @@ test('cada función registra su index.ts y TODO lo que importa de _shared', () =
   // fallar nada — que es exactamente el modo de fallo que esto persigue.
   for (const [nombre, info] of Object.entries(registro.funciones)) {
     const propio = `${nombre}/index.ts`;
-    assert.ok(info.archivos[propio], `${nombre}: falta ${propio}`);
+    // Una función que nunca se desplegó no tiene nada en `archivos`: su
+    // index.ts va en `pendiente`, igual que un `_shared` nuevo.
+    assert.ok(
+      info.archivos[propio] || (info.pendiente && info.pendiente.archivos && info.pendiente.archivos[propio]),
+      `${nombre}: falta ${propio}`
+    );
     const fuente = fs.readFileSync(path.join(DIR, nombre, 'index.ts'), 'utf8');
     for (const m of fuente.matchAll(/from\s+"\.\.\/_shared\/([\w.-]+)"/g)) {
       const esperado = `_shared/${m[1]}`;

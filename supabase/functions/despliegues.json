@@ -13,6 +13,21 @@
   ],
   "proyecto": "jvfoendzblkoxvwvommz",
   "funciones": {
+    "conciliar-pagos": {
+      "version": null,
+      "desplegada": null,
+      "comparada": null,
+      "archivos": {},
+      "pendiente": {
+        "motivo": "Nueva (migración 190): nunca desplegada. Se despliega con verify_jwt=false junto con aplicar la 190, con el sí de Vicente.",
+        "archivos": {
+          "conciliar-pagos/index.ts": "c0415ffe82f2d7846829eda6ea4cc3f13197421b9a0fa8dc1cc6bba581cb705a",
+          "_shared/conciliarPagos.ts": "8c43ca925011cbc8e4e7db51a97fa666213274ca9c268257479242302754ce2f",
+          "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
+          "_shared/flowPagos.ts": "24bc537ee7a06914de96d37ee5681706cf9ea677397eb8c0cf5ee936872c8571"
+        }
+      }
+    },
     "eliminar-cuenta": {
       "version": 1,
       "desplegada": "2026-11-13T22:31:28Z",

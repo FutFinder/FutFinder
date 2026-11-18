@@ -100,3 +100,10 @@ content_path = "./supabase/plantillas-correo/confirmacion.html"
 [auth.email.template.magic_link]
 subject = "Tu código de FutFinder"
 content_path = "./supabase/plantillas-correo/confirmacion.html"
+
+[functions.conciliar-pagos]
+# La llama `pg_cron` cada 10 minutos (`llamar_conciliar_pagos()`, migración
+# 190) con `pg_net`: no hay sesión. La protege un secreto propio en la
+# cabecera `x-conciliar-secreto` (`CONCILIAR_PAGOS_SECRETO` en la función y
+# `conciliar_pagos_secreto` en Vault), que la función compara antes de nada.
+verify_jwt = false

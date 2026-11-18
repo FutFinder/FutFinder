@@ -43,6 +43,18 @@ select p.id, p.monto, p.orden_comercio, p.pagado_at, r.id as reserva_id, r.fecha
  order by p.pagado_at;
 ```
 
+**Pagos que se quedaron en `pendiente` (desde la migración 190).** La conciliación (`conciliar-pagos`, cada 10 minutos) le pregunta a Flow por cada pendiente con más de 20 minutos y lo resuelve; uno que Flow sigue informando como pendiente no se cierra a la fuerza. Esta consulta **tendría que venir vacía**: si trae filas, la conciliación no está corriendo (falta el secreto, la función no está desplegada o Flow no contesta) o Flow tiene un cobro abierto hace más de un día, y hay que mirarlo en el panel de Flow.
+
+```sql
+select p.id, p.monto, p.orden_comercio, p.created_at, p.referencia_externa is not null as tiene_enlace
+  from public.pagos p
+ where p.estado = 'pendiente' and p.created_at < now() - interval '24 hours'
+ order by p.created_at;
+
+-- Lo que hizo la conciliación en las últimas 24 horas.
+select * from public.conciliaciones where created_at > now() - interval '24 hours' order by created_at desc;
+```
+
 ## 2. Moderación: lo que espera a que alguien decida
 
 **La cola vive en la app**: Ajustes → Moderación (migraciones 151 y 164), y sólo la ve quien está en `public.moderadores`. Trae cuatro listas, en este orden:
