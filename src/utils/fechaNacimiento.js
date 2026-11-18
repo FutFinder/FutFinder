@@ -3,7 +3,8 @@
  * `Bienvenida.dc.html`, pantalla 2B): la fecha de nacimiento se pide en
  * tres campos (DD/MM/AAAA) porque así la pide el diseño, pero `profiles`
  * no tiene una columna de fecha de nacimiento — solo `edad` (entero,
- * 12–99, ver `supabase/schema.sql`). Estas funciones convierten lo que
+ * 12–99 en el CHECK de `supabase/schema.sql`; desde la 186 el servidor
+ * exige 14 al registrarla). Estas funciones convierten lo que
  * escribe la persona en la edad real que se guarda, sin inventar un dato
  * que la base no tiene.
  *
@@ -11,7 +12,10 @@
  * (todo recibe `hoy` para poder testear sin depender del reloj real).
  */
 
-const EDAD_MIN = 12;
+// Edad mínima para crear una cuenta (decisión del equipo, 2026-11-13;
+// migración 186). El CHECK de la base sigue en 12 por las cuentas que ya
+// existían con 12 o 13 años.
+export const EDAD_MIN = 14;
 const EDAD_MAX = 99;
 
 /**
@@ -48,7 +52,8 @@ export function calcularEdad(fechaNacimiento, hoy = new Date()) {
 /**
  * Valida la fecha completa contra las reglas de la cuenta: no puede ser
  * futura, y la edad resultante tiene que caer en el mismo rango que exige
- * `profiles.edad` (12–99) — el mismo rango que ya usa Editar perfil.
+ * `profiles.edad` al registrarla (14–99, migración 186) — el mismo rango
+ * que usa Editar perfil cuando la edad todavía no está registrada.
  * Devuelve `{ ok, edad, reason }`.
  */
 export function validarFechaNacimiento(dd, mm, yyyy, hoy = new Date()) {

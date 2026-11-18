@@ -58,7 +58,7 @@ test('calcularEdad: el día exacto del cumpleaños ya cuenta como cumplido', () 
   assert.equal(calcularEdad(nacimiento, hoy), 26);
 });
 
-test('validarFechaNacimiento: acepta una edad dentro de 12-99', () => {
+test('validarFechaNacimiento: acepta una edad dentro de 14-99', () => {
   const hoy = new Date(2026, 5, 1);
   const r = validarFechaNacimiento('1', '1', '2000', hoy);
   assert.equal(r.ok, true);
@@ -69,14 +69,26 @@ test('validarFechaNacimiento: rechaza menores de 12 años', () => {
   const hoy = new Date(2026, 5, 1);
   const r = validarFechaNacimiento('1', '1', '2020', hoy);
   assert.equal(r.ok, false);
-  assert.match(r.reason, /entre 12 y 99/);
+  assert.match(r.reason, /entre 14 y 99/);
+});
+
+// 186: desde los 14. Quien tiene 13 (cumple 14 mañana) no pasa; quien
+// cumple 14 hoy, sí.
+test('validarFechaNacimiento: rechaza 13 años y acepta 14 justo en el cumpleaños', () => {
+  const hoy = new Date(2026, 5, 1);
+  const trece = validarFechaNacimiento('2', '6', '2012', hoy);
+  assert.equal(trece.ok, false);
+  assert.match(trece.reason, /entre 14 y 99/);
+  const catorce = validarFechaNacimiento('1', '6', '2012', hoy);
+  assert.equal(catorce.ok, true);
+  assert.equal(catorce.edad, 14);
 });
 
 test('validarFechaNacimiento: rechaza mayores de 99 años', () => {
   const hoy = new Date(2026, 5, 1);
   const r = validarFechaNacimiento('1', '1', '1900', hoy);
   assert.equal(r.ok, false);
-  assert.match(r.reason, /entre 12 y 99/);
+  assert.match(r.reason, /entre 14 y 99/);
 });
 
 test('validarFechaNacimiento: rechaza una fecha futura', () => {

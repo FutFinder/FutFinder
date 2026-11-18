@@ -46,6 +46,7 @@ import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD, OPCIONES_NIVEL, inicialDe } from '../utils/playerMeta';
 import { validateImageAsset, commitProfileSave, getProfileLoadStatus } from '../utils/profileEdit';
+import { EDAD_MIN } from '../utils/fechaNacimiento';
 import useConfirmacion from '../components/useConfirmacion';
 
 const POSICIONES = [
@@ -299,9 +300,11 @@ export default function EditProfileScreen({ navigation }) {
     if (username.length > 20) return '@username no puede tener más de 20 caracteres';
     if (!/^[a-zA-Z0-9_]+$/.test(username))
       return '@username solo puede tener letras, números y guión bajo';
-    if (edad) {
+    // Con la edad ya registrada no se valida: no se manda, y una cuenta de
+    // 12 o 13 años de antes de la 186 no tiene que quedar sin poder guardar.
+    if (edad && !edadFija) {
       const n = parseInt(edad, 10);
-      if (Number.isNaN(n) || n < 12 || n > 99) return 'La edad debe estar entre 12 y 99';
+      if (Number.isNaN(n) || n < EDAD_MIN || n > 99) return `La edad debe estar entre ${EDAD_MIN} y 99`;
     }
     if (!posiciones || posiciones.length === 0) return 'Elige al menos una posición';
     return null;

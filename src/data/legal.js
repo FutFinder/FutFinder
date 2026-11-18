@@ -15,13 +15,13 @@
  * `utils/avisoCookies.js`, que vuelve a mostrar el aviso en web.
  */
 
-export const ACTUALIZADO = '14 de noviembre de 2026';
+export const ACTUALIZADO = '18 de noviembre de 2026';
 /**
  * La misma fecha, como la guarda el servidor al aceptar (`aceptar_terminos`,
  * migración 181). Es la versión del texto: súbela junto con `ACTUALIZADO`
  * cada vez que cambie algo de fondo. Una prueba falla si se separan.
  */
-export const VERSION_LEGAL = '2026-11-14';
+export const VERSION_LEGAL = '2026-11-18';
 export const CORREO_PRIVACIDAD = 'futfindercl@gmail.com';
 
 const privacidad = {
@@ -113,7 +113,7 @@ const privacidad = {
     {
       titulo: 'Menores de edad',
       parrafos: [
-        'FutFinder se puede usar desde los 12 años. Si tienes menos de 14, necesitas la autorización de tu madre, padre o tutor para crear una cuenta. Si eres responsable de un menor y crees que usa la app sin tu autorización, escríbenos y eliminaremos la cuenta.',
+        'FutFinder se puede usar desde los 14 años. Si eres responsable de un menor de 14 y crees que tiene una cuenta, escríbenos y la eliminaremos.',
       ],
     },
     {
@@ -192,7 +192,7 @@ const terminos = {
     {
       titulo: 'Tu cuenta',
       lista: [
-        'Puedes usar FutFinder desde los 12 años. Si tienes menos de 14, necesitas la autorización de tu madre, padre o tutor.',
+        'Puedes usar FutFinder desde los 14 años.',
         'Los datos de tu perfil deben ser verdaderos. No puedes hacerte pasar por otra persona.',
         'Tu cuenta es personal: cuida tu contraseña y no la compartas. Eres responsable de lo que se haga con ella.',
         'Puedes eliminar tu cuenta cuando quieras desde Ajustes → Cuenta.',
