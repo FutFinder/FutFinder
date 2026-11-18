@@ -6,6 +6,7 @@ import ChatInboxHeader from '../components/chat/ChatInboxHeader';
 import ChatFilterPills from '../components/chat/ChatFilterPills';
 import ConversationCard from '../components/chat/ConversationCard';
 import { FriendRequestsCard } from '../components/chat/ThreadDecorations';
+import BuscadorDeAmigos from '../components/chat/BuscadorDeAmigos';
 import {
   InboxSkeleton,
   InboxEmpty,
@@ -20,7 +21,11 @@ import {
   fuentes as F,
 } from '../theme/colors';
 import { listMyThreads, subscribeToMessages } from '../services/messages';
-import { listIncomingRequests, subscribeToFriendships } from '../services/friends';
+import {
+  listIncomingRequests,
+  listMyFriends,
+  subscribeToFriendships,
+} from '../services/friends';
 import { isSupabaseConfigured } from '../services/supabase';
 import {
   filterThreads,
@@ -28,6 +33,7 @@ import {
   solicitudesTrasCargar,
   sortThreadsByActivity,
 } from '../utils/chatMeta';
+import { armarListaDeAmigos, filtrarAmigos } from '../utils/amigosDelChat';
 import { crearSecuencia } from '../utils/paginacionPartidos';
 import useConnection from '../utils/useConnection';
 
@@ -43,14 +49,20 @@ import useConnection from '../utils/useConnection';
  * agrupada en una ventana corta para que una ráfaga de mensajes no dispare
  * veinte consultas seguidas.
  *
- * Un fallo de la carga secundaria (solicitudes de amistad) NO bloquea la
- * pantalla: la bandeja se muestra igual y la tarjeta de solicitudes conserva
- * lo último que se supo.
+ * Un fallo de la carga secundaria (solicitudes de amistad, lista de amigos)
+ * NO bloquea la pantalla: la bandeja se muestra igual y cada una conserva lo
+ * último que se supo.
+ *
+ * El filtro «Amigos» no lista sólo los DM con mensajes: lista a TODOS los
+ * amigos aceptados (utils/amigosDelChat), con un buscador arriba, y tocar a
+ * uno abre `dm:<id>` igual que el botón «Mensaje» del perfil.
  */
 export default function ChatScreen({ navigation }) {
   const [filter, setFilter] = useState('todos');
   const [threads, setThreads] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [amigos, setAmigos] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -68,11 +80,13 @@ export default function ChatScreen({ navigation }) {
     const turno = secuencia.abrir();
     if (!silent) setError(null);
 
-    const [threadsRes, reqsRes] = await Promise.all([
+    const [threadsRes, reqsRes, amigosRes] = await Promise.all([
       listMyThreads(),
       // La carga secundaria no puede tumbar la bandeja; si falla, la tarjeta
       // de solicitudes conserva lo último que se supo (C16).
       listIncomingRequests().catch((e) => ({ data: null, error: e })),
+      // Igual la lista de amigos del filtro «Amigos».
+      listMyFriends().catch((e) => ({ data: null, error: e })),
     ]);
 
     if (!mountedRef.current || !secuencia.vigente(turno)) return;
@@ -94,6 +108,9 @@ export default function ChatScreen({ navigation }) {
     }
 
     setRequests((previas) => solicitudesTrasCargar(previas, reqsRes));
+    if (amigosRes && !amigosRes.error && Array.isArray(amigosRes.data)) {
+      setAmigos(amigosRes.data);
+    }
     setNow(new Date());
     setLoading(false);
     setRefreshing(false);
@@ -135,8 +152,19 @@ export default function ChatScreen({ navigation }) {
     };
   }, [scheduleReload, reportChannelStatus]);
 
-  const counts = useMemo(() => filterCounts(threads), [threads]);
-  const visible = useMemo(() => filterThreads(threads, filter), [threads, filter]);
+  const listaAmigos = useMemo(
+    () => armarListaDeAmigos({ amigos, hilos: threads }),
+    [amigos, threads]
+  );
+  const counts = useMemo(
+    () => ({ ...filterCounts(threads), amigos: listaAmigos.length }),
+    [threads, listaAmigos]
+  );
+  const enAmigos = filter === 'amigos';
+  const visible = useMemo(
+    () => (enAmigos ? filtrarAmigos(listaAmigos, busqueda) : filterThreads(threads, filter)),
+    [enAmigos, listaAmigos, busqueda, threads, filter]
+  );
 
   const openThread = useCallback(
     (thread) => {
@@ -170,7 +198,10 @@ export default function ChatScreen({ navigation }) {
   const showRequestsCard =
     requests.length > 0 && (filter === 'todos' || filter === 'amigos');
 
-  const hasNothingAtAll = threads.length === 0 && requests.length === 0;
+  const hasNothingAtAll =
+    threads.length === 0 && requests.length === 0 && amigos.length === 0;
+  const muestraBuscador = enAmigos && listaAmigos.length > 0;
+  const busquedaSinResultados = muestraBuscador && busqueda.trim() !== '';
 
   const renderBody = () => {
     if (loading) return <InboxSkeleton />;
@@ -195,14 +226,33 @@ export default function ChatScreen({ navigation }) {
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         ListHeaderComponent={
-          showRequestsCard ? (
-            <View style={{ marginBottom: 12 }}>
-              <FriendRequestsCard requests={requests} onPress={goFriends} />
-            </View>
+          showRequestsCard || muestraBuscador ? (
+            <>
+              {showRequestsCard && (
+                <View style={{ marginBottom: 12 }}>
+                  <FriendRequestsCard requests={requests} onPress={goFriends} />
+                </View>
+              )}
+              {muestraBuscador && (
+                <View style={{ marginBottom: 12 }}>
+                  <BuscadorDeAmigos value={busqueda} onChange={setBusqueda} />
+                </View>
+              )}
+            </>
           ) : null
         }
         ListEmptyComponent={
-          <FilterEmpty filter={filter} onExploreClubs={goExploreClubs} />
+          busquedaSinResultados ? (
+            <Text style={styles.sinCoincidencias}>
+              Ningún amigo coincide con «{busqueda.trim()}».
+            </Text>
+          ) : (
+            <FilterEmpty
+              filter={filter}
+              onExploreClubs={goExploreClubs}
+              onSearchPlayers={goSearchPlayers}
+            />
+          )
         }
         ListFooterComponent={
           <>
@@ -259,6 +309,13 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: S.screenPadding,
     paddingBottom: 120, // deja aire sobre la tab bar flotante
+  },
+  sinCoincidencias: {
+    marginTop: 18,
+    color: C.textMuted,
+    fontSize: 13,
+    fontFamily: F.semiBold,
+    textAlign: 'center',
   },
   softError: {
     marginTop: 18,

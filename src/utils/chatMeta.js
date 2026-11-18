@@ -416,6 +416,11 @@ export function threadPreview(thread) {
     // conversación se trata, y verlo dos veces se lee como si fuera el último
     // mensaje.
     const isGroupThread = isGroupType(thread?.type);
+    // Un amigo sin conversación todavía (filtro «Amigos», utils/amigosDelChat):
+    // la tarjeta invita a escribirle en vez de describir un hilo vacío.
+    if (thread?.sin_chat) {
+      return { prefix: null, text: 'Toca para escribirle', tone: 'normal' };
+    }
     return {
       prefix: null,
       text: isGroupThread ? 'Sé el primero en saludar' : 'Sin mensajes todavía',

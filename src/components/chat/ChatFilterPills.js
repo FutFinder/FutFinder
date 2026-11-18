@@ -36,7 +36,9 @@ export default function ChatFilterPills({ value, counts, onChange }) {
             accessibilityState={{ selected: active }}
             accessibilityLabel={
               count > 0
-                ? `${f.label}, ${count} ${count === 1 ? 'conversación' : 'conversaciones'}`
+                ? f.id === 'amigos'
+                  ? `${f.label}, ${count} ${count === 1 ? 'amigo' : 'amigos'}`
+                  : `${f.label}, ${count} ${count === 1 ? 'conversación' : 'conversaciones'}`
                 : f.label
             }
             style={({ pressed }) => [

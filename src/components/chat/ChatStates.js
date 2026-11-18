@@ -127,7 +127,7 @@ export function OfflineBanner() {
 }
 
 // ── Filtro sin resultados ───────────────────────────────────────
-export function FilterEmpty({ filter, onExploreClubs }) {
+export function FilterEmpty({ filter, onExploreClubs, onSearchPlayers }) {
   const copy = {
     partidos: {
       title: 'Todavía sin chats de partido',
@@ -138,9 +138,12 @@ export function FilterEmpty({ filter, onExploreClubs }) {
       text: 'Únete a un club para tener su chat aquí.',
       action: 'Explorar clubes',
     },
+    // El filtro «Amigos» lista a todos los amigos aceptados, hayan hablado o
+    // no: este estado sólo se alcanza sin ningún amigo.
     amigos: {
-      title: 'Todavía no tienes chats con amigos',
-      text: 'Agrega jugadores para hablar sin compartir tu número.',
+      title: 'Todavía no tienes amigos',
+      text: 'Busca jugadores y agrégalos para escribirles sin compartir tu número.',
+      action: 'Buscar jugadores',
     },
     // «Todos» NO puede mandar a probar otra categoría: es todas. Este estado
     // se alcanza de verdad —una solicitud de amistad y cero conversaciones
@@ -155,13 +158,15 @@ export function FilterEmpty({ filter, onExploreClubs }) {
     text: 'Cuando te inscribas en un partido, entres a un club o aceptes a un amigo, su chat aparece acá.',
   };
 
+  const onAction = filter === 'amigos' ? onSearchPlayers : onExploreClubs;
+
   return (
     <View style={styles.dashed}>
       <Text style={styles.dashedTitle}>{copy.title}</Text>
       <Text style={styles.dashedText}>{copy.text}</Text>
-      {copy.action && onExploreClubs && (
+      {copy.action && onAction && (
         <Pressable
-          onPress={onExploreClubs}
+          onPress={onAction}
           accessibilityRole="button"
           accessibilityLabel={copy.action}
           style={({ pressed }) => [styles.dashedBtn, pressed && { opacity: 0.8 }]}
