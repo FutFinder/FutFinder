@@ -12,9 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
+import { reportarContenido } from '../services/reports';
 import {
   AlertCircle,
   ArrowLeft,
+  Flag,
   Calendar,
   CalendarDays,
   CalendarX,
@@ -796,6 +799,10 @@ export default function MatchDetailScreen({ route, navigation }) {
               <IconButton icon={ArrowLeft} onPress={() => goBackOrPartidos(navigation)} accessibilityLabel="Volver" />
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <IconButton icon={Share2} onPress={() => setSheet('share')} accessibilityLabel="Compartir" />
+                {/* Reportar el partido (migración 186): quien tiene cuenta y no lo organiza. */}
+                {myId && !isOrganizer && match.id_organizador !== myId ? (
+                  <IconButton icon={Flag} onPress={() => setSheet('report')} accessibilityLabel="Reportar partido" />
+                ) : null}
                 {isOrganizer ? (
                   <IconButton
                     icon={Settings2}
@@ -1616,6 +1623,24 @@ export default function MatchDetailScreen({ route, navigation }) {
       </View>
 
       {/* ---------------- Hojas ---------------- */}
+      <ReportPlayerSheet
+        visible={sheet === 'report'}
+        titulo="Reportar partido"
+        etiqueta="Partido"
+        queSeReporta={match.titulo || 'este partido'}
+        onClose={() => setSheet(null)}
+        onSubmit={async ({ motivo, descripcion }) => {
+          const { error } = await reportarContenido({ tipo: 'partido', id: match.id, motivo, descripcion });
+          if (error) {
+            say('error', 'No se pudo enviar el reporte', error.message);
+            return { error };
+          }
+          setSheet(null);
+          say('success', 'Reporte enviado', 'Lo revisaremos. No le avisamos al organizador quién lo envió.');
+          return {};
+        }}
+      />
+
       <ShareSheet
         visible={sheet === 'share'}
         onClose={() => setSheet(null)}

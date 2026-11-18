@@ -172,6 +172,12 @@ carga de saldo.
 
 **Qué falta:** la 188 y `send-push` v13 ya están en producción (2026-11-18): falta invitar a alguien en www.futfinder.cl y ver que le llegue el push al teléfono; ver la barra de «Mi perfil» con flecha a 375 px.
 
+## 6f. Reportar club, foto de club y partido (cliente de la 186, 2026-11-18)
+
+**Qué sí se comprobó:** en la web local, con una cuenta que no es del club ni organiza el partido: la bandera aparece, la hoja de dos pasos envía, y el reporte del partido queda en `user_reports` contra el organizador con `elemento = partido:<id>`; el del club, «Reporte enviado»; la foto, desde el visor, con el aviso claro cuando ya hay uno pendiente contra la misma persona.
+
+**Qué falta:** probarlo en www.futfinder.cl y en el teléfono (el visor de fotos y la bandera del partido a 375 px).
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { ArrowLeft, Share2, Pencil } from 'lucide-react-native';
+import { ArrowLeft, Share2, Pencil, Flag } from 'lucide-react-native';
 
 import {
   paleta as C,
@@ -22,6 +22,7 @@ export default function ClubHeaderBar({
   onBack,
   onShare,
   onEdit,
+  onReport,
 }) {
   return (
     <View style={styles.bar}>
@@ -48,6 +49,19 @@ export default function ClubHeaderBar({
       >
         <Share2 color={C.textPrimary} size={17} strokeWidth={2} />
       </Pressable>
+
+      {/* Reportar (migración 186): sólo quien no es del club. */}
+      {onReport ? (
+        <Pressable
+          onPress={onReport}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Reportar club"
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
+        >
+          <Flag color={C.textPrimary} size={16} strokeWidth={2} />
+        </Pressable>
+      ) : null}
 
       {puedeEditar && (
         <Pressable
