@@ -51,11 +51,39 @@ export const NIVELES = [
   { value: 'competitivo', label: 'Competitivo', desc: 'Exigencia alta, ritmo sostenido' },
 ];
 
-/** Modalidades soportadas. */
+/**
+ * Modalidades de un partido normal (`matches_modalidad_check`, migración 183).
+ * `total` es el número de jugadores con que se suele jugar: lo usa el
+ * formulario para sugerir el total, nunca para imponerlo.
+ * Los desafíos entre clubes siguen sólo en 7 y 11 (ver `ClubChallengesScreen`).
+ */
 export const MODALIDADES = [
-  { value: 'futbol7', label: 'Fútbol 7' },
-  { value: 'futbol11', label: 'Fútbol 11' },
+  { value: 'futbol5', label: 'Fútbol 5', total: 10 },
+  { value: 'futbol7', label: 'Fútbol 7', total: 14 },
+  { value: 'futbol11', label: 'Fútbol 11', total: 22 },
 ];
+
+/** La modalidad con que abre el formulario de publicar. */
+export const MODALIDAD_INICIAL = 'futbol7';
+
+/**
+ * Si conviene sugerir otro total al elegir la modalidad. Devuelve
+ * `{ total, texto }` o `null`.
+ *
+ * Sólo sugiere cuando el total todavía es el típico de OTRA modalidad (por
+ * ejemplo, los 14 con que abre el formulario y se eligió Fútbol 5). Si el
+ * usuario escribió su propio total —16, con cambios—, no se le insiste.
+ */
+export function sugerenciaDeTotal(modalidad, total) {
+  const elegida = MODALIDADES.find((m) => m.value === modalidad);
+  if (!elegida || Number(total) === elegida.total) return null;
+  const esTipico = MODALIDADES.some((m) => m.total === Number(total));
+  if (!esTipico) return null;
+  return {
+    total: elegida.total,
+    texto: `${elegida.label} se suele jugar con ${elegida.total} jugadores y tu partido tiene ${total}.`,
+  };
+}
 
 /**
  * Opciones de puntaje mínimo: respaldo para cuando todavía no llega la tabla
@@ -455,9 +483,7 @@ export function trustLabel(match) {
 /** Etiqueta de modalidad, tolerando partidos antiguos sin el campo. */
 export function modalidadLabel(match) {
   const m = match?.modalidad;
-  if (m === 'futbol7') return 'Fútbol 7';
-  if (m === 'futbol11') return 'Fútbol 11';
-  return null;
+  return MODALIDADES.find((x) => x.value === m)?.label || null;
 }
 
 /** Etiqueta de nivel. */
@@ -939,7 +965,7 @@ export function validateDraft(draft, step = null) {
   if (inStep(2)) {
     if (!(draft.titulo || '').trim()) e.titulo = 'Pon un título al partido';
     if (!MODALIDADES.some((m) => m.value === draft.modalidad)) {
-      e.modalidad = 'Elige Fútbol 7 o Fútbol 11';
+      e.modalidad = 'Elige la modalidad';
     }
     if (!(draft.cancha || '').trim()) e.cancha = 'Falta el nombre de la cancha';
     if (!(draft.region || '').trim()) e.region = 'Elige una región';

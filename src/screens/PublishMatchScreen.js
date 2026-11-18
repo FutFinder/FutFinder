@@ -64,8 +64,14 @@ import LocationAutocomplete, { reverseGeocode } from '../components/LocationAuto
 import { publicarPartidoConAsientos, useNombresVigentes } from '../services/asientos';
 import { getMyProfile } from '../services/profile';
 import {
+  ARMADO_INICIAL,
   TOTAL_JUGADORES,
   asientosDelBorrador,
+  asientosIniciales,
+  conFaltan,
+  conTotal,
+  conTotalYFaltan,
+  limitesDeFaltan,
   libresDelBorrador,
   resumenDeJugadores,
   validarArmado,
@@ -91,8 +97,11 @@ import {
   EDAD_PRESETS,
   FIELD_ORDER,
   MODALIDADES,
+  MODALIDAD_INICIAL,
   NIVELES,
+  modalidadLabel,
   opcionesDeTrustMinimo,
+  sugerenciaDeTotal,
   combineDateTime,
   cuotaLabel,
   edadLabel,
@@ -115,9 +124,10 @@ function initialDraft() {
     // `cupos` sólo lo usa el flujo antiguo de clubes («jugadores que faltan»).
     cupos: 1,
     // Partido normal: total de jugadores y los asientos que el creador ya
-    // tiene ocupados o reservados (el suyo no va en la lista).
-    total: 10,
-    asientos: [],
+    // tiene ocupados o reservados (el suyo no va en la lista). Abre con
+    // 14 jugadores y falta 1: 12 reservados más el creador.
+    total: ARMADO_INICIAL.total,
+    asientos: asientosIniciales(ARMADO_INICIAL),
 
     cuota: '5000',
     nivel: 'intermedio',
@@ -129,7 +139,7 @@ function initialDraft() {
     descripcion: '',
     // Paso 2 · dónde y cuándo
     titulo: '',
-    modalidad: 'futbol7',
+    modalidad: MODALIDAD_INICIAL,
     cancha: '',
     direccion: '',
     // `{ lat, lng, direccion }` o `null`: el punto viaja con la dirección de
@@ -342,15 +352,20 @@ export default function PublishMatchScreen({ navigation, route }) {
   const libresPublicos = libresDelBorrador(draft.total, draft.asientos);
   const faltan = libresPublicos;
   const confirmados = draft.asientos.length + 1;
-  // Lleva la lista al largo pedido: corta por el final o agrega reservados.
-  const conLargo = (lista, n) =>
-    n <= lista.length
-      ? lista.slice(0, Math.max(n, 0))
-      : [...lista, ...Array.from({ length: n - lista.length }, () => ({ tipo: 'reservado' }))];
   // Cambiar el total conserva a los confirmados (cambian los que faltan),
   // salvo que ya no quepan: siempre tiene que quedar al menos un cupo libre.
-  const cambiarTotal = (v) => set({ total: v, asientos: conLargo(draft.asientos, Math.min(draft.asientos.length, v - 2)) });
-  const cambiarFaltan = (v) => set({ asientos: conLargo(draft.asientos, draft.total - 1 - v) });
+  // Las reglas viven en `utils/asientos.js`, con sus pruebas.
+  const cambiarTotal = (v) => set({ total: v, asientos: conTotal(draft.asientos, v) });
+  const cambiarFaltan = (v) => set({ asientos: conFaltan(draft.asientos, draft.total, v) });
+  const limFaltan = limitesDeFaltan(draft.total);
+  // Elegir Fútbol 5 con el total de Fútbol 7 sugiere 10 (no lo cambia solo:
+  // el total se fijó en el paso 1 y cambiarlo a escondidas sorprendería).
+  const sugerencia = conAsientos ? sugerenciaDeTotal(draft.modalidad, draft.total) : null;
+  // Los desafíos entre clubes siguen en 7 y 11: Fútbol 5 es de partidos normales.
+  const modalidades = conAsientos ? MODALIDADES : MODALIDADES.filter((m) => m.value !== 'futbol5');
+  const aceptarSugerencia = () =>
+    sugerencia &&
+    set({ total: sugerencia.total, asientos: conTotalYFaltan(draft.asientos, draft.total, sugerencia.total) });
   const reservados = draft.asientos.filter((a) => a.tipo === 'reservado').length;
   const listaDeAsientos = useMemo(
     () => asientosDelBorrador(draft.total, draft.asientos, creador),
@@ -685,8 +700,8 @@ export default function PublishMatchScreen({ navigation, route }) {
                       <Stepper
                         value={faltan}
                         onChange={cambiarFaltan}
-                        min={1}
-                        max={Math.max(draft.total - 1, 1)}
+                        min={limFaltan.min}
+                        max={limFaltan.max}
                         error={!!errors.cupos}
                       />
                     </View>
@@ -858,7 +873,7 @@ export default function PublishMatchScreen({ navigation, route }) {
 
               <Field label="Modalidad" onLayout={registerPos('modalidad')}>
                 <View style={styles.row}>
-                  {MODALIDADES.map((m) => (
+                  {modalidades.map((m) => (
                     <OptionChip
                       key={m.value}
                       label={m.label}
@@ -870,6 +885,15 @@ export default function PublishMatchScreen({ navigation, route }) {
                   ))}
                 </View>
                 <ErrorHint>{errors.modalidad}</ErrorHint>
+                {sugerencia ? (
+                  <View style={{ gap: 8 }}>
+                    <Note>{sugerencia.texto}</Note>
+                    <SurfaceButton
+                      label={`Cambiar a ${sugerencia.total} jugadores`}
+                      onPress={aceptarSugerencia}
+                    />
+                  </View>
+                ) : null}
               </Field>
 
               <Field label="Nombre de la cancha" onLayout={registerPos('cancha')}>
@@ -1235,7 +1259,7 @@ function PublishedView({ match, reservados = 0, onOpen, onShare, onInvitar, onBa
             <Text style={styles.summaryTitle}>{match?.titulo}</Text>
             <View style={styles.wrap}>
               {match?.modalidad ? (
-                <Tag label={match.modalidad === 'futbol11' ? 'Fútbol 11' : 'Fútbol 7'} tone="green" />
+                <Tag label={modalidadLabel(match)} tone="green" />
               ) : null}
               <Tag label={nivelLabel(match?.nivel)} />
               <Tag label={`${match?.duracion_min} min`} />

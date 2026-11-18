@@ -141,6 +141,18 @@ carga de saldo.
 - El amigo asignado: recibe el aviso, ve costo 0 al salirse y el asiento queda libre.
 - En el teléfono (build nativo): que `futfinder.cl/p/<id>?inv=…` abra la app con el parámetro, y la hoja de compartir del link.
 
+## 6c. Fútbol 5 y publicar con 14 / falta 1 (migración 183, 2026-11-18)
+
+**Qué se cambió:** la modalidad Fútbol 5 en publicar, editar, filtros, tarjetas y detalle; el formulario abre con 14 jugadores y falta 1; elegir Fútbol 5 sugiere «Cambiar a 10 jugadores». Ver [Partidos](../funcionalidades/partidos.md).
+
+**Qué sí se comprobó:** el arnés de la 183 (6 casos, como `authenticated`) en la base local reconstruida, y su control negativo con el CHECK viejo; el de la 182 sigue 13/13; las pruebas de Node; y en la web local, con una cuenta: abre con 14 y 1, el «−» de faltan no baja de 1, Fútbol 5 aparece y su sugerencia pasa a 10, se publica («9/10»), el detalle y la tarjeta dicen «Fútbol 5» y el filtro lo encuentra (también a 375 px).
+
+**Qué falta, y cómo:**
+
+- **Aplicar la 183 en producción ANTES de subir el cliente** (con el sí de Vicente). Vercel publica `main` solo: con el cliente nuevo y la base vieja, la web ofrece Fútbol 5 y publicarlo choca con el CHECK. Al revés no rompe nada: la 183 sola sólo acepta un valor más.
+- Editar un partido a Fútbol 5 desde `EditMatchScreen` (el arnés lo cubre por SQL, no por pantalla).
+- En el teléfono (build nativo): los tres botones de modalidad y los cuatro del filtro en una pantalla angosta.
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

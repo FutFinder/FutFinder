@@ -125,6 +125,54 @@ export function libresDelBorrador(total, ocupados = []) {
 }
 
 /**
+ * Con qué abre «Publicar partido»: 14 jugadores y falta 1. Los confirmados
+ * (13, contándote) nacen como asientos «Reservado» que se completan en el
+ * último paso.
+ */
+export const ARMADO_INICIAL = { total: 14, faltan: 1 };
+
+/** «¿Cuántos te faltan?» va de 1 al total menos el creador. */
+export function limitesDeFaltan(total) {
+  return { min: 1, max: Math.max(Number(total) - 1, 1) };
+}
+
+/** Lleva la lista al largo pedido: corta por el final o agrega reservados. */
+export function conLargo(lista, n) {
+  const largo = Math.max(n, 0);
+  return largo <= lista.length
+    ? lista.slice(0, largo)
+    : [...lista, ...Array.from({ length: largo - lista.length }, () => ({ tipo: 'reservado' }))];
+}
+
+/** Los asientos ocupados con que nace el borrador. */
+export function asientosIniciales({ total, faltan } = ARMADO_INICIAL) {
+  return conLargo([], Number(total) - 1 - Number(faltan));
+}
+
+/** Pone «cuántos te faltan» en `faltan`, dentro de sus límites. */
+export function conFaltan(ocupados, total, faltan) {
+  const { min, max } = limitesDeFaltan(total);
+  const f = Math.min(Math.max(Number(faltan), min), max);
+  return conLargo(ocupados, Number(total) - 1 - f);
+}
+
+/**
+ * Cambiar el total con el contador conserva a los confirmados (cambian los
+ * que faltan), salvo que ya no quepan: siempre queda al menos un cupo libre.
+ */
+export function conTotal(ocupados, total) {
+  return conLargo(ocupados, Math.min(ocupados.length, Number(total) - 2));
+}
+
+/**
+ * Cambiar el total desde la sugerencia de la modalidad conserva los que
+ * faltan: «me faltan 2» sigue siendo verdad en Fútbol 5 o en Fútbol 11.
+ */
+export function conTotalYFaltan(ocupados, totalAntes, totalNuevo) {
+  return conFaltan(ocupados, totalNuevo, libresDelBorrador(totalAntes, ocupados));
+}
+
+/**
  * La lista de asientos del borrador, en el orden en que se dibuja:
  * creador, ocupados y los libres al final.
  */
