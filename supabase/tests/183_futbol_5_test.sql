@@ -46,8 +46,9 @@ begin
     perform pg_temp.soy(f.org);
 
     -- 1. Un partido de Fútbol 5 con los valores con que abre el formulario
-    --    para esa modalidad: 10 jugadores, falta 1 (8 reservados + el creador).
-    select jsonb_agg(jsonb_build_object('tipo', 'reservado')) into v_res from generate_series(1, 8);
+    --    para esa modalidad: 10 jugadores, falta 1 (8 con nombre + el creador;
+    --    desde la 187 no se publica con reservados).
+    select jsonb_agg(jsonb_build_object('tipo', 'nombre', 'nombre', 'Tomás ' || i)) into v_res from generate_series(1, 8) i;
     r := public.publicar_partido_con_asientos(pg_temp.partido('Arnés 183: fútbol 5', 'futbol5', 10), v_res);
     select * into strict m from public.matches where id = (r->'match'->>'id')::uuid;
     if m.modalidad is distinct from 'futbol5' then raise exception 'FALLÓ 1: la modalidad quedó en %', m.modalidad; end if;
@@ -60,7 +61,7 @@ begin
     if n <> 1 then raise exception 'FALLÓ 2: el usuario no ve su partido de Fútbol 5 al filtrar'; end if;
 
     -- 3. Los valores con que abre el formulario: 14 jugadores, falta 1, Fútbol 7.
-    select jsonb_agg(jsonb_build_object('tipo', 'reservado')) into v_res from generate_series(1, 12);
+    select jsonb_agg(jsonb_build_object('tipo', 'nombre', 'nombre', 'Álvaro ' || i)) into v_res from generate_series(1, 12) i;
     r := public.publicar_partido_con_asientos(pg_temp.partido('Arnés 183: catorce', 'futbol7', 14), v_res);
     select * into strict m from public.matches where id = (r->'match'->>'id')::uuid;
     if m.cupos_totales <> 13 or m.cupos_disponibles <> 1 or m.modalidad <> 'futbol7' then

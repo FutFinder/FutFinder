@@ -68,6 +68,7 @@ import {
   TOTAL_JUGADORES,
   asientosDelBorrador,
   asientosIniciales,
+  asientosSinIdentificar,
   conFaltan,
   conTotal,
   conTotalYFaltan,
@@ -75,6 +76,7 @@ import {
   libresDelBorrador,
   resumenDeJugadores,
   validarArmado,
+  validarIdentificados,
 } from '../utils/asientos.js';
 import { createMatch, translateSchemaError } from '../services/matches';
 import { getChallenge, linkChallengeMatch } from '../services/clubChallenges';
@@ -291,9 +293,17 @@ export default function PublishMatchScreen({ navigation, route }) {
         if (m) e.cupos = m;
         else delete e.cupos;
       }
+      // Cada confirmado tiene que decir quién es (cuenta o nombre). Se pide
+      // en el último paso, que es donde se completan: en el paso 1 recién
+      // se decide cuántos son.
+      if (conAsientos && (s == null || s === 3)) {
+        const m = validarIdentificados(d.asientos, { nombres: nombresActivos });
+        if (m) e.asientos = m;
+        else delete e.asientos;
+      }
       return e;
     },
-    [conAsientos]
+    [conAsientos, nombresActivos]
   );
 
   const set = useCallback((patch) => {
@@ -313,6 +323,7 @@ export default function PublishMatchScreen({ navigation, route }) {
             ? 'cupos'
             : k;
         delete next[field];
+        if (k === 'asientos' || k === 'total') delete next.asientos;
       });
       return next;
     });
@@ -367,10 +378,15 @@ export default function PublishMatchScreen({ navigation, route }) {
     sugerencia &&
     set({ total: sugerencia.total, asientos: conTotalYFaltan(draft.asientos, draft.total, sugerencia.total) });
   const reservados = draft.asientos.filter((a) => a.tipo === 'reservado').length;
-  const listaDeAsientos = useMemo(
-    () => asientosDelBorrador(draft.total, draft.asientos, creador),
-    [draft.total, draft.asientos, creador]
-  );
+  // Con el error a la vista, las filas sin identificar se marcan en rojo.
+  const marcarSinIdentificar = !!errors.asientos;
+  const listaDeAsientos = useMemo(() => {
+    const lista = asientosDelBorrador(draft.total, draft.asientos, creador);
+    if (!marcarSinIdentificar) return lista;
+    const faltan = new Set(asientosSinIdentificar(draft.asientos));
+    return lista.map((a) => (a.indice != null && faltan.has(a.indice) ? { ...a, falta: true } : a));
+  }, [draft.total, draft.asientos, creador, marcarSinIdentificar]);
+  const sinIdentificar = conAsientos ? asientosSinIdentificar(draft.asientos).length : 0;
   const amigosSentados = useMemo(
     () => draft.asientos.filter((a) => a.tipo === 'amigo').map((a) => a.user_id),
     [draft.asientos]
@@ -456,7 +472,11 @@ export default function PublishMatchScreen({ navigation, route }) {
     if (Object.keys(errs).length) {
       // Si el error está en un paso anterior, volvemos a ese paso.
       const stepOf = (f) =>
-        ['titulo', 'modalidad', 'cancha', 'region', 'comuna', 'fecha', 'hora'].includes(f) ? 2 : 1;
+        f === 'asientos'
+          ? 3
+          : ['titulo', 'modalidad', 'cancha', 'region', 'comuna', 'fecha', 'hora'].includes(f)
+          ? 2
+          : 1;
       const first = FIELD_ORDER.find((f) => errs[f]);
       const target = first ? stepOf(first) : 1;
       setStep(target);
@@ -709,7 +729,7 @@ export default function PublishMatchScreen({ navigation, route }) {
                     <Note>
                       {confirmados === 1
                         ? `Por ahora vas solo: se publican ${faltan} cupos.`
-                        : `Ya tienes ${confirmados} confirmados, contándote. En el último paso eliges quiénes son.`}
+                        : `Ya tienes ${confirmados} confirmados, contándote. En el último paso eliges quiénes son: una cuenta o un nombre para cada uno.`}
                     </Note>
                   </Card>
                 </View>
@@ -1114,7 +1134,7 @@ export default function PublishMatchScreen({ navigation, route }) {
               </Field>
 
               {conAsientos ? (
-                <View style={{ gap: 8 }}>
+                <View style={{ gap: 8 }} onLayout={registerPos('asientos')}>
                   <FieldLabel right={`${confirmados}/${draft.total} · ${faltan} ${faltan === 1 ? 'libre' : 'libres'}`}>
                     Tus jugadores
                   </FieldLabel>
@@ -1128,11 +1148,22 @@ export default function PublishMatchScreen({ navigation, route }) {
                     onNombre={(a) => setParaNombre({ indice: a.indice, nombre: a.tipo === 'nombre' ? a.nombre : '' })}
                     onLiberar={quitarAsiento}
                   />
-                  <Note>
-                    {confirmados > 1
-                      ? `${nombresActivos ? 'Agrega a un amigo o escribe sólo su nombre (lápiz).' : 'Agrega a un amigo.'} Los que dejes en «Reservado» entran con el link de invitación que podrás compartir al publicar. Los cupos libres son los que se publican.`
-                      : 'Los cupos libres son los que se publican. Si ya tienes jugadores confirmados, vuelve al paso 1 y baja los que faltan.'}
-                  </Note>
+                  <ErrorHint>{errors.asientos}</ErrorHint>
+                  {!errors.asientos ? (
+                    <Note>
+                      {confirmados > 1
+                        ? `${
+                            nombresActivos
+                              ? 'Cada confirmado necesita una cuenta (+) o su nombre (lápiz).'
+                              : 'Cada confirmado necesita la cuenta de un amigo (+).'
+                          }${
+                            sinIdentificar > 0
+                              ? ` Te ${sinIdentificar === 1 ? 'falta 1' : `faltan ${sinIdentificar}`} antes de publicar.`
+                              : ''
+                          } Los cupos libres son los que se publican.`
+                        : 'Los cupos libres son los que se publican. Si ya tienes jugadores confirmados, vuelve al paso 1 y baja los que faltan.'}
+                    </Note>
+                  ) : null}
                 </View>
               ) : null}
             </View>

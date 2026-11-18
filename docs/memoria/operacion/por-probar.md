@@ -153,6 +153,17 @@ carga de saldo.
 - Editar un partido a Fútbol 5 desde `EditMatchScreen` (el arnés lo cubre por SQL, no por pantalla).
 - En el teléfono (build nativo): los tres botones de modalidad y los cuatro del filtro en una pantalla angosta.
 
+## 6d. Al publicar, cada confirmado tiene cuenta o nombre (migración 187, 2026-11-18)
+
+**Qué se cambió:** pedido de Vicente: no publicar partidos con «Jugador reservado» repetido. Publicar bloquea si un confirmado no es amigo ni tiene nombre, marca las filas y lo explica; los nombres genéricos («Jugador 3», «Reservado», «X») se rechazan en cliente y en servidor (`NOMBRES_GENERICOS` en `src/utils/asientos.js` = `_asiento_nombre_generico` en la 187; una prueba de Node compara las dos). Reservar asientos para el link sigue permitido ya publicado, en «Gestionar partido». Se escribió como 185 y se renumeró a **187**: la otra Mac ya había subido su 185 y su 186.
+
+**Qué sí se comprobó:** arnés de la 187 (8 casos, como `authenticated`) en la base local; control negativo con las funciones de la 182/183 en `begin … rollback`: falla en el caso 1 (se publicaban ocho reservados); arneses 182 (13) y 183 (6) siguen bien con la 187; `npm run verify`; y en la web local, publicar con 8 confirmados sin nombre bloquea («Falta 1 campo por corregir») y marca las 8 filas con su explicación. Que el rechazo no deja el partido creado lo comprueba el arnés.
+
+**Qué falta, y cómo:**
+
+- **Orden en producción:** 183 → subir el cliente → 187. Con la 187 aplicada y el cliente viejo, la web manda asientos `reservado` y publicar falla con ASIENTO_SIN_IDENTIFICAR. El cliente nuevo con la base sin la 187 no rompe nada (sólo manda amigos y nombres).
+- En la web local no se llegó a probar el camino feliz con nombres ni un nombre genérico rechazado por pantalla (el límite de uso cortó la sesión): sólo el bloqueo.
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

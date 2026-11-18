@@ -6,7 +6,7 @@ import Sheet from './Sheet';
 import { Avatar, GhostButton, Input, Note, PrimaryButton } from './ui';
 import { paleta as C, radios as R, fuentes as F } from '../../theme/colors';
 import { listMyFriends } from '../../services/friends';
-import { limpiarNombre, NOMBRE_MAX } from '../../utils/asientos.js';
+import { errorDeNombre, limpiarNombre, NOMBRE_MAX } from '../../utils/asientos.js';
 
 /**
  * Hoja para elegir a UN amigo y sentarlo en un asiento.
@@ -116,12 +116,12 @@ export function NombreDeAsientoSheet({ visible, onClose, onGuardar, inicial = ''
   }, [visible, inicial]);
 
   const guardar = () => {
-    const limpio = limpiarNombre(nombre);
-    if (!limpio) {
-      setError(`Escribe un nombre de hasta ${NOMBRE_MAX} letras`);
+    const malo = errorDeNombre(nombre);
+    if (malo) {
+      setError(malo);
       return;
     }
-    onGuardar(limpio);
+    onGuardar(limpiarNombre(nombre));
   };
 
   return (

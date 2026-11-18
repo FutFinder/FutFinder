@@ -56,11 +56,83 @@ export function resumenDeJugadores(match) {
   return c ? `${c.texto} · ${c.resto}` : null;
 }
 
+/**
+ * Nombres que no identifican a nadie: lo que la app escribe en la fila
+ * («Asiento reservado», «Cupo libre») o un relleno («Jugador 3», «X»).
+ * Se comparan sin tildes, sin mayúsculas, sin números ni signos, así que
+ * «Jugador 3» y «JUGADOR-reservado» caen igual. La migración 187 repite
+ * esta lista en `_asiento_nombre_generico`; una prueba compara las dos.
+ */
+export const NOMBRES_GENERICOS = [
+  'amiga', 'amigo', 'asiento', 'asiento reservado', 'confirmada', 'confirmado',
+  'cupo', 'cupo libre', 'invitada', 'invitado', 'jugador', 'jugador confirmado',
+  'jugador reservado', 'jugadora', 'jugadora confirmada', 'jugadora reservada',
+  'libre', 'na', 'nn', 'nombre', 'pendiente', 'por definir', 'reservada',
+  'reservado', 'sin nombre',
+];
+
+/** «Jugador-3 » → «jugador»: la forma en que se compara con la lista. */
+function claveDeNombre(v) {
+  return String(v ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** `true` si el nombre no identifica a nadie (genérico o con menos de dos letras). */
+export function esNombreGenerico(nombre) {
+  const clave = claveDeNombre(nombre);
+  return clave.replace(/ /g, '').length < 2 || NOMBRES_GENERICOS.includes(clave);
+}
+
 /** Deja un nombre escrito a mano como lo guarda el servidor, o `null` si no sirve. */
 export function limpiarNombre(nombre) {
   const v = String(nombre ?? '').replace(/\s+/g, ' ').trim();
   if (v.length < 1 || v.length > NOMBRE_MAX) return null;
+  if (esNombreGenerico(v)) return null;
   return v;
+}
+
+/** Por qué no sirve un nombre, para mostrarlo bajo el campo; `null` si sirve. */
+export function errorDeNombre(nombre) {
+  const v = String(nombre ?? '').replace(/\s+/g, ' ').trim();
+  if (v.length < 1 || v.length > NOMBRE_MAX) return `Escribe un nombre de hasta ${NOMBRE_MAX} letras`;
+  if (esNombreGenerico(v)) return 'Escribe el nombre de la persona, por ejemplo «Tomás» o «Álvaro»';
+  return null;
+}
+
+/**
+ * Los asientos ocupados que todavía no dicen QUIÉN es: un reservado, un
+ * amigo sin elegir o un nombre que no sirve. Devuelve sus índices en
+ * `ocupados`. Para publicar tiene que quedar vacío (pedido de Vicente,
+ * 2026-11-18: «no quiero partidos con jugador reservado, jugador
+ * reservado…»).
+ */
+export function asientosSinIdentificar(ocupados = []) {
+  const faltan = [];
+  ocupados.forEach((a, i) => {
+    const ok =
+      (a?.tipo === 'amigo' && !!a.user_id) || (a?.tipo === 'nombre' && limpiarNombre(a.nombre) != null);
+    if (!ok) faltan.push(i);
+  });
+  return faltan;
+}
+
+/**
+ * El mensaje para el último paso si falta identificar a alguien, o `null`.
+ * `nombres` dice si todavía se pueden escribir nombres (bandera
+ * `asientos_por_nombre`); sin ellos, la única forma es la cuenta de un amigo.
+ */
+export function validarIdentificados(ocupados = [], { nombres = true } = {}) {
+  const n = asientosSinIdentificar(ocupados).length;
+  if (n === 0) return null;
+  const como = nombres ? 'elige a un amigo o escribe su nombre' : 'elige a un amigo';
+  const cuantos =
+    n === 1 ? 'Falta identificar a 1 jugador confirmado' : `Faltan ${n} jugadores confirmados por identificar`;
+  return `${cuantos}: ${como}. Si todavía no sabes quiénes son, súmalos en «¿Cuántos te faltan?».`;
 }
 
 /**
@@ -102,7 +174,8 @@ export function validarArmado(total, ocupados = []) {
       if (vistos.has(a.user_id)) return 'Un mismo jugador no puede ocupar dos asientos';
       vistos.add(a.user_id);
     } else if (a?.tipo === 'nombre') {
-      if (!limpiarNombre(a.nombre)) return `Escribe un nombre de hasta ${NOMBRE_MAX} letras`;
+      const malo = errorDeNombre(a.nombre);
+      if (malo) return malo;
     } else if (a?.tipo !== 'reservado') {
       return 'Hay un asiento que no reconocemos';
     }
@@ -126,8 +199,8 @@ export function libresDelBorrador(total, ocupados = []) {
 
 /**
  * Con qué abre «Publicar partido»: 14 jugadores y falta 1. Los confirmados
- * (13, contándote) nacen como asientos «Reservado» que se completan en el
- * último paso.
+ * (13, contándote) nacen como asientos «Reservado» que hay que identificar
+ * —amigo o nombre— en el último paso antes de publicar.
  */
 export const ARMADO_INICIAL = { total: 14, faltan: 1 };
 
@@ -255,6 +328,8 @@ const ERRORES = {
   ASIENTO_TOTAL_INVALIDO: `El total de jugadores tiene que estar entre ${TOTAL_JUGADORES.min} y ${TOTAL_JUGADORES.max}.`,
   ASIENTO_NOMBRES_APAGADO: 'Ya no se pueden agregar jugadores sólo por nombre. Usa una cuenta de FutFinder o el link de invitación.',
   ASIENTO_NOMBRE_INVALIDO: `Escribe un nombre de hasta ${NOMBRE_MAX} letras.`,
+  ASIENTO_NOMBRE_GENERICO: 'Escribe el nombre de la persona, por ejemplo «Tomás» o «Álvaro».',
+  ASIENTO_SIN_IDENTIFICAR: 'Cada jugador confirmado tiene que tener una cuenta o un nombre.',
   ASIENTO_JUGADOR_INVALIDO: 'Ese jugador no se puede agregar.',
   ASIENTO_NO_ES_AMIGO: 'Sólo puedes agregar a tus amigos. Para el resto, reserva un asiento y comparte el link.',
   ASIENTO_YA_EN_PARTIDO: 'Ese jugador ya tiene un asiento en este partido.',

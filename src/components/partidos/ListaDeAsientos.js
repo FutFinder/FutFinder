@@ -24,6 +24,9 @@ import { paleta as C, radios as R, fuentes as F } from '../../theme/colors';
  * Con `libresFijos` (armado al publicar) los libres no tienen acciones —se
  * cambian con «¿Cuántos te faltan?»— y un reservado no se libera: ✕ sobre un
  * amigo o un nombre lo devuelve a reservado.
+ *
+ * Un asiento con `falta: true` (armado al publicar, tras intentar publicar)
+ * es un confirmado que todavía no dice quién es: se pinta en rojo.
  */
 export default function ListaDeAsientos({
   asientos = [],
@@ -84,7 +87,9 @@ function Fila({
   etiquetaUnirme,
 }) {
   const conCuenta = a.tipo === 'creador' || a.tipo === 'cuenta';
-  const titulo = conCuenta
+  const titulo = a.falta
+    ? 'Confirmado sin nombre'
+    : conCuenta
     ? `@${a.username || 'jugador'}`
     : a.tipo === 'nombre'
     ? a.nombre
@@ -92,8 +97,9 @@ function Fila({
     ? 'Asiento reservado'
     : 'Cupo libre';
 
-  const etiqueta =
-    a.tipo === 'creador'
+  const etiqueta = a.falta
+    ? { label: 'Falta', tone: 'danger' }
+    : a.tipo === 'creador'
       ? { label: 'Creador', tone: 'green' }
       : a.tipo === 'nombre'
       ? { label: 'Invitado', tone: 'neutral' }
@@ -122,7 +128,7 @@ function Fila({
       {conCuenta ? (
         <Avatar url={a.foto_url} name={a.username} size={36} />
       ) : (
-        <View style={[styles.generico, a.tipo === 'libre' && styles.genericoLibre]}>
+        <View style={[styles.generico, a.tipo === 'libre' && styles.genericoLibre, a.falta && styles.genericoFalta]}>
           {a.tipo === 'reservado' ? (
             <Lock color={C.gold} size={15} strokeWidth={2} />
           ) : a.tipo === 'nombre' ? (
@@ -133,7 +139,7 @@ function Fila({
         </View>
       )}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={[styles.titulo, a.tipo === 'libre' && styles.tituloLibre]}>
+        <Text numberOfLines={1} style={[styles.titulo, a.tipo === 'libre' && styles.tituloLibre, a.falta && styles.tituloFalta]}>
           {titulo}
         </Text>
       </View>
@@ -258,6 +264,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderStyle: 'dashed',
     borderColor: C.dashedBorderStrong,
+  },
+  genericoFalta: {
+    borderColor: C.red,
+  },
+  tituloFalta: {
+    color: C.red,
   },
   titulo: {
     fontSize: 14,

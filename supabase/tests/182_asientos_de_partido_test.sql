@@ -64,12 +64,12 @@ begin
         jsonb_build_array(
             jsonb_build_object('tipo', 'amigo', 'user_id', f.amigo),
             jsonb_build_object('tipo', 'nombre', 'nombre', '  Johan  '),
-            jsonb_build_object('tipo', 'nombre', 'nombre', 'Mario'),
-            jsonb_build_object('tipo', 'reservado'), jsonb_build_object('tipo', 'reservado'),
-            jsonb_build_object('tipo', 'reservado'), jsonb_build_object('tipo', 'reservado'),
-            jsonb_build_object('tipo', 'reservado'), jsonb_build_object('tipo', 'reservado')));
+            jsonb_build_object('tipo', 'nombre', 'nombre', 'Mario')));
     v_id := (r->'match'->>'id')::uuid;
     update asi_fx set partido = v_id;
+    -- Desde la 187 no se publica con reservados: se reservan ya publicado,
+    -- desde «Gestionar».
+    perform public.asiento_agregar(v_id, 'reservado', null, 6);
     select * into strict m from public.matches where id = v_id;
     if m.cupos_totales <> 13 or m.cupos_disponibles <> 4 or m.estado <> 'abierto' then
         raise exception 'FALLÓ 1: esperaba 13 plazas y 4 libres, hay %/% (%)', m.cupos_disponibles, m.cupos_totales, m.estado;
@@ -87,7 +87,8 @@ begin
     -- 3. El total tiene que ser mayor que lo ocupado: 3 jugadores con 2 asientos no se publica.
     begin
         perform public.publicar_partido_con_asientos(pg_temp.partido('Arnés 182: sin libres', 3),
-            jsonb_build_array(jsonb_build_object('tipo', 'reservado'), jsonb_build_object('tipo', 'reservado')));
+            jsonb_build_array(jsonb_build_object('tipo', 'nombre', 'nombre', 'Ana'),
+                              jsonb_build_object('tipo', 'nombre', 'nombre', 'Beto')));
         raise exception 'FALLÓ 3: se publicó un partido sin asientos libres';
     exception when raise_exception then
         if sqlerrm not like 'ASIENTO_SIN_LIBRES%' then raise; end if;
@@ -155,9 +156,9 @@ begin
 
     -- 7. Sin reservas el link no entra, aunque queden cupos libres.
     perform pg_temp.soy(f.org);
-    r := public.publicar_partido_con_asientos(pg_temp.partido('Arnés 182: chico', 4),
-        jsonb_build_array(jsonb_build_object('tipo', 'reservado')));
+    r := public.publicar_partido_con_asientos(pg_temp.partido('Arnés 182: chico', 4), '[]'::jsonb);
     update asi_fx set chico = (r->'match'->>'id')::uuid;
+    perform public.asiento_agregar((select chico from asi_fx), 'reservado');
     r := public.asientos_link((select chico from asi_fx));
     v_tok := (r->>'token')::uuid;
     select id into strict v_asiento from public.match_asientos where id_partido = (select chico from asi_fx);

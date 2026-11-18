@@ -1012,6 +1012,7 @@ export const FIELD_ORDER = [
   'edad',
   'descripcion',
   'aprobacion',
+  'asientos',
 ];
 
 /**
