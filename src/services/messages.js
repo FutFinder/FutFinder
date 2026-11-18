@@ -61,7 +61,13 @@ export {
   suggestCommands,
   canUseMentionAll,
 } from '../utils/chatMeta';
-import { canUseMentionAll, mapThreadRow, createSharedChannel, isGroupType } from '../utils/chatMeta';
+import {
+  canUseMentionAll,
+  mapThreadRow,
+  createSharedChannel,
+  canalDeChatPorUsuario,
+  isGroupType,
+} from '../utils/chatMeta';
 import { esEstadoActivo, estadoLabel } from './clubChallengeRules';
 import { accesoAlChatDelPartido, participaEnElChatDelPartido } from './matchRules';
 // `blockedUsers` no importa nada de acá, así que no hay ciclo.
@@ -1059,15 +1065,19 @@ async function hydrateProfiles(ids) {
 // ============================================================
 
 /**
- * Suscribe a INSERTS/UPDATES de la tabla messages.
+ * Suscribe a los mensajes nuevos, editados y borrados que me corresponden.
  * Llama a `onChange(payload)` con cada cambio y devuelve el cleanup.
  *
  * `onStatus(status)` recibe el estado del canal ('SUBSCRIBED', 'CHANNEL_ERROR',
  * 'TIMED_OUT', 'CLOSED') para poder pintar "Reconectando…".
  *
- * Filtramos del lado del cliente porque Supabase Realtime solo admite un
- * filtro `eq` por canal y aquí escuchamos varios hilos a la vez (partido,
- * club y DM no comparten una sola columna que filtrar del lado del server).
+ * BROADCAST, NO `postgres_changes` (migración 175). Antes se escuchaba la
+ * tabla `messages` ENTERA y Realtime revisaba la RLS de cada fila por cada
+ * persona conectada: con mucha gente a la vez es lo primero que se cae.
+ * Ahora un disparador decide quién puede leer cada mensaje y se lo manda a
+ * su canal privado `chat:<mi id>`; nadie más puede unirse a ese canal. El
+ * payload trae la misma forma que antes (`eventType`, `new`, `old`), y cada
+ * llamador sigue filtrando por hilo del lado del cliente.
  *
  * MULTIPLEXADO: la bandeja de chats, el badge del tab y una conversación
  * abierta pueden estar escuchando los tres a la vez — antes cada uno abría
@@ -1082,22 +1092,24 @@ async function hydrateProfiles(ids) {
 // suscriptores, se cierra solo con el último) es lógica pura — vive en
 // `utils/chatMeta` (`createSharedChannel`) precisamente para poder probarla
 // con un canal falso, sin Supabase real. Acá solo se cablea con el canal
-// verdadero.
-const messagesSharedChannel = createSharedChannel({
-  open: ({ emit, emitStatus, apertura }) =>
-    supabase
-      // Nombre único por apertura: ver `createSharedChannel`.
-      .channel(`messages-shared-${apertura}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, emit)
-      .subscribe(emitStatus),
-  close: (channel) => {
-    try {
-      supabase.removeChannel(channel);
-    } catch {
-      // noop
-    }
-  },
-});
+// verdadero. El topic `chat:<id>` no puede llevar número de apertura (es el
+// nombre que autoriza el servidor), así que `canalDeChatPorUsuario` espera a
+// que salga el canal anterior antes de pedir el siguiente.
+const messagesSharedChannel = createSharedChannel(
+  canalDeChatPorUsuario({
+    obtenerUsuario: async () => {
+      const { data } = await supabase.auth.getSession();
+      return data?.session?.user?.id || null;
+    },
+    prepararAuth: () => supabase.realtime.setAuth(),
+    crearCanal: (topic, alRecibir, alCambiarEstado) =>
+      supabase
+        .channel(topic, { config: { private: true } })
+        .on('broadcast', { event: '*' }, alRecibir)
+        .subscribe(alCambiarEstado),
+    quitarCanal: (canal) => supabase.removeChannel(canal),
+  })
+);
 
 export function subscribeToMessages(onChange, { onStatus } = {}) {
   if (!isSupabaseConfigured) return () => {};

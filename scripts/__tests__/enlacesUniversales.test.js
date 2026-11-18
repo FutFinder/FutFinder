@@ -70,14 +70,24 @@ test('las rutas salen de las URL que de verdad entiende la navegación', () => {
   }
 });
 
+// La dirección pública vive en un solo lugar (`utils/direccionPublica.js`):
+// la hoja de compartir y el `linking` la toman de ahí.
+const escapar = (s) => s.replace(/\./g, '\\.');
+
+test('la dirección pública es el dominio de los enlaces, sin redirección', () => {
+  const dir = leer('src', 'utils', 'direccionPublica.js');
+  assert.match(dir, new RegExp(`URL_PUBLICA = 'https://${escapar(DOMINIO)}';`));
+  assert.match(dir, /DIRECCIONES_PROPIAS = \[\s*URL_PUBLICA,/);
+});
+
 test('el linking acepta el dominio de los enlaces', () => {
   const nav = leer('src', 'navigation', 'AppNavigator.js');
-  assert.match(nav, new RegExp(`'https://${DOMINIO.replace(/\./g, '\\.')}'`));
+  assert.match(nav, /prefixes: \['futfinder:\/\/', \.\.\.DIRECCIONES_PROPIAS\]/);
 });
 
 test('lo que se comparte apunta al dominio sin redirección', () => {
   const share = leer('src', 'components', 'partidos', 'ShareSheet.js');
-  assert.match(share, /BASE_URL = 'https:\/\/www\.futfinder\.cl\/p\/'/);
+  assert.match(share, /BASE_URL = `\$\{URL_PUBLICA\}\/p\/`/);
 });
 
 test('apple-app-site-association nombra a la app y a sus rutas', () => {

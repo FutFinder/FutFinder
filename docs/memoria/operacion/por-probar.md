@@ -1,6 +1,6 @@
 # Por probar al final
 
-Última revisión: 2026-11-14
+Última revisión: 2026-11-18
 
 ## Qué es esta nota
 
@@ -146,15 +146,21 @@ carga de saldo.
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):
   permisos, token, una categoría permitida, una bloqueada por preferencia, y
   token inválido. Con el ícono de notificación nuevo.
-- **La migración 175** (chat por Broadcast) está aplicada en producción pero
-  su archivo y los cambios del cliente siguen sin commitear en una de las
-  Macs: probar el chat en tiempo real cuando ese trabajo se suba.
+- **La migración 175** (chat por Broadcast) está aplicada en producción y su
+  archivo y los cambios del cliente se subieron el 2026-11-18: probar el chat
+  en tiempo real con dos sesiones.
 
 ## Trabajo del 2026-11-14 (informe técnico)
 
 - **Íconos en el build nativo** (plugin `lucidePorIcono`, commit de «peso del bundle»). *Comprobado:* en web cada pantalla abierta dibuja sus íconos y el bundle bajó de 7,19 a 5,50 MB; las pruebas del plugin. *Falta:* en un build de Android y de iOS, abrir Inicio, un partido, el chat y Ajustes y ver que no falte ningún ícono (el plugin corre igual para nativo, pero acá no hay cómo ejecutarlo). Si faltara alguno, quitar el plugin de `babel.config.js` devuelve todo a como estaba.
 - **Alta por correo recuperable** (commit `c9938cc`). *Comprobado:* en web contra la base local, con fallos simulados: falla al guardar la edad → aviso → «Reintentar»; reenvío rechazado por frecuencia; contraseña rechazada → «Crea tu contraseña»; código pegado. *Falta:* en un teléfono, que el teclado ofrezca el código del correo (autocompletado) y que llene las seis casillas.
 - **Pausa de pagos, columnas de `pagos` y aceptación de términos** (migraciones 179, 180 y 181, aplicadas el 2026-11-14). *Comprobado:* arneses en local (143/143) y en GitHub; en producción, por catálogo y desde fuera sin sesión. *Falta:* con Flow en sandbox, encender `pagos_en_pausa` y ver el aviso en el resumen y en la pantalla de pago; pagar una reserva y ver que la pantalla de pago sigue leyendo el estado (180); crear una cuenta y ver su fila en `aceptaciones_legales` (181).
+
+## Trabajo subido el 2026-11-18 (lo que esperaba en una de las Macs)
+
+- **Actualizaciones por aire** (`expo-updates`, `runtimeVersion` por `fingerprint`, canales en `eas.json`) y **sólo teléfono** (`supportsTablet: false`). *Comprobado:* nada más que lint y pruebas. *Falta:* un build de producción que reciba una actualización publicada con `eas update --channel production`.
+- **Hoja de compartir:** el enlace sale de `utils/direccionPublica.js` (`https://www.futfinder.cl`) y los botones de WhatsApp y otros ya no preguntan `canOpenURL` antes de abrir. *Comprobado:* pruebas de Node; `www.futfinder.cl/p/<id>` responde 200. *Falta:* en un teléfono, cada botón de la hoja abre su app (o cae a compartir si no está).
+- **Migraciones 185 y 186** (escrituras directas; reportar contenido y edad mínima de 14) **sin aplicar**. *Falta:* aplicarlas y correr sus arneses (`supabase/tests/185_…` y `186_…`).
 
 ## Notas relacionadas
 

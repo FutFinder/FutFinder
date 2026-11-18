@@ -21,6 +21,7 @@ import {
 import { formatFechaCorta } from './DateTimeSheets';
 import { cuotaLabel } from '../../services/matchRules';
 import { resumenDeJugadores } from '../../utils/asientos.js';
+import { URL_PUBLICA } from '../../utils/direccionPublica';
 
 /**
  * Hoja de compartir del partido.
@@ -29,9 +30,8 @@ import { resumenDeJugadores } from '../../utils/asientos.js';
  * Nunca la ubicación del usuario ni datos personales de los jugadores.
  */
 
-// `www` y no la raíz: `futfinder.cl` redirige a `www`, y un enlace que pasa
-// por una redirección no abre la app (ver scripts/enlacesUniversales.js).
-const BASE_URL = 'https://www.futfinder.cl/p/';
+// La dirección sale de `utils/direccionPublica.js` (hoy `www.futfinder.cl`).
+const BASE_URL = `${URL_PUBLICA}/p/`;
 
 export function matchShareUrl(match) {
   return BASE_URL + (match?.id || '');
@@ -64,17 +64,22 @@ export default function ShareSheet({ visible, onClose, match, onShareInApp }) {
   const url = matchShareUrl(match);
   const text = matchShareText(match);
 
-  const openUrl = async (target) => {
-    try {
-      const can = await Linking.canOpenURL(target);
-      if (can) await Linking.openURL(target);
-    } catch {}
-  };
-
   const nativeShare = async () => {
     try {
       await Share.share(Platform.OS === 'ios' ? { message: text, url } : { message: text });
     } catch {}
+  };
+
+  // Sin `canOpenURL`: en iOS devuelve `false` para todo esquema que no esté en
+  // LSApplicationQueriesSchemes, y en Android 11+ sin `<queries>`, así que los
+  // botones no hacían nada. Se intenta abrir y, si no se puede, se cae a la
+  // hoja del sistema, que siempre comparte.
+  const openUrl = async (target) => {
+    try {
+      await Linking.openURL(target);
+    } catch {
+      nativeShare();
+    }
   };
 
   const copy = async () => {
@@ -96,13 +101,17 @@ export default function ShareSheet({ visible, onClose, match, onShareInApp }) {
       key: 'wa',
       label: 'WhatsApp',
       icon: MessageCircle,
-      onPress: () => openUrl(`whatsapp://send?text=${encodeURIComponent(text)}`),
+      // `wa.me` abre la app si está y la web si no: no depende de un esquema.
+      onPress: () => openUrl(`https://wa.me/?text=${encodeURIComponent(text)}`),
     },
     {
       key: 'ig',
       label: 'Instagram',
       icon: Instagram,
-      onPress: () => openUrl('instagram://app'),
+      // Instagram no tiene un enlace para compartir texto: `instagram://app`
+      // sólo abría la app, sin el partido. La hoja del sistema sí ofrece
+      // Instagram (historias o mensaje) con el texto listo.
+      onPress: nativeShare,
     },
     {
       key: 'copy',

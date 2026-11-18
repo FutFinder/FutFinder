@@ -738,6 +738,79 @@ export function createSharedChannel({ open, close }) {
   };
 }
 
+/**
+ * El canal privado del chat, `chat:<user_id>` (migración 175), con las
+ * piezas de Supabase inyectadas para poder probarlo sin red.
+ *
+ * Antes el chat escuchaba la tabla `messages` entera con `postgres_changes`
+ * y Realtime revisaba la RLS de cada fila por cada persona conectada. Ahora
+ * el servidor decide los destinatarios y le manda a cada uno un Broadcast a
+ * su topic; el payload ya trae la forma de siempre (`eventType`, `new`,
+ * `old`), así que las pantallas no cambian.
+ *
+ * Por qué no basta con `createSharedChannel` solo: el topic de un Broadcast
+ * ES el nombre del canal, así que no se le puede agregar el número de
+ * apertura como a los demás. Con un nombre fijo, reabrir mientras
+ * `removeChannel` sigue en vuelo devuelve el canal viejo (ver
+ * `canalUnicoPorApertura.test.js`). Acá cada apertura ESPERA a que termine
+ * de salir la anterior antes de pedir el canal: se serializan.
+ *
+ * Devuelve `{ open, close }` con la forma que pide `createSharedChannel`.
+ *
+ * @param {{
+ *   obtenerUsuario: () => Promise<string|null>,
+ *   prepararAuth: () => Promise<void>,
+ *   crearCanal: (topic: string, alRecibir: Function, alCambiarEstado: Function) => any,
+ *   quitarCanal: (canal: any) => Promise<any>,
+ * }} deps
+ */
+export function canalDeChatPorUsuario({ obtenerUsuario, prepararAuth, crearCanal, quitarCanal }) {
+  let retiroEnCurso = Promise.resolve();
+
+  return {
+    open({ emit, emitStatus }) {
+      const h = { canal: null, cerrado: false, listo: null };
+      // Un canal ya cerrado no debe tocar el estado del que vino después.
+      const avisar = (fn) => (arg) => {
+        if (!h.cerrado) fn(arg);
+      };
+      const alRecibir = avisar((mensaje) => {
+        const payload = mensaje && mensaje.payload;
+        if (payload && payload.eventType) emit(payload);
+      });
+      const alCambiarEstado = avisar(emitStatus);
+
+      h.listo = retiroEnCurso
+        .then(async () => {
+          if (h.cerrado) return;
+          const userId = await obtenerUsuario();
+          if (h.cerrado) return;
+          if (!userId) {
+            alCambiarEstado('CHANNEL_ERROR');
+            return;
+          }
+          // Un canal privado se autoriza con el token de la sesión, no con
+          // la clave pública: sin esto el servidor lo rechaza.
+          await prepararAuth();
+          if (h.cerrado) return;
+          h.canal = crearCanal(`chat:${userId}`, alRecibir, alCambiarEstado);
+        })
+        .catch((e) => {
+          console.error('[FutFinder] canal de chat:', e);
+          alCambiarEstado('CHANNEL_ERROR');
+        });
+      return h;
+    },
+    close(h) {
+      if (!h) return;
+      h.cerrado = true;
+      retiroEnCurso = Promise.resolve(h.listo)
+        .then(() => (h.canal ? quitarCanal(h.canal) : undefined))
+        .catch(() => {});
+    },
+  };
+}
+
 // ============================================================
 // DATOS DE JUGADOR EN LISTAS DE CHAT
 // ============================================================

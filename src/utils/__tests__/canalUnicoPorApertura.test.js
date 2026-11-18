@@ -100,9 +100,18 @@ test('la apertura sube en cada reapertura y no cambia mientras siga abierto', ()
   assert.deepEqual(aperturas, [1, 2]);
 });
 
-test('los tres canales de nombre fijo ponen la apertura en el tema', () => {
+test('los canales de nombre fijo ponen la apertura en el tema', () => {
   const leer = (...p) => fs.readFileSync(path.join(__dirname, '..', '..', ...p), 'utf8');
   assert.match(leer('services', 'notifications.js'), /\.channel\(`notif-\$\{userId\}-\$\{apertura\}`\)/);
-  assert.match(leer('services', 'messages.js'), /\.channel\(`messages-shared-\$\{apertura\}`\)/);
   assert.match(leer('services', 'clubRoster.js'), /\.channel\(`nomina:\$\{matchId\}:\$\{apertura\}`\)/);
+});
+
+test('el chat, cuyo topic no admite apertura, serializa sus reaperturas', () => {
+  // Desde la migración 175 el topic `chat:<id>` es el que autoriza el
+  // servidor: no se le puede agregar un número. La protección contra el
+  // mismo fallo es otra (`canalDeChatPorUsuario`, ver canalDeChat.test.js).
+  const leer = (...p) => fs.readFileSync(path.join(__dirname, '..', '..', ...p), 'utf8');
+  const fuente = leer('services', 'messages.js');
+  assert.match(fuente, /createSharedChannel\(\s*canalDeChatPorUsuario\(/);
+  assert.doesNotMatch(fuente, /\.on\(\s*'postgres_changes'/);
 });

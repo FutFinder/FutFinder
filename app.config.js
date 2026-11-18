@@ -39,8 +39,21 @@ module.exports = {
       backgroundColor: '#0A0C0A',
       barStyle: 'light-content',
     },
+    // ACTUALIZACIONES POR AIRE (expo-updates, 2026-11-13). Sin esto cada
+    // arreglo de JavaScript esperaba una revisión de tienda, y migraciones como
+    // la 149 quedaban frenadas hasta que todos actualizaran. `fingerprint`
+    // cambia la versión de ejecución sola cuando cambia algo NATIVO, así una
+    // actualización nunca llega a un build que no la puede correr. El canal de
+    // cada perfil está en `eas.json`; se publica con
+    // `npx eas-cli@latest update --channel production --message "…"`.
+    runtimeVersion: { policy: 'fingerprint' },
+    updates: {
+      url: 'https://u.expo.dev/254ce906-c402-456b-80df-8e060a10b09b',
+    },
     ios: {
-      supportsTablet: true,
+      // Sólo teléfono: la app es vertical y no se diseñó para iPad. Con `true`,
+      // App Review la prueba en iPad y pide capturas de iPad.
+      supportsTablet: false,
       bundleIdentifier: 'com.futfinder.app',
       // Enlaces universales: `https://www.futfinder.cl/p/<id>` abre la app.
       // Apple lo confirma leyendo `/.well-known/apple-app-site-association`

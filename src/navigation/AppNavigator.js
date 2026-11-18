@@ -67,6 +67,7 @@ import VerificarTelefonoScreen from '../screens/VerificarTelefonoScreen';
 import BlockedUsersScreen from '../screens/BlockedUsersScreen';
 import MfaSetupScreen from '../screens/MfaSetupScreen';
 import ReservasUiGalleryScreen from '../screens/ReservasUiGalleryScreen';
+import { DIRECCIONES_PROPIAS } from '../utils/direccionPublica';
 import ComplejoDetailScreen from '../screens/ComplejoDetailScreen';
 import ElegirCanchaScreen from '../screens/ElegirCanchaScreen';
 import FechaHoraScreen from '../screens/FechaHoraScreen';
@@ -220,7 +221,9 @@ const navTheme = {
  * tenga una URL propia, así que recargar no pierde el contexto.
  */
 const linking = {
-  prefixes: ['futfinder://', 'https://futfinder.cl', 'https://www.futfinder.cl'],
+  // La dirección oficial (y las que se suman cuando exista el dominio propio)
+  // viven en `utils/direccionPublica.js`.
+  prefixes: ['futfinder://', ...DIRECCIONES_PROPIAS],
   config: {
     screens: {
       Main: {
@@ -253,7 +256,9 @@ const linking = {
       // poder revisar los componentes en el navegador sin iniciar sesión.
       // No muestra datos de nadie: son las primitivas con textos de
       // ejemplo (por eso tampoco pasa por `withAuthGuard`).
-      ReservasUiGallery: 'ui-reservas',
+      // Sólo en desarrollo: en producción la galería de QA no existe (estaba
+      // pública en la web publicada).
+      ...(__DEV__ ? { ReservasUiGallery: 'ui-reservas' } : {}),
       // Términos y políticas, en las mismas direcciones a las que ya
       // apuntaban los enlaces de la app (`futfinder.cl/terminos`, …).
       Terminos: 'terminos',
@@ -557,11 +562,13 @@ export default function AppNavigator() {
           component={GuardedReportarProblemaScreen}
           options={{ animation: 'slide_from_right' }}
         />
-        <Stack.Screen
-          name="ReservasUiGallery"
-          component={SafeReservasUiGalleryScreen}
-          options={{ animation: 'slide_from_right' }}
-        />
+        {__DEV__ ? (
+          <Stack.Screen
+            name="ReservasUiGallery"
+            component={SafeReservasUiGalleryScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+        ) : null}
         <Stack.Screen
           name="MisRecintos"
           component={GuardedMisRecintosScreen}
