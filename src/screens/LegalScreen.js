@@ -81,7 +81,7 @@ export default function LegalScreen({ navigation, route }) {
               <Icono color={C.green} size={20} />
               <Text style={styles.title} accessibilityRole="header">{doc.titulo}</Text>
             </View>
-            <Text style={styles.fecha}>Última actualización: {ACTUALIZADO}</Text>
+            <Text style={styles.fecha}>Última actualización: {doc.actualizado || ACTUALIZADO}</Text>
 
             <View style={styles.resumenBox}>
               <Text style={styles.resumen}>{doc.resumen}</Text>

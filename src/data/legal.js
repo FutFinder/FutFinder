@@ -145,8 +145,10 @@ const privacidad = {
 
 const cookies = {
   titulo: 'Política de cookies',
+  // Cambió después que los otros dos documentos: tiene su propia fecha.
+  actualizado: '19 de noviembre de 2026',
   resumen:
-    'FutFinder no usa cookies de publicidad ni de seguimiento. En la versión web guardamos en tu navegador solo lo necesario para que la app funcione.',
+    'FutFinder no usa cookies de publicidad ni de seguimiento. En la versión web guardamos en tu navegador solo lo necesario para que la app funcione, y antes de que inicies sesión o cierres este aviso no guardamos nada.',
   secciones: [
     {
       titulo: 'Qué son',
@@ -157,14 +159,14 @@ const cookies = {
     {
       titulo: 'Qué guardamos y para qué',
       parrafos: [
-        'Todo lo que guarda FutFinder es necesario para que la app funcione o es una comodidad que tú activas al usarla. Junto a cada cosa va cuánto dura:',
+        'FutFinder no pone cookies propias: lo que guarda va en el almacenamiento local de tu navegador o de la app. Todo es necesario para que funcione o es una comodidad que tú activas al usarla. Junto a cada cosa va su nombre técnico y cuánto dura:',
       ],
       lista: [
-        'Sesión: el acceso a tu cuenta, para que no tengas que iniciar sesión cada vez. Lo crea Supabase. Dura hasta que cierres sesión o elimines tu cuenta, y se renueva sola mientras usas la app. En el teléfono se guarda cifrada.',
-        'Cuenta recordada: tu correo y nombre de usuario (nunca la contraseña), para ofrecerte entrar más rápido en este dispositivo. Se mantiene al cerrar sesión, que es justamente para lo que sirve, y se borra al eliminar tu cuenta o al borrar los datos de FutFinder.',
-        'Preferencias de uso: el club que tenías abierto, qué mensajes de club ya leíste y qué avisos de bienvenida ya viste. Duran hasta que borres los datos de FutFinder.',
-        'Copia temporal de datos: la última lista de partidos que cargaste, para mostrarla mientras se actualiza o si pierdes la conexión. Se reemplaza cada vez que la lista se actualiza y dura hasta que borres los datos de FutFinder.',
-        'Aviso de cookies: que ya viste este aviso, para no repetírtelo. Dura hasta que borres los datos de FutFinder; si cambiamos esta política de fondo, te lo mostramos una vez más.',
+        'Sesión (sb-…-auth-token): el acceso a tu cuenta, para que no tengas que iniciar sesión cada vez. Lo crea Supabase. Dura hasta que cierres sesión o elimines tu cuenta, y se renueva sola mientras usas la app. En el teléfono se guarda cifrada.',
+        'Cuenta recordada (futfinder.rememberedAccount): tu correo y nombre de usuario (nunca la contraseña), para ofrecerte entrar más rápido en este dispositivo. Se mantiene al cerrar sesión, que es justamente para lo que sirve, y se borra al eliminar tu cuenta o al borrar los datos de FutFinder.',
+        'Preferencias de uso (futfinder:clubActivo, club_chat_read:…, futfinder.panelRecintoBienvenida.…): el club que tenías abierto, qué mensajes de club ya leíste y qué avisos de bienvenida ya viste. Se borran al cerrar sesión.',
+        'Copia temporal de datos (@futfinder/cache/…): la última lista de partidos que cargaste y el detalle de los partidos que abriste, con sus jugadores, para mostrarlos mientras se actualizan o si pierdes la conexión. Se reemplaza cada vez que se actualiza y se borra al cerrar sesión.',
+        'Aviso de cookies (futfinder.avisoCookies): que ya viste este aviso, para no repetírtelo. Dura hasta que borres los datos de FutFinder; si cambiamos esta política de fondo, te lo mostramos una vez más.',
       ],
       parrafosFinales: [
         'Borrar los datos de FutFinder es borrar los datos del sitio en tu navegador o, en el teléfono, los datos de la app (o desinstalarla).',
@@ -173,14 +175,16 @@ const cookies = {
     {
       titulo: 'Servicios de terceros',
       parrafos: [
-        'Cuando abres el mapa de partidos en la web, Mapbox carga el mapa y puede guardar en tu navegador un identificador anónimo para medir el uso de su servicio. No lo usamos nosotros ni sirve para mostrarte publicidad. Cuánto dura lo decide Mapbox; puedes revisar cómo lo trata en su política de privacidad.',
+        'Supabase, donde se guardan los datos de FutFinder, funciona detrás de Cloudflare. Cuando la app carga fotos o se conecta al chat en vivo, Cloudflare puede poner una cookie técnica llamada __cf_bm para distinguir a las personas de los programas automáticos. Dura 30 minutos, no te identifica y no la podemos desactivar.',
+        'Cuando abres un mapa en la web, Mapbox guarda en tu navegador un identificador anónimo y la fecha de su último registro (mapbox.eventData…) para medir el uso de su servicio, y una copia de los cuadros del mapa que ya viste (mapbox-tiles) para cargarlos más rápido. Le pedimos que no recoja métricas de rendimiento. Nosotros no usamos esos datos y no sirven para mostrarte publicidad. Cuánto duran lo decide Mapbox; puedes revisar cómo los trata en su política de privacidad.',
+        'Para buscar direcciones al publicar un partido usamos Mapbox u OpenStreetMap (Nominatim); ninguno de los dos guarda nada en tu navegador.',
         'No usamos Google Analytics, píxeles de redes sociales ni ninguna otra herramienta de publicidad o seguimiento.',
       ],
     },
     {
       titulo: 'Cómo controlarlas',
       parrafos: [
-        'Como todo lo que guardamos es necesario para el funcionamiento, no pedimos un consentimiento aparte. Aun así, puedes borrar el almacenamiento de FutFinder desde la configuración de tu navegador o eliminando los datos de la app en tu teléfono. Si lo haces, se cerrará tu sesión y perderás las preferencias guardadas en ese dispositivo.',
+        'Como todo lo que se guarda es necesario para el funcionamiento, no pedimos un consentimiento aparte. Aun así, puedes borrar el almacenamiento de FutFinder desde la configuración de tu navegador o eliminando los datos de la app en tu teléfono. Si lo haces, se cerrará tu sesión y perderás las preferencias guardadas en ese dispositivo.',
         'Si algún día sumamos cookies opcionales, como medición o publicidad, te pediremos permiso antes de activarlas y podrás rechazarlas.',
       ],
     },

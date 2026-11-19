@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * Se guarda la VERSIÓN del aviso y no un simple «visto»: si la política de
  * cookies cambia de fondo, subir este número vuelve a mostrarlo una vez.
  */
-export const VERSION_AVISO_COOKIES = '2026-10-26';
+export const VERSION_AVISO_COOKIES = '2026-11-19';
 const KEY = 'futfinder.avisoCookies';
 
 export function debeMostrarseAviso(guardado) {

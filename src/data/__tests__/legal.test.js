@@ -91,7 +91,7 @@ test('la página de eliminar la cuenta es pública y dice lo mismo que delete_my
 test('la política de cookies dice cuánto dura cada cosa que se guarda', () => {
   const seccion = DOCUMENTOS_LEGALES.cookies.secciones.find((s) => s.titulo === 'Qué guardamos y para qué');
   for (const item of seccion.lista) {
-    assert.match(item, /[Dd]ura|se borra|Se mantiene/, `sin duración: «${item.slice(0, 40)}…»`);
+    assert.match(item, /dura|se borra|se mantiene/i, `sin duración: «${item.slice(0, 40)}…»`);
   }
 });
 
@@ -103,4 +103,65 @@ test('lo que la política promete de la cuenta recordada es lo que hace el códi
   assert.ok(borrado.indexOf('forgetRememberedAccount') < borrado.indexOf('signOut'));
   // El diálogo no puede decir que se borran los clubes: sobreviven sin autor (176).
   assert.ok(!/tus amistades y tus clubes/.test(borrado));
+});
+
+test('la política de cookies nombra cada cosa con el nombre técnico que de verdad se guarda', () => {
+  const texto = JSON.stringify(DOCUMENTOS_LEGALES.cookies);
+  // Las claves salen del FUENTE de cada módulo: si alguien renombra una, la
+  // política queda mintiendo y esto se pone rojo.
+  const claveDe = (archivo, patron) => {
+    const m = leer(archivo).match(patron);
+    assert.ok(m, `no encontré la clave en ${archivo}`);
+    return m[1];
+  };
+  const claves = [
+    claveDe('src/utils/rememberedAccount.js', /const KEY = '([^']+)'/),
+    claveDe('src/utils/avisoCookies.js', /const KEY = '([^']+)'/),
+    claveDe('src/contexts/ClubsHomeContext.js', /CLUB_ACTIVO_KEY = '([^']+)'/),
+    claveDe('src/utils/avisoPanelRecinto.js', /const PREFIJO = '([^']+)'/),
+    claveDe('src/services/connectivity.js', /const PREFIX = '([^']+)'/),
+    claveDe('src/services/messages.js', /clubReadKey = \(clubId\) => `([^$`]+)/),
+  ];
+  for (const c of claves) assert.ok(texto.includes(c), `la política no nombra ${c}`);
+  // Lo que ponen otros: Supabase (sesión), Cloudflare y Mapbox.
+  for (const c of ['auth-token', '__cf_bm', 'mapbox.eventData', 'mapbox-tiles']) {
+    assert.ok(texto.includes(c), `la política no nombra ${c}`);
+  }
+});
+
+test('la copia temporal y las preferencias se borran al cerrar sesión, como dice la política', () => {
+  const auth = leer('src/services/auth.js');
+  const salir = auth.slice(auth.indexOf('export async function signOut'), auth.indexOf('export async function getCurrentUser'));
+  assert.ok(salir.includes('await olvidarDatosDeLaCuenta()'), 'signOut tiene que borrar lo de la cuenta');
+  const { clavesDeLaCuenta } = require('../../utils/datosLocales.js');
+  const borra = clavesDeLaCuenta([
+    '@futfinder/cache/partidos/open', '@futfinder/cache/partidos/detail/x', 'futfinder:clubActivo',
+    'club_chat_read:abc', 'futfinder.panelRecintoBienvenida.k1',
+    'futfinder.rememberedAccount', 'futfinder.avisoCookies', 'sb-ref-auth-token', 'mapbox.eventData:x',
+  ]);
+  assert.deepEqual(borra, [
+    '@futfinder/cache/partidos/open', '@futfinder/cache/partidos/detail/x', 'futfinder:clubActivo',
+    'club_chat_read:abc', 'futfinder.panelRecintoBienvenida.k1',
+  ]);
+});
+
+test('olvidarDatosDeLaCuenta borra sólo lo de la cuenta y nunca lanza', async () => {
+  const { olvidarDatosDeLaCuenta } = require('../../utils/datosLocales.js');
+  const datos = new Map([['@futfinder/cache/partidos/open', '1'], ['futfinder.rememberedAccount', '2'], ['club_chat_read:z', '3']]);
+  const almacen = {
+    getAllKeys: async () => [...datos.keys()],
+    multiRemove: async (ks) => ks.forEach((k) => datos.delete(k)),
+  };
+  assert.equal(await olvidarDatosDeLaCuenta(almacen), 2);
+  assert.deepEqual([...datos.keys()], ['futfinder.rememberedAccount']);
+  assert.equal(await olvidarDatosDeLaCuenta({ getAllKeys: async () => { throw new Error('x'); } }), 0);
+});
+
+test('el mapa de la web le pide a Mapbox no recoger métricas de rendimiento', () => {
+  assert.match(leer('src/components/MatchMap.web.js'), /performanceMetricsCollection: false/);
+});
+
+test('la política de cookies tiene su propia fecha y la pantalla la muestra', () => {
+  assert.match(DOCUMENTOS_LEGALES.cookies.actualizado, /\d{4}$/);
+  assert.ok(leer('src/screens/LegalScreen.js').includes('doc.actualizado || ACTUALIZADO'));
 });

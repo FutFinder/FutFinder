@@ -243,6 +243,12 @@ carga de saldo.
 
 **Qué falta:** con una cuenta desechable, entrar (queda recordada), eliminarla desde Ajustes y ver que Iniciar sesión ya no ofrece su correo.
 
+## 6l. Cookies al 100 % (2026-11-19)
+
+**Qué sí se comprobó:** inventario en el navegador real (vacío en la primera visita; Mapbox real cargado a mano con el token público: `mapbox.eventData…` y `mapbox-tiles`), cabeceras de todos los servicios (sólo Supabase/Cloudflare pone `__cf_bm`), y en la web local: la política con su fecha nueva, el aviso que reaparece a quien vio la versión anterior y deja sólo `futfinder.avisoCookies = 2026-11-19`, Términos con su fecha propia, y la política a 375 px sin desbordes. Pruebas de Node: nombres técnicos leídos del fuente, borrado al cerrar sesión, opción de Mapbox.
+
+**Qué falta:** con una cuenta, abrir partidos y un club, cerrar sesión y ver en el navegador que ya no quedan `@futfinder/cache/…`, `futfinder:clubActivo` ni `club_chat_read:…` (y que sí queda `futfinder.rememberedAccount`). Y la descarga de «Exportar mis datos» en www.futfinder.cl (la sesión de A se perdió al cerrarse el panel).
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

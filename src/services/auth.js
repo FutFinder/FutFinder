@@ -10,6 +10,7 @@ import {
 } from './pendingSignUp';
 import { segundosDeEspera } from '../utils/altaPorCorreo';
 import { olvidarIntencion } from '../utils/intencionDeReserva';
+import { olvidarDatosDeLaCuenta } from '../utils/datosLocales';
 import { cerrarSesionEnOrden } from '../utils/cierreDeSesion';
 import { unregisterPushToken } from './notifications';
 
@@ -174,10 +175,13 @@ export async function signOut() {
   // dispositivo compartido la siguiente persona que entrara a reservar
   // podía ver el aviso con el partido y el club rival de la cuenta anterior.
   olvidarIntencion();
-  if (!isSupabaseConfigured) return { error: null };
+  if (!isSupabaseConfigured) {
+    await olvidarDatosDeLaCuenta();
+    return { error: null };
+  }
   // El token de push se da de baja ANTES de soltar la sesión: después, el
   // delete sale como anon y la base lo rechaza (ver utils/cierreDeSesion.js).
-  return cerrarSesionEnOrden({
+  const resultado = await cerrarSesionEnOrden({
     usuarioActual: async () => (await supabase.auth.getSession())?.data?.session?.user?.id ?? null,
     darDeBajaToken: (uid) => unregisterPushToken(uid),
     cerrar: async () => {
@@ -185,6 +189,11 @@ export async function signOut() {
       return { error };
     },
   });
+  // Lo que es de la cuenta y vive en el dispositivo (copia de partidos con
+  // sus jugadores, club abierto, mensajes leídos): en un equipo compartido no
+  // puede quedarle a la siguiente persona. Lo promete la política de cookies.
+  await olvidarDatosDeLaCuenta();
+  return resultado;
 }
 
 export async function getCurrentUser() {
