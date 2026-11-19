@@ -231,3 +231,13 @@ test('las credenciales del cliente vienen de variables de entorno EXPO_PUBLIC, n
     'no debe haber una URL de proyecto real en el código'
   );
 });
+
+test('ni el registro ni el login ofrecen un inicio con terceros que no funciona', () => {
+  // Eran «Continuar con Google / Apple» que sólo decían «Muy pronto»: Apple
+  // rechaza funciones de relleno (guía 2.1). Si algún día vuelven, tienen
+  // que funcionar, y con Google viene la obligación de ofrecer Apple (4.8).
+  for (const pantalla of ['screens/RegisterScreen.js', 'screens/LoginScreen.js']) {
+    const fuente = leer(pantalla).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '');
+    assert.doesNotMatch(fuente, /Continuar con (Google|Apple)|Muy pronto/, `${pantalla} volvió a mostrar un botón de relleno`);
+  }
+});

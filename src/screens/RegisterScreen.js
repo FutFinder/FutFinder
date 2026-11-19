@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Eye, EyeOff, Check } from 'lucide-react-native';
-import Svg, { Path } from 'react-native-svg';
 
 import FutFinderMark from '../components/FutFinderMark';
 import Banner from '../components/Banner';
@@ -28,25 +27,6 @@ import {
 import { saveRememberedAccount } from '../utils/rememberedAccount';
 import { isSupabaseConfigured } from '../services/supabase';
 
-
-function GoogleIcon({ size = 19 }) {
-  return (
-    <Svg viewBox="0 0 24 24" width={size} height={size}>
-      <Path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z" />
-      <Path fill="#34A853" d="M12 22c2.7 0 4.9-.9 6.6-2.4l-3.2-2.5c-.9.6-2 .9-3.4.9-2.6 0-4.8-1.7-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z" />
-      <Path fill="#FBBC05" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9l3.3-2.6z" />
-      <Path fill="#EA4335" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.7 9.4 6 12 6z" />
-    </Svg>
-  );
-}
-
-function AppleIcon({ size = 19 }) {
-  return (
-    <Svg viewBox="0 0 24 24" width={size} height={size} fill={C.textPrimary}>
-      <Path d="M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.7-1.8-3.3-1.8-1.4-.1-2.6.8-3.3.8-.7 0-1.7-.8-2.8-.8-1.5 0-2.9.9-3.6 2.2-1.6 2.7-.4 6.7 1.1 8.9.7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.5-.7 2.9-.7 1.3 0 1.7.7 2.8.7 1.2 0 2-1.1 2.7-2.2.5-.8.7-1.2 1.1-2.1-2.7-1-2.4-4.6-2.4-3.7zM14.3 5.9c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6 1 .1 2-.5 2.5-1.2z" />
-    </Svg>
-  );
-}
 
 function FieldLabel({ children, style }) {
   return <Text style={[styles.fieldLabel, style]}>{children}</Text>;
@@ -69,10 +49,6 @@ export default function RegisterScreen({ navigation }) {
 
   const showBanner = (type, title, message = '') => setBanner({ type, title, message });
 
-
-  const showComingSoon = (proveedor) => {
-    showBanner('info', `Muy pronto`, `El registro con ${proveedor} todavía no está disponible.`);
-  };
 
   const strength = passwordStrength(password);
 
@@ -152,30 +128,12 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.title}>Crea tu cuenta</Text>
           <Text style={styles.subtitle}>En un minuto estás dentro. Después completas tu perfil de jugador.</Text>
 
-          <View style={{ gap: 10, marginTop: 22 }}>
-            <Pressable
-              onPress={() => showComingSoon('Google')}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.socialBtn, styles.googleBtn, pressed && { opacity: 0.85 }]}
-            >
-              <GoogleIcon />
-              <Text style={styles.googleText}>Continuar con Google</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => showComingSoon('Apple')}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.socialBtn, styles.appleBtn, pressed && { opacity: 0.85 }]}
-            >
-              <AppleIcon />
-              <Text style={styles.appleText}>Continuar con Apple</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.dividerRow}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>O CON TU CORREO</Text>
-            <View style={styles.divider} />
-          </View>
+          {/* SIN «Continuar con Google / Apple»: eran botones de relleno que
+              sólo decían «Muy pronto», y Apple rechaza funciones que no
+              funcionan (guía 2.1). Si algún día se agrega un inicio con
+              Google, Apple exige ofrecer también «Iniciar sesión con Apple»
+              (guía 4.8). */}
+          <View style={styles.espacio} />
 
           <Card>
             <FieldLabel>Nombre y apellido</FieldLabel>
@@ -325,18 +283,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: F.extraBold, fontSize: 27, color: C.textPrimary, letterSpacing: -0.6, marginTop: 18 },
   subtitle: { fontFamily: F.medium, fontSize: 13.5, lineHeight: 20, color: C.textSecondary, marginTop: 9 },
 
-  socialBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    height: 54, borderRadius: R.ctaSecondary,
-  },
-  googleBtn: { backgroundColor: C.textPrimary },
-  googleText: { fontFamily: F.extraBold, fontSize: 14.5, color: '#0A0C0A' },
-  appleBtn: { backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border },
-  appleText: { fontFamily: F.extraBold, fontSize: 14.5, color: C.textPrimary },
-
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 22 },
-  divider: { flex: 1, height: 1, backgroundColor: C.dividerInner },
-  dividerText: { fontFamily: F.bold, fontSize: 10.5, letterSpacing: 1.4, color: C.textMuted },
+  espacio: { height: 22 },
 
   fieldLabel: { fontFamily: F.bold, color: C.textSecondary, fontSize: 12 },
   input: {
