@@ -348,7 +348,7 @@ export default function ModeracionScreen({ navigation }) {
                       </View>
                       <Text style={styles.filaFecha}>{fechaCorta(rep.created_at)}</Text>
                       <Text style={styles.filaTexto}>
-                        {elementoLegible(rep.elemento)}
+                        {elementoLegible(rep.elemento, rep.elemento_nombre, rep.elemento_hora)}
                         {rep.reportado ? ` · @${rep.reportado}` : ''}
                       </Text>
                       {rep.descripcion ? (

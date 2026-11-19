@@ -97,6 +97,26 @@ test('lo reportado se lee en español, y quitar contenido dice qué borra', () =
   assert.match(M.queQuitaElContenido('foto_club:abc'), /foto del club/);
 });
 
+test('la fila nombra el club, la foto o el partido reportado (migración 196)', () => {
+  // Con la 196 la cola trae `elemento_nombre`. Sin él, «Un club» no le dice a
+  // quien modera qué está mirando.
+  assert.equal(M.elementoLegible('club:abc', 'SixSiete'), 'El club «SixSiete»');
+  assert.equal(M.elementoLegible('foto_club:abc', 'SixSiete'), 'Una foto del club «SixSiete»');
+  assert.equal(
+    M.elementoLegible('partido:abc', 'hola', '2026-11-15T23:00:00+00:00'),
+    'El partido «hola» del 15-nov'
+  );
+  assert.equal(M.elementoLegible('partido:abc', 'hola'), 'El partido «hola»');
+  // Lo reportado ya no existe (se borró después): la cola trae null.
+  assert.equal(M.elementoLegible('club:abc', null), 'Un club que ya no existe');
+  assert.equal(M.elementoLegible('partido:abc', null), 'Un partido que ya no existe');
+  // Una cola sin la 196 (la clave no viene) sigue diciendo lo de antes.
+  assert.equal(M.elementoLegible('club:abc', undefined), 'Un club');
+  // El perfil y la foto de perfil no cambian.
+  assert.equal(M.elementoLegible(null, null), 'Su perfil');
+  assert.equal(M.elementoLegible('foto:abc', null), 'Una foto de su perfil');
+});
+
 test('la espera se cuenta en días de calendario y se lee en español', () => {
   // LAS FECHAS SE ARMAN EN HORA LOCAL, no con cadenas en Z. La cuenta es de
   // días de CALENDARIO —el de quien mira la pantalla— así que una cadena UTC

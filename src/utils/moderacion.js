@@ -184,14 +184,46 @@ export const DECISIONES_REPORTE = {
 export const DIAS_SUSPENSION = [7, 30];
 export const NOTA_REPORTE_MAX = 600;
 
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
+
+/** `2026-11-15T23:00:00Z` → `15-nov`, en hora de Chile (donde se juega). */
+function diaDelPartido(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Santiago', day: 'numeric', month: 'numeric',
+  }).formatToParts(d);
+  const dia = partes.find((p) => p.type === 'day')?.value;
+  const mes = Number(partes.find((p) => p.type === 'month')?.value);
+  return dia && mes ? `${dia}-${MESES[mes - 1]}` : null;
+}
+
 /**
  * Qué se reportó, en español. `elemento` es `tipo:uuid` o null cuando se
  * reportó a la persona (su perfil).
+ *
+ * `nombre` y `hora` los trae la cola desde la migración 196
+ * (`elemento_nombre`, `elemento_hora`): el nombre del club, el de la foto
+ * del club o el título del partido. `null` es que ya no existe (se borró
+ * después del reporte); `undefined` es una cola sin la 196, y entonces se
+ * dice lo genérico de antes.
  */
-export function elementoLegible(elemento) {
+export function elementoLegible(elemento, nombre, hora) {
   const tipo = typeof elemento === 'string' && elemento.includes(':')
     ? elemento.split(':')[0]
     : null;
+  const conNombre = typeof nombre === 'string' && nombre.trim() !== '';
+  if (tipo === 'club' && conNombre) return `El club «${nombre}»`;
+  if (tipo === 'foto_club' && conNombre) return `Una foto del club «${nombre}»`;
+  if (tipo === 'partido' && conNombre) {
+    const dia = hora ? diaDelPartido(hora) : null;
+    return dia ? `El partido «${nombre}» del ${dia}` : `El partido «${nombre}»`;
+  }
+  if (nombre === null) {
+    if (tipo === 'club') return 'Un club que ya no existe';
+    if (tipo === 'foto_club') return 'Una foto de club que ya no existe';
+    if (tipo === 'partido') return 'Un partido que ya no existe';
+  }
   switch (tipo) {
     case 'foto_club': return 'Una foto de un club';
     case 'foto': return 'Una foto de su perfil';
