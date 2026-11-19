@@ -21,13 +21,15 @@ Todo lo de [Por probar](por-probar.md), con un build `preview` en un iPhone y un
 
 ## 3. Fichas de tienda
 
+Los textos para pegar (descripción, palabras clave, notas para quien revisa, privacidad y seguridad de los datos) están en [Fichas de tienda](fichas-de-tienda.md). La cuenta de revisión con contenido se arma con `scripts/cuenta-revision/` **después** de la limpieza del paso 4.2 y antes del envío (4.4).
+
 **Las dos tiendas:**
 - Política de privacidad: `https://www.futfinder.cl/privacidad`. Términos: `https://www.futfinder.cl/terminos`.
 - **Una cuenta de prueba para quien revisa**, con contenido (un partido, un club, un chat) y sin dos pasos. FutFinder no se puede usar sin iniciar sesión, y sin esta cuenta Apple rechaza por la guía 2.1. El correo y la contraseña van en el formulario de la tienda, nunca en el repositorio.
 - No hace falta «Iniciar sesión con Apple»: la app no ofrece ningún inicio con terceros (sólo correo). Los botones «Continuar con Google / Apple» del registro, que sólo decían «Muy pronto», se quitaron el 2026-11-18 (Apple rechaza funciones de relleno, guía 2.1); una prueba en `sesionCableado.test.js` impide que vuelvan. El mismo día se quitó la fila «Ñuñoa, Santiago · cambiar» de Reservas, que además mostraba esa ubicación a todo el mundo, y «Cómo llegar» en la ficha de un recinto pasó a funcionar (Apple Maps o Google Maps). Otra prueba del mismo archivo los vigila.
 
 **App Store Connect:**
-- Etiquetas de privacidad: correo, teléfono, ubicación aproximada, fotos y mensajes (contenido del usuario), identificador de usuario y de dispositivo (token de push), compras (reservas) y diagnóstico (Sentry). Nada se usa para rastrear ni para publicidad.
+- Etiquetas de privacidad: correo, teléfono, ubicación precisa (ver [Fichas de tienda](fichas-de-tienda.md)), fotos y mensajes (contenido del usuario), identificador de usuario y de dispositivo (token de push), compras (reservas) y diagnóstico (Sentry). Nada se usa para rastrear ni para publicidad.
 - Clasificación por edad con contenido generado por usuarios. En las notas para la revisión, decir dónde se reporta (perfil, club, foto, partido), dónde se bloquea y que los reportes se resuelven en 24 horas (guía 1.2, migración 194).
 
 **Google Play Console:**
@@ -39,6 +41,7 @@ Todo lo de [Por probar](por-probar.md), con un build `preview` en un iPhone y un
 
 1. **Respaldo** (Supabase Pro, o `pg_dump`).
 2. **Limpieza de producción** con el sí de Vicente: `scripts/limpieza-prelanzamiento/` (su README dice cómo; primero el ensayo).
+   Después, la **cuenta de revisión**: registrarla en www.futfinder.cl y correr `scripts/cuenta-revision/semilla.sql` (su README dice cómo). Si se registró antes, su correo va en la lista de cuentas que la limpieza salva.
 3. Si el personal ya registró su segundo factor, encender `mfa_obligatoria_staff` (sección 4 de [Por probar](por-probar.md)).
 4. Build `production` con EAS y envío a las dos tiendas.
 
