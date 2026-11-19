@@ -66,6 +66,7 @@
         "npm:expo-notifications@~0.32.17",
         "npm:expo-secure-store@~15.0.8",
         "npm:expo-status-bar@~3.0.9",
+        "npm:expo-updates@~29.0.20",
         "npm:expo@~54.0.37",
         "npm:globals@^17.10.0",
         "npm:lucide-react-native@0.469",

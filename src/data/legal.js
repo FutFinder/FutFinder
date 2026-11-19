@@ -24,6 +24,18 @@ export const ACTUALIZADO = '18 de noviembre de 2026';
 export const VERSION_LEGAL = '2026-11-18';
 export const CORREO_PRIVACIDAD = 'futfindercl@gmail.com';
 
+/**
+ * Quién ofrece el servicio y responde por los datos (2026-11-18). Los términos
+ * no traían razón social ni RUT, que piden la Ley 19.496 del consumidor, la
+ * Ley 21.719 (identidad del responsable) y las fichas de las tiendas.
+ */
+export const EMPRESA = {
+  razonSocial: 'FutFinder SpA',
+  rut: '78.524.079-0',
+  domicilio: 'Av. Papa San Pedro 9477, Pudahuel, Región Metropolitana, Chile',
+};
+const IDENTIDAD = `${EMPRESA.razonSocial}, RUT ${EMPRESA.rut}, con domicilio en ${EMPRESA.domicilio}`;
+
 const privacidad = {
   titulo: 'Política de privacidad',
   resumen:
@@ -32,7 +44,7 @@ const privacidad = {
     {
       titulo: 'Quiénes somos',
       parrafos: [
-        `FutFinder es una aplicación para organizar fútbol amateur en Chile. Somos responsables de los datos personales que tratamos a través de la app. Para cualquier consulta sobre privacidad escríbenos a ${CORREO_PRIVACIDAD} o usa «Reportar un problema» en Ajustes.`,
+        `FutFinder es una aplicación para organizar fútbol amateur en Chile. La responsable de los datos personales que tratamos a través de la app es ${IDENTIDAD}. Para cualquier consulta sobre privacidad escríbenos a ${CORREO_PRIVACIDAD} o usa «Reportar un problema» en Ajustes.`,
         'Tratamos tus datos conforme a la Ley N° 19.628 sobre protección de la vida privada y, desde su entrada en vigencia, a la Ley N° 21.719 de protección de datos personales.',
       ],
     },
@@ -102,7 +114,7 @@ const privacidad = {
       ],
       lista: [
         'Editar tu perfil y tus preferencias en cualquier momento.',
-        'Descargar tus datos con «Exportar mis datos» en Ajustes (perfil, partidos, amigos, clubes y las versiones de los términos que aceptaste; los mensajes de chat no se incluyen).',
+        'Descargar tus datos con «Exportar mis datos» en Ajustes: perfil, teléfono, partidos, amigos, clubes, reservas, pagos, movimientos de saldo, calificaciones y reportes que hiciste, tickets de soporte, cuentas que bloqueaste, historial de tu puntaje, las versiones de los términos que aceptaste y los últimos 5.000 mensajes que escribiste. No incluye lo que escribieron otras personas.',
         'Elegir qué notificaciones recibes y desactivar el permiso de ubicación desde tu teléfono o navegador.',
         'Eliminar tu cuenta desde Ajustes → Cuenta.',
       ],
@@ -187,6 +199,7 @@ const terminos = {
       titulo: 'Qué es FutFinder',
       parrafos: [
         'FutFinder es una aplicación para encontrar y organizar partidos de fútbol amateur, armar clubes, conversar con otros jugadores y reservar canchas en Chile. Al crear una cuenta o usar la app aceptas estos términos y nuestra Política de privacidad. Si no estás de acuerdo, no uses la app.',
+        `El servicio lo ofrece ${IDENTIDAD}.`,
       ],
     },
     {
@@ -278,6 +291,7 @@ const terminos = {
       titulo: 'Contacto',
       parrafos: [
         `Si tienes dudas sobre estos términos escríbenos a ${CORREO_PRIVACIDAD} o usa «Reportar un problema» en Ajustes.`,
+        `${EMPRESA.razonSocial} · RUT ${EMPRESA.rut} · ${EMPRESA.domicilio}.`,
       ],
     },
   ],

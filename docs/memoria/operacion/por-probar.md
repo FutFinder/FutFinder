@@ -178,6 +178,12 @@ carga de saldo.
 
 **Qué falta:** probarlo en www.futfinder.cl y en el teléfono (el visor de fotos y la bandera del partido a 375 px).
 
+## 6g. Exportar mis datos y datos de la empresa (migración 192, 2026-11-18)
+
+**Qué sí se comprobó:** arnés de la 192 contra producción revertido (3/3: trae lo propio de cada tabla, nada de otra persona, sin cuenta no); pruebas de Node de los textos legales.
+
+**Qué falta:** con una cuenta real que tenga reservas, mensajes y un ticket, tocar «Exportar mis datos» en www.futfinder.cl y en el teléfono y revisar el archivo (que traiga las secciones nuevas y que no se corte al compartir un JSON grande en Android). Mirar en Términos y en Privacidad que se lean bien la razón social, el RUT y el domicilio.
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

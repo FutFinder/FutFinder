@@ -296,6 +296,10 @@ Transiciones cerradas desde el cliente en `friendships`, `club_join_requests`, `
 
 `match_asientos(id, id_partido, tipo 'reservado'|'nombre', nombre)` guarda los asientos sin cuenta; lectura para `authenticated` que ve el partido, escritura sólo por RPC. `match_invitaciones(id_partido, token)` no tiene ningún privilegio de cliente. `feature_flags` gana `termina_at` y `flag_activo()` la respeta. `attendees_origen_check` suma `asiento_asignado` y `asiento_link`. Se redefinen `matches_guard_cupos`, `tg_enforce_join_rules`, `tg_notify_match_join`, `leave_match_penalized` y `truescore_costo_salida` partiendo del cuerpo desplegado. Puertas nuevas: `publicar_partido_con_asientos` (invoker), `asientos_armar`, `asiento_asignar_amigo`, `asiento_agregar`, `asiento_cambiar`, `asiento_liberar`, `asiento_quitar_amigo`, `asientos_link`, `tomar_asiento_reservado` y `partidos_ajustes`; los ayudantes `_asiento_*` y `limpiar_asientos_vencidos` (cron `futfinder-limpiar-asientos`, cada hora) están cerrados también a `authenticated`. Ensayada entera contra producción en una transacción revertida (13 de 13) antes de aplicarla.
 
+## Exportar mis datos (migración 192, aplicada el 2026-11-18)
+
+`exportar_mis_datos()` (`security definer`, sólo `authenticated`, sólo lo de `auth.uid()`) junta en el servidor lo que el cliente no puede leer entero: teléfono (`perfil_telefonos` no tiene políticas), ubicación, reservas propias y en las que participa, pagos, movimientos de saldo, calificaciones dadas, reportes hechos, tickets, solicitudes de recinto, bloqueos, historial de puntaje y los últimos 5.000 mensajes escritos, con el tipo de conversación y no el destinatario. Arnés 3/3 contra producción revertido (trae lo propio, nada de otra persona, sin cuenta no).
+
 ## Convención de cambio
 
 `supabase/schema.sql` es una base idempotente; `supabase/migrations/NN_*.sql` mantiene cambios incrementales. Crea una migración nueva y una prueba SQL cuando corresponda; no edites ni reordenes migraciones ya aplicadas. La presencia de un archivo no confirma que esté aplicado en un proyecto remoto.
