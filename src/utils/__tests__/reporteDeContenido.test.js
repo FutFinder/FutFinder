@@ -35,11 +35,27 @@ test('cada pantalla reporta su propio tipo', () => {
   assert.match(leer('src/screens/MatchDetailScreen.js'), /reportarContenido\(\{ tipo: 'partido'/);
 });
 
-test('el reporte pendiente contra la misma persona no habla de «esta cuenta»', () => {
+test('el reporte repetido no habla de «esta cuenta»', () => {
   const r = interpretarReporteDeContenido({
     data: { ok: false, reason: 'Ya enviaste un reporte sobre esta cuenta y sigue en revisión.' },
     error: null,
   });
   assert.equal(r.error.message, YA_HAY_UNO);
   assert.doesNotMatch(r.error.message, /esta cuenta/);
+});
+
+test('con la 191 el reporte repetido dice «esto», y la app lo muestra igual', () => {
+  const r = interpretarReporteDeContenido({ data: { ok: false, reason: 'Ya reportaste esto y sigue en revisión.' }, error: null });
+  assert.equal(r.error.message, YA_HAY_UNO);
+});
+
+test('«ya reporté esta cuenta» mira sólo el reporte de la cuenta, no los de su contenido', () => {
+  const svc = leer('src/services/reports.js');
+  const ini = svc.indexOf('export async function getMyPendingReportFor(');
+  assert.match(svc.slice(ini), /\.is\('elemento', null\)/);
+});
+
+test('la 191 hace única la terna reportante, reportado y elemento', () => {
+  const sql = leer('supabase/migrations/191_un_reporte_pendiente_por_elemento.sql');
+  assert.match(sql, /\(reporter_id, reported_id, \(coalesce\(elemento, ''\)\)\)/);
 });

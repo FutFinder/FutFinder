@@ -188,6 +188,10 @@ export async function getMyPendingReportFor(userId) {
     .eq('reporter_id', me)
     .eq('reported_id', userId)
     .eq('estado', 'pendiente')
+    // Sólo el reporte de la CUENTA: desde la 191 puede haber además uno
+    // pendiente por cada club, foto o partido de esa persona, y esos no
+    // impiden reportarla a ella.
+    .is('elemento', null)
     .maybeSingle();
 
   if (error) {

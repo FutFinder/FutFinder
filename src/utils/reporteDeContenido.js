@@ -8,8 +8,7 @@
 export const TIPOS_DE_CONTENIDO = ['club', 'foto_club', 'partido'];
 
 const FALLO = 'No pudimos enviar el reporte. Intenta de nuevo.';
-export const YA_HAY_UNO =
-  'Ya tienes un reporte en revisión contra quien publicó esto. Cuando se resuelva podrás enviar otro.';
+export const YA_HAY_UNO = 'Ya reportaste esto y sigue en revisión.';
 
 /**
  * La respuesta de `reportar_contenido` → `{ error }`. Un `ok: false` del
@@ -24,10 +23,10 @@ export function interpretarReporteDeContenido({ data, error }) {
   }
   if (data && data.ok === true) return { error: null };
   if (data && data.ok === false) {
-    // El servidor admite un solo reporte pendiente por persona reportada, y
-    // un club, una foto o un partido se reportan contra quien lo publicó: si
-    // ya hay uno pendiente contra esa persona (por otra cosa), la RPC dice
-    // «sobre esta cuenta», que reportando un club no se entiende.
+    // Desde la 191 hay un reporte pendiente por elemento: el repetido es
+    // ESTE mismo club, foto o partido. Antes de la 191 la RPC decía «sobre
+    // esta cuenta», que reportando un club no se entiende; las dos frases
+    // terminan en «sigue en revisión».
     if (/sigue en revisión/.test(data.reason || '')) {
       return { error: { message: YA_HAY_UNO } };
     }
