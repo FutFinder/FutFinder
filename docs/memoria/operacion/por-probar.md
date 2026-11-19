@@ -13,6 +13,18 @@ cómo**. Cuando un ítem queda probado, se borra de acá y el resultado se anota
 en la nota del dominio (o en [Pruebas](pruebas.md)). Lo que es trabajo por
 hacer —no por probar— vive en [Pendientes](pendientes.md).
 
+## Recorrido del 2026-11-18 (lo que se pudo probar sin cuentas)
+
+Contra producción, sin crear ni borrar nada: los 14 cron de `futfinder-*` terminan en `succeeded`, incluido `futfinder-push-receipts`; `eliminar-cuenta`, `pagar-reserva` y `send-push` responden 401 sin sesión, y `flow-confirmacion` 503 «sin configurar», porque Flow todavía no tiene claves. En www.futfinder.cl (despliegue `559644c`): `/eliminar-cuenta` abre sin sesión; Términos y Privacidad muestran FutFinder SpA, el RUT y el domicilio; `/ui-reservas` ya no existe en producción, sino que vuelve al inicio; el registro rechaza 13 años («Debes tener entre 14 y 99 años») y deja pasar 14 recién cumplidos (probado con el correo vacío, sin enviar nada).
+
+**Encontrado en el recorrido:**
+- La **migración 190 no está aplicada y `conciliar-pagos` no está desplegada** (responde 404). Ya figuraba en [Pendientes](pendientes.md) como «sin aplicar ni desplegar»; hay que hacerlo antes de abrir pagos.
+- `/.well-known/apple-app-site-association` y `assetlinks.json` devuelven la página web y no el archivo: esperan el Team ID y la huella SHA-256.
+- Hay **2 reportes pendientes con más de 24 horas**: resolverlos desde Ajustes → Moderación sirve además como la prueba 6i.
+- `aceptaciones_legales` está vacía: no hay cuentas nuevas desde la 181. Se prueba con la primera cuenta que se cree.
+- En el registro, «Continuar con Google» y «Continuar con Apple» sólo dicen «Muy pronto». Apple suele rechazar funciones de relleno (guía 2.1).
+- La bandera `asientos_por_nombre` vence el 2026-12-30.
+
 ## Lo que hace falta para probar casi todo
 
 - **Un build nativo** (EAS, Android e iOS) con lo que hay en `main`: íconos,
@@ -182,7 +194,7 @@ carga de saldo.
 
 **Qué sí se comprobó:** arnés de la 192 contra producción revertido (3/3: trae lo propio de cada tabla, nada de otra persona, sin cuenta no); pruebas de Node de los textos legales.
 
-**Qué falta:** con una cuenta real que tenga reservas, mensajes y un ticket, tocar «Exportar mis datos» en www.futfinder.cl y en el teléfono y revisar el archivo (que traiga las secciones nuevas y que no se corte al compartir un JSON grande en Android). Mirar en Términos y en Privacidad que se lean bien la razón social, el RUT y el domicilio.
+**Qué falta:** con una cuenta real que tenga reservas, mensajes y un ticket, tocar «Exportar mis datos» en www.futfinder.cl y en el teléfono y revisar el archivo (que traiga las secciones nuevas y que no se corte al compartir un JSON grande en Android). *Probado el 2026-11-18:* Términos y Privacidad en www.futfinder.cl muestran la razón social, el RUT y el domicilio.
 
 ## 6h. Comprobantes de push (migración 193, 2026-11-18)
 
@@ -200,7 +212,7 @@ carga de saldo.
 
 **Qué sí se comprobó:** `/eliminar-cuenta` se abre sin sesión en la web local y muestra el texto completo; la base borra en cascada todo lo que la página dice que se borra (perfil, fotos, teléfono, amistades, bloqueos, mensajes, avisos, inscripciones, tokens de push); pruebas de Node (ruta pública, los tres impedimentos de la 176, el nombre del botón).
 
-**Qué falta:** abrir `https://www.futfinder.cl/eliminar-cuenta` después del despliegue, y que el aviso de moderación abra Términos (ya no el paso del registro).
+**Qué falta:** que el aviso de moderación abra Términos (ya no el paso del registro). *Probado el 2026-11-18:* `https://www.futfinder.cl/eliminar-cuenta` abre sin sesión con el despliegue `559644c`.
 
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
@@ -222,7 +234,7 @@ carga de saldo.
 - **Actualizaciones por aire** (`expo-updates`, `runtimeVersion` por `fingerprint`, canales en `eas.json`) y **sólo teléfono** (`supportsTablet: false`). *Comprobado:* nada más que lint y pruebas. *Falta:* un build de producción que reciba una actualización publicada con `eas update --channel production`.
 - **Hoja de compartir:** el enlace sale de `utils/direccionPublica.js` (`https://www.futfinder.cl`) y los botones de WhatsApp y otros ya no preguntan `canOpenURL` antes de abrir. *Comprobado:* pruebas de Node; `www.futfinder.cl/p/<id>` responde 200. *Falta:* en un teléfono, cada botón de la hoja abre su app (o cae a compartir si no está).
 - **185 aplicada** (2026-11-18; ver [Pendientes](pendientes.md)). *Falta:* en la web, rechazar y cancelar un desafío entre clubes y publicar el partido de un desafío aceptado (enlazarlo pasa ahora por el chequeo nuevo).
-- **186 aplicada** (2026-11-18). *Falta:* en la web, registrarse con 13 años (el formulario lo rechaza) y con 14; y una cuenta vieja de 12 o 13 guardando su perfil.
+- **186 aplicada** (2026-11-18). *Probado el 2026-11-18 en www.futfinder.cl:* 13 años se rechaza y 14 pasa. *Falta:* registrarse de verdad con 14, y una cuenta vieja de 12 o 13 guardando su perfil.
 
 ## Notas relacionadas
 

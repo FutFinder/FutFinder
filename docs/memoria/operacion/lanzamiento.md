@@ -12,7 +12,8 @@ El detalle de los cuatro primeros está en [Pendientes](pendientes.md), «Operac
 4. **Supabase → Authentication**: TOTP habilitado, duración del OTP, JWT y rotación.
 5. **Enlaces universales**: el Team ID de Apple y la huella SHA-256 de la firma de Android ([Navegación](../arquitectura/navegacion.md)).
 6. **Correo con dominio propio en Resend** y `SOLICITUDES_EMAIL_FROM`: con el remitente de prueba los correos sólo le llegan al dueño de la cuenta de Resend ([Despliegue](../arquitectura/despliegue-y-entornos.md)).
-7. **Flow en producción**, al final y sólo después de probar el sandbox (paso 2): las claves de producción y `FLOW_AMBIENTE=produccion` en las funciones de pago.
+7. **Conciliar pagos**: aplicar la migración 190 y desplegar `conciliar-pagos` con su secreto ([Pendientes](pendientes.md)). Está construida y probada, pero al 2026-11-18 no está en producción.
+8. **Flow en producción**, al final y sólo después de probar el sandbox (paso 2): las claves de producción y `FLOW_AMBIENTE=produccion` en las funciones de pago.
 
 ## 2. Probar todo
 
@@ -23,7 +24,7 @@ Todo lo de [Por probar](por-probar.md), con un build `preview` en un iPhone y un
 **Las dos tiendas:**
 - Política de privacidad: `https://www.futfinder.cl/privacidad`. Términos: `https://www.futfinder.cl/terminos`.
 - **Una cuenta de prueba para quien revisa**, con contenido (un partido, un club, un chat) y sin dos pasos. FutFinder no se puede usar sin iniciar sesión, y sin esta cuenta Apple rechaza por la guía 2.1. El correo y la contraseña van en el formulario de la tienda, nunca en el repositorio.
-- No hace falta «Iniciar sesión con Apple»: la app no ofrece ningún inicio con terceros (sólo correo).
+- No hace falta «Iniciar sesión con Apple»: la app no ofrece ningún inicio con terceros (sólo correo). **Pero el registro muestra «Continuar con Google» y «Continuar con Apple» que sólo dicen «Muy pronto»**: hay que esconderlos antes de enviar, porque Apple rechaza funciones de relleno (guía 2.1).
 
 **App Store Connect:**
 - Etiquetas de privacidad: correo, teléfono, ubicación aproximada, fotos y mensajes (contenido del usuario), identificador de usuario y de dispositivo (token de push), compras (reservas) y diagnóstico (Sentry). Nada se usa para rastrear ni para publicidad.

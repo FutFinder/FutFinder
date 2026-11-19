@@ -43,7 +43,7 @@ select p.id, p.monto, p.orden_comercio, p.pagado_at, r.id as reserva_id, r.fecha
  order by p.pagado_at;
 ```
 
-**Pagos que se quedaron en `pendiente` (desde la migración 190).** La conciliación (`conciliar-pagos`, cada 10 minutos) le pregunta a Flow por cada pendiente con más de 20 minutos y lo resuelve; uno que Flow sigue informando como pendiente no se cierra a la fuerza. Esta consulta **tendría que venir vacía**: si trae filas, la conciliación no está corriendo (falta el secreto, la función no está desplegada o Flow no contesta) o Flow tiene un cobro abierto hace más de un día, y hay que mirarlo en el panel de Flow.
+**Pagos que se quedaron en `pendiente` (desde la migración 190; al 2026-11-18 todavía sin aplicar ni desplegar, así que esto vale recién cuando lo estén).** La conciliación (`conciliar-pagos`, cada 10 minutos) le pregunta a Flow por cada pendiente con más de 20 minutos y lo resuelve; uno que Flow sigue informando como pendiente no se cierra a la fuerza. Esta consulta **tendría que venir vacía**: si trae filas, la conciliación no está corriendo (falta el secreto, la función no está desplegada o Flow no contesta) o Flow tiene un cobro abierto hace más de un día, y hay que mirarlo en el panel de Flow.
 
 ```sql
 select p.id, p.monto, p.orden_comercio, p.created_at, p.referencia_externa is not null as tiene_enlace
