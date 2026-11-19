@@ -22,7 +22,7 @@ Contra producción, sin crear ni borrar nada: los 14 cron de `futfinder-*` termi
 - `/.well-known/apple-app-site-association` y `assetlinks.json` devuelven la página web y no el archivo: esperan el Team ID y la huella SHA-256.
 - Hay **2 reportes pendientes con más de 24 horas**: resolverlos desde Ajustes → Moderación sirve además como la prueba 6i.
 - `aceptaciones_legales` está vacía: no hay cuentas nuevas desde la 181. Se prueba con la primera cuenta que se cree.
-- En el registro, «Continuar con Google» y «Continuar con Apple» sólo decían «Muy pronto»: **quitados el mismo día** y comprobado en la web local. También se quitaron «Cómo llegar» (ficha del recinto) y la fila «Ñuñoa, Santiago · cambiar» (Reservas). *Falta:* con sesión, mirar que Reservas y la ficha del recinto se vean bien sin esas piezas.
+- En el registro, «Continuar con Google» y «Continuar con Apple» sólo decían «Muy pronto»: **quitados el mismo día** y comprobado en la web local. También se quitó la fila «Ñuñoa, Santiago · cambiar» (Reservas), y «Cómo llegar» de la ficha del recinto ahora abre Apple Maps en iPhone y Google Maps en Android y la web. *Comprobado:* 6 pruebas de `enlaceComoLlegar`, y los dos enlaces armados para MaiClub abren la ruta al recinto en Google Maps y en Mapas de Apple (web). *Falta:* con sesión, ver Reservas y la ficha del recinto, y tocar «Cómo llegar» en un iPhone (abre la app Mapas) y en un Android (abre Google Maps).
 - La bandera `asientos_por_nombre` vence el 2026-12-30.
 
 ## Lo que hace falta para probar casi todo

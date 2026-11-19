@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions,
+  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions, Linking, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle, MapPin } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { Badge, IconButton, NoticeCard, StickyFooter, Button, Foto } from '../components/reservas/ui';
@@ -11,6 +11,7 @@ import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { PROPORCION_PORTADA } from '../utils/encuadre';
+import { enlaceComoLlegar } from '../utils/comoLlegar';
 
 /** Pantalla 5 del handoff `Reservas.dc.html`: perfil de un complejo. */
 export default function ComplejoDetailScreen({ navigation, route }) {
@@ -76,6 +77,7 @@ export default function ComplejoDetailScreen({ navigation, route }) {
   }
 
   const hayCanchas = complejo.canchas.length > 0;
+  const mapa = enlaceComoLlegar(complejo, Platform.OS);
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -183,8 +185,19 @@ export default function ComplejoDetailScreen({ navigation, route }) {
             </View>
             <View style={styles.direccionRow}>
               <Text style={styles.direccionText} numberOfLines={3}>{complejo.direccion}</Text>
-              {/* «Cómo llegar» sólo decía «Muy pronto» y se quitó el 2026-11-18
-                  (Apple, guía 2.1). */}
+              {/* Apple Maps en iPhone, Google Maps en Android y la web
+                  (`utils/comoLlegar.js`). Sin punto ni dirección no se dibuja. */}
+              {mapa ? (
+                <Pressable
+                  onPress={() => Linking.openURL(mapa).catch(() => {})}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Cómo llegar a ${complejo.nombre}`}
+                  style={({ pressed }) => [styles.comoLlegarBtn, pressed && { opacity: 0.85 }]}
+                >
+                  <MapPin color={C.textPrimary} size={13} strokeWidth={2} />
+                  <Text style={styles.comoLlegarText}>Cómo llegar</Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
 
@@ -324,6 +337,11 @@ const styles = StyleSheet.create({
   },
   direccionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, backgroundColor: C.surface },
   direccionText: { flex: 1, fontFamily: F.medium, color: C.textSecondary, fontSize: 12.5 },
+  comoLlegarBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 12,
+    borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surfaceAlt,
+  },
+  comoLlegarText: { fontFamily: F.bold, color: C.textPrimary, fontSize: 12.5 },
 
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   desdeLabel: { fontFamily: F.semiBold, color: C.textMuted, fontSize: 10.5, letterSpacing: 0.6 },
