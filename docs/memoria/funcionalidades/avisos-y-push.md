@@ -56,6 +56,10 @@ Dos cosas que hay que saber para no romperlo:
 
 El token **sigue pasando** por `net.http_request_queue` mientras `pg_net` procesa la petición, y esa tabla es legible por PUBLIC sin que se pueda revocar. Lo que la 117 quita es la copia estática del catálogo, y lo que la 118 quita es el premio: lo que viaja ahí es la misma clave que va dentro del bundle de la app. Hoy nada de `net` es alcanzable desde fuera: PostgREST expone sólo `public` y `graphql_public` —comprobado pidiéndoselo— y la publicación de Realtime no lleva ninguna tabla de `net`.
 
+## Comprobantes de entrega y tokens muertos (migración 193, 2026-11-18)
+
+`check_push_receipts()` (cron `futfinder-push-receipts`, cada 15 minutos) nunca había funcionado: pedía los comprobantes a Expo con `net.http_post` y leía la respuesta en la misma transacción, cuando pg_net recién manda la petición al terminarla. No se notó porque no había tickets (un solo token en toda la base). Desde la 193 va en dos pasos: cada corrida lee las respuestas que pg_net guardó de la consulta anterior (`net._http_response`), marca `ok` / `error` y borra el token si Expo dice `DeviceNotRegistered`, y después pide lo pendiente que no esté ya pedido, anotándolo en `push_receipt_consultas` (sin políticas: sólo el servidor). Una consulta sin respuesta en 30 minutos se vuelve a pedir; los tickets de más de dos días se cierran. Si existe en Vault `expo_access_token`, la consulta lo manda. Arnés 5/5 contra producción revertido, con la respuesta de Expo simulada.
+
 ## Notas relacionadas
 
 - [Configuración](configuracion.md)

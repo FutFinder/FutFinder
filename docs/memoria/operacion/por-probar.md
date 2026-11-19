@@ -184,6 +184,12 @@ carga de saldo.
 
 **Qué falta:** con una cuenta real que tenga reservas, mensajes y un ticket, tocar «Exportar mis datos» en www.futfinder.cl y en el teléfono y revisar el archivo (que traiga las secciones nuevas y que no se corte al compartir un JSON grande en Android). Mirar en Términos y en Privacidad que se lean bien la razón social, el RUT y el domicilio.
 
+## 6h. Comprobantes de push (migración 193, 2026-11-18)
+
+**Qué sí se comprobó:** arnés 5/5 contra producción revertido (pide, no repite, procesa la respuesta, borra el token muerto y no el vivo), con la respuesta de Expo simulada en `net._http_response`.
+
+**Qué falta:** con el build y un teléfono real, mandar un push y a los 15–30 minutos ver en `push_tickets` el `receipt_status = 'ok'`; después desinstalar la app, mandar otro y ver que el token desaparece de `push_tokens`.
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):
