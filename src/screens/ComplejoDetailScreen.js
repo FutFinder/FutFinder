@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, MapPin, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { Badge, IconButton, NoticeCard, StickyFooter, Button, Foto } from '../components/reservas/ui';
@@ -17,7 +17,6 @@ export default function ComplejoDetailScreen({ navigation, route }) {
   const { complejoId } = route.params || {};
   const [complejo, setComplejo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,11 +26,6 @@ export default function ComplejoDetailScreen({ navigation, route }) {
   }, [complejoId]);
 
   useEffect(() => { load(); }, [load]);
-
-  const proximamente = (mensaje) => {
-    setToast(mensaje);
-    setTimeout(() => setToast(null), 2400);
-  };
 
   /**
    * Tocar «Horarios» EN UNA CANCHA va derecho a los horarios de ESA cancha.
@@ -189,21 +183,11 @@ export default function ComplejoDetailScreen({ navigation, route }) {
             </View>
             <View style={styles.direccionRow}>
               <Text style={styles.direccionText} numberOfLines={3}>{complejo.direccion}</Text>
-              <Pressable
-                onPress={() => proximamente('Muy pronto vas a poder trazar la ruta desde aquí.')}
-                style={({ pressed }) => [styles.comoLlegarBtn, pressed && { opacity: 0.85 }]}
-              >
-                <MapPin color={C.textPrimary} size={13} strokeWidth={2} />
-                <Text style={styles.comoLlegarText}>Cómo llegar</Text>
-              </Pressable>
+              {/* «Cómo llegar» sólo decía «Muy pronto» y se quitó el 2026-11-18
+                  (Apple, guía 2.1). */}
             </View>
           </View>
 
-          {toast ? (
-            <View style={{ marginTop: 14 }}>
-              <NoticeCard tone="info">{toast}</NoticeCard>
-            </View>
-          ) : null}
         </View>
       </ScrollView>
 
@@ -340,11 +324,6 @@ const styles = StyleSheet.create({
   },
   direccionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, backgroundColor: C.surface },
   direccionText: { flex: 1, fontFamily: F.medium, color: C.textSecondary, fontSize: 12.5 },
-  comoLlegarBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 12,
-    borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surfaceAlt,
-  },
-  comoLlegarText: { fontFamily: F.bold, color: C.textPrimary, fontSize: 12.5 },
 
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   desdeLabel: { fontFamily: F.semiBold, color: C.textMuted, fontSize: 10.5, letterSpacing: 0.6 },

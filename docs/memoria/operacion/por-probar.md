@@ -22,7 +22,7 @@ Contra producción, sin crear ni borrar nada: los 14 cron de `futfinder-*` termi
 - `/.well-known/apple-app-site-association` y `assetlinks.json` devuelven la página web y no el archivo: esperan el Team ID y la huella SHA-256.
 - Hay **2 reportes pendientes con más de 24 horas**: resolverlos desde Ajustes → Moderación sirve además como la prueba 6i.
 - `aceptaciones_legales` está vacía: no hay cuentas nuevas desde la 181. Se prueba con la primera cuenta que se cree.
-- En el registro, «Continuar con Google» y «Continuar con Apple» sólo decían «Muy pronto»: **quitados el mismo día** y comprobado en la web local. Quedan otros dos «Muy pronto» (ver [Lanzamiento](lanzamiento.md)).
+- En el registro, «Continuar con Google» y «Continuar con Apple» sólo decían «Muy pronto»: **quitados el mismo día** y comprobado en la web local. También se quitaron «Cómo llegar» (ficha del recinto) y la fila «Ñuñoa, Santiago · cambiar» (Reservas). *Falta:* con sesión, mirar que Reservas y la ficha del recinto se vean bien sin esas piezas.
 - La bandera `asientos_por_nombre` vence el 2026-12-30.
 
 ## Lo que hace falta para probar casi todo

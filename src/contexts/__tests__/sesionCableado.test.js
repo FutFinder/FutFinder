@@ -241,3 +241,13 @@ test('ni el registro ni el login ofrecen un inicio con terceros que no funciona'
     assert.doesNotMatch(fuente, /Continuar con (Google|Apple)|Muy pronto/, `${pantalla} volvió a mostrar un botón de relleno`);
   }
 });
+
+test('ninguna pantalla de reservas ofrece algo que sólo dice «Muy pronto»', () => {
+  // «Cómo llegar» en la ficha del recinto y «cambiar» la ubicación (que además
+  // mostraba «Ñuñoa, Santiago» a todos) se quitaron el 2026-11-18: Apple
+  // rechaza funciones de relleno (guía 2.1).
+  for (const pantalla of ['screens/ReservasScreen.js', 'screens/ComplejoDetailScreen.js']) {
+    const fuente = leer(pantalla).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '');
+    assert.doesNotMatch(fuente, /Muy pronto|proximamente\(|Ñuñoa, Santiago/, `${pantalla} volvió a mostrar algo de relleno`);
+  }
+});
