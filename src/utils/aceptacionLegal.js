@@ -68,3 +68,26 @@ export function fechaLargaAVersion(texto) {
   if (mes < 0) return null;
   return `${m[3]}-${String(mes + 1).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
 }
+
+/**
+ * ¿La persona de la sesión ya aceptó la versión vigente de los textos?
+ *
+ * Cuando `VERSION_LEGAL` sube, quien aceptó una versión anterior (o quien se
+ * registró antes de la 181 y no tiene ninguna guardada) tiene que volver a
+ * aceptar antes de seguir usando la app. `data` son sus filas de
+ * `aceptaciones_legales` (sólo las propias, por RLS).
+ *
+ *   · 'al-dia'    — tiene una versión igual o posterior a la vigente.
+ *   · 'pendiente' — no la tiene: se le pide aceptar.
+ *   · 'sin-saber' — no se pudo leer (sin conexión, base sin la 181). NO se
+ *                   bloquea a nadie por un fallo de lectura: entra a la app
+ *                   y se vuelve a preguntar la próxima vez que abra.
+ *
+ * Las versiones son `AAAA-MM-DD`, así que compararlas como texto ordena por
+ * fecha.
+ */
+export function estadoDeAceptacion({ data, error } = {}, vigente) {
+  if (error || !Array.isArray(data) || typeof vigente !== 'string') return 'sin-saber';
+  const alDia = data.some((f) => typeof f?.version === 'string' && f.version >= vigente);
+  return alDia ? 'al-dia' : 'pendiente';
+}

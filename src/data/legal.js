@@ -22,6 +22,19 @@ export const ACTUALIZADO = '18 de noviembre de 2026';
  * cada vez que cambie algo de fondo. Una prueba falla si se separan.
  */
 export const VERSION_LEGAL = '2026-11-18';
+/**
+ * Qué cambió de fondo en esta versión, en una línea cada cosa. Lo ve quien
+ * ya tenía cuenta cuando se le pide aceptar de nuevo (`TerminosActualizados`
+ * → `withTerminosVigentes`). CAMBIA ESTA LISTA CADA VEZ QUE SUBA
+ * `VERSION_LEGAL`: si no, se le muestran a la gente los cambios de otra vez.
+ */
+export const CAMBIOS_DE_ESTA_VERSION = {
+  version: '2026-11-18',
+  cambios: [
+    'Ahora dicen quién ofrece el servicio y responde por tus datos: FutFinder SpA.',
+    'La edad mínima para usar FutFinder es 14 años.',
+  ],
+};
 export const CORREO_PRIVACIDAD = 'futfindercl@gmail.com';
 
 /**

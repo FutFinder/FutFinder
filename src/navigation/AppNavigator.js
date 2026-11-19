@@ -95,6 +95,7 @@ import SolicitudRecintoScreen from '../screens/SolicitudRecintoScreen';
 import AdministradoresScreen from '../screens/AdministradoresScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
+import withTerminosVigentes from './withTerminosVigentes';
 import withErrorBoundary from './withErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -129,7 +130,10 @@ const SafeSuccessScreen = withErrorBoundary(SuccessScreen, 'Success');
 // que Welcome/Login tampoco lo hacen.
 const SafeReservasUiGalleryScreen = withErrorBoundary(ReservasUiGalleryScreen, 'ReservasUiGallery');
 
-const GuardedMainTabs = withAuthGuard(MainTabs, 'Main');
+// Quien no aceptó la versión vigente de los términos la acepta antes de
+// entrar (`withTerminosVigentes`).
+const MainTabsConTerminosVigentes = withTerminosVigentes(MainTabs);
+const GuardedMainTabs = withAuthGuard(MainTabsConTerminosVigentes, 'Main');
 const GuardedPublishMatchScreen = withAuthGuard(PublishMatchScreen, 'CreateMatch');
 const GuardedEditMatchScreen = withAuthGuard(EditMatchScreen, 'EditMatch');
 const GuardedManageMatchScreen = withAuthGuard(ManageMatchScreen, 'ManageMatch');

@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { VERSION_LEGAL } from '../data/legal';
-import { interpretarAceptacion, interpretarAceptaciones } from '../utils/aceptacionLegal';
+import { interpretarAceptacion, interpretarAceptaciones, estadoDeAceptacion } from '../utils/aceptacionLegal';
 
 /**
  * Deja en el servidor qué versión de los términos y la política aceptó la
@@ -33,5 +33,24 @@ export async function misAceptacionesLegales() {
     return interpretarAceptaciones(respuesta);
   } catch (e) {
     return interpretarAceptaciones({ data: null, error: { message: e?.message || 'fetch' } });
+  }
+}
+
+/**
+ * ¿La persona de la sesión ya aceptó la versión vigente (`VERSION_LEGAL`)?
+ * Devuelve 'al-dia', 'pendiente' o 'sin-saber'; ver `estadoDeAceptacion`.
+ * Nunca lanza.
+ */
+export async function estadoDeMiAceptacion() {
+  if (!isSupabaseConfigured) return 'sin-saber';
+  try {
+    const respuesta = await supabase
+      .from('aceptaciones_legales')
+      .select('version')
+      .gte('version', VERSION_LEGAL)
+      .limit(1);
+    return estadoDeAceptacion(respuesta, VERSION_LEGAL);
+  } catch {
+    return 'sin-saber';
   }
 }

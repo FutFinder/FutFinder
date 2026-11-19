@@ -96,3 +96,35 @@ test('la política dice que se guarda la aceptación y que entra en el export', 
   assert.match(legal, /la versión de los términos y de esta política que aceptaste/);
   assert.match(legal, /las versiones de los términos que aceptaste/);
 });
+
+const { estadoDeAceptacion } = require('../aceptacionLegal.js');
+
+test('quien no aceptó la versión vigente tiene que aceptarla', () => {
+  assert.equal(estadoDeAceptacion({ data: [], error: null }, '2026-11-18'), 'pendiente');
+  assert.equal(estadoDeAceptacion({ data: [{ version: '2026-11-14' }], error: null }, '2026-11-18'), 'pendiente');
+});
+
+test('quien ya aceptó la vigente, o una posterior, sigue de largo', () => {
+  assert.equal(estadoDeAceptacion({ data: [{ version: '2026-11-14' }, { version: '2026-11-18' }], error: null }, '2026-11-18'), 'al-dia');
+  assert.equal(estadoDeAceptacion({ data: [{ version: '2027-01-05' }], error: null }, '2026-11-18'), 'al-dia');
+});
+
+test('un fallo de lectura no bloquea a nadie', () => {
+  assert.equal(estadoDeAceptacion({ data: null, error: { message: 'Failed to fetch' } }, '2026-11-18'), 'sin-saber');
+  assert.equal(estadoDeAceptacion({ data: null, error: { code: 'PGRST205' } }, '2026-11-18'), 'sin-saber');
+  assert.equal(estadoDeAceptacion({ data: null, error: null }, '2026-11-18'), 'sin-saber');
+  assert.equal(estadoDeAceptacion(undefined, '2026-11-18'), 'sin-saber');
+});
+
+test('la pantalla principal pasa por la comprobación de términos vigentes', () => {
+  const nav = fs.readFileSync(path.join(RAIZ, 'src/navigation/AppNavigator.js'), 'utf8');
+  assert.match(nav, /const MainTabsConTerminosVigentes = withTerminosVigentes\(MainTabs\);/);
+  assert.match(nav, /withAuthGuard\(MainTabsConTerminosVigentes, 'Main'\)/);
+});
+
+test('la lista de cambios que se muestra es la de la versión vigente', () => {
+  const { CAMBIOS_DE_ESTA_VERSION } = require('../../data/legal.js');
+  assert.equal(CAMBIOS_DE_ESTA_VERSION.version, VERSION_LEGAL,
+    'subiste VERSION_LEGAL: actualiza también CAMBIOS_DE_ESTA_VERSION');
+  assert.ok(CAMBIOS_DE_ESTA_VERSION.cambios.length > 0);
+});
