@@ -19,6 +19,10 @@ Lo que sigue abierto de ese trabajo:
 - **Términos.** Las cuentas que ya existían no tienen ninguna aceptación registrada: **falta decidir (Vicente) si se les pide aceptar de nuevo**. La app web ya la registra, pero un teléfono sólo lo hará con un build nuevo. «Exportar mis datos» ya incluye las aceptaciones (`terminos_aceptados`) y la política de privacidad lo dice.
 - **Pausa de pagos.** Cómo se enciende está en el encabezado de `179_pausa_de_pagos.sql`. Sin probar de punta a punta: no hay Flow conectado (ver [Por probar](por-probar.md)).
 
+## 2026-11-19 — el CI de arneses estuvo rojo desde la 192 sin que nadie lo viera
+
+`arneses.yml` falló en cada push desde la 192 (2026-11-19, 01:15) hasta esta tarde: tres arneses. **192:** tomaba «la primera cancha que haya», y la base que arma el CI desde cero no tiene ninguna; ahora siembra su recinto y su cancha. **170 E2:** la 194 creó tres llaves foráneas sin índice (`user_reports.moderado_por`, `moderacion_suspensiones.reporte_id` y `.creada_por`); la **migración 198** los crea (escrita, **sin aplicar**). **183 caso 6:** afirmaba que los clubes seguían en 7 / 11, lo contrario de lo que pidió Vicente con la 195; ahora afirma que aceptan Fútbol 5. En local, 159/159 con la 197 y la 198. **Lección:** el correo de GitHub del fallo de arneses llega a una sola persona; mirar `gh run list --workflow "Arneses SQL"` después de cada migración.
+
 ## Diseño propuesto: conciliar los pagos que quedaron `pendiente` (2026-11-14)
 
 **Construido el 2026-11-18, sin aplicar ni desplegar** (migración 190, Edge Function `conciliar-pagos`, lógica en `_shared/conciliarPagos.ts`). Probado: 14 pruebas de Deno, arnés `190_…_test.sql` 11/11 en local y contra producción con rollback, y de punta a punta en local con Flow simulado (`node scripts/conciliar-pagos-local/probar.mjs`: ocho casos, segunda pasada idempotente). Para encenderlo, ver el encabezado de la 190 (un secreto en la función y el mismo en Vault). Las tres decisiones de abajo se tomaron con lo propuesto: 20 minutos, sólo la revisión diaria, y ningún cierre a la fuerza.

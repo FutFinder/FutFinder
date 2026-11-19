@@ -43,7 +43,14 @@ begin
     from unnest(array[u1, u2]) u on conflict (id) do nothing;
 
   insert into public.perfil_telefonos (user_id, telefono) values (u1, '+56911111111'), (u2, '+56922222222');
-  select id into v_cancha from public.canchas_reservables limit 1;
+  -- Su propia cancha: en una base armada desde cero (el CI de arneses) no
+  -- hay ninguna, y «la primera que haya» dejaba la reserva sin cancha.
+  insert into public.complejos (nombre, comuna, latitud, longitud, publicado)
+  values ('Recinto arnés 192', 'Ñuñoa', -33.45, -70.60, true)
+  returning id into v_cancha;
+  insert into public.canchas_reservables (complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
+  values (v_cancha, 'Cancha arnés 192', 'futbol_7', 20000, 60, true)
+  returning id into v_cancha;
   insert into public.reservas (cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, modalidad, medio_pago, precio_cancha, estado)
   values (v_cancha, u1, current_date + 250, '05:19', '06:19', 20000, 'completa', 'tarjeta', 20000, 'armando') returning id into v_res;
   insert into public.pagos (user_id, reserva_id, monto, proveedor, orden_comercio) values (u1, v_res, 20000, 'flow', 'R192-U1'), (u2, v_res, 1000, 'flow', 'R192-U2');

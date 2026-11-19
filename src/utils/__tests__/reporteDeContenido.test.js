@@ -59,3 +59,27 @@ test('la 191 hace única la terna reportante, reportado y elemento', () => {
   const sql = leer('supabase/migrations/191_un_reporte_pendiente_por_elemento.sql');
   assert.match(sql, /\(reporter_id, reported_id, \(coalesce\(elemento, ''\)\)\)/);
 });
+
+// La hoja se quedaba abierta después de «Ya reportaste esto y sigue en
+// revisión» (probado en producción el 2026-11-19): se podía volver a tocar
+// «Enviar» para nada. Un rechazo DEFINITIVO del servidor cierra la hoja; uno
+// de transporte la deja abierta para reintentar.
+test('un rechazo del servidor cierra la hoja; un fallo de red no', () => {
+  const { cierraLaHoja } = require('../reporteDeContenido.js');
+  const repetido = interpretarReporteDeContenido({ data: { ok: false, reason: 'Ya reportaste esto y sigue en revisión.' }, error: null });
+  const propio = interpretarReporteDeContenido({ data: { ok: false, reason: 'No puedes reportar tu propio contenido.' }, error: null });
+  const red = interpretarReporteDeContenido({ data: null, error: { message: 'Failed to fetch' } });
+  assert.equal(cierraLaHoja(null), true);
+  assert.equal(cierraLaHoja(repetido.error), true);
+  assert.equal(cierraLaHoja(propio.error), true);
+  assert.equal(cierraLaHoja(red.error), false);
+  assert.equal(cierraLaHoja({ message: 'Selecciona un motivo' }), false);
+});
+
+test('la hoja cierra con cierraLaHoja, y reportar una cuenta repetida también es definitivo', () => {
+  assert.match(leer('src/components/player/ReportPlayerSheet.js'), /cierraLaHoja\(error\)/);
+  const svc = leer('src/services/reports.js');
+  const ini = svc.indexOf("if (error.code === '23505')");
+  assert.ok(ini > 0);
+  assert.match(svc.slice(ini, ini + 400), /definitivo: true/);
+});

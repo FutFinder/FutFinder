@@ -19,6 +19,7 @@ import {
   alfa,
 } from '../../theme/colors';
 import { MOTIVOS_REPORTE } from '../../services/reports';
+import { cierraLaHoja } from '../../utils/reporteDeContenido';
 
 const MAX_DESC = 600;
 
@@ -69,11 +70,14 @@ export default function ReportPlayerSheet({
     setEnviando(true);
     const { error } = (await onSubmit?.({ motivo, descripcion })) || {};
     setEnviando(false);
-    // La pantalla muestra el resultado; aquí solo cerramos si salió bien.
-    if (!error) {
+    // La pantalla muestra el resultado con su Banner. La hoja se limpia y se
+    // cierra si salió bien o si el servidor lo rechazó para siempre («ya
+    // reportaste esto»); con un fallo de red queda abierta para reintentar.
+    if (cierraLaHoja(error)) {
       setPaso('form');
       setMotivo(null);
       setDescripcion('');
+      if (error) onClose?.();
     }
   };
 

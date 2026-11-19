@@ -28,9 +28,21 @@ export function interpretarReporteDeContenido({ data, error }) {
     // esta cuenta», que reportando un club no se entiende; las dos frases
     // terminan en «sigue en revisión».
     if (/sigue en revisión/.test(data.reason || '')) {
-      return { error: { message: YA_HAY_UNO } };
+      return { error: { message: YA_HAY_UNO, definitivo: true } };
     }
-    return { error: { message: data.reason || FALLO } };
+    // El servidor contestó y dijo que no (lo propio, lo que ya no existe):
+    // reintentar da lo mismo.
+    return { error: { message: data.reason || FALLO, definitivo: true } };
   }
   return { error: { message: FALLO } };
+}
+
+/**
+ * ¿Se cierra la hoja de reporte con este resultado? Sí si salió bien o si
+ * el servidor lo rechazó para siempre (`definitivo`: ya hay uno pendiente,
+ * es propio, ya no existe). No si falló la red o la validación local: ahí
+ * la persona puede corregir o reintentar sin volver a llenar el motivo.
+ */
+export function cierraLaHoja(error) {
+  return !error || error.definitivo === true;
 }

@@ -99,7 +99,7 @@ export async function reportUser({ reportedId, motivo, descripcion, elemento }) 
     if (error.code === '23505') {
       return {
         data: null,
-        error: { message: 'Ya enviaste un reporte sobre esta cuenta y sigue en revisión.' },
+        error: { message: 'Ya enviaste un reporte sobre esta cuenta y sigue en revisión.', definitivo: true },
       };
     }
     // La tabla no existe todavía (migración 31 sin aplicar). No es un fallo

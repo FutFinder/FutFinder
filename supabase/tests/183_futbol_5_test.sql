@@ -85,14 +85,16 @@ begin
 end $$;
 reset role;
 
--- 6. El resto del vocabulario no se abrió: los clubes siguen en 7 / 11.
+-- 6. Los clubes NO quedaron fuera de Fútbol 5: la 183 los dejó en 7 / 11 a
+--    propósito y la 195 (2026-11-19, pedido de Vicente) los abrió. Este caso
+--    decía lo contrario y puso rojo el CI de arneses al llegar la 195.
 do $$
 begin
     if not exists (
         select 1 from pg_constraint
          where conname = 'clubs_modalidad_check'
-           and pg_get_constraintdef(oid) not like '%futbol5%'
-    ) then raise exception 'FALLÓ 6: clubs.modalidad cambió o no existe'; end if;
+           and pg_get_constraintdef(oid) like '%futbol5%'
+    ) then raise exception 'FALLÓ 6: clubs.modalidad no acepta Fútbol 5 (migración 195)'; end if;
 end $$;
 
 select 'OK 183: 6 casos' as resultado;
