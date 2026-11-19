@@ -64,6 +64,7 @@ import { describeAuthError } from '../services/authPolicy';
 import { buildMyDataExport } from '../services/dataExport';
 import useConfirmacion from '../components/useConfirmacion';
 import { forgetRememberedAccount } from '../utils/rememberedAccount';
+import { descargarArchivo, nombreArchivoExport } from '../utils/descargaWeb';
 
 
 // ── Custom slider (no deps externos) ─────────────────────────────
@@ -570,11 +571,13 @@ export default function SettingsScreen({ navigation }) {
     }
     const json = JSON.stringify(data, null, 2);
     if (Platform.OS === 'web') {
-      try {
-        await navigator.clipboard.writeText(json);
-        showBanner('success', 'Datos copiados', 'Pégalos en un archivo de texto para guardarlos.');
-      } catch {
-        showBanner('error', 'No se pudo copiar', 'Tu navegador no permitió copiar al portapapeles.');
+      // Un archivo .json, no el portapapeles: Safari no deja copiar después
+      // de esperar al servidor (ver utils/descargaWeb.js).
+      const nombre = nombreArchivoExport();
+      if (descargarArchivo(json, nombre)) {
+        showBanner('success', 'Descargamos tus datos', `Quedaron en el archivo ${nombre}, en tus descargas.`);
+      } else {
+        showBanner('error', 'No se pudo descargar', 'Inténtalo de nuevo en unos segundos.');
       }
       return;
     }

@@ -42,7 +42,7 @@ Dos cuentas desechables creadas por Johan en la web: A (`hilial`) en www.futfind
 **Encontrado y corregido:** la dirección del partido quedó «… Santiago Metropolitan Region, Chile», en inglés: el `retrieve` de Mapbox no pedía `language=es`. Arreglado en `LocationAutocomplete.js` (comprobado contra Mapbox real: con el parámetro devuelve «Región Metropolitana de Santiago»), con una prueba que exige español en cada llamada a Mapbox y Nominatim. Los partidos ya publicados conservan su dirección como quedó.
 
 **Encontrado, sin corregir:**
-- **«Exportar mis datos» en la web dijo «No se pudo copiar: tu navegador no permitió copiar al portapapeles».** El panel del navegador estaba oculto, lo que basta para que falle; pero copiar después de esperar la red también falla en Safari. La web debería descargar un archivo `.json`.
+- **«Exportar mis datos» en la web dijo «No se pudo copiar: tu navegador no permitió copiar al portapapeles».** Corregido el mismo día: la web ahora descarga `futfinder-mis-datos-AAAA-MM-DD.json` (`utils/descargaWeb.js`).
 - **Un reporte desaparece si se borra la cuenta reportada** (cascada de `user_reports`). Quien publica algo grave puede borrar su cuenta y con eso el rastro del reporte.
 - Menores: después de las 20:00 publicar abre con «Hoy 20:00» ya vencido (la validación lo frena); un chat abierto por enlace dice «Chat» en vez del nombre de la persona; en la web, Enter agrega un salto de línea en vez de enviar; a quien tiene abierta la conversación igual le sale el aviso flotante del mensaje nuevo.
 
