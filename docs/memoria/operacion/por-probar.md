@@ -205,13 +205,17 @@ carga de saldo.
 
 **Qué sí se comprobó:** en la web local con cuentas `*_v188`: la marca y el aviso de bloqueado en la hoja y en el partido completo; volver desde «Mi perfil» regresa a Integrantes; invitar → al invitado le llega el aviso, Aceptar lo deja como jugador y al admin le llega «aceptó tu invitación». Arnés de la 188 5/5 con control negativo.
 
-**Qué falta:** la 188 y `send-push` v13 ya están en producción (2026-11-18): falta invitar a alguien en www.futfinder.cl y ver que le llegue el push al teléfono; ver la barra de «Mi perfil» con flecha a 375 px.
+*Probado en producción el 2026-11-19* (www.futfinder.cl y futfinder.vercel.app, dos sesiones a la vez, a 375 px): «Mi perfil» desde Integrantes trae la flecha y vuelve; invitar a SixSiete → al invitado le llega el aviso con Aceptar y Rechazar, y Rechazar deja «Invitación rechazada» sin salir de Avisos (`status = rejected`); con el organizador bloqueado, el partido muestra «Bloqueado» junto al nombre y el aviso «Jugador bloqueado … está en este partido» (después se desbloqueó).
+
+**Qué falta:** que el push de la invitación llegue al teléfono (necesita el build).
 
 ## 6f. Reportar club, foto de club y partido (cliente de la 186, 2026-11-18)
 
 **Qué sí se comprobó:** en la web local, con una cuenta que no es del club ni organiza el partido: la bandera aparece, la hoja de dos pasos envía, y el reporte del partido queda en `user_reports` contra el organizador con `elemento = partido:<id>`; el del club, «Reporte enviado»; la foto, desde el visor, con el aviso claro cuando ya hay uno pendiente contra la misma persona.
 
-**Qué falta:** probarlo en www.futfinder.cl y en el teléfono (el visor de fotos y la bandera del partido a 375 px).
+*Probado en producción el 2026-11-19* a 375 px: reportar un club ajeno → «Reporte enviado»; el mismo club otra vez → «Ya reportaste esto y sigue en revisión»; un partido del mismo responsable → «Reporte enviado» (la 191). Los dos se descartaron después desde Moderación.
+
+**Qué falta:** la foto de club en producción (ningún club ajeno tenía fotos) y todo en el teléfono.
 
 ## 6g. Exportar mis datos y datos de la empresa (migración 192, 2026-11-18)
 
@@ -229,7 +233,9 @@ carga de saldo.
 
 **Qué sí se comprobó:** arnés 12/12 contra producción revertido (sólo el padrón resuelve, la cola trae los datos nuevos, quitar contenido borra la foto y avisa, suspender cierra los otros reportes y bloquea mensajes y fotos con la fecha, reportar sigue permitido, descartar no avisa, no se resuelve dos veces, días validados, tabla cerrada al cliente); pruebas de Node de las decisiones, los textos y el destino del aviso.
 
-**Qué falta:** con la sesión de quien modera, abrir Ajustes → Moderación y ver una fila de reporte con descripción, reportado y previos; con una cuenta de prueba reportada por otra, probar Advertir, Quitar contenido (una foto de club) y Suspender 7 días, y ver el aviso «moderacion» en la bandeja y como push (al tocarlo abre Términos). Con la cuenta suspendida, intentar escribir en un chat y subir una foto: tiene que salir «Tu cuenta está suspendida hasta el …». Después levantar la suspensión con el `update` de [Revisión diaria](revision-diaria.md).
+*Probado en producción el 2026-11-19:* con la sesión de moderación, los dos reportes de prueba aparecen con motivo, descripción, reportado y «Tiene otro reporte»; Descartar pide confirmar, los cierra (`estado = descartado`) y no manda aviso. Descartar el del club no cerró el del partido: son elementos distintos. ⚠️ La fila dice «Un club» o «Un partido» sin decir cuál: quien modera no sabe qué está mirando sin ir a la base.
+
+**Qué falta:** con una cuenta de prueba reportada por otra, probar Advertir, Quitar contenido (una foto de club) y Suspender 7 días, y ver el aviso «moderacion» en la bandeja y como push (al tocarlo abre Términos). Con la cuenta suspendida, intentar escribir en un chat y subir una foto: tiene que salir «Tu cuenta está suspendida hasta el …». Después levantar la suspensión con el `update` de [Revisión diaria](revision-diaria.md).
 
 ## 6j. Página pública para eliminar la cuenta (2026-11-18)
 
