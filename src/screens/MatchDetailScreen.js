@@ -146,6 +146,7 @@ import { getNominaPartido, suscribirseANomina } from '../services/clubRoster';
 import { haversineKm, getClubMatchLocation } from '../services/matches';
 import { getCurrentLocation } from '../services/location';
 import { goBackOrPartidos, irAPestana } from '../utils/navigation';
+import { enlaceComoLlegar } from '../utils/comoLlegar';
 
 /**
  * Detalle del partido (sección 2 del handoff).
@@ -659,14 +660,17 @@ export default function MatchDetailScreen({ route, navigation }) {
     // Sólo con la EXACTA: llevar a alguien al centro de una celda de un
     // kilómetro no es «cómo llegar», y además sería enseñar por el mapa lo
     // que no se enseña escrito.
-    const lat = ubicacionExacta?.latitud;
-    const lng = ubicacionExacta?.longitud;
-    if (lat == null || lng == null) return;
-    const label = encodeURIComponent(match.cancha_nombre || 'Cancha');
-    const url =
-      Platform.OS === 'ios'
-        ? `http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    // `soloPunto`: sin la exacta no hay enlace (ni búsqueda por el nombre).
+    const url = enlaceComoLlegar(
+      {
+        latitud: ubicacionExacta?.latitud,
+        longitud: ubicacionExacta?.longitud,
+        nombre: match.cancha_nombre || 'Cancha',
+      },
+      Platform.OS,
+      { soloPunto: true }
+    );
+    if (!url) return;
     Linking.openURL(url).catch(() => {});
   };
 

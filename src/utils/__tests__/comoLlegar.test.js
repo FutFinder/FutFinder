@@ -57,3 +57,27 @@ test('las coordenadas que llegan como texto desde la base también sirven', () =
     'https://www.google.com/maps/dir/?api=1&destination=-33.4,-70.6'
   );
 });
+
+test('soloPunto (partidos): sin la ubicación exacta no hay enlace, ni búsqueda por el nombre', () => {
+  const cancha = { nombre: 'Cancha 3', direccion: 'Calle 1', comuna: 'Maipú' };
+  assert.equal(enlaceComoLlegar({ ...cancha, latitud: null, longitud: null }, 'ios', { soloPunto: true }), null);
+  assert.equal(enlaceComoLlegar({ ...cancha, latitud: 0, longitud: 0 }, 'android', { soloPunto: true }), null);
+  assert.equal(
+    enlaceComoLlegar({ ...cancha, latitud: -33.5, longitud: -70.7 }, 'ios', { soloPunto: true }),
+    'https://maps.apple.com/?daddr=-33.5,-70.7&q=Cancha%203'
+  );
+});
+
+test('ninguna pantalla arma su propio enlace a mapas: todas pasan por comoLlegar', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const raiz = path.join(__dirname, '..', '..');
+  const archivos = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const ruta = path.join(dir, e.name);
+    if (e.isDirectory()) return e.name === '__tests__' ? [] : archivos(ruta);
+    return e.name.endsWith('.js') ? [ruta] : [];
+  });
+  const sueltos = [...archivos(path.join(raiz, 'screens')), ...archivos(path.join(raiz, 'components'))]
+    .filter((f) => /maps\.apple\.com|google\.com\/maps/.test(fs.readFileSync(f, 'utf8')));
+  assert.deepEqual(sueltos.map((f) => path.relative(raiz, f)), []);
+});

@@ -9,6 +9,8 @@
  * cosas distintas. Acá solo se traduce a un botón.
  */
 
+import { enlaceComoLlegar } from './comoLlegar.js';
+
 /** Estados en los que la reserva todavía va a pasar. */
 const VIVAS = ['armando', 'procesando', 'confirmada'];
 
@@ -227,13 +229,17 @@ export function lineaDePrecio(reserva) {
   };
 }
 
-/** Para abrir el mapa del teléfono con el recinto. */
-export function enlaceDeMapa(reserva) {
+/**
+ * Para abrir el mapa del teléfono con el recinto: Apple Maps en iPhone,
+ * Google Maps en Android y la web (la regla vive en `comoLlegar.js`).
+ */
+export function enlaceDeMapa(reserva, plataforma) {
   if (!reserva) return null;
-  const { latitud, longitud } = reserva;
-  if (Number.isFinite(Number(latitud)) && Number.isFinite(Number(longitud))) {
-    return `https://www.google.com/maps/search/?api=1&query=${latitud},${longitud}`;
-  }
-  const texto = [reserva.complejoNombre, reserva.direccion, reserva.comuna].filter(Boolean).join(', ');
-  return texto ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(texto)}` : null;
+  return enlaceComoLlegar({
+    latitud: reserva.latitud,
+    longitud: reserva.longitud,
+    nombre: reserva.complejoNombre,
+    direccion: reserva.direccion,
+    comuna: reserva.comuna,
+  }, plataforma);
 }

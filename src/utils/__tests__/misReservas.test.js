@@ -92,11 +92,18 @@ test('el texto de cancelación dice la regla entera cuando ya se cerró', () => 
 });
 
 test('el enlace del mapa usa las coordenadas y, si no hay, la dirección', () => {
-  assert.match(enlaceDeMapa({ latitud: -33.5, longitud: -70.7 }), /query=-33\.5,-70\.7/);
-  const porTexto = enlaceDeMapa({ complejoNombre: 'Cancha Norte', direccion: 'Calle 1', comuna: 'Maipú' });
+  assert.match(enlaceDeMapa({ latitud: -33.5, longitud: -70.7 }, 'android'), /google\.com\/maps\/dir\/.*destination=-33\.5,-70\.7/);
+  const porTexto = enlaceDeMapa({ complejoNombre: 'Cancha Norte', direccion: 'Calle 1', comuna: 'Maipú' }, 'android');
   assert.match(porTexto, /Cancha%20Norte/);
-  assert.equal(enlaceDeMapa({}), null);
-  assert.equal(enlaceDeMapa(null), null);
+  assert.equal(enlaceDeMapa({}, 'android'), null);
+  assert.equal(enlaceDeMapa(null, 'android'), null);
+});
+
+test('en iPhone, Mis reservas abre Apple Maps, como la ficha del recinto', () => {
+  assert.match(
+    enlaceDeMapa({ latitud: -33.5, longitud: -70.7, complejoNombre: 'Cancha Norte' }, 'ios'),
+    /^https:\/\/maps\.apple\.com\/\?daddr=-33\.5,-70\.7&q=Cancha%20Norte$/
+  );
 });
 
 test('la fila del servidor se traduce sin perder nada importante', () => {

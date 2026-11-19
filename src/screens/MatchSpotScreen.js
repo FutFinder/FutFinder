@@ -38,6 +38,7 @@ import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentUser } from '../services/auth';
 import { useOnline } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
+import { enlaceComoLlegar } from '../utils/comoLlegar';
 import { useCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
 import {
   TEXTO_REGLA_SALIDA_TS,
@@ -150,11 +151,12 @@ export default function MatchSpotScreen({ route, navigation }) {
   };
 
   const openDirections = () => {
-    if (match?.latitud == null) return;
-    const url =
-      Platform.OS === 'ios'
-        ? `http://maps.apple.com/?daddr=${match.latitud},${match.longitud}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${match.latitud},${match.longitud}`;
+    const url = enlaceComoLlegar(
+      { latitud: match?.latitud, longitud: match?.longitud, nombre: match?.cancha_nombre },
+      Platform.OS,
+      { soloPunto: true }
+    );
+    if (!url) return;
     Linking.openURL(url).catch(() => {});
   };
 

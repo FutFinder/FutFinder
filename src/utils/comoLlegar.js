@@ -11,6 +11,14 @@
  * el mapa busca. Sin ninguna de las dos devuelve null y el botón no se
  * dibuja: un «Cómo llegar» que no lleva a ninguna parte es peor que nada.
  *
+ * `soloPunto`: para un partido, que sólo enseña el «Cómo llegar» con la
+ * ubicación EXACTA. Sin punto válido devuelve null en vez de buscar el nombre
+ * de la cancha: llevar a alguien a un lugar aproximado no es «cómo llegar».
+ * El nombre igual sirve de etiqueta en Apple Maps.
+ *
+ * Lo usan la ficha del recinto, Mis reservas, el detalle del partido y «Mi
+ * cupo»: un solo lugar decide qué mapa se abre.
+ *
  * Sin React Native a propósito: la plataforma llega por parámetro para
  * poder probarlo con `node --test`.
  */
@@ -36,11 +44,12 @@ function direccionEscrita(lugar) {
 /**
  * @param {{ latitud?, longitud?, nombre?, direccion?, comuna? }} lugar
  * @param {string} plataforma `Platform.OS`: 'ios', 'android' o 'web'.
+ * @param {{ soloPunto?: boolean }} [opciones]
  * @returns {string|null}
  */
-export function enlaceComoLlegar(lugar, plataforma) {
+export function enlaceComoLlegar(lugar, plataforma, { soloPunto = false } = {}) {
   const punto = coordenadas(lugar);
-  const texto = direccionEscrita(lugar);
+  const texto = soloPunto ? null : direccionEscrita(lugar);
   if (!punto && !texto) return null;
 
   if (plataforma === 'ios') {
