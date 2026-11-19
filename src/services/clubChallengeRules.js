@@ -66,8 +66,12 @@ export const CUPOS_POR_CLUB = { min: 4, max: 15 };
 /** Duraciones ofrecidas, las mismas que el módulo Partidos. */
 export const DURACIONES = [60, 90, 120];
 
-/** Modalidades soportadas por `matches.modalidad`. */
+/**
+ * Modalidades de un desafío entre clubes. Fútbol 5 desde la migración 197
+ * (`club_challenges`, `club_challenge_proposals`, `club_open_challenges`).
+ */
 export const MODALIDADES = [
+  { value: 'futbol5', label: 'Fútbol 5' },
   { value: 'futbol7', label: 'Fútbol 7' },
   { value: 'futbol11', label: 'Fútbol 11' },
 ];

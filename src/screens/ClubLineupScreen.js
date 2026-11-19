@@ -25,7 +25,9 @@ import { etiquetaPosiciones } from '../utils/playerMeta';
 import { haceCuanto } from '../utils/tiempoRelativo.js';
 import {
   F7,
-  F11,
+  formacionesDe,
+  modoInicialDeClub,
+  MODOS,
   layoutSlots,
   fitsForMember,
   autocompletarAsignaciones,
@@ -133,9 +135,9 @@ export default function ClubLineupScreen({ navigation, route }) {
       setCustom(lu.puestos_personalizados || {});
       setPersonalizado(!!lu.personalizado);
     } else {
-      const modoInicial = c?.modalidad === 'futbol11' ? 11 : 7;
+      const modoInicial = modoInicialDeClub(c?.modalidad);
       setModo(modoInicial);
-      setFormacion(modoInicial === 11 ? F11[0] : F7[0]);
+      setFormacion(formacionesDe(modoInicial)[0]);
       setAsignaciones({});
       setCustom({});
       setPersonalizado(false);
@@ -345,7 +347,7 @@ export default function ClubLineupScreen({ navigation, route }) {
 
   const cambiarModo = (nuevoModo) => {
     if (!canEdit || nuevoModo === modo) return;
-    aplicarFormacion(nuevoModo, nuevoModo === 7 ? F7[0] : F11[0]);
+    aplicarFormacion(nuevoModo, formacionesDe(nuevoModo)[0]);
   };
 
   const cambiarFormacion = (f) => {
@@ -577,7 +579,7 @@ export default function ClubLineupScreen({ navigation, route }) {
           {canEdit && (
             <>
               <View style={styles.modeRow}>
-                {[7, 11].map((m) => (
+                {MODOS.map((m) => (
                   <Pressable
                     key={m}
                     onPress={() => cambiarModo(m)}
@@ -606,7 +608,7 @@ export default function ClubLineupScreen({ navigation, route }) {
                     </Text>
                   </Pressable>
                 )}
-                {(modo === 7 ? F7 : F11).map((f) => {
+                {formacionesDe(modo).map((f) => {
                   const activa = !personalizado && f === formacion;
                   return (
                     <Pressable

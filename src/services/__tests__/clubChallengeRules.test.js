@@ -644,3 +644,12 @@ test('un borrador vacío no revienta ni inventa valores', () => {
   assert.equal(p.direccion, null);
   assert.equal(p.cupos_por_club, null);
 });
+
+// ─────────────────────────────────────────────── Fútbol 5 (migración 197)
+
+test('los desafíos entre clubes también se acuerdan en Fútbol 5', () => {
+  assert.deepEqual(R.MODALIDADES.map((m) => m.value), ['futbol5', 'futbol7', 'futbol11']);
+  assert.equal(R.MODALIDADES[0].label, 'Fútbol 5');
+  // Cinco por lado cabe en el rango de cupos por club que ya existía.
+  assert.ok(R.CUPOS_POR_CLUB.min <= 5);
+});
