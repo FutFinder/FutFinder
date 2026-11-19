@@ -99,7 +99,10 @@ function candidatosOsm(a = {}) {
 async function retrieveMapbox(mapboxId, sessionToken) {
   const url =
     `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?` +
-    `access_token=${MAPBOX_TOKEN}&session_token=${sessionToken}`;
+    // `language=es` también acá: sin él, Mapbox devuelve la dirección completa
+    // en inglés («Santiago Metropolitan Region») y así quedaba guardada en el
+    // partido aunque la sugerencia se viera en español.
+    `access_token=${MAPBOX_TOKEN}&session_token=${sessionToken}&language=es`;
   const resp = await fetch(url);
   const data = await resp.json();
   const f = data?.features?.[0];

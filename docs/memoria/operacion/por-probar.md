@@ -25,14 +25,28 @@ Contra producción, sin crear ni borrar nada: los 14 cron de `futfinder-*` termi
 - En el registro, «Continuar con Google» y «Continuar con Apple» sólo decían «Muy pronto»: **quitados el mismo día** y comprobado en la web local. También se quitó la fila «Ñuñoa, Santiago · cambiar» (Reservas), y «Cómo llegar» de la ficha del recinto ahora abre Apple Maps en iPhone y Google Maps en Android y la web. *Comprobado:* 6 pruebas de `enlaceComoLlegar`, y los dos enlaces armados para MaiClub abren la ruta al recinto en Google Maps y en Mapas de Apple (web). Desde el mismo día también Mis reservas, el detalle del partido y «Mi cupo» usan esa función (los de partido, sólo con la ubicación exacta). *Falta:* con sesión, ver Reservas y la ficha del recinto, y tocar los cuatro «Cómo llegar» en un iPhone (abre la app Mapas) y en un Android (abre Google Maps).
 - La bandera `asientos_por_nombre` vence el 2026-12-30.
 
-## Recorrido con cuentas de prueba (2026-11-18, en curso)
+## Recorrido con cuentas de prueba (2026-11-18)
 
-Dos cuentas desechables creadas por Johan en la web (A en www.futfinder.cl, B en futfinder.vercel.app, que guarda otra sesión). Probado con B:
-- **181:** las dos cuentas quedaron con su fila en `aceptaciones_legales` (versión 2026-11-18), y B sólo ve la suya.
-- **Editar perfil:** la edad (18) aparece fija y de sólo lectura, con «Si está mal, escríbenos»; guardar otra cosa (posición) funciona.
-- **6c y 6d en producción:** publicar abre con 14 y falta 1, el «−» no baja de 1; Fútbol 5 sugiere y aplica «Cambiar a 10 jugadores»; la dirección se busca y la comuna se completa sola; «Jugador 3» se rechaza («Escribe el nombre de la persona…»), Tomás y Álvaro quedan como «Invitado»; el partido se publica como `futbol5` con 7 cupos libres y sus dos asientos por nombre.
-- **6g:** `exportar_mis_datos()` con la sesión de B devuelve sus 14 secciones. **Pero en la web «Exportar mis datos» dijo «No se pudo copiar: tu navegador no permitió copiar al portapapeles».** Puede ser porque el panel del navegador estaba oculto; si se repite con la ventana activa, es un fallo real (Safari no deja copiar después de esperar la red) y la web debería descargar un archivo.
-- Detalle menor: después de las 20:00, publicar abre con «Hoy 20:00», que ya pasó (la validación lo frena con «La hora ya pasó»).
+Dos cuentas desechables creadas por Johan en la web: A (`hilial`) en www.futfinder.cl y B (`hiliol`) en futfinder.vercel.app, que guarda otra sesión. **Probado y funcionando en producción:**
+- **181:** las dos quedaron con su fila en `aceptaciones_legales` (versión 2026-11-18), y cada una ve sólo la suya.
+- **Editar perfil:** la edad aparece fija, de sólo lectura y con «Si está mal, escríbenos»; guardar lo demás funciona.
+- **6c y 6d:** publicar abre con 14 y falta 1 (el «−» no baja de 1); Fútbol 5 sugiere y aplica «Cambiar a 10 jugadores»; la comuna se completa sola al elegir la dirección; «Jugador 3» se rechaza; Tomás y Álvaro quedan como «Invitado»; el partido queda `futbol5` con sus dos asientos por nombre; A lo ve en Inicio con «3/10».
+- **Amistad (177):** solicitud de B → aviso a A → Aceptar → `accepted` y aviso a B.
+- **Chat directo y 175:** el mensaje de A llega a B, y el segundo le aparece a B en tiempo real, sin recargar.
+- **Bloqueo (177):** A bloquea a B; B ve «Conversación no disponible» sin cuadro de texto, y en la base, con la sesión de B, lee 0 mensajes y escribir da 42501.
+- **6e:** en el partido de B, A ve «Jugador bloqueado · @hiliol está en este partido. Lo bloqueaste antes.» y la etiqueta «Bloqueado».
+- **6f:** A reporta el partido de B (dos pasos, «Reporte enviado»); queda `partido:<id>` contra el organizador.
+- **6g (parte del servidor):** `exportar_mis_datos()` con la sesión de B devuelve sus 14 secciones, y la app suma las aceptaciones.
+- **Borrar la cuenta (sección 1, 6k):** B se borra desde Ajustes con el texto nuevo del diálogo; la sesión se cierra y el correo recordado desaparece del navegador; perfil y usuario borrados, mensajes borrados, su partido cancelado y sin autor, y `cuentas_por_limpiar` marca los archivos limpios 1,5 s después (corrió la Edge Function, no el respaldo por RPC).
+
+**Encontrado y corregido:** la dirección del partido quedó «… Santiago Metropolitan Region, Chile», en inglés: el `retrieve` de Mapbox no pedía `language=es`. Arreglado en `LocationAutocomplete.js` (comprobado contra Mapbox real: con el parámetro devuelve «Región Metropolitana de Santiago»), con una prueba que exige español en cada llamada a Mapbox y Nominatim. Los partidos ya publicados conservan su dirección como quedó.
+
+**Encontrado, sin corregir:**
+- **«Exportar mis datos» en la web dijo «No se pudo copiar: tu navegador no permitió copiar al portapapeles».** El panel del navegador estaba oculto, lo que basta para que falle; pero copiar después de esperar la red también falla en Safari. La web debería descargar un archivo `.json`.
+- **Un reporte desaparece si se borra la cuenta reportada** (cascada de `user_reports`). Quien publica algo grave puede borrar su cuenta y con eso el rastro del reporte.
+- Menores: después de las 20:00 publicar abre con «Hoy 20:00» ya vencido (la validación lo frena); un chat abierto por enlace dice «Chat» en vez del nombre de la persona; en la web, Enter agrega un salto de línea en vez de enviar; a quien tiene abierta la conversación igual le sale el aviso flotante del mensaje nuevo.
+
+**Queda por probar de esta tanda:** la moderación con la sesión de Vicente (6i), el portapapeles con la ventana activa, y todo lo del teléfono.
 
 ## Lo que hace falta para probar casi todo
 
