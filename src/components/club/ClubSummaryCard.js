@@ -6,6 +6,7 @@ import { temaClub } from '../../theme/clubThemes';
 import { paleta as C, clubTonos, clubSuperficies, fuentes as F, alfa } from '../../theme/colors';
 import ClubLogo from './ClubLogo';
 import VerifiedBadge from './VerifiedBadge';
+import { modalidadInline } from '../../utils/clubModalidad';
 
 /**
  * La ficha del club en la portada: identidad, récord y entrada al detalle.
@@ -92,7 +93,7 @@ export default function ClubSummaryCard({
 
           <View style={styles.chips}>
             <Chip texto={esAdmin ? 'Administrador' : 'Jugador'} color={escala.main} />
-            {club.modalidad ? <Chip texto={etiquetaModalidad(club.modalidad)} /> : null}
+            {modalidadInline(club.modalidad) ? <Chip texto={modalidadInline(club.modalidad)} /> : null}
             {Number.isFinite(totalMiembros) && Number.isFinite(maxMiembros) ? (
               <Chip texto={`${totalMiembros} / ${maxMiembros}`} />
             ) : null}
@@ -159,11 +160,6 @@ function StatTile({ valor, texto, vacio = false, rotulo, color }) {
   );
 }
 
-function etiquetaModalidad(valor) {
-  if (valor === 'futbol7') return 'Fútbol 7';
-  if (valor === 'futbol11') return 'Fútbol 11';
-  return String(valor);
-}
 
 const styles = StyleSheet.create({
   tarjeta: {

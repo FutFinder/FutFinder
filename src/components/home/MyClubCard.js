@@ -3,14 +3,14 @@ import { View, Text, Image, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, ChevronRight, Shield } from 'lucide-react-native';
 import StatusPill from './StatusPill';
+import { modalidadInline } from '../../utils/clubModalidad';
 import {
   paleta as C,
 } from '../../theme/colors';
 
-const MODALIDAD_LABEL = { futbol7: 'Fútbol 7', futbol11: 'Fútbol 11', ambos: 'Fútbol 7 y 11' };
 
 export default function MyClubCard({ club, onPressClub, onCreateMatch }) {
-  const modLabel = MODALIDAD_LABEL[club.modalidad] || null;
+  const modLabel = modalidadInline(club.modalidad);
 
   return (
     <LinearGradient colors={[C.surface, C.surfaceAlt]} className="overflow-hidden rounded-[20px] border border-white/8">
