@@ -25,6 +25,15 @@ Contra producción, sin crear ni borrar nada: los 14 cron de `futfinder-*` termi
 - En el registro, «Continuar con Google» y «Continuar con Apple» sólo decían «Muy pronto»: **quitados el mismo día** y comprobado en la web local. También se quitó la fila «Ñuñoa, Santiago · cambiar» (Reservas), y «Cómo llegar» de la ficha del recinto ahora abre Apple Maps en iPhone y Google Maps en Android y la web. *Comprobado:* 6 pruebas de `enlaceComoLlegar`, y los dos enlaces armados para MaiClub abren la ruta al recinto en Google Maps y en Mapas de Apple (web). Desde el mismo día también Mis reservas, el detalle del partido y «Mi cupo» usan esa función (los de partido, sólo con la ubicación exacta). *Falta:* con sesión, ver Reservas y la ficha del recinto, y tocar los cuatro «Cómo llegar» en un iPhone (abre la app Mapas) y en un Android (abre Google Maps).
 - La bandera `asientos_por_nombre` vence el 2026-12-30.
 
+## Recorrido con cuentas de prueba (2026-11-18, en curso)
+
+Dos cuentas desechables creadas por Johan en la web (A en www.futfinder.cl, B en futfinder.vercel.app, que guarda otra sesión). Probado con B:
+- **181:** las dos cuentas quedaron con su fila en `aceptaciones_legales` (versión 2026-11-18), y B sólo ve la suya.
+- **Editar perfil:** la edad (18) aparece fija y de sólo lectura, con «Si está mal, escríbenos»; guardar otra cosa (posición) funciona.
+- **6c y 6d en producción:** publicar abre con 14 y falta 1, el «−» no baja de 1; Fútbol 5 sugiere y aplica «Cambiar a 10 jugadores»; la dirección se busca y la comuna se completa sola; «Jugador 3» se rechaza («Escribe el nombre de la persona…»), Tomás y Álvaro quedan como «Invitado»; el partido se publica como `futbol5` con 7 cupos libres y sus dos asientos por nombre.
+- **6g:** `exportar_mis_datos()` con la sesión de B devuelve sus 14 secciones. **Pero en la web «Exportar mis datos» dijo «No se pudo copiar: tu navegador no permitió copiar al portapapeles».** Puede ser porque el panel del navegador estaba oculto; si se repite con la ventana activa, es un fallo real (Safari no deja copiar después de esperar la red) y la web debería descargar un archivo.
+- Detalle menor: después de las 20:00, publicar abre con «Hoy 20:00», que ya pasó (la validación lo frena con «La hora ya pasó»).
+
 ## Lo que hace falta para probar casi todo
 
 - **Un build nativo** (EAS, Android e iOS) con lo que hay en `main`: íconos,
