@@ -87,3 +87,20 @@ test('la página de eliminar la cuenta es pública y dice lo mismo que delete_my
   assert.ok(leer('src/screens/SettingsScreen.js').includes('>Eliminar cuenta<'), 'el botón cambió de nombre: actualiza la página');
   assert.ok(texto.includes(CORREO_PRIVACIDAD));
 });
+
+test('la política de cookies dice cuánto dura cada cosa que se guarda', () => {
+  const seccion = DOCUMENTOS_LEGALES.cookies.secciones.find((s) => s.titulo === 'Qué guardamos y para qué');
+  for (const item of seccion.lista) {
+    assert.match(item, /[Dd]ura|se borra|Se mantiene/, `sin duración: «${item.slice(0, 40)}…»`);
+  }
+});
+
+test('lo que la política promete de la cuenta recordada es lo que hace el código', () => {
+  // «se borra al eliminar tu cuenta»: Ajustes la olvida antes de cerrar sesión.
+  const ajustes = leer('src/screens/SettingsScreen.js');
+  const borrado = ajustes.slice(ajustes.indexOf('const handleDeleteAccount'), ajustes.indexOf('const openFriendRequestPicker'));
+  assert.ok(borrado.includes('await forgetRememberedAccount()'), 'eliminar la cuenta tiene que olvidar el correo guardado');
+  assert.ok(borrado.indexOf('forgetRememberedAccount') < borrado.indexOf('signOut'));
+  // El diálogo no puede decir que se borran los clubes: sobreviven sin autor (176).
+  assert.ok(!/tus amistades y tus clubes/.test(borrado));
+});

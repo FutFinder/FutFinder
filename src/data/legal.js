@@ -157,20 +157,23 @@ const cookies = {
     {
       titulo: 'Qué guardamos y para qué',
       parrafos: [
-        'Todo lo que guarda FutFinder es necesario para que la app funcione o es una comodidad que tú activas al usarla:',
+        'Todo lo que guarda FutFinder es necesario para que la app funcione o es una comodidad que tú activas al usarla. Junto a cada cosa va cuánto dura:',
       ],
       lista: [
-        'Sesión: el acceso a tu cuenta, para que no tengas que iniciar sesión cada vez. Lo crea Supabase y se borra al cerrar sesión.',
-        'Cuenta recordada: tu correo y nombre de usuario (nunca la contraseña), para ofrecerte entrar más rápido en este dispositivo.',
-        'Preferencias de uso: el club que tenías abierto, qué mensajes de club ya leíste y qué avisos de bienvenida ya viste.',
-        'Copia temporal de datos: la última lista de partidos que cargaste, para mostrarla mientras se actualiza o si pierdes la conexión.',
-        'Aviso de cookies: que ya viste este aviso, para no repetírtelo.',
+        'Sesión: el acceso a tu cuenta, para que no tengas que iniciar sesión cada vez. Lo crea Supabase. Dura hasta que cierres sesión o elimines tu cuenta, y se renueva sola mientras usas la app. En el teléfono se guarda cifrada.',
+        'Cuenta recordada: tu correo y nombre de usuario (nunca la contraseña), para ofrecerte entrar más rápido en este dispositivo. Se mantiene al cerrar sesión, que es justamente para lo que sirve, y se borra al eliminar tu cuenta o al borrar los datos de FutFinder.',
+        'Preferencias de uso: el club que tenías abierto, qué mensajes de club ya leíste y qué avisos de bienvenida ya viste. Duran hasta que borres los datos de FutFinder.',
+        'Copia temporal de datos: la última lista de partidos que cargaste, para mostrarla mientras se actualiza o si pierdes la conexión. Se reemplaza cada vez que la lista se actualiza y dura hasta que borres los datos de FutFinder.',
+        'Aviso de cookies: que ya viste este aviso, para no repetírtelo. Dura hasta que borres los datos de FutFinder; si cambiamos esta política de fondo, te lo mostramos una vez más.',
+      ],
+      parrafosFinales: [
+        'Borrar los datos de FutFinder es borrar los datos del sitio en tu navegador o, en el teléfono, los datos de la app (o desinstalarla).',
       ],
     },
     {
       titulo: 'Servicios de terceros',
       parrafos: [
-        'Cuando abres el mapa de partidos en la web, Mapbox carga el mapa y puede guardar en tu navegador un identificador anónimo para medir el uso de su servicio. No lo usamos nosotros ni sirve para mostrarte publicidad. Puedes revisar cómo lo trata en la política de privacidad de Mapbox.',
+        'Cuando abres el mapa de partidos en la web, Mapbox carga el mapa y puede guardar en tu navegador un identificador anónimo para medir el uso de su servicio. No lo usamos nosotros ni sirve para mostrarte publicidad. Cuánto dura lo decide Mapbox; puedes revisar cómo lo trata en su política de privacidad.',
         'No usamos Google Analytics, píxeles de redes sociales ni ninguna otra herramienta de publicidad o seguimiento.',
       ],
     },

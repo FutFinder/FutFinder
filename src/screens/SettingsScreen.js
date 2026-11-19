@@ -63,6 +63,7 @@ import { validarPassword, PISTA_PASSWORD } from '../utils/passwordStrength';
 import { describeAuthError } from '../services/authPolicy';
 import { buildMyDataExport } from '../services/dataExport';
 import useConfirmacion from '../components/useConfirmacion';
+import { forgetRememberedAccount } from '../utils/rememberedAccount';
 
 
 // ── Custom slider (no deps externos) ─────────────────────────────
@@ -590,7 +591,7 @@ export default function SettingsScreen({ navigation }) {
       // Lo que hace de verdad `delete_my_account` (migración 176): lo que no
       // se borra es lo de otros, y el registro de pagos, que la política de
       // privacidad ya dice que se conserva.
-      'Es permanente. Se borrarán tu perfil, tus fotos, tus mensajes, tus amistades y tus clubes. Los partidos y reservas que organizabas por jugar se cancelarán con aviso. Los partidos ya jugados y los registros de pagos se conservan sin tu nombre.',
+      'Es permanente. Se borrarán tu perfil, tus fotos, tus mensajes, tus amistades y tu lugar en tus clubes. Los partidos y reservas que organizabas por jugar se cancelarán con aviso. Los partidos ya jugados, los clubes que fundaste y los registros de pagos se conservan sin tu nombre.',
       async () => {
         setSaving(true);
         const { error } = await deleteAccount();
@@ -599,6 +600,9 @@ export default function SettingsScreen({ navigation }) {
           showBanner('error', 'No se pudo eliminar', error.message);
           return;
         }
+        // La cuenta ya no existe: que este dispositivo tampoco recuerde su
+        // correo (lo dice la política de cookies).
+        await forgetRememberedAccount();
         await signOut();
         navigateToAuth();
       },

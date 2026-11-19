@@ -214,6 +214,12 @@ carga de saldo.
 
 **Qué falta:** que el aviso de moderación abra Términos (ya no el paso del registro). *Probado el 2026-11-18:* `https://www.futfinder.cl/eliminar-cuenta` abre sin sesión con el despliegue `559644c`.
 
+## 6k. Duraciones en la política de cookies (2026-11-18)
+
+**Qué sí se comprobó:** la política en la web local muestra cuánto dura cada cosa; pruebas de Node (cada ítem dice su duración, y eliminar la cuenta olvida el correo recordado antes de cerrar sesión).
+
+**Qué falta:** con una cuenta desechable, entrar (queda recordada), eliminarla desde Ajustes y ver que Iniciar sesión ya no ofrece su correo.
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):
