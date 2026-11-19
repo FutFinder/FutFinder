@@ -61,7 +61,7 @@ select * from public.conciliaciones where created_at > now() - interval '24 hour
 
 1. **Revisiones de sanción**: un club pidió revisar una sanción y su desafío está congelado (`bloqueado_sancion`) hasta que alguien decida. Se resuelve desde la pantalla: retirar o mantener la sanción.
 2. **Resultados en disputa**: un club rechazó el marcador del otro y el desafío quedó en `resultado_en_disputa`, sin salida para los clubes. Se reabre desde la pantalla.
-3. **Reportes de usuario sin mirar**: **se muestran y no se resuelven**; resolverlos exige decidir estados, medidas y apelación, y eso sigue abierto. Mirar la lista cada día es lo único que impide que pasen desapercibidos.
+3. **Reportes de usuario sin mirar**: se resuelven desde la pantalla (migración 194). **Plazo: 24 horas** desde que llegan; es lo que piden Apple y Google. Cómo decidir, más abajo.
 4. **Recintos esperando revisión**: los que apretaron «Mandar a revisión» y todavía no están aprobados, con cuántos días llevan esperando. Se aprueban desde la pantalla; cómo, en [Aprobar recintos](aprobar-recintos.md). Rechazar todavía no existe.
 
 Si hace falta mirarlas sin la pantalla (o sin estar en el padrón), son estas consultas en el editor SQL:
@@ -82,11 +82,13 @@ select d.id, cr.nombre as club_retador, cd.nombre as club_retado, d.match_id
  where d.estado = 'resultado_en_disputa'
  order by d.created_at;
 
--- 3. Reportes de usuario sin mirar
-select id, motivo, elemento, created_at
-  from public.user_reports
- where reviewed_at is null
- order by created_at;
+-- 3. Reportes de usuario sin mirar (los de más de 24 horas, primero)
+select u.id, u.motivo, u.elemento, u.descripcion, p.username as reportado, u.created_at,
+       u.created_at < now() - interval '24 hours' as fuera_de_plazo
+  from public.user_reports u
+  left join public.profiles p on p.id = u.reported_id
+ where u.reviewed_at is null
+ order by u.created_at;
 
 -- 4. Recintos esperando revisión
 select c.id, c.nombre, c.comuna, c.revision_pedida_at,
@@ -98,6 +100,23 @@ select c.id, c.nombre, c.comuna, c.revision_pedida_at,
 ```
 
 Las RPC `moderacion_*` exigen una sesión que esté en el padrón y por eso no sirven desde el editor SQL (sin sesión, `es_moderador()` da falso). Desde ahí una revisión se resuelve con `resolver_revision_sancion()`, que sólo corre con `service_role`.
+
+### Reportes: cómo decidir (migración 194)
+
+Cada fila trae qué se reportó, a quién, la descripción, cuántos reportes más tiene esa persona y si ya está suspendida. Las decisiones, de menor a mayor:
+
+- **Descartar**: el reporte no se sostiene (un desacuerdo de cancha, un reporte de venganza). No avisa a nadie.
+- **Advertir**: algo menor y primera vez. Le llega un aviso con las reglas de convivencia.
+- **Quitar contenido**: una foto, un escudo, una descripción o una bio ofensiva, sexual o que suplanta a alguien. Se borra y le llega un aviso. **No se puede deshacer.**
+- **Suspender 7 días**: insultos, acoso o reincidencia después de una advertencia. **30 días**: acoso grave, amenazas o una segunda suspensión. Mientras dura no puede publicar partidos, escribir, subir fotos ni pedir amistad; sí puede reportar.
+
+Si lo reportado es ilegal (amenazas serias, contenido sexual de menores), además de quitarlo y suspender hay que guardar el reporte y avisar a la autoridad; no borres la cuenta, que borraría la evidencia.
+
+La persona apela por correo a futfindercl@gmail.com. Para levantar una suspensión antes de tiempo, desde el editor SQL:
+
+```sql
+update public.moderacion_suspensiones set hasta = now() where user_id = '<user_id>';
+```
 
 ## 3. Solicitudes de recinto nuevas
 

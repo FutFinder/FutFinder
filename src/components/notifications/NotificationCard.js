@@ -90,6 +90,10 @@ export const CATEGORY = {
 
   // Lista de espera: el turno que se dejó pasar (migración 105).
   waitlist_turno_vencido: 'partidos',
+
+  // Moderación (migración 194): es sobre la cuenta, no sobre un partido ni
+  // un club.
+  moderacion: 'social',
 };
 
 export const ICON = {
@@ -126,6 +130,7 @@ export const ICON = {
   club_match_cancelled: CalendarX,
   club_sancionado: ShieldAlert,
   club_revision_resuelta: Scale,
+  moderacion: ShieldAlert,
 };
 
 /**

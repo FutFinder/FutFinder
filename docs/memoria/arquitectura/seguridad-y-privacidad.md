@@ -205,6 +205,13 @@ Aplicada en producción el 2026-11-13; arnés `177_..._test.sql` en verde contra
 - **`complejo_calificaciones`** se lee sólo con cuenta. El buscador de administradores escapa `%` y `_`.
 - **Regla aprendida:** un disparador con la guarda `current_user <> 'authenticated'` **no puede ser `security definer`**: adentro, `current_user` es el dueño y la guarda deja pasar todo. Si necesita leer saltándose la RLS, que llame a una función definer aparte. Lo vigila `src/services/__tests__/huecosDeUnaCuentaNormal.test.js` para la 177.
 
+## Moderación de lo reportado (migración 194, 2026-11-18)
+
+- Resolver un reporte es sólo de quien está en el padrón: `moderacion_resolver_reporte()` comprueba `es_moderador()` y responde 42501 a cualquier otra cuenta. Ningún cliente lee `moderacion_suspensiones`.
+- Una suspensión de moderación bloquea en el servidor todo alta de contenido de esa cuenta, incluidas las que pasan por RPC definer (el disparador mira `auth.uid()`, no `current_user`). Reportar sigue abierto, para que una cuenta suspendida pueda denunciar acoso.
+- Descartar no avisa a la persona reportada: no se le revela que alguien la reportó.
+- Lo que se suspende NO se extiende a editar lo ya publicado (un `update` del perfil, por ejemplo); quitar contenido cubre ese caso.
+
 ## Notas relacionadas
 
 - [Autenticación](../funcionalidades/autenticacion.md)

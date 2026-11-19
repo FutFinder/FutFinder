@@ -213,6 +213,11 @@ export function resolveNotificationTarget(n) {
     case 'friend_accept':
       return data.fromUserId ? { screen: 'UserProfile', params: { userId: data.fromUserId } } : null;
 
+    // Moderación (migración 194): a las reglas de convivencia, que es lo que
+    // explica la decisión. No hay otra pantalla que la muestre.
+    case 'moderacion':
+      return { screen: 'Terms', params: {} };
+
     default:
       return null;
   }

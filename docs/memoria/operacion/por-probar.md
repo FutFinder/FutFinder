@@ -190,6 +190,12 @@ carga de saldo.
 
 **Qué falta:** con el build y un teléfono real, mandar un push y a los 15–30 minutos ver en `push_tickets` el `receipt_status = 'ok'`; después desinstalar la app, mandar otro y ver que el token desaparece de `push_tokens`.
 
+## 6i. Resolver reportes (migración 194, 2026-11-18)
+
+**Qué sí se comprobó:** arnés 12/12 contra producción revertido (sólo el padrón resuelve, la cola trae los datos nuevos, quitar contenido borra la foto y avisa, suspender cierra los otros reportes y bloquea mensajes y fotos con la fecha, reportar sigue permitido, descartar no avisa, no se resuelve dos veces, días validados, tabla cerrada al cliente); pruebas de Node de las decisiones, los textos y el destino del aviso.
+
+**Qué falta:** con la sesión de quien modera, abrir Ajustes → Moderación y ver una fila de reporte con descripción, reportado y previos; con una cuenta de prueba reportada por otra, probar Advertir, Quitar contenido (una foto de club) y Suspender 7 días, y ver el aviso «moderacion» en la bandeja y como push (al tocarlo abre Términos). Con la cuenta suspendida, intentar escribir en un chat y subir una foto: tiene que salir «Tu cuenta está suspendida hasta el …». Después levantar la suspensión con el `update` de [Revisión diaria](revision-diaria.md).
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

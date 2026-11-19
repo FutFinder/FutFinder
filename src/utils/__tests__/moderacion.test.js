@@ -3,10 +3,8 @@
  *
  * LO QUE MÁS IMPORTA ACÁ, y por eso está en una función y no dentro del JSX:
  *
- *   · los reportes de usuario se MUESTRAN pero no se resuelven. Resolverlos
- *     exige decidir estados, medidas y apelación, que es diseño de producto
- *     y sigue abierto. Si alguien agrega un botón sin darse cuenta, esta
- *     prueba se pone roja y le explica por qué;
+ *   · los reportes de usuario se resuelven (migración 194) con las mismas
+ *     cuatro decisiones y los mismos límites que valida el servidor;
  *   · una cola vacía y una cola que no se pudo leer no son lo mismo. En una
  *     pantalla de sanciones sin resolver, confundirlas es grave.
  *
@@ -55,16 +53,48 @@ test('las claves de COLAS son las que devuelve moderacion_cola()', () => {
   assert.deepEqual(M.COLAS.map((c) => c.clave).sort(), clavesDeLaCola());
 });
 
-test('los reportes se muestran y no se tocan; el resto sí se resuelve', () => {
-  const reportes = M.COLAS.find((c) => c.clave === 'reportes_sin_mirar');
-  assert.equal(reportes.accionable, false, 'los reportes NO se resuelven todavía');
-  assert.ok(reportes.nota, 'y la pantalla tiene que decir por qué, no sólo no traer botones');
-  for (const clave of ['revisiones_de_sancion', 'resultados_en_disputa', 'recintos_esperando']) {
-    assert.equal(M.COLAS.find((c) => c.clave === clave).accionable, true);
-  }
+test('las cuatro colas se resuelven, también los reportes (migración 194)', () => {
+  for (const c of M.COLAS) assert.equal(c.accionable, true, `${c.clave} sin acciones`);
   // Toda cola tiene su texto de vacía: sin él, «no hay nada» se lee como
   // «no se pudo leer».
   for (const c of M.COLAS) assert.ok(c.vacio, `${c.clave} sin texto de cola vacía`);
+});
+
+test('las decisiones sobre un reporte son las que acepta el servidor', () => {
+  const sql = fs.readFileSync(
+    path.join(__dirname, '..', '..', '..', 'supabase', 'migrations', '194_resolver_reportes.sql'),
+    'utf8'
+  );
+  const m = sql.match(/p_decision not in \(([^)]*)\)/);
+  assert.ok(m, 'no encontré la validación de decisiones en la 194');
+  const delServidor = [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]).sort();
+  assert.deepEqual(Object.keys(M.DECISIONES_REPORTE).sort(), delServidor);
+  // Descartar no avisa: le revelaría a la persona que alguien la reportó.
+  assert.equal(M.DECISIONES_REPORTE.descartar.avisa, false);
+});
+
+test('puedeResolverReporte valida lo mismo que el servidor', () => {
+  assert.equal(M.puedeResolverReporte({ decision: 'descartar' }), true);
+  assert.equal(M.puedeResolverReporte({ decision: 'borrar_todo' }), false);
+  assert.equal(M.puedeResolverReporte({ decision: 'suspender' }), false, 'suspender sin días');
+  assert.equal(M.puedeResolverReporte({ decision: 'suspender', dias: 0 }), false);
+  assert.equal(M.puedeResolverReporte({ decision: 'suspender', dias: 366 }), false);
+  assert.equal(M.puedeResolverReporte({ decision: 'suspender', dias: 7 }), true);
+  for (const d of M.DIAS_SUSPENSION) {
+    assert.equal(M.puedeResolverReporte({ decision: 'suspender', dias: d }), true);
+  }
+  assert.equal(M.puedeResolverReporte({ decision: 'advertir', nota: 'x'.repeat(600) }), true);
+  assert.equal(M.puedeResolverReporte({ decision: 'advertir', nota: 'x'.repeat(601) }), false);
+});
+
+test('lo reportado se lee en español, y quitar contenido dice qué borra', () => {
+  assert.equal(M.elementoLegible(null), 'Su perfil');
+  assert.equal(M.elementoLegible('foto_club:abc'), 'Una foto de un club');
+  assert.equal(M.elementoLegible('foto:abc'), 'Una foto de su perfil');
+  assert.equal(M.elementoLegible('partido:abc'), 'Un partido');
+  assert.equal(M.elementoLegible('club:abc'), 'Un club');
+  assert.match(M.queQuitaElContenido(null), /foto, su portada y su bio/);
+  assert.match(M.queQuitaElContenido('foto_club:abc'), /foto del club/);
 });
 
 test('la espera se cuenta en días de calendario y se lee en español', () => {
@@ -125,6 +155,10 @@ test('vacía y no-se-pudo-leer son estados distintos', () => {
 test('los motivos de reporte se leen en español', () => {
   assert.equal(M.motivoLegible('suplantacion'), 'Suplantación de identidad');
   assert.equal(M.motivoLegible('informacion_falsa'), 'Información falsa');
+  // Los que acepta hoy `user_reports_motivo_check`.
+  assert.equal(M.motivoLegible('contenido_ofensivo'), 'Contenido ofensivo');
+  assert.equal(M.motivoLegible('foto_inapropiada'), 'Foto inapropiada');
+  assert.equal(M.motivoLegible('conducta_antideportiva'), 'Conducta antideportiva');
 });
 
 test('un motivo desconocido se muestra, no se esconde', () => {

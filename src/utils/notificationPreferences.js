@@ -94,6 +94,10 @@ export const PUSH_SIEMPRE = [
   'reserva_cancelacion_solicitada',
   'reserva_cancelacion_rechazada',
   'waitlist_turno_vencido',
+  // Una decisión de moderación (migración 194): quitamos contenido, una
+  // advertencia o una suspensión. Silenciarla dejaría a la persona sin saber
+  // por qué ya no puede publicar.
+  'moderacion',
 ];
 
 /** Devuelve la columna de preferencia para un tipo, o null si no está mapeado. */

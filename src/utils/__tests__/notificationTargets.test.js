@@ -167,6 +167,10 @@ test('resolveNotificationTarget: no queda ningún tipo de NOTIF_TYPE_TO_PREFEREN
   );
 });
 
+test('resolveNotificationTarget: un aviso de moderación lleva a las reglas de convivencia', () => {
+  assert.equal(resolveNotificationTarget({ type: 'moderacion', data: { decision: 'suspender' } }).screen, 'Terms');
+});
+
 test('resolveNotificationTarget: un tipo desconocido no inventa un destino', () => {
   assert.equal(resolveNotificationTarget({ type: 'tipo_que_no_existe', data: {} }), null);
 });

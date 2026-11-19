@@ -14,10 +14,9 @@ import { supabase, isSupabaseConfigured } from './supabase';
  * `insert` desde el panel. Por eso acá no hay ninguna función que liste
  * moderadores — no es un olvido.
  *
- * LO QUE ESTA PANTALLA **NO** HACE: resolver reportes de usuario. La cola
- * los trae para que no pasen desapercibidos, pero resolverlos exige decidir
- * estados, medidas y apelación, y eso sigue abierto. Ver `utils/moderacion.js`,
- * donde esa decisión vive en una constante en vez de en el JSX.
+ * LOS REPORTES DE USUARIO se resuelven desde la migración 194 con
+ * `resolverReporte()`. Qué significa cada decisión vive en
+ * `utils/moderacion.js`.
  */
 
 /**
@@ -94,6 +93,30 @@ export async function reabrirResultado(challengeId, nota = null) {
   });
   if (error) {
     console.error('[FutFinder] reabrirResultado:', error);
+    return { data: null, error };
+  }
+  return { data, error: null };
+}
+
+/**
+ * Resuelve un reporte de usuario (migración 194).
+ *
+ * `decision`: 'descartar', 'advertir', 'quitar_contenido' o 'suspender'
+ * (esta última con `dias`, de 1 a 365). Cierra también los otros reportes
+ * pendientes sobre lo mismo y avisa a la persona reportada, salvo al
+ * descartar. Como las demás, un problema de datos (un reporte ya resuelto)
+ * llega como `{ ok:false, reason }` por `data`.
+ */
+export async function resolverReporte(reporteId, decision, { dias = null, nota = null } = {}) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Demo' } };
+  const { data, error } = await supabase.rpc('moderacion_resolver_reporte', {
+    p_reporte_id: reporteId,
+    p_decision: decision,
+    p_dias: dias,
+    p_nota: nota,
+  });
+  if (error) {
+    console.error('[FutFinder] resolverReporte:', error);
     return { data: null, error };
   }
   return { data, error: null };

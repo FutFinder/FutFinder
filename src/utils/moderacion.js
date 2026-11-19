@@ -2,13 +2,11 @@
  * Lo que la pantalla de moderación necesita decidir, sin red.
  *
  * POR QUÉ EXISTE ESTE ARCHIVO. La pantalla muestra cuatro colas que vienen
- * en un solo `jsonb` de `moderacion_cola()` (migraciones 151 y 164) y tiene
- * que decidir
- * qué se puede resolver y qué no. Esa decisión no es cosmética: **moderar
- * reportes de usuario todavía no está diseñado** —estados, medidas y
- * apelación son una conversación pendiente— así que los reportes se muestran
- * y no se tocan. Si eso viviera dentro del JSX, el día que alguien agregue un
- * botón nadie se acordaría de por qué no estaba.
+ * en un solo `jsonb` de `moderacion_cola()` (migraciones 151, 164 y 194) y
+ * tiene que decidir qué se puede resolver y cómo. Los reportes de usuario se
+ * resuelven desde la 194 con cuatro decisiones (descartar, advertir, quitar
+ * el contenido, suspender), y lo que cada una significa vive acá y no en el
+ * JSX, junto con lo que se valida antes de mandarla.
  *
  * Y la otra razón: una cola vacía y una cola que no se pudo leer se ven
  * igual en pantalla si nadie las distingue, y son cosas muy distintas cuando
@@ -32,11 +30,11 @@ export const COLAS = [
   {
     clave: 'reportes_sin_mirar',
     titulo: 'Reportes sin mirar',
-    // No se resuelven desde acá y conviene que la pantalla lo diga, no que
-    // simplemente no haya botones. Ver el P2 de `pendientes.md`.
+    // Apple y Google piden actuar sobre lo reportado dentro de 24 horas: ver
+    // `docs/memoria/operacion/revision-diaria.md`.
     vacio: 'Nadie ha reportado nada.',
-    accionable: false,
-    nota: 'Se muestran para que no pasen desapercibidos. Resolverlos todavía no está diseñado: hace falta decidir estados, medidas y apelación.',
+    accionable: true,
+    nota: 'Revísalos dentro de 24 horas. La persona reportada recibe un aviso con lo que decidas, salvo si descartas.',
   },
   {
     clave: 'recintos_esperando',
@@ -94,8 +92,13 @@ export function totalPendiente(cola) {
  * moderación, no enseñar algo es peor que enseñarlo feo.
  */
 const MOTIVOS = {
+  // Los que acepta hoy `user_reports_motivo_check`.
   suplantacion: 'Suplantación de identidad',
   informacion_falsa: 'Información falsa',
+  contenido_ofensivo: 'Contenido ofensivo',
+  foto_inapropiada: 'Foto inapropiada',
+  conducta_antideportiva: 'Conducta antideportiva',
+  // Nombres viejos que pueden quedar en reportes anteriores.
   acoso: 'Acoso',
   lenguaje_ofensivo: 'Lenguaje ofensivo',
   spam: 'Spam',
@@ -143,5 +146,80 @@ export const NOTA_MAX = 1000;
 export function puedeResolver({ decision, nota } = {}) {
   if (decision !== 'retirar' && decision !== 'mantener') return false;
   if (typeof nota === 'string' && nota.length > NOTA_MAX) return false;
+  return true;
+}
+
+/**
+ * Resolver un reporte (migración 194).
+ *
+ * Las cuatro decisiones que acepta `moderacion_resolver_reporte()`, con el
+ * texto que ve quien modera antes de confirmar. `avisa` dice si la persona
+ * reportada recibe un aviso: descartar no avisa, porque no hay nada que
+ * contarle y le revelaría que alguien la reportó.
+ */
+export const DECISIONES_REPORTE = {
+  descartar: {
+    etiqueta: 'Descartar',
+    titulo: 'Descartar el reporte',
+    avisa: false,
+  },
+  advertir: {
+    etiqueta: 'Advertir',
+    titulo: 'Advertir a la persona',
+    avisa: true,
+  },
+  quitar_contenido: {
+    etiqueta: 'Quitar contenido',
+    titulo: 'Quitar el contenido',
+    avisa: true,
+  },
+  suspender: {
+    etiqueta: 'Suspender',
+    titulo: 'Suspender la cuenta',
+    avisa: true,
+  },
+};
+
+/** Los días de suspensión que ofrece la pantalla. El servidor acepta 1 a 365. */
+export const DIAS_SUSPENSION = [7, 30];
+export const NOTA_REPORTE_MAX = 600;
+
+/**
+ * Qué se reportó, en español. `elemento` es `tipo:uuid` o null cuando se
+ * reportó a la persona (su perfil).
+ */
+export function elementoLegible(elemento) {
+  const tipo = typeof elemento === 'string' && elemento.includes(':')
+    ? elemento.split(':')[0]
+    : null;
+  switch (tipo) {
+    case 'foto_club': return 'Una foto de un club';
+    case 'foto': return 'Una foto de su perfil';
+    case 'club': return 'Un club';
+    case 'partido': return 'Un partido';
+    case null: return 'Su perfil';
+    default: return String(elemento);
+  }
+}
+
+/** Lo que borra «Quitar contenido» según lo reportado, para confirmarlo. */
+export function queQuitaElContenido(elemento) {
+  const tipo = typeof elemento === 'string' && elemento.includes(':')
+    ? elemento.split(':')[0]
+    : null;
+  switch (tipo) {
+    case 'foto_club': return 'Se borra la foto del club.';
+    case 'foto': return 'Se borra esa foto de su perfil.';
+    case 'club': return 'Se quitan el escudo, la portada y la descripción del club.';
+    case 'partido': return 'Se quitan la descripción y la portada del partido.';
+    default: return 'Se quitan su foto, su portada y su bio.';
+  }
+}
+
+/** ¿Se puede mandar esta resolución? Lo mismo que valida el servidor. */
+export function puedeResolverReporte({ decision, dias, nota } = {}) {
+  if (!DECISIONES_REPORTE[decision]) return false;
+  if (decision === 'suspender' && !(Number.isInteger(dias) && dias >= 1 && dias <= 365)) return false;
+  if (typeof nota === 'string' && nota.length > NOTA_REPORTE_MAX) return false;
   return true;
 }

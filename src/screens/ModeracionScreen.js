@@ -20,6 +20,7 @@ import {
   resolverRevision,
   reabrirResultado,
   aprobarRecinto,
+  resolverReporte,
 } from '../services/moderacion';
 import {
   COLAS,
@@ -31,6 +32,12 @@ import {
   puedeResolver,
   esperaLegible,
   NOTA_MAX,
+  DECISIONES_REPORTE,
+  DIAS_SUSPENSION,
+  NOTA_REPORTE_MAX,
+  elementoLegible,
+  queQuitaElContenido,
+  puedeResolverReporte,
 } from '../utils/moderacion';
 
 /**
@@ -42,11 +49,11 @@ import {
  * las tres RPC vuelven a comprobarlo y devuelven `NO_MODERA` (42501) a quien
  * no corresponda. Esta pantalla nunca es la autoridad.
  *
- * LOS REPORTES SE MUESTRAN Y NO SE TOCAN, y la pantalla lo dice con todas
- * sus letras en vez de limitarse a no traer botones. Resolverlos exige
- * decidir estados, medidas y apelación: es diseño de producto y sigue
- * abierto. La decisión vive en `utils/moderacion.js`, con una prueba que se
- * pone roja si alguien agrega el botón sin darse cuenta.
+ * LOS REPORTES SE RESUELVEN desde la migración 194: descartar, advertir,
+ * quitar el contenido reportado o suspender 7 o 30 días. Cada fila trae lo
+ * necesario para decidir —quién, qué, la descripción, cuántos reportes
+ * previos tiene y si ya está suspendida— y cada decisión se confirma antes
+ * de mandarse. Lo que significa cada una vive en `utils/moderacion.js`.
  *
  * UN HALLAZGO DE LA 151 QUE SE NOTA ACÁ: quien modera **no ve el hilo del
  * desafío que modera** —`chat_puede_ver_desafio()` exige pertenecer a uno de
@@ -153,6 +160,25 @@ export default function ModeracionScreen({ navigation }) {
       'Reabrir el resultado',
       'Los dos clubes podrán proponer el marcador de nuevo. El rechazado se queda en el historial.',
       () => aplicar(d.challenge_id, () => reabrirResultado(d.challenge_id, nota), 'Resultado reabierto')
+    );
+  };
+
+  const resolverRep = (rep, decision, dias = null) => {
+    const nota = notaDe(rep.id).trim() || null;
+    if (!puedeResolverReporte({ decision, dias, nota })) return;
+    const quien = rep.reportado ? `@${rep.reportado}` : 'la persona reportada';
+    const textos = {
+      descartar: 'El reporte se cierra sin medidas y nadie recibe aviso.',
+      advertir: `${quien} recibe un aviso recordándole las reglas de convivencia, sin otra medida.`,
+      quitar_contenido: `${queQuitaElContenido(rep.elemento)} ${quien} recibe un aviso. No se puede deshacer.`,
+      suspender: `${quien} no podrá publicar partidos, escribir mensajes ni subir fotos durante ${dias} días, y recibe un aviso.`,
+    };
+    confirmar(
+      decision === 'suspender'
+        ? `Suspender ${dias} días`
+        : DECISIONES_REPORTE[decision].titulo,
+      textos[decision] + ' Los otros reportes pendientes sobre lo mismo se cierran con esta decisión.',
+      () => aplicar(rep.id, () => resolverReporte(rep.id, decision, { dias, nota }), 'Reporte resuelto')
     );
   };
 
@@ -321,9 +347,68 @@ export default function ModeracionScreen({ navigation }) {
                         <Text style={styles.filaTitulo}>{motivoLegible(rep.motivo)}</Text>
                       </View>
                       <Text style={styles.filaFecha}>{fechaCorta(rep.created_at)}</Text>
-                      {rep.elemento ? (
-                        <Text style={styles.filaTexto}>{String(rep.elemento)}</Text>
+                      <Text style={styles.filaTexto}>
+                        {elementoLegible(rep.elemento)}
+                        {rep.reportado ? ` · @${rep.reportado}` : ''}
+                      </Text>
+                      {rep.descripcion ? (
+                        <Text style={styles.filaContexto}>«{rep.descripcion}»</Text>
                       ) : null}
+                      {Number(rep.reportes_previos) > 0 ? (
+                        <Text style={styles.filaTexto}>
+                          {Number(rep.reportes_previos) === 1
+                            ? 'Tiene otro reporte'
+                            : `Tiene ${Number(rep.reportes_previos)} reportes más`}
+                        </Text>
+                      ) : null}
+                      {rep.suspendida_hasta ? (
+                        <Text style={styles.filaTexto}>
+                          Ya está suspendida hasta el {fechaCorta(rep.suspendida_hasta)}
+                        </Text>
+                      ) : null}
+
+                      <TextInput
+                        value={notaDe(rep.id)}
+                        onChangeText={(v) => setNota(rep.id, v)}
+                        placeholder="Nota interna (opcional)"
+                        placeholderTextColor={C.textDim}
+                        maxLength={NOTA_REPORTE_MAX}
+                        multiline
+                        style={styles.nota}
+                      />
+
+                      <View style={[styles.acciones, styles.accionesEnVarias]}>
+                        {['descartar', 'advertir', 'quitar_contenido'].map((dec) => (
+                          <Pressable
+                            key={dec}
+                            onPress={() => resolverRep(rep, dec)}
+                            disabled={enCurso === rep.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={DECISIONES_REPORTE[dec].titulo}
+                            style={({ pressed }) => [
+                              styles.btn,
+                              dec === 'quitar_contenido' ? styles.btnPrimario : styles.btnSecundario,
+                              pressed && styles.pressed,
+                            ]}
+                          >
+                            <Text style={dec === 'quitar_contenido' ? styles.btnPrimarioTexto : styles.btnSecundarioTexto}>
+                              {DECISIONES_REPORTE[dec].etiqueta}
+                            </Text>
+                          </Pressable>
+                        ))}
+                        {DIAS_SUSPENSION.map((dias) => (
+                          <Pressable
+                            key={`s${dias}`}
+                            onPress={() => resolverRep(rep, 'suspender', dias)}
+                            disabled={enCurso === rep.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Suspender ${dias} días`}
+                            style={({ pressed }) => [styles.btn, styles.btnPeligro, pressed && styles.pressed]}
+                          >
+                            <Text style={styles.btnPeligroTexto}>Suspender {dias} días</Text>
+                          </Pressable>
+                        ))}
+                      </View>
                     </View>
                   ))
                 : null}
@@ -461,6 +546,7 @@ const styles = StyleSheet.create({
   },
 
   acciones: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  accionesEnVarias: { flexWrap: 'wrap' },
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,5 +560,7 @@ const styles = StyleSheet.create({
   btnPrimarioTexto: { color: '#0B0D0B', fontSize: 13, fontFamily: F.extraBold },
   btnSecundario: { borderWidth: 1, borderColor: C.border },
   btnSecundarioTexto: { color: C.textSecondary, fontSize: 13, fontFamily: F.bold },
+  btnPeligro: { borderWidth: 1, borderColor: alfa(C.red, 0.5), backgroundColor: alfa(C.red, 0.1) },
+  btnPeligroTexto: { color: C.red, fontSize: 13, fontFamily: F.bold },
   pressed: { opacity: 0.85 },
 });
