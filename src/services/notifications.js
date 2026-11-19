@@ -97,7 +97,9 @@ export async function registerForPushNotifications(userId) {
 
     const tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
     const token = tokenResp.data;
-    console.log('[push] Expo token:', token);
+    // El token identifica el teléfono: sólo en desarrollo (Sentry ya descarta
+    // la consola, pero el registro del sistema del teléfono no).
+    if (__DEV__) console.log('[push] Expo token:', token);
 
     // 2.4 Guardar en Supabase
     if (isSupabaseConfigured && userId) {

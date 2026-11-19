@@ -213,10 +213,11 @@ export function resolveNotificationTarget(n) {
     case 'friend_accept':
       return data.fromUserId ? { screen: 'UserProfile', params: { userId: data.fromUserId } } : null;
 
-    // Moderación (migración 194): a las reglas de convivencia, que es lo que
-    // explica la decisión. No hay otra pantalla que la muestre.
+    // Moderación (migración 194): a los términos, donde están las reglas de
+    // convivencia que explican la decisión. `Terminos` (para leer), NUNCA
+    // `Terms`: ése es el paso del registro que marca el onboarding.
     case 'moderacion':
-      return { screen: 'Terms', params: {} };
+      return { screen: 'Terminos', params: {} };
 
     default:
       return null;

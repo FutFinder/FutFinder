@@ -9,8 +9,8 @@ const { debeMostrarseAviso, VERSION_AVISO_COOKIES } = require('../../utils/aviso
 const RAIZ = path.join(__dirname, '..', '..', '..');
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 
-test('los tres documentos existen y cada sección tiene algo que leer', () => {
-  assert.deepEqual(Object.keys(DOCUMENTOS_LEGALES).sort(), ['cookies', 'privacidad', 'terminos']);
+test('los cuatro documentos existen y cada sección tiene algo que leer', () => {
+  assert.deepEqual(Object.keys(DOCUMENTOS_LEGALES).sort(), ['cookies', 'eliminarCuenta', 'privacidad', 'terminos']);
   for (const [clave, doc] of Object.entries(DOCUMENTOS_LEGALES)) {
     assert.ok(doc.titulo && doc.resumen, `${clave}: falta título o resumen`);
     assert.ok(doc.secciones.length > 0, `${clave}: sin secciones`);
@@ -71,4 +71,19 @@ test('el aviso de cookies se muestra hasta que se ve la versión vigente', () =>
   assert.equal(debeMostrarseAviso(null), true);
   assert.equal(debeMostrarseAviso('2020-01-01'), true);
   assert.equal(debeMostrarseAviso(VERSION_AVISO_COOKIES), false);
+});
+
+test('la página de eliminar la cuenta es pública y dice lo mismo que delete_my_account()', () => {
+  // Google Play pide un enlace web para pedir el borrado sin la app.
+  const nav = leer('src/navigation/AppNavigator.js');
+  assert.ok(nav.includes("EliminarCuenta: 'eliminar-cuenta'"), 'falta la dirección /eliminar-cuenta');
+  assert.ok(!/EliminarCuenta[^\n]*withAuthGuard/.test(nav), 'la página no puede pedir sesión');
+  const texto = JSON.stringify(DOCUMENTOS_LEGALES.eliminarCuenta);
+  const sql = leer('supabase/migrations/176_borrar_la_cuenta_de_verdad.sql');
+  // Los tres impedimentos de la 176, uno por uno.
+  assert.ok(sql.includes('de saldo a favor') && texto.includes('Saldo a favor'));
+  assert.ok(sql.includes('reservas por jugar que ya pagaste') && texto.includes('Reservas por jugar que ya pagaste'));
+  assert.ok(sql.includes('Administras el recinto') && texto.includes('recinto que sólo tú administras'));
+  assert.ok(leer('src/screens/SettingsScreen.js').includes('>Eliminar cuenta<'), 'el botón cambió de nombre: actualiza la página');
+  assert.ok(texto.includes(CORREO_PRIVACIDAD));
 });

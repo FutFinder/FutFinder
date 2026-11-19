@@ -43,6 +43,7 @@ Esta bóveda documenta la configuración, el código y las migraciones versionad
 | Aprobar un recinto nuevo | [Aprobar recintos](operacion/aprobar-recintos.md) | [Reservas](funcionalidades/reservas.md), [Base de datos](arquitectura/base-de-datos.md) |
 | Estado, pendientes o pruebas | [Estado actual](operacion/estado-actual.md) | [Pendientes](operacion/pendientes.md), [Pruebas](operacion/pruebas.md) |
 | Lo cambiado que falta probar (se prueba todo junto al final) | [Por probar](operacion/por-probar.md) | La nota del dominio de cada ítem |
+| Qué falta para lanzar y en qué orden (cuentas, tiendas, el día antes) | [Lanzamiento](operacion/lanzamiento.md) | [Pendientes](operacion/pendientes.md), [Por probar](operacion/por-probar.md) |
 | Lint, calidad o errores de render | [Calidad y lint](operacion/calidad-y-lint.md) | [Pruebas](operacion/pruebas.md) |
 
 ## Política de actualización

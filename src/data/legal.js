@@ -297,4 +297,57 @@ const terminos = {
   ],
 };
 
-export const DOCUMENTOS_LEGALES = { terminos, privacidad, cookies };
+/**
+ * Cómo eliminar la cuenta, en una dirección pública (`/eliminar-cuenta`).
+ *
+ * Google Play la exige: el formulario de Seguridad de los datos pide un
+ * enlace web donde se pueda pedir el borrado SIN tener la app instalada.
+ * Lo que dice tiene que coincidir con `delete_my_account()` (migración 176):
+ * qué se borra, qué queda sin autor y qué impide borrar.
+ */
+const eliminarCuenta = {
+  titulo: 'Eliminar tu cuenta',
+  resumen: `Puedes eliminar tu cuenta de FutFinder y tus datos cuando quieras, desde la app o escribiéndonos. ${EMPRESA.razonSocial} es la responsable de tus datos.`,
+  secciones: [
+    {
+      titulo: 'Desde la app o la web',
+      parrafos: ['Es inmediato y no necesitas escribirnos:'],
+      lista: [
+        'Abre FutFinder en tu teléfono o inicia sesión en www.futfinder.cl.',
+        'Entra a Ajustes y, al final de la pantalla, toca «Eliminar cuenta».',
+        'Confirma con «Eliminar mi cuenta».',
+      ],
+    },
+    {
+      titulo: 'Sin la app',
+      parrafos: [
+        `Si ya no tienes la app o no puedes iniciar sesión, escríbenos a ${CORREO_PRIVACIDAD} desde el correo con el que te registraste y pídenos eliminar tu cuenta. Te responderemos dentro de 10 días hábiles para confirmar que eres tú y la eliminaremos.`,
+      ],
+    },
+    {
+      titulo: 'Qué se elimina',
+      parrafos: [
+        'Tu perfil (nombre de usuario, foto, portada, bio, edad, comuna y posición), tus fotos, tu teléfono, tu ubicación, tus amistades y bloqueos, tus mensajes, tus avisos, tus inscripciones en partidos y tus preferencias.',
+        'Si tienes partidos por jugar que organizaste, se cancelan y se avisa a los inscritos. Si eras la única persona que administraba un club con integrantes, la administración pasa a quien lleva más tiempo en él.',
+      ],
+    },
+    {
+      titulo: 'Qué se conserva, sin tu nombre',
+      parrafos: [
+        'Los partidos ya jugados, los clubes que fundaste y los resultados quedan para las demás personas que participaron, pero sin ningún vínculo contigo.',
+        'El registro de pagos y reservas se conserva desvinculado de ti por obligación contable y tributaria, durante el plazo que exige la ley.',
+      ],
+    },
+    {
+      titulo: 'Lo que hay que resolver antes',
+      parrafos: ['No se puede eliminar una cuenta que todavía tiene algo pendiente con otras personas o con dinero:'],
+      lista: [
+        `Saldo a favor: escríbenos a ${CORREO_PRIVACIDAD} para devolvértelo.`,
+        'Reservas por jugar que ya pagaste: cancélalas desde «Mis reservas» o espera a jugarlas.',
+        `Un recinto que sólo tú administras: escríbenos para traspasarlo.`,
+      ],
+    },
+  ],
+};
+
+export const DOCUMENTOS_LEGALES = { terminos, privacidad, cookies, eliminarCuenta };

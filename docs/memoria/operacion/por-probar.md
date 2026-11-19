@@ -196,6 +196,12 @@ carga de saldo.
 
 **Qué falta:** con la sesión de quien modera, abrir Ajustes → Moderación y ver una fila de reporte con descripción, reportado y previos; con una cuenta de prueba reportada por otra, probar Advertir, Quitar contenido (una foto de club) y Suspender 7 días, y ver el aviso «moderacion» en la bandeja y como push (al tocarlo abre Términos). Con la cuenta suspendida, intentar escribir en un chat y subir una foto: tiene que salir «Tu cuenta está suspendida hasta el …». Después levantar la suspensión con el `update` de [Revisión diaria](revision-diaria.md).
 
+## 6j. Página pública para eliminar la cuenta (2026-11-18)
+
+**Qué sí se comprobó:** `/eliminar-cuenta` se abre sin sesión en la web local y muestra el texto completo; la base borra en cascada todo lo que la página dice que se borra (perfil, fotos, teléfono, amistades, bloqueos, mensajes, avisos, inscripciones, tokens de push); pruebas de Node (ruta pública, los tres impedimentos de la 176, el nombre del botón).
+
+**Qué falta:** abrir `https://www.futfinder.cl/eliminar-cuenta` después del despliegue, y que el aviso de moderación abra Términos (ya no el paso del registro).
+
 ## 7. Lo que ya estaba sin probar antes de esta tanda
 
 - **Push en un teléfono físico** (el P1 de [Pendientes](pendientes.md)):

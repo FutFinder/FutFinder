@@ -8,7 +8,7 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, FileText, FileLock, Cookie, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, FileText, FileLock, Cookie, ChevronRight, UserX } from 'lucide-react-native';
 
 import Logo from '../components/Logo';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
@@ -16,8 +16,8 @@ import { APP_VERSION } from '../utils/appVersion';
 import { ACTUALIZADO, CORREO_PRIVACIDAD, DOCUMENTOS_LEGALES } from '../data/legal';
 
 /**
- * Términos y condiciones (`Terminos`), política de privacidad (`Privacidad`)
- * y de cookies (`Cookies`).
+ * Términos y condiciones (`Terminos`), política de privacidad (`Privacidad`),
+ * de cookies (`Cookies`) y cómo eliminar la cuenta (`EliminarCuenta`).
  *
  * Una sola pantalla para las tres rutas: la ruta elige el documento. Son
  * públicas a propósito —se leen ANTES de crear la cuenta, desde Bienvenida y
@@ -32,6 +32,9 @@ const RUTAS = [
   { ruta: 'Terminos', doc: 'terminos', Icono: FileText },
   { ruta: 'Privacidad', doc: 'privacidad', Icono: FileLock },
   { ruta: 'Cookies', doc: 'cookies', Icono: Cookie },
+  // Pública a propósito: Google Play pide un enlace web para pedir el
+  // borrado sin tener la app (`/eliminar-cuenta`).
+  { ruta: 'EliminarCuenta', doc: 'eliminarCuenta', Icono: UserX },
 ];
 
 function Parrafos({ textos }) {

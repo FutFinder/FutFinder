@@ -122,6 +122,7 @@ const SafeTermsScreen = withErrorBoundary(TermsScreen, 'Terms');
 const SafeTerminosScreen = withErrorBoundary(LegalScreen, 'Terminos');
 const SafePrivacidadScreen = withErrorBoundary(LegalScreen, 'Privacidad');
 const SafeCookiesScreen = withErrorBoundary(LegalScreen, 'Cookies');
+const SafeEliminarCuentaScreen = withErrorBoundary(LegalScreen, 'EliminarCuenta');
 const SafeSuccessScreen = withErrorBoundary(SuccessScreen, 'Success');
 // Galería interna de QA (Fase 1 del handoff de Reservas): no muestra datos
 // de usuario, así que no pasa por withAuthGuard — es la misma razón por la
@@ -264,6 +265,8 @@ const linking = {
       Terminos: 'terminos',
       Privacidad: 'privacidad',
       Cookies: 'cookies',
+      // La exige Google Play: borrar la cuenta sin tener la app.
+      EliminarCuenta: 'eliminar-cuenta',
     },
   },
 };
@@ -321,6 +324,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Terminos" component={SafeTerminosScreen} options={{ title: 'Términos y condiciones' }} />
         <Stack.Screen name="Privacidad" component={SafePrivacidadScreen} options={{ title: 'Política de privacidad' }} />
         <Stack.Screen name="Cookies" component={SafeCookiesScreen} options={{ title: 'Política de cookies' }} />
+        <Stack.Screen name="EliminarCuenta" component={SafeEliminarCuentaScreen} options={{ title: 'Eliminar tu cuenta' }} />
         <Stack.Screen name="Success" component={SafeSuccessScreen} options={{ animation: 'fade' }} />
 
         {/* Una vez logueado, el usuario vive dentro de Main (tabs) */}

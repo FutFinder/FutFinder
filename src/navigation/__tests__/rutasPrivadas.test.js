@@ -46,6 +46,8 @@ const PUBLICAS = new Set([
   'Terminos',
   'Privacidad',
   'Cookies',
+  // Cómo eliminar la cuenta: Google Play pide que se lea sin la app ni sesión.
+  'EliminarCuenta',
   'Success',
   // Galería interna de QA de las primitivas de Reservas: no importa ningún
   // servicio ni el cliente de Supabase, no lee datos de nadie y no está en la
