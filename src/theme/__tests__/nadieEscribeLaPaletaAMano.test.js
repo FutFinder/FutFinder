@@ -44,6 +44,35 @@ const path = require('node:path');
  */
 
 const RAIZ = path.resolve(__dirname, '../..');
+const RAIZ_REPO = path.resolve(RAIZ, '..');
+
+/**
+ * Y MIRA TAMBIÉN LA CONFIG DE LA RAÍZ, que es el agujero por el que se coló
+ * la tercera vez. `archivosDeFuente()` arranca en `src/`, así que durante casi
+ * un mes `app.config.js` siguió declarando el verde oliva legado en tres
+ * sitios: el `color` de `notification`, el `themeColor` del PWA y el `color`
+ * del plugin `expo-notifications`. Ese último es el tinte del ícono de
+ * notificación en Android, o sea que lo veía cualquiera que recibiera un
+ * push: el color viejo estaba en el lugar más visible de todos, justo donde
+ * nadie estaba mirando.
+ *
+ * Son los dos archivos de la raíz que pintan: `app.config.js` porque declara
+ * colores de la app nativa y del PWA, y `tailwind.config.js` porque declara
+ * las clases con nombre. El resto (`App.js`, `index.js`, `babel.config.js`,
+ * `metro.config.js`) no nombra colores; si algún día lo hace, se agrega acá.
+ *
+ * NO DUPLICA a `appConfigEnLaPaleta.test.js`, que nació del mismo susto y es
+ * su hermana: aquélla exige que todo hex de `app.config.js` sea un valor de
+ * `paleta` y que esos tres sean `paleta.green`, pero mira un solo archivo.
+ * Ésta es la que cubre `tailwind.config.js`, y la única que caza un color
+ * borrado escrito como `rgba()`.
+ *
+ * Y OJO AL EDITAR ESOS DOS ARCHIVOS: como la búsqueda es por TEXTO, un hex
+ * prohibido no se puede escribir ahí ni dentro de un comentario. Es lo que
+ * obligó a que `tailwind.config.js` cuente su propia historia diciendo
+ * `bg-[#...]` en vez del flúor que de verdad tenía.
+ */
+const CONFIG_DE_RAIZ = ['app.config.js', 'tailwind.config.js'];
 
 /**
  * Los colores de las paletas que se borraron, con dónde vivía cada uno y su
@@ -83,12 +112,17 @@ function archivosDeFuente(dir = RAIZ, acc = []) {
   return acc;
 }
 
-test('ningún color de las paletas borradas está escrito a mano en src/', () => {
+/** Todo lo que pinta: `src/` y los archivos de configuración de la raíz. */
+function archivosConPaleta() {
+  return [...archivosDeFuente(), ...CONFIG_DE_RAIZ.map((n) => path.join(RAIZ_REPO, n))];
+}
+
+test('ningún color de las paletas borradas está escrito a mano en src/ ni en la config de la raíz', () => {
   const hallazgos = [];
 
-  for (const archivo of archivosDeFuente()) {
+  for (const archivo of archivosConPaleta()) {
     const codigo = fs.readFileSync(archivo, 'utf8');
-    const relativo = path.relative(RAIZ, archivo);
+    const relativo = path.relative(RAIZ_REPO, archivo);
     for (const [hex, { origen, rgb }] of Object.entries(PROHIBIDOS)) {
       const formas = [new RegExp(hex, 'gi')];
       // `rgba( 90 , 224 , 106 , .12 )` es el mismo color que `#5AE06A`, así
@@ -128,9 +162,9 @@ const A_MANO = {
 
 test('la paleta actual tampoco se escribe a mano: para eso está alfa()', () => {
   const hallazgos = [];
-  for (const archivo of archivosDeFuente()) {
+  for (const archivo of archivosConPaleta()) {
     const codigo = fs.readFileSync(archivo, 'utf8');
-    const relativo = path.relative(RAIZ, archivo);
+    const relativo = path.relative(RAIZ_REPO, archivo);
     for (const [rgb, nombre] of Object.entries(A_MANO)) {
       const [r, g, b] = rgb.split(',');
       const re = new RegExp(`rgba?\\(\\s*${r}\\s*,\\s*${g}\\s*,\\s*${b}\\s*[,)]`, 'g');
@@ -150,7 +184,7 @@ test('tailwind expone la paleta con nombre, para que nadie escriba un hex', () =
   // La otra mitad del arreglo: mientras `theme.extend.colors` estuviera vacío,
   // la única forma de pintar algo con NativeWind era el valor arbitrario
   // `bg-[#...]`, que es exactamente lo que se nos escapó.
-  const config = require(path.resolve(RAIZ, '..', 'tailwind.config.js'));
+  const config = require(path.join(RAIZ_REPO, 'tailwind.config.js'));
   const colores = config.theme?.extend?.colors || {};
   const { paleta } = require('../colors.js');
 

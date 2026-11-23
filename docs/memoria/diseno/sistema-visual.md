@@ -27,6 +27,23 @@ exporte una segunda paleta y que ningún token que el código usa se quede sin
 valor —en React Native un token inexistente pinta transparente o negro y no
 avisa.
 
+El cuarto candado, y el único que caza un color **escrito a mano**, es
+`src/theme/__tests__/nadieEscribeLaPaletaAMano.test.js`: busca por TEXTO cada
+hex borrado y su `rgba()`, porque ni el lint ni la migración de tokens ven un
+color dentro de una cadena. **Desde el 23-11-2026 lee además los archivos de
+configuración de la raíz**, `app.config.js` y `tailwind.config.js`. Recorría
+sólo `src/`, y por ese hueco el olivo legado sobrevivió casi un mes en los
+tres sitios de `app.config.js` que se cuentan más abajo.
+
+Esa prueba y `appConfigEnLaPaleta.test.js` se reparten el trabajo y conviene
+no confundirlas: la segunda mira un solo archivo pero con más exigencia (todo
+hex de `app.config.js` tiene que ser un valor de `paleta`), y la primera es la
+que cubre `tailwind.config.js` y la única que caza un color borrado escrito
+como `rgba()`. Corolario para quien edite esos dos archivos: como la búsqueda
+es por texto, un hex prohibido no se escribe ahí **ni dentro de un
+comentario** — es lo que obligó a que `tailwind.config.js` cuente su propia
+historia diciendo `bg-[#...]` en vez del flúor que de verdad tenía.
+
 Diseño y fases: `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
 
 **Ya no hay excepción:** el olivo `#71B533` sobrevivía en `app.config.js` (`notification.color`, `web.themeColor` y el plugin `expo-notifications`) y desde `d11848d` esos tres usan el verde `#55DF69` de la paleta. El archivo no puede importar `src/theme/colors.js` (lo lee Expo en Node, antes de Babel), así que los colores van escritos a mano; `src/theme/__tests__/appConfigEnLaPaleta.test.js` exige que todo color de `app.config.js` sea un valor de `paleta` y que esos tres sean `paleta.green`. Si falla, no se agrega una excepción: se usa el valor del token. **El color nativo de la notificación (Android) sólo se verá en el próximo build**, porque no hay actualizaciones por aire. El fondo `#0A0C0A` del splash nativo coincide con `paleta.bg`.
