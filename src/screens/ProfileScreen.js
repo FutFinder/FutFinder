@@ -49,6 +49,7 @@ import {
   getProfileById,
   getAttendanceHistoryFor,
   getAccountStatusFor,
+  getConteoDeAsistencias,
   deriveStats,
 } from '../services/profile';
 import { getUserRatingSummary } from '../services/ratings';
@@ -66,6 +67,7 @@ import {
 import { reportUser, countReportsAgainst, getMyPendingReportFor } from '../services/reports';
 import { isBlockedByMe, blockUser, unblockUser } from '../services/blockedUsers';
 import { isSupabaseConfigured } from '../services/supabase';
+import { goBackOrPartidos } from '../utils/navigation';
 import { useTrueScoreAjustes } from '../services/trueScore';
 import {
   playerBadges,
@@ -127,6 +129,7 @@ export default function ProfileScreen({ navigation, route }) {
   const [ratingSummary, setRatingSummary] = useState(null);
   const [accountStatus, setAccountStatus] = useState({ suspended: false, suspended_until: null });
   const [reportesRecibidos, setReportesRecibidos] = useState(0);
+  const [conteoAsistencias, setConteoAsistencias] = useState(null);
   const [friendship, setFriendship] = useState(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [misClubs, setMisClubs] = useState([]);
@@ -185,13 +188,16 @@ export default function ProfileScreen({ navigation, route }) {
         return;
       }
 
-      const [pRes, h, ph, rs, acc, reportes] = await Promise.all([
+      const [pRes, h, ph, rs, acc, reportes, conteo] = await Promise.all([
         propio ? getMyProfile() : getProfileById(viewUserId),
         getAttendanceHistoryFor(targetId, HISTORIAL_LIMITE),
         getProfilePhotos(targetId),
         getUserRatingSummary(targetId),
         getAccountStatusFor(targetId),
         countReportsAgainst(targetId),
+        // Los contadores de asistencia, contados en el servidor y no sobre
+        // las últimas filas del historial (P01).
+        getConteoDeAsistencias(targetId),
       ]);
 
       // El perfil propio sigue llegando pelado; el ajeno viaja como
@@ -221,6 +227,8 @@ export default function ProfileScreen({ navigation, route }) {
       setRatingSummary(demo && (rs?.count ?? 0) === 0 ? getDemoRatingSummary() : rs);
       setAccountStatus(acc);
       setReportesRecibidos(reportes.data || 0);
+      // Con el historial de ejemplo, el conteo real (0) contradiría a la lista.
+      setConteoAsistencias(demo && h.length === 0 ? null : conteo || null);
 
       if (propio) {
         setFriendship(null);
@@ -264,17 +272,28 @@ export default function ProfileScreen({ navigation, route }) {
   };
 
   // ── Derivados ──
-  const stats = useMemo(() => deriveStats(profile, history), [profile, history]);
+  const stats = useMemo(
+    () => deriveStats(profile, history, conteoAsistencias),
+    [profile, history, conteoAsistencias]
+  );
   const rating = useMemo(() => ratingDisplay(ratingSummary), [ratingSummary]);
   // Con TrueScore el puntaje es real desde el primer día (evento «inicio»),
   // así que la tarjeta lo muestra en vez de esconderlo tras «N.A.».
   const trust = useMemo(() => trustDisplay(profile, { ts: tsFase1 }), [profile, tsFase1]);
-  const attendance = useMemo(() => attendanceDisplay(history), [history]);
+  const attendance = useMemo(
+    () => attendanceDisplay(history, conteoAsistencias),
+    [history, conteoAsistencias]
+  );
   const badges = useMemo(() => playerBadges(profile), [profile]);
 
+  // «Ver todo» despliega aquí mismo el historial ya cargado (P03): antes
+  // mandaba a Buscar partidos, que no es ningún historial.
+  const [verTodasLasParticipaciones, setVerTodasLasParticipaciones] = useState(false);
+  const conPartido = useMemo(() => history.filter((h) => h.match), [history]);
+  const hayMasParticipaciones = conPartido.length > MAX_PARTICIPACIONES;
   const participaciones = useMemo(
-    () => history.filter((h) => h.match).slice(0, MAX_PARTICIPACIONES),
-    [history]
+    () => (verTodasLasParticipaciones ? conPartido : conPartido.slice(0, MAX_PARTICIPACIONES)),
+    [conPartido, verTodasLasParticipaciones]
   );
 
   // ── Acciones propias ──
@@ -379,7 +398,7 @@ export default function ProfileScreen({ navigation, route }) {
     showBanner(
       'success',
       'Invitación enviada',
-      `@${profile?.username || 'jugador'} verá tu invitación a ${club.nombre} en su pestaña Clubes.`
+      `A @${profile?.username || 'jugador'} le llegó un aviso de tu invitación a ${club.nombre}, y la verá también en su pestaña Clubes.`
     );
   };
 
@@ -425,8 +444,9 @@ export default function ProfileScreen({ navigation, route }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <PlayerProfileTopBar
           isOwnProfile={isOwnProfile}
+          showBack={route?.name === 'UserProfile'}
           title={isOwnProfile ? 'Mi perfil' : 'Perfil'}
-          onBack={() => navigation.goBack()}
+          onBack={() => goBackOrPartidos(navigation)}
           onShare={() => {}}
           onEdit={canManageOwnProfile ? goEdit : undefined}
           onSettings={canManageOwnProfile ? goSettings : undefined}
@@ -442,8 +462,9 @@ export default function ProfileScreen({ navigation, route }) {
       <SafeAreaView edges={['top']} style={styles.root}>
         <PlayerProfileTopBar
           isOwnProfile={isOwnProfile}
+          showBack={route?.name === 'UserProfile'}
           title={isOwnProfile ? 'Mi perfil' : 'Perfil'}
-          onBack={() => navigation.goBack()}
+          onBack={() => goBackOrPartidos(navigation)}
           onShare={() => {}}
           onEdit={canManageOwnProfile ? goEdit : undefined}
           onSettings={canManageOwnProfile ? goSettings : undefined}
@@ -520,8 +541,11 @@ export default function ProfileScreen({ navigation, route }) {
     <SafeAreaView edges={['top']} style={styles.root}>
       <PlayerProfileTopBar
         isOwnProfile={isOwnProfile}
+        // La pestaña Perfil es raíz; `UserProfile` siempre se abre encima de
+        // otra pantalla, también cuando el perfil es el propio.
+        showBack={route?.name === 'UserProfile'}
         title={isOwnProfile ? 'Mi perfil' : `@${profile.username || 'jugador'}`}
-        onBack={() => navigation.goBack()}
+        onBack={() => goBackOrPartidos(navigation)}
         onShare={handleShare}
         onEdit={goEdit}
         onSettings={goSettings}
@@ -606,9 +630,11 @@ export default function ProfileScreen({ navigation, route }) {
         {/* ── Últimas participaciones ── */}
         <SectionHeader
           title="Últimas participaciones"
-          actionLabel={participaciones.length > 0 ? 'Ver todo' : null}
+          actionLabel={
+            hayMasParticipaciones ? (verTodasLasParticipaciones ? 'Ver menos' : 'Ver todo') : null
+          }
           onAction={
-            participaciones.length > 0 ? () => navigation.navigate('SearchTab') : null
+            hayMasParticipaciones ? () => setVerTodasLasParticipaciones((v) => !v) : null
           }
         />
         {participaciones.length === 0 ? (
@@ -673,6 +699,7 @@ export default function ProfileScreen({ navigation, route }) {
         <AccountStatusCard
           suspended={accountStatus.suspended}
           suspendedUntil={accountStatus.suspended_until}
+          desconocido={!!accountStatus.desconocido}
           stats={stats}
           reportesRecibidos={reportesRecibidos}
           isOwnProfile={isOwnProfile}

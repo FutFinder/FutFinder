@@ -33,6 +33,7 @@ export const NOTIF_TYPE_TO_PREFERENCE = {
   club_member_joined: 'notif_clubs',
   club_member_left: 'notif_clubs',
   club_invite_accepted: 'notif_clubs',
+  club_invite: 'notif_clubs',
   club_challenge: 'notif_clubs',
   club_challenge_accepted: 'notif_clubs',
   club_challenge_rejected: 'notif_clubs',
@@ -93,6 +94,10 @@ export const PUSH_SIEMPRE = [
   'reserva_cancelacion_solicitada',
   'reserva_cancelacion_rechazada',
   'waitlist_turno_vencido',
+  // Una decisión de moderación (migración 194): quitamos contenido, una
+  // advertencia o una suspensión. Silenciarla dejaría a la persona sin saber
+  // por qué ya no puede publicar.
+  'moderacion',
 ];
 
 /** Devuelve la columna de preferencia para un tipo, o null si no está mapeado. */

@@ -98,13 +98,22 @@ begin
   raise notice 'OK (caso 4): el camino interno de notificaciones sigue funcionando';
 
   -- ── Caso 5: el trigger de ratings sigue vivo ──────────────────
-  -- No hay partido de verdad, así que se comprueba llamando a la
-  -- función por el camino con sesión, que es el que usa el trigger.
-  set local role authenticated;
-  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_a, 'role','authenticated')::text);
+  -- La migración 165 le quitó EXECUTE también a `authenticated`: la única
+  -- que la llama es `tg_ratings_recalc`, que es `security definer` y corre
+  -- como `postgres`. Ya no se prueba «con sesión» (ya no puede), se prueba
+  -- que el cliente NO la ejecute y que el dueño sí. Que el trigger siga
+  -- recalculando lo cubre el caso B2 del arnés de la 165, que edita un
+  -- comentario como `authenticated` y dispara el trigger.
+  begin
+    set local role authenticated;
+    execute format('set local request.jwt.claims to %L', json_build_object('sub', v_a, 'role','authenticated')::text);
+    perform public.recalc_user_ratings(v_b);
+    reset role;
+    raise exception 'FALLÓ (caso 5): authenticated todavía ejecuta recalc_user_ratings';
+  exception when insufficient_privilege then reset role;
+  end;
   perform public.recalc_user_ratings(v_b);
-  reset role;
-  raise notice 'OK (caso 5): recalc_user_ratings sigue disponible con sesión';
+  raise notice 'OK (caso 5): recalc_user_ratings sólo la ejecuta el servidor (migración 165)';
 
   -- ── Caso 6: el cliente sigue pudiendo contar reportes ─────────
   set local role authenticated;

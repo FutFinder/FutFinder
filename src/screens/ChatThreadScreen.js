@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -51,6 +52,12 @@ import {
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
 import {
+  appEstaActiva,
+  cargaPermiteMarcarLeido,
+  crearAcuseDeLectura,
+} from '../utils/lecturaDeHilo';
+import { cursorDeHistorial } from '../utils/cursorDeMensajes';
+import {
   listThreadMessages,
   sendMessage,
   markThreadAsRead,
@@ -62,12 +69,13 @@ import {
   setThreadMuted,
   isThreadMuted,
   parseComposerCommand,
+  getRemitente,
   suggestCommands,
   canUseMentionAll,
 } from '../services/messages';
 import { getMatchById, getMatchAttendees, withClubs } from '../services/matches';
 import { enVentanaGps, puedeCalificar, textoConfirmacionGps } from '../services/matchRules';
-import { getClubById, listMembers } from '../services/clubs';
+import { getClubById, getMisMembresiasEn, listMembers } from '../services/clubs';
 import { confirmAttendanceWithGPS } from '../services/attendance';
 import {
   getChallenge,
@@ -115,6 +123,7 @@ import {
   attachCachedSender,
   needsSenderFetch,
   isGroupType,
+  threadHeaderTitle,
 } from '../utils/chatMeta';
 import useConnection from '../utils/useConnection';
 
@@ -173,6 +182,21 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [context, setContext] = useState(null); // info del club / partido
   const [clubChallenge, setClubChallenge] = useState(null);
+
+  // EL TÍTULO NO SIEMPRE VIENE POR PARÁMETRO. La bandeja de chats y la de
+  // desafíos lo pasan ya calculado; entrar desde un AVISO navega sólo con el
+  // `threadKey`, y entonces la cabecera decía 'Chat' a secas — hasta en el
+  // hilo de negociación entre dos clubes. Se deriva de lo ya cargado.
+  const headerTitle = useMemo(
+    () => threadHeaderTitle({
+      paramTitle: route?.params?.title,
+      tipo: t?.type,
+      context,
+      challenge: clubChallenge,
+    }),
+    [route?.params?.title, t?.type, context, clubChallenge],
+  );
+
   const [challengeEvents, setChallengeEvents] = useState([]);
   const [challengeProposal, setChallengeProposal] = useState(null);
   const [prorrogaReplies, setProrrogaReplies] = useState([]);
@@ -264,6 +288,40 @@ export default function ChatThreadScreen({ route, navigation }) {
   const isPrependingRef = useRef(false);
   const didInitialScrollRef = useRef(false);
 
+  // ── Acuse de lectura (C02): sólo lo que de verdad está a la vista ──
+  // Un mensaje que llega con Detalles encima, la app en segundo plano o la
+  // lista más arriba queda pendiente y se marca cuando vuelve a verse.
+  const enfocadoRef = useRef(navigation?.isFocused?.() ?? true);
+  const appActivaRef = useRef(appEstaActiva(AppState.currentState));
+  const acuseRef = useRef(null);
+  const estadoDeLectura = useCallback(
+    () => ({
+      enfocado: enfocadoRef.current,
+      appActiva: appActivaRef.current,
+      cercaDelFinal: nearBottomRef.current,
+    }),
+    []
+  );
+
+  useEffect(() => {
+    const alEnfocar = navigation?.addListener?.('focus', () => {
+      enfocadoRef.current = true;
+      acuseRef.current?.revisar(estadoDeLectura());
+    });
+    const alDesenfocar = navigation?.addListener?.('blur', () => {
+      enfocadoRef.current = false;
+    });
+    const alCambiarApp = AppState.addEventListener('change', (estado) => {
+      appActivaRef.current = appEstaActiva(estado);
+      acuseRef.current?.revisar(estadoDeLectura());
+    });
+    return () => {
+      try { alEnfocar?.(); } catch {}
+      try { alDesenfocar?.(); } catch {}
+      try { alCambiarApp?.remove?.(); } catch {}
+    };
+  }, [navigation, estadoDeLectura]);
+
   const { connection, reportChannelStatus } = useConnection();
 
   const canWrite = access ? access.canWrite : true;
@@ -288,6 +346,9 @@ export default function ChatThreadScreen({ route, navigation }) {
     didInitialScrollRef.current = false;
     firmaChallengeRef.current = '';
     expedienteRef.current = EXPEDIENTE_VACIO;
+    acuseRef.current = crearAcuseDeLectura(() => {
+      markThreadAsRead(threadKey).catch(() => {});
+    });
 
     (async () => {
       try {
@@ -322,7 +383,8 @@ export default function ChatThreadScreen({ route, navigation }) {
           });
         }
         setLoading(false);
-        markThreadAsRead(threadKey).catch(() => {});
+        // Sólo se da por leído lo que llegó: con error no hay nada en pantalla.
+        if (cargaPermiteMarcarLeido(page)) markThreadAsRead(threadKey).catch(() => {});
       } catch (e) {
         console.error('[FutFinder] ChatThread load:', e);
         if (!mountedRef.current) return;
@@ -411,11 +473,10 @@ export default function ChatThreadScreen({ route, navigation }) {
       setChallengeProposal(prop || null);
 
       if (!user?.id) return;
-      const { data: membresias } = await supabase
-        .from('club_members')
-        .select('club_id, rol')
-        .eq('user_id', user.id)
-        .in('club_id', [data.club_retador_id, data.club_retado_id]);
+      const { data: membresias } = await getMisMembresiasEn(user.id, [
+        data.club_retador_id,
+        data.club_retado_id,
+      ]);
       if (alive) {
         const filas = membresias || [];
         setMyClubIds(filas.filter((m) => m.rol === 'admin').map((m) => m.club_id));
@@ -458,11 +519,7 @@ export default function ChatThreadScreen({ route, navigation }) {
     if (fetchingSendersRef.current.has(senderId)) return;
     fetchingSendersRef.current.add(senderId);
     (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, username, foto_url')
-        .eq('id', senderId)
-        .maybeSingle();
+      const { data } = await getRemitente(senderId);
       fetchingSendersRef.current.delete(senderId);
       if (!data || !mountedRef.current) return;
       profilesRef.current.set(senderId, data);
@@ -512,7 +569,7 @@ export default function ChatThreadScreen({ route, navigation }) {
             return [...prev, enrichedRow];
           });
           if (row.sender_id !== myId) {
-            markThreadAsRead(threadKey).catch(() => {});
+            acuseRef.current?.llegoAjeno(estadoDeLectura());
             if (needsSenderFetch(row, { isGroup, myId, profilesById: profilesRef.current })) {
               fetchAndAttachSender(row.sender_id);
             }
@@ -527,14 +584,15 @@ export default function ChatThreadScreen({ route, navigation }) {
     return () => {
       try { unsubscribe(); } catch {}
     };
-  }, [threadKey, myId, canRead, isGroup, reportChannelStatus, fetchAndAttachSender]);
+  }, [threadKey, myId, canRead, isGroup, reportChannelStatus, fetchAndAttachSender, estadoDeLectura]);
 
   // ── Cargar mensajes anteriores ───────────────────────────────
   const loadEarlier = useCallback(async () => {
     if (loadingEarlier || messages.length === 0) return;
     setLoadingEarlier(true);
-    const oldest = messages[0]?.created_at;
-    const page = await listThreadMessages(threadKey, { limit: PAGE_SIZE, before: oldest });
+    // El par (created_at, id): sólo la fecha perdía mensajes empatados (C03).
+    const desde = cursorDeHistorial(messages);
+    const page = await listThreadMessages(threadKey, { limit: PAGE_SIZE, before: desde });
     if (!mountedRef.current) return;
     setLoadingEarlier(false);
     if (page.error) {
@@ -674,8 +732,8 @@ export default function ChatThreadScreen({ route, navigation }) {
   const openIdentity = useCallback(() => {
     if (!t?.id) return;
     if (t.type === 'dm') navigation.navigate('UserProfile', { userId: t.id });
-    else navigation.navigate('ChatDetails', { threadKey, title: paramTitle, fotoUrl });
-  }, [t?.id, t?.type, navigation, threadKey, paramTitle, fotoUrl]);
+    else navigation.navigate('ChatDetails', { threadKey, title: headerTitle, fotoUrl });
+  }, [t?.id, t?.type, navigation, threadKey, headerTitle, fotoUrl]);
 
   const handleRateMatch = () => t?.id && navigation.navigate('RateMatch', { matchId: t.id });
 
@@ -1412,8 +1470,8 @@ export default function ChatThreadScreen({ route, navigation }) {
 
   const headerSubtitle = useMemo(() => {
     if (t?.type === 'challenge') {
-      // El estado del ciclo es lo que de verdad orienta acá: el título ya
-      // dice qué dos clubes se enfrentan.
+      // El estado del ciclo es lo que de verdad orienta acá: el título dice
+      // qué dos clubes se enfrentan, o al menos que esto es un desafío.
       if (!clubChallenge) return paramSubtitle || 'Negociación del desafío';
       const admins = myClubIds.length > 0 ? 'Administradores de ambos clubes' : 'Solo lectura';
       return `${estadoLabel(clubChallenge.estado)} · ${admins}`;
@@ -1425,10 +1483,18 @@ export default function ChatThreadScreen({ route, navigation }) {
     if (t?.type === 'match') {
       const m = context?.match;
       if (!m) return paramSubtitle || 'Chat del partido';
+      // `hour12: false` Y QUITAR TODOS LOS PUNTOS (2026-10-19). Sin lo
+      // primero, `es-CL` resuelve a 12 horas en este runtime y la cabecera
+      // decía «08:00 p. m.» mientras el resto de la app —la tarjeta, la
+      // ficha, la hora de cada mensaje— dice 20:00. Sin lo segundo,
+      // `replace('.', '')` se lleva SÓLO el primer punto, el de «mar.», y
+      // dejaba a la vista un «p m.» que no es nada.
       const fecha = m.hora
         ? new Date(m.hora)
-            .toLocaleDateString('es-CL', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
-            .replace('.', '')
+            .toLocaleDateString('es-CL', {
+              weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+            })
+            .replace(/\./g, '')
         : null;
       return [fecha, m.comuna].filter(Boolean).join(' · ') || 'Chat del partido';
     }
@@ -1538,7 +1604,7 @@ export default function ChatThreadScreen({ route, navigation }) {
         <SafeAreaView edges={['top']} style={{ flex: 1 }}>
           <ChatThreadHeader
             type={t?.type}
-            title={paramTitle}
+            title={headerTitle}
             subtitle=""
             fotoUrl={fotoUrl}
             connection={connection}
@@ -1564,7 +1630,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <ChatThreadHeader
           type={t?.type}
-          title={paramTitle}
+          title={headerTitle}
           subtitle={headerSubtitle}
           fotoUrl={fotoUrl}
           muted={muted}
@@ -1678,6 +1744,8 @@ export default function ChatThreadScreen({ route, navigation }) {
               const distanceFromBottom =
                 contentSize.height - contentOffset.y - layoutMeasurement.height;
               nearBottomRef.current = distanceFromBottom < 120;
+              // Bajar hasta lo último cuenta como leerlo.
+              acuseRef.current?.revisar(estadoDeLectura());
             }}
             scrollEventThrottle={32}
             onContentSizeChange={(_w, newHeight) => {

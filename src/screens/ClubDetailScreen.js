@@ -29,6 +29,8 @@ import {
 import { temaDeClub } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import ClubHeaderBar from '../components/club/ClubHeaderBar';
+import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
+import { reportarContenido } from '../services/reports';
 import ClubHeroCard from '../components/club/ClubHeroCard';
 import CreateChallengeButton from '../components/club/CreateChallengeButton';
 import SectionHeader from '../components/ds/SectionHeader';
@@ -120,6 +122,7 @@ export default function ClubDetailScreen({ navigation, route }) {
   const [misPermisos, setMisPermisos] = useState(null);
   const [banner, setBanner] = useState(initialBanner || null);
   const [working, setWorking] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   // Un club que todavía no cargó —o uno anterior a la migración 53— resuelve
   // a verde, así la pantalla nunca se queda sin color.
@@ -340,6 +343,8 @@ export default function ClubDetailScreen({ navigation, route }) {
         puedeEditar={puedeEditarClub}
         onBack={() => navigation.goBack()}
         onShare={handleShare}
+        // Reportar el club (migración 186): sólo quien tiene cuenta y no es del club.
+        onReport={me && !soyMiembro ? () => setReportOpen(true) : undefined}
         // SÓLO el id. Mandar el club entero parecía gratis —el formulario se
         // pintaba sin esperar la consulta— pero React Navigation lo serializa
         // en la URL como `?club=[object Object]`: un enlace feo y, peor, una
@@ -534,6 +539,7 @@ export default function ClubDetailScreen({ navigation, route }) {
                 horaLabel={p.horaLabel}
                 localLabel={p.localLabel}
                 canchaNombre={p.canchaNombre}
+                tipoLabel={p.tipoLabel}
                 // Al partido sólo entran los integrantes de los dos clubes: a
                 // quien mira desde fuera, la tarjeta no le ofrece un destino
                 // que le va a contestar «este partido ya no está disponible».
@@ -588,6 +594,24 @@ export default function ClubDetailScreen({ navigation, route }) {
           </View>
         )}
       </ScrollView>
+
+      <ReportPlayerSheet
+        visible={reportOpen}
+        titulo="Reportar club"
+        etiqueta="Club"
+        queSeReporta={club.nombre}
+        onClose={() => setReportOpen(false)}
+        onSubmit={async ({ motivo, descripcion }) => {
+          const { error } = await reportarContenido({ tipo: 'club', id: club.id, motivo, descripcion });
+          if (error) {
+            setBanner({ type: 'error', title: 'No se pudo enviar el reporte', message: error.message });
+            return { error };
+          }
+          setReportOpen(false);
+          setBanner({ type: 'success', title: 'Reporte enviado', message: 'Lo revisaremos. No le avisamos al club quién lo envió.' });
+          return {};
+        }}
+      />
     </SafeAreaView>
   );
 }

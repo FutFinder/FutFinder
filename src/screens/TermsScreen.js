@@ -13,6 +13,7 @@ import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { completeOnboarding } from '../services/profile';
+import { registrarAceptacionLegal } from '../services/aceptacionLegal';
 import { APP_VERSION } from '../utils/appVersion';
 
 const TERMS_TEXT =
@@ -35,14 +36,45 @@ function CheckboxRow({ value, onToggle, label }) {
 export default function TermsScreen({ navigation }) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptNotifs, setAcceptNotifs] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
 
-  const canContinue = acceptTerms;
+  const canContinue = acceptTerms && !guardando;
 
+  /**
+   * SI NO SE PUDO GUARDAR, NO SE DICE «TODO LISTO» (2026-10-17).
+   *
+   * Esto hacía `await completeOnboarding()` y navegaba a `Success` pasara
+   * lo que pasara. Cuando la escritura falla —sin conexión, un 503 del
+   * servidor— el flag `onboarding_completed` se queda en false, la persona
+   * ve «¡Todo listo! Tu cuenta ha sido verificada y configurada
+   * correctamente»… y **la próxima vez que abra la app vuelve a pasar por
+   * el permiso de ubicación y por esta pantalla**. Para siempre, y sin un
+   * solo indicio de que algo falló.
+   *
+   * Se vio corriendo la app contra la base local con el API REST apagado:
+   * el registro llegaba hasta el final y el perfil quedaba sin marcar.
+   */
   const handleContinue = async () => {
     if (!canContinue) return;
-    // Marcamos onboarding como completado — el usuario nunca más
-    // tendrá que pasar por LocationPermission / Terms / Success.
-    await completeOnboarding();
+    setGuardando(true);
+    setError(null);
+    // Primero la aceptación (qué versión y cuándo, migración 181) y después
+    // el fin del onboarding: si la primera falla, la persona sigue acá y
+    // reintenta, en vez de quedar «lista» sin constancia de lo que aceptó.
+    // Si el servidor todavía no guarda aceptaciones, no hay error y se sigue.
+    const { error: errAceptacion } = await registrarAceptacionLegal();
+    if (errAceptacion) {
+      setGuardando(false);
+      setError(errAceptacion.message);
+      return;
+    }
+    const { error: err } = await completeOnboarding();
+    setGuardando(false);
+    if (err) {
+      setError('No pudimos guardar tu aceptación. Revisa tu conexión e inténtalo de nuevo.');
+      return;
+    }
     navigation.navigate('Success');
   };
 
@@ -76,6 +108,14 @@ export default function TermsScreen({ navigation }) {
 
             <View style={styles.legalBox}>
               <Text style={styles.legalText}>{TERMS_TEXT}</Text>
+              <Text style={styles.legalLinks}>
+                Lee los{' '}
+                <Text style={styles.legalLink} onPress={() => navigation.navigate('Terminos')}>Términos y condiciones</Text>
+                , la{' '}
+                <Text style={styles.legalLink} onPress={() => navigation.navigate('Privacidad')}>Política de privacidad</Text>
+                {' '}y la{' '}
+                <Text style={styles.legalLink} onPress={() => navigation.navigate('Cookies')}>Política de cookies</Text>.
+              </Text>
             </View>
 
             <CheckboxRow
@@ -92,10 +132,13 @@ export default function TermsScreen({ navigation }) {
 
             <View style={{ height: 22 }} />
 
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
             <Button
               label="Aceptar y continuar"
               variant="primary"
               onPress={handleContinue}
+              loading={guardando}
               disabled={!canContinue}
             />
           </View>
@@ -158,6 +201,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
+  legalLinks: {
+    color: C.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 10,
+  },
+  legalLink: {
+    color: C.green,
+    fontFamily: F.semiBold,
+  },
   checkRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -183,6 +236,14 @@ const styles = StyleSheet.create({
     color: C.textPrimary,
     fontSize: 13,
     lineHeight: 18,
+  },
+  error: {
+    // Ojo: el token `danger` del tema es un objeto {soft, fg}, no un color.
+    color: C.red,
+    fontFamily: F.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   footer: {
     textAlign: 'center',

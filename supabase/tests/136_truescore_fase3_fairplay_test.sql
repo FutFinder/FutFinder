@@ -157,7 +157,11 @@ begin
     reset role;
     v_err := 'lo dejó pasar';
   exception when others then reset role; v_err := sqlerrm; end;
-  insert into r136 values ('C04 el cierre del fair play no se escribe a mano', v_err like '%COLUMNA_PROTEGIDA%', v_err);
+  -- Desde la 165 `authenticated` ni siquiera tiene UPDATE sobre esa
+  -- columna: el rechazo llega antes que el disparador (COLUMNA_PROTEGIDA).
+  -- Cualquiera de las dos cierra la puerta; lo que no vale es «lo dejó pasar».
+  insert into r136 values ('C04 el cierre del fair play no se escribe a mano',
+    v_err like '%COLUMNA_PROTEGIDA%' or v_err like '%permission denied%', v_err);
 
   -- ── Pasan las 48 h: cierre ──
   update public.matches set hora = hora - interval '48 hours' where id in (ma, mb, mc, md);

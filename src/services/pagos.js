@@ -25,13 +25,22 @@ const SIN_CONFIG = { data: null, error: { message: 'Sin conexión a la base' } }
  * las credenciales empieza a devolver `true` sin tocar una línea de la app.
  */
 export async function estadoPasarela() {
-  if (!isSupabaseConfigured) return { data: { configurada: false }, error: null };
+  if (!isSupabaseConfigured) return { data: { configurada: false, pausada: false }, error: null };
   try {
     const { data, error } = await supabase.functions.invoke('pagar-reserva', {
       method: 'GET',
     });
     if (error) throw error;
-    return { data: { configurada: !!data?.configurada, ambiente: data?.ambiente || null }, error: null };
+    return {
+      data: {
+        configurada: !!data?.configurada,
+        ambiente: data?.ambiente || null,
+        // Migración 179: los cobros nuevos están cortados por un momento. Una
+        // función desplegada sin ese campo contesta `undefined`, que es «no».
+        pausada: data?.pausada === true,
+      },
+      error: null,
+    };
   } catch (e) {
     // Que la consulta falle NO es «no hay pasarela»: puede ser la red. Se
     // devuelve el error y la pantalla deja el botón quieto en vez de afirmar
@@ -57,14 +66,23 @@ export async function iniciarPagoReserva(reservaId) {
     if (error) throw error;
     if (!data?.ok) {
       return {
-        data: { configurada: data?.configurada !== false },
+        data: { configurada: data?.configurada !== false, pausada: data?.pausada === true },
         error: { message: data?.reason || 'No se pudo iniciar el pago.' },
       };
     }
     return { data, error: null };
   } catch (e) {
-    console.error('[FutFinder] iniciarPagoReserva:', e);
-    return { data: null, error: { message: 'No se pudo iniciar el pago. No se te cobró nada.' } };
+    console.error('[FutFinder] iniciarPagoReserva:', e?.context?.status ?? e?.name);
+    // Con un error HTTP la función igual manda su motivo, y a veces importa:
+    // «No pudimos revisar tu intento de pago anterior» NO es «no se te cobró
+    // nada» (ese intento pudo haberse pagado).
+    let motivo = null;
+    try {
+      motivo = (await e?.context?.json?.())?.reason || null;
+    } catch {
+      // sin cuerpo legible
+    }
+    return { data: null, error: { message: motivo || 'No se pudo iniciar el pago. No se te cobró nada.' } };
   }
 }
 

@@ -1,6 +1,12 @@
 import 'react-native-gesture-handler';
 import './global.css';
-import React, { useEffect, useRef } from 'react';
+
+// Antes que nada: un error que ocurra mientras se monta la app también tiene
+// que llegar a alguna parte. Sin `EXPO_PUBLIC_SENTRY_DSN` esto no hace nada.
+import { iniciarObservabilidad } from './src/services/observabilidad';
+
+iniciarObservabilidad();
+import React, { useEffect } from 'react';
 import { Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,9 +23,18 @@ import AppNavigator, { navigationRef, navigationReadyPromise } from './src/navig
 import { AuthProvider } from './src/contexts/AuthContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { supabase, isSupabaseConfigured } from './src/services/supabase';
+import { isSessionUsable } from './src/services/authPolicy';
+import { necesitaSegundoPaso, nivelDesdeSesion } from './src/services/mfaPolicy';
+
+// El token de push se registra sólo con una sesión que ya entró del todo: con
+// la verificación en dos pasos activada, la contraseña sola deja una sesión
+// `aal1` que NO es acceso (AuthContext), y registrar el token ahí dejaba el
+// teléfono de quien sabía la contraseña recibiendo los avisos de la cuenta.
+// Desde la migración 177 el servidor además rechaza esa petición.
+const sesionQueEntro = (session) =>
+  isSessionUsable(session) && !necesitaSegundoPaso(nivelDesdeSesion(session));
 import {
   registerForPushNotifications,
-  unregisterPushToken,
   addNotificationListeners,
 } from './src/services/notifications';
 import { navigateToNotification } from './src/utils/notificationTargets';
@@ -27,6 +42,7 @@ import { getMatchById } from './src/services/matches';
 import { getClubById } from './src/services/clubs';
 import AvisosHost from './src/components/AvisosHost';
 import NotificationToastHost from './src/components/NotificationToastHost';
+import AvisoCookies from './src/components/AvisoCookies';
 
 // Ids de notificación (fila real de `notifications`, no el id efímero del
 // push) ya procesados en esta sesión de la app. `getLastNotificationResponseAsync`
@@ -97,12 +113,9 @@ async function handleNotificationTap(response) {
 }
 
 export default function App() {
-  // Guardamos el último userId para poder borrar su token al hacer logout
-  const lastUserIdRef = useRef(null);
-
-  // Manrope es la única fuente que no es `System` en toda la app — la pide
-  // el handoff de Reservas (theme/colors.js: reservasFonts). El resto de la
-  // app no depende de esto y sigue rindiendo con `System` mientras carga.
+  // Manrope es la tipografía de toda la app (theme/colors.js: `fuentes`).
+  // Se espera a que cargue antes de pintar nada: ver `if (!fontsLoaded)`
+  // más abajo.
   const [fontsLoaded] = useFonts({
     Manrope_500Medium,
     Manrope_600SemiBold,
@@ -143,10 +156,9 @@ export default function App() {
     // 4) Registrar token cuando ya hay sesión al arrancar la app
     (async () => {
       const { data } = await supabase.auth.getSession();
-      const user = data?.session?.user;
-      if (user?.id) {
-        lastUserIdRef.current = user.id;
-        registerForPushNotifications(user.id);
+      const session = data?.session;
+      if (sesionQueEntro(session)) {
+        registerForPushNotifications(session.user.id);
       }
     })();
 
@@ -154,15 +166,14 @@ export default function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       const userId = session?.user?.id ?? null;
 
-      if (event === 'SIGNED_IN' && userId) {
-        lastUserIdRef.current = userId;
+      // `MFA_CHALLENGE_VERIFIED` es cuando una sesión `aal1` sube a `aal2`.
+      if ((event === 'SIGNED_IN' || event === 'MFA_CHALLENGE_VERIFIED') && userId && sesionQueEntro(session)) {
         registerForPushNotifications(userId);
       }
 
-      if (event === 'SIGNED_OUT' && lastUserIdRef.current) {
-        unregisterPushToken(lastUserIdRef.current);
-        lastUserIdRef.current = null;
-      }
+      // El token de push NO se borra en SIGNED_OUT: cuando llega ese evento la
+      // sesión ya no existe y el delete sale como anon (42501). Lo da de baja
+      // `signOut` antes de cerrar (services/auth.js, utils/cierreDeSesion.js).
     });
 
     return () => {
@@ -171,7 +182,7 @@ export default function App() {
     };
   }, []);
 
-  // Sin esto, un componente de Reservas podría montarse un instante antes de
+  // Sin esto, cualquier pantalla podría montarse un instante antes de
   // que Manrope esté lista y quedar con la fuente por defecto hasta el
   // siguiente re-render. La espera es breve (son 4 pesos, ya cacheados tras
   // la primera carga) y el splash animado de la app cubre visualmente esta
@@ -194,6 +205,11 @@ export default function App() {
                 con la pantalla que lo lanzó. */}
             <AvisosHost />
             <NotificationToastHost />
+            <AvisoCookies
+              onVerDetalle={() => {
+                if (navigationRef.isReady()) navigationRef.navigate('Cookies');
+              }}
+            />
           </AuthProvider>
         </SafeAreaProvider>
       </ActionSheetProvider>

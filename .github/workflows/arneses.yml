@@ -1,0 +1,89 @@
+# Los arneses SQL contra una base construida desde cero con este repositorio.
+#
+# Va aparte del CI porque levanta el stack de Supabase en Docker (varios
+# minutos) y sólo importa cuando cambia la base. Corre al tocar migraciones,
+# arneses o los scripts que los aplican, y a mano desde la pestaña Actions.
+#
+# Sin secretos: la base es local al runner y se bota al terminar.
+#
+# El `config.toml` se escribe acá, en una carpeta temporal SIN `migrations/`,
+# por la misma razón que en las Macs vive fuera del repositorio: el CLI
+# aplicaría las migraciones en orden alfabético, que para este proyecto es
+# el orden equivocado. La base la arma `scripts/construir-base.mjs`.
+name: Arneses SQL
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/schema.sql'
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - 'scripts/construir-base.mjs'
+      - 'scripts/correr-arneses.mjs'
+      - 'scripts/ordenMigraciones.js'
+      - '.github/workflows/arneses.yml'
+
+concurrency:
+  group: arneses-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  arneses:
+    name: Base desde cero y arneses
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.1.0
+
+      - name: Levantar el stack local
+        run: |
+          mkdir -p "$RUNNER_TEMP/futfinder-local/supabase"
+          cat > "$RUNNER_TEMP/futfinder-local/supabase/config.toml" <<'TOML'
+          project_id = "futfinder-local"
+
+          [db]
+          port = 54322
+          major_version = 17
+
+          [api]
+          enabled = true
+          port = 54321
+          schemas = ["public", "graphql_public"]
+          extra_search_path = ["public", "extensions"]
+          max_rows = 1000
+
+          [studio]
+          enabled = false
+
+          [auth]
+          enabled = true
+
+          [storage]
+          enabled = true
+
+          [realtime]
+          enabled = true
+
+          [analytics]
+          enabled = false
+          TOML
+          supabase start --workdir "$RUNNER_TEMP/futfinder-local"
+
+      - name: Construir la base (igual a producción, sin la 149)
+        run: node scripts/construir-base.mjs --sin-149
+
+      - name: Correr los arneses
+        run: node scripts/correr-arneses.mjs

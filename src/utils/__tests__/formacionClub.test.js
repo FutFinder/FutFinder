@@ -295,3 +295,25 @@ test('sin alineación guardada, mirar otra formación no es trabajo que perder',
     true
   );
 });
+
+// ── Fútbol 5 (migración 197) ────────────────────────────────────────
+test('F5: arquero + 4 en cada formación, sin pisar F7 ni F11', () => {
+  const { F5 } = require('../formacionClub.js');
+  assert.ok(F5.includes('2-2') && F5.includes('1-2-1'));
+  for (const f of F5) {
+    assert.equal(layoutSlots(f).length, 5, `${f} no da 5 puestos`);
+  }
+  assert.equal(F5.some((f) => F7.includes(f) || F11.includes(f)), false);
+});
+
+test('formacionesDe y modoInicialDeClub conocen el 5', () => {
+  const { F5, formacionesDe, modoInicialDeClub, MODOS } = require('../formacionClub.js');
+  assert.deepEqual(MODOS, [5, 7, 11]);
+  assert.equal(formacionesDe(5), F5);
+  assert.equal(formacionesDe(7), F7);
+  assert.equal(formacionesDe(11), F11);
+  assert.equal(modoInicialDeClub('futbol5'), 5);
+  assert.equal(modoInicialDeClub('futbol11'), 11);
+  assert.equal(modoInicialDeClub('ambos'), 7);
+  assert.equal(modoInicialDeClub(null), 7);
+});

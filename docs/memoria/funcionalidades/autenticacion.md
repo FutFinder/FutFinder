@@ -1,6 +1,6 @@
 # Autenticación
 
-Última revisión: 2026-09-10
+Última revisión: 2026-11-14
 
 ## Propósito
 
@@ -11,6 +11,14 @@ Crear o iniciar una sesión por correo, confirmar cuentas y encaminar al usuario
 Iniciar sesión y registrarse son pantallas separadas (`LoginScreen` y `RegisterScreen`, handoff `Bienvenida.dc.html`), no un mismo formulario con modo. El login solo llama a `signInWithPassword`: nunca cae a registro.
 
 El registro **no usa `signUp`**: usa `signInWithOtp` con `shouldCreateUser: true`, así que crea la cuenta sin contraseña usable y manda un código de 6 dígitos. La contraseña escrita queda en memoria (`pendingSignUp.js`, de un solo uso, nunca en disco ni en parámetros de navegación) y se fija con `updateUser` recién después de verificar el código (`completeSignUpPassword`). Sin acceso al buzón no hay código, no hay sesión y no hay contraseña: la cuenta no sirve ni para registrarse ni para iniciar sesión después.
+
+**El alta se puede terminar aunque algo falle a mitad (2026-11-14).** Verificar el código, fijar la contraseña y guardar la edad son tres pasos, y `VerificationScreen` sólo miraba el resultado del primero. Ahora la decisión de qué falta es lógica pura (`src/utils/altaPorCorreo.js`, `siguientePasoDelAlta`) y la pantalla ejecuta de a un paso: si uno falla lo dice y el botón pasa a «Reintentar», que retoma desde ese paso sin volver a pedir el código (ya está gastado). Tres reglas que no son obvias:
+
+- **La contraseña sale de memoria recién cuando el servidor la aceptó** (`verPasswordPendiente` mira sin borrar; `completeSignUpPassword` la olvida al tener éxito). Antes se consumía antes de llamar a `updateUser`, y un fallo de red dejaba una cuenta verificada y sin contraseña.
+- **Si la contraseña ya no está** —el servidor la rechazó por débil, o la pantalla se quedó sin ella— no hay nada que reintentar: se abre `RecuperarContrasena` con `crearPassword`, que entra directo a elegir una contraseña con la sesión que acaba de abrir el código. Sólo pasa en un registro (`registro: true` desde `RegisterScreen`); quien llega desde Iniciar sesión ya tiene contraseña.
+- **Recargar la página en web a mitad del alta lleva a Portada**, no de vuelta a la verificación (`Verification` no tiene ruta propia). La cuenta queda creada sin contraseña y se termina por cualquiera de dos caminos que ya existían: registrarse de nuevo con el mismo correo (manda otro código y fija la contraseña nueva) o «¿La olvidaste?» en Iniciar sesión.
+
+El reenvío espera **60 s** (`ESPERA_REENVIO`), igual que el `max_frequency` de Auth; una prueba lee `supabase/config.toml` y falla si se separan. Eran 42 s, así que el botón se encendía antes de que el servidor aceptara y el rechazo se perdía. Si Auth igual rechaza por frecuencia, la pantalla lo dice y ajusta el reloj a los segundos que el servidor informa. Las seis casillas aceptan el código pegado o autocompletado (`repartirCodigo`); con `maxLength={1}` sólo quedaba el primer dígito.
 
 Una sesión con onboarding completo abre `Main`; una incompleta continúa en ubicación. `AuthProvider` resuelve la sesión antes de montar la navegación y escucha cambios. Una ruta guardada por `withAuthGuard` se consume después del login terminado.
 
@@ -28,13 +36,27 @@ La creación del perfil depende del trigger `handle_new_user`. La migración 59 
 
 ## Pantallas y dependencias
 
-- Pantallas: `SplashScreen`, `WelcomeScreen`, `TutorialScreen`, `LoginScreen`, `RegisterScreen`, `VerificationScreen`, `LocationPermissionScreen`, `TermsScreen` y `SuccessScreen`.
+- Pantallas: `SplashScreen`, `WelcomeScreen`, `TutorialScreen`, `LoginScreen`, `RegisterScreen`, `VerificationScreen`, `RecuperarContrasenaScreen`, `LocationPermissionScreen`, `TermsScreen` y `SuccessScreen`, más `LegalScreen`, que sirve las tres rutas públicas `Terminos`, `Privacidad` y `Cookies` (con URL propia `/terminos`, `/privacidad` y `/cookies`; el texto vive en `src/data/legal.js`). `Terms` es el paso del registro donde se acepta; `Terminos` sólo se lee.
 - Código: `src/services/authPolicy.js` (política pura), `src/services/auth.js`, `src/services/profile.js`, `src/contexts/AuthContext.js`, `src/navigation/withAuthGuard.js` y `src/utils/routing.js`.
 - Backend: Supabase Auth, `profiles` y el trigger del esquema.
 
 ## Estados, errores y problemas conocidos
 
-Login valida correo/contraseña, traduce los errores de Auth a mensajes propios y ofrece reenvío de OTP. Un correo inexistente y una contraseña incorrecta reciben el mismo mensaje, para no permitir averiguar qué correos están registrados. La guarda cubre `Main` y las pantallas operativas del stack; `LocationPermission`, `Terms` y `Success` quedan públicas a propósito (son el onboarding posterior al registro, no exponen datos y no están en la config de deep links), igual que la galería de QA `ReservasUiGallery`. El enlace «¿La olvidaste?» de `LoginScreen` sí llama a `requestPasswordResetForEmail` (real). Las opciones visuales de Google y Apple, en `RegisterScreen`, muestran un aviso «muy pronto» y no tienen acción implementada.
+Login valida correo/contraseña, traduce los errores de Auth a mensajes propios y ofrece reenvío de OTP. Un correo inexistente y una contraseña incorrecta reciben el mismo mensaje, para no permitir averiguar qué correos están registrados. La guarda cubre `Main` y las pantallas operativas del stack; `LocationPermission`, `Terms` y `Success` quedan públicas a propósito (son el onboarding posterior al registro, no exponen datos y no están en la config de deep links), igual que la galería de QA `ReservasUiGallery` y las tres rutas legales `Terminos`, `Privacidad` y `Cookies` (éstas sí tienen deep link: se leen antes de crear la cuenta). «¿La olvidaste?» (Iniciar sesión) y «¿Olvidaste tu contraseña?» (Ajustes) abren `RecuperarContrasenaScreen` desde el 2026-11-13: código de 6 dígitos por `signInWithOtp` (la misma plantilla Magic Link con `{{ .Token }}` que ya usa «Reenviar código», así que no se tocó el panel), `verifyOtp({ type: 'email' })`, el código de la app de autenticación si la cuenta lo tiene (Supabase exige `aal2` para cambiar la contraseña) y `updateUser({ password })`, que además cierra las demás sesiones (`signOut({ scope: 'others' })`). La lógica pura y probada está en `src/services/recuperacionPolicy.js`. Antes se llamaba `resetPasswordForEmail` sin `redirectTo` y nada escuchaba `PASSWORD_RECOVERY`: el enlace abría la web con sesión y el único cambio de contraseña pedía la actual, así que quien la olvidaba quedaba fuera. Un correo sin cuenta contesta igual que uno con cuenta. El correo no viaja como parámetro de navegación (en web iría a la URL): va en memoria, `src/utils/correoParaRecuperar.js`. Una prueba impide que vuelva `resetPasswordForEmail`. Las opciones visuales de Google y Apple, en `RegisterScreen`, muestran un aviso «muy pronto» y no tienen acción implementada.
+
+**Sin inicio con terceros (desde el 2026-11-18).** El registro mostraba «Continuar con Google» y «Continuar con Apple», que sólo respondían «Muy pronto»; se quitaron porque Apple rechaza funciones de relleno (guía 2.1). La única forma de entrar es el correo. Si se agrega Google algún día, Apple exige ofrecer también «Iniciar sesión con Apple» (guía 4.8). Lo vigila una prueba en `src/contexts/__tests__/sesionCableado.test.js`.
+
+## Aceptación de términos con versión (desde el 2026-11-14)
+
+Hasta ahora el servidor sólo sabía que alguien terminó el onboarding, no qué texto aceptó ni cuándo. `TermsScreen` llama a `registrarAceptacionLegal()` (`src/services/aceptacionLegal.js`) antes de `completeOnboarding()`: guarda `VERSION_LEGAL` por la RPC `aceptar_terminos` de la migración 181. Si esa llamada falla de verdad, la persona se queda en la pantalla y reintenta; si la función no existiera en el servidor (la 181 se aplicó en producción el 2026-11-14; esto cubre una base sin ella), no hay error y todo sigue como antes (`src/utils/aceptacionLegal.js`). «Exportar mis datos» las incluye (`misAceptacionesLegales`, en `terminos_aceptados`). Subir `ACTUALIZADO` obliga a subir `VERSION_LEGAL`: una prueba falla si se separan. Estado: [Pendientes](../operacion/pendientes.md).
+
+**Volver a aceptar cuando cambian (2026-11-19).** `Main` va envuelto en `withTerminosVigentes` (`src/navigation/withTerminosVigentes.js`): si la persona no tiene en `aceptaciones_legales` una versión igual o posterior a `VERSION_LEGAL`, en vez de las pestañas ve `TerminosActualizadosScreen` («Actualizamos los términos», con los cambios de `CAMBIOS_DE_ESTA_VERSION` en `src/data/legal.js` y enlaces a los textos). Sólo hay dos salidas: «Aceptar y continuar» (misma RPC; si falla, se queda con el mensaje) o «Ahora no, cerrar sesión». Mientras se pregunta, la app se muestra; si no se puede leer la tabla, no se bloquea a nadie y se pregunta en el próximo arranque (`estadoDeAceptacion` → `sin-saber`). Al subir `VERSION_LEGAL` hay que reescribir `CAMBIOS_DE_ESTA_VERSION`: una prueba falla si sus versiones se separan. El día que se hizo, 28 de las 29 cuentas con onboarding de producción no tenían ninguna aceptación guardada (se registraron antes de la 181): todas verán la pantalla una vez. Un enlace profundo a otra pantalla no pasa por la comprobación; el siguiente arranque sí.
+
+## Pendiente de decisión: edad mínima y menores de 14
+
+El registro sólo valida que la edad calculada desde la fecha de nacimiento esté entre **12 y 99** (`src/utils/fechaNacimiento.js`, el mismo rango de `profiles.edad`). La política de privacidad y los términos (`src/data/legal.js`, actualizados el 2026-10-26) dicen además que quien tiene **menos de 14** necesita la autorización de su madre, padre o tutor. En el código no hay ningún paso que la pida ni la registre: hoy esa frase es una promesa del texto, no una regla de la app. Falta decidir si se pide la autorización al registrarse o si se ajusta el texto.
+
+Relacionado y también sin resolver: el texto corto de `TermsScreen` (`TERMS_TEXT`) afirma que los datos de ubicación «no se compartirán con terceros sin tu consentimiento» y habla de «Términos de Servicios», mientras que la política completa lista encargados de tratamiento (Supabase, Mapbox y Nominatim, Expo, Resend, Sentry, Flow) y describe la ubicación como una posición aproximada que sólo se usa con permiso. No se comprobó que sean contradictorios en la práctica; conviene alinear ambos textos cuando se decida lo anterior.
 
 ## Un solo mínimo de contraseña: 8
 
@@ -54,7 +76,16 @@ La protección de contraseñas filtradas (HaveIBeenPwned) que recomienda el advi
 
 La confirmación de correo está **desactivada** en el proyecto de Supabase: `signUp` autoconfirma y emite sesión al instante, y una cuenta creada así queda confirmada para siempre, así que después sirve para iniciar sesión con su contraseña. Por eso el registro dejó de usar `signUp`: ninguna validación en el cliente puede tapar eso. El camino OTP no depende de ese ajuste.
 
-Dependencia real de configuración: el **envío de correos**. Con el servicio incorporado de Supabase el envío está muy limitado y puede no llegar a direcciones fuera del equipo, así que el registro no funciona de verdad para usuarios reales hasta que haya un SMTP propio y la plantilla del código incluya `{{ .Token }}`.
+Dependencia real de configuración: el **envío de correos**. **Resuelto el 2026-11-13** con SMTP propio; antes de eso el servicio incorporado de Supabase dejaba **2 correos por hora para todo el proyecto**, así que la tercera persona que se registraba en una hora no recibía código. Estado actual, todo en el panel (no se puede versionar):
+
+- **SMTP**: Resend, remitente `FutFinder <no-responder@envios.futfinder.cl>`, `smtp.resend.com:465`, usuario `resend`, contraseña = clave de Resend `supabase-auth` (sólo envío, sólo ese dominio). El dominio `futfinder.cl` es de Vicente (NIC Chile), con DNS en Vercel; `envios.futfinder.cl` está verificado en Resend (DKIM, dos CNAME de envío y `_dmarc` con `p=none`). Ver [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md).
+- **Plantillas**: «Confirm sign up» **y** «Magic Link» llevan la misma, la de `supabase/plantillas-correo/confirmacion.html` (asunto «Tu código de FutFinder», logo desde `www.futfinder.cl/correo/logo.png`). Las dos importan: con la confirmación de correo apagada, el registro por OTP y el «Reenviar código» salen con «Magic Link», que hasta el 2026-11-13 era la de fábrica de Supabase —un enlace en inglés, sin código— y «Confirm sign up» escondía el `{{ .Token }}` dentro de un `href`.
+- **Vigencia del código**: 900 s (15 minutos) desde el 2026-11-13, igual que el stack local; las dos plantillas lo dicen («Vence en 15 minutos»). Si se cambia una, cambiar la otra.
+- **Largo del código**: la app espera **6** dígitos (`CODE_LENGTH` en `VerificationScreen.js`); producción llegó a tener *Email OTP length* en 8. Si un registro falla con «código incorrecto», mirar eso primero.
+- **Topes**: Supabase subió solo a 30 correos por hora al activar el SMTP propio; el plan gratis de Resend corta en **100 al día y 3.000 al mes**, compartidos con los avisos de las Edge Functions. Crecer más allá pide Resend Pro.
+- **Círculo del remitente**: Gmail no muestra logo sin BIMI (DMARC en `quarantine` o `reject` y un certificado VMC/CMC pagado). Postergado a propósito.
+
+Probado de punta a punta el 2026-11-13: registro en `www.futfinder.cl` con un Gmail distinto del de FutFinder, el código de 6 dígitos llegó y la app lo aceptó.
 
 Comprobado el 2026-08-27: `signInWithOtp` crea la cuenta **antes** de enviar el correo, y si el destino no existe falla en el envío (`email_address_invalid`) dejando la fila creada. Esas cuentas quedan sin contraseña usable, así que no permiten entrar, pero sí acumulan filas basura.
 

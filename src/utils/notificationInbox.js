@@ -43,23 +43,81 @@ export function createRequestGuard() {
 }
 
 /**
- * Aplica `apply(items)` de inmediato (para que la UI reaccione al toque sin
- * esperar la red), ejecuta `action()` — que debe resolver `{ error }`, el
- * mismo contrato que ya usan los servicios — y si falla revierte `items` a
- * como estaba antes de tocar nada.
+ * Aplica `apply` de inmediato (para que la UI reaccione al toque sin esperar
+ * la red), ejecuta `action()` — que debe resolver `{ error }`, el mismo
+ * contrato que ya usan los servicios — y si falla aplica `revert`.
+ *
+ * `apply` y `revert` reciben el estado ACTUAL, no una foto del de antes
+ * (C07): la bandeja sigue recibiendo avisos por Realtime mientras la
+ * petición viaja, y restaurar la foto entera borraba esas novedades o
+ * resucitaba avisos que otra acción ya había borrado bien. Cada acción
+ * deshace sólo su propio cambio (`deshacerBorrado`, `deshacerLeidos`).
  *
  * Devuelve `{ error }` para que el llamador decida qué mostrar (banner,
- * etc.); el propio `items` ya quedó correcto (optimista u original) cuando
- * esta promesa resuelve.
+ * etc.); la lista ya quedó correcta cuando esta promesa resuelve.
  */
-export async function runOptimistic({ items, apply, action, setItems }) {
-  setItems(apply(items));
+export async function runOptimistic({ apply, revert, action, setItems }) {
+  setItems((prev) => apply(prev));
   const { error } = await action();
   if (error) {
-    setItems(items);
+    setItems((prev) => revert(prev));
     return { error };
   }
   return { error: null };
+}
+
+const fechaDe = (n) => (n && n.created_at) || '';
+
+/**
+ * Devuelve a la lista los avisos que un borrado fallido había sacado, en su
+ * lugar por fecha (más nuevo primero). Lo que ya está en la lista manda: si
+ * llegó una versión más nueva de ese aviso por Realtime, no se pisa.
+ */
+export function deshacerBorrado(items, borrados = []) {
+  const presentes = new Set(items.map((n) => n.id));
+  const faltan = (borrados || []).filter((n) => n && !presentes.has(n.id));
+  if (faltan.length === 0) return items;
+  return [...items, ...faltan]
+    .map((n, i) => ({ n, i }))
+    .sort((x, y) => {
+      const fx = fechaDe(x.n);
+      const fy = fechaDe(y.n);
+      if (fx !== fy) return fx < fy ? 1 : -1;
+      return x.i - y.i;
+    })
+    .map(({ n }) => n);
+}
+
+/**
+ * Vuelve a «sin leer» sólo los avisos que lo estaban antes de un «marcar»
+ * fallido. Los que ya no están (otra acción los borró) no reaparecen.
+ */
+export function deshacerLeidos(items, ids = []) {
+  const set = new Set(ids);
+  if (set.size === 0) return items;
+  return items.map((n) => (set.has(n.id) ? { ...n, read: false } : n));
+}
+
+/**
+ * Abrir un aviso lo marca leído en el acto, pero sólo se queda así si el
+ * servidor lo guardó (C08). Antes la tarjeta quedaba leída aunque
+ * `markAsRead` fallara: la campana, la tarjeta y otra sesión discrepaban y al
+ * recargar el aviso volvía a estar pendiente sin explicación. La navegación
+ * no espera esto: se puede abrir el destino aunque el marcado falle.
+ */
+export async function leerAlAbrir({ id, markAsRead, setItems }) {
+  return runOptimistic({
+    apply: (items) => withRead(items, id),
+    revert: (items) => deshacerLeidos(items, [id]),
+    action: async () => {
+      try {
+        return (await markAsRead(id)) || { error: null };
+      } catch (e) {
+        return { error: e };
+      }
+    },
+    setItems,
+  });
 }
 
 // Transformaciones puras reutilizadas como `apply` de runOptimistic.
@@ -90,6 +148,11 @@ export const withActionsResolved = (items, id, resolucion = null) =>
  * single JSON object»: la solicitud ya no estaba pendiente.
  */
 export function fusionarAvisoEnVivo(items, notif) {
+  // Un borrado difundido por la propia app (C09): `todos` es «borrar todo».
+  if (notif?._eventType === 'DELETE') {
+    if (notif.todos) return items.length === 0 ? items : [];
+    return items.some((p) => p.id === notif.id) ? withoutId(items, notif.id) : items;
+  }
   const idx = items.findIndex((p) => p.id === notif.id);
   if (idx < 0) return [notif, ...items];
   const previo = items[idx];
@@ -105,7 +168,13 @@ export function fusionarAvisoEnVivo(items, notif) {
 const ESTADOS = {
   friend_request: { pending: null, accepted: 'aceptada', rejected: 'rechazada' },
   club_request: { pending: null, approved: 'aceptada', rejected: 'rechazada' },
+  club_invite: { pending: null, approved: 'aceptada', rejected: 'rechazada' },
   club_challenge: { pendiente: null, aceptado: 'aceptada', rechazado: 'rechazada' },
+  // Migración 48. El aviso dice «Hay un resultado por confirmar · confírmalo
+  // o recházalo», así que una vez respondido queda mintiendo igual que una
+  // solicitud ya aceptada. `resultado_en_disputa` es el rechazo: la fila
+  // queda en 'rechazado' y sólo la moderación la reabre (48b).
+  club_resultado_propuesto: { propuesto: null, confirmado: 'aceptada', rechazado: 'rechazada' },
 };
 
 /**
@@ -126,6 +195,10 @@ export function textoResolucion(n) {
   if (!r) return null;
   if (r === 'cerrada') return 'Ya no está pendiente';
   if (n.type === 'club_challenge') return r === 'aceptada' ? 'Reto aceptado' : 'Reto rechazado';
+  if (n.type === 'club_resultado_propuesto') {
+    return r === 'aceptada' ? 'Resultado confirmado' : 'Resultado rechazado';
+  }
+  if (n.type === 'club_invite') return r === 'aceptada' ? 'Invitación aceptada' : 'Invitación rechazada';
   return r === 'aceptada' ? 'Solicitud aceptada' : 'Solicitud rechazada';
 }
 
@@ -133,7 +206,7 @@ export function textoResolucion(n) {
  * Marca como respondidas las tarjetas cuya solicitud ya no está pendiente.
  *
  * `estados` trae, por id, el estado actual de cada fila de origen
- * (`friendships`, `requests`, `challenges`), o `null` si no se pudo
+ * (`friendships`, `requests`, `challenges`, `resultados`), o `null` si no se pudo
  * averiguar — y entonces no se toca nada: mejor ofrecer los botones que
  * esconderlos sin saber.
  *
@@ -149,11 +222,16 @@ export function conResoluciones(items, estados) {
     let estado;
     if (n.type === 'friend_request' && data.friendshipId) {
       estado = estados.friendships?.get(data.friendshipId);
-    } else if (n.type === 'club_request' && data.requestId) {
+    } else if ((n.type === 'club_request' || n.type === 'club_invite') && data.requestId) {
       estado = estados.requests?.get(data.requestId);
       if (estado === undefined) return n;
     } else if (n.type === 'club_challenge' && data.challengeId) {
       estado = estados.challenges?.get(data.challengeId);
+      if (estado === undefined) return n;
+    } else if (n.type === 'club_resultado_propuesto' && data.resultId) {
+      estado = estados.resultados?.get(data.resultId);
+      // Ausente es «no sé», igual que el reto: puede ser la RLS —dejé de
+      // administrar el club— y no que el resultado haya desaparecido.
       if (estado === undefined) return n;
     } else {
       return n;

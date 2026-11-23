@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import StatusPill from './StatusPill';
+import { contadorDeJugadores } from '../../utils/asientos.js';
 import {
   paleta as C,
 } from '../../theme/colors';
@@ -53,6 +54,7 @@ function Meta({ label, value, tone }) {
 
 export default function MatchCard({ match: m, onJoin, onPress, width = 238 }) {
   const cuposLeft = m.cupos_disponibles ?? 0;
+  const contador = contadorDeJugadores(m);
   const full = cuposLeft <= 0;
   const joined = !!m._joined;
   const manual = m.aprobacion === 'manual';
@@ -85,7 +87,11 @@ export default function MatchCard({ match: m, onJoin, onPress, width = 238 }) {
 
         <View className="flex-row gap-1.5">
           <Meta label="HORA" value={formatHora(m.hora)} />
-          <Meta label="CUPOS" value={full ? 'Completo' : `${cuposLeft} de ${m.cupos_totales}`} tone={full ? undefined : 'neon'} />
+          {contador ? (
+            <Meta label="JUGADORES" value={contador.texto} tone={full ? undefined : 'neon'} />
+          ) : (
+            <Meta label="CUPOS" value={full ? 'Completo' : `${cuposLeft} de ${m.cupos_totales}`} tone={full ? undefined : 'neon'} />
+          )}
         </View>
 
         <Pressable

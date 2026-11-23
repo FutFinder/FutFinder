@@ -66,6 +66,9 @@ export function resolveNotificationTarget(n) {
         : null;
 
     case 'club_request_rejected':
+    // Una invitación (188) se responde en la pestaña Clubes, donde ya está
+    // la lista de invitaciones; el detalle del club es para miembros.
+    case 'club_invite':
       return { screen: 'Main', params: { screen: 'ClubsTab' } };
 
     // Tu club quedó sancionado (migración 47). Va al CLUB y no al hilo del
@@ -209,6 +212,12 @@ export function resolveNotificationTarget(n) {
     case 'friend_request':
     case 'friend_accept':
       return data.fromUserId ? { screen: 'UserProfile', params: { userId: data.fromUserId } } : null;
+
+    // Moderación (migración 194): a los términos, donde están las reglas de
+    // convivencia que explican la decisión. `Terminos` (para leer), NUNCA
+    // `Terms`: ése es el paso del registro que marca el onboarding.
+    case 'moderacion':
+      return { screen: 'Terminos', params: {} };
 
     default:
       return null;

@@ -1,11 +1,25 @@
 # Calidad: lint y errores de render
 
-Última revisión: 2026-08-11
+Última revisión: 2026-11-14
 
 ## Propósito
 
 Dejar por escrito las dos redes que atrapan los fallos que antes solo
 aparecían como una pantalla en blanco: el lint y el error boundary.
+
+## Dónde corre
+
+En cada Mac con `npm run verify` y, desde el 2026-11-14, en GitHub en cada push y PR a `main` (`.github/workflows/ci.yml`; detalle en [Pruebas](pruebas.md)). Un error de lint ahí deja el run en rojo.
+
+## Los seis avisos que quedan (2026-11-14)
+
+Todos son `react-hooks/exhaustive-deps` y se dejaron **a propósito**: arreglarlos cambia cuándo corre un efecto, y eso hay que mirarlo pantalla por pantalla, no en un barrido. (Eran 24; el 2026-11-13 se quitaron las importaciones sin uso y el 14 los tres que sólo pedían `navigation`, que es estable.)
+
+- `ChatThreadScreen` (`cacheSenders`) y `PartidosScreen` (`load`): son funciones que se crean en cada render; agregarlas hace que el efecto corra en cada render (recarga en bucle) salvo que antes se envuelvan en `useCallback` con sus propias dependencias bien puestas.
+- `MatchDetailScreen` (`match`): el efecto lee el partido pero no debe volver a correr cada vez que el partido se recarga.
+- `ProfileScreen` (`authUser?.id`, `isAuthenticated`): agregarlas recarga el perfil al cambiar la sesión; probablemente sea lo correcto, pero es un cambio de comportamiento y va con prueba en pantalla.
+- `HomeScreen` (`handleJoin`): pide envolver `handleJoin` en `useCallback`; toca la inscripción a un partido, el camino más usado de la app.
+- `SplashScreen`: el efecto corre una sola vez al montar y decide a dónde entra la app; no se toca sin poder probar el arranque en teléfono.
 
 ## ESLint
 
@@ -30,8 +44,46 @@ verdad** y la puerta significa algo.
 - Ignorados con `**/`: hay bundles compilados dentro de `.worktrees/`, y sin
   eso entraban al análisis con miles de falsos positivos del empaquetador.
 
-Estado actual: **0 errores, 25 avisos** (importaciones muertas y
-dependencias de efectos). Los avisos son deuda conocida, no bloquean.
+- `no-restricted-imports` (error, desde el 2026-09-16) es el candado de la
+  **estética única**: prohíbe importar de `theme/colors` los nombres de las
+  seis paletas que se borraron (`colors`, `dsColors`, `clubColors`,
+  `chatColors`, `tactical`, `partidos` y sus radios, tamaños y fuentes). Va
+  por patrón y no por ruta exacta, porque el mismo módulo se importa como
+  `../theme/colors` y como `../../theme/colors`. **Ojo: su mensaje está
+  desactualizado.** Manda a usar `reservas`/`reservasRadius`/`reservasSizes`/
+  `reservasFonts`, y esas familias ya no existen: el commit `0555ab9` las
+  renombró y hoy los exports de `src/theme/colors.js` son `paleta`, `radios`,
+  `medidas` y `fuentes`. Quien tropiece con la regla leerá un nombre que no
+  puede importar (ver [Pendientes](pendientes.md), comentarios desactualizados).
+
+Estado actual: **0 errores y 25 avisos** (importaciones muertas y
+dependencias de efectos), medido el 2026-09-25. **No se volvió a medir el
+2026-11-05**: el número de avisos puede haber cambiado. Los avisos son deuda
+conocida, no bloquean.
+
+## Lo que el lint no ve, y las pruebas que lo cubren
+
+El lint prohíbe importar y detecta variables sueltas; no mira el texto de un
+archivo ni los nombres que un `import` pide a otro módulo. Tres guardas de
+`npm test` cubren esos huecos, y las tres leen archivos como las demás pruebas
+leen migraciones:
+
+- `src/utils/__tests__/importaciones.test.js`: todo lo que una pantalla
+  importa de `src/utils` o `src/services` tiene que existir de verdad. En
+  JavaScript un nombre que no existe llega como `undefined` y la pantalla
+  revienta recién al dibujarse (`TarifasScreen`, y el 2026-10-21
+  `ClubProposalScreen` pidiendo `NIVELES` al módulo equivocado). Es el hermano
+  de `no-undef` para los imports. No cubre los módulos que Node no puede cargar
+  (`appVersion`, `notify`, `clubMeta`): lo que importan queda sin comprobar.
+- `src/theme/__tests__/unaSolaEstetica.test.js`: recorre `src/` y comprueba que
+  cada `X.clave` de la paleta única tenga valor, porque en React Native un
+  token inexistente no avisa (pinta transparente o negro). Sólo ve el acceso
+  por punto (`C.green`), no la desestructuración.
+- `src/theme/__tests__/nadieEscribeLaPaletaAMano.test.js`: ningún color de las
+  paletas borradas, ni de la paleta actual, vuelve escrito a mano (hex o
+  `rgba()`), sobre todo en las clases NativeWind (`bg-[#…]`), que el lint y la
+  prueba de cobertura no miran. Si falla, se usa el token (`paleta.*`, `alfa()`)
+  o la clase con nombre de `tailwind.config.js`, no se agrega una excepción.
 
 ## Error boundary
 

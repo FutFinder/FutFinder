@@ -1,0 +1,373 @@
+/**
+ * Términos y condiciones, política de privacidad y política de cookies.
+ *
+ * Viven acá y no en una web aparte porque `futfinder.cl/terminos` y
+ * `futfinder.cl/privacidad`, a donde apuntaban Bienvenida, Registro y
+ * Ajustes, no respondían: aceptar algo que no se puede leer no es aceptar
+ * nada. Como datos puros se
+ * pueden probar sin montar la pantalla y `LegalScreen` las dibuja igual en
+ * web y en el teléfono.
+ *
+ * CADA FRASE TIENE QUE SER VERDAD EN EL CÓDIGO. Antes de cambiar un servicio
+ * externo, una clave del almacenamiento local, qué entra en «Exportar mis
+ * datos» o una regla de reservas o de clubes, revisa la sección que lo nombra. Si cambia algo de fondo, sube
+ * `ACTUALIZADO` (y `VERSION_LEGAL`, que es la misma fecha) y, para cookies, `VERSION_AVISO_COOKIES` en
+ * `utils/avisoCookies.js`, que vuelve a mostrar el aviso en web.
+ */
+
+export const ACTUALIZADO = '18 de noviembre de 2026';
+/**
+ * La misma fecha, como la guarda el servidor al aceptar (`aceptar_terminos`,
+ * migración 181). Es la versión del texto: súbela junto con `ACTUALIZADO`
+ * cada vez que cambie algo de fondo. Una prueba falla si se separan.
+ */
+export const VERSION_LEGAL = '2026-11-18';
+/**
+ * Qué cambió de fondo en esta versión, en una línea cada cosa. Lo ve quien
+ * ya tenía cuenta cuando se le pide aceptar de nuevo (`TerminosActualizados`
+ * → `withTerminosVigentes`). CAMBIA ESTA LISTA CADA VEZ QUE SUBA
+ * `VERSION_LEGAL`: si no, se le muestran a la gente los cambios de otra vez.
+ */
+export const CAMBIOS_DE_ESTA_VERSION = {
+  version: '2026-11-18',
+  cambios: [
+    'Ahora dicen quién ofrece el servicio y responde por tus datos: FutFinder SpA.',
+    'La edad mínima para usar FutFinder es 14 años.',
+  ],
+};
+export const CORREO_PRIVACIDAD = 'futfindercl@gmail.com';
+
+/**
+ * Quién ofrece el servicio y responde por los datos (2026-11-18). Los términos
+ * no traían razón social ni RUT, que piden la Ley 19.496 del consumidor, la
+ * Ley 21.719 (identidad del responsable) y las fichas de las tiendas.
+ */
+export const EMPRESA = {
+  razonSocial: 'FutFinder SpA',
+  rut: '78.524.079-0',
+  domicilio: 'Av. Papa San Pedro 9477, Pudahuel, Región Metropolitana, Chile',
+};
+const IDENTIDAD = `${EMPRESA.razonSocial}, RUT ${EMPRESA.rut}, con domicilio en ${EMPRESA.domicilio}`;
+
+const privacidad = {
+  titulo: 'Política de privacidad',
+  resumen:
+    'Usamos tus datos para que puedas encontrar partidos, armar clubes y jugar. No vendemos tu información ni mostramos publicidad.',
+  secciones: [
+    {
+      titulo: 'Quiénes somos',
+      parrafos: [
+        `FutFinder es una aplicación para organizar fútbol amateur en Chile. La responsable de los datos personales que tratamos a través de la app es ${IDENTIDAD}. Para cualquier consulta sobre privacidad escríbenos a ${CORREO_PRIVACIDAD} o usa «Reportar un problema» en Ajustes.`,
+        'Tratamos tus datos conforme a la Ley N° 19.628 sobre protección de la vida privada y, desde su entrada en vigencia, a la Ley N° 21.719 de protección de datos personales.',
+      ],
+    },
+    {
+      titulo: 'Qué datos guardamos',
+      lista: [
+        'Cuenta: correo, contraseña (cifrada por nuestro proveedor de autenticación; nunca la vemos) y, si lo registras, tu número de celular.',
+        'Aceptación de estos textos: la versión de los términos y de esta política que aceptaste al crear tu cuenta, y la fecha.',
+        'Perfil: nombre de usuario, foto, portada, edad, biografía, región y comuna, posición, nivel y modalidad que prefieres.',
+        'Ubicación: tu posición aproximada, solo si das permiso, para mostrarte partidos cercanos. Puedes usar la app eligiendo una comuna a mano.',
+        'Actividad: partidos que publicas o a los que te unes, asistencia, clubes, amistades, bloqueos, reservas de canchas y las calificaciones que das y recibes, con las que se calcula tu Trust Score.',
+        'Mensajes del chat, fotos de galerías y los reportes que envías a soporte, con su captura si la adjuntas.',
+        'Pagos de reservas: el monto y su estado. Los datos de tu tarjeta los ingresas directamente en Flow; FutFinder no los recibe ni los guarda.',
+        'Datos técnicos: el token para enviarte notificaciones push y, si la app falla, un informe de error sin tu correo, tu IP ni el contenido de tus mensajes.',
+      ],
+    },
+    {
+      titulo: 'Para qué los usamos',
+      lista: [
+        'Crear y mantener tu cuenta, e iniciar sesión.',
+        'Mostrarte partidos, clubes y canchas cerca de ti, y que otros jugadores te encuentren si así lo permites.',
+        'Hacer funcionar el chat, las invitaciones, las reservas y los pagos.',
+        'Enviarte avisos sobre tus partidos, clubes, chats y amistades, según lo que elijas en Ajustes.',
+        'Cuidar la comunidad: reputación, reportes, bloqueos y moderación.',
+        'Corregir errores y mantener la app segura.',
+      ],
+      parrafos: [
+        'No usamos tus datos para publicidad, no los vendemos y no armamos perfiles para terceros.',
+      ],
+    },
+    {
+      titulo: 'Qué ven los demás',
+      parrafos: [
+        'Tu perfil público (nombre de usuario, foto, portada, edad, comuna, posición, nivel, estadísticas y Trust Score) lo pueden ver otros jugadores dentro de clubes, partidos y chats. En Ajustes → Privacidad decides si apareces en la búsqueda de jugadores y quién puede enviarte solicitudes de amistad.',
+        'Las fotos que subes a tu perfil, tu portada y las galerías (tuyas o de tus clubes) se guardan con un enlace público: quien tenga el enlace puede verlas. No subas imágenes con información confidencial.',
+        'La captura que adjuntas a un reporte a soporte no es pública: se guarda en un espacio privado y solo la ve el equipo de FutFinder, a través de un enlace temporal.',
+        'El resultado de un partido entre clubes ya finalizado es público. La hora exacta y la cancha solo las ven los integrantes de esos clubes.',
+      ],
+    },
+    {
+      titulo: 'Con quién los compartimos',
+      parrafos: [
+        'Solo con proveedores que necesitamos para que la app funcione, y solo lo necesario para su tarea:',
+      ],
+      lista: [
+        'Supabase: base de datos, autenticación y almacenamiento de archivos.',
+        'Flow: procesamiento de pagos de reservas.',
+        'Mapbox y OpenStreetMap (Nominatim): mapas y búsqueda de direcciones.',
+        'Expo (y, a través de ella, Apple y Google): envío de notificaciones push.',
+        'Resend: envío de correos al equipo cuando reportas un problema o solicitas sumar un recinto.',
+        'Sentry: informes de errores, sin datos que te identifiquen.',
+      ],
+      parrafosFinales: [
+        'Algunos de estos proveedores procesan datos fuera de Chile. También podemos entregar información cuando una autoridad competente lo exija conforme a la ley.',
+      ],
+    },
+    {
+      titulo: 'Cuánto tiempo los guardamos',
+      parrafos: [
+        'Mientras tu cuenta esté activa. Si la eliminas desde Ajustes → Cuenta, borramos tu cuenta y tus datos asociados o los desvinculamos de ti, salvo lo que debamos conservar por obligación legal o contable, como el registro de los pagos.',
+      ],
+    },
+    {
+      titulo: 'Tus derechos',
+      parrafos: [
+        'Puedes acceder a tus datos, corregirlos, eliminarlos, oponerte a un tratamiento o pedir una copia para llevártela. Desde la app ya puedes:',
+      ],
+      lista: [
+        'Editar tu perfil y tus preferencias en cualquier momento.',
+        'Descargar tus datos con «Exportar mis datos» en Ajustes: perfil, teléfono, partidos, amigos, clubes, reservas, pagos, movimientos de saldo, calificaciones y reportes que hiciste, tickets de soporte, cuentas que bloqueaste, historial de tu puntaje, las versiones de los términos que aceptaste y los últimos 5.000 mensajes que escribiste. No incluye lo que escribieron otras personas.',
+        'Elegir qué notificaciones recibes y desactivar el permiso de ubicación desde tu teléfono o navegador.',
+        'Eliminar tu cuenta desde Ajustes → Cuenta.',
+      ],
+      parrafosFinales: [
+        `Para cualquier otra solicitud escríbenos a ${CORREO_PRIVACIDAD}. Te responderemos dentro de los plazos que fija la ley.`,
+      ],
+    },
+    {
+      titulo: 'Menores de edad',
+      parrafos: [
+        'FutFinder se puede usar desde los 14 años. Si eres responsable de un menor de 14 y crees que tiene una cuenta, escríbenos y la eliminaremos.',
+      ],
+    },
+    {
+      titulo: 'Seguridad',
+      parrafos: [
+        'Protegemos tus datos con conexiones cifradas y reglas en el servidor que limitan qué puede leer o cambiar cada cuenta. Ningún sistema es infalible: si detectamos un incidente que afecte tus datos, te avisaremos.',
+      ],
+    },
+    {
+      titulo: 'Cambios a esta política',
+      parrafos: [
+        'Si cambiamos algo importante, lo avisaremos dentro de la app antes de que aplique. La fecha de la última actualización aparece al inicio.',
+      ],
+    },
+  ],
+};
+
+const cookies = {
+  titulo: 'Política de cookies',
+  // Cambió después que los otros dos documentos: tiene su propia fecha.
+  actualizado: '19 de noviembre de 2026',
+  resumen:
+    'FutFinder no usa cookies de publicidad ni de seguimiento. En la versión web guardamos en tu navegador solo lo necesario para que la app funcione, y antes de que inicies sesión o cierres este aviso no guardamos nada.',
+  secciones: [
+    {
+      titulo: 'Qué son',
+      parrafos: [
+        'Las cookies y el almacenamiento local son pequeños archivos o registros que un sitio guarda en tu navegador para recordar cosas entre visitas. En el teléfono, la app usa el almacenamiento interno del dispositivo para lo mismo.',
+      ],
+    },
+    {
+      titulo: 'Qué guardamos y para qué',
+      parrafos: [
+        'FutFinder no pone cookies propias: lo que guarda va en el almacenamiento local de tu navegador o de la app. Todo es necesario para que funcione o es una comodidad que tú activas al usarla. Junto a cada cosa va su nombre técnico y cuánto dura:',
+      ],
+      lista: [
+        'Sesión (sb-…-auth-token): el acceso a tu cuenta, para que no tengas que iniciar sesión cada vez. Lo crea Supabase. Dura hasta que cierres sesión o elimines tu cuenta, y se renueva sola mientras usas la app. En el teléfono se guarda cifrada.',
+        'Cuenta recordada (futfinder.rememberedAccount): tu correo y nombre de usuario (nunca la contraseña), para ofrecerte entrar más rápido en este dispositivo. Se mantiene al cerrar sesión, que es justamente para lo que sirve, y se borra al eliminar tu cuenta o al borrar los datos de FutFinder.',
+        'Preferencias de uso (futfinder:clubActivo, club_chat_read:…, futfinder.panelRecintoBienvenida.…): el club que tenías abierto, qué mensajes de club ya leíste y qué avisos de bienvenida ya viste. Se borran al cerrar sesión.',
+        'Copia temporal de datos (@futfinder/cache/…): la última lista de partidos que cargaste y el detalle de los partidos que abriste, con sus jugadores, para mostrarlos mientras se actualizan o si pierdes la conexión. Se reemplaza cada vez que se actualiza y se borra al cerrar sesión.',
+        'Aviso de cookies (futfinder.avisoCookies): que ya viste este aviso, para no repetírtelo. Dura hasta que borres los datos de FutFinder; si cambiamos esta política de fondo, te lo mostramos una vez más.',
+      ],
+      parrafosFinales: [
+        'Borrar los datos de FutFinder es borrar los datos del sitio en tu navegador o, en el teléfono, los datos de la app (o desinstalarla).',
+      ],
+    },
+    {
+      titulo: 'Servicios de terceros',
+      parrafos: [
+        'Supabase, donde se guardan los datos de FutFinder, funciona detrás de Cloudflare. Cuando la app carga fotos o se conecta al chat en vivo, Cloudflare puede poner una cookie técnica llamada __cf_bm para distinguir a las personas de los programas automáticos. Dura 30 minutos, no te identifica y no la podemos desactivar.',
+        'Cuando abres un mapa en la web, Mapbox guarda en tu navegador un identificador anónimo y la fecha de su último registro (mapbox.eventData…) para medir el uso de su servicio, y una copia de los cuadros del mapa que ya viste (mapbox-tiles) para cargarlos más rápido. Le pedimos que no recoja métricas de rendimiento. Nosotros no usamos esos datos y no sirven para mostrarte publicidad. Cuánto duran lo decide Mapbox; puedes revisar cómo los trata en su política de privacidad.',
+        'Para buscar direcciones al publicar un partido usamos Mapbox u OpenStreetMap (Nominatim); ninguno de los dos guarda nada en tu navegador.',
+        'No usamos Google Analytics, píxeles de redes sociales ni ninguna otra herramienta de publicidad o seguimiento.',
+      ],
+    },
+    {
+      titulo: 'Cómo controlarlas',
+      parrafos: [
+        'Como todo lo que se guarda es necesario para el funcionamiento, no pedimos un consentimiento aparte. Aun así, puedes borrar el almacenamiento de FutFinder desde la configuración de tu navegador o eliminando los datos de la app en tu teléfono. Si lo haces, se cerrará tu sesión y perderás las preferencias guardadas en ese dispositivo.',
+        'Si algún día sumamos cookies opcionales, como medición o publicidad, te pediremos permiso antes de activarlas y podrás rechazarlas.',
+      ],
+    },
+    {
+      titulo: 'Contacto',
+      parrafos: [
+        `Si tienes dudas sobre esta política escríbenos a ${CORREO_PRIVACIDAD}. Lo demás sobre tus datos está en la Política de privacidad.`,
+      ],
+    },
+  ],
+};
+
+const terminos = {
+  titulo: 'Términos y condiciones',
+  resumen:
+    'Las reglas para usar FutFinder: juega limpio, cumple lo que te comprometes a jugar y trata bien a los demás. Al crear tu cuenta aceptas estos términos.',
+  secciones: [
+    {
+      titulo: 'Qué es FutFinder',
+      parrafos: [
+        'FutFinder es una aplicación para encontrar y organizar partidos de fútbol amateur, armar clubes, conversar con otros jugadores y reservar canchas en Chile. Al crear una cuenta o usar la app aceptas estos términos y nuestra Política de privacidad. Si no estás de acuerdo, no uses la app.',
+        `El servicio lo ofrece ${IDENTIDAD}.`,
+      ],
+    },
+    {
+      titulo: 'Tu cuenta',
+      lista: [
+        'Puedes usar FutFinder desde los 14 años.',
+        'Los datos de tu perfil deben ser verdaderos. No puedes hacerte pasar por otra persona.',
+        'Tu cuenta es personal: cuida tu contraseña y no la compartas. Eres responsable de lo que se haga con ella.',
+        'Puedes eliminar tu cuenta cuando quieras desde Ajustes → Cuenta.',
+      ],
+    },
+    {
+      titulo: 'Partidos',
+      lista: [
+        'Quien publica un partido es su organizador: define la cancha, la hora, los cupos, la cuota y los requisitos, y confirma después quién asistió.',
+        'Al inscribirte te comprometes a ir. Salirte, llegar tarde o no presentarte afecta tu puntaje de reputación según las reglas que la app muestra antes de cada acción.',
+        'Si un partido tiene una cuota, se acuerda y se paga entre los jugadores y el organizador fuera de la app, salvo que se trate de una reserva pagada en FutFinder. FutFinder no cobra ni garantiza esas cuotas.',
+      ],
+    },
+    {
+      titulo: 'Reputación',
+      parrafos: [
+        'Tu puntaje de reputación (Trust Score o TrueScore) y las calificaciones de tus compañeros reflejan tu asistencia, puntualidad y juego limpio. Los calcula el sistema a partir de lo que ocurre en los partidos; nadie puede editar el suyo. Un organizador puede exigir un puntaje mínimo para entrar a su partido.',
+      ],
+    },
+    {
+      titulo: 'Clubes y desafíos',
+      lista: [
+        'Puedes pertenecer hasta a tres clubes. Cada club admite hasta 26 integrantes y 3 administradores.',
+        'Los administradores gestionan el club, sus integrantes y sus desafíos, y son responsables de su uso.',
+        'El resultado de un desafío lo proponen los administradores de un club y lo confirma el otro. Si no hay acuerdo, el resultado queda en disputa hasta que lo revise FutFinder.',
+        'Un club que cancela un desafío con menos de 2 horas de aviso puede quedar sancionado para nuevos desafíos durante 14 días.',
+      ],
+    },
+    {
+      titulo: 'Reservas de canchas y pagos',
+      lista: [
+        'Las canchas las administra cada recinto. FutFinder te permite ver su disponibilidad, reservar y pagar, pero no es dueño de las canchas ni responde por su estado o por lo que ocurra en ellas.',
+        'Los pagos con tarjeta los procesa Flow. Los montos se muestran en pesos chilenos antes de pagar.',
+        'Puedes cancelar una reserva confirmada hasta 12 horas antes de su inicio; lo pagado vuelve a tu Balance FutFinder. Después de ese plazo no se puede cancelar desde la app.',
+        'Si pagaste y la reserva no alcanzó a confirmarse, por ejemplo porque otro grupo tomó el horario antes, te devolvemos el monto completo.',
+        'Lo que tengas en tu Balance solo se usa para pagar reservas dentro de FutFinder.',
+      ],
+    },
+    {
+      titulo: 'Recintos',
+      parrafos: [
+        'Si administras un recinto en FutFinder, te comprometes a publicar información real sobre tus canchas, precios y horarios, y a respetar las reservas confirmadas. Revisamos cada recinto antes de publicarlo y podemos retirarlo si no cumple estos términos.',
+      ],
+    },
+    {
+      titulo: 'Convivencia y contenido',
+      parrafos: [
+        'Eres responsable de lo que publicas: mensajes, fotos, nombres de clubes y descripciones. No está permitido:',
+      ],
+      lista: [
+        'Insultar, acosar, amenazar o discriminar a otras personas.',
+        'Publicar contenido sexual, violento, ilegal o que no te pertenezca.',
+        'Hacer spam, estafas o vender productos sin autorización.',
+        'Crear cuentas falsas, manipular la reputación o los resultados, o intentar acceder a datos de otros.',
+        'Agredir a otros jugadores dentro o fuera de la cancha.',
+      ],
+      parrafosFinales: [
+        'Puedes bloquear a otro jugador o reportar su cuenta desde su perfil, y reportar un problema de la app desde Ajustes.',
+      ],
+    },
+    {
+      titulo: 'Moderación y suspensión',
+      parrafos: [
+        'Podemos revisar reportes, ocultar contenido y suspender o cerrar cuentas que no cumplan estos términos. Si crees que nos equivocamos, escríbenos y revisaremos tu caso.',
+      ],
+    },
+    {
+      titulo: 'Responsabilidad',
+      parrafos: [
+        'El fútbol es un deporte de contacto. Cada jugador participa bajo su propia responsabilidad y debe cuidar su salud y la de los demás. FutFinder pone en contacto a jugadores, clubes y recintos, pero no organiza los partidos ni está presente en ellos, por lo que no responde por lesiones, daños, pérdidas o conflictos entre usuarios, salvo en lo que la ley no permita excluir.',
+        'Hacemos lo posible para que la app funcione siempre, pero puede tener interrupciones o errores. Podemos cambiar, agregar o quitar funciones.',
+        'Nada de esto limita los derechos que te da la Ley N° 19.496 de protección de los derechos de los consumidores.',
+      ],
+    },
+    {
+      titulo: 'Cambios y ley aplicable',
+      parrafos: [
+        'Si cambiamos algo importante de estos términos, te lo avisaremos antes de que aplique. Seguir usando la app después significa que aceptas los cambios.',
+        'Estos términos se rigen por las leyes de Chile.',
+      ],
+    },
+    {
+      titulo: 'Contacto',
+      parrafos: [
+        `Si tienes dudas sobre estos términos escríbenos a ${CORREO_PRIVACIDAD} o usa «Reportar un problema» en Ajustes.`,
+        `${EMPRESA.razonSocial} · RUT ${EMPRESA.rut} · ${EMPRESA.domicilio}.`,
+      ],
+    },
+  ],
+};
+
+/**
+ * Cómo eliminar la cuenta, en una dirección pública (`/eliminar-cuenta`).
+ *
+ * Google Play la exige: el formulario de Seguridad de los datos pide un
+ * enlace web donde se pueda pedir el borrado SIN tener la app instalada.
+ * Lo que dice tiene que coincidir con `delete_my_account()` (migración 176):
+ * qué se borra, qué queda sin autor y qué impide borrar.
+ */
+const eliminarCuenta = {
+  titulo: 'Eliminar tu cuenta',
+  resumen: `Puedes eliminar tu cuenta de FutFinder y tus datos cuando quieras, desde la app o escribiéndonos. ${EMPRESA.razonSocial} es la responsable de tus datos.`,
+  secciones: [
+    {
+      titulo: 'Desde la app o la web',
+      parrafos: ['Es inmediato y no necesitas escribirnos:'],
+      lista: [
+        'Abre FutFinder en tu teléfono o inicia sesión en www.futfinder.cl.',
+        'Entra a Ajustes y, al final de la pantalla, toca «Eliminar cuenta».',
+        'Confirma con «Eliminar mi cuenta».',
+      ],
+    },
+    {
+      titulo: 'Sin la app',
+      parrafos: [
+        `Si ya no tienes la app o no puedes iniciar sesión, escríbenos a ${CORREO_PRIVACIDAD} desde el correo con el que te registraste y pídenos eliminar tu cuenta. Te responderemos dentro de 10 días hábiles para confirmar que eres tú y la eliminaremos.`,
+      ],
+    },
+    {
+      titulo: 'Qué se elimina',
+      parrafos: [
+        'Tu perfil (nombre de usuario, foto, portada, bio, edad, comuna y posición), tus fotos, tu teléfono, tu ubicación, tus amistades y bloqueos, tus mensajes, tus avisos, tus inscripciones en partidos y tus preferencias.',
+        'Si tienes partidos por jugar que organizaste, se cancelan y se avisa a los inscritos. Si eras la única persona que administraba un club con integrantes, la administración pasa a quien lleva más tiempo en él.',
+      ],
+    },
+    {
+      titulo: 'Qué se conserva, sin tu nombre',
+      parrafos: [
+        'Los partidos ya jugados, los clubes que fundaste y los resultados quedan para las demás personas que participaron, pero sin ningún vínculo contigo.',
+        'El registro de pagos y reservas se conserva desvinculado de ti por obligación contable y tributaria, durante el plazo que exige la ley.',
+      ],
+    },
+    {
+      titulo: 'Lo que hay que resolver antes',
+      parrafos: ['No se puede eliminar una cuenta que todavía tiene algo pendiente con otras personas o con dinero:'],
+      lista: [
+        `Saldo a favor: escríbenos a ${CORREO_PRIVACIDAD} para devolvértelo.`,
+        'Reservas por jugar que ya pagaste: cancélalas desde «Mis reservas» o espera a jugarlas.',
+        `Un recinto que sólo tú administras: escríbenos para traspasarlo.`,
+      ],
+    },
+  ],
+};
+
+export const DOCUMENTOS_LEGALES = { terminos, privacidad, cookies, eliminarCuenta };

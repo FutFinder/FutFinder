@@ -14,6 +14,12 @@
  * una posición más precisa que el jugador nunca declaró.
  */
 
+/**
+ * Formaciones de fútbol 5 (migración 197): arquero + 4. Las de siempre en
+ * baby: el cuadrado (2-2), el rombo (1-2-1) y sus variantes.
+ */
+export const F5 = ['2-2', '1-2-1', '2-1-1', '1-1-2', '3-1', '1-3'];
+
 /** Formaciones de fútbol 7 (10 líneas posibles, arquero aparte). */
 export const F7 = ['2-3-1', '3-2-1', '2-1-3', '1-3-2', '3-1-2', '2-2-2', '1-4-1', '3-3'];
 
@@ -32,6 +38,26 @@ export const F11 = [
   '4-1-2-3',
   '3-4-1-2',
 ];
+
+/** Modos del tablero: jugadores por lado. `club_lineups.modo` (197). */
+export const MODOS = [5, 7, 11];
+
+/** Las formaciones que se ofrecen para un modo. */
+export function formacionesDe(modo) {
+  if (modo === 5) return F5;
+  if (modo === 11) return F11;
+  return F7;
+}
+
+/**
+ * Con qué modo abre el tablero de un club que todavía no guardó alineación:
+ * el de su modalidad. «Ambos» (7 y 11) y sin modalidad abren en 7.
+ */
+export function modoInicialDeClub(modalidad) {
+  if (modalidad === 'futbol5') return 5;
+  if (modalidad === 'futbol11') return 11;
+  return 7;
+}
 
 const LINE_LABELS = {
   def: { 1: ['DFC'], 2: ['DFC', 'DFC'], 3: ['DFC', 'DFC', 'DFC'], 4: ['LI', 'DFC', 'DFC', 'LD'], 5: ['LI', 'DFC', 'DFC', 'DFC', 'LD'] },

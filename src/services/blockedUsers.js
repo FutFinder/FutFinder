@@ -87,6 +87,25 @@ export async function isBlockedByMe(userId) {
 }
 
 /**
+ * Los ids de quienes bloqueé, como `Set`. Para marcar «Bloqueado» en las
+ * listas de un partido. Ante un error devuelve un `Set` vacío: la marca es
+ * una ayuda, no algo que deba tumbar la pantalla.
+ */
+export async function idsQueBloquee() {
+  if (!isSupabaseConfigured) return new Set();
+  const me = await getMe();
+  if (!me) return new Set();
+  const { data, error } = await supabase.from('blocked_users').select('blocked_id').eq('blocker_id', me);
+  if (error) {
+    if (!faltaLaMigracion(error)) {
+      console.error('[FutFinder] idsQueBloquee:', error.code || '', error.message || error);
+    }
+    return new Set();
+  }
+  return new Set((data || []).map((r) => r.blocked_id));
+}
+
+/**
  * Lista los usuarios que bloqueé, con su perfil básico para mostrarlos.
  * @returns {{ data: Array<{id, blockedId, blockedAt, profile}>, error }}
  */

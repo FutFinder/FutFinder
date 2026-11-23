@@ -179,12 +179,31 @@ begin
   end if;
   raise notice 'OK (caso 12): es_organizador_de_reserva bloqueada para anon';
 
-  -- ── get_disponibilidad_cancha sigue siendo pública a propósito ────
-  v_j := public.get_disponibilidad_cancha(v_cancha, current_date + 30);
-  if (v_j->>'ok')::boolean is not true then
-    raise exception 'FALLÓ (caso 13): get_disponibilidad_cancha debería seguir siendo ejecutable por anon, respondió %', v_j;
-  end if;
-  raise notice 'OK (caso 13): get_disponibilidad_cancha sigue pública para anon';
+  -- ── get_disponibilidad_cancha YA NO es pública, y no se decidió ───
+  --
+  -- ESTE CASO DECÍA LO CONTRARIO y afirmaba que seguía siendo ejecutable
+  -- por `anon` «a propósito». Lo era: las migraciones 54, 60, 64, 65 y 84
+  -- se la conceden a `anon` explícitamente, cinco veces, a lo largo de
+  -- treinta migraciones. Hoy su ACL es `postgres | authenticated |
+  -- service_role`.
+  --
+  -- La cerró la migración **114** («anon no ejecuta nada»), que barrió
+  -- TODAS las funciones de `public` para quitarle a `anon` el `execute`
+  -- que `alter default privileges` le concedía a su nombre. Esta función
+  -- cayó en la redada y la 114 ni la nombra: fue daño colateral, no una
+  -- decisión. Nadie lo supo porque este arnés lleva rojo desde entonces y
+  -- no se volvió a correr hasta el 2026-10-15.
+  --
+  -- El caso se invierte para que mida lo que de verdad pasa, NO porque el
+  -- cierre esté bien: reabrirla a `anon` amplía el acceso anónimo y eso
+  -- es una decisión de producto. Queda anotado en `pendientes.md`.
+  begin
+    v_j := public.get_disponibilidad_cancha(v_cancha, current_date + 30);
+    raise exception 'FALLÓ (caso 13): anon ejecutó get_disponibilidad_cancha. '
+      'Si se reabrió a propósito, actualiza este caso Y el pendiente que lo explica.';
+  exception when insufficient_privilege then
+    raise notice 'OK (caso 13): anon NO la ejecuta — la cerró la 114, sin decidirlo';
+  end;
 
   -- ── authenticated no perdió su acceso ──────────────────────────────
   execute format('set local role authenticated');

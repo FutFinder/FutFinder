@@ -6,12 +6,13 @@ import { Bell, X } from 'lucide-react-native';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeToNotifications } from '../services/notifications';
+import { listMutedThreads } from '../services/messages';
 import { navigateToNotification } from '../utils/notificationTargets';
 import { getMatchById } from '../services/matches';
 import { getClubById } from '../services/clubs';
 import { ICON, TAG, FALLBACK_TAG } from './notifications/NotificationCard';
 import {
-  empujarToast, quitarToast, suscribirseAToasts, DURACION_TOAST_MS,
+  empujarToast, quitarToast, limpiarToasts, suscribirseAToasts, toastsDelUsuario, avisoSilenciado, DURACION_TOAST_MS,
 } from '../utils/notificationToasts';
 import { navigationRef } from '../navigation/AppNavigator';
 
@@ -39,12 +40,41 @@ export default function NotificationToastHost() {
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
+    // Cerrar sesión o cambiar de cuenta: nada de la anterior queda arriba (C10).
+    limpiarToasts();
     if (!user?.id) return undefined;
-    return subscribeToNotifications(user.id, (notif) => {
+    let vigente = true;
+    const desuscribir = subscribeToNotifications(user.id, (notif) => {
+      // Un aviso borrado no puede seguir flotando arriba (C09).
+      if (notif._eventType === 'DELETE') {
+        if (notif.todos) limpiarToasts();
+        else quitarToast(notif.id);
+        return;
+      }
       if (notif._eventType !== 'INSERT') return;
       if (navigationRef.getCurrentRoute?.()?.name === 'Notifications') return;
-      empujarToast(notif);
+      // Un hilo silenciado no abre popups (C05). Se pregunta en el momento
+      // —es raro y barato— para no depender de una caché que quede vieja
+      // cuando alguien silencia o reactiva desde Detalles del chat.
+      (async () => {
+        if (notif.type === 'message_new' || notif.type === 'chat_mention_all') {
+          let silenciados = null;
+          try {
+            ({ data: silenciados } = await listMutedThreads());
+          } catch {
+            // Sin saber, se muestra: mejor un popup de más que uno perdido.
+          }
+          if (!vigente) return;
+          if (avisoSilenciado(notif, silenciados)) return;
+        }
+        empujarToast(notif);
+      })();
     });
+    return () => {
+      vigente = false;
+      desuscribir();
+      limpiarToasts();
+    };
   }, [user?.id]);
 
   useEffect(() => suscribirseAToasts(setToasts), []);
@@ -55,7 +85,8 @@ export default function NotificationToastHost() {
     return () => relojes.forEach(clearTimeout);
   }, [toasts]);
 
-  if (toasts.length === 0) return null;
+  const visibles = toastsDelUsuario(toasts, user?.id);
+  if (visibles.length === 0) return null;
 
   const abrir = async (n) => {
     quitarToast(n.id);
@@ -71,7 +102,7 @@ export default function NotificationToastHost() {
 
   return (
     <View style={[styles.capa, { top: insets.top + 8 }]} pointerEvents="box-none">
-      {toasts.map((n) => {
+      {visibles.map((n) => {
         const Icon = ICON[n.type] || Bell;
         const tag = TAG[n.type] || FALLBACK_TAG;
         return (

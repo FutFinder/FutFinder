@@ -119,7 +119,10 @@ export async function listChallengesForClub(clubId) {
   const creadorIds = new Set();
   for (const c of data) {
     otherClubIds.add(c.club_retador_id === clubId ? c.club_retado_id : c.club_retador_id);
-    creadorIds.add(c.creado_por);
+    // Desde la 176, quien borra su cuenta deja sus desafíos sin autor
+    // (`creado_por` nulo): un `null` dentro de `.in()` haría fallar la
+    // consulta entera y se perderían también los nombres de los demás.
+    if (c.creado_por) creadorIds.add(c.creado_por);
   }
 
   const [{ data: clubs }, { data: profiles }] = await Promise.all([

@@ -583,7 +583,8 @@ test('el payload usa los nombres de columna que espera la RPC', () => {
   assert.deepEqual(Object.keys(p).sort(), [
     'cancha_nombre', 'comuna', 'cuota_por_persona', 'cupos_por_club',
     'direccion', 'duracion_min', 'fecha', 'instrucciones', 'latitud',
-    'longitud', 'metodo_inscripcion', 'modalidad', 'proponente_juega', 'region',
+    'longitud', 'metodo_inscripcion', 'modalidad', 'nivel', 'proponente_juega',
+    'region',
   ]);
   assert.equal(p.duracion_min, 90);
   assert.equal(p.cupos_por_club, 7);
@@ -642,4 +643,13 @@ test('un borrador vacío no revienta ni inventa valores', () => {
   assert.equal(p.fecha, null);
   assert.equal(p.direccion, null);
   assert.equal(p.cupos_por_club, null);
+});
+
+// ─────────────────────────────────────────────── Fútbol 5 (migración 197)
+
+test('los desafíos entre clubes también se acuerdan en Fútbol 5', () => {
+  assert.deepEqual(R.MODALIDADES.map((m) => m.value), ['futbol5', 'futbol7', 'futbol11']);
+  assert.equal(R.MODALIDADES[0].label, 'Fútbol 5');
+  // Cinco por lado cabe en el rango de cupos por club que ya existía.
+  assert.ok(R.CUPOS_POR_CLUB.min <= 5);
 });

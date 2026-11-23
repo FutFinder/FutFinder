@@ -14,7 +14,6 @@ import {
 
 import {
   paleta as C,
-  radios as R,
   fuentes as F,
   alfa,
 } from '../theme/colors';
@@ -39,9 +38,11 @@ import { confirmAttendanceWithGPS } from '../services/attendance';
 import { getCurrentUser } from '../services/auth';
 import { useOnline } from '../services/connectivity';
 import { goBackOrPartidos } from '../utils/navigation';
+import { enlaceComoLlegar } from '../utils/comoLlegar';
 import { useCostoSalida, useTrueScoreAjustes } from '../services/trueScore';
 import {
   TEXTO_REGLA_SALIDA_TS,
+  nombrePuntajeDe,
   sufijoCosto,
   textoCostoSalida,
   textoEfectoGps,
@@ -81,6 +82,7 @@ export default function MatchSpotScreen({ route, navigation }) {
   // Con TrueScore el costo de salirse lo calcula el servidor: hasta que
   // llegue, no se puede confirmar una salida cuyo precio no se conoce.
   const ts = !!useTrueScoreAjustes().fase1;
+  const nombreTS = nombrePuntajeDe(ts);
   const costo = useCostoSalida(matchId, { activo: ts && sheet === 'leave' });
   const costoListo = !ts || costo.estado === 'listo';
 
@@ -149,11 +151,12 @@ export default function MatchSpotScreen({ route, navigation }) {
   };
 
   const openDirections = () => {
-    if (match?.latitud == null) return;
-    const url =
-      Platform.OS === 'ios'
-        ? `http://maps.apple.com/?daddr=${match.latitud},${match.longitud}`
-        : `https://www.google.com/maps/dir/?api=1&destination=${match.latitud},${match.longitud}`;
+    const url = enlaceComoLlegar(
+      { latitud: match?.latitud, longitud: match?.longitud, nombre: match?.cancha_nombre },
+      Platform.OS,
+      { soloPunto: true }
+    );
+    if (!url) return;
     Linking.openURL(url).catch(() => {});
   };
 
@@ -391,7 +394,7 @@ export default function MatchSpotScreen({ route, navigation }) {
                   : costo.estado === 'cargando'
                   ? 'Calculando lo que te cuesta salir ahora…'
                   : costo.error
-                : `Tu Trust Score baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
+                : `Tu ${nombreTS} baja ${leavePenaltyFor(match.hora)} ${leavePenaltyFor(match.hora) === 1 ? 'punto' : 'puntos'}`
             }
           />
           {ts && costo.estado === 'error' ? (

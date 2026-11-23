@@ -18,6 +18,8 @@
  * argumento, para que las pruebas no tengan que congelar el reloj.
  */
 
+import { NIVELES } from './matchRules.js';
+
 // ─────────────────────────────────────────────── plazos del ciclo
 
 /** Horas de negociación que se abren al aceptar un desafío. */
@@ -64,8 +66,12 @@ export const CUPOS_POR_CLUB = { min: 4, max: 15 };
 /** Duraciones ofrecidas, las mismas que el módulo Partidos. */
 export const DURACIONES = [60, 90, 120];
 
-/** Modalidades soportadas por `matches.modalidad`. */
+/**
+ * Modalidades de un desafío entre clubes. Fútbol 5 desde la migración 197
+ * (`club_challenges`, `club_challenge_proposals`, `club_open_challenges`).
+ */
 export const MODALIDADES = [
+  { value: 'futbol5', label: 'Fútbol 5' },
   { value: 'futbol7', label: 'Fútbol 7' },
   { value: 'futbol11', label: 'Fútbol 11' },
 ];
@@ -470,6 +476,17 @@ export function propuestaOficialPayload(draft = {}) {
     // false)` ya resuelve la ausencia, pero mandar el valor explícito deja el
     // registro de que la pregunta se hizo y la respuesta fue no.
     proponente_juega: draft.proponenteJuega === true,
+    // El nivel lo fija quien propone y no se negocia (migración 156).
+    //
+    // `null` NO es `'recreativo'`: significa «no se eligió», y el servidor
+    // guarda esa diferencia. Mandar «recreativo» por omisión repetiría el
+    // fallo que la 156 vino a cerrar — un valor por defecto disfrazado de
+    // dato que el historial después mostraba como si alguien lo hubiera
+    // elegido.
+    //
+    // Un valor que no existe tampoco viaja: la columna tiene una
+    // restricción `check` y llegaría como un 23514 sin texto en español.
+    nivel: NIVELES.some((n) => n.value === draft.nivel) ? draft.nivel : null,
   };
 }
 

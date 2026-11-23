@@ -283,3 +283,36 @@ export function rivalesPorCercania(rivales, { club = null, distancia = null } = 
     return a.distanciaKm - b.distanciaKm;
   });
 }
+
+/**
+ * «ADMIN · 2 CLUBES» en la cabecera de Inicio, o `undefined` si en el club
+ * activo no soy administrador.
+ *
+ * I06: contaba TODAS las membresías, así que quien administra un club y
+ * juega en otro leía «ADMIN · 2 CLUBES». Ahora cuenta sólo las de rol
+ * `admin`. Si las membresías todavía no llegaron, administra al menos el
+ * club activo: «ADMIN · 0 CLUBES» sería peor que esperar.
+ */
+export function etiquetaAdminDeClubes(rolEnClubActivo, membresias) {
+  if (rolEnClubActivo !== 'admin') return undefined;
+  const n = (Array.isArray(membresias) ? membresias : []).filter((m) => m?.miRol === 'admin').length || 1;
+  return `ADMIN · ${n} ${n === 1 ? 'CLUB' : 'CLUBES'}`;
+}
+
+/**
+ * Qué muestra el bloque «Partidos cerca de ti» de Inicio (I02).
+ *
+ * Un fallo de `listOpenMatches` se tiraba y la portada decía «Sin partidos
+ * en tu radio»: sin red parecía que no había partidos. Ahora:
+ *   · 'error'           nada cargado y la consulta falló: error con reintento.
+ *   · 'lista-con-error' falló, pero quedan los de la carga anterior: se
+ *                       muestran con un aviso.
+ *   · 'vacio' / 'lista' lo de siempre.
+ */
+export function vistaDePartidosCerca({ cuantos = 0, error = null, destacados = 0 } = {}) {
+  if (error) return cuantos > 0 ? 'lista-con-error' : 'error';
+  if (cuantos > 0) return 'lista';
+  // I07: el único cercano subió a «Tu club juega». Decir «Sin partidos en
+  // tu radio» contradecía al resumen de arriba («1 partido cerca de ti»).
+  return destacados > 0 ? 'vacio-con-destacados' : 'vacio';
+}

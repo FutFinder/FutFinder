@@ -303,24 +303,23 @@ export function Callout({ title, text, tone = 'gold', icon: Icon, onPress, style
     danger: { bg: alfa(C.red, 0.09), border: C.redBorder, fg: C.red },
     neutral: { bg: C.surface, border: C.border, fg: C.textStrong },
   }[tone];
+  const caja = {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: map.bg,
+    borderWidth: 1,
+    borderColor: map.border,
+    borderRadius: 16,
+    padding: 13,
+  };
+  // Sólo `Pressable` acepta un estilo-función: un `View` lo ignora entero y
+  // la banda salía sin fondo ni borde cuando no tenía `onPress`.
   const Wrapper = onPress ? Pressable : View;
   return (
     <Wrapper
       onPress={onPress}
-      style={({ pressed } = {}) => [
-        {
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          gap: 10,
-          backgroundColor: map.bg,
-          borderWidth: 1,
-          borderColor: map.border,
-          borderRadius: 16,
-          padding: 13,
-        },
-        pressed && { opacity: 0.85 },
-        style,
-      ]}
+      style={onPress ? ({ pressed }) => [caja, pressed && { opacity: 0.85 }, style] : [caja, style]}
     >
       {Icon ? <Icon color={map.fg} size={17} strokeWidth={2} style={{ marginTop: 1 }} /> : null}
       <View style={{ flex: 1 }}>
@@ -519,7 +518,7 @@ export function CheckRow({ label, checked, onPress }) {
   );
 }
 
-export function Stepper({ value, onChange, min = 1, max = 30, error }) {
+export function Stepper({ value, onChange, min = 1, max = 30, error, unidad = ['CUPO', 'CUPOS'] }) {
   const dec = () => onChange(Math.max(min, value - 1));
   const inc = () => onChange(Math.min(max, value + 1));
   return (
@@ -547,7 +546,7 @@ export function Stepper({ value, onChange, min = 1, max = 30, error }) {
       <View style={{ flex: 1, alignItems: 'center' }}>
         <Text style={{ fontSize: 32, fontFamily: F.extraBold, color: C.textPrimary, lineHeight: 36 }}>{value}</Text>
         <Text style={{ fontSize: 10.5, fontFamily: F.semiBold, color: C.textFaint, letterSpacing: 0.6 }}>
-          {value === 1 ? 'CUPO' : 'CUPOS'}
+          {value === 1 ? unidad[0] : unidad[1]}
         </Text>
       </View>
       <Pressable

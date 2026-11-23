@@ -1,12 +1,22 @@
 // supabase/functions/send-push/index.ts
 //
 // Edge Function que recibe una row recién insertada en `notifications`
-// (vía Database Webhook) y la envía como push a todos los dispositivos
-// del usuario destinatario.
+// y la envía como push a todos los dispositivos del usuario destinatario.
+//
+// LA LLAMA EL DISPARADOR `notificar_push` (AFTER INSERT en `notifications`,
+// migraciones 117 y 118) con `pg_net`. La cabecera Authorization lleva la
+// clave publicable guardada en Vault (`send_push_authorization`), que sólo
+// sirve para pasar `verify_jwt`: esta función no la lee y trabaja con la
+// service key que le inyecta la plataforma. Ya no hay un webhook del panel.
+//
+// UN AVISO EN `failed` NO SE REINTENTA. Nadie vuelve a invocar la función
+// para una fila vieja: el disparador es sólo de INSERT y `pg_net` no
+// reintenta. Se dejó así a propósito: un barrido que reenviara `failed`
+// podría duplicar un push que sí alcanzó a salir antes del error.
 //
 // Flujo (recomendado por Expo — https://docs.expo.dev/push-notifications/sending-notifications/):
 //   1. Se reclama la notificación de forma atómica (evita doble envío
-//      si el webhook reintenta la misma fila).
+//      si la misma fila llega a invocarse dos veces).
 //   2. Se arman los mensajes y se mandan a Expo en tandas de 100.
 //   3. Cada ticket que Expo devuelve al toque se guarda en
 //      `push_tickets`; un ticket con error nunca marca la notif como
@@ -25,13 +35,14 @@
 //   EXPO_ACCESS_TOKEN  → si decides usar Push Security en Expo (recomendado en producción)
 
 // deno-lint-ignore-file no-explicit-any
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
 import {
   buildExpoMessage,
   chunk,
   classifyTickets,
   dedupeValidTokens,
   getPreferenceColumn,
+  hiloQueSilencia,
   isPushAllowed,
   maskToken,
   summarizePushStatus,
@@ -102,11 +113,12 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    // 0) Reclamar la fila de forma atómica. Si el webhook reintenta el
-    // mismo INSERT mientras un envío anterior sigue en curso (o ya
-    // terminó), esta condición no matchea ninguna fila y se corta acá
-    // sin volver a mandar nada. `push_claimed_at` vencido recupera
-    // reclamos de una invocación anterior que se cayó a mitad de camino.
+    // 0) Reclamar la fila de forma atómica. Si la misma fila llega dos
+    // veces mientras un envío anterior sigue en curso (o ya terminó),
+    // esta condición no matchea ninguna fila y se corta acá sin volver a
+    // mandar nada. `push_claimed_at` vencido deja tomar una fila que quedó
+    // en 'sending' porque una invocación anterior se cayó, SI alguien la
+    // vuelve a invocar (hoy nadie lo hace solo: ver la cabecera).
     const staleCutoff = new Date(
       Date.now() - CLAIM_STALE_AFTER_MINUTES * 60_000,
     ).toISOString();
@@ -124,7 +136,7 @@ Deno.serve(async (req) => {
       return json({ error: claimErr.message }, 500);
     }
     if (!claimed) {
-      console.log(`[send-push] notif ${notif.id} ya reclamada, se omite (reintento del webhook)`);
+      console.log(`[send-push] notif ${notif.id} ya reclamada, se omite (invocación repetida)`);
       return json({ skipped: "already_processing_or_done" });
     }
     notif = claimed as NotificationRow;
@@ -154,6 +166,39 @@ Deno.serve(async (req) => {
           .update({ push_status: "skipped_preference" })
           .eq("id", notif.id);
         return json({ skipped: "preference_disabled", preference: preferenceColumn });
+      }
+    }
+
+    // 1b) Respetar el silencio del hilo (C05). La migración 169 ya no crea
+    // el aviso de un hilo silenciado, pero el silencio puede llegar entre
+    // el aviso y este envío. Si la consulta falla, se sigue (igual que la
+    // preferencia): mejor un push de más que uno perdido.
+    const hilo = hiloQueSilencia(notif);
+    if (hilo) {
+      const { data: silencio, error: muteErr } = await admin
+        .from("chat_mutes")
+        .select("thread_key")
+        .eq("user_id", notif.user_id)
+        .eq("thread_key", hilo)
+        .maybeSingle();
+      if (muteErr) {
+        console.error("[send-push] chat_mutes error:", muteErr.message);
+      } else if (silencio) {
+        console.log(`[send-push] push omitido: hilo ${hilo} silenciado (notif ${notif.id})`);
+        const { error: estadoErr } = await admin
+          .from("notifications")
+          .update({ push_status: "skipped_muted" })
+          .eq("id", notif.id);
+        // `skipped_muted` lo agrega la migración 169. Si la función llegara
+        // a desplegarse antes que la migración, no se deja la fila colgada
+        // en 'sending': se anota como omitida por preferencia.
+        if (estadoErr) {
+          await admin
+            .from("notifications")
+            .update({ push_status: "skipped_preference" })
+            .eq("id", notif.id);
+        }
+        return json({ skipped: "thread_muted" });
       }
     }
 
@@ -290,8 +335,9 @@ Deno.serve(async (req) => {
   } catch (err: any) {
     console.error("[send-push] error:", err?.message ?? err);
     // Si ya habíamos reclamado la notif antes de reventar, la dejamos
-    // en 'failed' en vez de 'sending' colgado — igual es recuperable:
-    // el claim por staleness la vuelve a tomar si hiciera falta.
+    // en 'failed' en vez de 'sending' colgado. Es un estado TERMINAL: el
+    // reclamo no toma 'failed' y nadie reintenta (ver la cabecera). Sirve
+    // para contar y diagnosticar, no para recuperar.
     if (admin && notif?.id) {
       try {
         await admin

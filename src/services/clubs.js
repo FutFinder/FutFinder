@@ -279,6 +279,27 @@ export async function getMyClubIds() {
 }
 
 /**
+ * Mis membresías (`club_id`, `rol`) en algunos clubes: los dos de un desafío
+ * o los dos de un partido entre clubes.
+ *
+ * Era la misma consulta copiada a mano en tres pantallas (el hilo del
+ * desafío, la propuesta y el cambio de partido). Igual que entonces, un
+ * fallo devuelve `[]`: quien llama pierde los atajos de administrador, no la
+ * pantalla.
+ */
+export async function getMisMembresiasEn(userId, clubIds = []) {
+  const ids = (clubIds || []).filter(Boolean);
+  if (!isSupabaseConfigured || !userId || ids.length === 0) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('club_members')
+    .select('club_id, rol')
+    .eq('user_id', userId)
+    .in('club_id', ids);
+  if (error) return { data: [], error };
+  return { data: data || [], error: null };
+}
+
+/**
  * Los clubes que ADMINISTRO, en una sola consulta.
  *
  * `data: []` es «no administro ninguno» y `data: null` es «no se pudo

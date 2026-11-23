@@ -50,6 +50,17 @@ begin
 
   A := pg_temp.usuario(); B := pg_temp.usuario(); D := pg_temp.usuario(); N := pg_temp.usuario();
 
+  -- FOTO DE LAS CUENTAS AJENAS ANTES DE CORRER EL JOB (2026-10-17). El C09
+  -- de más abajo daba por hecho que cualquier otra cuenta de la base valía
+  -- 75 —cierto en una base recién construida y en ninguna otra—. Con una
+  -- cuenta de prueba creada por la app, o corriendo el arnés con el reloj
+  -- adelantado seis meses, esa cuenta SÍ se mueve: el job hace exactamente
+  -- su trabajo y el arnés lo llamaba fallo. Lo que el caso quiere decir es
+  -- «el job no tocó a nadie que no fuera inactivo», y eso se comprueba
+  -- comparando contra la foto, no contra un número.
+  create temp table r137_ajenas on commit drop as
+    select id, trust_score from public.profiles;
+
   perform pg_temp.viejo(A, 'asistio', interval '7 months');                       -- 81, racha 1
   perform pg_temp.viejo(B, 'planton', interval '8 months');                       -- 40
   perform pg_temp.viejo(D, 'asistio', interval '7 months');
@@ -79,9 +90,16 @@ begin
      and (has_function_privilege('anon', pr.oid, 'execute') or has_function_privilege('authenticated', pr.oid, 'execute'));
   insert into r137 values ('C07 nadie de la app ejecuta el job ni la activación', v_n = 0, v_n::text);
 
-  -- Las cuentas reales acaban de recibir su inicio: nadie lleva 6 meses.
-  select count(*) into v_n from public.profiles where trust_score <> 75 and id not in (A, B, D, N);
-  insert into r137 values ('C09 las cuentas reales no se movieron', v_n = 0, v_n::text);
+  -- Las cuentas ajenas que NO llevaban seis meses sin jugar siguen igual.
+  select count(*) into v_n
+    from r137_ajenas f
+    join public.profiles p on p.id = f.id
+   where p.trust_score is distinct from f.trust_score
+     and f.id not in (A, B, D, N)
+     and coalesce(public.truescore_ultima_actividad(f.id), now())
+         > now() - make_interval(months => (public.truescore_cfg('inactividad_meses'))::int);
+  insert into r137 values ('C09 el job no movió a ninguna cuenta ajena que estuviera al día',
+    v_n = 0, v_n::text);
 
   update public.feature_flags set activo = false where nombre = 'truescore_fase4';
   insert into r137 values ('C08 con el flag apagado el job no hace nada', public.truescore_inactividad() = 0, 'ok');

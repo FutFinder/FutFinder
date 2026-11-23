@@ -22,40 +22,19 @@
 
 import { getComunaCoords } from '../data/comunas-coords';
 import { haversineKm } from '../services/matches';
+import { modalidadInline } from './clubModalidad.js';
 
 // El vocabulario de modalidad vive en `clubModalidad.js` —puro, sin
 // Supabase— para que el formulario pueda validarlo sin arrastrar este
 // archivo, que sí depende de la red por el cálculo de distancias. Se
 // re-exporta acá para no cambiar los imports existentes.
-import { MODALIDADES } from './clubModalidad.js';
-
-export { MODALIDADES, OPCIONES_MODALIDAD, esModalidadValida } from './clubModalidad.js';
-
-/**
- * Etiquetas de modalidad para el banner del club (MAYÚSCULAS).
- * Devuelve un array porque "ambos" se muestra como DOS chips.
- * Sin modalidad → `[]`, y no se dibuja ninguno.
- */
-export function modalidadBadges(modalidad) {
-  if (modalidad === MODALIDADES.FUTBOL_7) return ['FÚTBOL 7'];
-  if (modalidad === MODALIDADES.FUTBOL_11) return ['FÚTBOL 11'];
-  if (modalidad === MODALIDADES.AMBOS) return ['FÚTBOL 7', 'FÚTBOL 11'];
-  // Sin modalidad declarada no hay chip: uno que dice «FÚTBOL N.A.» ocupa el
-  // mismo sitio sin contar nada.
-  return [];
-}
-
-/**
- * Modalidad en línea, para la meta de las tarjetas de rival.
- * Ej: 'Fútbol 7' · 'Fútbol 11' · 'Fútbol 7 y Fútbol 11'.
- * Sin modalidad declarada devuelve `null`: quien llama la omite.
- */
-export function modalidadInline(modalidad) {
-  if (modalidad === MODALIDADES.FUTBOL_7) return 'Fútbol 7';
-  if (modalidad === MODALIDADES.FUTBOL_11) return 'Fútbol 11';
-  if (modalidad === MODALIDADES.AMBOS) return 'Fútbol 7 y Fútbol 11';
-  return null;
-}
+export {
+  MODALIDADES,
+  OPCIONES_MODALIDAD,
+  esModalidadValida,
+  modalidadBadges,
+  modalidadInline,
+} from './clubModalidad.js';
 
 /**
  * Nivel del club para el banner. Hoy NO existe cálculo de nivel en la BD, así

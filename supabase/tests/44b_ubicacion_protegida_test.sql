@@ -19,8 +19,20 @@
 --      región para el filtro por zona.
 --   4. Integrante del club local: lee la ubicación exacta.
 --   5. Integrante del club rival y jugador sin rol: también.
---   6. Externo autenticado: sólo la aproximada, sin calle.
+--   6. Externo autenticado: ni la exacta ni el partido.
 --   7. Anónimo: igual que el externo.
+--
+--      OJO (2026-10-16): los casos 3, 6 y 7 decían otra cosa —que el
+--      partido SE DESCUBRE con la aproximada y que el externo y el
+--      anónimo la veían—, y era verdad cuando se escribieron. La
+--      migración **44d** («el partido entre clubes es privado hasta que
+--      termina») cambió la regla a propósito: mientras no esté
+--      finalizado, el partido sólo existe para los integrantes de los dos
+--      clubes. Lo que esta migración sigue aportando, y es lo que estos
+--      casos cuidan hoy, es que la calle NO se guarde en `matches` y que
+--      la coordenada pública esté redondeada a la rejilla: si mañana el
+--      partido vuelve a ser público, lo que se publique ya es aproximado.
+--      La regla nueva la cubre entera `44d_partido_privado_test.sql`.
 --   8. Ni la exacta ni la aproximada entran en `canchas` ni en
 --      `search_canchas()`.
 --   9. El GPS usa EXCLUSIVAMENTE la exacta: estar parado en la
@@ -117,13 +129,19 @@ begin
 
   -- ══ 3: mapa y filtro por zona ════════════════════════════════
   -- Es la misma forma de la consulta de `listMatchesInBounds`.
+  -- Como INTEGRANTE, no como el rol del editor: desde la 44d el partido
+  -- de clubes sólo lo ve su gente, y preguntar esto sin rol —que es como
+  -- estaba— lo respondía saltándose la RLS. Daba verde sin medir nada.
+  execute 'set local role authenticated';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub',v_l1,'role','authenticated')::text);
   select count(*) into v_count from public.matches
    where id = v_match.id
      and latitud between -33.60 and -33.30 and longitud between -70.80 and -70.50
      and latitud is not null and longitud is not null;
+  execute 'reset role';
   if v_count <> 1 then raise exception 'FALLÓ (3): no aparece en el cuadrante del mapa'; end if;
   insert into t44b values (3,'mapa y filtro por zona',
-    'aparece en la consulta por cuadrante y conserva comuna y región para filtrar');
+    'para su club aparece en la consulta por cuadrante y conserva comuna y región');
 
   -- ══ 4 y 5: los integrantes leen la exacta ════════════════════
   execute 'set local role authenticated';
@@ -156,11 +174,12 @@ begin
     from public.matches where id = v_match.id;
   execute 'reset role';
   if v_count <> 0 then raise exception 'FALLÓ (6): un externo leyó la exacta'; end if;
-  if v_lat is null then raise exception 'FALLÓ (6): un externo no puede descubrir el partido'; end if;
-  if v_dir is not null then raise exception 'FALLÓ (6): un externo obtuvo la calle'; end if;
-  if not v_apx then raise exception 'FALLÓ (6): sin marca de aproximada'; end if;
+  -- Antes acá se exigía que SÍ viera la aproximada. Lo cambió la 44d: el
+  -- partido de clubes no existe para un externo hasta que termina.
+  if v_lat is not null or v_lng is not null or v_dir is not null or v_apx is not null then
+    raise exception 'FALLÓ (6): un externo no debería ver ni la fila del partido'; end if;
   insert into t44b values (6,'externo autenticado',
-    format('ve la aproximada (%s, %s) marcada, sin calle y sin la exacta', v_lat, v_lng));
+    'no ve la exacta ni la fila del partido (regla de la 44d)');
 
   -- ══ 7: anónimo ═══════════════════════════════════════════════
   execute format('set local request.jwt.claims to %L', json_build_object('role','anon')::text);
@@ -169,16 +188,21 @@ begin
   select latitud, direccion into v_lat, v_dir from public.matches where id = v_match.id;
   execute 'reset role';
   if v_count <> 0 then raise exception 'FALLÓ (7): anon leyó la exacta'; end if;
-  if v_lat is null then raise exception 'FALLÓ (7): anon no puede descubrir el partido'; end if;
-  if v_dir is not null then raise exception 'FALLÓ (7): anon obtuvo la calle'; end if;
+  if v_lat is not null or v_dir is not null then
+    raise exception 'FALLÓ (7): anon no debería ver ni la fila del partido'; end if;
   insert into t44b values (7,'anónimo',
-    'descubre el partido con la aproximada y no obtiene ni calle ni exacta');
+    'no ve la exacta ni la fila del partido (regla de la 44d)');
 
   -- ══ 8: canchas y search_canchas ══════════════════════════════
   select count(*) into v_count from public.canchas where nombre = v_cancha;
   if v_count <> 0 then raise exception 'FALLÓ (8): la cancha entró en canchas'; end if;
-  execute format('set local request.jwt.claims to %L', json_build_object('role','anon')::text);
-  execute 'set local role anon';
+  -- Como `authenticated` desde el 2026-10-16: esto corría como `anon`, a
+  -- quien la migración **114** le quitó `search_canchas` junto con todas
+  -- las demás funciones de `public`. El caso no pierde nada —lo que mide
+  -- es que la cancha NO salga en el buscador, y quien más ve es quien
+  -- mejor lo prueba—. El conflicto está anotado como P2 en `pendientes.md`.
+  execute 'set local role authenticated';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub',v_x,'role','authenticated')::text);
   select count(*) into v_count from public.search_canchas('Protegida',10);
   execute 'reset role';
   if v_count <> 0 then raise exception 'FALLÓ (8): search_canchas la devolvió'; end if;
@@ -188,7 +212,12 @@ begin
   -- ══ 9: el GPS usa EXCLUSIVAMENTE la exacta ═══════════════════
   -- Parado justo en la coordenada pública, que está a ~400 m de la
   -- cancha real: si el GPS mirara la aproximada, esto confirmaría.
-  insert into public.attendees (id_partido,id_jugador,estado) values (v_match.id,v_lj,'inscrito');
+  -- Con `club_id` desde el 2026-10-16: la migración **44d** puso un
+  -- disparador que sólo deja inscribirse en un partido de clubes por la
+  -- vía del club, y este insert a pelo moría con «la inscripción es por
+  -- club» antes de llegar al GPS, que es lo que el caso mide.
+  insert into public.attendees (id_partido,id_jugador,estado,club_id)
+  values (v_match.id,v_lj,'inscrito',v_club_l);
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L', json_build_object('sub',v_lj,'role','authenticated')::text);
   v_json := public.confirm_attendance_gps(v_match.id, v_match.latitud, v_match.longitud);

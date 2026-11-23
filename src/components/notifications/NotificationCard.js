@@ -46,6 +46,7 @@ export const CATEGORY = {
   match_left: 'partidos',
   match_attendance: 'partidos',
   club_request: 'clubes',
+  club_invite: 'clubes',
   club_request_accepted: 'clubes',
   club_request_rejected: 'clubes',
   club_member_joined: 'clubes',
@@ -89,6 +90,10 @@ export const CATEGORY = {
 
   // Lista de espera: el turno que se dejó pasar (migración 105).
   waitlist_turno_vencido: 'partidos',
+
+  // Moderación (migración 194): es sobre la cuenta, no sobre un partido ni
+  // un club.
+  moderacion: 'social',
 };
 
 export const ICON = {
@@ -109,6 +114,7 @@ export const ICON = {
   match_left: LogOut,
   match_attendance: UserX,
   club_request: Shield,
+  club_invite: Shield,
   club_request_accepted: CheckCheck,
   club_request_rejected: Shield,
   club_member_joined: Users,
@@ -124,6 +130,7 @@ export const ICON = {
   club_match_cancelled: CalendarX,
   club_sancionado: ShieldAlert,
   club_revision_resuelta: Scale,
+  moderacion: ShieldAlert,
 };
 
 /**
@@ -163,6 +170,7 @@ export const TAG = {
   match_left: { label: 'PARTIDO', ...VERDE },
   match_attendance: { label: 'PARTIDO', ...ROJO },
   club_request: { label: 'CLUBES', ...CLUBES },
+  club_invite: { label: 'CLUBES', ...CLUBES },
   club_request_accepted: { label: 'CLUBES', ...CLUBES },
   club_request_rejected: { label: 'CLUBES', ...ROJO },
   club_member_joined: { label: 'CLUBES', ...CLUBES },

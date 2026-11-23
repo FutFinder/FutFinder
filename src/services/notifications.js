@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 // El multiplexado de un canal Realtime es lógica pura y ya estaba resuelta
 // para el chat: se reutiliza en vez de escribir una segunda versión.
 import { createSharedChannel } from '../utils/chatMeta';
+import { aplicarFiltrosDeAvisos, filtroDeClub, paginaDeAvisos } from '../utils/consultaDeAvisos.js';
 
 /**
  * Servicio de notificaciones push de FutFinder.
@@ -96,7 +97,9 @@ export async function registerForPushNotifications(userId) {
 
     const tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
     const token = tokenResp.data;
-    console.log('[push] Expo token:', token);
+    // El token identifica el teléfono: sólo en desarrollo (Sentry ya descarta
+    // la consola, pero el registro del sistema del teléfono no).
+    if (__DEV__) console.log('[push] Expo token:', token);
 
     // 2.4 Guardar en Supabase
     if (isSupabaseConfigured && userId) {
@@ -193,25 +196,44 @@ export function addNotificationListeners({ onReceived, onTapped } = {}) {
  * chequea `user` explícitamente para distinguir ambos casos, igual que ya
  * hace `deleteAllNotifications` en este mismo archivo.
  */
-export async function listNotifications({ limit = 50 } = {}) {
-  if (!isSupabaseConfigured) return { data: [], error: null };
+export async function listNotifications({ limit = 50, tipos = null, clubId = null, cursor = null } = {}) {
+  if (!isSupabaseConfigured) return { data: [], hasMore: false, error: null };
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: [], error: { message: 'No autenticado' } };
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  return { data: data || [], error };
+  if (!user) return { data: [], hasMore: false, error: { message: 'No autenticado' } };
+  // Categoría y club van en la consulta, antes del límite, y se pagina por
+  // (created_at, id): filtrar después de traer 50 dejaba fuera para siempre
+  // lo que estuviera más atrás (C06, ver utils/consultaDeAvisos.js).
+  const { data, error } = await aplicarFiltrosDeAvisos(
+    supabase.from('notifications').select('*'),
+    { tipos, clubId, cursor }
+  ).limit(limit + 1);
+  if (error) return { data: [], hasMore: false, error };
+  return { ...paginaDeAvisos(data, limit), error: null };
+}
+
+/**
+ * Cuántos avisos hay con esos filtros, contados en el servidor (los chips de
+ * la bandeja). Contar lo cargado ya no sirve: la bandeja trae sólo una
+ * página del filtro activo. `null` si no se pudo contar.
+ */
+export async function contarAvisos({ tipos = null, clubId = null } = {}) {
+  if (!isSupabaseConfigured) return null;
+  let q = supabase.from('notifications').select('id', { count: 'exact', head: true });
+  if (Array.isArray(tipos)) q = q.in('type', tipos);
+  if (clubId) q = q.or(filtroDeClub(clubId));
+  const { count, error } = await q;
+  if (error) return null;
+  return count ?? null;
 }
 
 /**
  * Estado actual de las solicitudes que originaron estos avisos (amistad,
- * solicitud de club, reto), para que la bandeja no ofrezca «Aceptar» sobre
- * algo que ya se respondió — aquí, desde otra pantalla o en otro
- * dispositivo. Devuelve `{ friendships, requests, challenges }`, cada uno un
- * `Map` id → estado, o `null` si alguna consulta falló: en ese caso la
- * bandeja deja las tarjetas como están.
+ * solicitud de club, reto, resultado propuesto), para que la bandeja no
+ * ofrezca «Aceptar» —ni afirme que algo sigue pendiente— sobre algo que ya
+ * se respondió, aquí, desde otra pantalla o en otro dispositivo. Devuelve
+ * `{ friendships, requests, challenges, resultados }`, cada uno un `Map`
+ * id → estado, o `null` si alguna consulta falló: en ese caso la bandeja
+ * deja las tarjetas como están.
  */
 export async function getEstadosDeOrigen(items) {
   if (!isSupabaseConfigured) return null;
@@ -227,12 +249,16 @@ export async function getEstadosDeOrigen(items) {
     return new Map((data || []).map((r) => [r.id, r[columna]]));
   };
   try {
-    const [friendships, requests, challenges] = await Promise.all([
+    const [friendships, requests, challenges, resultados] = await Promise.all([
       consultar('friendships', 'status', ids('friend_request', 'friendshipId')),
-      consultar('club_join_requests', 'status', ids('club_request', 'requestId')),
+      consultar('club_join_requests', 'status', [
+        ...ids('club_request', 'requestId'),
+        ...ids('club_invite', 'requestId'),
+      ]),
       consultar('club_challenges', 'estado', ids('club_challenge', 'challengeId')),
+      consultar('club_match_results', 'estado', ids('club_resultado_propuesto', 'resultId')),
     ]);
-    return { friendships, requests, challenges };
+    return { friendships, requests, challenges, resultados };
   } catch (e) {
     console.error('[FutFinder] getEstadosDeOrigen:', e?.message || e);
     return null;
@@ -277,6 +303,7 @@ export async function deleteNotification(notificationId) {
     .from('notifications')
     .delete()
     .eq('id', notificationId);
+  if (!error) difundirBorrado({ id: notificationId });
   return { error };
 }
 
@@ -289,6 +316,7 @@ export async function deleteAllNotifications() {
     .from('notifications')
     .delete()
     .eq('user_id', user.id);
+  if (!error) difundirBorrado({ id: null, todos: true });
   return { error };
 }
 
@@ -322,7 +350,7 @@ function canalDeNotificaciones(userId) {
   if (compartido) return compartido;
 
   compartido = createSharedChannel({
-    open: ({ emit }) => {
+    open: ({ emit, apertura }) => {
       const filtro = {
         schema: 'public',
         table: 'notifications',
@@ -335,7 +363,8 @@ function canalDeNotificaciones(userId) {
       // popup de NotificationToastHost, que no debe abrirse por un simple
       // recuento de mensajes agrupados— pueda hacerlo sin un canal aparte.
       return supabase
-        .channel(`notif-${userId}`)
+        // Nombre único por apertura: ver `createSharedChannel` (chatMeta.js).
+        .channel(`notif-${userId}-${apertura}`)
         .on('postgres_changes', { ...filtro, event: 'INSERT' }, (p) => emit({ ...p.new, _eventType: p.eventType }))
         .on('postgres_changes', { ...filtro, event: 'UPDATE' }, (p) => emit({ ...p.new, _eventType: p.eventType }))
         .subscribe();
@@ -352,6 +381,21 @@ function canalDeNotificaciones(userId) {
 
   canalesPorUsuario.set(userId, compartido);
   return compartido;
+}
+
+/**
+ * Cuenta un borrado a quienes escuchan el canal de avisos (C09): la campana
+ * recarga su contador, la bandeja saca la tarjeta y el popup se cierra.
+ *
+ * No se escucha el DELETE de Realtime porque Supabase no deja filtrarlo por
+ * `user_id` (la fila ya no existe para aplicar el filtro ni la RLS): sería
+ * recibir los borrados de todos. Lo hecho en otro dispositivo lo recoge la
+ * campana al volver la app a primer plano (`useUnreadNotifications`).
+ */
+function difundirBorrado({ id, todos = false }) {
+  for (const canal of canalesPorUsuario.values()) {
+    canal.difundir({ id, todos, _eventType: 'DELETE' });
+  }
 }
 
 export function subscribeToNotifications(userId, onEvent) {

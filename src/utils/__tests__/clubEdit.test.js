@@ -96,7 +96,11 @@ test('región y comuna viajan tal cual, incluso al borrarlas', () => {
 
 test('una modalidad conocida viaja; una inventada se rechaza', () => {
   assert.deepEqual(E.buildClubPatch({ modalidad: 'futbol7' }).patch, { modalidad: 'futbol7' });
-  assert.match(E.buildClubPatch({ modalidad: 'futbol5' }).error.message, /Modalidad/);
+  assert.match(E.buildClubPatch({ modalidad: 'futbol8' }).error.message, /Modalidad/);
+});
+
+test('Fútbol 5 es una modalidad de club (migración 195)', () => {
+  assert.deepEqual(E.buildClubPatch({ modalidad: 'futbol5' }).patch, { modalidad: 'futbol5' });
 });
 
 test('deseleccionar la modalidad la deja nula', () => {

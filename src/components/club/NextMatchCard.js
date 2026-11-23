@@ -175,6 +175,7 @@ function Tile({ Icono, rotulo, valor }) {
 
 /** `matches.modalidad` guarda 'futbol7'/'futbol11'; la tarjeta los muestra. */
 function etiquetaModalidad(valor) {
+  if (valor === 'futbol5') return 'FÚTBOL 5';
   if (valor === 'futbol7') return 'FÚTBOL 7';
   if (valor === 'futbol11') return 'FÚTBOL 11';
   return String(valor).toUpperCase();

@@ -120,6 +120,18 @@ export function textoDelEvento(event) {
       return textoResultadoConfirmado(p);
     case 'resultado_disputado':
       return textoResultadoDisputado(p);
+    // Migración 43. LOS DOS PASOS QUE DA EL RELOJ, y que durante un tiempo
+    // cayeron en el «Hubo una novedad» de abajo: son tipos que este mismo
+    // servidor emite desde la 43, no de una versión más nueva. Salían dos
+    // burbujas idénticas y mudas seguidas —el partido empezó y el partido
+    // terminó— justo en los dos momentos que más le importan al hilo.
+    case 'partido_en_juego': {
+      const h = hourLabel(p.inicio);
+      return h ? `Empezó el partido (${h}).` : 'Empezó el partido.';
+    }
+    case 'esperando_resultado':
+      return 'Terminó el partido. Un administrador de cualquiera de los dos '
+        + 'clubes puede registrar el marcador; lo confirma el club contrario.';
     // Migración 151. Lo único que se dice es que el resultado volvió a
     // estar abierto: la nota de quien moderó es para el expediente, no
     // para el hilo, igual que en `revision_solicitada`.

@@ -16,6 +16,7 @@ import {
   modalidadLabel,
   nivelLabel,
 } from '../../services/matchRules';
+import { contadorDeJugadores } from '../../utils/asientos.js';
 
 /**
  * Tarjeta del listado «Descubrir partidos» (variante 1a del handoff).
@@ -30,6 +31,8 @@ export default function PartidoCard({ match, onPress, isMine, distanceKm }) {
   const full = libres <= 0;
   const pocos = !full && libres <= 2;
   const estado = estadoLabel(match);
+  // «10/14 · quedan 4 cupos»: confirmados sobre el total del partido.
+  const contador = contadorDeJugadores(match);
   const manual = match.aprobacion === 'manual';
   const modalidad = modalidadLabel(match);
   const edad = match.edad_min != null || match.edad_max != null ? edadLabel(match) : null;
@@ -127,7 +130,11 @@ export default function PartidoCard({ match, onPress, isMine, distanceKm }) {
               { color: full ? C.textSecondary : pocos ? C.gold : C.green },
             ]}
           >
-            {full ? 'Sin cupos' : `${libres} de ${totales} cupos`}
+            {contador
+              ? `${contador.texto} · ${contador.resto}`
+              : full
+              ? 'Sin cupos'
+              : `${libres} de ${totales} cupos`}
           </Text>
           <View style={styles.dot} />
           <Text style={styles.cuota}>{cuotaLabel(match.precio_cuota)}</Text>

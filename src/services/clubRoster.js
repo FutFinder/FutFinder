@@ -141,9 +141,10 @@ function canalDeNomina(matchId) {
   if (compartido) return compartido;
 
   compartido = createSharedChannel({
-    open: ({ emit, emitStatus }) => {
+    open: ({ emit, emitStatus, apertura }) => {
       const canal = supabase
-        .channel(`nomina:${matchId}`)
+        // Nombre único por apertura: ver `createSharedChannel` (chatMeta.js).
+        .channel(`nomina:${matchId}:${apertura}`)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'attendees', filter: `id_partido=eq.${matchId}` },

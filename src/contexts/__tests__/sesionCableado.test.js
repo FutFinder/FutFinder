@@ -48,7 +48,10 @@ test('el cliente de Supabase persiste y refresca la sesión (se recupera al reca
   const fuente = leer('services/supabase.js');
   assert.match(fuente, /persistSession:\s*true/, 'persistSession debe estar activo');
   assert.match(fuente, /autoRefreshToken:\s*true/, 'autoRefreshToken debe estar activo');
-  assert.match(fuente, /AsyncStorage/, 'en nativo la sesión se guarda en AsyncStorage');
+  // Desde el lote C la sesión va al almacén seguro del teléfono (Keychain /
+  // Keystore), no a AsyncStorage sin cifrar: ver utils/almacenSeguro.js.
+  assert.match(fuente, /storage: Platform\.OS === 'web' \? undefined : almacenDeSesion/,
+    'en nativo la sesión se guarda en el almacén seguro');
 });
 
 test('el contexto pide la sesión guardada al montar y escucha los cambios', () => {
@@ -227,4 +230,24 @@ test('las credenciales del cliente vienen de variables de entorno EXPO_PUBLIC, n
     /https:\/\/[a-z0-9]{20}\.supabase\.co/,
     'no debe haber una URL de proyecto real en el código'
   );
+});
+
+test('ni el registro ni el login ofrecen un inicio con terceros que no funciona', () => {
+  // Eran «Continuar con Google / Apple» que sólo decían «Muy pronto»: Apple
+  // rechaza funciones de relleno (guía 2.1). Si algún día vuelven, tienen
+  // que funcionar, y con Google viene la obligación de ofrecer Apple (4.8).
+  for (const pantalla of ['screens/RegisterScreen.js', 'screens/LoginScreen.js']) {
+    const fuente = leer(pantalla).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '');
+    assert.doesNotMatch(fuente, /Continuar con (Google|Apple)|Muy pronto/, `${pantalla} volvió a mostrar un botón de relleno`);
+  }
+});
+
+test('ninguna pantalla de reservas ofrece algo que sólo dice «Muy pronto»', () => {
+  // «Cómo llegar» en la ficha del recinto y «cambiar» la ubicación (que además
+  // mostraba «Ñuñoa, Santiago» a todos) se quitaron el 2026-11-18: Apple
+  // rechaza funciones de relleno (guía 2.1).
+  for (const pantalla of ['screens/ReservasScreen.js', 'screens/ComplejoDetailScreen.js']) {
+    const fuente = leer(pantalla).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '');
+    assert.doesNotMatch(fuente, /Muy pronto|proximamente\(|Ñuñoa, Santiago/, `${pantalla} volvió a mostrar algo de relleno`);
+  }
 });

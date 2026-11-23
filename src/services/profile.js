@@ -1,6 +1,8 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { buildBuscarJugadoresParams } from '../utils/buscarJugadoresParams';
 import { COLUMNAS_PUBLICAS } from './perfilColumnas';
+import { esFaltaDeEsquema } from '../utils/cambioRpc.js';
+import { contadoresDeAsistencia } from '../utils/playerMeta.js';
 
 /**
  * Servicio de perfil del jugador.
@@ -296,6 +298,10 @@ export async function getAttendanceHistoryFor(userId, limit = 8) {
       'match:matches(id, titulo, cancha_nombre, comuna, hora, estado)'
     )
     .eq('id_jugador', userId)
+    // Por la hora del partido EN la consulta, antes del límite (P01): cortar
+    // por `inscrito_at` dejaba fuera una inscripción vieja a un partido
+    // próximo. `match(hora)` ordena por la columna del partido embebido.
+    .order('match(hora)', { ascending: false, nullsFirst: false })
     .order('inscrito_at', { ascending: false })
     .limit(limit);
 
@@ -314,6 +320,28 @@ export async function getAttendanceHistoryFor(userId, limit = 8) {
 }
 
 /**
+ * Cuántas asistencias confirmadas y ausencias tiene el jugador, contadas en
+ * el servidor (P01): el historial cargado son sólo las últimas filas, y los
+ * contadores de Perfil no pueden salir de una página. `null` si falló.
+ */
+export async function getConteoDeAsistencias(userId) {
+  if (!isSupabaseConfigured || !userId) return null;
+  const contar = (estado) =>
+    supabase
+      .from('attendees')
+      .select('id', { count: 'exact', head: true })
+      .eq('id_jugador', userId)
+      .eq('estado', estado);
+  try {
+    const [c, a] = await Promise.all([contar('confirmado_gps'), contar('no_asistio')]);
+    if (c.error || a.error) return null;
+    return { confirmadas: c.count ?? 0, ausencias: a.count ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Estado de cuenta público de un jugador: si tiene una sanción activa y hasta
  * cuándo. No expone el motivo ni el detalle de la sanción.
  *
@@ -329,10 +357,12 @@ export async function getAccountStatusFor(userId) {
     .maybeSingle();
 
   if (error) {
-    // `estado` / `suspended_until` pueden no existir en entornos antiguos:
-    // en ese caso asumimos cuenta sin sanciones en vez de romper la pantalla.
     console.warn('[FutFinder] getAccountStatusFor:', error.message || error);
-    return { suspended: false, suspended_until: null };
+    // `estado` / `suspended_until` pueden no existir en entornos antiguos:
+    // ahí no hay sanciones que leer. Cualquier otro fallo es «no lo sabemos»
+    // y la tarjeta no puede afirmar buen estado (P04).
+    if (esFaltaDeEsquema(error)) return { suspended: false, suspended_until: null };
+    return { suspended: false, suspended_until: null, desconocido: true, error };
   }
 
   const suspended =
@@ -354,11 +384,11 @@ export async function getAccountStatusFor(userId) {
  * Las reglas de presentación (N.A., textos, colores) viven en
  * src/utils/playerMeta.js, no aquí.
  */
-export function deriveStats(profile, history) {
+export function deriveStats(profile, history, conteo = null) {
   if (!profile) return null;
   const rows = history || [];
-  const confirmados = rows.filter((h) => h.estado === 'confirmado_gps').length;
-  const ausencias = rows.filter((h) => h.estado === 'no_asistio').length;
+  // Del conteo del servidor si llegó; si no, de lo cargado (P01).
+  const { confirmadas: confirmados, ausencias } = contadoresDeAsistencia(rows, conteo);
   // Denominador de la tasa: solo partidos ya cerrados (asistió o no asistió).
   const cerrados = confirmados + ausencias;
 

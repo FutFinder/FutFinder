@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { getCurrentUser } from '../services/auth';
 import { countUnread, subscribeToNotifications } from '../services/notifications';
 
@@ -31,9 +32,17 @@ export default function useUnreadNotifications() {
       unsubscribe = subscribeToNotifications(u.id, reload);
     })();
 
+    // Un borrado hecho en otro dispositivo no llega por Realtime (C09: el
+    // DELETE no se puede filtrar por usuario). Al volver a primer plano, se
+    // pregunta de nuevo.
+    const alCambiarApp = AppState.addEventListener('change', (estado) => {
+      if (estado === 'active') reload();
+    });
+
     return () => {
       mounted = false;
       unsubscribe();
+      try { alCambiarApp?.remove?.(); } catch {}
     };
   }, []);
 

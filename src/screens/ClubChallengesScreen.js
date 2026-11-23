@@ -884,6 +884,7 @@ function DetailSheet({ visible, pub, tema, puedoResponder, miRespuesta, mensaje,
 
 const MODALIDAD_OPCIONES = [
   { value: null, label: 'Cualquiera' },
+  { value: 'futbol5', label: 'Fútbol 5' },
   { value: 'futbol7', label: 'Fútbol 7' },
   { value: 'futbol11', label: 'Fútbol 11' },
 ];
@@ -1076,7 +1077,7 @@ function TableroSubScreen({
         <>
           <Text style={styles.fieldLabel}>Modalidad</Text>
           <View style={styles.chipsRow}>
-            {['futbol7', 'futbol11'].map((m) => {
+            {['futbol5', 'futbol7', 'futbol11'].map((m) => {
               const activo = draft.modalidad === m;
               return (
                 <Pressable key={m} onPress={() => patch('modalidad', m)} style={[styles.optionChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}>

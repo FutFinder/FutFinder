@@ -47,6 +47,14 @@ declare
   v_ajeno    uuid := gen_random_uuid();
   v_complejo uuid := gen_random_uuid();
   v_cancha   uuid := gen_random_uuid();
+  -- EL LUNES DE DENTRO DE DOS SEMANAS, no una fecha de marzo de 2027
+  -- (2026-10-17). Estaba clavada en `v_lunes`, y a partir del
+  -- 2 de marzo de 2027 esa fecha es PASADO: `crear_reserva` la rechaza
+  -- —es la regla de la 84— y este arnés se habría puesto rojo, junto con
+  -- otros siete, sin que nadie tocara una línea de código. Se calcula
+  -- sobre la hora de CHILE y cae siempre en lunes, que es lo que las
+  -- reglas de horario de más abajo dan por supuesto.
+  v_lunes    date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date;
   v_bloqueo  uuid;
   v_reserva  uuid := gen_random_uuid();
   v_cancha2  uuid;
@@ -69,8 +77,14 @@ begin
          'r60-' || u || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
     from unnest(array[v_dueno, v_admin, v_ajeno]) as u;
 
-  insert into public.complejos (id, nombre, comuna, latitud, longitud)
-  values (v_complejo, 'Complejo Prueba 60', 'Ñuñoa', -33.45, -70.60);
+  -- PUBLICADO a propósito (2026-10-16): nació sin `publicado` porque cuando
+  -- se escribió este arnés la columna no mandaba nada. La migración **65**
+  -- hizo que `get_disponibilidad_cancha` no entregue slots de un recinto sin
+  -- publicar, así que los casos 12 en adelante preguntaban por el slot de
+  -- las 14:00 de una cancha que no tenía ninguno y recibían NULL. Nada que
+  -- ver con los bloqueos, que es lo que creían estar midiendo.
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+  values (v_complejo, 'Complejo Prueba 60', 'Ñuñoa', -33.45, -70.60, true);
 
   insert into public.canchas_reservables (id, complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
   values (v_cancha, v_complejo, 'Cancha 1', 'futbol_7', 20000, 60, true);
@@ -110,13 +124,35 @@ begin
   -- siguientes (caso 5 verifica de paso el aviso).
   perform public.admin_agregar_admin(v_complejo, v_admin, 'admin');
 
+  -- OJO (2026-10-16): el caso 3 pedía que un `admin` recién agregado
+  -- editara la ficha, y eso valía hasta la migración **83** («permisos de
+  -- cada administrador»), que partió el cargo en tres permisos y dejó a los
+  -- administradores NUEVOS naciendo sin ninguno —decisión de Vicente: el
+  -- dueño los enciende a mano—. El arnés, escrito antes, moría con «No
+  -- tienes permiso para esto en este recinto (Permiso necesario: ficha)».
+  -- Ahora prueba las dos mitades, que es lo que la 83 realmente instaló.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin, 'role', 'authenticated')::text);
+  begin
+    perform public.admin_actualizar_complejo(v_complejo, null, 'Sin permiso todavía');
+    v_rechazado := false;
+  exception when others then
+    v_rechazado := true;
+  end;
+  if not v_rechazado then
+    raise exception 'FALLÓ (caso 3a): un admin sin `puede_ficha` no debería editar la ficha';
+  end if;
+  raise notice 'OK (caso 3a): un admin nace sin permisos';
+
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_dueno, 'role', 'authenticated')::text);
+  perform public.admin_permisos_admin(v_complejo, v_admin, false, false, true);
+
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin, 'role', 'authenticated')::text);
   perform public.admin_actualizar_complejo(v_complejo, null, 'Con pasto sintético nuevo');
   select descripcion into v_nombre from public.complejos where id = v_complejo;
   if v_nombre <> 'Con pasto sintético nuevo' then
-    raise exception 'FALLÓ (caso 3): un admin debería poder editar el complejo';
+    raise exception 'FALLÓ (caso 3b): con `puede_ficha` encendido debería poder editar el complejo';
   end if;
-  raise notice 'OK (caso 3): un admin (no dueño) edita el complejo';
+  raise notice 'OK (caso 3b): con el permiso encendido, un admin (no dueño) edita el complejo';
 
   -- ── Casos 4-8: gestión de administradores ──────────────────────
   begin
@@ -223,17 +259,17 @@ begin
   -- Bloqueo de 14:00 a 16:00 en una fecha futura fija (un lunes, para
   -- que no dependa del día en que se corra el arnés).
   v_bloqueo := public.admin_crear_bloqueo(
-    v_cancha, date '2027-03-01', time '14:00', time '16:00', 'Mantención de riego'
+    v_cancha, v_lunes, time '14:00', time '16:00', 'Mantención de riego'
   );
 
   select (s->>'disponible')::boolean into v_disp
-    from json_array_elements((public.get_disponibilidad_cancha(v_cancha, date '2027-03-01'))->'slots') s
+    from json_array_elements((public.get_disponibilidad_cancha(v_cancha, v_lunes))->'slots') s
    where s->>'hora_inicio' = '14:00';
   if v_disp is not false then
     raise exception 'FALLÓ (caso 12): el slot 14:00 bloqueado debería estar no disponible, está %', v_disp;
   end if;
   select (s->>'disponible')::boolean into v_disp
-    from json_array_elements((public.get_disponibilidad_cancha(v_cancha, date '2027-03-01'))->'slots') s
+    from json_array_elements((public.get_disponibilidad_cancha(v_cancha, v_lunes))->'slots') s
    where s->>'hora_inicio' = '15:00';
   if v_disp is not false then
     raise exception 'FALLÓ (caso 12): el slot 15:00 también cae dentro del bloqueo';
@@ -241,7 +277,7 @@ begin
   raise notice 'OK (caso 12): el bloqueo saca los slots 14:00 y 15:00';
 
   select (s->>'disponible')::boolean into v_disp
-    from json_array_elements((public.get_disponibilidad_cancha(v_cancha, date '2027-03-01'))->'slots') s
+    from json_array_elements((public.get_disponibilidad_cancha(v_cancha, v_lunes))->'slots') s
    where s->>'hora_inicio' = '13:00';
   if v_disp is not true then
     raise exception 'FALLÓ (caso 13): el slot 13:00-14:00 NO se cruza con un bloqueo 14:00-16:00';
@@ -249,24 +285,26 @@ begin
   raise notice 'OK (caso 13): el solape es semiabierto, 13:00 sigue libre';
 
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ajeno, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha, date '2027-03-01', time '14:00', 'completa', 'tarjeta');
+  -- Con contacto desde el 2026-10-16: la migración 67 lo hizo obligatorio y
+  -- sin él la RPC se caía por «Escribe un nombre de contacto» antes de
+  -- llegar a mirar el bloqueo, que es lo que este caso quiere probar.
+  v_j := public.crear_reserva(v_cancha, v_lunes, time '14:00', 'completa', 'tarjeta',
+    p_contacto_nombre := 'QA 60', p_contacto_telefono := '+56911111111');
   if (v_j->>'ok')::boolean is not false or v_j->>'reason' <> 'bloqueado' then
     raise exception 'FALLÓ (caso 14): crear_reserva debería rechazar un slot bloqueado, devolvió %', v_j::text;
   end if;
   raise notice 'OK (caso 14): crear_reserva rechaza el slot bloqueado';
 
   -- Reserva confirmada a las 18:00 para el caso 15.
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values (
-    v_reserva, v_cancha, v_ajeno, date '2027-03-01', time '18:00', time '19:00',
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values (
+    v_reserva, v_cancha, v_ajeno, v_lunes, time '18:00', time '19:00',
+    20000,
     20000, 'completa', 'tarjeta', 'confirmada'
   );
 
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_dueno, 'role', 'authenticated')::text);
   begin
-    perform public.admin_crear_bloqueo(v_cancha, date '2027-03-01', time '18:00', time '19:00', 'Torneo');
+    perform public.admin_crear_bloqueo(v_cancha, v_lunes, time '18:00', time '19:00', 'Torneo');
     v_rechazado := false;
   exception when others then
     v_rechazado := true;
@@ -278,7 +316,7 @@ begin
 
   perform public.admin_eliminar_bloqueo(v_bloqueo);
   select (s->>'disponible')::boolean into v_disp
-    from json_array_elements((public.get_disponibilidad_cancha(v_cancha, date '2027-03-01'))->'slots') s
+    from json_array_elements((public.get_disponibilidad_cancha(v_cancha, v_lunes))->'slots') s
    where s->>'hora_inicio' = '14:00';
   if v_disp is not true then
     raise exception 'FALLÓ (caso 16): al borrar el bloqueo el slot 14:00 debería volver a estar libre';
@@ -287,7 +325,7 @@ begin
 
   -- ── Casos 17-19: RLS de las tablas nuevas ──────────────────────
   v_bloqueo := public.admin_crear_bloqueo(
-    v_cancha, date '2027-03-08', time '14:00', time '16:00', 'Arriendo a una empresa'
+    v_cancha, (v_lunes + 7), time '14:00', time '16:00', 'Arriendo a una empresa'
   );
 
   execute format('set local role authenticated');
@@ -341,7 +379,7 @@ begin
   end if;
 
   begin
-    perform public.admin_crear_bloqueo(v_cancha, date '2027-03-15', time '14:00', time '15:00');
+    perform public.admin_crear_bloqueo(v_cancha, (v_lunes + 14), time '14:00', time '15:00');
     v_rechazado := false;
   exception when insufficient_privilege then
     v_rechazado := true;
@@ -372,21 +410,29 @@ begin
 
   execute 'reset role';
 
-  -- `get_disponibilidad_cancha` sigue siendo pública a propósito: se
-  -- muestra sin iniciar sesión, y ahora también respeta los bloqueos.
-  execute format('set local role anon');
-  v_j := public.get_disponibilidad_cancha(v_cancha, date '2027-03-08');
+  -- OJO (2026-10-16): acá decía «`get_disponibilidad_cancha` sigue siendo
+  -- pública a propósito: se muestra sin iniciar sesión», y lo comprobaba
+  -- como `anon` —se le concedió a propósito en las migraciones 54, 60, 64,
+  -- 65 y 84—. La migración **114** («anon no ejecuta nada») barrió todas
+  -- las funciones de `public` sin lista de excepciones y la cerró de paso.
+  -- Se corre como `authenticated`, que es quien puede hoy, para que el caso
+  -- siga midiendo LO SUYO —que la disponibilidad respeta el bloqueo— en vez
+  -- de reventar con «permission denied for function
+  -- get_disponibilidad_cancha». El conflicto está anotado como P2 en
+  -- `pendientes.md`; si se reabre a `anon`, esto vuelve a `set local role anon`.
+  execute format('set local role authenticated');
+  v_j := public.get_disponibilidad_cancha(v_cancha, (v_lunes + 7));
   if (v_j->>'ok')::boolean is not true then
-    raise exception 'FALLÓ (caso 20f): anon debería seguir viendo la disponibilidad';
+    raise exception 'FALLÓ (caso 20f): la disponibilidad debería entregarse';
   end if;
   select (s->>'disponible')::boolean into v_disp
     from json_array_elements(v_j->'slots') s
    where s->>'hora_inicio' = '14:00';
   if v_disp is not false then
-    raise exception 'FALLÓ (caso 20f): anon debería ver el slot bloqueado como no disponible';
+    raise exception 'FALLÓ (caso 20f): el slot bloqueado debería verse como no disponible';
   end if;
   execute 'reset role';
-  raise notice 'OK (caso 20): anon no ejecuta ninguna RPC de administración, pero sí ve la disponibilidad con los bloqueos aplicados';
+  raise notice 'OK (caso 20): anon no ejecuta ninguna RPC de administración, y la disponibilidad aplica los bloqueos';
 
   raise notice '=== TODOS LOS CASOS DE LA MIGRACIÓN 60 PASARON ===';
 end $$;

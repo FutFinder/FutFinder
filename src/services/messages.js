@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getMisPermisosEnClub, getRolePermissions, getAllMemberOverrides, resolvePermisos } from './clubPermissions';
+import { aplicarOrdenYCursorDeMensajes } from '../utils/cursorDeMensajes';
 
 /**
  * Servicio de mensajería en tiempo real.
@@ -60,9 +61,15 @@ export {
   suggestCommands,
   canUseMentionAll,
 } from '../utils/chatMeta';
-import { canUseMentionAll, mapThreadRow, createSharedChannel, isGroupType } from '../utils/chatMeta';
+import {
+  canUseMentionAll,
+  mapThreadRow,
+  createSharedChannel,
+  canalDeChatPorUsuario,
+  isGroupType,
+} from '../utils/chatMeta';
 import { esEstadoActivo, estadoLabel } from './clubChallengeRules';
-import { accesoAlChatDelPartido } from './matchRules';
+import { accesoAlChatDelPartido, participaEnElChatDelPartido } from './matchRules';
 // `blockedUsers` no importa nada de acá, así que no hay ciclo.
 import { isBlockedByMe } from './blockedUsers';
 
@@ -686,8 +693,10 @@ export async function listMyThreads() {
  * Historial de un hilo (antiguo → nuevo), paginado hacia atrás.
  *
  * @param {string} threadKeyStr
- * @param {{ limit?: number, before?: string }} opts
- *        `before` = created_at ISO del mensaje más antiguo ya cargado.
+ * @param {{ limit?: number, before?: { created_at: string, id: string } }} opts
+ *        `before` = el par (created_at, id) del mensaje más antiguo ya
+ *        cargado (`cursorDeHistorial`). Sólo la fecha perdía mensajes que
+ *        empataban justo en el corte: ver `utils/cursorDeMensajes.js`.
  * @returns {{ data: object[], hasMore: boolean, error }}
  */
 export async function listThreadMessages(threadKeyStr, { limit = 40, before = null } = {}) {
@@ -722,14 +731,12 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
         ? `${baseCols}, challenge_id`
         : baseCols;
 
-    // Pedimos uno de más para saber si quedan mensajes anteriores.
-    let q = supabase
-      .from('messages')
-      .select(cols)
-      .order('created_at', { ascending: false })
-      .limit(limit + 1);
-
-    if (before) q = q.lt('created_at', before);
+    // Pedimos uno de más para saber si quedan mensajes anteriores. Orden y
+    // cursor por el par (created_at, id), para no perder empates en el corte.
+    let q = aplicarOrdenYCursorDeMensajes(
+      supabase.from('messages').select(cols),
+      before
+    ).limit(limit + 1);
 
     if (t.type === 'dm') {
       q = q
@@ -782,6 +789,21 @@ export async function listThreadMessages(threadKeyStr, { limit = 40, before = nu
     console.error('[FutFinder] listThreadMessages exception:', e);
     return { data: [], hasMore: false, error: e };
   }
+}
+
+/**
+ * Nombre y foto de quien escribió en un hilo, para un mensaje que llegó por
+ * Realtime sin `sender` (la fila cruda no trae el join). Mismas columnas que
+ * `listThreadMessages` usa para los remitentes de la carga inicial.
+ */
+export async function getRemitente(senderId) {
+  if (!isSupabaseConfigured || !senderId) return { data: null, error: null };
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, foto_url')
+    .eq('id', senderId)
+    .maybeSingle();
+  return { data: data || null, error };
 }
 
 /**
@@ -951,7 +973,10 @@ export async function getThreadParticipants(threadKeyStr) {
       console.error('[FutFinder] getThreadParticipants(match):', error);
       return { data: [], error };
     }
-    const rows = await hydrateProfiles((attendees || []).map((a) => a.id_jugador));
+    // Sólo quienes de verdad están en el chat: una solicitud `pendiente` no
+    // es un «inscrito» (C13). Misma regla que abre el chat.
+    const dentro = (attendees || []).filter((a) => participaEnElChatDelPartido(a.estado));
+    const rows = await hydrateProfiles(dentro.map((a) => a.id_jugador));
     const organizerId = match?.id_organizador || null;
     return {
       data: decorate(rows, (r) => (r.user_id === organizerId ? 'organizador' : 'jugador')),
@@ -1040,15 +1065,19 @@ async function hydrateProfiles(ids) {
 // ============================================================
 
 /**
- * Suscribe a INSERTS/UPDATES de la tabla messages.
+ * Suscribe a los mensajes nuevos, editados y borrados que me corresponden.
  * Llama a `onChange(payload)` con cada cambio y devuelve el cleanup.
  *
  * `onStatus(status)` recibe el estado del canal ('SUBSCRIBED', 'CHANNEL_ERROR',
  * 'TIMED_OUT', 'CLOSED') para poder pintar "Reconectando…".
  *
- * Filtramos del lado del cliente porque Supabase Realtime solo admite un
- * filtro `eq` por canal y aquí escuchamos varios hilos a la vez (partido,
- * club y DM no comparten una sola columna que filtrar del lado del server).
+ * BROADCAST, NO `postgres_changes` (migración 175). Antes se escuchaba la
+ * tabla `messages` ENTERA y Realtime revisaba la RLS de cada fila por cada
+ * persona conectada: con mucha gente a la vez es lo primero que se cae.
+ * Ahora un disparador decide quién puede leer cada mensaje y se lo manda a
+ * su canal privado `chat:<mi id>`; nadie más puede unirse a ese canal. El
+ * payload trae la misma forma que antes (`eventType`, `new`, `old`), y cada
+ * llamador sigue filtrando por hilo del lado del cliente.
  *
  * MULTIPLEXADO: la bandeja de chats, el badge del tab y una conversación
  * abierta pueden estar escuchando los tres a la vez — antes cada uno abría
@@ -1063,21 +1092,24 @@ async function hydrateProfiles(ids) {
 // suscriptores, se cierra solo con el último) es lógica pura — vive en
 // `utils/chatMeta` (`createSharedChannel`) precisamente para poder probarla
 // con un canal falso, sin Supabase real. Acá solo se cablea con el canal
-// verdadero.
-const messagesSharedChannel = createSharedChannel({
-  open: ({ emit, emitStatus }) =>
-    supabase
-      .channel('messages-shared')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, emit)
-      .subscribe(emitStatus),
-  close: (channel) => {
-    try {
-      supabase.removeChannel(channel);
-    } catch {
-      // noop
-    }
-  },
-});
+// verdadero. El topic `chat:<id>` no puede llevar número de apertura (es el
+// nombre que autoriza el servidor), así que `canalDeChatPorUsuario` espera a
+// que salga el canal anterior antes de pedir el siguiente.
+const messagesSharedChannel = createSharedChannel(
+  canalDeChatPorUsuario({
+    obtenerUsuario: async () => {
+      const { data } = await supabase.auth.getSession();
+      return data?.session?.user?.id || null;
+    },
+    prepararAuth: () => supabase.realtime.setAuth(),
+    crearCanal: (topic, alRecibir, alCambiarEstado) =>
+      supabase
+        .channel(topic, { config: { private: true } })
+        .on('broadcast', { event: '*' }, alRecibir)
+        .subscribe(alCambiarEstado),
+    quitarCanal: (canal) => supabase.removeChannel(canal),
+  })
+);
 
 export function subscribeToMessages(onChange, { onStatus } = {}) {
   if (!isSupabaseConfigured) return () => {};

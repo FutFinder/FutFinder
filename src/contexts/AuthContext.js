@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { isSessionUsable } from '../services/authPolicy';
+import { nivelDesdeSesion, necesitaSegundoPaso } from '../services/mfaPolicy';
 
 /**
  * Fuente única de verdad de la sesión, usada por el guard de navegación
@@ -16,6 +17,12 @@ import { isSessionUsable } from '../services/authPolicy';
  *
  * "Autenticado" exige una sesión usable: token, usuario y correo verificado
  * (ver `isSessionUsable` en services/authPolicy.js).
+ *
+ * Y, si la persona activó la verificación en dos pasos, que la sesión ya haya
+ * presentado el código (`aal2`). Una sesión que entró sólo con la contraseña
+ * (`aal1`) de alguien con el código activado NO es acceso: las rutas privadas
+ * la mandan a Login, que le pide los seis dígitos (`mfaPendiente`). Ver
+ * `services/mfaPolicy.js`.
  */
 const AuthContext = createContext(null);
 
@@ -29,11 +36,21 @@ export function AuthProvider({ children }) {
 
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data?.session ?? null);
-      setIsReady(true);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setSession(data?.session ?? null);
+        setIsReady(true);
+      })
+      // Si leer la sesión falla (el almacén seguro del teléfono no responde,
+      // un dato corrupto), es «sin sesión» y a Login. Sin esto `isReady` no
+      // llegaba nunca a true y la app se quedaba en blanco.
+      .catch((e) => {
+        console.warn('[FutFinder] getSession falló, se sigue sin sesión:', e?.message || e);
+        if (!mounted) return;
+        setSession(null);
+        setIsReady(true);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
@@ -57,13 +74,15 @@ export function AuthProvider({ children }) {
     return destination;
   };
 
-  const isAuthenticated = isSessionUsable(session);
+  const mfaPendiente = necesitaSegundoPaso(nivelDesdeSesion(session));
+  const isAuthenticated = isSessionUsable(session) && !mfaPendiente;
 
   const value = {
     session,
     user: session?.user ?? null,
     isReady,
     isAuthenticated,
+    mfaPendiente,
     setPendingDestination,
     consumePendingDestination,
   };

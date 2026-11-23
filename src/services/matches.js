@@ -3,6 +3,8 @@ import { crearRegistroDeColumnas } from '../utils/columnasOpcionales';
 import { cargarClubesDePartido } from '../utils/clubesDePartidoQuery.js';
 import { aplicarOrdenYCursor } from '../utils/paginacionPartidos.js';
 import { nombrePuntaje } from '../utils/trueScore.js';
+import { cancelarConMotivo } from '../utils/motivoDeCancelacion.js';
+import { cajaDeBusqueda } from '../utils/cajaDeBusqueda.js';
 import { aceptaACualquiera, rangoDeFecha } from './matchRules';
 
 /**
@@ -34,10 +36,50 @@ export function haversineKm(a, b) {
 }
 
 /**
+ * Para Inicio: los partidos donde estoy inscrito (o confirmé por GPS) y el
+ * próximo de ellos que no esté cancelado.
+ *
+ * Vivía como dos consultas sueltas en `HomeScreen`. Conserva lo que hacía
+ * allá: un fallo no rompe la portada, deja `proximo` en `null` y los
+ * `inscritos` que alcanzaron a llegar.
+ */
+export async function getMisInscripcionesYProximo(userId) {
+  if (!isSupabaseConfigured || !userId) return { inscritos: [], proximo: null };
+  let inscritos = [];
+  try {
+    const ahora = new Date().toISOString();
+    const { data: filas } = await supabase
+      .from('attendees')
+      .select('id_partido')
+      .eq('id_jugador', userId)
+      .in('estado', ['inscrito', 'confirmado_gps']);
+    inscritos = (filas || []).map((r) => r.id_partido);
+    if (inscritos.length === 0) return { inscritos, proximo: null };
+    const { data: proximo } = await supabase
+      .from('matches')
+      .select('id, titulo, hora, cancha_nombre, comuna')
+      .in('id', inscritos)
+      .gt('hora', ahora)
+      .neq('estado', 'cancelado')
+      .order('hora', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return { inscritos, proximo: proximo || null };
+  } catch {
+    return { inscritos, proximo: null };
+  }
+}
+
+/**
  * Lista partidos abiertos cerca del usuario, ordenados por hora.
  * Si pasas comuna filtra por comuna.
  */
-export async function listOpenMatches({ comuna = null, limit = 50, estados = ['abierto'] } = {}) {
+export async function listOpenMatches({
+  comuna = null,
+  limit = 50,
+  estados = ['abierto'],
+  cerca = null,
+} = {}) {
   if (!isSupabaseConfigured) return { data: getDemoMatches(), error: null };
 
   // Mostramos solo partidos cuya hora oficial todavía NO haya pasado.
@@ -58,6 +100,17 @@ export async function listOpenMatches({ comuna = null, limit = 50, estados = ['a
     .limit(limit);
 
   if (comuna) q = q.eq('comuna', comuna);
+  // `cerca: { lat, lng, km }`: sólo los partidos dentro de una caja alrededor
+  // del jugador, ANTES del límite. Sin esto Inicio pedía los N más próximos
+  // de todo el país y aplicaba el radio después (I01, ver cajaDeBusqueda.js).
+  const caja = cerca ? cajaDeBusqueda(cerca, cerca.km) : null;
+  if (caja) {
+    q = q
+      .gte('latitud', caja.latMin)
+      .lte('latitud', caja.latMax)
+      .gte('longitud', caja.lngMin)
+      .lte('longitud', caja.lngMax);
+  }
   const { data, error } = await q;
   if (error) {
     console.error('[FutFinder] listOpenMatches error:', error);
@@ -915,7 +968,7 @@ export async function getMatchAttendees(matchId) {
     // 1) Trae attendees
     const { data: atts, error: aErr } = await supabase
       .from('attendees')
-      .select('id, id_jugador, estado, inscrito_at, confirmado_at, asistencia')
+      .select('id, id_jugador, estado, inscrito_at, confirmado_at, asistencia, origen')
       .eq('id_partido', matchId)
       .order('inscrito_at', { ascending: true });
     if (aErr) {
@@ -968,6 +1021,8 @@ export async function getMatchAttendees(matchId) {
         confirmado_at: a.confirmado_at,
         // Marca del organizador con TrueScore: 'asistio' | 'tarde' | 'no_fue'.
         asistencia: a.asistencia ?? null,
+        // Cómo llegó a la nómina; `asiento_asignado` = lo sentó el organizador.
+        origen: a.origen ?? null,
       };
     });
 
@@ -985,19 +1040,29 @@ export async function getMatchAttendees(matchId) {
  * el partido siga en el historial y el chat quede en solo lectura.
  */
 export async function cancelMatchWithReason(matchId, motivo = null, tipo = null) {
-  // El motivo se escribe ANTES de cancelar. La RPC `cancel_match` que está
-  // corriendo en la base es una versión anterior a este repo (la migración 33
-  // no la sobrescribe a propósito) y no sabemos con certeza si cambia el
-  // `estado` o borra la fila. Escribiendo primero, el motivo queda guardado en
-  // el caso en que el registro sobreviva, y no se pierde nada si no.
-  if (motivo && isSupabaseConfigured) {
-    await supabase
-      .from('matches')
-      .update({ motivo_cancelacion: motivo })
-      .eq('id', matchId);
-  }
-
-  const res = await cancelMatch(matchId, tipo);
+  // El motivo se escribe ANTES de cancelar porque `cancel_match` lo lee para
+  // el aviso a los jugadores, y se DESHACE si la cancelación falla: antes
+  // quedaba huérfano en un partido que seguía vivo. Ver
+  // utils/motivoDeCancelacion.js.
+  const res = await cancelarConMotivo({
+    motivo: isSupabaseConfigured ? motivo : null,
+    leerMotivo: async () => {
+      const { data, error } = await supabase
+        .from('matches')
+        .select('motivo_cancelacion')
+        .eq('id', matchId)
+        .maybeSingle();
+      return { data: data?.motivo_cancelacion ?? null, error };
+    },
+    escribirMotivo: async (valor) => {
+      const { error } = await supabase
+        .from('matches')
+        .update({ motivo_cancelacion: valor })
+        .eq('id', matchId);
+      return { error };
+    },
+    cancelar: () => cancelMatch(matchId, tipo),
+  });
   if (!res?.ok) return res;
 
   // ¿Quedó como 'cancelado' en el historial, o desapareció?

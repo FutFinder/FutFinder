@@ -47,7 +47,8 @@ export function notaDeCancha(cancha) {
   if (!cancha) return null;
   const min = Number(cancha.duracion_slot_min);
   if (!Number.isFinite(min) || min <= 0) return nombreDeTipo(cancha.tipo);
-  return `bloques de ${min} min`;
+  // Espacios duros: al partirse la línea, «de 60 min» viaja junto.
+  return `bloques de\u00A0${min}\u00A0min`;
 }
 
 /**
@@ -79,6 +80,28 @@ export function comoComplejoDeLista(fila) {
     proximaHoraLibre: fila.proxima_hora_libre || null,
     distanciaKm: fila.distancia_km ?? null,
   };
+}
+
+/**
+ * El bloque «juega hoy» a partir de la lista que ya se pidió.
+ *
+ * Es un FILTRO sobre `listComplejosCerca()`, no otra consulta: la próxima
+ * hora libre ya viene en cada fila de `buscar_complejos()`. Se separó acá
+ * para que la pantalla pueda pedir la lista UNA vez y sacar las dos cosas;
+ * antes pedía la misma RPC dos veces para mostrar dos vistas de lo mismo.
+ */
+export function horasLibresDeHoy(complejos, limite = 6) {
+  return (complejos || [])
+    .filter((c) => c && c.proximaHoraLibre)
+    .slice(0, limite)
+    .map((c) => ({
+      id: `hoy-${c.id}`,
+      hora: c.proximaHoraLibre,
+      complejoId: c.id,
+      nombre: c.nombre,
+      meta: (c.tipos || []).join(' · '),
+      precio: c.desde,
+    }));
 }
 
 /**

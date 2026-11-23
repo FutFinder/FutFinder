@@ -416,6 +416,11 @@ export function threadPreview(thread) {
     // conversación se trata, y verlo dos veces se lee como si fuera el último
     // mensaje.
     const isGroupThread = isGroupType(thread?.type);
+    // Un amigo sin conversación todavía (filtro «Amigos», utils/amigosDelChat):
+    // la tarjeta invita a escribirle en vez de describir un hilo vacío.
+    if (thread?.sin_chat) {
+      return { prefix: null, text: 'Toca para escribirle', tone: 'normal' };
+    }
     return {
       prefix: null,
       text: isGroupThread ? 'Sé el primero en saludar' : 'Sin mensajes todavía',
@@ -441,6 +446,38 @@ export function threadKindLabel(thread) {
     return thread.subtitle ? `Chat del partido · ${thread.subtitle}` : 'Chat del partido';
   }
   return 'Amigos';
+}
+
+/**
+ * El título de la CABECERA de un hilo abierto.
+ *
+ * POR QUÉ NO BASTA CON EL PARÁMETRO. Dos de los tres caminos que abren un
+ * hilo le pasan el título ya calculado —la bandeja de chats y la de
+ * desafíos—, pero el tercero no: entrar desde un AVISO navega sólo con el
+ * `threadKey`, así que la cabecera caía en un 'Chat' genérico. Se vio el
+ * 2026-10-21 al aceptar un reto desde la bandeja de avisos: el hilo de
+ * negociación entre dos clubes se abría titulado «Chat», con el subtítulo
+ * prometiendo que «el título ya dice qué dos clubes se enfrentan».
+ *
+ * Así que el título se deriva de lo que la pantalla YA cargó, y sólo cuando
+ * no vino por parámetro. Para el desafío se reutiliza
+ * `challengeThreadTitle`, que es la misma función que usa la bandeja: sin
+ * los nombres de los clubes devuelve «Desafío entre clubes», que es
+ * genérico pero cierto, y 'Chat' no lo era.
+ */
+export function threadHeaderTitle({
+  paramTitle = '',
+  tipo = null,
+  context = null,
+  challenge = null,
+} = {}) {
+  const dado = String(paramTitle || '').trim();
+  if (dado) return dado;
+
+  if (tipo === 'challenge') return challengeThreadTitle(challenge);
+  if (tipo === 'club') return context?.club?.nombre || 'Chat del club';
+  if (tipo === 'match') return context?.match?.titulo || 'Chat del partido';
+  return 'Chat';
 }
 
 // ============================================================
@@ -649,6 +686,12 @@ export function createSharedChannel({ open, close }) {
   const listeners = new Map(); // onEvent -> { onStatus }
   let handle = null;
   let lastStatus = null;
+  // Sube cada vez que el canal se vuelve a abrir. `open` lo pone en el nombre
+  // del canal: `removeChannel` es asíncrono, y con un nombre fijo una
+  // reapertura inmediata recibía de supabase-js el canal VIEJO, ya suscrito,
+  // y el `.on(...)` reventaba («cannot add postgres_changes callbacks …
+  // after subscribe()»).
+  let apertura = 0;
 
   const safeCall = (fn, arg) => {
     if (!fn) return;
@@ -669,9 +712,21 @@ export function createSharedChannel({ open, close }) {
   };
 
   return {
+    /**
+     * Entrega un evento propio de la app a quienes ya escuchan, sin pasar
+     * por la red ni abrir el canal. Lo usa el borrado de avisos (C09): un
+     * DELETE de Realtime no se puede filtrar por usuario, así que quien
+     * borra lo cuenta él mismo.
+     */
+    difundir(payload) {
+      emit(payload);
+    },
     subscribe(onEvent, { onStatus } = {}) {
       listeners.set(onEvent, { onStatus });
-      if (!handle) handle = open({ emit, emitStatus });
+      if (!handle) {
+        apertura += 1;
+        handle = open({ emit, emitStatus, apertura });
+      }
       // Quien se suscribe después de que el canal ya esté abierto no debe
       // quedarse "sin estado" hasta el próximo cambio real.
       if (lastStatus !== null) safeCall(onStatus, lastStatus);
@@ -684,6 +739,79 @@ export function createSharedChannel({ open, close }) {
           lastStatus = null;
         }
       };
+    },
+  };
+}
+
+/**
+ * El canal privado del chat, `chat:<user_id>` (migración 175), con las
+ * piezas de Supabase inyectadas para poder probarlo sin red.
+ *
+ * Antes el chat escuchaba la tabla `messages` entera con `postgres_changes`
+ * y Realtime revisaba la RLS de cada fila por cada persona conectada. Ahora
+ * el servidor decide los destinatarios y le manda a cada uno un Broadcast a
+ * su topic; el payload ya trae la forma de siempre (`eventType`, `new`,
+ * `old`), así que las pantallas no cambian.
+ *
+ * Por qué no basta con `createSharedChannel` solo: el topic de un Broadcast
+ * ES el nombre del canal, así que no se le puede agregar el número de
+ * apertura como a los demás. Con un nombre fijo, reabrir mientras
+ * `removeChannel` sigue en vuelo devuelve el canal viejo (ver
+ * `canalUnicoPorApertura.test.js`). Acá cada apertura ESPERA a que termine
+ * de salir la anterior antes de pedir el canal: se serializan.
+ *
+ * Devuelve `{ open, close }` con la forma que pide `createSharedChannel`.
+ *
+ * @param {{
+ *   obtenerUsuario: () => Promise<string|null>,
+ *   prepararAuth: () => Promise<void>,
+ *   crearCanal: (topic: string, alRecibir: Function, alCambiarEstado: Function) => any,
+ *   quitarCanal: (canal: any) => Promise<any>,
+ * }} deps
+ */
+export function canalDeChatPorUsuario({ obtenerUsuario, prepararAuth, crearCanal, quitarCanal }) {
+  let retiroEnCurso = Promise.resolve();
+
+  return {
+    open({ emit, emitStatus }) {
+      const h = { canal: null, cerrado: false, listo: null };
+      // Un canal ya cerrado no debe tocar el estado del que vino después.
+      const avisar = (fn) => (arg) => {
+        if (!h.cerrado) fn(arg);
+      };
+      const alRecibir = avisar((mensaje) => {
+        const payload = mensaje && mensaje.payload;
+        if (payload && payload.eventType) emit(payload);
+      });
+      const alCambiarEstado = avisar(emitStatus);
+
+      h.listo = retiroEnCurso
+        .then(async () => {
+          if (h.cerrado) return;
+          const userId = await obtenerUsuario();
+          if (h.cerrado) return;
+          if (!userId) {
+            alCambiarEstado('CHANNEL_ERROR');
+            return;
+          }
+          // Un canal privado se autoriza con el token de la sesión, no con
+          // la clave pública: sin esto el servidor lo rechaza.
+          await prepararAuth();
+          if (h.cerrado) return;
+          h.canal = crearCanal(`chat:${userId}`, alRecibir, alCambiarEstado);
+        })
+        .catch((e) => {
+          console.error('[FutFinder] canal de chat:', e);
+          alCambiarEstado('CHANNEL_ERROR');
+        });
+      return h;
+    },
+    close(h) {
+      if (!h) return;
+      h.cerrado = true;
+      retiroEnCurso = Promise.resolve(h.listo)
+        .then(() => (h.canal ? quitarCanal(h.canal) : undefined))
+        .catch(() => {});
     },
   };
 }
@@ -739,4 +867,36 @@ export function initialOf(nameOrProfile) {
       : nameOrProfile?.username || nameOrProfile?.title || '';
   const clean = String(base).replace(/^@/, '').trim();
   return clean ? clean[0].toUpperCase() : '?';
+}
+
+/**
+ * Las solicitudes de amistad de la bandeja después de pedirlas (C16).
+ *
+ * Si la consulta falla, se conservan las que ya se mostraban: antes el error
+ * se convertía en `[]` y la tarjeta de solicitudes desaparecía con su
+ * contador, como si no hubiera ninguna. Sin error, manda lo que llegó.
+ */
+export function solicitudesTrasCargar(previas, res) {
+  if (!res || res.error) return previas || [];
+  return res.data || [];
+}
+
+/**
+ * El subtítulo de Detalles del chat según el tipo de hilo.
+ *
+ * C14: el hilo de un desafío (`challenge:<id>`) caía en «Mensaje directo»,
+ * aunque es un grupo entre los dos clubes.
+ */
+export function subtituloDeDetalles({ tipo, cuantos = 0, error = false } = {}) {
+  const n = Number(cuantos) || 0;
+  // C15: con la consulta de participantes caída no se afirma un número.
+  if (error && (tipo === 'club' || tipo === 'match' || tipo === 'challenge')) {
+    return 'No pudimos cargar los participantes';
+  }
+  if (tipo === 'club') return `Chat del club · ${n} ${n === 1 ? 'jugador' : 'jugadores'}`;
+  if (tipo === 'match') return `Chat del partido · ${n} ${n === 1 ? 'inscrito' : 'inscritos'}`;
+  if (tipo === 'challenge') {
+    return `Desafío entre clubes · ${n} ${n === 1 ? 'participante' : 'participantes'}`;
+  }
+  return 'Mensaje directo';
 }

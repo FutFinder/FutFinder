@@ -10,7 +10,6 @@ import {
   Platform,
   Image,
   ActivityIndicator,
-  Alert,
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -47,6 +46,7 @@ import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD, OPCIONES_NIVEL, inicialDe } from '../utils/playerMeta';
 import { validateImageAsset, commitProfileSave, getProfileLoadStatus } from '../utils/profileEdit';
+import { EDAD_MIN } from '../utils/fechaNacimiento';
 import useConfirmacion from '../components/useConfirmacion';
 
 const POSICIONES = [
@@ -123,6 +123,7 @@ export default function EditProfileScreen({ navigation }) {
   const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
   const [loadError, setLoadError] = useState(null);
   const [initialProfile, setInitialProfile] = useState(null);
+  const edadFija = initialProfile?.edad != null;
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState(null);
 
@@ -299,9 +300,11 @@ export default function EditProfileScreen({ navigation }) {
     if (username.length > 20) return '@username no puede tener más de 20 caracteres';
     if (!/^[a-zA-Z0-9_]+$/.test(username))
       return '@username solo puede tener letras, números y guión bajo';
-    if (edad) {
+    // Con la edad ya registrada no se valida: no se manda, y una cuenta de
+    // 12 o 13 años de antes de la 186 no tiene que quedar sin poder guardar.
+    if (edad && !edadFija) {
       const n = parseInt(edad, 10);
-      if (Number.isNaN(n) || n < 12 || n > 99) return 'La edad debe estar entre 12 y 99';
+      if (Number.isNaN(n) || n < EDAD_MIN || n > 99) return `La edad debe estar entre ${EDAD_MIN} y 99`;
     }
     if (!posiciones || posiciones.length === 0) return 'Elige al menos una posición';
     return null;
@@ -335,7 +338,9 @@ export default function EditProfileScreen({ navigation }) {
       updateProfile: ({ foto_url, banner_url }) => {
         const patch = {
           username: username.trim(),
-          edad: edad ? parseInt(edad, 10) : null,
+          // Con la edad ya registrada no se manda: el servidor rechaza
+          // cualquier cambio, incluso borrarla.
+          ...(edadFija ? {} : { edad: edad ? parseInt(edad, 10) : null }),
           bio: bio.trim() || null,
           posicion_preferida: posiciones,
           flanco,
@@ -533,7 +538,13 @@ export default function EditProfileScreen({ navigation }) {
                       value={edad}
                       onChangeText={(v) => setEdad(v.replace(/\D/g, '').slice(0, 2))}
                       keyboardType="number-pad"
+                      // Una vez registrada, la edad no se cambia desde la app
+                      // (migración 177): era la forma de saltarse el rango de
+                      // edad de un partido.
+                      editable={!edadFija}
+                      accessibilityHint={edadFija ? 'Tu edad ya quedó registrada. Si está mal, escríbenos.' : undefined}
                     />
+                    {edadFija ? <Text style={styles.fieldHint}>Si está mal, escríbenos.</Text> : null}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <FieldLabel>Flanco preferido</FieldLabel>

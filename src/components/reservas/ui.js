@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Modal, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Minus, Plus, Info, AlertTriangle, Check, X as XIcon, Image as ImageIcon,
 } from 'lucide-react-native';
@@ -466,9 +467,26 @@ export function NoticeCard({ children, tone = 'info', icon }) {
 
 // ------------------------------------------------------------------ CTA sticky
 
-/** Envoltorio para el CTA fijo al fondo, con el degradado del handoff. */
+/**
+ * Envoltorio para el CTA fijo al fondo, con el degradado del handoff.
+ *
+ * LLEVA FONDO PROPIO. La barra flota encima del scroll, y sin fondo el
+ * contenido se veía a través mientras pasaba por detrás: «Ver horarios»
+ * encima del precio de otra cancha, «Continuar al pago» encima de un título.
+ * El degradado de arriba es para que el contenido se desvanezca al llegar a
+ * la barra en vez de cortarse contra una línea; no recibe toques.
+ */
 export function StickyFooter({ children }) {
-  return <View style={styles.stickyFooter}>{children}</View>;
+  return (
+    <View style={styles.stickyFooter}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[alfa(C.bg, 0), C.bg]}
+        style={styles.stickyFooterFade}
+      />
+      {children}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -666,5 +684,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 18,
+    backgroundColor: C.bg,
   },
+  stickyFooterFade: { position: 'absolute', left: 0, right: 0, top: -24, height: 24 },
 });

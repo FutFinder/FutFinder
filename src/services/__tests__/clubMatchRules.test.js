@@ -117,9 +117,10 @@ test('el número sale de cupos_por_club, no de dividir el total', () => {
   assert.equal(R.cuposLabel(raro, ['club-a']), '7 cupos para tu club');
 });
 
-test('un partido normal conserva su etiqueta de siempre', () => {
-  assert.equal(R.cuposLabel(partidoNormal(), []), '4 de 10 cupos');
-  assert.equal(R.cuposLabel(partidoNormal({ cupos_disponibles: 0 }), []), 'Sin cupos');
+test('un partido normal muestra confirmados sobre el total', () => {
+  // 10 plazas más el organizador = 11 jugadores; con 4 libres van 7 (migración 182).
+  assert.equal(R.cuposLabel(partidoNormal(), []), '7/11 · quedan 4 cupos');
+  assert.equal(R.cuposLabel(partidoNormal({ cupos_disponibles: 0 }), []), '11/11 · Completo');
 });
 
 test('un partido de clubes del flujo antiguo, sin cupos_por_club, cae en la etiqueta normal', () => {
@@ -131,7 +132,7 @@ test('un partido de clubes del flujo antiguo, sin cupos_por_club, cae en la etiq
     cupos_disponibles: 6,
     cupos_totales: 14,
   });
-  assert.equal(R.cuposLabel(viejo, ['club-a']), '6 de 14 cupos');
+  assert.equal(R.cuposLabel(viejo, ['club-a']), '9/15 · quedan 6 cupos');
 });
 
 test('usaNominaPorClub sólo activa la ruta U3 en partidos nacidos de una propuesta con cupos por club', () => {

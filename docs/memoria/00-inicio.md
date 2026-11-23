@@ -1,6 +1,6 @@
 # Memoria de FutFinder
 
-Última revisión: 2026-08-08
+Última revisión: 2026-11-05
 
 ## Propósito
 
@@ -32,6 +32,8 @@ Esta bóveda documenta la configuración, el código y las migraciones versionad
 | Avisos o push | [Avisos y push](funcionalidades/avisos-y-push.md) | [Configuración](funcionalidades/configuracion.md), [Despliegue](arquitectura/despliegue-y-entornos.md) |
 | Reservas de canchas | [Reservas](funcionalidades/reservas.md) | [Sistema visual](diseno/sistema-visual.md), [Navegación](arquitectura/navegacion.md) |
 | Privacidad o ajustes | [Configuración](funcionalidades/configuracion.md) | [Seguridad](arquitectura/seguridad-y-privacidad.md) |
+| Términos, política de privacidad o de cookies | [Autenticación](funcionalidades/autenticacion.md) | [Navegación](arquitectura/navegacion.md), [Configuración](funcionalidades/configuracion.md) |
+| Moderación: padrón, sanciones en revisión, disputas, aprobar recintos desde la app | [Pendientes](operacion/pendientes.md) (sección «ya hay quien modera») | [Ciclo de desafíos](decisiones/2026-08-17-ciclo-desafios-clubes.md), [Aprobar recintos](operacion/aprobar-recintos.md), [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) |
 | Datos, migraciones, RLS o RPC | [Base de datos](arquitectura/base-de-datos.md) | [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) |
 | Seguridad, privacidad o autorización | [Seguridad y privacidad](arquitectura/seguridad-y-privacidad.md) | [Base de datos](arquitectura/base-de-datos.md) |
 | Despliegue, entornos o secretos | [Despliegue y entornos](arquitectura/despliegue-y-entornos.md) | [Stack y estructura](arquitectura/stack-y-estructura.md) |
@@ -40,6 +42,8 @@ Esta bóveda documenta la configuración, el código y las migraciones versionad
 | Revisión diaria: plata por devolver, solicitudes | [Revisión diaria](operacion/revision-diaria.md) | [Aprobar recintos](operacion/aprobar-recintos.md) |
 | Aprobar un recinto nuevo | [Aprobar recintos](operacion/aprobar-recintos.md) | [Reservas](funcionalidades/reservas.md), [Base de datos](arquitectura/base-de-datos.md) |
 | Estado, pendientes o pruebas | [Estado actual](operacion/estado-actual.md) | [Pendientes](operacion/pendientes.md), [Pruebas](operacion/pruebas.md) |
+| Lo cambiado que falta probar (se prueba todo junto al final) | [Por probar](operacion/por-probar.md) | La nota del dominio de cada ítem |
+| Qué falta para lanzar y en qué orden (cuentas, tiendas, el día antes) | [Lanzamiento](operacion/lanzamiento.md) | [Pendientes](operacion/pendientes.md), [Por probar](operacion/por-probar.md), [Fichas de tienda](operacion/fichas-de-tienda.md) |
 | Lint, calidad o errores de render | [Calidad y lint](operacion/calidad-y-lint.md) | [Pruebas](operacion/pruebas.md) |
 
 ## Política de actualización

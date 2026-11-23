@@ -152,6 +152,9 @@ export default function MatchMap({
         center: [initialRegion?.longitude ?? -70.6483, initialRegion?.latitude ?? -33.4569],
         zoom: 12,
         attributionControl: true,
+        // Sin métricas de rendimiento para Mapbox (opción de la v3). Lo que
+        // sigue guardando y enviando está en la política de cookies.
+        performanceMetricsCollection: false,
       });
       mapa.current = m;
 

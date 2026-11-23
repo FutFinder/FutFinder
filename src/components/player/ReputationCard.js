@@ -11,6 +11,7 @@ import {
 } from '../../theme/colors';
 import { useTrueScoreAjustes } from '../../services/trueScore';
 import { nivelTrueScore, nombrePuntajeDe } from '../../utils/trueScore';
+import { pistaDeValoracion } from '../../utils/playerMeta';
 
 // Color del nivel de TrueScore, desde la única paleta.
 const TONO_NIVEL = { verde: C.green, amarillo: C.amber, rojo: C.red };
@@ -72,9 +73,7 @@ export default function ReputationCard({ rating, trust, fairplay = null }) {
           })}
         </View>
         <Text style={styles.leftHint} numberOfLines={1}>
-          {rating.hasRatings
-            ? `${rating.count} ${rating.count === 1 ? 'evaluación' : 'evaluaciones'}`
-            : 'Sin evaluaciones todavía'}
+          {pistaDeValoracion(rating)}
         </Text>
       </View>
 

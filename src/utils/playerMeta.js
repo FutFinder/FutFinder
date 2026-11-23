@@ -110,6 +110,10 @@ export function modalidadInline(modalidad) {
  *   value: '4,6' | 'N.A.'   filled: estrellas llenas (0 si no hay evaluaciones)
  */
 export function ratingDisplay(summary) {
+  // P05: un resumen que no llegó no es «cero evaluaciones».
+  if (summary?.desconocido) {
+    return { value: 'N.A.', hasRatings: false, count: 0, filled: 0, desconocido: true };
+  }
   const count = summary?.count ?? 0;
   const overall = Number(summary?.overall ?? 0);
   if (!count || !Number.isFinite(overall) || overall <= 0) {
@@ -178,10 +182,8 @@ export function trustDisplay(profile, { ts = false } = {}) {
  *
  * @returns {{ value: string, pct: number|null, hint: string, confirmadas: number, cerradas: number }}
  */
-export function attendanceDisplay(history) {
-  const rows = history || [];
-  const confirmadas = rows.filter((h) => h.estado === 'confirmado_gps').length;
-  const ausencias = rows.filter((h) => h.estado === 'no_asistio').length;
+export function attendanceDisplay(history, conteo = null) {
+  const { confirmadas, ausencias } = contadoresDeAsistencia(history, conteo);
   const cerradas = confirmadas + ausencias;
 
   if (cerradas === 0) {
@@ -296,4 +298,83 @@ export function perfilIncompleto({ profile, history, photos }) {
   const sinActividad = (history || []).length === 0;
   const sinFotos = (photos || []).length === 0;
   return sinFoto && sinBio && sinPosicion && sinActividad && sinFotos;
+}
+
+/**
+ * La línea de la tarjeta de reputación de Inicio: «3 partidos jugados · 2
+ * reportes». Los partidos son `asistencias_confirmadas` (lo mismo que cuenta
+ * Perfil: `partidos_jugados` no lo incrementa nada) y los reportes, los de
+ * `count_reports_against`. Si los reportes no se pudieron contar (`null`) se
+ * omiten: un cero inventado se lee como «nadie te reportó» (I03).
+ */
+export function lineaDeReputacion(partidos, reportes) {
+  const p = Number(partidos) || 0;
+  const linea = `${p} ${p === 1 ? 'partido jugado' : 'partidos jugados'}`;
+  if (reportes === null || reportes === undefined || !Number.isFinite(Number(reportes))) return linea;
+  const r = Number(reportes);
+  return `${linea} · ${r} ${r === 1 ? 'reporte' : 'reportes'}`;
+}
+
+/**
+ * Encabezado de la tarjeta «Estado de la cuenta» de Perfil.
+ *
+ * P04: si la consulta fallaba, el servicio devolvía `suspended: false` y la
+ * tarjeta afirmaba «Cuenta en buen estado · Sin sanciones ni restricciones
+ * activas». Ahora un fallo llega como `desconocido` y se dice eso.
+ *
+ * @returns {{ tono: 'ok'|'sancion'|'desconocido', titulo: string, sub: string }}
+ */
+export function encabezadoEstadoDeCuenta({ suspended = false, desconocido = false, hasta = null, ausencias = 0 } = {}) {
+  if (desconocido) {
+    return {
+      tono: 'desconocido',
+      titulo: 'No pudimos comprobar el estado de la cuenta',
+      sub: 'Revisa tu conexión y vuelve a abrir el perfil',
+    };
+  }
+  if (suspended) {
+    const n = Number(ausencias) || 0;
+    return {
+      tono: 'sancion',
+      titulo: 'Sanción activa',
+      sub: [
+        hasta ? `No puede inscribirse hasta el ${hasta}` : 'No puede inscribirse',
+        n > 0 ? `${n} ${n === 1 ? 'ausencia' : 'ausencias'}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    };
+  }
+  return { tono: 'ok', titulo: 'Cuenta en buen estado', sub: 'Sin sanciones ni restricciones activas' };
+}
+
+/**
+ * La pista bajo las estrellas de «Reputación». Distingue «no hay
+ * evaluaciones» de «no pudimos cargarlas» (P05).
+ */
+export function pistaDeValoracion(rating) {
+  if (rating?.desconocido) return 'No pudimos cargar las evaluaciones';
+  if (rating?.hasRatings) return `${rating.count} ${rating.count === 1 ? 'evaluación' : 'evaluaciones'}`;
+  return 'Sin evaluaciones todavía';
+}
+
+/**
+ * Confirmadas y ausencias del jugador (P01). Con el conteo del servidor
+ * (`getConteoDeAsistencias`) se usa ése: el historial cargado son sólo las
+ * últimas 20 filas, y contar ahí dejaba fuera ausencias viejas. Sin conteo
+ * (falló), lo cargado, como antes.
+ */
+export function contadoresDeAsistencia(history, conteo = null) {
+  if (
+    conteo &&
+    Number.isFinite(Number(conteo.confirmadas)) &&
+    Number.isFinite(Number(conteo.ausencias))
+  ) {
+    return { confirmadas: Number(conteo.confirmadas), ausencias: Number(conteo.ausencias) };
+  }
+  const rows = history || [];
+  return {
+    confirmadas: rows.filter((h) => h.estado === 'confirmado_gps').length,
+    ausencias: rows.filter((h) => h.estado === 'no_asistio').length,
+  };
 }

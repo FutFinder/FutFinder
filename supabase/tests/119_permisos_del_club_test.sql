@@ -45,6 +45,7 @@ declare
   v_resp_id      uuid;
   v_match_id     uuid;
   v_res          json;
+  v_apodo        text;   -- `v_res` es json: un apodo no cabe ahí
 begin
   -- ── Setup: usuarios, clubes, membresías ───────────────────────
   insert into auth.users (
@@ -71,8 +72,13 @@ begin
     (v_club_a, v_jugador_a,  'jugador'),
     (v_club_a, v_jugador_a2, 'jugador'),
     (v_club_b, v_admin_b,    'admin'),
-    (v_club_b, v_jugador_b,  'jugador')
-  returning id into v_member_jugador_a; -- se pisa, se recupera abajo
+    (v_club_b, v_jugador_b,  'jugador');
+  -- Antes acá iba un `returning id into v_member_jugador_a` con el
+  -- comentario «se pisa, se recupera abajo». No se pisaba: PL/pgSQL
+  -- rechaza un RETURNING INTO sobre varias filas —«query returned more
+  -- than one row»— así que este arnés **nunca pasó**. No se rompió, nació
+  -- así, y como nadie volvió a correrlo no se supo hasta el 2026-10-16.
+  -- Los tres ids se recuperan justo abajo, que es lo que ya hacía.
 
   select id into v_member_jugador_a  from public.club_members where club_id = v_club_a and user_id = v_jugador_a;
   select id into v_member_jugador_a2 from public.club_members where club_id = v_club_a and user_id = v_jugador_a2;
@@ -307,7 +313,12 @@ begin
   --             siempre se puede cambiar ────────────────────────────
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_a, 'role', 'authenticated')::text);
   perform public.set_apodo_club(v_member_jugador_a, 'MiPropioApodo');
-  select apodo into v_res from public.club_member_apodos where member_id = v_member_jugador_a; -- ok, sólo comprobación de humo
+  -- A `v_res` (json) no se le puede asignar un texto: «invalid input
+  -- syntax for type json». Otro defecto de nacimiento de este arnés.
+  select apodo into v_apodo from public.club_member_apodos where member_id = v_member_jugador_a;
+  if v_apodo is distinct from 'MiPropioApodo' then
+    raise exception 'FALLÓ (caso 15): el apodo propio no se guardó, quedó «%»', v_apodo;
+  end if;
 
   begin
     perform public.set_apodo_club(v_member_capitan_a, 'ApodoAjeno');
@@ -470,6 +481,10 @@ begin
   -- existe `tipo` ni `creado_por`), y `tg_match_future_only` rechaza
   -- insertar un partido con hora pasada: se crea a futuro y se mueve al
   -- pasado con un update, que es lo que el disparador sí permite.
+  -- Desde la 177 el cliente sólo inserta en `matches` las columnas que manda
+  -- `createMatch` (ni `id` ni `cupos_por_club`): el partido de un desafío lo
+  -- arma el servidor, así que este armado también se hace como el dueño.
+  reset role;
   insert into public.matches (id, id_organizador, titulo, comuna, cancha_nombre,
       latitud, longitud, hora, cupos_totales, cupos_disponibles,
       duracion_min, cupos_por_club, club_local_id, club_visitante_id)
@@ -480,9 +495,13 @@ begin
   update public.matches set hora = now() - interval '1 hour', estado = 'finalizado'
    where id = v_match_id;
 
+  -- El armado es cosa del servidor: la 165 deja que `authenticated` sólo
+  -- rechace, cancele y vincule el partido por la API, así que este
+  -- estado se escribe como el dueño y se vuelve a la sesión después.
   update public.club_challenges
      set estado = 'esperando_resultado', match_id = v_match_id
    where id = v_challenge_id;
+  set local role authenticated;
 
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador_a, 'role', 'authenticated')::text);
   v_res := public.proponer_resultado(v_challenge_id, 3, 1, null);

@@ -14,7 +14,7 @@ import {
  * reemplaza (Home, Chat, Partidos) habían divergido en tamaño de ícono,
  * tamaño de texto y tono de verde. Fijar los valores acá — en vez de
  * exponerlos como props — es lo que evita que un futuro cambio los separe
- * otra vez. Usa los tokens de la paleta única (`reservas`) siempre,
+ * otra vez. Usa los tokens de la paleta única (`paleta`) siempre,
  * sin adaptarse a la paleta de la pantalla que la aloja — mismo criterio
  * que ya sigue `NotificationBell`.
  */

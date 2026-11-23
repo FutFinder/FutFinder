@@ -63,3 +63,39 @@ export function buildRivalClubsQuery(
     .order('created_at', { ascending: false })
     .limit(limit);
 }
+
+/**
+ * Qué estado vacío le toca al explorador de clubes.
+ *
+ * VIVE ACÁ Y NO EN EL JSX porque es una decisión, no un adorno, y porque
+ * ya se equivocó una vez de una forma que nadie podía ver leyendo el
+ * componente: `catalogoConClubes` —antes llamada `hasAnyClub`— significa
+ * «la consulta sin filtros trajo algo», NO «la persona tiene club». En
+ * modo rival esa consulta excluye los clubes propios a propósito, así que
+ * cero resultados no dice nada sobre los clubes de quien mira, y la
+ * pantalla le decía «Todavía no tienes clubes» —ofreciéndole crear uno— a
+ * un integrante que venía de ver su club en la portada dos toques antes.
+ *
+ * Devuelve: 'cargando' | 'error' | 'sin-rivales' | 'sin-clubes' |
+ * 'sin-resultados' | 'con-filas'.
+ */
+export function estadoDelExplorador({
+  cargando = false,
+  error = false,
+  cantidad = 0,
+  hayTexto = false,
+  hayFiltros = false,
+  modoRival = false,
+  catalogoConClubes = true,
+} = {}) {
+  if (cargando) return 'cargando';
+  if (error) return 'error';
+  if (cantidad > 0) return 'con-filas';
+
+  // Con texto o filtros puestos, «no hay» es siempre «no calza», nunca
+  // «no existe»: el botón que corresponde es limpiar, no crear.
+  if (hayTexto || hayFiltros) return 'sin-resultados';
+
+  if (modoRival) return 'sin-rivales';
+  return catalogoConClubes ? 'sin-resultados' : 'sin-clubes';
+}

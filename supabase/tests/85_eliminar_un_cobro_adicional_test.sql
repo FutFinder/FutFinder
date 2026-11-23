@@ -23,9 +23,26 @@ declare
   v_dueno uuid; v_cpl uuid; v_cobro uuid; v_res json; v_n int;
   v_mano uuid := gen_random_uuid(); v_err text; v_cancha uuid; v_reserva uuid;
 begin
-  select a.complejo_id, a.user_id into v_cpl, v_dueno
-    from public.complejo_admins a where a.rol = 'dueño' limit 1;
-  select k.id into v_cancha from public.canchas_reservables k where k.complejo_id = v_cpl limit 1;
+  -- SIEMBRA SU PROPIO RECINTO Y SU DUEÑO (2026-10-15). Antes tomaba el
+  -- primer `complejo_admins` con rol 'dueño' que hubiera en la base, y
+  -- contra una recién construida no hay ninguno: moría en el montaje. No
+  -- estaba roto, no era autosuficiente.
+  v_cpl := gen_random_uuid();
+  v_dueno := gen_random_uuid();
+  v_cancha := gen_random_uuid();
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+    confirmation_token, email_change, email_change_token_new, recovery_token)
+  values ('00000000-0000-0000-0000-000000000000', v_dueno, 'authenticated', 'authenticated',
+    'dueno85-' || v_dueno || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', '');
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado, created_by)
+  values (v_cpl, 'Recinto arnés 85', 'Ñuñoa', -33.45, -70.60, true, v_dueno);
+  insert into public.complejo_admins (complejo_id, user_id, rol, puede_canchas, puede_cobros, puede_ficha)
+  values (v_cpl, v_dueno, 'dueño', true, true, true);
+  insert into public.canchas_reservables (id, complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
+  values (v_cancha, v_cpl, 'Cancha arnés 85', 'futbol_7', 20000, 60, true);
+  insert into public.cancha_horario_reglas (cancha_id, dia_semana, hora_apertura, hora_cierre)
+  select v_cancha, d, time '00:00', time '23:00' from generate_series(0, 6) as d;
 
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,

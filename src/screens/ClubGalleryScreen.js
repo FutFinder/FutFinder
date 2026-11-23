@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ImagePlus,
+  Flag,
 } from 'lucide-react-native';
 
 import {
@@ -30,6 +31,8 @@ import {
   alfa,
 } from '../theme/colors';
 import Banner from '../components/Banner';
+import ReportPlayerSheet from '../components/player/ReportPlayerSheet';
+import { reportarContenido } from '../services/reports';
 import { IconButton } from '../components/reservas/ui';
 import { getCurrentUser } from '../services/auth';
 import { listMembers } from '../services/clubs';
@@ -64,10 +67,14 @@ export default function ClubGalleryScreen({ navigation, route }) {
   const [viewerIndex, setViewerIndex] = useState(null); // null = cerrado
   const [banner, setBanner] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [miId, setMiId] = useState(null);
+  // La foto que se está reportando (migración 186); `null` = hoja cerrada.
+  const [fotoAReportar, setFotoAReportar] = useState(null);
 
   const load = useCallback(async () => {
     const user = await getCurrentUser();
     const myId = user?.id || null;
+    setMiId(myId);
 
     const [{ data: ph }, { data: ms }] = await Promise.all([
       getClubPhotos(clubId),
@@ -268,8 +275,43 @@ export default function ClubGalleryScreen({ navigation, route }) {
               <Text style={styles.viewerDeleteText}>Eliminar</Text>
             </Pressable>
           )}
+
+          {/* Reportar la foto: quien no administra el club y no la subió. */}
+          {!soyAdmin && miId && viewerIndex !== null && photos[viewerIndex] &&
+          photos[viewerIndex].uploaded_by !== miId ? (
+            <Pressable
+              onPress={() => {
+                setFotoAReportar(photos[viewerIndex]);
+                setViewerIndex(null);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Reportar esta foto"
+              style={({ pressed }) => [styles.viewerDelete, pressed && { opacity: 0.7 }]}
+            >
+              <Flag color={C.red} size={17} strokeWidth={2.2} />
+              <Text style={styles.viewerDeleteText}>Reportar</Text>
+            </Pressable>
+          ) : null}
         </View>
       </Modal>
+
+      <ReportPlayerSheet
+        visible={fotoAReportar !== null}
+        titulo="Reportar foto"
+        etiqueta="Foto"
+        queSeReporta="esta foto del club"
+        onClose={() => setFotoAReportar(null)}
+        onSubmit={async ({ motivo, descripcion }) => {
+          const { error } = await reportarContenido({ tipo: 'foto_club', id: fotoAReportar?.id, motivo, descripcion });
+          if (error) {
+            setBanner({ type: 'error', title: 'No se pudo enviar el reporte', message: error.message });
+            return { error };
+          }
+          setFotoAReportar(null);
+          setBanner({ type: 'success', title: 'Reporte enviado', message: 'Lo revisaremos. No le avisamos a quien la subió quién lo envió.' });
+          return {};
+        }}
+      />
 
       {dialogo}
     </SafeAreaView>

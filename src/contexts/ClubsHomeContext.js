@@ -380,7 +380,14 @@ export function ClubsHomeProvider({ children }) {
             [],
             'listRivalCandidates'
           ),
-          segura(listNotifications({ limit: 50 }).then((r) => r.data || []), [], 'listNotifications'),
+          // Sólo los avisos del club activo, filtrados en el servidor y en el
+          // número que se muestra: pedir 50 de toda la cuenta y filtrar
+          // después dejaba la actividad vacía con avisos ajenos encima (C06).
+          segura(
+            listNotifications({ limit: TOPE_ACTIVIDAD, clubId: activeId }).then((r) => r.data || []),
+            [],
+            'listNotifications'
+          ),
           segura(listPartidosDeClub(activeId).then((r) => r.data || []), [], 'listPartidosDeClub'),
           // Quien no es admin puede tener `pubChallenge`/`answerChallenge`
           // delegado (migración 119, Permisos de club) — `can.responderDesafios`

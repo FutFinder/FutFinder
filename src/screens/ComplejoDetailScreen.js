@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions,
+  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions, Linking, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, MapPin, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle, MapPin } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { Badge, IconButton, NoticeCard, StickyFooter, Button, Foto } from '../components/reservas/ui';
@@ -11,13 +11,13 @@ import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { PROPORCION_PORTADA } from '../utils/encuadre';
+import { enlaceComoLlegar } from '../utils/comoLlegar';
 
 /** Pantalla 5 del handoff `Reservas.dc.html`: perfil de un complejo. */
 export default function ComplejoDetailScreen({ navigation, route }) {
   const { complejoId } = route.params || {};
   const [complejo, setComplejo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,11 +27,6 @@ export default function ComplejoDetailScreen({ navigation, route }) {
   }, [complejoId]);
 
   useEffect(() => { load(); }, [load]);
-
-  const proximamente = (mensaje) => {
-    setToast(mensaje);
-    setTimeout(() => setToast(null), 2400);
-  };
 
   /**
    * Tocar «Horarios» EN UNA CANCHA va derecho a los horarios de ESA cancha.
@@ -82,10 +77,14 @@ export default function ComplejoDetailScreen({ navigation, route }) {
   }
 
   const hayCanchas = complejo.canchas.length > 0;
+  const mapa = enlaceComoLlegar(complejo, Platform.OS);
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, hayCanchas && styles.scrollConBarra]}
+        showsVerticalScrollIndicator={false}
+      >
         <Galeria fotos={complejo.fotos} nombre={complejo.nombre}>
           <IconButton
             icon={ArrowLeft}
@@ -147,10 +146,19 @@ export default function ComplejoDetailScreen({ navigation, route }) {
             <View style={{ gap: 11 }}>
               {complejo.canchas.map((k) => (
                 <View key={k.id} style={styles.canchaRow}>
-                  <View style={styles.canchaThumb} />
+                  <Foto
+                    uri={k.fotoUrl}
+                    style={styles.canchaThumb}
+                    iconSize={20}
+                    alt={`Foto de ${k.nombre}`}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.canchaNombre}>{k.nombre}</Text>
-                    <Text style={styles.canchaNota} numberOfLines={1}>{k.tipo} · {k.nota}</Text>
+                    {/* Dos líneas y no una: al lado del botón la columna es
+                        angosta y «bloques de 60 min» se cortaba en «bloques
+                        de 6…», que es justo el dato que distingue una cancha
+                        de 60 de una de 90. */}
+                    <Text style={styles.canchaNota} numberOfLines={2}>{k.tipo} · {k.nota}</Text>
                     <Text style={styles.canchaPrecio}>
                       {formatCLP(k.total)}<Text style={styles.canchaPrecioSub}> / hora</Text>
                     </Text>
@@ -176,22 +184,23 @@ export default function ComplejoDetailScreen({ navigation, route }) {
               <View style={styles.mapDot} />
             </View>
             <View style={styles.direccionRow}>
-              <Text style={styles.direccionText} numberOfLines={1}>{complejo.direccion}</Text>
-              <Pressable
-                onPress={() => proximamente('Muy pronto vas a poder trazar la ruta desde aquí.')}
-                style={({ pressed }) => [styles.comoLlegarBtn, pressed && { opacity: 0.85 }]}
-              >
-                <MapPin color={C.textPrimary} size={13} strokeWidth={2} />
-                <Text style={styles.comoLlegarText}>Cómo llegar</Text>
-              </Pressable>
+              <Text style={styles.direccionText} numberOfLines={3}>{complejo.direccion}</Text>
+              {/* Apple Maps en iPhone, Google Maps en Android y la web
+                  (`utils/comoLlegar.js`). Sin punto ni dirección no se dibuja. */}
+              {mapa ? (
+                <Pressable
+                  onPress={() => Linking.openURL(mapa).catch(() => {})}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Cómo llegar a ${complejo.nombre}`}
+                  style={({ pressed }) => [styles.comoLlegarBtn, pressed && { opacity: 0.85 }]}
+                >
+                  <MapPin color={C.textPrimary} size={13} strokeWidth={2} />
+                  <Text style={styles.comoLlegarText}>Cómo llegar</Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
 
-          {toast ? (
-            <View style={{ marginTop: 14 }}>
-              <NoticeCard tone="info">{toast}</NoticeCard>
-            </View>
-          ) : null}
         </View>
       </ScrollView>
 
@@ -267,6 +276,13 @@ function Galeria({ fotos = [], nombre, children }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: 24 },
+  // La barra de «Ver horarios» va en absoluto sobre el contenido, así que
+  // sin este hueco tapa la última fila para siempre: la DIRECCIÓN del
+  // recinto, que es justo lo que la sección «Ubicación» viene a decir. No se
+  // podía leer ni bajando del todo. Los 110 son los mismos que ya usan las
+  // otras pantallas con barra fija. Solo cuando la barra existe: sin canchas
+  // no se dibuja, y el hueco sería un vacío sin motivo.
+  scrollConBarra: { paddingBottom: 110 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   errorText: { fontFamily: F.medium, color: C.textSecondary, fontSize: 13 },
   header: { paddingHorizontal: 16, paddingTop: 10 },
@@ -298,7 +314,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 13,
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: R.row, padding: 13,
   },
-  canchaThumb: { width: 62, height: 62, borderRadius: 15, flexShrink: 0, backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border },
+  canchaThumb: {
+    width: 62, height: 62, borderRadius: 15, flexShrink: 0, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
+  },
   canchaNombre: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 15.5 },
   canchaNota: { fontFamily: F.medium, color: C.textSecondary, fontSize: 12, marginTop: 3 },
   canchaPrecio: { fontFamily: F.extraBold, color: C.textPrimary, fontSize: 14, marginTop: 6 },

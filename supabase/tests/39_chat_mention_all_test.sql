@@ -98,6 +98,14 @@ begin
   -- A partir de acá actuamos como distintos usuarios autenticados, igual
   -- que lo haría PostgREST, para que RLS se evalúe de verdad.
 
+  -- LAS COMPROBACIONES LEEN COMO EL EDITOR, NO COMO EL REMITENTE
+  -- (2026-10-16). `notifications` sólo deja ver lo PROPIO
+  -- —`notifications_select_own`, `auth.uid() = user_id`— y este arnés
+  -- contaba los avisos sin salir del rol de quien acababa de escribir,
+  -- que justamente NO es destinatario de su propia mención. Contaba cero
+  -- y culpaba al disparador. Lo que se mide acá es lo que el disparador
+  -- escribe, no quién puede leerlo: eso es de los arneses de RLS.
+
   -- ══ CASO 1: /todos autorizado en el chat del club ═══════════════
   execute format('set local role authenticated');
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin, 'role', 'authenticated')::text);
@@ -110,24 +118,30 @@ begin
     raise exception 'FALLÓ (caso 1): un miembro del club debería poder mandar /todos';
   end if;
 
+  execute 'reset role';
   select count(*) into v_count
   from public.notifications
   where type = 'chat_mention_all' and data->>'threadKey' = 'club:' || v_club_id::text;
+  execute 'set local role authenticated';
   if v_count <> 2 then
     raise exception 'FALLÓ (caso 1): deberían crearse 2 avisos (member_1 y member_2), no %', v_count;
   end if;
 
+  execute 'reset role';
   select count(*) into v_count
   from public.notifications
   where type = 'chat_mention_all' and user_id = v_admin;
+  execute 'set local role authenticated';
   if v_count <> 0 then
     raise exception 'FALLÓ (caso 1): el propio remitente no debería recibir su propio aviso';
   end if;
 
+  execute 'reset role';
   select count(*) into v_count
   from public.notifications
   where type = 'chat_mention_all' and user_id = v_member_1
     and data->>'threadKey' = 'club:' || v_club_id::text;
+  execute 'set local role authenticated';
   if v_count <> 1 then
     raise exception 'FALLÓ (caso 1): member_1 debería tener exactamente un aviso';
   end if;
@@ -139,9 +153,11 @@ begin
   insert into public.messages (sender_id, match_id, content, mention_all)
   values (v_organizador, v_match_id, 'Nos vemos a las 9', true);
 
+  execute 'reset role';
   select count(*) into v_count
   from public.notifications
   where type = 'chat_mention_all' and data->>'threadKey' = 'match:' || v_match_id::text;
+  execute 'set local role authenticated';
   if v_count <> 2 then
     raise exception 'FALLÓ (caso 2): deberían avisarse los 2 inscritos, no %', v_count;
   end if;
@@ -180,26 +196,32 @@ begin
   -- ══ CASO 5: un segundo /todos no duplica, actualiza ═════════════
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin, 'role', 'authenticated')::text);
 
+  execute 'reset role';
   select id into v_notif_id
   from public.notifications
   where type = 'chat_mention_all' and user_id = v_member_1
     and data->>'threadKey' = 'club:' || v_club_id::text;
+  execute 'set local role authenticated';
 
   insert into public.messages (sender_id, club_id, content, mention_all)
   values (v_admin, v_club_id, 'Segundo aviso a todos', true);
 
+  execute 'reset role';
   select count(*) into v_count
   from public.notifications
   where type = 'chat_mention_all' and user_id = v_member_1
     and data->>'threadKey' = 'club:' || v_club_id::text;
+  execute 'set local role authenticated';
   if v_count <> 1 then
     raise exception 'FALLÓ (caso 5): un segundo /todos sin leer el primero debería actualizar la misma fila, no crear otra (hay %)', v_count;
   end if;
 
+  execute 'reset role';
   select id, (data->>'mentionCount')::int into v_notif_id, v_count
   from public.notifications
   where type = 'chat_mention_all' and user_id = v_member_1
     and data->>'threadKey' = 'club:' || v_club_id::text;
+  execute 'set local role authenticated';
   if v_count <> 2 then
     raise exception 'FALLÓ (caso 5): mentionCount debería ser 2 tras el segundo /todos, no %', v_count;
   end if;
@@ -210,6 +232,7 @@ begin
   -- fuera club_members/attendees, esto no cuadraría: los únicos avisados
   -- deben ser exactamente los OTROS miembros reales del club, ni v_ajeno
   -- (nunca fue miembro) ni el propio remitente.
+  execute 'reset role';
   select count(*) into v_count
   from public.notifications n
   where n.type = 'chat_mention_all'
@@ -217,13 +240,16 @@ begin
     and n.user_id not in (
       select user_id from public.club_members where club_id = v_club_id
     );
+  execute 'set local role authenticated';
   if v_count <> 0 then
     raise exception 'FALLÓ (caso 6): hay avisos a usuarios que no son miembros reales del club';
   end if;
 
+  execute 'reset role';
   select count(*) into v_count
   from public.notifications
   where type = 'chat_mention_all' and user_id = v_ajeno;
+  execute 'set local role authenticated';
   if v_count <> 0 then
     raise exception 'FALLÓ (caso 6): v_ajeno nunca fue miembro del club y no debería tener ningún aviso';
   end if;

@@ -21,7 +21,7 @@ sondeo (U5.2) y la disputa que ningún club reabre (48b).
 
 | Paso | Estado del desafío | Lo mueve | Pantalla |
 |---|---|---|---|
-| Retar | `pendiente` | `crear_desafio` | `ClubChallengeScreen` |
+| Retar | `pendiente` | `insert` directo en `club_challenges` (RLS; no existe `crear_desafio`; actualización 2026-11-05) | `ClubChallengeScreen` |
 | Aceptar | `negociacion` | `aceptar_desafio()` (42) | `ClubChallengesScreen` / hilo |
 | Acordar | `negociacion` → prórroga → `sin_acuerdo` | `procesar_vencimientos_desafios()` por `cron` (43) | hilo |
 | Proponer | `esperando_aprobacion` | `crear_propuesta_oficial()` (43d) | `ClubProposalScreen` |
@@ -76,6 +76,11 @@ de [Pendientes](../operacion/pendientes.md).
    Lo fijó la 48b en la guarda y lo dicen ya, desde la 50 y la 50b, el aviso
    del rechazo y el motivo de error — antes invitaban a «proponer uno nuevo»,
    una acción que el servidor rechazaba acto seguido.
+
+   *Actualización 2026-11-05:* «la moderación» ya es una persona concreta: la
+   que está en el padrón `moderadores` (migración 151) y usa
+   `moderacion_reabrir_resultado()` desde Ajustes → Moderación. La regla no
+   cambia: ningún club la reabre.
 3. **UN RESULTADO NO CONFIRMADO NO MUEVE NADA.** Ni `club_record()`, ni
    `club_estadisticas()`, ni `historial_club()`. Un partido `finalizado` sin
    resultado confirmado **no es un partido jugado**.
@@ -104,6 +109,16 @@ de [Pendientes](../operacion/pendientes.md).
    y una disputa no tiene quién la reabra. Son los dos P1/P2 abiertos de
    [Pendientes](../operacion/pendientes.md).
 
+   *Actualización 2026-11-05: superado.* La migración 151 creó el padrón
+   `public.moderadores`, `es_moderador()` y las RPC `moderacion_cola()`,
+   `moderacion_resolver_revision()` (envoltorio de `resolver_revision_sancion()`,
+   que sigue siendo de `service_role`) y `moderacion_reabrir_resultado()`.
+   Desde Ajustes → Moderación (`ModeracionScreen`, `resolverRevision()` y
+   `reabrirResultado()` en `src/services/moderacion.js`) quien está en el padrón
+   retira o mantiene la sanción y devuelve una disputa a `esperando_resultado`;
+   decidió Vicente que modera él (2026-10-14). Lo que sigue abierto es la
+   moderación de los reportes de usuario, que es otro asunto.
+
 ## Consecuencias
 
 - **Ninguna pantalla decide permisos.** Esconder un botón es cortesía; la
@@ -129,6 +144,9 @@ de [Pendientes](../operacion/pendientes.md).
 - **Lo que queda pendiente está clasificado y no bloquea:** la moderación
   (P1/P2), la comprobación manual del historial en pantalla (P3), el nivel del
   encuentro (P3) y el destino de `historial_publico_club()` (P4).
+
+  *Actualización 2026-11-05:* la moderación de sanciones y disputas ya existe
+  (ver el punto 8); de ese pendiente sólo queda la de los reportes de usuario.
 
 ## Pruebas que sostienen todo esto
 

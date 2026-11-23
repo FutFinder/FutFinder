@@ -24,6 +24,8 @@
  * en nada.
  */
 
+import { resumenDeJugadores } from '../utils/asientos.js';
+
 /**
  * `true` si el partido enfrenta a dos clubes.
  *
@@ -92,6 +94,10 @@ export function cuposLabel(match, misClubIds, { inscritosDeMiClub = null } = {})
 
   // Partido normal, o partido de clubes anterior a la migración 44: la
   // etiqueta de siempre, sin tocar nada.
+  // Un partido normal muestra confirmados sobre el total («10/14 · quedan 4
+  // cupos», migración 182).
+  const resumen = resumenDeJugadores(match);
+  if (resumen) return resumen;
   const libres = match?.cupos_disponibles ?? 0;
   const totales = match?.cupos_totales ?? 0;
   return libres <= 0 ? 'Sin cupos' : `${libres} de ${totales} cupos`;

@@ -35,8 +35,9 @@
 -- devolviendo el usuario del bloque anterior.
 --
 -- Cómo correr: pega este archivo completo en Supabase → SQL Editor.
--- Todo corre en una transacción que termina en ROLLBACK. Usa el
--- partido de clubes que ya exista en la base; no crea uno nuevo.
+-- Todo corre en una transacción que termina en ROLLBACK. Siembra su
+-- propio partido de clubes (futuro), sus dos clubes, su externo y su
+-- partido normal: no depende de lo que haya en la base.
 -- =============================================================
 
 begin;
@@ -47,18 +48,94 @@ do $$
 declare
   v_m uuid; v_cl uuid; v_cv uuid; v_normal uuid;
   v_local uuid; v_visit uuid; v_jug uuid := gen_random_uuid(); v_ext uuid;
-  v_count int; v_ok boolean; v_err text; v_json json; v_tit text;
+  v_count int; v_ok boolean; v_err text; v_err2 text; v_json json; v_tit text;
+  v_resp jsonb;
 begin
-  select id, club_local_id, club_visitante_id into v_m, v_cl, v_cv
-    from public.matches where challenge_proposal_id is not null limit 1;
+  -- ── SIEMBRA SU PROPIO PARTIDO DE CLUBES (2026-10-15) ──────────
+  -- Antes tomaba el primero que hubiera en la base, lo que ataba este
+  -- arnés a una con historia: contra una recién construida moría en el
+  -- montaje. No estaba roto, no era autosuficiente.
+  --
+  -- Se recorre el flujo REAL —desafío, aceptación, propuesta, aprobación—
+  -- y no se fuerzan estados a mano: así el partido que queda es el que la
+  -- app habría creado, con su desafío, su propuesta y sus dos clubes.
+  declare
+    v_sa uuid := gen_random_uuid(); v_sb uuid := gen_random_uuid();
+    v_sx uuid := gen_random_uuid();
+    v_sca uuid; v_scb uuid; v_sch uuid; v_sprop record;
+    v_smarca text := 'sem' || substr(replace(gen_random_uuid()::text,'-',''),1,6);
+  begin
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+      confirmation_token, email_change, email_change_token_new, recovery_token)
+    select '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated',
+      v_smarca||'-'||u.id||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','',''
+    from (values (v_sa), (v_sb), (v_sx)) as u(id);
+    -- El tercero (v_sx) existe para los casos que necesitan a alguien
+    -- AJENO a los dos clubes; en una base vacía no habría ninguno.
+    insert into public.profiles (id, username) values
+      (v_sa, v_smarca||'a'), (v_sb, v_smarca||'b'), (v_sx, v_smarca||'x')
+      on conflict (id) do nothing;
+
+    insert into public.clubs (nombre, slug, created_by)
+    values (v_smarca||' A', v_smarca||'-a', v_sa) returning id into v_sca;
+    insert into public.clubs (nombre, slug, created_by)
+    values (v_smarca||' B', v_smarca||'-b', v_sb) returning id into v_scb;
+    insert into public.club_members (club_id, user_id, rol) values
+      (v_sca, v_sa, 'admin'), (v_scb, v_sb, 'admin');
+
+    -- Un partido NORMAL, público. El caso 12 comprueba que `anon` sigue
+    -- viéndolos —que el blindaje del partido de clubes no se llevó por
+    -- delante a los demás— y en una base recién construida no hay ninguno,
+    -- así que la aserción fallaba por falta de datos y no por el código.
+    insert into public.matches (id_organizador, titulo, comuna, cancha_nombre,
+      latitud, longitud, hora, cupos_totales, cupos_disponibles)
+    values (v_sx, 'Pichanga '||v_smarca, 'Ñuñoa', 'Cancha normal '||v_smarca,
+            -33.4569, -70.6483, now() + interval '5 days', 10, 8)
+    returning id into v_normal;
+
+    insert into public.club_challenges (club_retador_id, club_retado_id, creado_por, estado)
+    values (v_sca, v_scb, v_sa, 'pendiente') returning id into v_sch;
+
+    execute 'set local role authenticated';
+    execute format('set local request.jwt.claims to %L',
+      json_build_object('sub', v_sb, 'role','authenticated')::text);
+    perform public.aceptar_desafio(v_sch);
+
+    execute format('set local request.jwt.claims to %L',
+      json_build_object('sub', v_sa, 'role','authenticated')::text);
+    v_sprop := public.crear_propuesta_oficial(v_sch, jsonb_build_object(
+      'fecha', (now() + interval '7 days')::text, 'duracion_min', 90,
+      'direccion', 'Av. Siempre Viva 742', 'cancha_nombre', 'Cancha '||v_smarca,
+      'comuna', 'Ñuñoa', 'region', 'Metropolitana',
+      'latitud', -33.4569, 'longitud', -70.6483, 'modalidad', 'futbol7',
+      'cupos_por_club', 7, 'metodo_inscripcion', 'orden_llegada',
+      'cuota_por_persona', 0), gen_random_uuid());
+
+    execute format('set local request.jwt.claims to %L',
+      json_build_object('sub', v_sb, 'role','authenticated')::text);
+    perform public.aprobar_propuesta(v_sprop.id, p_me_inscribo => false);
+    execute 'reset role';
+    execute 'set local request.jwt.claims to ''{}''';
+
+    -- EL PARTIDO ES EL QUE SE ACABA DE SEMBRAR (2026-11-09). La siembra de
+    -- arriba existía, pero después se tomaba «el primero que hubiera» con
+    -- un `limit 1` sin orden: en una base con historia salía uno viejo, ya
+    -- jugado, y el caso 10 leía un «El partido no está abierto» como si
+    -- hubiera dejado entrar. Lo mismo el externo —cualquiera de la base,
+    -- que podía ser de OTRO club con sus propios partidos (caso 4)— y el
+    -- partido normal —cualquiera abierto, aunque su hora ya hubiera pasado
+    -- (caso 13)—. Ahora los tres son los de esta corrida.
+    select id, club_local_id, club_visitante_id into v_m, v_cl, v_cv
+      from public.matches where challenge_proposal_id = v_sprop.id;
+    v_ext := v_sx;
+  end;
+
   if v_m is null then
-    raise exception 'No hay ningún partido de clubes en la base contra el que probar';
+    raise exception 'La siembra no dejó un partido de clubes contra el que probar';
   end if;
   select user_id into v_local from public.club_members where club_id=v_cl and rol='admin' limit 1;
   select user_id into v_visit from public.club_members where club_id=v_cv and rol='admin' limit 1;
-  select id into v_ext from auth.users
-   where id not in (select user_id from public.club_members where club_id in (v_cl,v_cv)) limit 1;
-  select id into v_normal from public.matches where challenge_proposal_id is null and estado='abierto' limit 1;
 
   -- Un integrante SIN rol administrativo, temporal.
   insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,
@@ -149,23 +226,41 @@ begin
   if (v_json->>'ok')::boolean then raise exception 'FALLÓ 9: un integrante entró por join_match'; end if;
   insert into t44d values (9,'integrante · RPC join_match', format('también rechazado: la inscripción por club llega en U3 — %s', v_json->>'reason'));
 
-  v_ok := false;
+  -- Un rechazo tiene DOS formas y las dos valen: la excepción del trigger,
+  -- o un `{ok:false}` de la propia función (que mira el estado, los cupos y
+  -- la hora antes de llegar al insert). Lo que NO vale es que quede una
+  -- fila: eso se cuenta aparte, como `postgres`, para que no dependa de lo
+  -- que el externo alcance a ver.
+  v_ok := false; v_err := null;
   begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L', json_build_object('sub',v_ext,'role','authenticated')::text);
-    perform public.request_join(v_m);
+    v_resp := public.request_join(v_m);
     execute 'reset role';
+    if not coalesce((v_resp->>'ok')::boolean, false) then
+      v_ok := true; v_err := 'ok=false — ' || coalesce(v_resp->>'reason', 'sin motivo');
+    end if;
   exception when others then execute 'reset role'; v_err := sqlerrm; v_ok := true; end;
-  if not v_ok then raise exception 'FALLÓ 10: request_join dejó entrar'; end if;
-  v_ok := false;
+  select count(*) into v_count from public.attendees where id_partido=v_m and id_jugador=v_ext;
+  if not v_ok or v_count<>0 then
+    raise exception 'FALLÓ 10: request_join dejó entrar (respuesta %, % filas en attendees)', v_resp, v_count;
+  end if;
+  v_ok := false; v_err2 := null; v_resp := null;
   begin
     execute 'set local role authenticated';
     execute format('set local request.jwt.claims to %L', json_build_object('sub',v_ext,'role','authenticated')::text);
-    perform public.join_waitlist(v_m);
+    v_resp := public.join_waitlist(v_m);
     execute 'reset role';
-  exception when others then execute 'reset role'; v_ok := true; end;
-  if not v_ok then raise exception 'FALLÓ 10: join_waitlist dejó entrar'; end if;
-  insert into t44d values (10,'request_join y join_waitlist', format('el trigger las atrapa aunque sean security definer — %s', v_err));
+    if not coalesce((v_resp->>'ok')::boolean, false) then
+      v_ok := true; v_err2 := 'ok=false — ' || coalesce(v_resp->>'reason', 'sin motivo');
+    end if;
+  exception when others then execute 'reset role'; v_err2 := sqlerrm; v_ok := true; end;
+  select count(*) into v_count from public.match_waitlist where id_partido=v_m and id_jugador=v_ext;
+  if not v_ok or v_count<>0 then
+    raise exception 'FALLÓ 10: join_waitlist dejó entrar (respuesta %, % filas en la cola)', v_resp, v_count;
+  end if;
+  insert into t44d values (10,'request_join y join_waitlist',
+    format('rechazadas las dos y sin dejar fila — request_join: %s · join_waitlist: %s', v_err, v_err2));
 
   execute 'set local role authenticated';
   execute format('set local request.jwt.claims to %L', json_build_object('sub',v_jug,'role','authenticated')::text);
@@ -191,16 +286,24 @@ begin
     insert into t44d values (13,'inscripción en partido normal','join_match sigue funcionando igual');
   end if;
 
-  execute format('set local request.jwt.claims to %L', json_build_object('role','anon')::text);
-  execute 'set local role anon';
+  -- OJO (2026-10-15): estos casos corrían como `anon` porque
+  -- `historial_publico_club` se le concedió a propósito en la migración 44d
+  -- —es la proyección estrictamente pública de un encuentro terminado—. La
+  -- migración **114** barrió todas las funciones de `public` sin lista de
+  -- excepciones y se la llevó, junto con otras trece. Se corre como un
+  -- `authenticated` AJENO a los dos clubes, que es la otra cara de lo mismo:
+  -- lo que se prueba es que un externo no ve lo que no le toca, y eso no
+  -- depende del rol. Ver el P2 de `pendientes.md`.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ext, 'role','authenticated')::text);
+  execute 'set local role authenticated';
   select count(*) into v_count from public.historial_publico_club(v_cl, 20);
   execute 'reset role';
   if v_count<>0 then raise exception 'FALLÓ 14: un partido no finalizado salió en el historial público'; end if;
   insert into t44d values (14,'historial público · pendiente','un partido no finalizado NO aparece');
 
   update public.matches set estado='finalizado' where id=v_m;
-  execute format('set local request.jwt.claims to %L', json_build_object('role','anon')::text);
-  execute 'set local role anon';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ext, 'role','authenticated')::text);
+  execute 'set local role authenticated';
   select count(*) into v_count from public.historial_publico_club(v_cl, 20);
   select club_local_nombre||' vs '||club_visitante_nombre into v_tit
     from public.historial_publico_club(v_cl,20) limit 1;
@@ -211,8 +314,8 @@ begin
     format('sale «%s» con día, marcador y resultado; la fila del partido SIGUE oculta para anon', v_tit));
 
   update public.matches set estado='cancelado' where id=v_m;
-  execute format('set local request.jwt.claims to %L', json_build_object('role','anon')::text);
-  execute 'set local role anon';
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ext, 'role','authenticated')::text);
+  execute 'set local role authenticated';
   select count(*) into v_count from public.historial_publico_club(v_cl, 20);
   execute 'reset role';
   if v_count<>0 then raise exception 'FALLÓ 16: un cancelado salió en el historial público'; end if;

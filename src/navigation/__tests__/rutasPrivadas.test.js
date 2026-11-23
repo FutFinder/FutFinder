@@ -36,8 +36,18 @@ const PUBLICAS = new Set([
   'Login',
   'Register',
   'Verification',
+  // «Olvidé mi contraseña»: se usa justamente sin poder iniciar sesión. Sólo
+  // muestra datos de la cuenta después de que el código del correo la abre.
+  'RecuperarContrasena',
   'LocationPermission',
   'Terms',
+  // Términos y políticas de privacidad y cookies: texto fijo que se lee
+  // antes de crear la cuenta.
+  'Terminos',
+  'Privacidad',
+  'Cookies',
+  // Cómo eliminar la cuenta: Google Play pide que se lea sin la app ni sesión.
+  'EliminarCuenta',
   'Success',
   // Galería interna de QA de las primitivas de Reservas: no importa ningún
   // servicio ni el cliente de Supabase, no lee datos de nadie y no está en la
@@ -156,6 +166,7 @@ test('las pantallas con datos de usuario, partidos, clubes y reservas están ent
     'Resumen',
     'ElegirCancha',
     'BlockedUsers',
+    'MfaSetup',
     'TrustScoreHistory',
     'VerificarTelefono',
   ]) {

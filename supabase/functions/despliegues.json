@@ -1,0 +1,97 @@
+{
+  "_lee_esto": [
+    "Qué versión de cada Edge Function está DESPLEGADA en jvfoendzblkoxvwvommz, y con qué contenido.",
+    "`archivos` guarda el sha256 de cada archivo TAL COMO SE DESPLEGÓ. Lo comprueba scripts/__tests__/edgeDespliegues.test.js: si el archivo del repositorio ya no da ese hash, la función está corriendo código viejo y la prueba falla.",
+    "No se compara por fecha: el patrón normal es desplegar y commitear un minuto después, así que el commit SIEMPRE es más nuevo que el despliegue y una comparación de fechas daría falso positivo siempre.",
+    "`comparada` es el día en que ese contenido se trajo con get_edge_function y se verificó contra el repositorio. `null` significa que el hash es el del archivo de hoy y se dio por bueno sin traer la copia desplegada.",
+    "AL DESPLEGAR: actualiza version, desplegada y los hashes. Es a propósito que haya que tocar esto a mano.",
+    "UN CAMBIO EN _shared/ NO ESTÁ EN PRODUCCIÓN HASTA REDESPLEGAR CADA FUNCIÓN QUE LO IMPORTA: la copia viaja dentro de cada despliegue.",
+    "Las seis se compararon contra la copia desplegada el 2026-10-16 y las seis coincidían con el repositorio, salvo send-push, que venía atrasada y se redesplegó. El 2026-11-13 se trajeron con get_edge_function las cuatro que estaban con `comparada: null` (pagar-reserva, flow-confirmacion, solicitud-recinto y reportar-problema): los diez archivos dan el mismo sha256 que el repositorio y que este registro, `_shared` incluido.",
+    "`pendiente` (opcional, por función) = contenido YA escrito en el repositorio que todavía NO se desplegó, con el sha256 exacto de cada archivo. La guarda lo deja pasar —y lo anuncia— mientras el archivo coincida con ese hash; si se edita otra vez, vuelve a fallar. AL DESPLEGAR: mueve esos hashes a `archivos`, sube `version`/`desplegada` y borra `pendiente`.",
+    "La plataforma reporta en `version` UNO MÁS que el número de acá en las siete funciones (comprobado el 2026-11-13 con list_edge_functions): es otra numeración, no código viejo. Lo que manda es el hash; `updated_at` coincide con `desplegada` y `entrypoint_path` termina en el número de acá.",
+    "pagar-reserva se redesplegó el 2026-11-14 (la plataforma reporta version 6): mira el resultado de anotar_referencia_pago y consulta la pausa de la migración 179; trae _shared/pagarReserva.ts. Ese mismo día se trajo con get_edge_function y sus cuatro archivos dan el mismo sha256 que el repositorio. El primer intento falló al empaquetar por un 521 de esm.sh y no cambió nada."
+  ],
+  "proyecto": "jvfoendzblkoxvwvommz",
+  "funciones": {
+    "conciliar-pagos": {
+      "version": null,
+      "desplegada": null,
+      "comparada": null,
+      "archivos": {},
+      "pendiente": {
+        "motivo": "Nueva (migración 190): nunca desplegada. Se despliega con verify_jwt=false junto con aplicar la 190, con el sí de Vicente.",
+        "archivos": {
+          "conciliar-pagos/index.ts": "c0415ffe82f2d7846829eda6ea4cc3f13197421b9a0fa8dc1cc6bba581cb705a",
+          "_shared/conciliarPagos.ts": "8c43ca925011cbc8e4e7db51a97fa666213274ca9c268257479242302754ce2f",
+          "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
+          "_shared/flowPagos.ts": "24bc537ee7a06914de96d37ee5681706cf9ea677397eb8c0cf5ee936872c8571"
+        }
+      }
+    },
+    "eliminar-cuenta": {
+      "version": 1,
+      "desplegada": "2026-11-13T22:31:28Z",
+      "comparada": "2026-11-13",
+      "archivos": {
+        "eliminar-cuenta/index.ts": "a8db72cf11dea2a59b5b6409bf88ef04f4a22cc8084824b94aafb83e0339e8c2",
+        "_shared/borrarCuenta.ts": "72a023768af957d007127208ccecf2e94ce64dcb94eb16bc08c4462ad5033d81"
+      }
+    },
+    "flow-confirmacion": {
+      "version": 4,
+      "desplegada": "2026-11-13T23:22:17Z",
+      "comparada": "2026-11-13",
+      "archivos": {
+        "flow-confirmacion/index.ts": "fda6e3fc1da2d1cddbbb8729bf425673181c637be073fad0c4724ce0e6337dc6",
+        "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
+        "_shared/flowPagos.ts": "24bc537ee7a06914de96d37ee5681706cf9ea677397eb8c0cf5ee936872c8571"
+      }
+    },
+    "flow-retorno": {
+      "version": 2,
+      "desplegada": "2026-09-11T01:28:33Z",
+      "comparada": "2026-10-16",
+      "archivos": {
+        "flow-retorno/index.ts": "f2e7ec30569db0fc7e37e71458c630f6c1541e1491b6b27408650d00e626e968"
+      }
+    },
+    "pagar-reserva": {
+      "version": 5,
+      "desplegada": "2026-11-14T10:46:26Z",
+      "comparada": "2026-11-14",
+      "archivos": {
+        "pagar-reserva/index.ts": "8f721f2d23afb27a50c21fe164f44c978b6afaec94ad82ef1eda218a23ed2738",
+        "_shared/flowLogic.ts": "c28767ba2695aabb544caea3ff52496aaf387704e1235fddb0f23a2ea4f3797a",
+        "_shared/flowPagos.ts": "24bc537ee7a06914de96d37ee5681706cf9ea677397eb8c0cf5ee936872c8571",
+        "_shared/pagarReserva.ts": "51ce470c6dbf453aaf4cc15d2cc12ac2a400a63dc4e6623c730bbc7be8d9f92d"
+      }
+    },
+    "reportar-problema": {
+      "version": 3,
+      "desplegada": "2026-11-10T02:17:41Z",
+      "comparada": "2026-11-13",
+      "archivos": {
+        "reportar-problema/index.ts": "72c15fd4c8bd4a586169d3894d46031d3a7c3aa347810aa9c9fdb85a24b5aeed",
+        "_shared/correoReporte.ts": "66fe8c0874f6eaf22cb7d03f8ac0d474b74754af41c50054d9eda9dbba63dee2"
+      }
+    },
+    "send-push": {
+      "version": 13,
+      "desplegada": "2026-11-18T17:32:21Z",
+      "comparada": "2026-11-18",
+      "archivos": {
+        "send-push/index.ts": "6db7b7f16cc11a42de5f96e1de1e6a8a70c53a026fff72bfa5f6a797a58a752f",
+        "send-push/pushLogic.ts": "2707fa290adf464c3a0f6be7b1129b7f2dd5c5f16a9c8c36bcaf978c17c58a92"
+      }
+    },
+    "solicitud-recinto": {
+      "version": 8,
+      "desplegada": "2026-11-10T01:23:05Z",
+      "comparada": "2026-11-13",
+      "archivos": {
+        "solicitud-recinto/index.ts": "cd6919e9ce1870575fede9e41a4fd87723f083a993846aa0d4e3ffea43a63621",
+        "_shared/correoSolicitud.ts": "b0f4ba51d671685ac01caacfbf109487f816668b2844cd4562decbc835071593"
+      }
+    }
+  }
+}

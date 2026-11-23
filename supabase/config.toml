@@ -24,7 +24,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-push]
-# La dispara un Database Webhook de Supabase, que sí manda la service key.
+# La llama el disparador `notificar_push` (AFTER INSERT en `notifications`,
+# migraciones 117 y 118) con `pg_net`. La cabecera lleva la clave PUBLICABLE
+# guardada en Vault, que sólo sirve para pasar esta verificación: la función
+# no la lee y trabaja con la service key que le inyecta la plataforma.
 verify_jwt = true
 
 [functions.solicitud-recinto]
@@ -32,3 +35,75 @@ verify_jwt = true
 # usa ese mismo token para crear la solicitud: sin sesión no tiene nada que
 # hacer. El correo al equipo lo manda después, con sus propios secretos.
 verify_jwt = true
+
+[functions.eliminar-cuenta]
+# La llama la app con la sesión de quien se borra: la función usa ese token
+# para `delete_my_account()` (migración 176) y recién después, con
+# service_role, borra sus carpetas de Storage, que SQL no puede tocar.
+verify_jwt = true
+
+[functions.reportar-problema]
+# La llama la app con la sesión de quien reporta: la función usa ese token
+# para guardar el ticket como esa persona (RLS) y leer su correo con
+# `auth.getUser()`. El correo al equipo lo manda después, con su propio
+# secreto, y con el tope de la migración 166 (`limite_correo_de_reporte`).
+verify_jwt = true
+
+# ── Correo del stack LOCAL ───────────────────────────────────────
+# OJO: el stack local NO se levanta desde este directorio, sino desde
+# `~/.futfinder-local`, que tiene una copia de estas líneas. Vive aparte a
+# propósito: si el `config.toml` del stack estuviera acá, `supabase db reset`
+# aplicaría `supabase/migrations/` en orden ALFABÉTICO —la 100 entre la 09 y
+# la 10, la 44b antes que la 44— y construiría una base distinta sin avisar.
+# La base se arma con `node scripts/construir-base.mjs`, que sabe el orden.
+#
+# Esto queda versionado como referencia, y funciona si alguna vez se levanta
+# desde acá. Las plantillas de producción viven en el panel y no se pueden
+# versionar desde ningún lado.
+#
+# La pantalla de verificación espera un CÓDIGO DE 6 DÍGITOS, no un enlace
+# (ver `src/services/auth.js`). La plantilla por omisión del stack local
+# manda un enlace mágico, y con eso el registro local queda a medias de una
+# forma que parece un fallo de la app: la cuenta se crea y la contraseña
+# nunca se fija —se fija al verificar el código—, así que el login siguiente
+# contesta «Correo o contraseña incorrectos».
+#
+# Detalle y motivo de cada línea en `supabase/plantillas-correo/LEEME.md`.
+
+[auth.email]
+enable_confirmations = true
+# Un correo con código por dirección cada minuto, y el código vale 15 minutos
+# (el valor por omisión es 1 hora: una ventana larga para adivinar 6 dígitos).
+max_frequency = "1m0s"
+otp_length = 6
+otp_expiry = 900
+
+# Límites de Supabase Auth por IP y por cinco minutos (login, registro, OTP y
+# renovación de sesión). Son los valores de referencia del proyecto: los de
+# PRODUCCIÓN viven en el panel (Authentication → Rate Limits) y no se pueden
+# versionar ni cambiar por migración; ver seguridad-y-privacidad.md.
+[auth.rate_limit]
+email_sent = 30
+sms_sent = 30
+anonymous_users = 30
+token_refresh = 150
+sign_in_sign_ups = 30
+token_verifications = 30
+
+[auth.email.template.confirmation]
+subject = "Tu código de FutFinder"
+content_path = "./supabase/plantillas-correo/confirmacion.html"
+
+# La misma plantilla a propósito: «Reenviar código» va por `signInWithOtp`,
+# así que Supabase manda la de magic_link. Si sólo se cambiara la de arriba,
+# el primer correo traería el código y el del reenvío un enlace.
+[auth.email.template.magic_link]
+subject = "Tu código de FutFinder"
+content_path = "./supabase/plantillas-correo/confirmacion.html"
+
+[functions.conciliar-pagos]
+# La llama `pg_cron` cada 10 minutos (`llamar_conciliar_pagos()`, migración
+# 190) con `pg_net`: no hay sesión. La protege un secreto propio en la
+# cabecera `x-conciliar-secreto` (`CONCILIAR_PAGOS_SECRETO` en la función y
+# `conciliar_pagos_secreto` en Vault), que la función compara antes de nada.
+verify_jwt = false

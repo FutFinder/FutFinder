@@ -56,6 +56,42 @@ begin
   insert into resultado values ('CASO 4 OK — anon no ejecuta search_canchas');
 end $$;
 
+-- ── Las dos canchas con las que se mide ──────────────────────────
+-- SEMBRADAS (2026-10-15). Antes se apoyaba en dos canchas de producción
+-- —`maiclub` y `tangus`— y eso ataba el arnés a esa base: contra una
+-- recién construida no existen y el caso 3 fallaba sin que nada estuviera
+-- roto. Mi propio arnés tenía el defecto que les critiqué a los demás.
+--
+-- `cancha_umbral` la usan DOS organizadores distintos, así que pasa el
+-- umbral de la 153. `cancha_sola` la usa uno, así que no. Es exactamente
+-- la distinción que el caso 3 comprueba.
+do $$
+declare
+  v_u1 uuid := gen_random_uuid(); v_u2 uuid := gen_random_uuid();
+begin
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+    confirmation_token, email_change, email_change_token_new, recovery_token)
+  select '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated',
+    'm154-'||u.id||'@futfinder.test','x',now(),now(),now(),'{}','{}','','','',''
+  from (values (v_u1), (v_u2)) as u(id);
+  insert into public.profiles (id, username) values
+    (v_u1, 'm154a'||substr(replace(v_u1::text,'-',''),1,6)),
+    (v_u2, 'm154b'||substr(replace(v_u2::text,'-',''),1,6))
+    on conflict (id) do nothing;
+
+  -- Dos personas distintas publican en la misma cancha: la asciende.
+  insert into public.matches (id_organizador, titulo, comuna, cancha_nombre,
+    latitud, longitud, hora, cupos_totales, cupos_disponibles)
+  values (v_u1, 'm154', 'Ñuñoa', 'Cancha umbral m154', -33.4569, -70.6483,
+          now() + interval '2 days', 10, 8),
+         (v_u2, 'm154', 'Ñuñoa', 'Cancha umbral m154', -33.4569, -70.6483,
+          now() + interval '3 days', 10, 8),
+  -- Y una sola persona en otra: se queda bajo el umbral.
+         (v_u1, 'm154', 'Ñuñoa', 'Cancha sola m154', -33.4569, -70.6483,
+          now() + interval '4 days', 10, 8);
+end $$;
+
 -- ── Ahora sí: con la lente de un usuario real ────────────────────
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
@@ -76,7 +112,7 @@ begin
 
   -- ── Caso 2: y aun así la función contesta ─────────────────────
   begin
-    select count(*) into v_n from public.search_canchas('maiclub', 10);
+    select count(*) into v_n from public.search_canchas('umbral m154', 10);
     v_pudo := true;
   exception when others then v_pudo := false; end;
   if not v_pudo then
@@ -85,14 +121,13 @@ begin
   insert into resultado values ('CASO 2 OK — search_canchas contesta como authenticated');
 
   -- ── Caso 3: y contesta lo correcto ────────────────────────────
-  -- `maiclub` tiene 4 organizadores y pasa; `tangus` y `Canchas de
-  -- Bonilla` tienen 1 y no. Si el arreglo hubiera sido «que no falle»
-  -- devolviendo todo, este caso lo caza.
-  select count(*) into v_n from public.search_canchas('maiclub', 10);
+  -- La sembrada con DOS organizadores pasa; la de uno, no. Si el arreglo
+  -- hubiera sido «que no falle» devolviendo todo, este caso lo caza.
+  select count(*) into v_n from public.search_canchas('umbral m154', 10);
   if v_n <> 1 then
     raise exception 'CASO 3 FALLA: la cancha sobre el umbral no se sugiere (devolvió %)', v_n;
   end if;
-  select count(*) into v_n from public.search_canchas('tangus', 10);
+  select count(*) into v_n from public.search_canchas('sola m154', 10);
   if v_n <> 0 then
     raise exception 'CASO 3 FALLA: una cancha bajo el umbral se sugiere (devolvió %)', v_n;
   end if;

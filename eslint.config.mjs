@@ -107,7 +107,8 @@ export default [
       // La app tuvo SIETE paletas conviviendo (`colors` olivo, `dsColors`,
       // `clubColors`, `chatColors`, `tactical` flúor, `partidos` y
       // `reservas`): cuatro verdes y tres fondos en un solo recorrido. Se
-      // unificaron en `reservas` el 2026-09-16 y las otras seis se borraron.
+      // unificaron en `reservas` el 2026-09-16 y las otras seis se borraron;
+      // después se renombró a `paleta` (con `radios`, `medidas` y `fuentes`).
       //
       // Hoy importar una de ellas ya falla al empaquetar, porque el export no
       // existe. Esta regla está para el caso que el empaquetador NO cubre:
@@ -129,8 +130,8 @@ export default [
             'clubsExplorer', 'clubsExplorerRadius',
           ],
           message:
-            'La app tiene UNA paleta: `reservas`/`reservasRadius`/'
-            + '`reservasSizes`/`reservasFonts`. Las familias viejas se '
+            'La app tiene UNA paleta: `paleta`/`radios`/`medidas`/'
+            + '`fuentes` (src/theme/colors.js). Las familias viejas se '
             + 'borraron el 2026-09-16 — ver '
             + 'docs/superpowers/specs/2026-09-16-estetica-unica-design.md',
         }],

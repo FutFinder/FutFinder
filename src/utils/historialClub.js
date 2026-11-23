@@ -28,6 +28,8 @@
  * es peor que cualquiera de las dos por separado.
  */
 
+import { NIVELES } from '../services/matchRules.js';
+
 /** Resultado de un partido, desde la óptica del club que se está mirando. */
 export const RESULTADO = {
   VICTORIA: 'V',
@@ -259,8 +261,16 @@ export function normalizarPartido(row, clubId) {
     horaLabel: formatHora(row.hora),
     localLabel: esLocal ? 'Local' : 'Visita',
     canchaNombre: row.cancha_nombre || null,
-    // `nivel` viaja en la fila pero no se muestra: en un encuentro entre
-    // clubes nadie lo elige. Ver `NIVEL_POR_OMISION` arriba.
+    // El nivel, SÓLO si alguien lo eligió.
+    //
+    // Desde la migración 157 `historial_club()` lo saca de la propuesta y no
+    // de `matches`, así que un encuentro anterior a la 156 llega con `null`
+    // y acá no se pinta nada. Es la diferencia que importa: `matches.nivel`
+    // tiene `default 'recreativo'`, y leer de ahí haría que un encuentro que
+    // nadie clasificó se leyera «Recreativo» como si fuera un dato.
+    //
+    // Un valor desconocido tampoco se pinta: mejor nada que la cadena cruda.
+    tipoLabel: NIVELES.find((n) => n.value === row.nivel)?.label || null,
     soyIntegrante: row.soy_integrante === true,
   };
 }

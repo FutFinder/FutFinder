@@ -93,7 +93,7 @@ export default function ClubInviteScreen({ navigation, route }) {
     setBanner({
       type: 'success',
       title: 'Invitación enviada',
-      message: `${player.username} verá tu invitación en su pestaña Clubes.`,
+      message: `A ${player.username} le llegó un aviso, y la verá también en su pestaña Clubes.`,
     });
   };
 

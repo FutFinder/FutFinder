@@ -1,6 +1,6 @@
 # Sistema visual
 
-Última revisión: 2026-09-22
+Última revisión: 2026-11-05
 
 ## Propósito
 
@@ -30,19 +30,23 @@ avisa.
 El cuarto candado, y el único que caza un color **escrito a mano**, es
 `src/theme/__tests__/nadieEscribeLaPaletaAMano.test.js`: busca por TEXTO cada
 hex borrado y su `rgba()`, porque ni el lint ni la migración de tokens ven un
-color dentro de una cadena. **Desde el 14-10-2026 lee además los archivos de
+color dentro de una cadena. **Desde el 23-11-2026 lee además los archivos de
 configuración de la raíz**, `app.config.js` y `tailwind.config.js`. Recorría
-sólo `src/`, y por ese hueco el olivo legado sobrevivió casi un mes en tres
-sitios de `app.config.js`: `notification.color`, el `themeColor` del PWA y el
-`color` del plugin `expo-notifications` —el tinte del ícono de notificación en
-Android, o sea el color de marca que veía cualquiera que recibiera un push.
-Ahí el verde va escrito a mano a propósito (el prebuild evalúa ese archivo con
-un Node cuya versión no fijamos, y `colors.js` es un módulo ES); lo que
-mantiene la copia al día es una aserción de esa misma prueba contra
-`paleta.green`. Corolario para quien edite esos archivos: un hex prohibido no
-se escribe **ni en un comentario**, porque la prueba va por texto.
+sólo `src/`, y por ese hueco el olivo legado sobrevivió casi un mes en los
+tres sitios de `app.config.js` que se cuentan más abajo.
+
+Esa prueba y `appConfigEnLaPaleta.test.js` se reparten el trabajo y conviene
+no confundirlas: la segunda mira un solo archivo pero con más exigencia (todo
+hex de `app.config.js` tiene que ser un valor de `paleta`), y la primera es la
+que cubre `tailwind.config.js` y la única que caza un color borrado escrito
+como `rgba()`. Corolario para quien edite esos dos archivos: como la búsqueda
+es por texto, un hex prohibido no se escribe ahí **ni dentro de un
+comentario** — es lo que obligó a que `tailwind.config.js` cuente su propia
+historia diciendo `bg-[#...]` en vez del flúor que de verdad tenía.
 
 Diseño y fases: `docs/superpowers/specs/2026-09-16-estetica-unica-design.md`.
+
+**Ya no hay excepción:** el olivo `#71B533` sobrevivía en `app.config.js` (`notification.color`, `web.themeColor` y el plugin `expo-notifications`) y desde `d11848d` esos tres usan el verde `#55DF69` de la paleta. El archivo no puede importar `src/theme/colors.js` (lo lee Expo en Node, antes de Babel), así que los colores van escritos a mano; `src/theme/__tests__/appConfigEnLaPaleta.test.js` exige que todo color de `app.config.js` sea un valor de `paleta` y que esos tres sean `paleta.green`. Si falla, no se agrega una excepción: se usa el valor del token. **El color nativo de la notificación (Android) sólo se verá en el próximo build**, porque no hay actualizaciones por aire. El fondo `#0A0C0A` del splash nativo coincide con `paleta.bg`.
 
 ### Lo que NO se unificó, a propósito
 
@@ -75,10 +79,11 @@ rojo») sería una regla sorprendente. No es deuda pendiente.
 ## Familias reutilizables y copy
 
 - `src/components/ds/`: fondo de banner, estado vacío, cabecera de sección y badge de etiqueta para Clubes y Perfil. La cabecera mantiene acciones españolas como “Ver todos”, “Ver todo” o “Ver todas”.
-- `src/components/club/`: explorador, tarjetas de club/rival/historial, héroe, logo, galería, insignia de plan, estadísticas y CTA de desafío.
+- `src/components/club/`: explorador, tarjetas de club/rival/historial, héroe, logo, galería, insignia de club verificado (`VerifiedBadge`; ya no hay insignia de plan porque los clubes no tienen planes), estadísticas y CTA de desafío.
+- `src/components/clubes/`: piezas del hilo de un desafío (cabecera, burbuja de eventos, cambio de partido, cancelación, incomparecencia y revisión). `src/components/reservas/`: hojas y primitivas del vertical de Reservas (`ui.js`, `recintoUi.js`).
 - `src/components/player/`: héroe, biografía, estadísticas, reputación, participación, acciones públicas, tarjetas de cuenta/soporte, galería, reporte y skeleton de perfil.
 - `src/components/partidos/`: hojas, filtros, selectores, tarjeta de partido, vistas de estado y primitivas `ui`.
-- `src/components/BrandMark.js`: única fuente del logo «**Fut**Finder» (pin + wordmark) para el header de las pantallas ya logueadas. Sin props de tamaño ni color — usa siempre los tokens de `tactical` (`neon` y `text`), sea cual sea la pantalla que lo aloja. Se usa en Home, Partidos y Chat; el onboarding (`Logo.js`, el ícono de balón) es una marca distinta y no lo usa. `src/screens/SplashScreen.js` tampoco renderiza `<BrandMark />`: reconstruye a mano el mismo ícono `MapPin`/`tactical.neon` y el mismo wordmark (mismo tamaño, mismo estilo) como dos piezas independientes, porque necesita animar el pin y el texto en momentos distintos (el pin se asienta, después el texto se desliza a su derecha) y `BrandMark` no expone sus partes por separado. Fondo del splash: `clubsExplorer.bg`, no `tactical.bg` ni la paleta global. **La primera versión —halo, `BrandMark` como bloque único y pulso— quedó descartada por decisión de Vicente el 2026-08-27:** para la marca prefiere que el ícono se asiente primero y el texto se deslice después, sin halo, brillo ni pulso. Vale para cualquier animación de marca que se agregue, no sólo para esta pantalla.
+- `src/components/BrandMark.js`: única fuente del logo «**Fut**Finder» (pin + wordmark) para el header de las pantallas ya logueadas. Sin props de tamaño ni color — usa siempre los tokens de `paleta` (`C.green` y `C.textPrimary`; `tactical` ya no existe), sea cual sea la pantalla que lo aloja. Se usa en Home, Partidos y Chat; el onboarding (`Logo.js`, el ícono de balón) es una marca distinta y no lo usa. `src/screens/SplashScreen.js` tampoco renderiza `<BrandMark />`: reconstruye a mano el mismo ícono `MapPin`/`C.green` y el mismo wordmark (mismo tamaño, mismo estilo) como dos piezas independientes, porque necesita animar el pin y el texto en momentos distintos (el pin se asienta, después el texto se desliza a su derecha) y `BrandMark` no expone sus partes por separado. Fondo del splash: `C.bg`, el fondo de la paleta única. **La primera versión —halo, `BrandMark` como bloque único y pulso— quedó descartada por decisión de Vicente el 2026-08-27:** para la marca prefiere que el ícono se asiente primero y el texto se deslice después, sin halo, brillo ni pulso. Vale para cualquier animación de marca que se agregue, no sólo para esta pantalla.
 - **La marca se escribe «FutFinder», con las dos efes en mayúscula.** El wordmark se dibujaba `fut` + `finder` todo en minúsculas en los SIETE sitios que lo pintan (`BrandMark`, `Logo`, Splash, Portada, Tutorial, Iniciar sesión y Crear cuenta), y cuatro pies de página y el texto de Términos lo escribían `FUTFINDER` en mayúsculas literales. Decisión de Vicente el 22-09-2026: se ve más profesional con la capitalización de la marca. El color no cambia — «Fut» en el texto base y «Finder» en verde. Las pruebas `headerBrand.test.js` y `SplashScreen.test.js` fijan el wordmark buscando `Fut<Text`, así que una pantalla que vuelva a dibujarlo a mano en minúsculas se detecta.
 
   Lo que NO se tocó, a propósito: las mayúsculas que pone `SectionLabel` con `textTransform` (ahí la marca ya lleva las dos efes), el nombre del paquete npm, el `slug`/`scheme`/`bundleIdentifier` (`futfinder`, `com.futfinder.app`), las claves de `AsyncStorage` (`futfinder:clubActivo`, `futfinder.rememberedAccount`), las columnas de la base (`aprobado_futfinder`, `verificado_futfinder`), los dominios y los correos. Son identificadores: cambiarlos rompe datos guardados, despliegues o direcciones reales, y ninguno se le enseña a nadie.
@@ -95,7 +100,7 @@ El rótulo de un badge numérico se decide en un solo sitio, `etiquetaBadge()` d
 
 ## Objetivos táctiles
 
-La medida mínima sólo se afirma donde el código la define. `dsSizes.tapBtn` es 44, y `dsSizes.iconBtn` es 40 con `hitSlop` para llegar a 44. `EmptyStateCard` mantiene un botón visual de 38 con `hitSlop` vertical de 4 para alcanzar 44. En Partidos, las primitivas de botón usan 48 o más por defecto; `IconButton` usa tamaño 36 con `hitSlop` de 8. Otros controles deben conservar su medida o `hitSlop` comprobando el componente afectado, en vez de inferir un mínimo global.
+La medida mínima sólo se afirma donde el código la define. `medidas.tapBtn` es 44, y `medidas.iconBtn` es 40 con `hitSlop` para llegar a 44 (`dsSizes` ya no existe). `EmptyStateCard` mantiene un botón visual de 38 con `hitSlop` vertical de 4 para alcanzar 44. En Partidos, las primitivas de botón usan 48 o más por defecto; `IconButton` usa tamaño 36 con `hitSlop` de 8. Otros controles deben conservar su medida o `hitSlop` comprobando el componente afectado, en vez de inferir un mínimo global.
 
 ## Diferencias web y nativo
 
@@ -108,6 +113,6 @@ Las capturas o handoffs específicos de una tarea permanecen fuera de esta memor
 ## Rutas relacionadas
 
 - `src/theme/colors.js`
-- `src/components/ds/`, `src/components/club/`, `src/components/player/` y `src/components/partidos/`
+- `src/components/ds/`, `src/components/club/`, `src/components/clubes/`, `src/components/player/`, `src/components/partidos/` y `src/components/reservas/`
 - `src/components/BrandMark.js` y `src/components/NotificationBell.js`
 - [Partidos](../funcionalidades/partidos.md), [Clubes](../funcionalidades/clubes.md) y [Perfil y amigos](../funcionalidades/perfil-y-amigos.md)

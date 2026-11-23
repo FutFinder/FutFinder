@@ -1,0 +1,566 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ArrowLeft, Building2, Check, Gavel, RotateCcw, ShieldAlert, TriangleAlert } from 'lucide-react-native';
+
+import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
+import Banner from '../components/Banner';
+import useConfirmacion from '../components/useConfirmacion';
+import {
+  getColaModeracion,
+  resolverRevision,
+  reabrirResultado,
+  aprobarRecinto,
+  resolverReporte,
+} from '../services/moderacion';
+import {
+  COLAS,
+  filasDe,
+  estadoDeLaCola,
+  motivoLegible,
+  tipoSancionLegible,
+  totalPendiente,
+  puedeResolver,
+  esperaLegible,
+  NOTA_MAX,
+  DECISIONES_REPORTE,
+  DIAS_SUSPENSION,
+  NOTA_REPORTE_MAX,
+  elementoLegible,
+  queQuitaElContenido,
+  puedeResolverReporte,
+} from '../utils/moderacion';
+
+/**
+ * Las cuatro colas de moderación (migraciones 151 y 164).
+ *
+ * QUIÉN LLEGA ACÁ. Sólo quien está en `public.moderadores`, y el padrón no se
+ * lee desde la app: nombrar a alguien es un `insert` desde el panel. La
+ * entrada del menú se esconde con `soyModerador()`, pero eso es cosmética —
+ * las tres RPC vuelven a comprobarlo y devuelven `NO_MODERA` (42501) a quien
+ * no corresponda. Esta pantalla nunca es la autoridad.
+ *
+ * LOS REPORTES SE RESUELVEN desde la migración 194: descartar, advertir,
+ * quitar el contenido reportado o suspender 7 o 30 días. Cada fila trae lo
+ * necesario para decidir —quién, qué, la descripción, cuántos reportes
+ * previos tiene y si ya está suspendida— y cada decisión se confirma antes
+ * de mandarse. Lo que significa cada una vive en `utils/moderacion.js`.
+ *
+ * UN HALLAZGO DE LA 151 QUE SE NOTA ACÁ: quien modera **no ve el hilo del
+ * desafío que modera** —`chat_puede_ver_desafio()` exige pertenecer a uno de
+ * los dos clubes, y no pertenecer es justo lo que lo hace imparcial—. Por eso
+ * la revisión muestra el `contexto`, que es el expediente copiado al pedirla.
+ *
+ * LA CUARTA COLA (migración 164) son los recintos que pidieron revisión. No
+ * nació con las otras tres y por eso llegó tarde: la app le decía al dueño
+ * «te avisamos» y no había dónde verlo. En producción hubo uno esperando 35
+ * días. Acá se aprueba y nada más; rechazar sigue sin estar diseñado.
+ */
+
+function fechaCorta(iso) {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })
+      + ' · ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch {
+    return '';
+  }
+}
+
+export default function ModeracionScreen({ navigation }) {
+  const [cola, setCola] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [refrescando, setRefrescando] = useState(false);
+  const [banner, setBanner] = useState(null);
+  const [enCurso, setEnCurso] = useState(null);
+  // La nota es por fila: dos revisiones abiertas a la vez no pueden
+  // compartir el mismo texto.
+  const [notas, setNotas] = useState({});
+  const { confirmar, dialogo } = useConfirmacion();
+
+  const cargar = useCallback(async () => {
+    const { data, error: e } = await getColaModeracion();
+    if (e) {
+      setError(e);
+      setCola(null);
+    } else {
+      setCola(data);
+      setError(null);
+    }
+    setCargando(false);
+    setRefrescando(false);
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const notaDe = (id) => notas[id] || '';
+  const setNota = (id, v) => setNotas((n) => ({ ...n, [id]: v }));
+
+  /**
+   * Las dos acciones terminan igual: un `{ ok, reason }` que puede venir en
+   * `data` sin que `error` tenga nada. Mirar sólo `error` dejaría pasar en
+   * silencio «esa revisión ya está resuelta».
+   */
+  const aplicar = useCallback(async (id, fn, exito) => {
+    setEnCurso(id);
+    const { data, error: e } = await fn();
+    setEnCurso(null);
+    if (e) {
+      setBanner({ type: 'error', title: 'No se pudo', message: e.message || 'Intenta de nuevo.' });
+      return;
+    }
+    if (data && data.ok === false) {
+      setBanner({ type: 'error', title: 'No se pudo', message: data.reason || 'El servidor lo rechazó.' });
+      return;
+    }
+    setBanner({ type: 'success', title: exito, message: null });
+    setNota(id, '');
+    await cargar();
+  }, [cargar]);
+
+  const resolver = (rev, decision) => {
+    const nota = notaDe(rev.id).trim() || null;
+    if (!puedeResolver({ decision, nota })) return;
+    confirmar(
+      decision === 'retirar' ? 'Retirar la sanción' : 'Mantener la sanción',
+      decision === 'retirar'
+        ? 'La sanción se levanta y el club queda sin castigo por este encuentro.'
+        : 'La sanción se confirma y el club la cumple.',
+      () => aplicar(rev.id, () => resolverRevision(rev.id, decision, nota), 'Revisión resuelta')
+    );
+  };
+
+  const aprobar = (k) => {
+    const espera = esperaLegible(k.pedida_at);
+    confirmar(
+      `Aprobar ${k.nombre}`,
+      'Queda listo para que el dueño lo publique cuando quiera. No lo publicamos nosotros: '
+      + 'mientras no lo publique él, no aparece en el buscador.'
+      + (espera ? ` Lo pidió ${espera}.` : ''),
+      () => aplicar(k.id, () => aprobarRecinto(k.id), 'Recinto aprobado')
+    );
+  };
+
+  const reabrir = (d) => {
+    const nota = notaDe(d.challenge_id).trim() || null;
+    confirmar(
+      'Reabrir el resultado',
+      'Los dos clubes podrán proponer el marcador de nuevo. El rechazado se queda en el historial.',
+      () => aplicar(d.challenge_id, () => reabrirResultado(d.challenge_id, nota), 'Resultado reabierto')
+    );
+  };
+
+  const resolverRep = (rep, decision, dias = null) => {
+    const nota = notaDe(rep.id).trim() || null;
+    if (!puedeResolverReporte({ decision, dias, nota })) return;
+    const quien = rep.reportado ? `@${rep.reportado}` : 'la persona reportada';
+    const textos = {
+      descartar: 'El reporte se cierra sin medidas y nadie recibe aviso.',
+      advertir: `${quien} recibe un aviso recordándole las reglas de convivencia, sin otra medida.`,
+      quitar_contenido: `${queQuitaElContenido(rep.elemento)} ${quien} recibe un aviso. No se puede deshacer.`,
+      suspender: `${quien} no podrá publicar partidos, escribir mensajes ni subir fotos durante ${dias} días, y recibe un aviso.`,
+    };
+    confirmar(
+      decision === 'suspender'
+        ? `Suspender ${dias} días`
+        : DECISIONES_REPORTE[decision].titulo,
+      textos[decision] + ' Los otros reportes pendientes sobre lo mismo se cierran con esta decisión.',
+      () => aplicar(rep.id, () => resolverReporte(rep.id, decision, { dias, nota }), 'Reporte resuelto')
+    );
+  };
+
+  const total = totalPendiente(cola);
+
+  return (
+    <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
+      <View style={styles.cabecera}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+          style={styles.volver}
+        >
+          <ArrowLeft color={C.textPrimary} size={20} strokeWidth={2.2} />
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.titulo}>Moderación</Text>
+          <Text style={styles.subtitulo}>
+            {cargando ? 'Cargando…' : `${total} ${total === 1 ? 'cosa' : 'cosas'} esperando`}
+          </Text>
+        </View>
+        <Gavel color={C.green} size={20} strokeWidth={2} />
+      </View>
+
+      {banner ? (
+        <View style={styles.bannerWrap}>
+          <Banner {...banner} onClose={() => setBanner(null)} />
+        </View>
+      ) : null}
+
+      <ScrollView
+        contentContainerStyle={styles.contenido}
+        refreshControl={
+          <RefreshControl
+            refreshing={refrescando}
+            onRefresh={() => { setRefrescando(true); cargar(); }}
+            tintColor={C.green}
+          />
+        }
+      >
+        {COLAS.map((def) => {
+          const estado = estadoDeLaCola({ cargando, error, cola, clave: def.clave });
+          const filas = filasDe(cola, def.clave);
+
+          return (
+            <View key={def.clave} style={styles.seccion}>
+              <View style={styles.seccionCabecera}>
+                <Text style={styles.seccionTitulo}>{def.titulo}</Text>
+                {estado === 'con-filas' ? (
+                  <View style={styles.contador}>
+                    <Text style={styles.contadorTexto}>{filas.length}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {def.nota ? <Text style={styles.seccionNota}>{def.nota}</Text> : null}
+
+              {estado === 'cargando' ? (
+                <ActivityIndicator color={C.green} style={{ marginVertical: 18 }} />
+              ) : null}
+
+              {/* «No se pudo leer» NO se dibuja como «no hay nada»: lo que
+                  habría detrás son sanciones sin resolver. */}
+              {estado === 'error' ? (
+                <View style={styles.aviso}>
+                  <TriangleAlert color={C.red} size={16} strokeWidth={2} />
+                  <Text style={styles.avisoTexto}>
+                    No se pudo leer esta cola. Desliza hacia abajo para reintentar.
+                  </Text>
+                </View>
+              ) : null}
+
+              {estado === 'vacia' ? <Text style={styles.vacio}>{def.vacio}</Text> : null}
+
+              {estado === 'con-filas' && def.clave === 'revisiones_de_sancion'
+                ? filas.map((rev) => (
+                    <View key={rev.id} style={styles.fila}>
+                      <Text style={styles.filaTitulo}>
+                        {tipoSancionLegible(rev.tipo)} · {rev.club || 'Club'}
+                      </Text>
+                      <Text style={styles.filaFecha}>{fechaCorta(rev.created_at)}</Text>
+                      {rev.motivo ? <Text style={styles.filaTexto}>{rev.motivo}</Text> : null}
+                      {rev.contexto ? (
+                        <Text style={styles.filaContexto} numberOfLines={6}>
+                          {typeof rev.contexto === 'string'
+                            ? rev.contexto
+                            : JSON.stringify(rev.contexto, null, 1)}
+                        </Text>
+                      ) : null}
+
+                      <TextInput
+                        value={notaDe(rev.id)}
+                        onChangeText={(v) => setNota(rev.id, v)}
+                        placeholder="Nota (opcional)"
+                        placeholderTextColor={C.textDim}
+                        maxLength={NOTA_MAX}
+                        multiline
+                        style={styles.nota}
+                      />
+
+                      <View style={styles.acciones}>
+                        <Pressable
+                          onPress={() => resolver(rev, 'retirar')}
+                          disabled={enCurso === rev.id}
+                          accessibilityRole="button"
+                          accessibilityLabel="Retirar la sanción"
+                          style={({ pressed }) => [styles.btn, styles.btnPrimario, pressed && styles.pressed]}
+                        >
+                          <Text style={styles.btnPrimarioTexto}>Retirar sanción</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => resolver(rev, 'mantener')}
+                          disabled={enCurso === rev.id}
+                          accessibilityRole="button"
+                          accessibilityLabel="Mantener la sanción"
+                          style={({ pressed }) => [styles.btn, styles.btnSecundario, pressed && styles.pressed]}
+                        >
+                          <Text style={styles.btnSecundarioTexto}>Mantener</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                : null}
+
+              {estado === 'con-filas' && def.clave === 'resultados_en_disputa'
+                ? filas.map((d) => (
+                    <View key={d.challenge_id} style={styles.fila}>
+                      <Text style={styles.filaTitulo}>
+                        {d.club_retador || 'Club'} vs {d.club_retado || 'Club'}
+                      </Text>
+                      <Text style={styles.filaTexto}>
+                        Los dos clubes propusieron marcadores que no coinciden.
+                      </Text>
+                      <TextInput
+                        value={notaDe(d.challenge_id)}
+                        onChangeText={(v) => setNota(d.challenge_id, v)}
+                        placeholder="Nota (opcional)"
+                        placeholderTextColor={C.textDim}
+                        maxLength={NOTA_MAX}
+                        multiline
+                        style={styles.nota}
+                      />
+                      <View style={styles.acciones}>
+                        <Pressable
+                          onPress={() => reabrir(d)}
+                          disabled={enCurso === d.challenge_id}
+                          accessibilityRole="button"
+                          accessibilityLabel="Reabrir el resultado"
+                          style={({ pressed }) => [styles.btn, styles.btnPrimario, pressed && styles.pressed]}
+                        >
+                          <RotateCcw color="#0B0D0B" size={15} strokeWidth={2.3} />
+                          <Text style={styles.btnPrimarioTexto}>Reabrir resultado</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                : null}
+
+              {estado === 'con-filas' && def.clave === 'reportes_sin_mirar'
+                ? filas.map((rep) => (
+                    <View key={rep.id} style={styles.fila}>
+                      <View style={styles.filaIcono}>
+                        <ShieldAlert color={C.amber} size={15} strokeWidth={2} />
+                        <Text style={styles.filaTitulo}>{motivoLegible(rep.motivo)}</Text>
+                      </View>
+                      <Text style={styles.filaFecha}>{fechaCorta(rep.created_at)}</Text>
+                      <Text style={styles.filaTexto}>
+                        {elementoLegible(rep.elemento, rep.elemento_nombre, rep.elemento_hora)}
+                        {rep.reportado ? ` · @${rep.reportado}` : ''}
+                      </Text>
+                      {rep.descripcion ? (
+                        <Text style={styles.filaContexto}>«{rep.descripcion}»</Text>
+                      ) : null}
+                      {Number(rep.reportes_previos) > 0 ? (
+                        <Text style={styles.filaTexto}>
+                          {Number(rep.reportes_previos) === 1
+                            ? 'Tiene otro reporte'
+                            : `Tiene ${Number(rep.reportes_previos)} reportes más`}
+                        </Text>
+                      ) : null}
+                      {rep.suspendida_hasta ? (
+                        <Text style={styles.filaTexto}>
+                          Ya está suspendida hasta el {fechaCorta(rep.suspendida_hasta)}
+                        </Text>
+                      ) : null}
+
+                      <TextInput
+                        value={notaDe(rep.id)}
+                        onChangeText={(v) => setNota(rep.id, v)}
+                        placeholder="Nota interna (opcional)"
+                        placeholderTextColor={C.textDim}
+                        maxLength={NOTA_REPORTE_MAX}
+                        multiline
+                        style={styles.nota}
+                      />
+
+                      <View style={[styles.acciones, styles.accionesEnVarias]}>
+                        {['descartar', 'advertir', 'quitar_contenido'].map((dec) => (
+                          <Pressable
+                            key={dec}
+                            onPress={() => resolverRep(rep, dec)}
+                            disabled={enCurso === rep.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={DECISIONES_REPORTE[dec].titulo}
+                            style={({ pressed }) => [
+                              styles.btn,
+                              dec === 'quitar_contenido' ? styles.btnPrimario : styles.btnSecundario,
+                              pressed && styles.pressed,
+                            ]}
+                          >
+                            <Text style={dec === 'quitar_contenido' ? styles.btnPrimarioTexto : styles.btnSecundarioTexto}>
+                              {DECISIONES_REPORTE[dec].etiqueta}
+                            </Text>
+                          </Pressable>
+                        ))}
+                        {DIAS_SUSPENSION.map((dias) => (
+                          <Pressable
+                            key={`s${dias}`}
+                            onPress={() => resolverRep(rep, 'suspender', dias)}
+                            disabled={enCurso === rep.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Suspender ${dias} días`}
+                            style={({ pressed }) => [styles.btn, styles.btnPeligro, pressed && styles.pressed]}
+                          >
+                            <Text style={styles.btnPeligroTexto}>Suspender {dias} días</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ))
+                : null}
+
+              {estado === 'con-filas' && def.clave === 'recintos_esperando'
+                ? filas.map((k) => (
+                    <View key={k.id} style={styles.fila}>
+                      <View style={styles.filaIcono}>
+                        <Building2 color={C.green} size={15} strokeWidth={2} />
+                        <Text style={styles.filaTitulo}>{k.nombre}</Text>
+                      </View>
+                      {/* CUÁNTO LLEVA ESPERANDO va primero que la fecha: es
+                          lo que hace que se mire. */}
+                      <Text style={styles.filaFecha}>
+                        Lo pidió {esperaLegible(k.pedida_at) || 'hace un tiempo'}
+                        {' · '}{fechaCorta(k.pedida_at)}
+                      </Text>
+                      <Text style={styles.filaTexto}>
+                        {[k.comuna, k.region].filter(Boolean).join(', ') || 'Sin comuna'}
+                      </Text>
+                      {k.direccion ? (
+                        <Text style={styles.filaTexto} numberOfLines={2}>{k.direccion}</Text>
+                      ) : null}
+                      <Text style={styles.filaTexto}>
+                        {Number(k.canchas) || 0}{' '}
+                        {Number(k.canchas) === 1 ? 'cancha reservable' : 'canchas reservables'}
+                      </Text>
+
+                      <View style={styles.acciones}>
+                        <Pressable
+                          onPress={() => aprobar(k)}
+                          disabled={enCurso === k.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Aprobar ${k.nombre}`}
+                          style={({ pressed }) => [styles.btn, styles.btnPrimario, pressed && styles.pressed]}
+                        >
+                          <Check color="#0B0D0B" size={15} strokeWidth={2.3} />
+                          <Text style={styles.btnPrimarioTexto}>Aprobar recinto</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                : null}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {dialogo}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+
+  cabecera: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  volver: { padding: 4 },
+  titulo: { color: C.textPrimary, fontSize: 19, fontFamily: F.extraBold },
+  subtitulo: { color: C.textSecondary, fontSize: 12, fontFamily: F.medium, marginTop: 1 },
+
+  bannerWrap: { paddingHorizontal: 18, paddingTop: 12 },
+  contenido: { padding: 18, gap: 22, paddingBottom: 48 },
+
+  seccion: { gap: 10 },
+  seccionCabecera: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  seccionTitulo: { color: C.textPrimary, fontSize: 15, fontFamily: F.bold },
+  seccionNota: { color: C.textDim, fontSize: 12, lineHeight: 17, fontFamily: F.medium },
+  contador: {
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 999,
+    backgroundColor: alfa(C.green, 0.16),
+    alignItems: 'center',
+  },
+  contadorTexto: { color: C.green, fontSize: 11, fontFamily: F.extraBold },
+
+  vacio: { color: C.textDim, fontSize: 13, fontFamily: F.medium },
+
+  aviso: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: R.row,
+    backgroundColor: alfa(C.red, 0.08),
+    borderWidth: 1,
+    borderColor: alfa(C.red, 0.25),
+  },
+  avisoTexto: { color: C.textSecondary, fontSize: 12, flex: 1, fontFamily: F.medium },
+
+  fila: {
+    padding: 14,
+    borderRadius: R.lg,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    gap: 6,
+  },
+  filaIcono: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  filaTitulo: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
+  filaFecha: { color: C.textDim, fontSize: 11, fontFamily: F.medium },
+  filaTexto: { color: C.textSecondary, fontSize: 13, lineHeight: 18, fontFamily: F.medium },
+  filaContexto: {
+    color: C.textDim,
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: F.medium,
+    padding: 8,
+    borderRadius: R.row,
+    backgroundColor: alfa(C.tinta, 0.04),
+  },
+
+  nota: {
+    color: C.textPrimary,
+    fontSize: 13,
+    fontFamily: F.medium,
+    minHeight: 44,
+    padding: 10,
+    marginTop: 4,
+    borderRadius: R.row,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    textAlignVertical: 'top',
+  },
+
+  acciones: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  accionesEnVarias: { flexWrap: 'wrap' },
+  btn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 42,
+    paddingHorizontal: 14,
+    borderRadius: R.row,
+  },
+  btnPrimario: { backgroundColor: C.green },
+  btnPrimarioTexto: { color: '#0B0D0B', fontSize: 13, fontFamily: F.extraBold },
+  btnSecundario: { borderWidth: 1, borderColor: C.border },
+  btnSecundarioTexto: { color: C.textSecondary, fontSize: 13, fontFamily: F.bold },
+  btnPeligro: { borderWidth: 1, borderColor: alfa(C.red, 0.5), backgroundColor: alfa(C.red, 0.1) },
+  btnPeligroTexto: { color: C.red, fontSize: 13, fontFamily: F.bold },
+  pressed: { opacity: 0.85 },
+});

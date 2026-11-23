@@ -42,23 +42,34 @@ begin;
 
 create temp table t45b (n text, caso text, detalle text) on commit drop;
 
--- ── B1. Las filas previas quedan `legado` ───────────────────────
--- Se mide contra las filas que YA existían, sin depender de un número
--- escrito a mano.
+-- ── B1. Ninguna fila previa quedó sin clasificar ────────────────
+-- ESTO EXIGÍA QUE **TODAS** LAS FILAS DE `attendees` FUERAN `legado`
+-- (2026-10-17). Era cierto el día que se escribió —las 25 que había eran
+-- anteriores a la migración 45— y deja de serlo con el primer partido que
+-- alguien publique: su organizador entra como `organizador`. O sea que el
+-- caso caducaba igual que una fecha clavada, sólo que por los datos. Saltó
+-- publicando un partido de prueba desde la app.
+--
+-- Lo que la migración promete no es que no haya otros orígenes: es que
+-- **nadie se quede sin uno y que no se invente ninguno**. Eso es lo que se
+-- mide, y la foto de cómo está repartido queda en el detalle para que se
+-- vea de un vistazo.
 do $$
-declare v_total int; v_legado int; v_otros text;
+declare v_total int; v_malos int; v_reparto text;
 begin
-  select count(*), count(*) filter (where origen = 'legado')
-    into v_total, v_legado
+  select count(*),
+         count(*) filter (where origen is null
+                             or origen not in ('legado','organizador','orden_llegada',
+                                               'postulacion','reserva_proponente','reserva_aprobador'))
+    into v_total, v_malos
     from public.attendees;
-  if v_total <> v_legado then
-    select string_agg(distinct origen, ', ') into v_otros
-      from public.attendees where origen is distinct from 'legado';
-    raise exception 'FALLÓ B1: de % filas previas, % no son legado (%)',
-      v_total, v_total - v_legado, coalesce(v_otros, 'null');
+  if v_malos > 0 then
+    raise exception 'FALLÓ B1: % de % filas previas tienen un origen que no existe', v_malos, v_total;
   end if;
+  select string_agg(origen || '×' || n, ', ' order by origen) into v_reparto
+    from (select origen, count(*) as n from public.attendees group by origen) r;
   insert into t45b values ('B1','filas previas',
-    format('las %s filas anteriores a la migración quedaron en legado, sin inventarles procedencia', v_total));
+    format('las %s filas previas tienen un origen válido: %s', v_total, coalesce(v_reparto, 'ninguna fila')));
 end;
 $$;
 

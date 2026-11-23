@@ -357,7 +357,11 @@ export async function uploadBannerFile(asset) {
  * — un archivo por reporte, a diferencia de avatar/portada que ocupan un
  * único slot fijo. No toca ninguna tabla: quien llama decide cuándo
  * asociarla a la fila del reporte (mismo criterio que `uploadAvatarFile`).
- * Devuelve { url, path, error }.
+ *
+ * Devuelve { path, error } y NADA MÁS, a propósito: el bucket es privado
+ * (migración 174), así que una dirección directa al archivo no abre. Lo que
+ * identifica la captura es su ruta; el enlace para verla lo firma la Edge
+ * Function `reportar-problema` al avisar al equipo.
  */
 export async function uploadSupportScreenshot(asset, userId) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
@@ -369,13 +373,13 @@ export async function uploadSupportScreenshot(asset, userId) {
   const contentType = processed.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
   const body = await getUploadBody(processed);
-  const { error, url } = await uploadToBucket('support-screenshots', path, body, contentType);
+  const { error } = await uploadToBucket('support-screenshots', path, body, contentType);
   if (error) {
     console.error('[FutFinder] uploadSupportScreenshot:', error);
     return { error };
   }
 
-  return { url, path };
+  return { path };
 }
 
 /** Borra un archivo del bucket `support-screenshots` por su path. */

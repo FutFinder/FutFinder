@@ -25,8 +25,14 @@
 // SECRETS: los de `_shared/correoReporte.ts`.
 
 // deno-lint-ignore-file no-explicit-any
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { enviarCorreo, leerConfigCorreo, type Ticket } from "../_shared/correoReporte.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.119.0";
+import {
+  BUCKET_CAPTURAS,
+  enviarCorreo,
+  leerConfigCorreo,
+  resolverCaptura,
+  type Ticket,
+} from "../_shared/correoReporte.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,21 +92,49 @@ Deno.serve(async (req) => {
     return json({ ok: true, avisado: false });
   }
 
-  // `profiles_read_all` es de lectura pública, así que el mismo token
-  // alcanza para el username — no hace falta la clave de servicio tampoco
-  // acá.
+  // Un mismo ticket no puede disparar correos sin fin: el id ya guardado
+  // sigue sirviendo, y repetir la llamada repetía el aviso al equipo. La
+  // base (migración 166) deja pasar 5 por hora y persona; el ticket queda
+  // guardado igual, sólo que sin correo. Si la RPC todavía no existe (la
+  // función se despliega antes que la migración) se manda como siempre.
+  const { data: cabe, error: eLimite } = await comoUsuario.rpc("limite_correo_de_reporte");
+  if (!eLimite && cabe === false) {
+    console.warn(`[reportar-problema] ${user.id} pasó el tope de correos; ticket ${id} guardado sin aviso.`);
+    return json({ ok: true, avisado: false });
+  }
+
+  // Desde la migración 143 el perfil se lee por relación, no por lectura
+  // pública — pero el propio se lee siempre, y acá sólo se pide el de quien
+  // reporta. El mismo token alcanza: no hace falta la clave de servicio
+  // tampoco acá.
   const { data: perfil } = await comoUsuario
     .from("profiles")
     .select("username")
     .eq("id", user.id)
     .maybeSingle();
 
+  // LA CAPTURA VA COMO ENLACE FIRMADO (migración 174: el bucket es privado).
+  // Se firma con el token de quien reporta, igual que todo lo demás acá: la
+  // política de Storage sólo deja leer la carpeta propia, así que nadie
+  // consigue por esta vía un enlace a la captura de otra persona, ponga lo
+  // que ponga en `screenshot_url`. La columna puede traer la ruta (app
+  // nueva) o la URL pública vieja (tickets anteriores y apps instaladas):
+  // `resolverCaptura` entiende las dos.
+  const captura = await resolverCaptura(fila.screenshot_url, async (ruta, segundos) => {
+    const { data, error } = await comoUsuario.storage.from(BUCKET_CAPTURAS).createSignedUrl(ruta, segundos);
+    if (error) {
+      console.error(`[reportar-problema] no se pudo firmar la captura del ticket ${id}:`, error.message);
+      return null;
+    }
+    return data?.signedUrl ?? null;
+  });
+
   const ticket: Ticket = {
     id: fila.id,
     category: fila.category,
     title: fila.title,
     description: fila.description,
-    screenshot_url: fila.screenshot_url,
+    ...captura,
     app_version: fila.app_version,
     platform: fila.platform,
     created_at: fila.created_at,

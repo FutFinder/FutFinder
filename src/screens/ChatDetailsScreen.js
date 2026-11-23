@@ -29,7 +29,7 @@ import {
 import { getClubById } from '../services/clubs';
 import { getMatchById } from '../services/matches';
 import { notify } from '../utils/notify';
-import { playerLine } from '../utils/chatMeta';
+import { playerLine, subtituloDeDetalles } from '../utils/chatMeta';
 
 const PREVIEW_COUNT = 6;
 
@@ -53,6 +53,9 @@ export default function ChatDetailsScreen({ route, navigation }) {
 
   const [loading, setLoading] = useState(true);
   const [participants, setParticipants] = useState([]);
+  // C15: un fallo al traer participantes no es «0 jugadores».
+  const [errorParticipantes, setErrorParticipantes] = useState(null);
+  const [intento, setIntento] = useState(0);
   const [muted, setMuted] = useState(false);
   const [muteBusy, setMuteBusy] = useState(false);
   const [entity, setEntity] = useState(null);
@@ -82,6 +85,7 @@ export default function ChatDetailsScreen({ route, navigation }) {
       if (!alive) return;
 
       setParticipants(people.data || []);
+      setErrorParticipantes(people.error || null);
       setMuted(mutedNow);
       setEntity(extra);
       setLoading(false);
@@ -89,7 +93,7 @@ export default function ChatDetailsScreen({ route, navigation }) {
     return () => {
       alive = false;
     };
-  }, [threadKey, t?.type, t?.id]);
+  }, [threadKey, t?.type, t?.id, intento]);
 
   const toggleMute = useCallback(async () => {
     if (muteBusy) return;
@@ -104,16 +108,11 @@ export default function ChatDetailsScreen({ route, navigation }) {
     }
   }, [muted, muteBusy, threadKey]);
 
-  const subtitle = useMemo(() => {
-    const n = participants.length;
-    if (t?.type === 'club') {
-      return `Chat del club · ${n} ${n === 1 ? 'jugador' : 'jugadores'}`;
-    }
-    if (t?.type === 'match') {
-      return `Chat del partido · ${n} ${n === 1 ? 'inscrito' : 'inscritos'}`;
-    }
-    return 'Mensaje directo';
-  }, [t?.type, participants.length]);
+  const subtitle = useMemo(
+    () =>
+      subtituloDeDetalles({ tipo: t?.type, cuantos: participants.length, error: !!errorParticipantes }),
+    [t?.type, participants.length, errorParticipantes]
+  );
 
   const shown = expanded ? participants : participants.slice(0, PREVIEW_COUNT);
 
@@ -223,7 +222,7 @@ export default function ChatDetailsScreen({ route, navigation }) {
             {/* Participantes */}
             <View style={styles.sectionHead}>
               <Text style={styles.sectionTitle}>
-                PARTICIPANTES · {participants.length}
+                {errorParticipantes ? 'PARTICIPANTES' : `PARTICIPANTES · ${participants.length}`}
               </Text>
               {participants.length > PREVIEW_COUNT && (
                 <Pressable
@@ -240,6 +239,25 @@ export default function ChatDetailsScreen({ route, navigation }) {
                 </Pressable>
               )}
             </View>
+
+            {errorParticipantes ? (
+              <View style={styles.note}>
+                <Info color={C.textSecondary} size={17} strokeWidth={1.8} />
+                <Text style={styles.noteText}>
+                  No pudimos cargar quiénes están en este chat. Revisa tu conexión.
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setLoading(true);
+                    setIntento((n) => n + 1);
+                  }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.sectionAction}>Reintentar</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <View style={{ gap: 7 }}>
               {shown.map((p) => (

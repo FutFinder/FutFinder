@@ -816,9 +816,10 @@ test('y explica el cierre cuando no se sabe con quién era', () => {
 // EL BLOQUEADOR QUE FIJAN. Una invitación a alguien que YA tiene club era
 // invisible. La cadena entera:
 //
-//   1. La migración 13 no crea aviso a propósito —«solo solicitudes (las
-//      invitaciones las ve el jugador en su pestaña)»—, así que Avisos no
-//      la muestra y eso es deliberado.
+//   1. La migración 13 no creaba aviso a propósito —«solo solicitudes (las
+//      invitaciones las ve el jugador en su pestaña)»—. Desde la 188 sí
+//      llega un aviso `club_invite`, pero la tarea de la portada sigue
+//      siendo donde se responde aunque el aviso se borre.
 //   2. Pero `<Invitaciones>` sólo se dibujaba en `SinClub` y en
 //      `SolicitudEnRevision`. En la portada de quien YA es miembro, cero.
 //   3. Y a quien invita se le prometía lo contrario: «verá tu invitación en

@@ -59,6 +59,11 @@ export default function MatchHistoryCard({
   horaLabel,
   localLabel,
   canchaNombre,
+  // El nivel del encuentro, ya traducido a español. Llega `null` cuando
+  // nadie lo eligió —todos los encuentros anteriores a la migración 156— y
+  // entonces no se pinta: enseñar «Recreativo» porque la tabla trae ese
+  // valor por omisión es justo el fallo que la 6.3 vino a quitar de acá.
+  tipoLabel,
   onPress,
 }) {
   const r = estiloResultado(resultado);
@@ -67,7 +72,7 @@ export default function MatchHistoryCard({
 
   // El resultado se pinta con su color y el resto en gris, así que la primera
   // línea se arma en dos trozos en vez de uno.
-  const contexto = [fechaLabel, horaLabel, localLabel].filter(Boolean).join(' · ');
+  const contexto = [fechaLabel, horaLabel, localLabel, tipoLabel].filter(Boolean).join(' · ');
 
   return (
     <Pressable
@@ -77,7 +82,7 @@ export default function MatchHistoryCard({
       accessibilityLabel={[
         `${resultadoNombre || 'Partido'}.`,
         `${miNombre} ${marcador} ${rivalNombre}.`,
-        [fechaLabel, horaLabel, localLabel, canchaNombre].filter(Boolean).join(', '),
+        [fechaLabel, horaLabel, localLabel, tipoLabel, canchaNombre].filter(Boolean).join(', '),
       ].join(' ')}
       style={({ pressed }) => [styles.card, onPress && pressed && styles.pressed]}
     >

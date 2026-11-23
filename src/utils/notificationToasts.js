@@ -53,10 +53,47 @@ export function suscribirseAToasts(fn) {
   return () => { suscriptores = suscriptores.filter((f) => f !== fn); };
 }
 
-/** Para las pruebas y para cuando se cierra sesión. */
+/**
+ * Vacía la cola. La llama `NotificationToastHost` al cerrar sesión y al
+ * cambiar de cuenta (C10): la cola es global al módulo y el host sigue
+ * montado en la pantalla de acceso, así que sin esto un popup de la cuenta
+ * anterior seguía arriba hasta expirar.
+ */
 export function limpiarToasts() {
+  if (cola.length === 0) return;
   cola = [];
   avisar();
+}
+
+/**
+ * Lo que se puede pintar para esta sesión: nada sin sesión, y sólo los
+ * avisos de la cuenta actual. Segunda barrera por si algo de la cuenta
+ * anterior quedara en la cola entre el cambio y la limpieza.
+ */
+export function toastsDelUsuario(toasts, userId) {
+  if (!userId) return [];
+  return (toasts || []).filter((n) => !n?.user_id || n.user_id === userId);
+}
+
+// Los avisos que nacen de un hilo de chat y que, por eso, el silencio de
+// ese hilo (`chat_mutes`) tiene que callar.
+const AVISOS_DE_CHAT = new Set(['message_new', 'chat_mention_all']);
+
+/**
+ * ¿Este aviso es de un hilo que la persona silenció? (C05, parte de cliente)
+ *
+ * Silenciar prometía «Silenciado hasta que lo reactives» y el popup se abría
+ * igual. Ahora no se abre. La excepción es la regla del producto: lo marcado
+ * importante sigue llegando, si el aviso trae esa marca. El push y la fila en
+ * `notifications` los decide el servidor (`send-push`, el disparador), y eso
+ * sigue pendiente: necesita migración y Edge Function.
+ */
+export function avisoSilenciado(notif, silenciados) {
+  if (!notif || !AVISOS_DE_CHAT.has(notif.type)) return false;
+  const threadKey = notif.data?.threadKey || notif.data?.threadId;
+  if (!threadKey || !silenciados || typeof silenciados.has !== 'function') return false;
+  if (notif.data?.important === true || notif.data?.is_important === true) return false;
+  return silenciados.has(threadKey);
 }
 
 /** Cuánto dura en pantalla antes de irse solo. */

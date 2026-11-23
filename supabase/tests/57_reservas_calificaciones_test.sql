@@ -59,21 +59,25 @@ begin
          'r57-' || u || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
     from unnest(array[v_org, v_part, v_ajeno, v_org_armando, v_org_otro]) u;
 
-  insert into public.complejos (id, nombre, comuna, latitud, longitud)
-  values (v_complejo1, 'Complejo Rating 1', 'Ñuñoa', -33.45, -70.60),
-         (v_complejo2, 'Complejo Rating 2', 'Providencia', -33.42, -70.61);
+  -- PUBLICADOS a propósito (2026-10-16): nacían sin `publicado` porque
+  -- cuando se escribió este arnés la columna no mandaba nada. La policy de
+  -- insert de `complejo_calificaciones` comprueba la reserva con un EXISTS
+  -- que se une a `canchas_reservables`, y esa tabla sólo deja ver las
+  -- canchas de un recinto PUBLICADO (migraciones 65 y 77). Con el recinto
+  -- sin publicar el EXISTS daba falso y hasta el caso 1 moría con «new row
+  -- violates row-level security policy».
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+  values (v_complejo1, 'Complejo Rating 1', 'Ñuñoa', -33.45, -70.60, true),
+         (v_complejo2, 'Complejo Rating 2', 'Providencia', -33.42, -70.61, true);
 
   insert into public.canchas_reservables (id, complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
   values (v_cancha1, v_complejo1, 'Cancha 1', 'futbol_7', 20000, 60, true),
          (v_cancha2, v_complejo2, 'Cancha 1', 'futbol_7', 20000, 60, true);
 
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values
-    (v_res_ok,      v_cancha1, v_org,         current_date + 3, time '10:00', time '11:00', 20000, 'completa',  'balance', 'confirmada'),
-    (v_res_armando, v_cancha1, v_org_armando, current_date + 4, time '10:00', time '11:00', 20000, 'completa',  'balance', 'armando'),
-    (v_res_otro,    v_cancha2, v_org_otro,    current_date + 3, time '10:00', time '11:00', 20000, 'completa',  'balance', 'confirmada');
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values
+    (v_res_ok,      v_cancha1, v_org,         current_date + 3, time '10:00', time '11:00', 20000, 20000, 'completa',  'balance', 'confirmada'),
+    (v_res_armando, v_cancha1, v_org_armando, current_date + 4, time '10:00', time '11:00', 20000, 20000, 'completa',  'balance', 'armando'),
+    (v_res_otro,    v_cancha2, v_org_otro,    current_date + 3, time '10:00', time '11:00', 20000, 20000, 'completa',  'balance', 'confirmada');
 
   insert into public.reserva_participantes (reserva_id, user_id, rol, estado)
   values (v_res_ok, v_part, 'jugador', 'aceptado');

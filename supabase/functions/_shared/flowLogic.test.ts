@@ -11,8 +11,14 @@ import {
   asuntoDelPago,
   firmados,
   firmar,
+  FLOW_ANULADA,
+  FLOW_PAGADA,
+  FLOW_PENDIENTE,
+  FLOW_RECHAZADA,
   leerConfig,
   montoCoincide,
+  queHacerConPendiente,
+  tokenConForma,
   urlDePago,
 } from "./flowLogic.ts";
 
@@ -61,13 +67,17 @@ Deno.test("sin credenciales no hay configuración, y eso no es un error", () => 
   assertEquals(leerConfig(() => "   "), null);
 });
 
-Deno.test("producción se pide explícitamente; cualquier otra cosa es sandbox", () => {
+Deno.test("el ambiente se dice: sin FLOW_AMBIENTE, o con otra cosa, no hay pasarela", () => {
   const env = (extra: Record<string, string>) => (k: string) =>
     ({ FLOW_API_KEY: "a", FLOW_SECRET_KEY: "b", ...extra })[k];
 
-  assertEquals(leerConfig(env({}))?.ambiente, "sandbox");
-  assertEquals(leerConfig(env({ FLOW_AMBIENTE: "" }))?.ambiente, "sandbox");
-  assertEquals(leerConfig(env({ FLOW_AMBIENTE: "prod" }))?.ambiente, "sandbox");
+  // Antes caía en sandbox por omisión: claves de prueba en producción
+  // confirmaban reservas reales con tarjetas de prueba.
+  assertEquals(leerConfig(env({})), null);
+  assertEquals(leerConfig(env({ FLOW_AMBIENTE: "" })), null);
+  assertEquals(leerConfig(env({ FLOW_AMBIENTE: "prod" })), null);
+  assertEquals(leerConfig(env({ FLOW_AMBIENTE: "sandbox" }))?.ambiente, "sandbox");
+  assertEquals(leerConfig(env({ FLOW_AMBIENTE: " Sandbox " }))?.apiBase, "https://sandbox.flow.cl/api");
   assertEquals(leerConfig(env({ FLOW_AMBIENTE: "PRODUCCION" }))?.ambiente, "produccion");
   assertEquals(
     leerConfig(env({ FLOW_AMBIENTE: "produccion" }))?.apiBase,
@@ -107,7 +117,7 @@ Deno.test("el token va escapado en la URL de pago", () => {
 });
 
 Deno.test("las URL de vuelta salen de SUPABASE_URL sin configurar nada más", () => {
-  const base = { FLOW_API_KEY: "a", FLOW_SECRET_KEY: "b" };
+  const base = { FLOW_API_KEY: "a", FLOW_SECRET_KEY: "b", FLOW_AMBIENTE: "sandbox" };
   const env = (extra: Record<string, string>) => (k: string) => ({ ...base, ...extra })[k];
 
   assertEquals(
@@ -125,4 +135,25 @@ Deno.test("las URL de vuelta salen de SUPABASE_URL sin configurar nada más", ()
     "https://api.futfinder.cl/fn",
   );
   assertEquals(leerConfig(env({}))?.functionsBase, "");
+});
+
+Deno.test("un token con forma pasa; basura y vacíos no llegan a Flow", () => {
+  assert(tokenConForma("41097C28B5BD78C77F589FE4BC59E18AC333F9EU"));
+  for (const malo of ["", "abc", "a b c d e f g h i j k l", "x".repeat(101), null, 42, "<script>alert(1)</script>xx"]) {
+    assertEquals(tokenConForma(malo), false, String(malo));
+  }
+});
+
+Deno.test("pendiente reusado: pagado se confirma, mismo monto y enlace se devuelve, lo demás se cierra", () => {
+  const base = { montoEnFlow: 15000, montoAhora: 15000, url: "https://flow/pay" };
+  assertEquals(queHacerConPendiente({ ...base, status: FLOW_PAGADA }), "confirmar");
+  assertEquals(queHacerConPendiente({ ...base, status: FLOW_PENDIENTE }), "mismo_enlace");
+  // La cuota cambió: el enlace viejo cobra otro monto.
+  assertEquals(queHacerConPendiente({ ...base, status: FLOW_PENDIENTE, montoAhora: 12000 }), "cerrar_y_crear");
+  // Sin enlace guardado (pagos anteriores a este cambio) no se puede devolver el mismo.
+  assertEquals(queHacerConPendiente({ ...base, status: FLOW_PENDIENTE, url: null }), "cerrar_y_crear");
+  assertEquals(queHacerConPendiente({ ...base, status: FLOW_RECHAZADA }), "cerrar_y_crear");
+  assertEquals(queHacerConPendiente({ ...base, status: FLOW_ANULADA }), "cerrar_y_crear");
+  // Sin token nunca hubo transacción en Flow.
+  assertEquals(queHacerConPendiente({ ...base, status: null }), "cerrar_y_crear");
 });

@@ -36,8 +36,15 @@ declare
   -- Se derivan en vez de hardcodearse: `date_trunc('week')` cae en lunes,
   -- así que +5 es sábado. Hardcodear un día de la semana es la clase de
   -- supuesto que hace fallar un arnés por el motivo equivocado.
-  v_lunes    date := date_trunc('week', date '2027-03-08')::date;
-  v_sabado   date := date_trunc('week', date '2027-03-08')::date + 5;
+  -- EL LUNES DE DENTRO DE DOS SEMANAS, no una fecha de marzo de 2027
+  -- (2026-10-17). Estaba clavada en `date '2027-03-01'`, y a partir del
+  -- 2 de marzo de 2027 esa fecha es PASADO: `crear_reserva` la rechaza
+  -- —es la regla de la 84— y este arnés se habría puesto rojo, junto con
+  -- otros siete, sin que nadie tocara una línea de código. Se calcula
+  -- sobre la hora de CHILE y cae siempre en lunes, que es lo que las
+  -- reglas de horario de más abajo dan por supuesto.
+  v_lunes    date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date;
+  v_sabado   date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date + 5;
   v_res      uuid;
   v_j        json;
   v_n        integer;
@@ -119,7 +126,10 @@ begin
 
   -- ── Casos 8-9: la reserva y su comisión ────────────────────────
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ajeno, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha, v_lunes, time '12:00', 'completa', 'tarjeta');
+  -- El contacto va explícito desde el 2026-10-16: lo exige la migración 67,
+  -- posterior a este arnés, que moría en «Escribe un nombre de contacto».
+  v_j := public.crear_reserva(v_cancha, v_lunes, time '12:00', 'completa', 'tarjeta',
+    p_contacto_nombre := 'QA 64', p_contacto_telefono := '+56911111111');
   if (v_j->>'ok')::boolean is not true then
     raise exception 'FALLÓ (caso 8): no se creó la reserva: %', v_j::text;
   end if;
@@ -178,9 +188,20 @@ begin
   if not v_rechazado then
     raise exception 'FALLÓ (caso 12): anon no debería ejecutar admin_upsert_tarifa';
   end if;
-  -- `precio_de_bloque` SÍ es para anon: el precio se muestra sin sesión.
+  execute 'reset role';
+  -- OJO (2026-10-16): acá decía «`precio_de_bloque` SÍ es para anon: el
+  -- precio se muestra sin sesión», y lo comprobaba como `anon` —se lo
+  -- concedió a propósito la migración 64, línea 109—. La migración **114**
+  -- («anon no ejecuta nada») barrió todas las funciones de `public` sin
+  -- lista de excepciones y se la quitó de paso. Se corre como
+  -- `authenticated`, que es quien puede hoy, para que el caso siga midiendo
+  -- LO SUYO —que el precio de la franja es 14.000— en vez de reventar con
+  -- «permission denied for function precio_de_bloque». El conflicto está
+  -- anotado como P2 en `pendientes.md`; si se reabre a `anon`, esto vuelve
+  -- a correr bajo `set local role anon`.
+  execute format('set local role authenticated');
   if public.precio_de_bloque(v_cancha, v_lunes, time '12:00') <> 14000 then
-    raise exception 'FALLÓ (caso 12): anon debería poder ver el precio';
+    raise exception 'FALLÓ (caso 12): debería poder verse el precio';
   end if;
   execute 'reset role';
   raise notice 'OK (caso 12)';

@@ -2,12 +2,17 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { COLUMNAS_PUBLICAS } from './perfilColumnas';
 import { misAjustes } from './profile';
 import { performLogin, performSignUp, describeAuthError, MENSAJES } from './authPolicy';
+import { pedirCodigo, verificarCodigo, fijarNuevaPassword } from './recuperacionPolicy';
 import {
   guardarPasswordPendiente,
-  consumirPasswordPendiente,
+  verPasswordPendiente,
   olvidarPasswordPendiente,
 } from './pendingSignUp';
+import { segundosDeEspera } from '../utils/altaPorCorreo';
 import { olvidarIntencion } from '../utils/intencionDeReserva';
+import { olvidarDatosDeLaCuenta } from '../utils/datosLocales';
+import { cerrarSesionEnOrden } from '../utils/cierreDeSesion';
+import { unregisterPushToken } from './notifications';
 
 /**
  * Servicio de autenticación de FutFinder.
@@ -68,17 +73,32 @@ export async function registerWithEmail({ email, password, username }) {
 
 /**
  * Fija la contraseña del registro, ya con la sesión que emitió `verifyOtp`.
- * Se llama una sola vez y solo si ese correo tenía un registro en curso.
+ *
+ * La contraseña sale de memoria recién cuando el servidor la aceptó: si
+ * `updateUser` falla por la red se puede volver a llamar. La excepción es un
+ * rechazo por débil: reintentar con la misma no sirve, así que se olvida y la
+ * pantalla le pide a la persona una nueva.
  *
  * @returns {{ error: {message: string}|null, applied: boolean }}
  */
 export async function completeSignUpPassword({ email }) {
-  const password = consumirPasswordPendiente(email);
+  const password = verPasswordPendiente(email);
   if (!password) return { error: null, applied: false };
   if (!isSupabaseConfigured) return { error: { message: MENSAJES.faltaConfiguracion }, applied: false };
 
   const { error } = await supabase.auth.updateUser({ password });
-  return { error: error ? { message: describeAuthError(error) } : null, applied: !error };
+  if (!error) {
+    olvidarPasswordPendiente();
+    return { error: null, applied: true };
+  }
+  const debil = error.code === 'weak_password' || error.error_code === 'weak_password';
+  if (debil) olvidarPasswordPendiente();
+  return { error: { message: describeAuthError(error) }, applied: false, rechazada: debil };
+}
+
+/** ¿Hay un registro a medias, con su contraseña esperando, para ese correo? */
+export function hayRegistroPendiente(email) {
+  return verPasswordPendiente(email) != null;
 }
 
 /** Descarta un registro a medias (por ejemplo, al salir de la verificación). */
@@ -111,27 +131,41 @@ export async function verifyEmailOtp({ email, token }) {
  * aplica a una cuenta creada así y respondía con error.
  *
  * `shouldCreateUser: false` para que reenviar no cree cuentas por su cuenta.
+ *
+ * `esperar` trae los segundos que faltan cuando Auth rechaza el envío por ir
+ * muy seguido (0 si el error es otro): la pantalla ajusta su reloj con eso.
  */
 export async function resendOtp({ email }) {
-  if (!isSupabaseConfigured) return { error: { message: MENSAJES.faltaConfiguracion } };
+  if (!isSupabaseConfigured) return { error: { message: MENSAJES.faltaConfiguracion }, esperar: 0 };
   const { error } = await supabase.auth.signInWithOtp({
     email: String(email || '').trim().toLowerCase(),
     options: { shouldCreateUser: false },
   });
-  return { error: error ? { message: describeAuthError(error) } : null };
+  return {
+    error: error ? { message: describeAuthError(error) } : null,
+    esperar: segundosDeEspera(error),
+  };
 }
 
 /**
- * Envía el correo de recuperación de contraseña a un email arbitrario, SIN
- * requerir sesión — a diferencia de `requestPasswordReset()` en
- * `settings.js`, que lee el email de la sesión activa (sirve para "olvidé
- * mi contraseña" desde Ajustes, ya logueado). Esta es la variante para el
- * link "¿La olvidaste?" de IniciarSesión, antes de tener sesión.
+ * «Olvidé mi contraseña» en tres pasos, con código de 6 dígitos (la lógica y
+ * el porqué están en `recuperacionPolicy.js`; la pantalla es
+ * `RecuperarContrasenaScreen`). Sirve igual desde Iniciar sesión, sin sesión,
+ * que desde Ajustes, con sesión pero sin recordar la actual.
  */
-export async function requestPasswordResetForEmail(email) {
-  if (!isSupabaseConfigured) return { error: null };
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
-  return { error: error ? { message: describeAuthError(error) } : null };
+export async function pedirCodigoDeRecuperacion(email) {
+  if (!isSupabaseConfigured) return faltaConfiguracion();
+  return pedirCodigo(email, supabase.auth);
+}
+
+export async function verificarCodigoDeRecuperacion({ email, codigo }) {
+  if (!isSupabaseConfigured) return { ...faltaConfiguracion(), session: null, necesitaMfa: false };
+  return verificarCodigo({ email, codigo }, supabase.auth);
+}
+
+export async function fijarPasswordRecuperada({ password, confirmacion }) {
+  if (!isSupabaseConfigured) return faltaConfiguracion();
+  return fijarNuevaPassword({ password, confirmacion }, supabase.auth);
 }
 
 export async function signOut() {
@@ -141,9 +175,25 @@ export async function signOut() {
   // dispositivo compartido la siguiente persona que entrara a reservar
   // podía ver el aviso con el partido y el club rival de la cuenta anterior.
   olvidarIntencion();
-  if (!isSupabaseConfigured) return { error: null };
-  const { error } = await supabase.auth.signOut();
-  return { error };
+  if (!isSupabaseConfigured) {
+    await olvidarDatosDeLaCuenta();
+    return { error: null };
+  }
+  // El token de push se da de baja ANTES de soltar la sesión: después, el
+  // delete sale como anon y la base lo rechaza (ver utils/cierreDeSesion.js).
+  const resultado = await cerrarSesionEnOrden({
+    usuarioActual: async () => (await supabase.auth.getSession())?.data?.session?.user?.id ?? null,
+    darDeBajaToken: (uid) => unregisterPushToken(uid),
+    cerrar: async () => {
+      const { error } = await supabase.auth.signOut();
+      return { error };
+    },
+  });
+  // Lo que es de la cuenta y vive en el dispositivo (copia de partidos con
+  // sus jugadores, club abierto, mensajes leídos): en un equipo compartido no
+  // puede quedarle a la siguiente persona. Lo promete la política de cookies.
+  await olvidarDatosDeLaCuenta();
+  return resultado;
 }
 
 export async function getCurrentUser() {

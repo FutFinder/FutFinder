@@ -3,10 +3,18 @@
 --
 -- QUÉ SE PRUEBA:
 --   El agujero que la motiva
---   1.  Un `select` directo sobre `canchas_reservables`, hecho por el DUEÑO de
---       un recinto NO publicado, devuelve CERO filas. Es la policy de la
---       migración 65 y está bien que sea así; esta prueba existe para que si
---       alguna vez alguien afloja esa policy, se entere acá y no en el
+--   1.  Un `select` directo sobre `canchas_reservables` de un recinto NO
+--       publicado: el DUEÑO sí las ve, un AJENO no ve ninguna.
+--
+--       OJO (2026-10-16): este caso decía lo contrario —que ni el dueño las
+--       veía, por la policy de la migración 65— y pedía CERO filas. Lo
+--       cambió a propósito la migración **77**, que añadió
+--       `canchas_reservables_select_admin` (`using (es_admin_cancha(id))`)
+--       para que el panel del recinto pudiera ver también las apagadas. El
+--       arnés se quedó pidiendo el mundo anterior y fallaba contra el
+--       esquema vigente. Lo que sigue valiendo la pena cuidar —y es lo que
+--       cuida ahora— es que el AJENO siga sin ver nada de un recinto sin
+--       publicar: si alguien afloja ESA mitad, se entera acá y no en el
 --       buscador del jugador.
 --   2.  La RPC, con el mismo usuario y el mismo recinto, sí las devuelve.
 --
@@ -81,11 +89,20 @@ begin
   insert into public.cancha_tarifas (cancha_id, hora_desde, hora_hasta, precio)
   values (v_k1, time '11:00', time '16:00', 14000);
 
-  -- ── Caso 1: el agujero ─────────────────────────────────────────
+  -- ── Caso 1: quién ve el recinto sin publicar ───────────────────
   set local role authenticated;
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_dueno, 'role', 'authenticated')::text);
   select count(*) into v_n from public.canchas_reservables where complejo_id = v_complejo;
-  insert into r72 values ('1', v_n = 0, 'select directo del dueño sobre un recinto no publicado: ' || v_n || ' filas');
+  insert into r72 values ('1a', v_n = 3,
+    'select directo del dueño sobre un recinto no publicado: ' || v_n || ' de 3 filas');
+
+  -- La mitad que importa cuidar: el ajeno no ve nada.
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_ajeno, 'role', 'authenticated')::text);
+  select count(*) into v_n from public.canchas_reservables where complejo_id = v_complejo;
+  insert into r72 values ('1b', v_n = 0,
+    'select directo de un ajeno sobre un recinto no publicado: ' || v_n || ' filas');
+
+  execute format('set local request.jwt.claims to %L', json_build_object('sub', v_dueno, 'role', 'authenticated')::text);
 
   -- ── Caso 2: la RPC sí ──────────────────────────────────────────
   select count(*) into v_n from public.admin_canchas_complejo(v_complejo);

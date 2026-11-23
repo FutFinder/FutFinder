@@ -38,6 +38,26 @@ export const MIN_PASSWORD = 8;
  */
 const SIMBOLOS = /[!@#$%^&*()_+\-=[\]{};'\\:"|<>?,./`~]/;
 
+/**
+ * LA PISTA QUE SE LE MUESTRA A LA PERSONA, sacada de la misma lista de
+ * arriba y no escrita a mano.
+ *
+ * El 2026-10-16, probando el registro contra la base local, la pantalla de
+ * «Crear cuenta» decía debajo del campo «Usa una mayúscula y un número para
+ * reforzarla» — y el validador exige CUATRO tipos. Quien leía esa línea
+ * escribía `Futbol2026`, apretaba «Crear mi cuenta» y recién ahí se
+ * enteraba de que faltaba un símbolo. El marcador de posición sí lo decía
+ * entero, pero el marcador desaparece al escribir la primera letra: lo
+ * único visible mientras tipeas era la frase incompleta.
+ *
+ * En Ajustes era peor: el campo de contraseña nueva no decía NADA.
+ */
+export const PISTA_PASSWORD =
+  `${MIN_PASSWORD}+ caracteres, con minúscula, mayúscula, número y símbolo.`;
+
+/** La misma regla, cortita, para un marcador de posición. */
+export const PISTA_PASSWORD_CORTA = `${MIN_PASSWORD}+ con mayúscula, número y símbolo`;
+
 function enumerar(cosas) {
   if (cosas.length === 1) return cosas[0];
   return `${cosas.slice(0, -1).join(', ')} y ${cosas[cosas.length - 1]}`;

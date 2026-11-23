@@ -47,7 +47,14 @@ declare
   v_complejo uuid := gen_random_uuid();
   v_cancha   uuid := gen_random_uuid();
   v_cancha43 uuid := gen_random_uuid();
-  v_fecha    date := date '2027-03-01';
+  -- EL LUNES DE DENTRO DE DOS SEMANAS, no una fecha de marzo de 2027
+  -- (2026-10-17). Estaba clavada en `date '2027-03-01'`, y a partir del
+  -- 2 de marzo de 2027 esa fecha es PASADO: `crear_reserva` la rechaza
+  -- —es la regla de la 84— y este arnés se habría puesto rojo, junto con
+  -- otros siete, sin que nadie tocara una línea de código. Se calcula
+  -- sobre la hora de CHILE y cae siempre en lunes, que es lo que las
+  -- reglas de horario de más abajo dan por supuesto.
+  v_fecha    date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date;
   v_res      uuid;
   v_res_canc uuid := gen_random_uuid();
   v_res_sin  uuid := gen_random_uuid();
@@ -113,7 +120,11 @@ begin
   -- Se usa la RPC real y no un insert a mano: lo que se prueba es que el
   -- camino de verdad escriba la comisión.
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_jugador, 'role', 'authenticated')::text);
-  v_j := public.crear_reserva(v_cancha43, v_fecha, time '10:00', 'completa', 'tarjeta');
+  -- El contacto va explícito desde el 2026-10-16: la migración 67 lo hizo
+  -- obligatorio y este arnés, escrito antes, seguía llamando sin él. No
+  -- probaba la comisión: moría en «Escribe un nombre de contacto».
+  v_j := public.crear_reserva(v_cancha43, v_fecha, time '10:00', 'completa', 'tarjeta',
+    p_contacto_nombre := 'QA 62', p_contacto_telefono := '+56911111111');
   if (v_j->>'ok')::boolean is not true then
     raise exception 'FALLÓ (caso 10): no se pudo crear la reserva: %', v_j::text;
   end if;
@@ -196,9 +207,9 @@ begin
   -- cancelada que NO debe sumar.
   update public.reservas set estado = 'confirmada', confirmada_at = now() where id = v_res;
 
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res_canc, v_cancha, v_jugador, v_fecha, time '12:00', time '13:00',
+          28000,
           28000, 'completa', 'tarjeta', 'cancelada');
   insert into public.reserva_comisiones (reserva_id, base, tasa, piso, techo, iva_tasa, monto)
   values (v_res_canc, 28000, 0.05, 1000, 2500, 0.19, public.calcular_comision(28000));
@@ -232,9 +243,9 @@ begin
   -- Se usa una reserva que EXISTE y todavía no tiene comisión, para que
   -- el rechazo venga del CHECK y no de la llave foránea.
   execute 'reset role';
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res_sin, v_cancha, v_jugador, v_fecha, time '14:00', time '15:00',
+          28000,
           28000, 'completa', 'tarjeta', 'procesando');
   begin
     insert into public.reserva_comisiones (reserva_id, base, tasa, piso, techo, iva_tasa, monto)

@@ -30,7 +30,7 @@ declare
   v_jug uuid := gen_random_uuid();
   v_pide uuid := gen_random_uuid();
   v_lleno uuid; v_cancelado uuid; v_jugado uuid; v_cancelado_jugado uuid;
-  v_manual uuid; v_club_m uuid; v_prop uuid; v_club uuid;
+  v_manual uuid; v_club_m uuid; v_prop uuid; v_club uuid; v_club_rival uuid; v_ch uuid;
   v_res jsonb; v_n int; v_cupos int; v_estado text;
 begin
   -- Los partidos reales que estén en cualquiera de las dos ventanas quedan
@@ -142,9 +142,28 @@ begin
   insert into r128 values ('P7 y la solicitud rechazada ya no está', v_n = 0, v_n::text);
 
   -- ── leave_club_match sobre un encuentro cancelado ─────────────
-  select p.id into v_prop from public.club_challenge_proposals p
-   where not exists (select 1 from public.matches m where m.challenge_proposal_id = p.id) limit 1;
-  select id into v_club from public.clubs order by created_at limit 1;
+  -- SOBRE UNA PROPUESTA PROPIA (2026-10-16). Antes buscaba en la base una
+  -- propuesta sin partido y el club más antiguo que hubiera: contra una
+  -- recién construida no hay ninguno de los dos y el caso se auto-reprobaba
+  -- con «no hay propuesta libre». No estaba roto, no era autosuficiente.
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Retador 128 ' || left(v_org::text, 8),
+          'retador-128-' || left(v_org::text, 8), v_org)
+  returning id into v_club;
+  insert into public.clubs (nombre, slug, created_by)
+  values ('Retado 128 ' || left(v_jug::text, 8),
+          'retado-128-' || left(v_jug::text, 8), v_jug)
+  returning id into v_club_rival;
+  insert into public.club_challenges (club_retador_id, club_retado_id, creado_por, estado)
+  values (v_club, v_club_rival, v_org, 'esperando_aprobacion')
+  returning id into v_ch;
+  insert into public.club_challenge_proposals (challenge_id, club_proponente_id, creada_por,
+      fecha, duracion_min, direccion, cancha_nombre, comuna, region, latitud, longitud,
+      modalidad, cupos_por_club, metodo_inscripcion, cuota_por_persona)
+  values (v_ch, v_club, v_org, now() + interval '9 days', 60,
+      'Av. Siempre Viva 742', 'Cancha', 'Santiago', 'Metropolitana', -33.45, -70.66,
+      'futbol7', 7, 'orden_llegada', 0)
+  returning id into v_prop;
 
   if v_prop is null then
     insert into r128 values ('P9 no hay propuesta libre para el partido de clubes',

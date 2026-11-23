@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, FileText, MapPin, Users, Wallet, Clock } from 'lucide-react-native';
+import { X, FileText, MapPin, Users, Wallet, Clock, Trophy } from 'lucide-react-native';
 
 import {
   paleta as C,
@@ -30,6 +30,7 @@ import {
 } from '../utils/ubicacionPropuesta';
 import { supabase } from '../services/supabase';
 import { getChallenge } from '../services/clubChallenges';
+import { getMisMembresiasEn } from '../services/clubs';
 import {
   crearPropuestaOficial,
   aprobarPropuesta,
@@ -37,6 +38,13 @@ import {
   getPropuestaVigente,
   nuevoClientToken,
 } from '../services/clubProposals';
+// NIVELES VIVE EN `matchRules`, no acá. `clubChallengeRules` lo importa
+// para validar el borrador pero NO lo reexporta, así que pedírselo devolvía
+// `undefined` y la pantalla reventaba al dibujar la fila de niveles — el
+// error decía «Cannot read properties of undefined (reading 'map')» y no
+// nombraba el archivo equivocado. Es el mismo agujero que `importaciones`
+// ya cuidaba para `src/utils` y que ahora cuida también para `src/services`.
+import { NIVELES, modalidadLabel, nivelLabel } from '../services/matchRules';
 import {
   DURACIONES,
   MODALIDADES,
@@ -160,6 +168,11 @@ export default function ClubProposalScreen({ navigation, route }) {
   const { direccion, canchaNombre, comuna, region } = ubicacion;
   const hayUbicacion = ubicacionFijada(ubicacion);
   const [modalidad, setModalidad] = useState('futbol7');
+  // Nace en `null` y no en 'recreativo': «no elegí» y «elegí recreativo»
+  // son cosas distintas, y el servidor las guarda distintas desde la
+  // migración 156. Un valor por defecto acá volvería a borrar esa
+  // diferencia, que es justo el fallo que se vino a cerrar.
+  const [nivel, setNivel] = useState(null);
   const [cuposPorClub, setCuposPorClub] = useState(String(CUPOS_POR_CLUB.min + 3));
   const [metodoInscripcion, setMetodoInscripcion] = useState('orden_llegada');
   const [cuotaPorPersona, setCuotaPorPersona] = useState('0');
@@ -190,11 +203,10 @@ export default function ClubProposalScreen({ navigation, route }) {
       setPropuesta(prop || null);
 
       if (ch && user?.id) {
-        const { data: membresias } = await supabase
-          .from('club_members')
-          .select('club_id, rol')
-          .eq('user_id', user.id)
-          .in('club_id', [ch.club_retador_id, ch.club_retado_id]);
+        const { data: membresias } = await getMisMembresiasEn(user.id, [
+          ch.club_retador_id,
+          ch.club_retado_id,
+        ]);
         if (alive) {
           const filas = membresias || [];
           setMisClubIds(filas.filter((m) => m.rol === 'admin').map((m) => m.club_id));
@@ -244,6 +256,7 @@ export default function ClubProposalScreen({ navigation, route }) {
       duracionMin,
       ...ubicacionDraft(ubicacion),
       modalidad,
+      nivel,
       cuposPorClub: parseInt(cuposPorClub, 10),
       metodoInscripcion,
       cuotaPorPersona: parseInt(cuotaPorPersona, 10),
@@ -281,6 +294,7 @@ export default function ClubProposalScreen({ navigation, route }) {
     fechaStr,
     horaStr,
     duracionMin,
+    nivel,
     ubicacion,
     modalidad,
     cuposPorClub,
@@ -386,6 +400,18 @@ export default function ClubProposalScreen({ navigation, route }) {
                   <Row icon={<MapPin color={C.green} size={16} strokeWidth={2} />} label="Dónde">
                     {`${propuesta.cancha_nombre}\n${propuesta.direccion}\n${propuesta.comuna}, ${propuesta.region}`}
                   </Row>
+                  {/* MODALIDAD Y NIVEL SE MUESTRAN ACÁ aunque no se negocien.
+                      El formulario los pide y la propuesta los guarda, pero
+                      esta pantalla no los enseñaba: quien aprueba estaba
+                      publicando un partido para los jugadores de SU club sin
+                      ver si era fútbol 7 u 11 —que decide quién puede
+                      jugar— ni con qué nivel iba a quedar clasificado. */}
+                  <Row icon={<Trophy color={C.green} size={16} strokeWidth={2} />} label="Partido">
+                    {[
+                      modalidadLabel(propuesta) || 'Modalidad sin definir',
+                      propuesta.nivel ? nivelLabel(propuesta.nivel) : 'Sin nivel declarado',
+                    ].join(' · ')}
+                  </Row>
                   <Row icon={<Users color={C.green} size={16} strokeWidth={2} />} label="Cupos">
                     {`${cuposLabel(propuesta.cupos_por_club)} · ${metodoLabel(
                       propuesta.metodo_inscripcion
@@ -473,6 +499,10 @@ export default function ClubProposalScreen({ navigation, route }) {
                           </Text>
                           <Text style={styles.confirmLinea}>
                             · {propuesta.cancha_nombre}, {propuesta.comuna}
+                          </Text>
+                          <Text style={styles.confirmLinea}>
+                            · {modalidadLabel(propuesta) || 'Modalidad sin definir'}
+                            {propuesta.nivel ? ` · ${nivelLabel(propuesta.nivel)}` : ''}
                           </Text>
                           <Text style={styles.confirmLinea}>
                             · {cuposLabel(propuesta.cupos_por_club)} ·{' '}
@@ -671,6 +701,27 @@ export default function ClubProposalScreen({ navigation, route }) {
                       />
                     ))}
                   </View>
+                </View>
+
+                <View style={styles.grupo}>
+                  <FieldLabel>Nivel (opcional)</FieldLabel>
+                  <View style={styles.chipsRow}>
+                    {NIVELES.map((n) => (
+                      <Opcion
+                        key={n.value}
+                        label={n.label}
+                        activa={nivel === n.value}
+                        // Volver a tocar el elegido lo suelta: sin esto no
+                        // habría forma de volver a «no lo digo» una vez
+                        // marcado, y el campo es opcional.
+                        onPress={() => setNivel(nivel === n.value ? null : n.value)}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.ayuda}>
+                    Lo eliges tú y no se negocia. Si lo dejas en blanco, el
+                    encuentro no queda clasificado.
+                  </Text>
                 </View>
 
                 <View style={styles.grupo}>

@@ -94,7 +94,15 @@ begin
   if v_txt <> 'cerrado' then raise exception 'FALLÓ (caso 7): falta el tipo'; end if;
   raise notice 'OK (caso 7)';
 
-  execute format('set local role anon');
+  -- OJO (2026-10-15): esta parte corría como `anon` porque
+  -- `get_disponibilidad_cancha` se le concedió a propósito —migraciones 54,
+  -- 60, 64, 65 y 84—. La migración **114** («anon no ejecuta nada») barrió
+  -- todas las funciones de `public` sin lista de excepciones y la cerró de
+  -- paso. Se corre como `authenticated`, que es quien puede hoy, para que el
+  -- caso siga midiendo LO SUYO —la regla de negocio, no el privilegio— en vez
+  -- de reventar con 42501. El conflicto está anotado como P2 en
+  -- `pendientes.md`; si se reabre a `anon`, esto vuelve a `set local role anon`.
+  execute format('set local role authenticated');
   v_j := public.get_disponibilidad_cancha(v_cancha, v_manana);
   if (select count(*) from json_array_elements(v_j->'slots') s
        where s->>'hora_inicio' in ('12:00','16:00') and (s->>'disponible')::boolean) <> 0 then

@@ -58,11 +58,15 @@ export function leerConfig(
   const secretKey = (env("FLOW_SECRET_KEY") || "").trim();
   if (!apiKey || !secretKey) return null;
 
-  // Por omisión, sandbox. Pasar a producción tiene que ser un acto
-  // explícito: nadie cobra plata de verdad por olvidarse de una variable.
-  const ambiente = (env("FLOW_AMBIENTE") || "sandbox").trim().toLowerCase() === "produccion"
-    ? "produccion"
-    : "sandbox";
+  // EL AMBIENTE SE DICE, NO SE SUPONE (2026-11-13). Antes caía en sandbox por
+  // omisión, y eso tiene un modo de fallo peor que no cobrar: claves de
+  // sandbox cargadas en el proyecto de producción, y cualquiera confirma
+  // reservas reales con las tarjetas de prueba públicas de Flow. Sin
+  // `FLOW_AMBIENTE` (o con un valor que no es ninguno de los dos) la pasarela
+  // queda «no conectada», que es lo que la app ya sabe mostrar.
+  const ambienteDicho = (env("FLOW_AMBIENTE") || "").trim().toLowerCase();
+  if (ambienteDicho !== "produccion" && ambienteDicho !== "sandbox") return null;
+  const ambiente: "sandbox" | "produccion" = ambienteDicho;
 
   return {
     apiKey,
@@ -178,6 +182,44 @@ export function montoCoincide(esperado: number, recibido: unknown): boolean {
 export function asuntoDelPago(recinto: string, fecha: string, hora: string): string {
   const base = `${recinto} · ${fecha} ${hora}`;
   return base.length <= 80 ? base : base.slice(0, 79) + "…";
+}
+
+/**
+ * ¿Parece un token de Flow? Se mira ANTES de preguntarle a Flow: la URL de
+ * confirmación es pública, y cada POST con basura era una llamada firmada a
+ * la API del comercio, que tiene su propio límite.
+ */
+export function tokenConForma(token: unknown): boolean {
+  return typeof token === "string" && /^[A-Za-z0-9]{16,100}$/.test(token);
+}
+
+/**
+ * Qué hacer con el pago pendiente que `iniciar_pago_reserva` devolvió para
+ * reusar, según lo que Flow dice de su token. Antes se pedía OTRA transacción
+ * a Flow con la misma orden: o Flow la rechazaba (y esa reserva no se podía
+ * pagar nunca más) o quedaban dos enlaces vivos para un mismo cobro.
+ *
+ *   · `confirmar`: Flow ya lo cobró y el aviso no llegó todavía.
+ *   · `mismo_enlace`: sigue pendiente, por el mismo monto, y tenemos su
+ *      enlace: se devuelve ese, no se crea otro.
+ *   · `cerrar_y_crear`: rechazado, anulado, sin token, sin enlace o por otro
+ *      monto (la cuota cambió): se cierra en la base y se arma uno nuevo. Si
+ *      alguien igual paga el enlace viejo, el aviso lo marca para devolver.
+ */
+export function queHacerConPendiente(p: {
+  status: number | null;
+  montoEnFlow: unknown;
+  montoAhora: number;
+  url: unknown;
+}): "confirmar" | "mismo_enlace" | "cerrar_y_crear" {
+  if (p.status === FLOW_PAGADA) return "confirmar";
+  if (
+    p.status === FLOW_PENDIENTE && typeof p.url === "string" && p.url &&
+    montoCoincide(p.montoAhora, p.montoEnFlow)
+  ) {
+    return "mismo_enlace";
+  }
+  return "cerrar_y_crear";
 }
 
 /** Adónde mandamos al jugador. Flow devuelve `url` y `token` por separado. */

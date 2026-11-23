@@ -33,6 +33,7 @@ export const NOTIF_TYPE_TO_PREFERENCE: Record<string, string> = {
   club_member_joined: "notif_clubs",
   club_member_left: "notif_clubs",
   club_invite_accepted: "notif_clubs",
+  club_invite: "notif_clubs",
   club_challenge: "notif_clubs",
   club_challenge_accepted: "notif_clubs",
   club_challenge_rejected: "notif_clubs",
@@ -194,7 +195,29 @@ export type PushStatus =
   | "sent"
   | "skipped_preference"
   | "skipped_no_token"
+  | "skipped_muted"
   | "failed";
+
+// Los avisos que nacen de un hilo de chat: los que el silencio del hilo
+// (`chat_mutes`) tiene que callar. Mismo criterio que el popup del cliente
+// (`avisoSilenciado` en src/utils/notificationToasts.js).
+const AVISOS_DE_CHAT = new Set(["message_new", "chat_mention_all"]);
+
+/**
+ * El hilo cuyo silencio frena este push, o null si no aplica (C05).
+ * Un aviso marcado `important` (un `/todos` que además es `/importante`,
+ * migración 169) atraviesa el silencio: es la regla que promete el chat
+ * del club.
+ */
+export function hiloQueSilencia(
+  notif: { type: string; data: Record<string, any> | null },
+): string | null {
+  if (!AVISOS_DE_CHAT.has(notif.type)) return null;
+  const data = notif.data || {};
+  if (data.important === true) return null;
+  const hilo = data.threadKey;
+  return typeof hilo === "string" && hilo.length > 0 ? hilo : null;
+}
 
 /** Si al menos un ticket salió 'ok', se considera que el push se mandó. */
 export function summarizePushStatus(results: TokenTicketResult[]): PushStatus {

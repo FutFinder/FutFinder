@@ -32,3 +32,17 @@ export async function getRememberedAccount() {
     return null;
   }
 }
+
+/**
+ * Olvida la cuenta recordada de este dispositivo. Se llama al ELIMINAR la
+ * cuenta: cerrar sesión no la borra (para eso existe el atajo), pero una
+ * cuenta que ya no existe no puede quedar con su correo guardado. Lo promete
+ * la política de cookies.
+ */
+export async function forgetRememberedAccount() {
+  try {
+    await AsyncStorage.removeItem(KEY);
+  } catch {
+    // Sin almacenamiento no hay nada que olvidar.
+  }
+}

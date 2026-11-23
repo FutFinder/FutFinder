@@ -18,6 +18,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Link2,
   Locate,
   MapPin,
   Share2,
@@ -57,7 +58,26 @@ import {
   nextWeekday,
   startOfDay,
 } from '../components/partidos/DateTimeSheets';
+import ListaDeAsientos from '../components/partidos/ListaDeAsientos';
+import { SelectorDeAmigos, NombreDeAsientoSheet } from '../components/partidos/SelectorDeAmigos';
 import LocationAutocomplete, { reverseGeocode } from '../components/LocationAutocomplete';
+import { publicarPartidoConAsientos, useNombresVigentes } from '../services/asientos';
+import { getMyProfile } from '../services/profile';
+import {
+  ARMADO_INICIAL,
+  TOTAL_JUGADORES,
+  asientosDelBorrador,
+  asientosIniciales,
+  asientosSinIdentificar,
+  conFaltan,
+  conTotal,
+  conTotalYFaltan,
+  limitesDeFaltan,
+  libresDelBorrador,
+  resumenDeJugadores,
+  validarArmado,
+  validarIdentificados,
+} from '../utils/asientos.js';
 import { createMatch, translateSchemaError } from '../services/matches';
 import { getChallenge, linkChallengeMatch } from '../services/clubChallenges';
 import { getCurrentLocation } from '../services/location';
@@ -79,8 +99,11 @@ import {
   EDAD_PRESETS,
   FIELD_ORDER,
   MODALIDADES,
+  MODALIDAD_INICIAL,
   NIVELES,
-  TRUST_OPTS,
+  modalidadLabel,
+  opcionesDeTrustMinimo,
+  sugerenciaDeTotal,
   combineDateTime,
   cuotaLabel,
   edadLabel,
@@ -100,7 +123,14 @@ function initialDraft() {
   const d = startOfDay(new Date());
   return {
     // Paso 1 · formato y cupos
+    // `cupos` sólo lo usa el flujo antiguo de clubes («jugadores que faltan»).
     cupos: 1,
+    // Partido normal: total de jugadores y los asientos que el creador ya
+    // tiene ocupados o reservados (el suyo no va en la lista). Abre con
+    // 14 jugadores y falta 1: 12 reservados más el creador.
+    total: ARMADO_INICIAL.total,
+    asientos: asientosIniciales(ARMADO_INICIAL),
+
     cuota: '5000',
     nivel: 'intermedio',
     duracion: 90,
@@ -111,7 +141,7 @@ function initialDraft() {
     descripcion: '',
     // Paso 2 · dónde y cuándo
     titulo: '',
-    modalidad: 'futbol7',
+    modalidad: MODALIDAD_INICIAL,
     cancha: '',
     direccion: '',
     // `{ lat, lng, direccion }` o `null`: el punto viaja con la dirección de
@@ -141,7 +171,11 @@ function initialDraft() {
  */
 export default function PublishMatchScreen({ navigation, route }) {
   // Cómo se llama el puntaje, según el flag que responde el servidor.
-  const nombreTS = nombrePuntajeDe(!!useTrueScoreAjustes().fase1);
+  const ajustesTS = useTrueScoreAjustes();
+  const nombreTS = nombrePuntajeDe(!!ajustesTS.fase1);
+  // Los mínimos salen de los niveles del servidor (truescore_config), no de
+  // una lista fija que ya no calzaba con ellos.
+  const opcionesTrust = opcionesDeTrustMinimo(ajustesTS.fase1 ? ajustesTS.niveles : []);
 
   const insets = useSafeAreaInsets();
   const online = useOnline();
@@ -160,6 +194,14 @@ export default function PublishMatchScreen({ navigation, route }) {
   const [submitError, setSubmitError] = useState(null);
   const [sheet, setSheet] = useState(null); // 'region' | 'comuna' | 'fecha' | 'hora' | 'share'
   const [locBusy, setLocBusy] = useState(false);
+  // Asientos: a qué asiento va el amigo o el nombre que se está eligiendo
+  // (`{ indice }` reemplaza uno ya ocupado; `{}` toma uno libre).
+  const [paraAmigo, setParaAmigo] = useState(null);
+  const [paraNombre, setParaNombre] = useState(null);
+  const [creador, setCreador] = useState(null);
+  const nombresActivos = useNombresVigentes();
+  // El flujo antiguo de clubes sigue publicando «jugadores que faltan».
+  const conAsientos = !clubChallengeId;
   // Ubicación del teléfono. Sirve SOLO para ordenar las sugerencias del
   // buscador: nunca se publica como ubicación de la cancha.
   const [proximidad, setProximidad] = useState(null);
@@ -173,7 +215,7 @@ export default function PublishMatchScreen({ navigation, route }) {
     if (route?.params?.matchId) {
       navigation.replace('EditMatch', { matchId: route.params.matchId });
     }
-  }, [route?.params?.matchId]);
+  }, [route?.params?.matchId, navigation]);
 
   // La ruta CreateMatch se reutiliza para cada «Publicar partido»: si la
   // pantalla no se remonta entre una publicación y la siguiente (recupera
@@ -230,6 +272,40 @@ export default function PublishMatchScreen({ navigation, route }) {
     })();
   }, []);
 
+  // El asiento del creador se dibuja con su perfil.
+  useEffect(() => {
+    let vivo = true;
+    getMyProfile().then((p) => {
+      if (vivo && p?.id) setCreador({ username: p.username, foto_url: p.foto_url, user_id: p.id });
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  // Las reglas del borrador más las del armado de asientos, que se muestran
+  // en el mismo sitio que antes mostraba el error de cupos.
+  const validar = useCallback(
+    (d, s) => {
+      const e = validateDraft(d, s);
+      if (conAsientos && (s == null || s === 1)) {
+        const m = validarArmado(d.total, d.asientos);
+        if (m) e.cupos = m;
+        else delete e.cupos;
+      }
+      // Cada confirmado tiene que decir quién es (cuenta o nombre). Se pide
+      // en el último paso, que es donde se completan: en el paso 1 recién
+      // se decide cuántos son.
+      if (conAsientos && (s == null || s === 3)) {
+        const m = validarIdentificados(d.asientos, { nombres: nombresActivos });
+        if (m) e.asientos = m;
+        else delete e.asientos;
+      }
+      return e;
+    },
+    [conAsientos, nombresActivos]
+  );
+
   const set = useCallback((patch) => {
     setDraft((d) => ({ ...d, ...patch }));
     // Tocar cualquier campo descarta el error del último intento de publicar:
@@ -240,8 +316,14 @@ export default function PublishMatchScreen({ navigation, route }) {
       if (!Object.keys(prev).length) return prev;
       const next = { ...prev };
       Object.keys(patch).forEach((k) => {
-        const field = k === 'edadMin' || k === 'edadMax' || k === 'edadPreset' ? 'edad' : k;
+        const field =
+          k === 'edadMin' || k === 'edadMax' || k === 'edadPreset'
+            ? 'edad'
+            : k === 'total' || k === 'asientos'
+            ? 'cupos'
+            : k;
         delete next[field];
+        if (k === 'asientos' || k === 'total') delete next.asientos;
       });
       return next;
     });
@@ -267,12 +349,58 @@ export default function PublishMatchScreen({ navigation, route }) {
   // Revalida en vivo una vez que el usuario intentó avanzar.
   useEffect(() => {
     if (touchedStep == null) return;
-    setErrors(validateDraft(draft, touchedStep));
-  }, [draft, touchedStep]);
+    setErrors(validar(draft, touchedStep));
+  }, [draft, touchedStep, validar]);
 
   const comunas = useMemo(() => (draft.region ? getComunasOfRegion(draft.region) : []), [draft.region]);
   const dt = combineDateTime(draft.fecha, draft.hora);
   const errorCount = Object.keys(errors).length;
+
+  // ---------------------------------------------------- asientos del borrador
+  // El paso 1 pide el total y cuántos faltan; los confirmados (sin contar al
+  // creador) son la lista `draft.asientos`, que nace en «Reservado» y se
+  // completa en el último paso. Así el largo de la lista ES los confirmados.
+  const libresPublicos = libresDelBorrador(draft.total, draft.asientos);
+  const faltan = libresPublicos;
+  const confirmados = draft.asientos.length + 1;
+  // Cambiar el total conserva a los confirmados (cambian los que faltan),
+  // salvo que ya no quepan: siempre tiene que quedar al menos un cupo libre.
+  // Las reglas viven en `utils/asientos.js`, con sus pruebas.
+  const cambiarTotal = (v) => set({ total: v, asientos: conTotal(draft.asientos, v) });
+  const cambiarFaltan = (v) => set({ asientos: conFaltan(draft.asientos, draft.total, v) });
+  const limFaltan = limitesDeFaltan(draft.total);
+  // Elegir Fútbol 5 con el total de Fútbol 7 sugiere 10 (no lo cambia solo:
+  // el total se fijó en el paso 1 y cambiarlo a escondidas sorprendería).
+  const sugerencia = conAsientos ? sugerenciaDeTotal(draft.modalidad, draft.total) : null;
+  // Los desafíos entre clubes siguen en 7 y 11: Fútbol 5 es de partidos normales.
+  const modalidades = conAsientos ? MODALIDADES : MODALIDADES.filter((m) => m.value !== 'futbol5');
+  const aceptarSugerencia = () =>
+    sugerencia &&
+    set({ total: sugerencia.total, asientos: conTotalYFaltan(draft.asientos, draft.total, sugerencia.total) });
+  const reservados = draft.asientos.filter((a) => a.tipo === 'reservado').length;
+  // Con el error a la vista, las filas sin identificar se marcan en rojo.
+  const marcarSinIdentificar = !!errors.asientos;
+  const listaDeAsientos = useMemo(() => {
+    const lista = asientosDelBorrador(draft.total, draft.asientos, creador);
+    if (!marcarSinIdentificar) return lista;
+    const faltan = new Set(asientosSinIdentificar(draft.asientos));
+    return lista.map((a) => (a.indice != null && faltan.has(a.indice) ? { ...a, falta: true } : a));
+  }, [draft.total, draft.asientos, creador, marcarSinIdentificar]);
+  const sinIdentificar = conAsientos ? asientosSinIdentificar(draft.asientos).length : 0;
+  const amigosSentados = useMemo(
+    () => draft.asientos.filter((a) => a.tipo === 'amigo').map((a) => a.user_id),
+    [draft.asientos]
+  );
+  // Pone `asiento` en el lugar de `destino.indice`, o al final si era un libre.
+  const ponerAsiento = (destino, asiento) => {
+    const lista = [...draft.asientos];
+    if (destino?.indice != null) lista[destino.indice] = asiento;
+    else lista.push(asiento);
+    set({ asientos: lista });
+  };
+  // Sacar a alguien de un asiento confirmado lo deja reservado: los que
+  // faltan sólo se cambian en el paso 1.
+  const quitarAsiento = (a) => ponerAsiento({ indice: a.indice }, { tipo: 'reservado' });
 
   const registerPos = (field) => (e) => {
     positions.current[field] = e.nativeEvent.layout.y;
@@ -288,7 +416,7 @@ export default function PublishMatchScreen({ navigation, route }) {
   };
 
   const goNext = () => {
-    const errs = validateDraft(draft, step);
+    const errs = validar(draft, step);
     setTouchedStep(step);
     setErrors(errs);
     if (Object.keys(errs).length) {
@@ -340,16 +468,20 @@ export default function PublishMatchScreen({ navigation, route }) {
 
   const publish = async () => {
     if (submitting || published) return; // doble pulsación
-    const errs = validateDraft(draft, null);
+    const errs = validar(draft, null);
     if (Object.keys(errs).length) {
       // Si el error está en un paso anterior, volvemos a ese paso.
       const stepOf = (f) =>
-        ['titulo', 'modalidad', 'cancha', 'region', 'comuna', 'fecha', 'hora'].includes(f) ? 2 : 1;
+        f === 'asientos'
+          ? 3
+          : ['titulo', 'modalidad', 'cancha', 'region', 'comuna', 'fecha', 'hora'].includes(f)
+          ? 2
+          : 1;
       const first = FIELD_ORDER.find((f) => errs[f]);
       const target = first ? stepOf(first) : 1;
       setStep(target);
       setTouchedStep(target);
-      setErrors(validateDraft(draft, target));
+      setErrors(validar(draft, target));
       setTimeout(() => scrollToFirstError(errs), 60);
       return;
     }
@@ -379,7 +511,7 @@ export default function PublishMatchScreen({ navigation, route }) {
       latitud: ubicacionFijada(ubicacionDelFormulario(draft)) ? draft.coords.lat : null,
       longitud: ubicacionFijada(ubicacionDelFormulario(draft)) ? draft.coords.lng : null,
       hora: dt.toISOString(),
-      cupos_totales: Number(draft.cupos),
+      ...(conAsientos ? { jugadores_total: Number(draft.total) } : { cupos_totales: Number(draft.cupos) }),
       precio_cuota: draft.cuota === '' ? 0 : Number(draft.cuota),
       nivel: draft.nivel,
       duracion_min: Number(draft.duracion),
@@ -409,7 +541,9 @@ export default function PublishMatchScreen({ navigation, route }) {
       return;
     }
 
-    const { data, error, duplicate } = await createMatch(payload);
+    const { data, error, duplicate } = conAsientos
+      ? await publicarPartidoConAsientos(payload, draft.asientos)
+      : await createMatch(payload);
     setSubmitting(false);
 
     if (error) {
@@ -435,6 +569,8 @@ export default function PublishMatchScreen({ navigation, route }) {
     return (
       <PublishedView
         match={published}
+        reservados={conAsientos ? reservados : 0}
+        onInvitar={() => navigation.replace('ManageMatch', { matchId: published.id, tab: 'confirmados' })}
         onOpen={() => navigation.replace('MatchDetail', { matchId: published.id })}
         onShare={() => setSheet('share')}
         onBack={() => navigation.navigate('Main', { screen: 'SearchTab' })}
@@ -448,7 +584,9 @@ export default function PublishMatchScreen({ navigation, route }) {
 
   const stepTitle = ['Formato y cupos', 'Dónde y cuándo', 'Acceso y publicación'][step - 1];
   const stepSub = [
-    'Cuántos faltan, cuánto cuesta y a qué ritmo se juega',
+    conAsientos
+      ? 'Cuántos juegan, quiénes ya están y cuánto cuesta'
+      : 'Cuántos faltan, cuánto cuesta y a qué ritmo se juega',
     'La cancha, la comuna y el horario del partido',
     'Cómo entran los jugadores y qué avisos enviamos',
   ][step - 1];
@@ -476,7 +614,11 @@ export default function PublishMatchScreen({ navigation, route }) {
               {step === 1
                 ? 'Encuentra jugadores para completar tu partido'
                 : step === 2
-                ? `${MODALIDADES.find((m) => m.value === draft.modalidad)?.label} · ${draft.cupos} ${draft.cupos === 1 ? 'cupo' : 'cupos'}`
+                ? `${MODALIDADES.find((m) => m.value === draft.modalidad)?.label} · ${
+                    conAsientos
+                      ? `${draft.total} jugadores`
+                      : `${draft.cupos} ${draft.cupos === 1 ? 'cupo' : 'cupos'}`
+                  }`
                 : 'Último paso'}
             </Text>
           </View>
@@ -550,6 +692,48 @@ export default function PublishMatchScreen({ navigation, route }) {
           {/* =============== PASO 1 =============== */}
           {step === 1 ? (
             <View style={{ gap: 16 }}>
+              {conAsientos ? (
+                <View onLayout={registerPos('cupos')}>
+                  <Card style={{ padding: 14, gap: 14 }}>
+                    <View style={{ gap: 11 }}>
+                      <View>
+                        <Text style={styles.cardTitle}>Jugadores del partido</Text>
+                        <Text style={styles.cardSub}>El total, contándote a ti.</Text>
+                      </View>
+                      <Stepper
+                        value={draft.total}
+                        onChange={cambiarTotal}
+                        unidad={['JUGADOR', 'JUGADORES']}
+                        min={TOTAL_JUGADORES.min}
+                        max={TOTAL_JUGADORES.max}
+                        error={!!errors.cupos}
+                      />
+                    </View>
+                    <View style={{ height: 1, backgroundColor: C.hairline }} />
+                    <View style={{ gap: 11 }}>
+                      <View>
+                        <Text style={styles.cardTitle}>¿Cuántos te faltan?</Text>
+                        <Text style={styles.cardSub}>
+                          Los cupos que se publican para que se una gente nueva.
+                        </Text>
+                      </View>
+                      <Stepper
+                        value={faltan}
+                        onChange={cambiarFaltan}
+                        min={limFaltan.min}
+                        max={limFaltan.max}
+                        error={!!errors.cupos}
+                      />
+                    </View>
+                    <ErrorHint>{errors.cupos}</ErrorHint>
+                    <Note>
+                      {confirmados === 1
+                        ? `Por ahora vas solo: se publican ${faltan} cupos.`
+                        : `Ya tienes ${confirmados} confirmados, contándote. En el último paso eliges quiénes son: una cuenta o un nombre para cada uno.`}
+                    </Note>
+                  </Card>
+                </View>
+              ) : (
               <View onLayout={registerPos('cupos')}>
                 <Card style={{ padding: 14, gap: 11 }}>
                   <View>
@@ -568,6 +752,7 @@ export default function PublishMatchScreen({ navigation, route }) {
                   <ErrorHint>{errors.cupos}</ErrorHint>
                 </Card>
               </View>
+              )}
 
               <Field label="Cuota por jugador" right={cuotaLabel(draft.cuota === '' ? 0 : Number(draft.cuota))} onLayout={registerPos('cuota')}>
                 <Input
@@ -617,7 +802,7 @@ export default function PublishMatchScreen({ navigation, route }) {
               </Field>
 
               <Field label={`${nombreTS} mínimo para unirse`} onLayout={registerPos('minTrust')}>
-                {TRUST_OPTS.map((t) => (
+                {opcionesTrust.map((t) => (
                   <RadioRow
                     key={t.value}
                     label={t.label}
@@ -708,7 +893,7 @@ export default function PublishMatchScreen({ navigation, route }) {
 
               <Field label="Modalidad" onLayout={registerPos('modalidad')}>
                 <View style={styles.row}>
-                  {MODALIDADES.map((m) => (
+                  {modalidades.map((m) => (
                     <OptionChip
                       key={m.value}
                       label={m.label}
@@ -720,6 +905,15 @@ export default function PublishMatchScreen({ navigation, route }) {
                   ))}
                 </View>
                 <ErrorHint>{errors.modalidad}</ErrorHint>
+                {sugerencia ? (
+                  <View style={{ gap: 8 }}>
+                    <Note>{sugerencia.texto}</Note>
+                    <SurfaceButton
+                      label={`Cambiar a ${sugerencia.total} jugadores`}
+                      onPress={aceptarSugerencia}
+                    />
+                  </View>
+                ) : null}
               </Field>
 
               <Field label="Nombre de la cancha" onLayout={registerPos('cancha')}>
@@ -905,10 +1099,17 @@ export default function PublishMatchScreen({ navigation, route }) {
                     label="Cancha"
                     value={[draft.cancha, draft.comuna].filter(Boolean).join(' · ') || '—'}
                   />
-                  <DetailRow
-                    label="Jugadores que faltan"
-                    value={`${draft.cupos} ${draft.cupos === 1 ? 'cupo' : 'cupos'}`}
-                  />
+                  {conAsientos ? (
+                    <DetailRow
+                      label="Jugadores"
+                      value={`${draft.asientos.length + 1}/${draft.total} confirmados · ${libresPublicos} ${libresPublicos === 1 ? 'cupo libre' : 'cupos libres'}`}
+                    />
+                  ) : (
+                    <DetailRow
+                      label="Jugadores que faltan"
+                      value={`${draft.cupos} ${draft.cupos === 1 ? 'cupo' : 'cupos'}`}
+                    />
+                  )}
                   <DetailRow
                     label="Cuota"
                     value={cuotaLabel(draft.cuota === '' ? 0 : Number(draft.cuota))}
@@ -931,6 +1132,40 @@ export default function PublishMatchScreen({ navigation, route }) {
                   />
                 </Card>
               </Field>
+
+              {conAsientos ? (
+                <View style={{ gap: 8 }} onLayout={registerPos('asientos')}>
+                  <FieldLabel right={`${confirmados}/${draft.total} · ${faltan} ${faltan === 1 ? 'libre' : 'libres'}`}>
+                    Tus jugadores
+                  </FieldLabel>
+                  <ListaDeAsientos
+                    asientos={listaDeAsientos}
+                    editable
+                    libresFijos
+                    nombresActivos={nombresActivos}
+                    miId={creador?.user_id}
+                    onAmigo={(a) => setParaAmigo({ indice: a.indice })}
+                    onNombre={(a) => setParaNombre({ indice: a.indice, nombre: a.tipo === 'nombre' ? a.nombre : '' })}
+                    onLiberar={quitarAsiento}
+                  />
+                  <ErrorHint>{errors.asientos}</ErrorHint>
+                  {!errors.asientos ? (
+                    <Note>
+                      {confirmados > 1
+                        ? `${
+                            nombresActivos
+                              ? 'Cada confirmado necesita una cuenta (+) o su nombre (lápiz).'
+                              : 'Cada confirmado necesita la cuenta de un amigo (+).'
+                          }${
+                            sinIdentificar > 0
+                              ? ` Te ${sinIdentificar === 1 ? 'falta 1' : `faltan ${sinIdentificar}`} antes de publicar.`
+                              : ''
+                          } Los cupos libres son los que se publican.`
+                        : 'Los cupos libres son los que se publican. Si ya tienes jugadores confirmados, vuelve al paso 1 y baja los que faltan.'}
+                    </Note>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           ) : null}
 
@@ -1008,13 +1243,31 @@ export default function PublishMatchScreen({ navigation, route }) {
         minDate={draft.fecha}
         onSelect={(v) => set({ hora: v })}
       />
+      <SelectorDeAmigos
+        visible={!!paraAmigo}
+        onClose={() => setParaAmigo(null)}
+        excluidos={amigosSentados}
+        onElegir={(f) => {
+          ponerAsiento(paraAmigo, { tipo: 'amigo', user_id: f.user_id, username: f.username, foto_url: f.foto_url });
+          setParaAmigo(null);
+        }}
+      />
+      <NombreDeAsientoSheet
+        visible={!!paraNombre}
+        onClose={() => setParaNombre(null)}
+        inicial={paraNombre?.nombre || ''}
+        onGuardar={(nombre) => {
+          ponerAsiento(paraNombre, { tipo: 'nombre', nombre });
+          setParaNombre(null);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 // ------------------------------------------------------------- éxito
 
-function PublishedView({ match, onOpen, onShare, onBack, shareOpen, onCloseShare }) {
+function PublishedView({ match, reservados = 0, onOpen, onShare, onInvitar, onBack, shareOpen, onCloseShare }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.root}>
@@ -1037,7 +1290,7 @@ function PublishedView({ match, onOpen, onShare, onBack, shareOpen, onCloseShare
             <Text style={styles.summaryTitle}>{match?.titulo}</Text>
             <View style={styles.wrap}>
               {match?.modalidad ? (
-                <Tag label={match.modalidad === 'futbol11' ? 'Fútbol 11' : 'Fútbol 7'} tone="green" />
+                <Tag label={modalidadLabel(match)} tone="green" />
               ) : null}
               <Tag label={nivelLabel(match?.nivel)} />
               <Tag label={`${match?.duracion_min} min`} />
@@ -1052,12 +1305,20 @@ function PublishedView({ match, onOpen, onShare, onBack, shareOpen, onCloseShare
               {[match?.cancha_nombre, match?.comuna].filter(Boolean).join(' · ')}
             </Row>
             <Row icon={ShieldCheck}>
-              {`${match?.cupos_disponibles} ${match?.cupos_disponibles === 1 ? 'cupo' : 'cupos'} · ${cuotaLabel(match?.precio_cuota)} · ${match?.aprobacion === 'manual' ? 'Aprobación manual' : 'Inscripción inmediata'} · ${edadLabel(match)}`}
+              {`${resumenDeJugadores(match) || `${match?.cupos_disponibles} ${match?.cupos_disponibles === 1 ? 'cupo' : 'cupos'}`} · ${cuotaLabel(match?.precio_cuota)} · ${match?.aprobacion === 'manual' ? 'Aprobación manual' : 'Inscripción inmediata'} · ${edadLabel(match)}`}
             </Row>
           </Card>
 
           <View style={{ gap: 9, marginTop: 20 }}>
             <PrimaryButton label="Ver mi partido" onPress={onOpen} height={52} />
+            {reservados > 0 ? (
+              <SurfaceButton
+                label={`Invitar a tus ${reservados} ${reservados === 1 ? 'reservado' : 'reservados'}`}
+                icon={Link2}
+                onPress={onInvitar}
+                height={48}
+              />
+            ) : null}
             <SurfaceButton label="Compartir el partido" icon={Share2} onPress={onShare} height={48} />
             <Pressable onPress={onBack} style={({ pressed }) => [{ height: 44, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.7 }]}>
               <Text style={{ fontSize: 13.5, fontFamily: F.bold, color: C.textSecondary }}>

@@ -1,6 +1,23 @@
 # Pruebas
 
-Última revisión: 2026-09-23
+Última revisión: 2026-11-14
+
+## Integración continua (desde el 2026-11-14)
+
+Dos workflows en `.github/workflows/`, los dos sin secretos:
+
+- **`ci.yml`**, en cada push y PR a `main`: `npm ci`, lint, pruebas de Node, pruebas y tipos de Deno, y `npm run build:web`. **Deno es obligatorio ahí**: corre con `EXIGIR_DENO=1`, que hace que `scripts/pruebas-edge.mjs` falle si falta (en una Mac sin Deno sigue avisando sin bloquear). El build sale sin variables `EXPO_PUBLIC_*`, o sea en modo de demostración: prueba que el bundle se arma, no lo publica.
+- **`arneses.yml`**, sólo cuando cambian `supabase/schema.sql`, las migraciones, los arneses o los scripts que los aplican, y a mano desde Actions: levanta el stack de Supabase en el runner, construye la base con `construir-base.mjs --sin-149` y corre todos los arneses. El `config.toml` se escribe en una carpeta temporal sin `migrations/`, por la misma razón que en las Macs vive fuera del repositorio.
+
+**El runner está en UTC y eso es a propósito un canario.** El primer run falló en tres pruebas que comparaban horas formateadas contra fechas con desfase de Chile: pasaban sólo porque las Macs están en Santiago. Una prueba que formatea fechas fija su zona (`process.env.TZ = 'America/Santiago'` antes de crear ninguna fecha) o usa una hora que cae en el mismo día en cualquier zona.
+
+Para ver cómo salió: `gh run list --limit 5`.
+
+## Carrera de dos pagos por el mismo bloque (2026-11-14)
+
+`node scripts/carrera-dos-pagos.mjs [vueltas]`, sólo contra la base local (se niega con otro contenedor). Dos sesiones `psql` reales llaman a `confirmar_pago` por dos reservas de la **misma cancha, fecha y hora**: una vuelta orquestada (A retiene su transacción 1,5 s; B tiene que esperar y, al despertar, ver la hora tomada), varias libres lanzadas a la vez y una con avisos repetidos. En cada bloque exige exactamente una reserva `confirmada`, la otra `rechazada`, un pago `pagado`, el otro en `reversar` y un aviso a quien perdió. Crea su fixture y lo borra al terminar.
+
+Resultado: verde en las 10 vueltas; **no encontró ningún fallo en `confirmar_pago`**. Y sirve: con el `pg_advisory_xact_lock` quitado de la función (probado en local y restaurado) falla en todas las vueltas —el segundo pago revienta contra el índice único de reservas confirmadas y queda `pendiente`, sin marca de devolución—. O sea, el índice impide la doble reserva pero es el candado el que deja el pago perdedor identificable. No corre en CI ni con `npm test`: necesita el stack local.
 
 ## Comprobaciones locales del proyecto
 
@@ -8,7 +25,7 @@
 npm test
 ```
 
-Ejecuta las pruebas de Node de `src/**/__tests__/*.test.js`: utilidades de chat, privacidad de amistades, bandeja y preferencias de avisos, destinos de avisos, edición de perfil, rutas y búsqueda.
+Ejecuta las pruebas de Node de `src/**/__tests__/*.test.js` y de `scripts/__tests__/*.test.js` (orden de migraciones, despliegues de Edge Functions, fechas de los arneses): utilidades de chat, privacidad de amistades, bandeja y preferencias de avisos, destinos de avisos, edición de perfil, rutas y búsqueda. **Última cifra, según la sesión que cerró el lote de arreglos de Chat, Avisos, Inicio, Perfil y Partidos el 2026-11-05** (no se volvió a medir al escribir esta nota): `npm run verify` dio 0 errores de lint (24 avisos), 1.879 pruebas de Node (eran 1.771 al empezar el lote) y las 49 de Deno.
 
 ```bash
 npm run build:web
@@ -64,7 +81,7 @@ Cada archivo se abre con `begin;` y termina en `rollback;`, así que ejecutarlo 
 
 La verificación U3 del 2026-08-13 compuso también cada migración con su arnés dentro de una transacción exterior: 44e sola 8/8, 45 sola 14/14, ambas juntas 45b 13/13, 45c 18/18 y 45d 5/5. Se probó una carrera real con dos sesiones: la segunda recibió `lock_not_available` mientras la primera retenía la fila de `matches`, y ambas hicieron rollback. Tras aplicar 44e y 45 en producción se repitieron los arneses seguros —todos con su propio `BEGIN/ROLLBACK`— con los mismos resultados, más 44d 16/16. El catálogo confirmó 25 asistentes `legado`, cero NULL, ACL, Realtime y orden de triggers; la consulta final confirmó cero fixtures, objetos temporales, avisos duplicados y sesiones `idle in transaction`.
 
-La comprobación local posterior al despliegue pasó `npm run lint` con 0 errores y 25 advertencias conocidas, `npm test` 376/376, Deno 13/13 y `npm run build:web`.
+La comprobación local posterior al despliegue (2026-08-13; las cifras son de ese día, no las de hoy) pasó `npm run lint` con 0 errores y 25 advertencias conocidas, `npm test` 376/376, Deno 13/13 y `npm run build:web`.
 
 La prueba manual autenticada se hizo el 2026-08-13, con dos sesiones a la vez, y encontró un fallo de cliente que ninguna prueba SQL podía ver: la nómina pedía `profiles.nombre`, columna inexistente, y PostgREST rechazaba la consulta entera con `400 / 42703`. Corregido y cubierto por `src/utils/__tests__/nominaQuery.test.js`, que contrasta cada columna pedida contra `schema.sql` y las migraciones. Repetida la comprobación, pasó entera, incluido el corte de 720 px en Chrome a 390 × 845. Todo lo verificado es web; el render nativo en un dispositivo físico no tiene evidencia. `45_inscripcion_por_club_test.sql` se volvió a ejecutar contra producción, 14/14, y se verificó después que su `ROLLBACK` dejó la nómina idéntica fila por fila, sin usuarios ni partidos de fixture.
 
@@ -95,6 +112,8 @@ deno test supabase/functions/send-push/pushLogic.test.ts
 
 Esa suite cubre clasificación de tickets y recibos, deduplicación/validez de tokens y preferencias de push. No invoca Expo ni un proyecto Supabase reales.
 
+Hoy las pruebas de Deno son cuatro archivos —`send-push/pushLogic.test.ts` y, en `_shared/`, `correoReporte.test.ts`, `correoSolicitud.test.ts` y `flowLogic.test.ts`— y se corren todas juntas con `npm run test:edge`, que desde el 2026-10-16 forma parte de `npm run verify`. **Medido el 2026-11-05: 49 pasaron, 0 fallaron.**
+
 ## Flujos manuales autenticados
 
 Con una instancia de desarrollo configurada y cuentas de prueba, comprobar al menos:
@@ -111,6 +130,305 @@ Con una instancia de desarrollo configurada y cuentas de prueba, comprobar al me
 ## Push sólo en dispositivo físico
 
 La validación de push nativo exige dispositivos físicos Android/iOS, permisos concedidos, configuración de Firebase/EAS y servicios remotos autorizados. Probar registro de token, cada preferencia de categoría, recepción en primer plano y arranque frío, además de un token inválido. Web y simuladores omiten el registro nativo; por tanto, ni `npm test` ni `npm run build:web` validan push nativo.
+
+## El recorrido manual del rediseño de Clubes — 18/18 el 2026-09-04
+
+Se rescata acá porque vivía en `HANDOFF_CLUBES.md`, que se retiró en la limpieza del 2026-09-30, y al irse el archivo se fue la evidencia: `pendientes.md` quedó afirmando durante seis semanas que estos dieciocho controles «nunca se corrieron». Sí se corrieron.
+
+El recorrido usó Playwright con clics por JavaScript —la comprobación de estabilidad no funciona con las animaciones de React Native Web— y **0 `pageerror`** en las cuatro sesiones.
+
+| Control | Qué se comprobó |
+|---|---|
+| C3 / C4 | Aceptar y rechazar una invitación, dos veces cada uno: desde el explorador y desde la tarjeta nueva |
+| E6–E9 | Cambio de club activo, persistencia al salir de la pestaña, persistencia tras recargar, y caída al club restante al salir del activo |
+| D7 | El último elemento termina **82 px** por encima de la barra |
+| H5 / H6 | Tres idas y vueltas al detalle: siempre vuelve a la portada |
+| K1 | Los cuatro temas. Los elementos que se quedan verdes son las tarjetas de rival, que usan **el tema del rival**: conducta documentada, no un fallo |
+| L1 / L2 | Error total y recuperación con «Reintentar» |
+| M2 / M3 / M6 | 390, 360 y 1280 px sin desborde horizontal |
+| M4 | Nombre de **76 caracteres**: tres apariciones, todas con elipsis, ninguna se sale |
+| M5 | El carrusel desplaza **1850 px** sobre 390 visibles |
+| N3 | Chat de mensaje directo y de partido normal futuro, en los dos sentidos: historial, compositor, enviar y recibir |
+
+**N3 necesitó una segunda pasada, y el motivo importa:** la primera no falló por el código sino porque **la base no tenía ni un solo partido futuro**, así que el único chat de partido disponible era de un partido ya jugado y en solo lectura. Es el mismo vacío de datos que sigue hoy (ver [Estado actual](estado-actual.md)) y que vuelve a morder cada vez que algo hay que mirarlo en pantalla.
+
+**Los datos de prueba quedaron restaurados**, y se comprobó: tema de «Club prueba» de vuelta en rojo, su comuna de vuelta en vacío **sin tocar la región** —que ya estaba puesta antes, así que borrar las dos habría destruido un dato ajeno—, el nombre largo de «Los Papi Pasty» revertido, las membresías e invitaciones deshechas, y el partido, desafío, propuesta, amistad temporal y la cancha sembrada eliminados. **La cuenta cuadra: 24 partidos antes de sembrar y 24 después de limpiar.**
+
+## Los 123 arneses, todos en verde (2026-10-16)
+
+Se escriben uno por migración y se corren cuando se escriben, pegándolos a mano en el editor SQL. **Nadie los había corrido juntos contra el esquema actual**, porque contra producción cada uno siembra y revierte y hacerlo 120 veces a mano no es realista. Con la base local sí lo es: `node scripts/correr-arneses.mjs`.
+
+**Resultado final: 123 de 123** (2026-10-16). El camino: 76 en la primera pasada del 2026-10-15, 84 tras arreglar los viejos, 95 tras el recinto sembrado, 99 tras el partido de clubes sembrado, 101 tras el fallo que el caso 11 del arnés de la 48 llevaba cinco meses denunciando, 109 tras los tres que NUNCA habían pasado, 115 tras los que se habían quedado en el mundo anterior, 120 tras los de chat y 123 al final. Lo que fallaba se repartía así:
+
+- **~10 necesitan datos de producción.** Mueren en el montaje: «No hay ningún partido de clubes en la base contra el que probar», «Club no encontrado», «La prueba necesita al menos un complejo con dueño cargado». No están rotas: **no son autosuficientes**, y por eso sólo sirven contra una base con historia. Es una propiedad, no un fallo, pero conviene saber cuáles son antes de confiar en un «pasó».
+- **Las que estaban VIEJAS ya están arregladas (2026-10-15).** Eran menos de las que parecía: la primera estimación dijo «~14» contando por el texto del error, y varias de esas —`null value in column cancha_id`, `complejo_id`— resultaron ser del primer grupo: el arnés hace `select … from complejos where publicado limit 1` y en una base vacía no hay ninguno. El error parecía mecánico y no lo era. **Contar errores por su mensaje tampoco es clasificar.**
+
+  Lo que sí estaba viejo y quedó corregido:
+  - **Diez arneses del vertical de Reservas** insertaban sin `reservas.precio_cancha`, que la migración **68** hizo `not null`. Llevaban rotos desde entonces. El valor correcto es el mismo `precio_total`, y lo dice la propia 68 al rellenar las filas viejas: «hasta acá `precio_total` ERA el precio de la cancha».
+  - **El arnés de la 55** llamaba `crear_reserva` sin el contacto que la **67** hizo obligatorio (18 llamadas). Ahora va por nombre de parámetro, no por posición: la firma ya creció dos veces.
+  - **Su caso 26 se había vuelto imposible.** Montaba dos jugadores, los dos autorizando antes de recalcular la cuota; después llegó el auto-confirmado y con dos el grupo se completaba, la reserva salía de `armando` y `recalcular_cuota_reserva` la rechazaba con razón. Se rehízo con un tercero que no autoriza, de modo que **las dos aserciones siguen midiendo lo suyo** — bajar a una sola autorización habría dejado la segunda pasando sin probar nada.
+  - **El arnés de la 44** llamaba `aprobar_propuesta(uuid)`, que dejó de existir cuando la 45c añadió `p_me_inscribo`. Y su caso 11, el de permisos, preguntaba por esa misma firma: `has_function_privilege` con una función que no existe **no devuelve false, lanza**. Ese caso no medía permisos, reventaba.
+- **El resto** son fallos de montaje encadenados al primer grupo, más unos pocos que merecen mirarse uno por uno.
+
+**Lo que este ejercicio encontró y ya está arreglado** (ver `pendientes.md`):
+
+- Cuatro columnas de `profiles` sin versionar —`rating_count` y las tres medias de valoración—, que hacían morir cuatro arneses con `column p.rating_count does not exist`.
+- `reactivate_suspended()` ejecutable por `authenticated` en una base nueva y no en producción. Lo cierra la migración **158**.
+
+**Ocho arneses de Reservas ya no dependen de datos de producción.** Tomaban el primer complejo publicado que hubiera, o el primer `complejo_admins` con rol dueño; ahora cada uno crea su recinto, su cancha y sus horarios. Dos detalles que costaron una vuelta: el horario se siembra para **los siete días** —varios casos piden disponibilidad de `hoy + 2`, que cae en otro día de la semana— y el del 81 va **despublicado**, porque su caso 15 comprueba justamente que sin sesión no se ve ni una foto de un recinto no publicado.
+
+**Y cuatro arneses destaparon lo de la migración 114** (ver el P2 de [Pendientes](pendientes.md)): los casos que corrían como `anon` ya no pueden, porque esa migración cerró las catorce funciones que el producto le había abierto. Se ajustaron para medir lo que de verdad pasa, con el conflicto escrito dentro de cada uno y la indicación de cómo revertirlos si se decide reabrir.
+
+**Cuatro arneses de clubes ya siembran su propio partido** (44d, 45, 46 y 47). Recorren el flujo real —desafío, aceptación, propuesta, aprobación— en vez de forzar estados, así que el partido que queda es el que la app habría creado. El 44d siembra además un partido NORMAL y un tercer usuario ajeno a los dos clubes, porque sus casos 12 y 14 los necesitan.
+
+**Y el 46 tenía un defecto latente que sólo se ve con datos sembrados:** buscaba el evento del rechazo con `order by created_at desc limit 1`, y **dentro de una transacción `now()` no avanza**, así que todos los eventos comparten `created_at` y esa consulta devuelve cualquiera. Acusaba a la función de inventarse un motivo que venía de un caso anterior. Ahora se busca por `change_id`. Contra una base con historia el defecto estaba igual de presente; sólo que no se notaba.
+
+**Y el ejercicio encontró un fallo de verdad en producción.** El caso 11 del arnés de la 48 —«en disputa nadie debería poder proponer de nuevo»— llevaba rojo desde mayo, y tenía razón: la migración **119** reescribió `proponer_resultado` para añadirle los permisos de club y la reconstruyó desde una copia **anterior a la 48b**, devolviendo la guarda laxa que aquella había cerrado. Lo arregla la **159**. Detalle en `pendientes.md`.
+
+**La última tanda (2026-10-16) no era trabajo mecánico.** De los que quedaban rojos, casi ninguno estaba «roto»: cada uno pedía una regla que una migración posterior cambió a propósito, y nadie volvió a correrlos. Vale la pena la lista, porque es el catálogo de cómo envejece un arnés:
+
+- **La 67** hizo obligatorio el contacto de la reserva: el 60, el 62 y el 64 morían en «Escribe un nombre de contacto» antes de llegar a lo suyo.
+- **La 43c** hizo obligatoria la ubicación en el mapa de la propuesta oficial: los casos 9 a 15 del 43 nunca llegaban a correr.
+- **La 65** dejó de entregar disponibilidad de un recinto sin publicar, y varios arneses creaban el suyo sin publicar. El 57 ni siquiera llegaba al caso 1: la policy de insert de las calificaciones se une a `canchas_reservables`, que sólo muestra las de un recinto publicado.
+- **La 77** añadió `canchas_reservables_select_admin`, y el caso 1 del 72 seguía exigiendo que el dueño NO viera sus canchas.
+- **La 83** partió el cargo de administrador en tres permisos y dejó a los nuevos naciendo sin ninguno: el caso 3 del 60 editaba la ficha con un admin recién agregado.
+- **La 44d** cambió la regla entera del partido de clubes —privado hasta que termina—, así que los casos 6 y 7 del 44b pedían lo contrario de lo vigente, y su caso 9 se inscribía a mano en un partido que la 44d cerró.
+- **Un tope de 3 clubes por usuario** hacía imposible el caso 9 del 40, que creaba 30. La escala es lo que importa, no el tipo de hilo: se arma con 30 partidos.
+
+**Y dos arneses de chat no medían nada de lo que creían.** El del `/todos` (39) contaba los avisos sin salir del rol de quien acababa de escribir, y `notifications` sólo deja ver lo propio: el remitente nunca es destinatario de su propia mención, así que contaba cero y culpaba al disparador. El de la bandeja (40) ponía el `sender_id` a mano, pero desde la migración **32** el disparador `messages_force_server_fields` hace `sender_id := auth.uid()`: **todos** sus mensajes se guardaban como de una sola persona y la bandeja medía una conversación de uno consigo mismo. El DM lo delataba —nadie es amigo de sí mismo— y por eso moría ahí.
+
+**El reloj de la transacción, otra vez.** Ese mismo disparador estampa `created_at := now()`, que es la hora de ARRANQUE de la transacción: los `pg_sleep` del arnés 40 no separaban nada y «el mensaje más nuevo» quedaba indefinido. Su propio caso 8 lo comprobaba y habría gritado, si hubiera llegado a correr. Ahora los mensajes, las lecturas y el escondite van en un reloj propio del arnés, **hacia atrás** y de a un segundo —hacia adelante ninguna lectura los alcanzaría—. Es la misma lección del 46, en otra tabla: *dentro de una transacción `now()` no avanza*.
+
+**Y una de SQL que cuesta una tarde:** el caso 7 del 40 comprobaba `v_payload->'last_message' is not null` contra una RPC que devuelve `'last_message': null`. `->` entrega el valor JSON `null`, que no es un NULL de SQL, así que la condición era cierta siempre. Para preguntar por «vacío» hay que usar `->>`.
+
+**Y una lección sobre cómo se compara.** El 2026-10-14 se dio por buena la equivalencia con producción comparando **conteos de objetos** —72 tablas, 285 funciones, 118 políticas— y coincidían. Lo que no coincidía eran las columnas de una tabla y el privilegio de una función. **Contar no es comparar.**
+
+## Comparar las dos bases objeto por objeto (2026-10-16)
+
+Comparar dos huellas tampoco bastaba: columnas y privilegios cuadraban desde el 14 de octubre, y aun así la base que construye el repositorio **no era** producción. Se comparan ahora **siete dimensiones**, y la 162 cerró lo que faltaba:
+
+| | base nueva | producción |
+|---|---|---|
+| Columnas (658 en 72 tablas) | `65dea24a…` | `65dea24a…` |
+| `execute` y `security` de las 285 funciones | `bb7d1ccf…` | `bb7d1ccf…` |
+| **Cuerpos** de las 285 funciones | `addf38f8…` | `addf38f8…` |
+| Políticas (118) | `bb2a653a…` | `bb2a653a…` |
+| Disparadores (58) | `f549a45a…` | `f549a45a…` |
+| Restricciones (431) | `cd15f320…` | `cd15f320…` |
+| Índices (202) | `e7f820a4…` | `e7f820a4…` |
+
+**EL `prosrc` DE PRODUCCIÓN NO ES EL DEL ARCHIVO, y por eso casi nadie compara cuerpos.** Lo que se aplica por el editor o por el MCP llega **sin comentarios y con los saltos de línea comidos**. Un `md5(prosrc)` a secas da 285 diferencias de 285 y ninguna es real; quitando comentarios y colapsando espacios quedan 14, que siguen sin serlo —son `(select` contra `( select`—. Hay que quitar **todo** el espacio en blanco, la misma transformación en los dos lados. Entonces quedan **dos**, y las dos importan. Es el mismo trabajo que hacía falta para no volver a perder una decisión como la de la 48b.
+
+**Lo que encontró, y que ninguna de las otras seis dimensiones habría visto:**
+
+- **`solicitar_revision_sancion` estaba MEJOR en producción que en el repositorio.** Filtra el informe de incomparecencia por `club_reportado_id = v_club`; el archivo 47c lo busca sólo por `challenge_id`. La función hermana de esa misma migración sí filtra, con el comentario que lo explica. Sin el filtro, un club que no fue reportado puede pedir revisión apoyándose en el informe del otro, y el expediente que se congela retrata al club equivocado. El arnés de la 162 lo demuestra con un control que degrada la función dentro de la transacción: con el cuerpo viejo, `ok:true` y revisión creada.
+- **Tres CHECK que producción tiene y `schema.sql` no declara**: `matches_duracion_min_check`, `matches_min_trust_score_check` y `profiles_estado_check`. Una base nueva aceptaba un partido de 5000 minutos, un `min_trust_score` de -3 y un perfil en estado inventado.
+- **`idx_profiles_username`**, que existe en producción y nunca se versionó.
+- **`idx_matches_con_reserva`**, al revés: lo crea la migración 99 y producción no lo tiene. Es un índice no único sobre exactamente la misma columna y el mismo predicado que `matches_reserva_uidx`, que sí es único. Peso muerto; la 162 lo retira.
+- **Dos textos de aviso** que el repositorio dice más largos de lo que la gente recibe. Se conservó lo que recibe hoy; la elección está anotada en `pendientes.md`.
+
+## Correr la APP contra la base local (2026-10-16)
+
+`npm run web:local`. Lo que desbloquea no es poco: hasta ahora cualquier prueba de un flujo real —registrarse, crear un partido, escribir en el chat— habría escrito en producción, así que no se hacía. Las trampas y la razón de cada defensa están en la cabecera de `scripts/web-local.mjs`; lo que importa recordar es que **pasar las variables en el proceso no alcanza** (Expo incrusta el `.env` en el bundle y ése gana) y que el respaldo del `.env` **tiene que estar ignorado por git**, comprobado con `git check-ignore` antes de tocar nada.
+
+**El registro completo ya corre en local (2026-10-16):** crear cuenta → código de 6 dígitos por correo → verificar → términos → Inicio, con la contraseña fijada y comprobada pidiendo un token a `/auth/v1/token`. Costó tres cosas, y las tres valen para cualquiera que levante el stack:
+
+- **La plantilla de correo.** El registro no deja una cuenta usable hasta verificar el OTP —la contraseña se fija después, en `completeSignUpPassword`— y la plantilla por omisión manda un **enlace mágico**, no `{{ .Token }}`. Con esa plantilla la cuenta se crea, el perfil se crea, la contraseña nunca queda fijada, y el login siguiente dice «Correo o contraseña incorrectos»: parece un fallo de la app y es del entorno. La plantilla está versionada en `supabase/plantillas-correo/`. Va en `confirmation` **y** en `magic_link`: «Reenviar código» pasa por `signInWithOtp`.
+- **colima sólo comparte `/Users/...`.** El proyecto del stack vivía en `/private/tmp` y Docker montó la plantilla dentro del contenedor como un **directorio vacío**, sin quejarse; gotrue mandó un listado de directorio en vez del código. El proyecto del stack local vive ahora en `~/.futfinder-local` — fuera del repositorio, para que `supabase db reset` no pueda aplicar las migraciones en orden alfabético.
+- **`[api]` y `[realtime]` estaban apagados.** Para los arneses da igual —se habla con Postgres directo— pero con la app encima el `/auth` funciona y **cada `supabase.from(...)` vuelve 503**: Inicio decía «¡Hola, jugador!» y «No pudimos cargar tu reputación». Parecían dos fallos de la app y eran uno solo del entorno.
+
+## Lo que los arneses miden sin querer: el reloj y el calendario (2026-10-17)
+
+El caso M7 de la **86** salió por casualidad —se corrió la suite de mañana y no de noche—, así que se buscaron los demás a propósito. Hay dos familias y se distinguen bien.
+
+**1. Depende de la HORA del día.** Pasa cuando un escenario mezcla una hora del reloj con una ventana relativa. Son dos, las dos arregladas:
+
+- **86**: ponía la reserva «hoy a las 23:30» y comprobaba que ya no se pudiera cancelar. A las 21:00 faltaban dos horas y pasaba; a las 10:30 faltaban trece y fallaba. Ahora la pone **a una hora de ahora**, sobre la hora de Chile y partiendo fecha y hora juntas para que cruzar la medianoche no la deje en el día equivocado. El modelo a copiar estaba al lado: la **70** ya lo hacía así (`v_ts := v_ahora + interval '13 hours'`, y después `v_ts::date` y `v_ts::time`).
+- **84**: su caso C2 —«reservar una hora de hoy que ya pasó se rechaza»— vivía dentro de un `if v_h is not null`, y `v_h` es «un bloque de hoy que ya empezó». Entre las 00:00 y las 00:59 de Chile no existe ninguno: **el caso desaparecía sin dejar rastro y el arnés terminaba en verde**. Ahora, si no hay bloque pasado, lo dice y falla. Un caso que no corre no es un caso que pasa.
+
+Lo que NO es hora-dependiente aunque lo parezca: `now() ± N horas` y `date_trunc('hour', now()) + N días`. Son relativos y se comportan igual a cualquier hora. Están en 25 arneses y ninguno es un problema.
+
+**2. Depende del CALENDARIO, y tenía fecha de estallido.** Once arneses del vertical de Reservas montaban su escenario sobre `date '2027-03-01'`. **El 2 de marzo de 2027, los ocho que crean una reserva ahí se habrían puesto rojos a la vez**: desde la migración 84, `crear_reserva` rechaza el pasado. Ocho arneses en rojo por el calendario, sin que nadie tocara una línea.
+
+Se cambiaron por **el lunes de dentro de dos semanas**, calculado sobre la hora de Chile:
+
+```sql
+(date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date
+```
+
+Lunes porque las reglas de horario de esos arneses lo dan por supuesto, y a dos semanas porque así nunca cae en pasado. Los tres que conservan una fecha fija —**66**, **67** y **70**— comprueban una **conversión** (el desfase de zona horaria, el cruce de la medianoche), no reservan nada, y lo dicen en un comentario.
+
+**El guardián:** `scripts/__tests__/arnesesSinFechaCaduca.test.js` falla si un arnés escribe una fecha del calendario a mano. La exención se declara en el propio archivo —un comentario con las palabras «no caduca»— y no en una lista que vive en otra parte y que nadie vuelve a leer. Control comprobado: una fecha de 2028 colada en el arnés de la 63 lo pone en rojo con el archivo y la línea.
+
+## El recorrido de la app, caminado de verdad (2026-10-17 al 19)
+
+Con `npm run web:local` se puede usar FutFinder sin escribir en producción, así que se caminó el recorrido real con **dos cuentas**. Esto es lo que ya está comprobado de punta a punta, para no repetirlo:
+
+| Paso | Comprobado en la base, no sólo en pantalla |
+|---|---|
+| Registro con código por correo | la cuenta queda confirmada y **la contraseña fijada** (se pide un token a `/auth/v1/token`) |
+| Publicar un partido | dirección real, coordenadas y **comuna correcta**; la cancha se registra en `canchas` |
+| Segunda cuenta se une | `cupos_disponibles` baja, el inscrito queda con `origen = orden_llegada`, al organizador le llega `match_join` |
+| Chat del partido | el mensaje queda en `messages` con su `match_id` |
+| Crear club | queda con comuna, modalidad y tema, y el fundador entra como `admin` |
+| Solicitar unirse / aceptar | `club_join_requests` pasa a `approved`, el jugador entra como `jugador`, y salen **dos** avisos: «fue aceptada» a quien pidió y «se unió» al club |
+| `/todos` en el chat del club | el mensaje queda con `mention_all`, y el aviso le llega al OTRO integrante y **no a quien lo escribió** — que es justo lo que afirma el arnés 39, ahora visto en la app |
+| Bandeja de avisos | filtra por categoría con sus conteos y marca la solicitud ya resuelta |
+
+**Cuatro fallos de interfaz salieron de este recorrido** —la pista de la contraseña que mentía, el «¡Todo listo!» que no guardaba nada, la hora en 12 horas y el botón de crear club que no hacía nada— y **los cuatro comparten forma**: la app hace algo distinto de lo que dice, o no dice nada. Ninguno se encuentra leyendo código ni corriendo arneses.
+
+### El vertical de Reservas, entero (2026-10-19)
+
+Era el que **nunca había transaccionado**: producción tiene 13 canchas, 19 tarifas y 73 reglas de horario, y **cero reservas y cero pagos**. Se caminó completo contra la base local, de las dos puntas: el dueño y el jugador.
+
+| Paso | Comprobado en la base, no sólo en pantalla |
+|---|---|
+| «Quiero sumar mi recinto» | queda en `solicitudes_recinto`, el teléfono normalizado a `+569…`, `avisada_at` en null (sin proveedor de correo local, que es el «no falla, sólo no avisa» de diseño) |
+| Autorización y crear el recinto | la autorización se gasta en la misma transacción (`usada_at` **y** `complejo_id`, que es lo que exige el CHECK), el complejo queda con comuna y coordenadas, y el dueño entra en `complejo_admins` |
+| Cargar una cancha | `canchas_reservables`, con el aviso correcto de que sin horario no es reservable ni se puede publicar |
+| Horarios y tarifas | 7 reglas 09:00–23:00, y una tarifa 19:00–23:00 que la pantalla desglosa bien: «10 bloques a $28.000 y 4 a $34.000», con la comisión del 5 % |
+| Mandar a revisión → aprobar → publicar | `revision_pedida_at`, luego `aprobado_futfinder`, luego `publicado`; aprobar **no** publica |
+| El jugador busca y elige hora | `buscar_complejos` lo trae con su «desde» y su próxima hora libre; las horas pasadas no se ofrecen y **cada bloque trae el precio de SU franja** |
+| Reservar | la reserva se crea con `precio_total = 34000` **calculado por el servidor**, no por el precio que mandó el cliente |
+| El pago | se detiene donde tiene que detenerse: sin pasarela, «No pudimos iniciar el pago · no se te descontó nada». La reserva queda en `procesando` y **no bloquea la hora** — sigue ofreciéndose, que es lo que el resumen le promete al jugador |
+
+**Cinco cosas salieron de este recorrido**, y ninguna la encuentra un arnés:
+
+1. **El buscador se quedaba pegado** en lo que vio al abrir la app: la lista se pedía sólo al montar, y en un navegador de pestañas esa pantalla vive toda la sesión.
+2. **La dirección del recinto quedaba tapada** por el botón «Ver horarios», sin forma de destaparla.
+3. **Quitar una tarifa no preguntaba nada**, y esas horas vuelven al precio base de inmediato.
+4. **El basurero era un botón dentro de otro botón**, marcado inválido en web.
+5. **Nadie se enteraba cuando un recinto pedía revisión** — el más grave, y el único que ya estaba pasando en producción: 35 días de espera. Ver [Aprobar recintos](aprobar-recintos.md).
+
+### El ciclo de desafíos entre clubes, entero (2026-10-21)
+
+Con **dos sesiones a la vez** —`localhost:8081` y `127.0.0.1:8081`, que para el navegador son dos orígenes y por eso cada una guarda su propia sesión—, cada cuenta administrando un club distinto.
+
+| Paso | Comprobado en la base, no sólo en pantalla |
+|---|---|
+| Crear el segundo club | queda con comuna, modalidad y tema propios, y quien lo crea entra como `admin` |
+| Salir del otro club | la membresía se borra y al rival le llega `club_member_left` |
+| Mandar el reto | `club_challenges` en `pendiente`, con zona y mensaje; el aviso `club_challenge` va al admin del club RETADO, no a quien lo manda |
+| Aceptar desde el aviso | pasa a `negociacion` con `negociacion_vence_at` a 72 h y abre el hilo `challenge:<id>` |
+| Propuesta oficial | cancha ubicada en el mapa (lat/lng reales), modalidad, nivel, cupos, cuota e instrucciones, todo en `club_challenge_proposals` |
+| Aprobar y publicar | `matches` con `cupos_totales = 2 × cupos_por_club`, `nivel` y `precio_cuota`; el desafío pasa a `publicado` y sale `club_match_published` a los integrantes de los dos clubes |
+| Las dos nóminas | cada sesión se inscribe por SU club, el conteo dice «de tu club» del lado correcto, y la otra sesión lo ve **sin recargar** |
+| El reloj | movida la fecha del fixture, `refrescar_desafio()` lleva `publicado → en_juego → esperando_resultado` |
+| Registrar el marcador | 3-1 con un jugador destildado: queda `no_asistio` en `attendees` y **el TrueScore de las dos cuentas se queda en 75** — la garantía de la migración 50, vista de verdad y no sólo en el arnés |
+| Confirmar desde el club contrario | desafío y partido en `finalizado`, resultado `confirmado`, y `club_estadisticas()` devuelve 1-0-0 con 3-1 para La Reina y 0-0-1 con 1-3 para Ñuñoa: el marcador se lee desde el club que se mira |
+
+**Cinco fallos salieron de este recorrido**, y el primero es de los que no se pueden ignorar:
+
+1. **«Crear propuesta oficial» reventaba al abrirse**, siempre y para todos — el paso que convierte un desafío en partido. Un `NIVELES` pedido al módulo equivocado; la guarda de importaciones existía pero sólo miraba `src/utils` y éste venía de `src/services`.
+2. **Dos burbujas mudas** —«Hubo una novedad en el desafío», dos veces— donde iban «empezó el partido» y «terminó, registren el marcador».
+3. **«Faltan menos de 2 horas para el partido»** en el hilo de un encuentro terminado hacía tres.
+4. **El aviso seguía pidiendo confirmar** un resultado ya confirmado, al lado de un reto que sí aparecía cerrado.
+5. **«Buscar rivales» decía «todavía no tienes clubes»** a un integrante, por una variable mal nombrada cuyo nombre se filtró al texto.
+
+Y dos cosas que quien aprueba no veía y ahora sí: la **modalidad** y el **nivel** del partido que estaba a punto de publicar.
+
+**Lo que todavía no se ha caminado:** confirmar la asistencia al terminar un partido normal, y las valoraciones. Del vertical de Reservas quedan sin caminar las partes que no se pueden sin pasarela: el pago dividido entre jugadores, cancelar con devolución y la agenda del dueño con reservas de verdad. Del ciclo de clubes quedan las ramas tristes —rechazar el reto, pedir cambios, la prórroga, cancelar el encuentro y la incomparecencia—, que sí tienen arnés pero no recorrido.
+
+**Una pregunta abierta que dejó el recorrido:** un partido entre clubes no suma a `profiles.partidos_jugados`. Quien jugó y quedó `confirmado_gps` sigue viendo «0 partidos jugados» en su perfil. Puede ser correcto —la 50 cerró a propósito la puerta genérica que tocaba la reputación— pero conviene decidirlo, no heredarlo.
+
+## El barrido del reloj, hecho de verdad (2026-10-17)
+
+La búsqueda de arriba fue leyendo los 126. Después se comprobó **moviendo el reloj**: `bash scripts/barrido-reloj.sh horas` y `… fechas`.
+
+**Resultado: 126/126 a las nueve horas del día** (00:30 a 23:30 de Chile) **y en las nueve fechas** probadas, de fin de año a 2029, pasando por el 2 de marzo de 2027 —el día en que habrían estallado las fechas clavadas—, los dos cambios de hora de Chile (abril y septiembre) y el 29 de febrero de 2028.
+
+**El control, que es lo que lo convierte en una prueba:** las versiones ANTERIORES de esos arneses, sacadas de git y corridas con el reloj en el 2027-03-02, fallan. El arnés 55 lo dice con todas sus letras:
+
+```
+FALLÓ (caso 1): crear_reserva completa debería aceptar,
+respondió {"ok": false, "reason": "Esa hora ya pasó. Elige otra."}
+```
+
+**Cómo se mueve el reloj, porque los dos caminos obvios no sirven:**
+
+- `date -s` a secas **no dura dos segundos**: `lima-guestagent` lo devuelve a la hora real. Hay que pararlo — y `docker` desde el host sigue funcionando sin él, comprobado.
+- `libfaketime` dentro del contenedor **revienta**: el postgres de la imagen es de Nix y la libfaketime de Alpine es musl. `Fatal glibc error: malloc.c`. No insistir.
+
+El script para el guestagent, mueve la hora, corre la suite entera a cada paso y **repone todo en un `trap`**, también si te vas con Ctrl-C. Al terminar deja el reloj sincronizado con el host.
+
+**Y REINICIA POSTGRES, que no es por gusto.** `pg_cron` se queda colgado después del viaje en el tiempo: anota corridas con fecha futura y deja de disparar. Se vio el 2026-10-19 —**37 horas sin ejecutar ninguna de las 12 tareas**, con 99 corridas fechadas en 2028 y 2029 en el registro—. No se nota enseguida, y lo que se pierde en silencio son los recordatorios, el cierre de los partidos sin confirmar y el vencimiento de las reservas. Reiniciar el contenedor levanta de nuevo el lanzador y todo vuelve a su hora.
+
+**Y encontró uno que la lectura no había visto.** El C09 del arnés de la **137** —«las cuentas reales no se movieron»— contaba cuántos perfiles de la base tenían un puntaje distinto de 75, excluyendo sus cuatro fixtures. Daba por hecho que cualquier otra cuenta vale 75: cierto en una base recién construida y en ninguna otra. Con el reloj en junio de 2027 y una cuenta de prueba creada por la app, el job de inactividad **hace exactamente su trabajo** —la cuenta lleva ocho meses sin jugar— y el arnés lo llamaba fallo. Ahora toma una foto de los perfiles ajenos antes de correr el job y comprueba que no se movió ninguno **que estuviera al día**. Es el mismo defecto que «no es autosuficiente», en otra forma: el caso se apoyaba en datos que no son suyos.
+
+## La diferencia que no es de esquema: los interruptores (2026-10-16)
+
+Las siete huellas de la base construida cuadran con producción. **Los datos de configuración, no.** Una base nueva nace con **las cuatro fases de TrueScore apagadas** y producción las tiene encendidas desde el 2026-09-24.
+
+**Y eso cambia el resultado de la suite.** Con los interruptores como los tiene producción, **119 de 125** pasan: seis arneses dan por buena la regla PRE-TrueScore y nunca se corrieron con la configuración de verdad.
+
+| arnés | lo que afirma |
+|---|---|
+| `122_una_salida_y_una_asistencia…` | la salida legítima cobra **3** (con TrueScore cobra 1) |
+| `125_la_otra_puerta_de_la_salida` | el cambio legítimo cobra **3** |
+| `127_cancelar_para_cambiarse…` | cobra 25 de una vez, 80 → 55 |
+| `50_una_sola_puerta` | el jugador del club rival no pierde puntaje |
+| `134_truescore_fase1` | enciende la fase él mismo y ya estaba encendida |
+| `profiles_reputacion_protegida` | la sanción vigente son 3 puntos |
+
+Los cinco primeros no estaban rotos: estaban **viejos**, igual que los doce que se repararon esta misma semana. **Cerrado el 2026-10-17, y con 126/126** (los 125 más el guardián nuevo).
+
+**Lo que se cambió, y por qué no es «ajustar el número esperado».** Lo que esas migraciones prometen no es «3 puntos»: es que **se cobre UNA SOLA VEZ**. Clavar el número ataba el arnés a una tabla de penalizaciones que no es suya. Ahora:
+
+- se lee el puntaje antes, se llama una vez, y se exige que la baja sea **exactamente lo que la propia RPC dice haber cobrado**;
+- cuando el cobro no viene en la respuesta —cancelar— se le pregunta a `truescore_costo_salida` **antes** de cancelar;
+- el segundo intento tiene que dejar el puntaje donde estaba, que es el caso de verdad.
+
+**`construir-base.mjs` enciende ahora las cuatro fases** al terminar, y `interruptores_como_produccion_test.sql` falla si alguna está apagada —o si las de teléfono están encendidas sin proveedor de SMS—. Control comprobado: apagar la fase 3 lo pone en rojo nombrándola.
+
+**Y tres trampas que cazó el ejercicio, ninguna sobre TrueScore:**
+
+- El arnés de la 122 contaba los apuntes del historial **con el rol puesto**, y los dos libros tienen RLS de «sólo lo mío»: la sesión era la del organizador mirando los del jugador. Contaba 0 y parecía que el registro de puntos no se había hecho. Misma trampa que el arnés 39.
+- El de la 134 contaba *todos* los eventos del partido y exigía 3; con la fase 2 encendida aparece un cuarto, el bono del organizador.
+- Y el de la **86** no tenía nada que ver: su caso M7 ponía la reserva «hoy a las 23:30» y comprobaba que ya no se pudiera cancelar. A las 21:00 faltaban dos horas y pasaba; a las 10:30 faltaban trece y fallaba. **No probaba la regla, probaba el reloj.** Ahora la pone a una hora de AHORA, sobre la hora de Chile y partiendo fecha y hora juntas para que cruzar la medianoche no la deje en el día equivocado.
+
+**Y lo que sí se puede comprobar sin eso:** que la app arrancó contra la base local se verifica leyendo el bundle servido, no mirando la pantalla — `curl` al `index.bundle` y contar apariciones del proyecto de producción. Tiene que haber cero. Mirar la pantalla engaña: la primera corrida abrió con la sesión y los datos de producción y parecía correcta.
+
+## Y una octava diferencia, en `storage` (2026-10-16)
+
+Las siete dimensiones de arriba miran `public`. `storage` se mira igual, y ahí apareció la última: producción tenía **27** políticas sobre `storage.objects` y el repositorio construye **28**. La que faltaba era `match_covers_organizer_delete`, o sea que **nadie podía borrar la portada de un partido, ni siquiera quien lo organiza**. Todos los demás buckets tienen su puerta de borrado; `match-covers` era el único asimétrico, y la asimetría no estaba escrita en ninguna parte: es un accidente de cómo se aplicó la 08. Lo repone la **163**.
+
+No amplía nada que no se pudiera hacer: el organizador ya sube con `upsert: true` y tiene la política de `update`, así que podía SOBRESCRIBIR la portada con cualquier cosa. Borrarla es estrictamente menos. Hoy no la llama nadie —`storage.js` no exporta un `removeMatchCoverFile`—; se repone para que las dos bases digan lo mismo y para que la puerta esté donde la 08 dijo.
+
+**Un detalle para quien escriba el próximo arnés de `storage`:** `storage.objects` trae un disparador, `storage.protect_delete`, que rechaza cualquier borrado por SQL —«use la Storage API»— salvo que esté puesto `storage.allow_delete_query`. Eso es lo que pone la API antes de borrar, así que ponerlo en el arnés es ponerse en su lugar; quién puede y quién no lo sigue decidiendo la RLS. Sin eso, los cuatro casos de borrado mueren todos igual y el arnés no prueba nada.
+
+**Lo que también se comparó y SÍ cuadraba:** las 12 tareas de `cron` (nombre, horario, comando y activas), los 8 buckets de `storage` con sus límites y tipos, los privilegios de las 72 tablas, los de las 41 columnas con ACL propia, y los privilegios por omisión de `public` y `storage` —los de la 115—. Los `pg_default_acl` de los esquemas que administra Supabase (`cron`, `extensions`, `graphql`, `realtime`, `auth`, `supabase_functions`) sí difieren, y eso es del alojamiento, no del repositorio: no se persigue.
+
+**La prueba de que la 162 cierra el círculo:** contenedores nuevos, base vacía, `node scripts/construir-base.mjs --sin-149` (schema.sql + 173 migraciones), y las siete huellas iguales a producción. Después, **124/124 arneses** contra esa base recién construida. La 162 se aplicó a producción el 2026-10-16 y **no cambió ni una huella**, que era justamente lo que tenía que pasar: lo que arregla es la base que el repositorio levanta, no la que está corriendo.
+
+## Cuántos arneses hay hoy, y cuántos están medidos (2026-11-05)
+
+Contados con `ls supabase/tests` el 2026-11-05: **127 arneses `.sql` y 3 de concurrencia `.cjs`** (los tres de la carrera real: salida, agenda del jugador y membresías de club). Las cifras de arriba —123, 124 y 126— fueron ciertas el día que se midieron y el conteo después creció.
+
+**El 127 es `164_recinto_esperando_revision_test.sql`**, de la migración 164 (la cuarta cola de moderación, «Recintos esperando revisión»). Cubre seis cosas: que quien no está en el padrón no ve la cola ni aprueba (`NO_MODERA`, 42501); que un recinto que pidió revisión y no está aprobado aparece con su comuna y sus canchas activas con horario; el control negativo —uno aprobado y uno que nunca pidió revisión **no** aparecen—; que aprobar lo saca de la cola y **no lo publica**; que aprobar dos veces no es un error y aprobar algo inexistente devuelve `ok:false`; y que las tres colas de la 151 siguen estando.
+
+**Qué está medido y qué no:** el «126 de 126 con los interruptores de producción» es del 2026-10-17 y es **anterior a la migración 164** (2026-10-19). El arnés de la 164 **no se re-ejecutó en esta revisión**, ni se volvió a correr la suite entera, así que «127 de 127» no es un dato medido. Sí se midieron el 2026-11-05 las 49 pruebas de Deno (ver arriba).
+
+## La batería completa el 2026-11-13: 140 de 140, sobre una base recién construida
+
+Contados con `ls`: **140 arneses `.sql`**. Base local borrada (`supabase stop --no-backup`) y reconstruida con `node scripts/construir-base.mjs --sin-149`: **188/188 migraciones**, o sea todo lo que tiene producción (hasta la 178, sin la 149). Auth local con lo mismo que producción: código de 6 dígitos, vigencia de 900 s y TOTP habilitado (en `~/.futfinder-local/supabase/config.toml`, fuera del repo).
+
+**Primera corrida: 135 de 140. Ninguna de las cinco era un fallo de la base ni de la app**, y se comprobó antes de tocarlas:
+
+- `112` (caso 14), `119` (armado de un partido de clubes) y `155` (caso 1, el control) eran **anteriores a la 177**, que pasó el `insert` de `matches`, `club_open_challenges` y `club_open_challenge_responses` a privilegios **por columna**. Se miró que el cliente (`createMatch`, `publishOpenChallenge`) sólo escribe columnas concedidas. Los arneses ahora arman como `postgres` lo que arma el servidor (`id`, `cupos_por_club`, `created_at`) y el control de la 155 mira `has_any_column_privilege`.
+- `134` (C06) esperaba el error del disparador (`COLUMNA_PROTEGIDA`) y desde la 165 el privilegio por columna rechaza antes, con 42501. Acepta las dos capas, pero sólo con ese código y ese mensaje: que pase, o cualquier otro error, sigue siendo falla.
+- `176` tomaba «la primera cancha que haya» y una base nueva no tiene ninguna: ahora crea su recinto y su cancha.
+
+**Segunda corrida: 140 de 140.** `44d`, `45`, `83` y `157`, que fallaban en la base vieja, pasaron en la nueva (`44d` y `45` ya se habían corregido en `05fea89` para sembrar su propio partido).
+
+## La batería completa el 2026-11-09 (134 arneses), y cómo se supo qué no rompió la 171
+
+Contados con `ls`: **134 arneses `.sql`** (entraron los de las migraciones 165 a 171). Corrida entera contra la base local con la 170 y la 171 aplicadas: **129 de 134**. Los cinco que fallan son `134` (datos locales), `83` (un caso), `157`, `44d` y `45`.
+
+**Ninguno falla por la 171, y se comprobó en vez de suponerlo:** se revirtió la 171 en la base local (políticas de vuelta a `public`, función anterior, bucket sin tope) y se corrieron `44d` y `45` tres veces en cada estado. Fallan igual con y sin ella. `44d` cambia de caso entre corridas (4, 10 u OK) porque toma un partido de clubes que ya exista en la base local: cuando ese partido ya pasó, `request_join` contesta `{ok:false}` en vez de lanzar y el caso 10 lo cuenta como «dejó entrar». Se miró con un diagnóstico: **no inscribe a nadie** (cero filas en `attendees`). Es el arnés, no la base. Queda en [Pendientes](pendientes.md).
+
+**Lo que sí estuvo a punto de romper la 171:** su primera versión cerraba también `matches` a `anon`, y el caso 12 de `44d` («anon dejó de ver los partidos normales») lo marcó. Ese caso es una decisión escrita, no un accidente, así que la 171 dejó `matches` como estaba. Correr la batería entera antes de aplicar sirvió para eso.
+
+**La base local no tenía la 170** aunque producción sí: su arnés fallaba (96 políticas sin envolver y 71 llaves sin índice) hasta que se aplicó en local ese día. Antes de leer un fallo de la batería como regresión, comprobar que la base local está al día con el repositorio.
 
 ## Notas relacionadas
 

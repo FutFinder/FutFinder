@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { TriangleAlert, RotateCcw, ArrowLeft } from 'lucide-react-native';
 
 import { paleta as C, radios as R, fuentes as F, alfa } from '../theme/colors';
+import { reportarError } from '../services/observabilidad';
 
 /**
  * Red de seguridad para una excepción durante el render.
@@ -34,9 +35,16 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     this.setState({ info });
-    // Queda en la consola siempre: es la única traza que tendremos si el
-    // fallo aparece en el teléfono de alguien más.
+    // Queda en la consola siempre: es la traza que sirve con el teléfono en
+    // la mano, y la única si Sentry no está configurado.
     console.error(`[FutFinder] Error en ${this.props.nombre || 'la pantalla'}:`, error);
+    // Y además sale de la máquina, que es lo que faltaba: este boundary
+    // envuelve TODAS las pantallas (ver `withErrorBoundary`) más la raíz, así
+    // que es el único sitio donde hay que engancharlo. Sin DSN no hace nada.
+    reportarError(error, {
+      pantalla: this.props.nombre || 'desconocida',
+      componentStack: info?.componentStack,
+    });
   }
 
   reintentar = () => {

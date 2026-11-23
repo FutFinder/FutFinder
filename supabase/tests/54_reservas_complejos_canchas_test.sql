@@ -40,8 +40,15 @@ declare
 
   -- Fecha fija de prueba: se ancla el día de la semana de las reglas de
   -- horario a esta fecha, así el arnés no depende del día en que se corre.
-  v_fecha      date := date '2027-03-01'; -- lunes
-  v_dow        int  := extract(dow from date '2027-03-01')::int;
+  -- EL LUNES DE DENTRO DE DOS SEMANAS, no una fecha de marzo de 2027
+  -- (2026-10-17). Estaba clavada en `date '2027-03-01'`, y a partir del
+  -- 2 de marzo de 2027 esa fecha es PASADO: `crear_reserva` la rechaza
+  -- —es la regla de la 84— y este arnés se habría puesto rojo, junto con
+  -- otros siete, sin que nadie tocara una línea de código. Se calcula
+  -- sobre la hora de CHILE y cae siempre en lunes, que es lo que las
+  -- reglas de horario de más abajo dan por supuesto.
+  v_fecha      date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date;
+  v_dow        int  := 1;   -- lunes: `date_trunc('week', …)` siempre cae ahí
 
   v_json       json;
   v_slots      json;
@@ -62,8 +69,14 @@ begin
     'canchas-user-' || v_user || '@futfinder.test', 'x', now(), now(), now(), '{}', '{}', '', '', '', ''
   );
 
-  insert into public.complejos (id, nombre, comuna, latitud, longitud)
-  values (v_complejo, 'Complejo Prueba 54', 'Ñuñoa', -33.45, -70.60);
+  -- PUBLICADO (2026-10-15). Cuando se escribió este arnés, `complejos` se
+  -- leía sin condiciones; la migración **65** cambió la política a
+  -- `publicado`, así que un recinto sin publicar dejó de ser legible y el
+  -- caso 1 llevaba rojo desde entonces. Lo que ese caso mide sigue siendo
+  -- válido —que cualquier autenticado lee un recinto público— sólo que
+  -- ahora hay que publicarlo para que lo sea.
+  insert into public.complejos (id, nombre, comuna, latitud, longitud, publicado)
+  values (v_complejo, 'Complejo Prueba 54', 'Ñuñoa', -33.45, -70.60, true);
 
   insert into public.canchas_reservables (id, complejo_id, nombre, tipo, precio_hora, duracion_slot_min, activa)
   values
@@ -85,11 +98,25 @@ begin
   end if;
   raise notice 'OK (caso 1): complejos se lee públicamente';
 
-  select count(*) into v_count from public.canchas_reservables where complejo_id = v_complejo;
-  if v_count <> 2 then
-    raise exception 'FALLÓ (caso 2): cualquier autenticado debería poder leer canchas_reservables, vio %', v_count;
+  -- UNA de las dos, no las dos. Este arnés siembra una cancha activa y una
+  -- inactiva, y cuando se escribió las leía las dos. La política de hoy es
+  -- `activa AND (el complejo está publicado)`, así que la inactiva dejó de
+  -- verse — a propósito, y el caso llevaba rojo desde entonces.
+  --
+  -- Se comprueban las dos caras en vez de sólo contar: que la activa se ve
+  -- y que la inactiva NO. Contar «1» a secas pasaría también si se viera la
+  -- equivocada.
+  select count(*) into v_count from public.canchas_reservables
+   where complejo_id = v_complejo and id = v_cancha;
+  if v_count <> 1 then
+    raise exception 'FALLÓ (caso 2): la cancha activa de un recinto publicado debería leerse, vio %', v_count;
   end if;
-  raise notice 'OK (caso 2): canchas_reservables se lee públicamente';
+  select count(*) into v_count from public.canchas_reservables
+   where complejo_id = v_complejo and id = v_cancha_off;
+  if v_count <> 0 then
+    raise exception 'FALLÓ (caso 2): una cancha INACTIVA no debería leerse públicamente, vio %', v_count;
+  end if;
+  raise notice 'OK (caso 2): la cancha activa se lee y la inactiva no';
 
   select count(*) into v_count from public.cancha_horario_reglas where cancha_id = v_cancha;
   if v_count <> 1 then
@@ -128,11 +155,9 @@ begin
   -- migración 55): el fixture se escribe sin RLS y se retoma el rol
   -- autenticado después, para no romper el resto de las aserciones.
   reset role;
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values (
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values (
     v_reserva_bloqueante, v_cancha, v_user, v_fecha, time '19:00', time '20:00',
+    20000,
     20000, 'completa', 'balance', 'confirmada'
   );
   execute format('set local role authenticated');
@@ -157,11 +182,9 @@ begin
 
   -- ── Setup: una reserva 'armando' en el slot 20:00 ─────────────────
   reset role;
-  insert into public.reservas (
-    id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-    precio_total, modalidad, medio_pago, estado
-  ) values (
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado) values (
     v_reserva_armando, v_cancha, v_user, v_fecha, time '20:00', time '21:00',
+    20000,
     20000, 'capitanes', 'balance', 'armando'
   );
   execute format('set local role authenticated');

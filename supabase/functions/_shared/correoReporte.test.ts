@@ -10,8 +10,11 @@ import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
   asuntoDeReporte,
   cuerpoDeReporte,
+  leerCaptura,
   leerConfigCorreo,
+  resolverCaptura,
   type Ticket,
+  VIGENCIA_ENLACE_S,
 } from "./correoReporte.ts";
 
 const env = (m: Record<string, string>) => (k: string) => m[k];
@@ -105,4 +108,90 @@ Deno.test("app y plataforma sin informar lo dicen, no quedan en blanco", () => {
   assertEquals(cuerpo.includes("plataforma no informada"), true);
   const conDatos = cuerpoDeReporte({ ...TICKET, app_version: "1.4.2", platform: "ios" });
   assertEquals(conDatos.includes("1.4.2 · ios"), true);
+});
+
+// ── La captura, desde que el bucket es privado (migración 174) ──────────
+//
+// La columna `screenshot_url` trae DOS formas y las dos tienen que terminar
+// en un enlace que abra: la ruta (app nueva) y la URL pública completa
+// (tickets anteriores y apps ya instaladas, que no se actualizan solas).
+
+const RUTA = "22222222-2222-2222-2222-222222222222/1700000000000.jpg";
+const URL_VIEJA =
+  `https://proyecto.supabase.co/storage/v1/object/public/support-screenshots/${RUTA}?t=1700000000001`;
+const FIRMADA = "https://proyecto.supabase.co/storage/v1/object/sign/support-screenshots/x.jpg?token=abc";
+
+Deno.test("captura: la ruta que guarda la app nueva se lee como ruta", () => {
+  assertEquals(leerCaptura(RUTA), { tipo: "ruta", ruta: RUTA, original: null });
+  assertEquals(leerCaptura(`/${RUTA}`), { tipo: "ruta", ruta: RUTA, original: null }, "una barra de más no la rompe");
+});
+
+Deno.test("captura: de la URL pública vieja se saca la ruta, sin el ?t= de caché", () => {
+  assertEquals(leerCaptura(URL_VIEJA), { tipo: "ruta", ruta: RUTA, original: URL_VIEJA });
+});
+
+Deno.test("captura: un nombre con espacios o tildes vuelve de la URL tal como está en el bucket", () => {
+  const url = "https://p.supabase.co/storage/v1/object/public/support-screenshots/uid/mi%20captura%20%C3%B1.png";
+  const c = leerCaptura(url);
+  assertEquals(c.tipo === "ruta" && c.ruta, "uid/mi captura ñ.png");
+});
+
+Deno.test("captura: una URL de otro bucket o de otro sitio no se toca", () => {
+  const otroBucket = "https://p.supabase.co/storage/v1/object/public/avatars/uid/avatar.jpg";
+  assertEquals(leerCaptura(otroBucket), { tipo: "externa", url: otroBucket });
+  assertEquals(leerCaptura("https://ejemplo/captura.png"), { tipo: "externa", url: "https://ejemplo/captura.png" });
+});
+
+Deno.test("captura: vacío, nulo o sólo espacios es «no adjuntó»", () => {
+  assertEquals(leerCaptura(null), { tipo: "ninguna" });
+  assertEquals(leerCaptura(undefined), { tipo: "ninguna" });
+  assertEquals(leerCaptura("   "), { tipo: "ninguna" });
+});
+
+Deno.test("captura: se firma la RUTA, por una semana, venga como ruta o como URL vieja", async () => {
+  for (const valor of [RUTA, URL_VIEJA]) {
+    const pedidos: Array<[string, number]> = [];
+    const r = await resolverCaptura(valor, (ruta, segundos) => {
+      pedidos.push([ruta, segundos]);
+      return Promise.resolve(FIRMADA);
+    });
+    assertEquals(pedidos, [[RUTA, VIGENCIA_ENLACE_S]]);
+    assertEquals(r, { screenshot_url: FIRMADA, screenshot_ruta: RUTA, screenshot_firmado: true });
+  }
+  assertEquals(VIGENCIA_ENLACE_S, 60 * 60 * 24 * 7);
+});
+
+Deno.test("captura: sin captura no se firma nada", async () => {
+  let llamadas = 0;
+  const r = await resolverCaptura(null, () => {
+    llamadas++;
+    return Promise.resolve(FIRMADA);
+  });
+  assertEquals(llamadas, 0);
+  assertEquals(r, { screenshot_url: null, screenshot_ruta: null, screenshot_firmado: false });
+});
+
+Deno.test("captura: si no se puede firmar, el correo igual dice dónde está", async () => {
+  // Con ruta: no hay enlace, pero la ruta no se pierde.
+  const sinEnlace = await resolverCaptura(RUTA, () => Promise.resolve(null));
+  assertEquals(sinEnlace, { screenshot_url: null, screenshot_ruta: RUTA, screenshot_firmado: false });
+  // Con la URL vieja: se manda esa, que abre mientras el bucket siga público.
+  const conVieja = await resolverCaptura(URL_VIEJA, () => Promise.reject(new Error("storage caído")));
+  assertEquals(conVieja, { screenshot_url: URL_VIEJA, screenshot_ruta: RUTA, screenshot_firmado: false });
+});
+
+Deno.test("cuerpo: el enlace firmado avisa que vence y dónde queda la captura después", () => {
+  const cuerpo = cuerpoDeReporte({ ...TICKET, screenshot_url: FIRMADA, screenshot_ruta: RUTA, screenshot_firmado: true });
+  assertEquals(cuerpo.includes(FIRMADA), true);
+  assertEquals(cuerpo.includes("vence en 7 días"), true);
+  assertEquals(cuerpo.includes(`Storage → support-screenshots → ${RUTA}`), true);
+});
+
+Deno.test("cuerpo: una captura que no se pudo firmar NUNCA se lee como «no adjuntó»", () => {
+  const sinEnlace = cuerpoDeReporte({ ...TICKET, screenshot_url: null, screenshot_ruta: RUTA, screenshot_firmado: false });
+  assertEquals(sinEnlace.includes("No adjuntó captura de pantalla."), false);
+  assertEquals(sinEnlace.includes(`Storage → support-screenshots → ${RUTA}`), true);
+  const conVieja = cuerpoDeReporte({ ...TICKET, screenshot_url: URL_VIEJA, screenshot_ruta: RUTA, screenshot_firmado: false });
+  assertEquals(conVieja.includes(URL_VIEJA), true);
+  assertEquals(conVieja.includes("vence en 7 días"), false, "no promete un enlace firmado que no hay");
 });

@@ -330,3 +330,52 @@ function teclearEnFormulario(form, texto) {
       form
     );
 }
+
+/**
+ * EL GRAN SANTIAGO NO ES UNA COMUNA (2026-10-17).
+ *
+ * Publicando un partido de prueba en Irarrázaval 3000, la app lo dejó en
+ * la comuna «Santiago». Esa dirección es de **Ñuñoa**. Nominatim contesta
+ * `city: Santiago` y `suburb: Ñuñoa` —la comuna es la segunda— y el
+ * buscador se quedaba con `city`. La comuna es con lo que la app busca,
+ * filtra y arma «partidos cerca de ti»: medio Gran Santiago terminaba en
+ * el mismo saco.
+ *
+ * Los candidatos viajan ahora en orden, del más específico al más general,
+ * y gana el primero que sea una comuna del catálogo.
+ */
+test('entre Santiago y Ñuñoa gana Ñuñoa: la comuna es la específica', () => {
+  const r = U.seleccionarLugar(U.UBICACION_VACIA, {
+    lat: -33.4569,
+    lng: -70.5941,
+    address: 'Avenida Irarrázaval 3000, Ñuñoa, Santiago',
+    // Tal como los devuelve Nominatim para esa dirección.
+    comunaCandidatos: ['Ñuñoa', 'Santiago', 'Provincia de Santiago'],
+    comunaRaw: 'Ñuñoa',
+    regionRaw: 'Región Metropolitana de Santiago',
+  });
+  assert.equal(r.comuna, 'Ñuñoa');
+});
+
+test('un barrio que no es comuna cede el turno al siguiente', () => {
+  const r = U.seleccionarLugar(U.UBICACION_VACIA, {
+    lat: -33.6,
+    lng: -70.57,
+    address: 'Una dirección de Puente Alto',
+    comunaCandidatos: ['Villa Los Aromos', 'Puente Alto', 'Cordillera'],
+    comunaRaw: 'Villa Los Aromos',
+    regionRaw: 'Región Metropolitana de Santiago',
+  });
+  assert.equal(r.comuna, 'Puente Alto');
+});
+
+test('sin lista de candidatos se sigue usando comunaRaw, como antes', () => {
+  const r = U.seleccionarLugar(U.UBICACION_VACIA, {
+    lat: -33.45,
+    lng: -70.66,
+    address: 'Una dirección',
+    comunaRaw: 'Providencia',
+    regionRaw: 'Región Metropolitana de Santiago',
+  });
+  assert.equal(r.comuna, 'Providencia');
+});

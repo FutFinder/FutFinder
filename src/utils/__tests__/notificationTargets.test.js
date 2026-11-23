@@ -46,6 +46,7 @@ const SAMPLE_DATA_BY_TYPE = {
   club_member_joined: { clubId: 'c1' },
   club_member_left: { clubId: 'c1' },
   club_invite_accepted: { clubId: 'c1' },
+  club_invite: { clubId: 'c1', requestId: 'r1' },
   club_challenge: { clubRetadoId: 'c1', clubRetadorId: 'c2' },
   club_challenge_accepted: { clubRetadorId: 'c1', clubRetadoId: 'c2' },
   club_challenge_rejected: { clubRetadorId: 'c1', clubRetadoId: 'c2' },
@@ -108,6 +109,7 @@ const EXPECTED_SCREEN_BY_TYPE = {
   club_member_joined: 'ClubDetail',
   club_member_left: 'ClubDetail',
   club_invite_accepted: 'ClubDetail',
+  club_invite: 'Main',
   club_challenge: 'ClubChallenges',
   club_challenge_accepted: 'ClubChallenges',
   club_challenge_rejected: 'ClubChallenges',
@@ -163,6 +165,10 @@ test('resolveNotificationTarget: no queda ningún tipo de NOTIF_TYPE_TO_PREFEREN
     [...testedTypes].sort(),
     'esta prueba debe cubrir exactamente los mismos tipos que notificationPreferences.js — si se agrega un tipo ahí, hay que agregarlo aquí también'
   );
+});
+
+test('resolveNotificationTarget: un aviso de moderación lleva a las reglas de convivencia', () => {
+  assert.equal(resolveNotificationTarget({ type: 'moderacion', data: { decision: 'suspender' } }).screen, 'Terminos');
 });
 
 test('resolveNotificationTarget: un tipo desconocido no inventa un destino', () => {

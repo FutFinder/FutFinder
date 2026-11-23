@@ -264,9 +264,16 @@ begin
 
   -- ── Caso 14: expirar_desafios_abiertos() ─────────────────────
   execute format('set local request.jwt.claims to %L', json_build_object('sub', v_admin_a, 'role', 'authenticated')::text);
-  insert into public.club_open_challenges (club_id, creado_por, modalidad, fecha_propuesta, created_at)
-  values (v_club_a, v_admin_a, 'futbol7', now() + interval '10 days', now() - interval '8 days')
+  -- Desde la 177 el cliente sólo inserta las columnas que manda la app
+  -- (`created_at` ya no es una de ellas): se publica como el admin y la
+  -- publicación se envejece después como `postgres`, que es lo que haría el
+  -- paso del tiempo.
+  insert into public.club_open_challenges (club_id, creado_por, modalidad, fecha_propuesta)
+  values (v_club_a, v_admin_a, 'futbol7', now() + interval '10 days')
   returning id into v_open_id;
+
+  execute 'reset role';
+  update public.club_open_challenges set created_at = now() - interval '8 days' where id = v_open_id;
 
   perform public.expirar_desafios_abiertos();
 

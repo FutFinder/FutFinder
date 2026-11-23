@@ -19,6 +19,7 @@ import {
   alfa,
 } from '../../theme/colors';
 import { MOTIVOS_REPORTE } from '../../services/reports';
+import { cierraLaHoja } from '../../utils/reporteDeContenido';
 
 const MAX_DESC = 600;
 
@@ -35,8 +36,21 @@ const MAX_DESC = 600;
  *
  * @param {string} username        A quién se reporta (solo para mostrar).
  * @param {Function} onSubmit      async ({ motivo, descripcion }) => { error }
+ *
+ * Sirve también para reportar contenido (un club, una foto de club, un
+ * partido; migración 186): `titulo`, `queSeReporta` y `etiqueta` cambian
+ * los textos; sin ellos dice lo de siempre, «Reportar esta cuenta».
  */
-export default function ReportPlayerSheet({ visible, username, onClose, onSubmit }) {
+export default function ReportPlayerSheet({
+  visible,
+  username,
+  onClose,
+  onSubmit,
+  titulo = 'Reportar esta cuenta',
+  queSeReporta = null,
+  etiqueta = 'Cuenta',
+}) {
+  const nombre = queSeReporta ?? `@${username}`;
   const [paso, setPaso] = useState('form');
   const [motivo, setMotivo] = useState(null);
   const [descripcion, setDescripcion] = useState('');
@@ -56,11 +70,14 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
     setEnviando(true);
     const { error } = (await onSubmit?.({ motivo, descripcion })) || {};
     setEnviando(false);
-    // La pantalla muestra el resultado; aquí solo cerramos si salió bien.
-    if (!error) {
+    // La pantalla muestra el resultado con su Banner. La hoja se limpia y se
+    // cierra si salió bien o si el servidor lo rechazó para siempre («ya
+    // reportaste esto»); con un fallo de red queda abierta para reintentar.
+    if (cierraLaHoja(error)) {
       setPaso('form');
       setMotivo(null);
       setDescripcion('');
+      if (error) onClose?.();
     }
   };
 
@@ -80,10 +97,10 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
             <>
               <View style={styles.titleRow}>
                 <Flag color={C.loss} size={18} strokeWidth={2} />
-                <Text style={styles.title}>Reportar esta cuenta</Text>
+                <Text style={styles.title}>{titulo}</Text>
               </View>
               <Text style={styles.subtitle} numberOfLines={2}>
-                Cuéntanos qué ocurre con @{username}. Tu reporte es anónimo para esa persona.
+                Cuéntanos qué ocurre con {nombre}. Tu reporte es anónimo para quien lo publicó.
               </Text>
 
               <ScrollView
@@ -167,7 +184,7 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
               </View>
 
               <View style={styles.summary}>
-                <SummaryRow label="Cuenta" value={`@${username}`} />
+                <SummaryRow label={etiqueta} value={nombre} />
                 <SummaryRow label="Motivo" value={motivoLabel} />
                 {descripcion.trim() ? (
                   <SummaryRow label="Descripción" value={descripcion.trim()} multiline />
@@ -175,7 +192,7 @@ export default function ReportPlayerSheet({ visible, username, onClose, onSubmit
               </View>
 
               <Text style={styles.warning}>
-                El equipo de FutFinder revisará el reporte. No se avisa a la persona reportada
+                El equipo de FutFinder revisará el reporte. No se le avisa a quien lo publicó
                 quién lo envió.
               </Text>
 

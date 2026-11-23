@@ -30,6 +30,7 @@ const {
   filasDeComparacion,
   mensajeDeEspera,
   nombresDeLosClubes,
+  partidoYaEmpezo,
 } = require('../cambioPartido.js');
 
 const AHORA = new Date(2026, 7, 15, 12, 0); // 15 de agosto de 2026, 12:00 local
@@ -851,4 +852,60 @@ test('el nombre NO puede salir del desafío: esa fila no trae los clubes', () =>
     /create or replace function public\.refrescar_desafio\(p_challenge_id uuid\)\s*\nreturns public\.club_challenges/,
     '`refrescar_desafio` devuelve una fila pelada de `club_challenges`'
   );
+});
+
+/* ── «Faltan menos de 2 horas» no vale para un partido que ya pasó ─────── */
+
+test('partidoYaEmpezo separa los dos motivos de estar fuera de plazo', () => {
+  const ahora = new Date(2026, 7, 15, 17, 0);
+  assert.equal(partidoYaEmpezo(new Date(2026, 7, 15, 18, 0).toISOString(), ahora), false);
+  assert.equal(partidoYaEmpezo(new Date(2026, 7, 15, 16, 0).toISOString(), ahora), true);
+  // Justo a la hora cuenta como empezado.
+  assert.equal(partidoYaEmpezo(new Date(2026, 7, 15, 17, 0).toISOString(), ahora), true);
+  // Falla cerrado, igual que `puedePedirCambios`.
+  assert.equal(partidoYaEmpezo(null, ahora), true);
+  assert.equal(partidoYaEmpezo('no es fecha', ahora), true);
+});
+
+test('el bloqueo dice «ya empezó» cuando el partido ya pasó', () => {
+  // Regresión del 2026-10-21: en el hilo de un encuentro TERMINADO hacía
+  // tres horas, la barra decía «Faltan menos de 2 horas para el partido».
+  // `puedePedirCambios` devuelve false por los dos motivos y el texto sólo
+  // contaba el primero.
+  const terminado = accionesDeCambio({
+    partido: partidoDeClubes({ hora: new Date(2026, 7, 15, 14, 0).toISOString() }),
+    cambio: null,
+    userId: YO,
+    clubesAdmin: [CLUB_A],
+    clubesTodos: [CLUB_A],
+    ahora: new Date(2026, 7, 15, 17, 0),
+  });
+  assert.equal(terminado.puedePedir, false);
+  assert.match(terminado.bloqueoPedir, /ya empezó/);
+  assert.doesNotMatch(terminado.bloqueoPedir, /Faltan menos/);
+
+  // Y al revés: faltando una hora sigue diciendo lo de siempre.
+  const porEmpezar = accionesDeCambio({
+    partido: partidoDeClubes({ hora: new Date(2026, 7, 15, 18, 0).toISOString() }),
+    cambio: null,
+    userId: YO,
+    clubesAdmin: [CLUB_A],
+    clubesTodos: [CLUB_A],
+    ahora: new Date(2026, 7, 15, 17, 0),
+  });
+  assert.equal(porEmpezar.puedePedir, false);
+  assert.match(porEmpezar.bloqueoPedir, /Faltan menos de 2 horas/);
+});
+
+test('lo mismo para responder una solicitud pendiente', () => {
+  const terminado = accionesDeCambio({
+    partido: partidoDeClubes({ hora: new Date(2026, 7, 15, 14, 0).toISOString() }),
+    cambio: solicitudPendiente(),
+    userId: YO,
+    clubesAdmin: [CLUB_B],
+    clubesTodos: [CLUB_B],
+    ahora: new Date(2026, 7, 15, 17, 0),
+  });
+  assert.equal(terminado.puedeResponder, false);
+  assert.match(terminado.bloqueoResponder, /ya empezó/);
 });

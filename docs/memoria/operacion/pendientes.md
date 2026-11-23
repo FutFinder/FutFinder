@@ -1,10 +1,124 @@
 # Pendientes
 
-Última revisión: 2026-09-30
+Última revisión: 2026-11-14
 
 Los ítems siguientes son trabajo no resuelto. Cada uno se separa de los cambios ya versionados y requiere una comprobación explícita para cerrarse.
 
-La lista consolidada de fallas de cliente detectadas en Inicio, Chat, Perfil, Avisos y Ajustes el 2026-09-23 está en [`PENDIENTES_CALIDAD_2026-09-23.md`](../../../PENDIENTES_CALIDAD_2026-09-23.md). Ese documento distingue los casos reproducidos de los detectados por flujo de código y no los considera corregidos.
+Los dos informes del 2026-09-23 (`PENDIENTES_CALIDAD_2026-09-23.md`, la lista de calidad de Inicio, Chat, Perfil, Avisos y Ajustes, y `ERRORES_CHATS_NOTIFICACIONES_2026-09-23.txt`, la auditoría de chats y avisos que la alimentaba) **se cerraron enteros y se borraron el 2026-11-13**: cada ítem quedó con su commit en `main`, listado abajo en «Cerrados de los informes del 2026-09-23». El texto completo sigue en el historial de git.
+
+## Resuelto el 2026-11-18 — la búsqueda de jugadores no contestaba (migración 184, aplicada)
+
+Buscar jugadores (Partidos → Jugadores, y también Amigos e Invitar jugadores) mostraba «Sin resultados» para cualquier texto **desde que la 166 llegó a producción (2026-11-05)**. Los registros de la API mostraban `rpc/buscar_jugadores` → **405** en cada llamada. Causa: la 166 le puso a la función un contador que escribe (`_exigir_limite`), pero la función siguió `stable`, y PostgREST corre las `stable` en una transacción de sólo lectura (25006 → 405). Los arneses llaman por SQL en una transacción de escritura y no lo veían. Reproducido por la API local (405 con `stable`, 200 con `volatile`). La 184 la declara `volatile`; su arnés (8 casos, con control negativo: A1 y A2 fallan sin ella) vigila además que ninguna función con `_exigir_limite` quede `stable`. Ensayada contra producción en `begin … rollback`: 8/8 y no quedó nada. **Aplicada en producción el 2026-11-18 con el sí de Vicente** (versión `20261118150207`); comprobado por catálogo: `volatile`, conserva `_exigir_limite`, `anon` no la ejecuta, y ninguna otra función con límite queda `stable`. La 183 (Fútbol 5) es de otra sesión y no va en este paso.
+
+## Aplicado el 2026-11-14 (informe técnico)
+
+Con el sí de Vicente, ese día se aplicaron en producción las migraciones **179** (interruptor `pagos_en_pausa`, nace apagado), **180** (privilegios por columna en `pagos`) y **181** (`aceptaciones_legales` y `aceptar_terminos`), y se redesplegó `pagar-reserva`. Antes se ensayaron las tres juntas contra producción dentro de una transacción revertida. Comprobado después por catálogo y desde fuera: la bandera está apagada y el disparador existe; `authenticated` no lee `datos` ni escribe en `pagos`, y `anon` no lee nada (la API contesta 42501); `aceptar_terminos` no la ejecuta `anon`; la consulta de estado de `pagar-reserva` ya contesta `pausada`. En producción no había ningún pago.
+
+Lo que sigue abierto de ese trabajo:
+
+- **Términos.** Las cuentas que ya existían no tienen ninguna aceptación registrada: **falta decidir (Vicente) si se les pide aceptar de nuevo**. La app web ya la registra, pero un teléfono sólo lo hará con un build nuevo. «Exportar mis datos» ya incluye las aceptaciones (`terminos_aceptados`) y la política de privacidad lo dice.
+- **Pausa de pagos.** Cómo se enciende está en el encabezado de `179_pausa_de_pagos.sql`. Sin probar de punta a punta: no hay Flow conectado (ver [Por probar](por-probar.md)).
+
+## 2026-11-19 — el CI de arneses estuvo rojo desde la 192 sin que nadie lo viera
+
+`arneses.yml` falló en cada push desde la 192 (2026-11-19, 01:15) hasta esta tarde: tres arneses. **192:** tomaba «la primera cancha que haya», y la base que arma el CI desde cero no tiene ninguna; ahora siembra su recinto y su cancha. **170 E2:** la 194 creó tres llaves foráneas sin índice (`user_reports.moderado_por`, `moderacion_suspensiones.reporte_id` y `.creada_por`); la **migración 198** los crea (aplicada el 2026-11-19 con el sí de Vicente, `20261119165602`). **183 caso 6:** afirmaba que los clubes seguían en 7 / 11, lo contrario de lo que pidió Vicente con la 195; ahora afirma que aceptan Fútbol 5. En local, 159/159 con la 197 y la 198. **Lección:** el correo de GitHub del fallo de arneses llega a una sola persona; mirar `gh run list --workflow "Arneses SQL"` después de cada migración.
+
+## Diseño propuesto: conciliar los pagos que quedaron `pendiente` (2026-11-14)
+
+**Construido el 2026-11-18, sin aplicar ni desplegar** (migración 190, Edge Function `conciliar-pagos`, lógica en `_shared/conciliarPagos.ts`). Probado: 14 pruebas de Deno, arnés `190_…_test.sql` 11/11 en local y contra producción con rollback, y de punta a punta en local con Flow simulado (`node scripts/conciliar-pagos-local/probar.mjs`: ocho casos, segunda pasada idempotente). Para encenderlo, ver el encabezado de la 190 (un secreto en la función y el mismo en Vault). Las tres decisiones de abajo se tomaron con lo propuesto: 20 minutos, sólo la revisión diaria, y ningún cierre a la fuerza.
+
+**El hueco, comprobado.** Un pago pasa de `pendiente` a otro estado sólo si llega el aviso de Flow (`flow-confirmacion`) o si la misma persona vuelve a tocar «pagar» (`pagar-reserva` pregunta por el token anterior). Ninguna de las 13 tareas de `pg_cron` mira `pagos`: `vencer_reservas_pasadas` vence la reserva y manda a devolver los pagos `pagado`, pero deja los `pendiente` como están. Si alguien paga y el aviso se pierde —Flow reintenta, pero no para siempre— y no vuelve a la app, queda **plata cobrada con el pago en `pendiente` y sin ninguna marca**: no aparece en la revisión diaria, que sólo lista `reversar`. Hoy no hay pagos reales, así que no hay plata afectada.
+
+**La propuesta.**
+
+1. **Una Edge Function nueva, `conciliar-pagos`**, sin JWT de usuario y protegida por un secreto propio en la cabecera (el mismo patrón de `send-push`, con el secreto en Vault). Tiene que ser Edge Function y no SQL porque hay que firmar la consulta a Flow con la Secret Key, que no vive en la base.
+2. **La llama `pg_cron` cada 10 minutos** con `net.http_post` (ya se usa para el push).
+3. **Qué revisa en cada pasada:** los pagos `pendiente` con `referencia_externa` (token) cuya creación tenga más de N minutos (N = la vida del enlace, 15, más un margen), de a un lote chico (20) y los más viejos primero. Los `pendiente` **sin** token no se le preguntan a Flow —nunca llegó a existir un cobro que la persona pudiera pagar— y se cierran como `expirado` pasado el mismo plazo.
+4. **Qué hace con cada uno,** preguntando `payment/getStatus` por el token y reusando lo que ya existe, sin lógica nueva de dinero:
+   - Flow dice **pagado** → `registrarCobro` (`_shared/flowPagos.ts`), el mismo camino del aviso: confirma, o deja en `reversar` si la hora ya se la llevó otro o la reserva venció, o marca la diferencia de monto.
+   - Flow dice **rechazado o anulado** → `rechazar_pago` con `fallido`/`expirado` (`accionSegunEstado`).
+   - Flow dice **pendiente** → no se toca. **Un enlace puede seguir pagable**: marcarlo vencido de nuestro lado sin que Flow lo haya cerrado es justo como se pierde un cobro. Sólo se cuenta para la alerta.
+   - Flow **no contesta** → no se toca; se reintenta en la pasada siguiente.
+5. **Idempotente por construcción:** `confirmar_pago`, `pago_cobrado_sin_reserva` y `rechazar_pago` ya reconocen un pago resuelto, así que conciliar y recibir el aviso a la vez no duplica nada (lo ejercita `scripts/carrera-dos-pagos.mjs` para `confirmar_pago`).
+6. **No mira la pausa** (`pagos_en_pausa`): conciliar no crea cobros, y es justamente lo que tiene que seguir andando durante una pausa.
+7. **Qué deja a la vista:** una fila por pasada en una tabla chica (`conciliaciones`: cuándo, cuántos revisó, confirmados, cerrados, sin respuesta) y, en la [revisión diaria](revision-diaria.md), una consulta nueva: pagos `pendiente` con más de 24 horas, que con esto debería venir siempre vacía.
+
+**Cómo se prueba antes de aplicar:** la decisión por estado es lógica pura y va con pruebas de Deno; el recorrido completo, contra la base local con un Flow simulado (un servidor de mentira que contesta `getStatus`), más un arnés SQL para la selección del lote.
+
+**Decisiones (tomadas el 2026-11-18 con lo propuesto; se pueden revisar):**
+
+- **¿Cuánto se espera antes de mirar un pendiente?** Propongo 20 minutos (15 del enlace + 5).
+- **¿Quién se entera, y cómo, cuando la conciliación encuentra plata cobrada sin reserva?** Hoy esos casos sólo aparecen en la consulta de la revisión diaria. ¿Basta eso, o quieres un correo al de contacto por cada uno?
+- **¿Un `pendiente` que Flow sigue informando como pendiente después de días se cierra a la fuerza?** Yo no lo cerraría sin que Flow lo dé por vencido; si quieres un tope (por ejemplo 48 horas), hay que confirmar antes con Flow que un cobro de esa edad ya no se puede pagar.
+
+## Auditoría de lanzamiento (2026-11-13)
+
+> Lo que se cambió en esta tanda y **falta probar** está junto en [Por probar](por-probar.md): se prueba todo al final.
+
+Revisión de qué falta para publicar en las tiendas: base de datos, Edge Functions, cliente, tiendas y operación. Lo comprobable se contrastó contra producción con consultas de sólo lectura.
+
+### Los cinco bloqueos, cerrados ese día
+
+- **Token de GitHub en el remoto de git** (texto plano en `.git/config` de una de las Macs): se movió al Llavero de macOS y el remoto quedó sin token. **Revocado en GitHub el 2026-11-18** (token clásico «Futfinder-despliegue», sin vencimiento; ningún workflow ni secreto del repo lo usaba). No se creó otro: git entra con la sesión de `gh` (`gh auth setup-git`), comprobado con `git push --dry-run` en una Mac. En la otra, el 2026-11-18: `gh auth login`, `gh auth setup-git` y el remoto cambiado a `https://github.com/FutFinder/FutFinder.git` (seguía con el usuario `x-token-auth@` del token viejo, y con él git no usa la sesión de `gh`); `git push` comprobado. Las dos Macs quedan sin token propio.
+- **Borrar la cuenta**: migración 176 aplicada y Edge Function `eliminar-cuenta` **desplegada el 2026-11-13 (v1)**, comparada por contenido con el repositorio y probada desde fuera sin sesión (401 sin cabecera, 401 «Inicia sesión…» con la clave publicable, 405 por GET). No se probó un borrado real con una cuenta: hacerlo exige una cuenta desechable con fotos. Las apps ya instaladas siguen llamando la RPC directo; sus archivos quedan en `cuentas_por_limpiar` y los limpia la función en su siguiente uso (hasta 10 por pasada). Ver [Base de datos](../arquitectura/base-de-datos.md), «Borrar la cuenta».
+- **Recuperar la contraseña**: flujo con código de 6 dígitos; ver [Autenticación](../funcionalidades/autenticacion.md).
+- **Íconos e imagen de inicio**, y **permisos sobrantes** (micrófono, cámara, ubicación «siempre», textos en inglés): ver [Despliegue y entornos](../arquitectura/despliegue-y-entornos.md). Llegan con el próximo build.
+
+### Lo que sigue abierto de esa auditoría
+
+- **Seguridad, con cuenta normal: cerrada el 2026-11-13 con la migración 177** (ver [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md), «Tercera pasada»). Queda de esa lista: `ratings` muestra a cualquiera con sesión quién calificó a quién (`rater_id`); `profiles.edad` lo ve cualquiera con sesión sobre perfiles descubribles (se cierra con la 149, que espera build). La migración 167 (dos pasos obligatorios para el personal) **se aplicó el 2026-11-13 con la bandera apagada**; encenderla espera el build con las pantallas y que el personal active su código (ver [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md), «Qué falta aplicar o desplegar», punto 4).
+- **Flow, antes de las claves de producción: resuelto en código el 2026-11-13; la migración 178 está aplicada, y `pagar-reserva` y `flow-confirmacion` se desplegaron como v4 el mismo día** (desde el contenido del repositorio; probadas desde fuera: `flow-confirmacion` contesta 405 a un GET y 503 «sin configurar» porque no hay claves de Flow; `pagar-reserva` contesta `configurada: false` y 401 sin cabecera). Lo que de verdad cobra se prueba recién con claves de sandbox. Qué cambia:
+  - Reintentar ya no pide otra transacción a Flow con la misma orden. Se le pregunta por el token anterior (`queHacerConPendiente`): si ya se cobró, se registra; si sigue pendiente por el mismo monto, se devuelve el mismo enlace (`pagos.datos.url` y `montoFlow`, que se guardan desde ahora); si no, se cierra (`rechazar_pago`) y se arma una orden nueva. Si no se le puede preguntar a Flow, no se arma otra: 502 con el motivo.
+  - Un cobro que Flow confirmó y no confirma una reserva (monto distinto, o pago ya cerrado porque alguien pagó un enlace viejo) queda `reversar` con `reversa_nota` y aviso a la persona (`pago_cobrado_sin_reserva`, `_shared/flowPagos.ts`). Entra en la cola de «plata por devolver» de la [revisión diaria](revision-diaria.md).
+  - `FLOW_AMBIENTE` es obligatorio (`sandbox` o `produccion`); sin él la pasarela queda «no conectada». La pantalla de pago avisa «modo de prueba» en sandbox.
+  - `flow-confirmacion`: 400 a un token sin forma o que Flow no reconoce, 405 a lo que no es POST, tope de 120 avisos por minuto e IP (`limite_aviso_de_pago`), y logs sin la respuesta entera de Flow (traía el correo de quien paga).
+  - Saldo (latente): candado por pagador en `confirmar_reserva_interna` y `for update` en `admin_cancelar_reserva`.
+  - Lo que sigue sin resolver de pagos: ningún cron vence los pagos `pendiente` viejos (se cierran al reintentar o con el aviso de Flow); la devolución a tarjeta es manual; y que nadie deje `FLOW_AMBIENTE=sandbox` con recintos reales: una reserva confirmada con tarjeta de prueba ocupa la cancha de verdad.
+- **Tiendas y producto:** `expo-updates` configurado (`runtimeVersion` por `fingerprint`, un canal por perfil en `eas.json`) pero sin probar en un build, enlaces universales preparados pero sin los dos datos que faltan (Team ID de Apple y huella SHA-256 de Android; ver [Navegación](../arquitectura/navegacion.md)). **Cerrado:** los reportes se resuelven desde la app (migración 194, 2026-11-18), menores fuera de búsquedas (177), edad mínima 14 (186), y desde el 2026-11-18 los términos y la política nombran a FutFinder SpA, RUT 78.524.079-0, Av. Papa San Pedro 9477, Pudahuel (`EMPRESA` en `src/data/legal.js`), y «Exportar mis datos» trae todo lo propio (migración 192).
+- **Operación (revisado el 2026-11-18).** Ya resuelto: hay CI (`.github/workflows/ci.yml` corre `npm run verify` con Deno obligatorio y el build web; `arneses.yml` arma la base desde cero y corre los arneses SQL; los dos en verde), Deno está en las dos Macs, y el cron de comprobantes de push funciona (migración 193). **Lo que espera una cuenta o un pago (no lo puede hacer una sesión):**
+  1. **Supabase al plan Pro** (organización `FutFinder`, hoy `free`): respaldos diarios restaurables, que el proyecto no se pause por inactividad, y poder encender la protección de contraseñas filtradas (Authentication → Policies). Con pagos reales andando, no es opcional.
+  2. **Sentry:** crear la organización y un proyecto React Native; poner el DSN en `EXPO_PUBLIC_SENTRY_DSN` (EAS, entornos `preview` y `production`, y Vercel para la web) y un `SENTRY_AUTH_TOKEN` en EAS para subir los mapas de origen. Sin DSN la app no manda nada (está hecho así a propósito).
+  3. **Expo, seguridad reforzada de push:** activarla en expo.dev (proyecto → Credentials → Push), y guardar el token de acceso en dos lugares: el secreto `EXPO_ACCESS_TOKEN` de la Edge Function `send-push` y Vault con el nombre `expo_access_token` (lo lee `check_push_receipts`, 193). Sin eso, quien consiga un token de push puede mandarle avisos a ese teléfono directo por Expo.
+  4. **Panel de Supabase → Authentication:** confirmar que *MFA → TOTP* está habilitado (enroll y verify), la duración del OTP (900 s), la del JWT y la rotación del refresh token.
+- **Migración 188 aplicada el 2026-11-18 con el sí de Vicente** (versión `20261118172401`; ensayo 5/5 en `begin … rollback`), y `send-push` redesplegado como v13 con `club_invite` en la categoría de clubes. **Migración 189 aplicada el 2026-11-18 con el sí de Vicente** (versión `20261118173031`): la 185 recreó las políticas de `club_photos` con `auth.uid()` a secas y deshizo lo que la 170 había optimizado (el arnés E1 de la 170 dejó el CI «Arneses SQL» en rojo desde el commit de la otra Mac); la 189 las devuelve a `(select auth.uid())`. Sólo rendimiento, no permisos.
+- **Migración 186 aplicada el 2026-11-18 con el sí de Vicente** (versión `20261118171000`), después de subir el cliente con edad mínima 14 (registro, Editar perfil sólo si la edad no está registrada, y términos y privacidad; `VERSION_LEGAL` 2026-11-18; desde el 2026-11-19 quien no aceptó esa versión la acepta al entrar, ver [Autenticación](../funcionalidades/autenticacion.md)) y de comprobar que www.futfinder.cl ya servía ese bundle. Ensayo en `begin … rollback`: 11/11. Desde el 2026-11-18 la app reporta club (bandera en la barra del club, para quien no es miembro), foto de club (visor de la galería, para quien no administra ni la subió) y partido (bandera junto a Compartir, para quien no lo organiza), con la misma hoja que «Reportar esta cuenta». **Migración 191 aplicada el 2026-11-18 con el sí de Vicente** (versión `20261119005514`): el índice único de `user_reports` pasa de «uno pendiente por persona» a «uno pendiente por (persona, elemento)», para que reportar un club y un partido del mismo admin no choque; la cuenta sigue siendo uno por persona. Arnés 4/4 con control negativo (sin la 191 falla R1b) y ensayo contra producción en `begin … rollback`. El cliente ya está listo para las dos (el «ya reporté esta cuenta» del perfil mira sólo `elemento is null`). La **185** se aplicó el 2026-11-18 con el sí de Vicente (versión `20261118170117`): casi todo ya lo habían cerrado la 165 y la 171, así que se reescribió su sección 3 para extender el disparador de la 165 (el partido enlazado a un desafío tiene que organizarlo quien lo enlaza) en vez de crear un segundo disparador casi igual, y se retiró el UPDATE sobrante en `club_photos`. Su arnés tenía dos datos viejos (el `client_token` único de la 182 y el alta directa de `club_open_challenges`, que ya va por RPC) y un partido copiado en el pasado; corregidos, da 13/13 en local y contra producción en `begin … rollback`, con control negativo (C5 falla con el disparador de la 165). Ese mismo commit de la otra Mac subió el archivo de la **175** (chat por Broadcast, aplicada desde el 2026-11-10) y sus cambios de cliente.
+
+## Cerrados de los informes del 2026-09-23
+
+Verificado el 2026-11-13 contra el historial: **no queda ningún ítem abierto** de los dos informes, por eso se borraron. Cada uno con su commit en `main` y su prueba de Node (varias leen el texto de los archivos, no datos); los mensajes de algunos commits cuentan además una comprobación en web o contra la base local que esta nota no repitió.
+
+- **Chat:** C01 `6deeddb` (no se marca leído un hilo cuya carga falló), C02 `a2e43a3` (el acuse espera foco, app activa y lista al final), C03 `8a5b9e6` (el historial pagina por `(created_at, id)`), C11 `4b08e28` (una carga vieja de la bandeja no pisa a la nueva), C12 `b05a0fb` (el aviso sin conexión ya no promete mensajes guardados), C13 `f5aaac7` (Detalles no cuenta las solicitudes pendientes como inscritos), C14 `843da93` (Detalles de un desafío dice «Desafío entre clubes»), C15 `e3a37f6` (si fallan los participantes, Detalles no anuncia un chat vacío), C16 `c5a6968` (si fallan las solicitudes de amistad, la tarjeta no desaparece).
+- **Avisos:** C04 y C05 `793e993` (migración 169 y `send-push`: leer un hilo cierra su aviso y el silencio frena aviso y push; la 169 está en producción y `send-push` va en la v11, sin nada pendiente en `despliegues.json`), C05 en el cliente `eed4ffd`, C06 `264fa24`, C07 `6228900`, C08 `e02e53e`, C09 `4978999`, C10 `d3e06bf`.
+- **Inicio:** I01 `efdd63e`, I02 `cbed48d`, I03 `c44bbe8`, I04 `f267f65`, I06 `1217d08`, I07 `6131ade` (si el único partido cercano está en «Tu club juega», no se dice «Sin partidos»).
+- **Perfil y Ajustes:** P01 `c1f7607`, P03 `8f8c64a`, P04 `b7f5126`, P05 `99f87d3`, A01 `45b2984`, A02 `e0020f4` (dos toques rápidos de un interruptor ya no se pisan).
+- **Partidos y deuda menor:** `dc52a29` (el motivo de cancelación ya no queda huérfano si falla la RPC), `31d4e2f` (el cierre de un partido cancelado ya no muestra jerga técnica), `3df6d0a` (los mínimos de puntaje salen de los niveles del servidor), `e4c20dc` y `6ba71a4` (todos los rótulos de puntaje usan `nombrePuntaje`), `d11848d` (`app.config.js` deja el olivo por el `#55DF69`), `3e92dc1` (comentarios al día) y `6c653a5` (ninguna pantalla consulta una tabla directo).
+- **Cerrados antes:** P06 (`70d6569`), P02, T01–T07 y G01; I05 y P07 los confirmaron en vivo T01 y T02 el 2026-09-29.
+
+### Lo que dejó el lote del 2026-11-05
+
+- **Cerrados:** el error de Realtime al remontar el popup (`69c6ef9`, los canales compartidos usan un nombre nuevo en cada apertura) y «Actividad reciente» de Clubes, que pedía 50 avisos y filtraba después (`e623113`).
+- **«Ver todo» de Perfil despliega sólo las últimas 20 participaciones** (`HISTORIAL_LIMITE` en `ProfileScreen.js`); si algún día hace falta el historial completo, habrá que paginarlo.
+
+### De la segunda pasada de seguridad (2026-11-09)
+
+Detalle y evidencia en [Seguridad y privacidad](../arquitectura/seguridad-y-privacidad.md), «Segunda pasada».
+
+- **Cerrado el 2026-11-13:** las cuatro Edge Functions que estaban con `comparada: null` (`pagar-reserva` y `flow-confirmacion` v4, `solicitud-recinto` v8, `reportar-problema` v3) se trajeron con `get_edge_function` y coinciden byte a byte con el repositorio, `_shared` incluido (diez archivos). `despliegues.json` ya tiene la fecha. La plataforma numera `version` uno más arriba que el registro en las siete funciones: es otra numeración, no código viejo.
+- **`matches` se lee sin cuenta, con `id_organizador` incluido** (también `clubs`, `club_photos` y lo de recintos). No se cerró a propósito: es la decisión de «superficie pública sin cuenta» de más abajo, y el arnés de la 44d exige que `anon` vea los partidos normales. Si la respuesta es «no hay vitrina», se cierran igual que las tres que cerró la 171; si es «sí», que sea por una función que devuelva sólo lo que se muestra.
+- **Cerrado (`b1a06e2`, migración 172, en producción):** `lista_de_espera()` sólo se le muestra a quien ve el partido.
+- **Cerrado en lo que se podía (`515b665`, migración 173, en producción):** `es_participante_de_reserva` y `es_organizador_de_reserva` contestan sólo por quien llama. `perfil_acepta_solicitudes` y `tiene_permiso_de_club` **quedan así a propósito**: las llaman políticas con la OTRA persona (el destinatario de una amistad; las dos puntas de un DM entre clubes) y atarlas rompería esas funciones. El porqué está en la cabecera de la 173.
+- **Cerrado (`65cd5a7`, migración 174, en producción):** `support-screenshots` es privado; el correo lleva un enlace firmado. Quedó un resto con la caché del CDN para lo que ya se había pedido antes.
+- **Cerrado (`05fea89`):** `44d` y `45` dependían de los datos que hubiera en la base local (tomaban «el primer partido que hubiera»); ahora prueban sobre el partido que siembran. El 2026-11-13 pasaron los dos, con la batería entera en 140 de 140 sobre una base recién construida.
+
+### Otros pendientes, verificados el 2026-11-05
+
+- **Cerrado (`5a48c85`, migración 168, en producción):** una reserva pagada con tarjeta y cancelada queda marcada para devolver (cola de «plata por devolver» de la [revisión diaria](revision-diaria.md)). La devolución en sí sigue siendo manual.
+- **`cargar_balance` revocada (migración 73) deja inservible el pago dividido y la reserva de capitanes** salvo para quien tenga saldo sembrado a mano: no hay cómo cargar saldo hasta que exista la pasarela (decisión de Vicente: las credenciales de Flow van a nombre de la empresa, no personales, y esperan a que exista). La pantalla lo dice y deja el botón apagado.
+- **Cerrado (`4f4fe4b`):** el token de push se da de baja ANTES de soltar la sesión (`utils/cierreDeSesion.js`); después el `delete` salía como `anon` y la base lo rechazaba.
+- **Decidido, no se reintenta (a propósito):** un aviso en `failed` no se reenvía porque un barrido podría duplicar un push que sí alcanzó a salir antes del error. Está escrito en la cabecera de `send-push/index.ts`.
+- **Cerrado el 2026-11-18 — texto legal y registro de acuerdo.** La edad mínima es 14 en el registro (`EDAD_MIN`), en el servidor (186) y en el texto; y los términos y la política nombran a la empresa responsable (razón social, RUT y domicilio).
+- **Cerrado:** los comentarios de `send-push/index.ts` y `supabase/config.toml` ya describen el disparador `notificar_push` (no hay webhook del panel), y `config.toml` declara `reportar-problema` y `eliminar-cuenta`.
+- **Pregunta de producto abierta: un partido entre clubes no suma a `profiles.partidos_jugados`.** Quien jugó y quedó `confirmado_gps` sigue viendo «0 partidos jugados». Puede ser correcto —la migración 50 cerró a propósito la puerta genérica que tocaba la reputación—, pero hay que decidirlo; ver [Pruebas](pruebas.md), recorrido del 2026-10-21. Desde I03 (`c44bbe8`) Inicio cuenta `asistencias_confirmadas`, como Perfil, y ya no `profiles.partidos_jugados`; la pregunta de si un partido entre clubes debe sumar sigue abierta.
 
 ## Repaso del 2026-09-30
 
@@ -20,15 +134,41 @@ Lo que se confirmó **sin cambios**: la política `profiles_read_all` sigue en `
 
 No se pudieron comprobar desde acá: la entrega push en un teléfono y los tipos de carácter de la contraseña, las dos por falta de entorno nativo y de un build distribuido.
 
-## P1 — Falta construir una base nueva desde el repositorio y comprobar que funciona
+## Resuelto el 2026-10-14 — el repositorio ya construye una base desde cero
 
-> **El repositorio ya describe todo lo que la base tiene (migración 146, 2026-10-01).** Lo que queda no es escribir: es construir una base vacía desde `supabase/` y ver que levanta. Eso necesita un PostgreSQL local, que la Mac donde se cerró esto no tiene.
+**Y no construía.** Fallaba en la migración 16 de 169. Se levantó por primera vez una base vacía (colima + el stack local de Supabase, Postgres 17.11) y se fue arreglando hasta que entró entera. Lo que apareció por el camino no se veía desde producción, y ése era justamente el punto.
 
-- **Lo que se cerró:** se cruzó el catálogo ENTERO contra todas las migraciones y `schema.sql`, buscando la sentencia que crea cada objeto. El inventario real era **mayor** que el de esta nota: 4 tablas (`canchas`, `notifications`, `push_tokens`, `ratings`), 8 funciones (`norm_text`, `search_canchas`, `recalc_user_ratings`, `tg_ratings_recalc`, `create_notification`, `tg_match_future_only`, `tg_notify_friend_request`, `tg_notify_friend_accept`), **8 disparadores**, 2 columnas de `profiles` y 3 cron. Los describe la migración 146.
-- **Los ocho disparadores son el hallazgo que esta nota no tenía**, y es el peor de los casos: seis de sus funciones SÍ estaban versionadas, pero su `create trigger` no. En una base nueva la función existiría y **nadie la llamaría** — todo compila, nada falla, y las reglas simplemente no se aplican. Lo fija el caso 3 del arnés, que comprueba que cada disparador apunte a su función.
-- **La 146 no toca nada de lo que ya existe.** Cada objeto va detrás de su comprobación de existencia y no se usa `create or replace function`, que habría reemplazado el cuerpo desplegado por la transcripción. Comprobado con una huella md5 de todo el catálogo de `public` —columnas con tipo y default, restricciones, índices, políticas, disparadores, cuerpos de función y cron— **idéntica antes y después** de aplicarla: `e1baa073…`.
-- **Dos cosas quedan fuera a propósito**, y están explicadas en el archivo: `notifications_type_check` (la lista de 53 tipos de aviso, que catorce migraciones posteriores fueron ampliando; copiarla fijaría una versión vieja) y `ratings_insert_eligible` (la migración 124 la reescribió para exigir que el partido no esté cancelado). En una base nueva las pone la migración que corresponda.
-- **Verificación necesaria para cerrar esto del todo:** levantar una base vacía corriendo `supabase/migrations/` en orden y comprobar que no falta ningún objeto y que las pruebas SQL pasan. Hasta entonces, lo que está demostrado es que el repositorio lo describe y que aplicarlo sobre producción no cambia nada — no que el resultado arranque.
+### Los cinco huecos
+
+1. **El orden de los archivos, que ningún `sort` acierta.** Alfabéticamente la **100 va entre la 09 y la 10** —noventa posiciones antes de donde corresponde—, así que cualquier herramienta que lea el directorio aplica la 100 sobre tablas que la 10 no ha creado. Y `sort -V`, que arregla eso, pone **44b, 44c y 44d ANTES que la 44**, que es la que crea lo que las otras modifican. Las dos fallan al aplicar, no al leer. Lo resuelve `scripts/ordenMigraciones.js`, con pruebas que fijan las dos trampas.
+2. **Tres de las cuatro tablas de la migración 146 se creaban después de usarse.** `notifications` la usa la **16**, `canchas` la **101** y `ratings` la **124**; las tres nacían en la **146**. La 146 demostró con una huella md5 que el repositorio describía todo lo que la base tiene, y era cierto **para producción** —donde ya existían— pero no decía nada de una base nueva.
+3. **La 146 transcribió mal una columna, y no se podía notar.** `canchas.nombre_norm` es una columna **generada** (`attgenerated = 's'`) y la 146 la escribió como `default public.norm_text(nombre)`, que Postgres rechaza: «cannot use column reference in DEFAULT expression». En producción el `create table if not exists` nunca se evaluó, así que el error llevaba ahí desde octubre sin que nada lo delatara. La huella md5 probaba que no cambiaba nada, **no que la transcripción fuera correcta**.
+4. **Nadie creaba `pg_net` ni `pg_cron`,** y el repositorio las usa: la migración 38 escribe `net.http_response_result` y la 146 llama `cron.schedule`. Estaban en producción porque Supabase las instaló a mano.
+5. **Cuatro cosas más sin versionar:** `matches.direccion`, `matches.reminder_sent_at`, `matches.rating_reminder_sent_at` y la función `tg_auto_suspend` —que la migración **88** toca y que sólo se versionó en la **134**, cuarenta y seis después—.
+
+### Cómo quedó
+
+- **`scripts/construir-base.mjs`** levanta la base entera desde `supabase/schema.sql` más las 169 migraciones en el orden correcto. Usa `psql` si está, y si no, el que vive dentro del contenedor del stack local. Para en la PRIMERA que falla y dice cuántas iban.
+- **`schema.sql` creció** con lo que faltaba: las dos extensiones, las tres columnas de `matches`, las funciones del cimiento (secciones 2 y 6 de la 146), `tg_auto_suspend` en su forma anterior a TrueScore, las cuatro tablas **con `nombre_norm` corregida** y las dos columnas de `profiles`. **La 146 no se tocó**: está aplicada, y como todo lo suyo lleva `if not exists`, cuando le llega su turno ya no hace nada.
+- Sus **disparadores** (sección 7 de la 146) sí se quedan donde están: dependen de funciones que crean otras migraciones, así que no pueden ir antes que ellas.
+
+### La comprobación
+
+**169/169 migraciones aplicadas**, y reconstruida después **sin la 149** —la que espera un build— para comparar contra producción:
+
+| | base nueva | producción |
+|---|---|---|
+| Tablas de `public` | 72 | 72 |
+| Funciones de `public` | 285 | 285 |
+| Políticas de `public` | 118 | 118 |
+| Disparadores | 68 | 68 |
+| Tareas cron | 12 | 12 |
+
+La única diferencia bruta era una política de más en el recuento total, y resultó ser del propio stack local en `storage`, no del repositorio.
+
+### Lo que esto deja montado
+
+El stack local sigue disponible: `colima start` y después `supabase start` desde la carpeta aislada. Es lo que destraba el pendiente de la carrera de dos sesiones, que no se podía montar contra producción.
 
 ## Resuelto el 2026-09-23 — aprobar a un jugador también mira su agenda
 
@@ -59,6 +199,163 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Resolución:** la migración **114** revocó `execute` sobre TODAS las rutinas de `public` a `public` y a `anon` —a los dos, que es la parte que las migraciones anteriores erraban— y la **115** puso un disparador de eventos para que lo que se cree mañana nazca igual de cerrado.
 - **Verificación de cierre (2026-09-18, contra `jvfoendzblkoxvwvommz`):** de 43 funciones de trigger en `public`, `anon` puede ejecutar **0** y ninguna conserva `EXECUTE` para `PUBLIC`. El advisor ya no devuelve ni un `anon_security_definer_function_executable`. Las 91 RPC que el cliente llama de verdad siguen accesibles (arnés de la 114, sacado de `grep .rpc(` sobre `src/`).
 
+## Resuelto el 2026-10-17 — seis arneses daban por buena la regla PRE-TrueScore
+
+Descubierto el 2026-10-16 al poner la base local con **los interruptores como los tiene producción**. Las siete huellas de esquema cuadran; los datos de configuración, no: una base construida con `construir-base.mjs` nace con las cuatro fases de TrueScore **apagadas** y producción las tiene **encendidas desde el 2026-09-24**.
+
+- **Qué pasa:** con las fases encendidas la suite da **119 de 125**. Seis arneses afirman la regla vieja —la salida legítima cobra 3 en vez de 1, el puntaje baja 80 → 77, la sanción son 3 puntos— y nunca se corrieron con la configuración real. El `125/125` se midió con los interruptores apagados.
+- **Cuáles:** `122_una_salida_y_una_asistencia_se_cobran_una_sola_vez`, `125_la_otra_puerta_de_la_salida`, `127_cancelar_para_cambiarse_no_borra_el_partido`, `50_una_sola_puerta`, `profiles_reputacion_protegida` y `134_truescore_fase1`.
+- **Los cinco primeros están VIEJOS, no rotos:** afirman la conducta anterior a las migraciones 134-137, igual que los doce que se repararon esta semana. El sexto es distinto: `134_truescore_fase1` **enciende la fase él mismo** y ahora se la encuentra encendida, así que hay que hacerlo autosuficiente —que funcione esté como esté el interruptor—.
+- **Cómo se arregló (2026-10-17):** `construir-base.mjs` enciende las cuatro fases al terminar —las huellas de esquema no ven una fila de `feature_flags`— y hay un arnés nuevo, `interruptores_como_produccion_test.sql`, que **falla si alguna fase está apagada** o si las de teléfono están encendidas sin proveedor de SMS. Control comprobado: apagar la fase 3 lo pone en rojo nombrándola.
+- **Y los seis arneses dejaron de clavar números.** Lo que esas migraciones prometen no es «3 puntos», es «se cobra UNA SOLA VEZ». Ahora se mide el puntaje antes y después y se compara con lo que la propia RPC dice haber cobrado, o se le pregunta a `truescore_costo_salida` cuánto toca ANTES de cancelar. Siguen cazando el cobro doble —que es lo suyo— y dejan de romperse cada vez que alguien ajusta la tabla de penalizaciones.
+- **Dos cosas más que salieron por el camino:**
+  - El arnés de la 122 contaba los apuntes del historial **con el rol puesto**, y los dos libros tienen RLS de «sólo lo mío»: la sesión era la del organizador mirando los del jugador, así que contaba 0 y parecía que no se registraba nada. Es la misma trampa del arnés 39.
+  - El arnés de la 134 contaba *todos* los eventos del partido y exigía 3; con la fase 2 encendida aparece un cuarto, el bono del organizador. Y su caso C08 clavaba la secuencia `{40, 5, 0}`, que con reincidencia es `{40, 0, 0}`. Lo que ese caso cuida es que llegar a cero **no suspenda la cuenta**, no la curva.
+- **Verificación: 126/126 con los interruptores de producción**, incluido el arnés nuevo.
+
+## Resuelto el 2026-10-19 — «Crear club» no hacía nada
+
+Formulario lleno —nombre, descripción, región, comuna, tema—, botón apretado, **no pasaba nada**. Ni un mensaje, ni una pista. Me fui a buscar un error 500 que no existía: no había ninguna petición, porque el botón estaba apagado.
+
+`modalidad` empezaba en `null` y es uno de los cuatro datos que exige `listo`. Región y comuna traen su «Selecciona una…»; **las tres fichas de modalidad se quedan quietas y no se leen como obligatorias**. Y encima, tocar la ficha activa la deseleccionaba, así que se podía volver al mismo pozo sin querer.
+
+- **Arreglo:** arranca en `futbol7` —como «Publicar partido», que es la otra pantalla larga de la app y preselecciona nivel, duración y modalidad— y tocar la activa ya no la apaga. `crearClubListo.test.js` lo fija, y avisa si alguien agrega un quinto requisito sin darle valor de partida.
+- **Lo que NO era:** el botón sí se ve apagado (`opacity: 0.45`). El problema no es que no se note el estado, es que **no hay forma de saber cuál de los cuatro datos falta**, y el que falta es el único sin marcador de «elige uno».
+
+## Resuelto el 2026-10-19 — el chat decía la hora en otro idioma
+
+Siguiendo el recorrido entero contra la base local —publicar un partido, entrar con una segunda cuenta, unirse, abrir el chat— la cabecera del chat decía **«mar, 08:00 p m. · Ñuñoa»** mientras la tarjeta, la ficha del partido y la hora de cada mensaje decían **20:00**. Dos defectos en la misma línea:
+
+- `toLocaleDateString('es-CL', { hour, minute })` **sin `hour12: false`** resuelve a 12 horas en este runtime. No es cosmético: sin fijarlo, el formato depende de los datos de ICU que traiga el teléfono, y la misma pantalla se ve distinta en dos dispositivos.
+- Y `replace('.', '')` se lleva **sólo el primer punto** —el de «mar.»—, así que lo que quedaba a la vista era «p m.», que no es nada.
+
+Arreglado ahí y en los otros dos sitios que pedían la hora sin fijar el formato (`TrustScoreHistoryScreen`, `ModeracionScreen`). `horaEnVeinticuatro.test.js` recorre `src/` y falla si alguien vuelve a pedir la hora sin `hour12: false`. Control comprobado.
+
+**El recorrido que ya camina entero**, y que hasta esta semana no se podía hacer sin escribir en producción: registro con código por correo → sesión → publicar un partido con dirección real, coordenadas y comuna correctas → segunda cuenta → unirse (el cupo baja, el origen queda `orden_llegada`, le llega el aviso al organizador) → chat del partido.
+
+## Resuelto el 2026-10-17 — tres cosas que sólo se ven usando la app
+
+Siguiendo el recorrido real contra la base local —registrarse, entrar, publicar un partido— aparecieron tres fallos que ninguna prueba iba a encontrar.
+
+### 1. «¡Todo listo!» aunque no se guardara nada
+
+La pantalla de términos hacía `await completeOnboarding()` y navegaba a `Success` **pasara lo que pasara**. Si la escritura falla —sin conexión, un 503— el flag `onboarding_completed` se queda en false, la persona lee «Tu cuenta ha sido verificada y configurada correctamente» y **la próxima vez que abra la app vuelve a pasar por el permiso de ubicación y por los términos**. Para siempre, y sin un solo indicio de que algo falló.
+
+Se vio con el API REST del stack local apagado: el registro llegaba hasta el final y el perfil quedaba sin marcar. Ahora, si no se pudo guardar, se dice y no se avanza. `terminosNoMiente.test.js` falla si alguien vuelve a tirar el resultado a la basura.
+
+### 2. Un partido de Ñuñoa se publicaba en Santiago
+
+Publicando en «Avenida Irarrázaval 3000», la app lo dejó en la comuna **Santiago**. Esa dirección es de **Ñuñoa**. Nominatim contesta `city: Santiago` y `suburb: Ñuñoa` —la comuna es la segunda— y el buscador se quedaba con `city`.
+
+**La comuna es con lo que la app busca, filtra y arma «partidos cerca de ti»**, así que medio Gran Santiago habría terminado en el mismo saco. Los candidatos viajan ahora en orden, del más específico al más general, y gana **el primero que sea una comuna del catálogo**: un barrio que no lo sea cede el turno, que es lo que hace falta donde la comuna sí es el `city` (Puente Alto). Comprobado contra Nominatim de verdad y después en la app: ahora dice Ñuñoa.
+
+### 3. Un arnés que caducaba por los datos, no por la fecha
+
+El caso B1 de `45b_origen_compatibilidad` exigía que **todas** las filas de `attendees` fueran `legado`. Era cierto el día que se escribió —las 25 que había eran anteriores a la migración 45— y deja de serlo **con el primer partido que alguien publique**: su organizador entra como `organizador`. Saltó al publicar el partido de prueba. Ahora comprueba lo que la migración promete —que nadie se quede sin origen y que no se invente ninguno— y deja el reparto en el detalle.
+
+## Resuelto el 2026-10-16 — la app ya se puede correr contra la base local, y lo primero que apareció
+
+**`npm run web:local`** levanta la app web contra `127.0.0.1:54321` en vez de contra producción. Hasta ahora la única forma de abrir FutFinder era contra `jvfoendzblkoxvwvommz`, así que probar un flujo de verdad —registrarse, crear un partido, escribir en el chat— significaba escribir en producción, y por eso no se hacía nunca.
+
+- **Dos trampas que costó descubrir, y están escritas en el script:**
+  1. `process.env.EXPO_PUBLIC_*` se **incrusta** en el bundle cuando Metro transforma. Un bundle cacheado de un `npm run web` anterior sigue trayendo dentro la URL de producción. Por eso el script pasa siempre `--clear`.
+  2. Pasar las variables en el proceso **no alcanza**: Expo mete los valores del archivo `.env` en un módulo del bundle que los asigna a `process.env` en tiempo de ejecución, y ése gana. Se vio leyendo el bundle servido: traía los DOS valores, y la app abrió con la sesión y los datos de producción. Ni `EXPO_NO_DOTENV=1` lo evitó. El script **aparta el `.env` mientras dura** y lo repone al salir, también con Ctrl-C, y si un corte dejó el respaldo tirado lo repone al arrancar.
+  - La comprobación que vale: el bundle servido tiene **cero** apariciones del proyecto de producción y una de `127.0.0.1:54321`.
+- **Y una tercera trampa, la peor, que se llevó un susto:** el respaldo del `.env` es el `.env` de verdad con otro nombre, y el patrón `.env*.local` del `.gitignore` NO lo tapaba. Un `git add -A` lo subió al commit. **Lo frenó la protección de secretos de GitHub, no la revisión de nadie.** Ahora está en el `.gitignore` por nombre propio y el script **comprueba con `git check-ignore` que lo esté antes de renombrar nada**: si esa línea desapareciera, se niega a arrancar en vez de dejar el archivo expuesto.
+
+### Lo primero que apareció al correrla: la pista de la contraseña mentía
+
+Debajo del campo de contraseña, «Crear cuenta» decía **«Usa una mayúscula y un número para reforzarla»**, y `validarPassword` exige **cuatro** tipos. Quien leía esa línea escribía `Futbol2026`, apretaba «Crear mi cuenta» y recién ahí se enteraba: «Te falta un símbolo». El marcador de posición sí decía la regla entera, pero **el marcador desaparece al escribir la primera letra**: lo único visible mientras tipeas era la frase incompleta. En Ajustes era peor — el campo de contraseña nueva no decía **nada**.
+
+- **Arreglo:** `PISTA_PASSWORD` se exporta desde `passwordStrength.js`, armada con `MIN_PASSWORD` y los cuatro tipos, y la usan las dos pantallas. `pistaPassword.test.js` falla si una pantalla vuelve a redactar la regla a mano o si la pista deja de nombrar alguno de los cuatro.
+- **De paso:** la pista nueva de Ajustes iba a salir con `F.regular`, que **no existe** en el tema (los pesos son `medium`, `semiBold`, `bold`, `extraBold`). Habría quedado con la tipografía del sistema sin que nada fallara. Corregido a `F.medium`.
+
+### Lo que todavía no se puede probar en local
+
+El registro **no deja una cuenta usable hasta verificar el código**: la contraseña se fija después, en `completeSignUpPassword`. El stack local manda el correo con el **enlace mágico** por omisión, no con `{{ .Token }}`, así que la pantalla de verificación no se puede completar y la cuenta de prueba queda sin contraseña. Hay que ajustar la plantilla del stack local para exercitar registro → verificación → sesión.
+
+## Resuelto el 2026-10-16 — `send-push` llevaba dos meses corriendo código viejo
+
+**Un fallo real en producción, y de los que no se notan.** El commit del 17 de agosto (`feat(clubes): la Tarea 6.1 registra y confirma el resultado`) agregó tres tipos al mapa de preferencias de `pushLogic.ts` —`club_resultado_propuesto`, `club_resultado_confirmado` y `club_resultado_disputado`—. El último despliegue de `send-push` era del **15** de agosto. Dos días antes.
+
+- **Qué pasaba:** `getPreferenceColumn` devolvía `null` para esos tres tipos, así que la comprobación de preferencia se saltaba ENTERA y **el push salía aunque la persona tuviera apagados los avisos de clubes**. La función «falla abierto» a propósito, así que el síntoma no es un error sino un push de más: nadie iba a reportarlo.
+- **Por qué nadie se enteró:** `avisosCompletos.test.js` ya compara el mapa de la app con el de `pushLogic.ts`, y pasaba — los dos ARCHIVOS del repositorio estaban de acuerdo. Lo que nadie miraba era el tercero, el que corre. Una Edge Function es el único código del proyecto que puede estar commiteado y no desplegado.
+- **Cómo salió:** comparando la fecha del último despliegue (por `list_edge_functions`) con la del último commit de cada archivo que la función empaqueta. `send-push` fue la única con el commit DESPUÉS del despliegue.
+- **Arreglo:** redesplegada el 2026-10-16, versión 10, con los archivos del repositorio tal cual. Verificada trayéndola de vuelta con `get_edge_function`.
+- **Para que no vuelva a pasar:** `supabase/functions/despliegues.json` guarda el sha256 de cada archivo tal como se desplegó, y `scripts/__tests__/edgeDespliegues.test.js` falla si el archivo del repositorio ya no da ese hash. **Por hash y no por fecha:** la primera versión comparaba fechas y daba falso positivo en cinco de seis, porque el patrón normal es desplegar y commitear un minuto después. El control está comprobado: tocar un byte de `pushLogic.ts` pone la prueba en rojo con el nombre del archivo.
+- **Las seis quedaron comparadas** contra la copia desplegada el 2026-10-16. `send-push` era la única atrasada; `solicitud-recinto`, `reportar-problema` y las tres de la pasarela —`flow-retorno`, `pagar-reserva` y `flow-confirmacion`— coinciden con el repositorio **línea por línea**, incluidas las DOS copias de `_shared/flowLogic.ts` (una viaja dentro de `pagar-reserva` y otra dentro de `flow-confirmacion`, y son idénticas entre sí y al archivo). Ya no hay ninguna entrada con `"comparada": null`.
+- **De paso, lo que la pasarela necesita de la base está en su sitio:** `iniciar_pago_reserva` es la única concedida a `authenticated` —la llama la función con el token del jugador, así que la RLS y las reglas las sigue aplicando la base— y `anotar_referencia_pago`, `confirmar_pago` y `rechazar_pago` sólo a `service_role`, que es como las llama el servidor. Las cuatro `security definer`. Y las dos que reciben a Flow están desplegadas con `verify_jwt: false`, que es lo que sus propios comentarios exigen: Flow no tiene sesión de Supabase, y lo que las protege es la firma con la Secret Key, no un token de entrada.
+
+## Resuelto el 2026-10-16 — lo que la base nueva todavía no reproducía (migración 162)
+
+La 146 cerró cinco huecos entre el repositorio y producción. Quedaban **siete**, y sólo salieron al comparar las dos bases en **siete dimensiones** en vez de dos. Detalle del método y de la trampa del `prosrc` en [Pruebas](pruebas.md).
+
+- **El que importa: `solicitar_revision_sancion` estaba mejor en producción que en el repositorio.** Producción filtra el informe de incomparecencia por `club_reportado_id = v_club`; el archivo 47c lo busca sólo por `challenge_id`. La función hermana de esa misma migración sí filtra, y lleva el comentario que lo explica: «el otro club puede tener su propio informe, y ése no es el reintento de éste». Sin el filtro, **un club que NO fue reportado puede pedir una revisión apoyándose en el informe del otro**, y el expediente que se congela en `contexto` retrata al club equivocado. Alguien lo arregló en el editor y nunca lo escribió de vuelta.
+- **Tres CHECK sin versionar**: `matches_duracion_min_check` (10-300), `matches_min_trust_score_check` (0-100) y `profiles_estado_check` ('activo','suspendido'). Una base nueva aceptaba un partido de 5000 minutos y un perfil en un estado inventado.
+- **`idx_profiles_username`** existe en producción y no estaba en ningún archivo.
+- **`idx_matches_con_reserva`** es al revés: lo crea la migración 99 y producción no lo tiene. Repite, sin ser único, exactamente lo que ya cubre `matches_reserva_uidx`. Se retira.
+- **Verificación:** arnés `162_..._test.sql` **16/16** en local, con el control que degrada la función dentro de la transacción y demuestra el agujero (`ok:true` y revisión creada para el club equivocado); **12/12** contra producción, sin los dos controles destructivos. Dry-run revertido antes de aplicar. Después de aplicar, **las siete huellas de producción quedaron idénticas a las de una base construida desde cero** y los **124 arneses pasan contra esa base**. La migración no cambió nada en producción: lo que arregla es lo que el repositorio levanta.
+
+### La octava, en `storage` (migración 163)
+
+Las siete dimensiones de arriba miran `public`. Mirando `storage` igual apareció una más: producción tenía 27 políticas sobre `storage.objects` y el repositorio construye 28. Faltaba `match_covers_organizer_delete`, o sea que **nadie podía borrar la portada de un partido, ni siquiera quien lo organiza**. Todos los demás buckets tienen su puerta de borrado; `match-covers` era el único asimétrico, y eso no está escrito en ninguna parte — es un accidente de cómo se aplicó la 08.
+
+- **No amplía nada que no se pudiera hacer:** el organizador sube con `upsert: true` y tiene la política de `update`, así que ya podía sobrescribir la portada con cualquier cosa. Borrarla es estrictamente menos.
+- **Hoy no la llama nadie:** `src/services/storage.js` no exporta un `removeMatchCoverFile`. Se repone para que las dos bases digan lo mismo y para que la puerta esté donde la 08 dijo, el día que la pantalla ofrezca «quitar la portada».
+- **Verificación:** arnés `163_..._test.sql` **7/7** en local —con el control que quita la política y comprueba que entonces ni el organizador puede, que es lo que producción hacía— y **6/6** contra producción, sin el control. Después de aplicar, las políticas de `storage` de producción quedaron idénticas a las de la base construida: 28 y la misma huella.
+
+### Lo que queda decidido a medias: dos textos de aviso
+
+`notify_club_challenge_responded` manda en producción «Coordinen los detalles por el chat.» y «Puedes desafiar a otros equipos.». Las migraciones **26 y 28** dicen «…los detalles **del partido** por el chat.» y «…a otros equipos **desde tu club**.». El cuerpo desplegado llega con saltos de línea de Windows, así que en algún momento se pegó desde otra parte; no hay forma de saber cuál es la intención vigente.
+
+- **Qué se hizo:** conservar lo que la gente recibe hoy, y que el repositorio deje de decir otra cosa. Cambiar copia de producción por mi cuenta no corresponde.
+- **Acción (de Vicente):** si prefiere los textos largos, es una línea en una migración nueva — nunca editando la 26, la 28 ni la 162.
+
+## P2 — La migración 114 cerró a `anon` las CATORCE funciones que el producto le había abierto
+
+> Descubierto el 2026-10-15 al correr los 120 arneses juntos. **No urge** —hoy ninguna pantalla llama nada sin sesión— pero es una decisión de producto revertida en silencio, y se arregla mejor ahora que cuando haya una página pública esperándola.
+
+- **Qué pasó.** A lo largo del historial, varias migraciones concedieron `execute` a `anon` **a propósito**, cada una con su motivo y varias con un caso de arnés dedicado a comprobarlo. La migración **114** («anon no ejecuta nada») barrió TODAS las funciones de `public` para quitarle a `anon` el `execute` que `alter default privileges` le concedía a su nombre — un problema real, bien diagnosticado: 56 funciones `security definer` ejecutables por `anon` sin que nadie lo pidiera. **Pero el barrido no llevaba lista de excepciones**, así que se llevó por delante las concesiones deliberadas.
+- **Medido: de las 14 funciones que alguna migración concede explícitamente a `anon`, hoy `anon` no puede ejecutar NINGUNA.**
+
+  | Función | Quién se la concedió, y para qué |
+  |---|---|
+  | `historial_club(uuid,integer)` | **49** — el historial público de un club. Su caso 11 se llama «anon ve lo público, escudos incluidos» |
+  | `historial_publico_club(uuid,integer)` | **44d** — la proyección estrictamente pública de un encuentro |
+  | `get_disponibilidad_cancha(uuid,date)` | **54, 60, 64, 65, 84** — cinco veces en treinta migraciones |
+  | `buscar_complejos(numeric,numeric,text,integer)` | buscar recintos sin cuenta |
+  | `precio_de_bloque(uuid,date,time)` | el precio de una hora, sin cuenta |
+  | `club_estadisticas(uuid)`, `club_record(uuid)` | las estadísticas públicas de un club |
+  | `inicio_de_reserva`, `fin_de_reserva`, `desafio_reglas`, `distancia_km`, `normaliza_telefono_cl`, `sin_tildes` | ayudantes puros que acompañaban a las anteriores |
+  | `expire_old_challenges()` | (conviene mirar ésta aparte: no es obvio que deba ser de `anon`) |
+
+- **Por qué nadie se enteró:** los arneses que lo habrían cazado el mismo día —**44b, 49, 58, 60, 64, 65 y 69**— se pusieron rojos a la vez y no se volvieron a correr hasta ahora. Los siete están actualizados para medir lo que de verdad pasa, con el conflicto escrito dentro de cada uno y la indicación de cómo revertirlos: corren como `authenticated` y vuelven a `set local role anon` el día que se decida reabrir. Las funciones en juego en los tres últimos son `precio_de_bloque`, `get_disponibilidad_cancha` y `search_canchas`.
+- **Esto explica el P4.** La nota de `historial_publico_club()` decía que `historial_club()` «ya funciona para `anon`» y el 2026-10-14 se corrigió como si fuera un error de la nota. **No lo era: era cierto cuando se escribió.** Lo reversó la 114.
+- **La decisión que hace falta** no es función por función, es una sola: **si FutFinder tiene superficie pública sin cuenta**. Si la respuesta es sí, se reabren con una lista explícita —y el barrido de la 114 debería llevar esa lista para que no vuelva a pasar—. Si es no, hay que retirar las concesiones de catorce migraciones y los casos de arnés que las comprueban, para que el repositorio deje de decir dos cosas distintas.
+- **Verificación necesaria:** con `set local role anon`, cada función de la lista que se decida reabrir responde; las que no, dan 42501; y ningún arnés queda afirmando lo contrario de lo que la base hace.
+
+## Resuelto el 2026-10-16 — las otras dos cosas que la 119 revirtió (migraciones 160 y 161)
+
+La 159 restauró la **regla**; faltaban las dos frases que la gente sí lee. Mismo origen: la 119 reescribió `confirmar_resultado` para añadirle los permisos de club y la reconstruyó desde una copia anterior a la **50**.
+
+- **El aviso del rechazo** decía «… rechazó el marcador propuesto para «X». **Propongan uno nuevo.**» La 50 ya lo había cambiado, con esta razón escrita en su cabecera: «es una instrucción que el servidor rechaza acto seguido». La **160** devuelve el texto que explica lo que de verdad pasa: el encuentro queda en disputa y las estadísticas no se mueven hasta que la moderación lo revise.
+- **El motivo de error** al confirmar algo ya rechazado decía «pide que propongan uno nuevo». La **161** lo devuelve a «quedó rechazado y el encuentro está en disputa: sólo la moderación puede reabrirlo».
+- **Por qué importan más de lo que parece:** las dos invitaban a una acción que el servidor rechaza. Un aviso que pide lo imposible manda a dos administradores a pelearse con un botón que no existe y les hace creer que la app está rota.
+- **Se comprobó que no hay una cuarta.** Se tomaron los siete textos que la 50 introdujo y se buscó cada uno en producción: faltaban dos. Éstos. El tercero que parecía faltar —«Solo un administrador del club contrario puede confirmar este resultado»— **no es una reversión**: lo reemplazó la 119 a propósito al meter `tiene_permiso_de_club(…, 'results')`, que era justamente su trabajo. Queda anotado para que nadie lo «restaure» y deshaga los permisos.
+- **Verificación:** arnés `160_161_..._test.sql` 3/3 —con un control que exige que los textos nuevos nombren a la moderación, porque borrar la frase vieja sin decir qué sí se puede habría pasado igual— y los casos 6 y 7 del arnés de la 50, de vuelta en verde.
+
+## Resuelto el 2026-10-15 — la disputa vuelve a cerrarse (migración 159)
+
+**Un fallo de verdad en producción, encontrado por un arnés que llevaba cinco meses en rojo diciéndolo.**
+
+- **La regla.** La migración **48b** existía para una sola cosa: con el desafío en `resultado_en_disputa`, **ningún club propone un resultado nuevo por su cuenta**. Su texto lo dice con todas sus letras y cambió la guarda de `estado not in ('esperando_resultado','resultado_en_disputa')` a `estado <> 'esperando_resultado'`.
+- **Qué la rompió.** La **119** («permisos del club») reescribió `proponer_resultado` entera para añadirle la comprobación de permisos, y la reconstruyó desde una copia **anterior a la 48b**. La guarda laxa volvió. La función compila igual y hace otra cosa: no hubo aviso de nada.
+- **La consecuencia.** Un club podía empujar su marcador otra vez estando en disputa, en vez de esperar a que alguien la resolviera — que es exactamente lo que la pieza de moderación de la **151** (`moderacion_reabrir_resultado`) vino a hacer bien. La puerta trasera llevaba abierta desde entonces.
+- **Por qué nadie se enteró en cinco meses:** el caso 11 del arnés de la 48 lo comprueba literalmente, y estaba rojo. Los arneses se corren cuando se escriben y nadie vuelve. Salió al correrlos todos juntos.
+- **Gravedad real, sin inflarla:** hoy hay **cero** desafíos en `resultado_en_disputa`, así que **no hay ni un dato afectado**. Lo que estaba abierto era la puerta.
+- **Verificación:** arnés `159_..._test.sql` **4/4**, midiendo conducta y no el texto de la función — en `esperando_resultado` sí se propone (control), en disputa no lo hacen ni el proponente ni el contrario, y la moderación reabre y entonces sí se puede, que es la salida que impide que un encuentro quede trabado para siempre. Más el caso 11 de la 48, que vuelve a verde.
+- **La lección, que no es nueva pero costó cinco meses:** reescribir una función de 12 KB para cambiarle una línea es la forma más fácil de revertir lo que otra migración decidió. Por eso las migraciones de estos días parchean el cuerpo **desplegado** con anclas que fallan si no existen, en vez de transcribirlo.
+
 ## P1 — Validar el envío push de extremo a extremo en dispositivo físico
 
 - **Dominio afectado:** avisos y push.
@@ -67,18 +364,19 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Verificación necesaria:** una matriz Android/iOS en dispositivos físicos confirma permisos, token, una categoría permitida, una bloqueada por preferencia y la recuperación ante token inválido. Las pruebas web no cierran este pendiente.
 - **No se puede avanzar desde la Mac en la que se trabaja hoy:** no tiene Xcode ni el SDK de Android, así que ni siquiera se llega a un build para instalar.
 
-## P1 — Falta decidir quién modera, y después las pantallas
+## Resuelto el 2026-10-14 — ya hay quien modera, y pantalla para hacerlo
 
-> **El mecanismo ya está (migración 151, 2026-10-01) y el padrón nace VACÍO.** Mientras nadie esté en él no cambia nada. Lo que queda es una decisión tuya y, después, las pantallas.
-
-- **Lo que quedó listo:** la tabla `moderadores` —sin privilegios de cliente: ni la app la lee ni puede nombrar a nadie—, `es_moderador()` como única fuente de la pregunta, `moderacion_cola()` con las tres colas en una llamada, `moderacion_resolver_revision()` como puerta con nombre sobre la función de la 47c, y `moderacion_reabrir_resultado()`.
-- **Nombrar a alguien es un `insert` desde el panel:** `insert into public.moderadores (user_id, nota) values ('<uuid>', 'por qué');`. Es la única parte que queda en manos de una persona, a propósito.
-- **Lo que sigue sin existir, y es lo que decides tú:** quién modera. La nota original ya lo acotaba —rol propio, no `admin` de club, porque quien modera no puede ser parte interesada— y el padrón respeta eso sin elegir a nadie.
-- **Y después, las pantallas:** una bandeja que lea `moderacion_cola()` y dos acciones. No se construyeron porque sin rol no hay a quién mostrárselas.
-- **Un dato medido que le hace falta a quien construya esa pantalla:** quien modera **no ve el hilo** del desafío que modera. `club_challenge_events_read` exige `chat_puede_ver_desafio()`, y quien modera no pertenece a ninguno de los dos clubes — que es justamente lo que lo hace imparcial. Se comprobó: ve 0 eventos. Por eso `club_sanction_reviews.contexto` ya guarda el expediente copiado al pedir la revisión; la pantalla usa eso, o necesita su propia puerta `security definer`.
-- **Sigue en pie la obligación operativa:** nadie recibe un aviso cuando llega una revisión. Hasta que exista la bandeja hay que mirar la cola a mano — ahora con `select public.moderacion_cola();`, que además trae los resultados en disputa y los reportes sin mirar.
-- **Cómo se resuelve HOY, sin pantalla:** nombrarse en el padrón y llamar `moderacion_resolver_revision('<review_id>', 'retirar' | 'mantener', 'nota')`; o seguir con `resolver_revision_sancion(...)` desde el panel con `service_role`, que no cambió. La diferencia es que por la puerta nueva queda registrado **quién** decidió, y por la vieja `resuelta_por` queda en null.
-- **Verificación: arnés 9/9.** Mide las dos mitades: con el padrón vacío nadie modera, la cola está cerrada, reabrir está cerrado y el desafío no se mueve; con alguien nombrado, modera, ve las tres colas con datos reales, reabre y deja su evento. Y los dos bordes: nombrar a uno **no** le abre la puerta a otro, y no se reabre lo que no está en disputa.
+- **La decisión (Vicente): modera él, y solo él.** Con 32 usuarios no hace falta más, y no reparte un poder que después cuesta quitar. Queda **una fila** en `public.moderadores`, puesta desde el panel porque la tabla no tiene políticas ni privilegios de cliente: la app ni lee el padrón ni puede nombrar a nadie.
+- **La pantalla** (`src/screens/ModeracionScreen.js`) muestra las tres colas de `moderacion_cola()` y resuelve dos: retirar o mantener una sanción revisada, y reabrir un resultado en disputa. **Actualización del 2026-11-05:** desde la migración **164** (aplicada el 2026-10-19) hay una **cuarta cola, «Recintos esperando revisión»** (`recintos_esperando`), con un botón «Aprobar recinto» que llama a `moderacion_aprobar_recinto()` (misma puerta de `es_moderador()`, idempotente, no publica: publicar sigue siendo del dueño). Nació de un hueco real: `admin_solicitar_revision_complejo()` sólo marcaba `revision_pedida_at` y no avisaba a nadie; «los mojojo» llevaba 35 días esperando. **Rechazar un recinto sigue sin existir a propósito** (motivo, si se puede volver a pedir, qué ve el dueño: decisión de producto, igual que los reportes). Arnés `164_recinto_esperando_revision_test.sql`, no re-ejecutado el 2026-11-05. Detalle operativo en [Aprobar recintos](aprobar-recintos.md). Se llega por Configuración → Moderación, y **esa entrada sólo se dibuja para quien está en el padrón**.
+- **Esconder la entrada es cosmética y el código lo dice.** `es_moderador()` decide en el servidor y las tres RPC lo comprueban por su cuenta; la pantalla nunca es la autoridad.
+- **Los reportes se resuelven desde el 2026-11-18** (migración 194; ver el P2, ya cerrado, más abajo). Hasta entonces se mostraban sin botones.
+- **«Vacía» y «no se pudo leer» se dibujan distinto.** En una pantalla de sanciones sin resolver, confundirlas es grave: la primera dice que no hay nada, la segunda ofrece reintentar.
+- **Verificación, con la sesión real de Vicente:**
+  - La entrada aparece en Configuración y la pantalla abre con las colas de producción (2 reportes, 0 revisiones, 0 disputas).
+  - **Las filas accionables se vieron dibujadas** —con su expediente, su campo de nota y sus botones— fabricando la respuesta de `moderacion_cola()` con el arnés de `fetch`, de sólo lectura. Las dos colas estaban vacías en producción y no se iba a sembrar una sanción para mirarla.
+  - **El camino de acción está probado de punta a punta sin escribir nada:** al confirmar «Retirar sanción» sobre una fila inventada, la pantalla mostró **«No se pudo — Esa revisión no existe»**, que es un texto que vive dentro de `resolver_revision_sancion`. Para llegar ahí la RPC se llamó, `es_moderador()` devolvió **true** (si no, habría sido un 42501, no un `ok:false`) y el cliente leyó `data.ok === false`. Lo único sin ejercitar es la rama de éxito, que necesita una sanción real.
+  - **La puerta cierra por los cuatro lados:** con una cuenta fuera del padrón, `es_moderador()` da false y `moderacion_cola()`, `moderacion_reabrir_resultado()` y `moderacion_resolver_revision()` responden **42501**; y `public.moderadores` no se puede leer desde la app.
+- **Lo que esto no cerraba:** el P2 de moderación de reportes, que se cerró el 2026-11-18 con la migración 194.
 
 ## Resuelto el 2026-10-01 — un resultado en disputa ya tiene forma de reabrirse
 
@@ -97,13 +395,15 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **El paso 6, a medias y hay que decirlo.** La mitad del servidor está comprobada contra producción: una cuenta que **no** pertenece a ninguno de los dos clubes recibe el marcador pero con **hora y cancha ocultas**, y `soy_integrante = false`. La mitad visual —que la tarjeta no lleve a ninguna parte— está comprobada **por código**, no vista: `ClubDetailScreen` y `ClubHistoryScreen` pasan `onPress` sólo si `soyIntegrante`, y `MatchHistoryCard` dibuja el chevron sólo si hay `onPress`. Para verlo hace falta una sesión de una cuenta ajena a los dos clubes, y en este recorrido sólo había una.
 - **El paso 7 sigue sin hacerse:** el del resultado rechazado que deja el desafío en disputa. Hoy hay **cero** desafíos en `resultado_en_disputa` y montarlo exige rechazar un resultado real.
 
-## P3 — El nivel de un encuentro entre clubes no se acuerda en ninguna parte
+## Resuelto el 2026-10-14 — el nivel lo fija quien propone (migraciones 156 y 157)
 
-- **Dominio afectado:** desafíos entre clubes y el historial del club.
-- **Evidencia (comprobada el 2026-08-17 contra `jvfoendzblkoxvwvommz`):** `club_challenges` no tiene columna de nivel, `club_challenge_proposals` tampoco —se acuerdan fecha, cancha, modalidad, cupos, método de inscripción y cuota— y `aprobar_propuesta()` (migración 44) crea el `matches` sin `nivel`, así que queda el `default 'recreativo'` de la tabla. Los partidos de clubes que existen —**9** al 2026-09-30, eran 7— están todos en `recreativo`, ninguno por elección. Comprobado ese día: ninguna de las dos tablas tiene columna de nivel.
-- **Por qué importa:** la Tarea 6.2 mostraba ese campo en la tarjeta del historial como «tipo de partido», así que un encuentro competitivo se leía «Recreativo». Es un valor por defecto disfrazado de dato, exactamente lo que la 6.2 vino a quitar del historial. En la 6.3 se dejó de mostrar: `historial_club()` sigue devolviendo la columna, pero el cliente no la pinta (ver `NIVEL_POR_OMISION` en `src/utils/historialClub.js`).
-- **Acción:** decidir si el nivel se acuerda en la propuesta —quién lo elige, si se negocia como la hora y la cuota, y si condiciona algo— y sólo entonces agregarlo. Volver a mostrarlo son dos líneas: `tipoLabel` en `normalizarPartido()` y la prop en `MatchHistoryCard`.
-- **Verificación necesaria:** un encuentro creado con nivel competitivo se lee «Competitivo» en el historial de los dos clubes, y uno anterior a ese cambio no miente.
+- **Qué pasaba.** `club_challenge_proposals` no tenía columna de nivel y `aprobar_propuesta()` creaba el `matches` sin ponerlo, así que quedaba el `default 'recreativo'` de la tabla. Los nueve partidos de clubes estaban los nueve en `recreativo` y **ninguno por elección**. La tarjeta del historial lo mostraba como «tipo de partido», así que un encuentro competitivo se leía «Recreativo»: un valor por omisión disfrazado de dato. En la 6.3 se dejó de pintar, que tapaba el síntoma.
+- **La decisión (Vicente, 2026-10-14): lo fija quien propone y no se negocia**, igual que la modalidad. El club rival lo ve antes de aceptar —se le muestra la propuesta entera— pero no lo contrapropone. Menos ida y vuelta, a cambio de que quien recibe no pueda ajustarlo sin rechazar la propuesta completa.
+- **`null` no es `'recreativo'`, y ahí está todo.** La columna nueva admite nulo y nace nula: significa «no se eligió». Poner `'recreativo'` por defecto habría repetido exactamente el fallo. Sólo al crear el `matches` se cae a `'recreativo'`, porque esa tabla tiene ese valor por omisión desde siempre.
+- **Hicieron falta DOS migraciones, y la segunda no es un detalle.** La **156** da dónde elegirlo y lo lleva al partido. Pero `historial_club()` devolvía `m.nivel`, y con el `default` de `matches` un encuentro anterior a la 156 es **indistinguible** de uno donde alguien eligió «recreativo»: volver a pintarlo leyendo de ahí habría repetido el fallo con una migración de respaldo que lo hacía parecer cierto. La **157** hace que el historial tome el nivel de **la propuesta**, que sí admite nulo. Es literalmente lo que pedía la verificación de este pendiente: «uno anterior a ese cambio no miente».
+- **Las dos parchean los cuerpos DESPLEGADOS** de `crear_propuesta_oficial` (7 KB), `aprobar_propuesta` (12 KB) e `historial_club`, con anclas que fallan si no existen o aparecen más de una vez. Transcribir funciones de ese tamaño es la forma más fácil de meter un error que nadie nota.
+- **Verificación: arnés de la 156 6/6 y el de la 157 2/2**, en ensayo revertido, recorriendo el flujo real —desafío → aceptar → proponer con `competitivo` → aprobar— y comprobando que el partido sale `competitivo` y no el valor de la tabla. **El control de la 157 es el que más dice:** con la función vieja en pie, el único encuentro del historial devolvía «recreativo», un nivel que nadie había elegido; después devuelve `null`. Más **1694 pruebas** en verde, incluidas las dos que fijaban la conducta anterior y se reescribieron en vez de borrarse.
+- **Lo que quedaba sin comprobar (actualizado el 2026-11-05):** el selector de nivel en `ClubProposalScreen` **no se había visto en pantalla** el 2026-10-14. No había ningún desafío en negociación en producción y crear uno entre dos clubes de Vicente para mirarlo habría sido escribir en producción sin pedirlo. **Ese pendiente se cerró en buena parte el 2026-10-21**, caminando el ciclo de desafíos entero contra la base local: la propuesta oficial se llenó con modalidad y nivel, el partido salió con ese `nivel` y la pantalla de aprobación los muestra desde el commit `be57dd4` (ver [Pruebas](pruebas.md)); además apareció que la pantalla reventaba al abrirse y se arregló. **Sigue abierto el paso 7** del historial (resultado rechazado que deja el desafío en disputa) y las ramas tristes del ciclo, que tienen arnés pero no recorrido. Lo que sí está probado es que el borrador lleva el nivel, que el payload usa el nombre de columna correcto y que la pantalla compila y la app levanta con el cambio dentro.
 
 ## P4 — `historial_publico_club()` quedó sin consumidor
 
@@ -111,15 +411,33 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Evidencia:** la creó la migración 44d como la proyección estrictamente pública de un partido de clubes terminado (clubes, día, marcador y V/E/D) y la 48 le rellenó el marcador. Desde la 49, la aplicación lee el historial con `historial_club()`, que devuelve más —escudos y nivel— y reserva la hora exacta y la cancha para los integrantes de los dos clubes. Ninguna pantalla, servicio ni Edge Function llama ya a `historial_publico_club()`; sólo la usan `44d_partido_privado_test.sql` (caso 15) y `49_historial_test.sql` (caso 5), que la comparan a propósito.
 - **Por qué NO se elimina:** sigue siendo el contrato que fija qué es público de un encuentro terminado, y `clubs.slug` existe desde la migración 11 «para la futura página pública `futfinder.com/club/<slug>`», donde el visitante es `anon` — el caso exacto que esta función atiende. Retirar una función aplicada porque hoy no tiene quien la llame es perder la referencia sin ganar nada; su coste es una función `stable security definer` de sólo lectura.
 - **El detalle que hay que recordar si se usa:** su `join` contra `club_match_results` es `left`, así que publica cualquier partido `finalizado` **aunque nadie haya confirmado el marcador**, con los goles en `null`. `historial_club()` hace ese join interno justamente para no publicar un partido como jugado sin resultado. Quien construya la página pública tiene que elegir una de las dos a conciencia.
-- **Acción:** al construir la página pública del club, decidir si se usa `historial_club()` para todo —recomendado, ya funciona para `anon`— y, si es así, retirar `historial_publico_club()` con una migración nueva que también actualice el caso 15 de la prueba de la 44d. Nunca editando la 44d.
+- **CORRECCIÓN del 2026-10-14, matizada el 2026-10-15: «ya funciona para `anon`» era falso HOY, pero era cierto cuando se escribió** — lo reversó la migración 114 (ver el P2 de arriba, que cubre las catorce funciones afectadas). Medido con `set local role anon` contra producción: `historial_club()` y `historial_publico_club()` dan **42501** las dos. Ninguna la puede ejecutar `anon` —el `execute` es de `postgres`, `authenticated` y `service_role`— así que la recomendación que estaba escrita acá habría mandado a quien construya la página pública directo contra un muro. Elegir cuál se usa **no basta**: hace falta además un `grant execute … to anon`, y eso es una decisión de seguridad, no un trámite.
+- **Lo que un visitante anónimo YA ve hoy, sin que exista ninguna página pública** (medido el 2026-10-14):
+
+  | | `anon` |
+  |---|---|
+  | `profiles` | **0 filas** — cerrado por las migraciones 142, 143 y 148 |
+  | `clubs` | 13 filas (`clubs_read` es `true` para todos) |
+  | `club_members` | 15 filas… |
+  | …pero esos `user_id` | **no resuelven a nadie**: 0 de 15 llegan a un perfil |
+  | `club_photos` | 4 filas |
+  | `matches` | 18 de 27 |
+  | `historial_club()` / `historial_publico_club()` | **42501** |
+
+  O sea: el padrón de quién pertenece a qué club es legible, pero **anonimizado** —son uuid que no llevan a ninguna persona, porque `profiles` se cerró—. Esa mitigación no es deliberada, es un efecto de las migraciones de privacidad del perfil; si alguien reabriera `profiles` a `anon`, el grafo de membresías quedaría con nombre y apellido sin que nadie tocara `club_members`.
+- **Acción:** al construir la página pública del club, decidir si se usa `historial_club()` para todo y, si es así, retirar `historial_publico_club()` con una migración nueva que también actualice el caso 15 de la prueba de la 44d. Nunca editando la 44d. **Y, antes que eso, decidir qué se abre a `anon`:** hoy no hay ninguna función de historial que pueda llamar.
 - **Verificación necesaria:** la página pública no muestra ningún partido sin marcador confirmado, y ninguna prueba versionada queda apuntando a una función que ya no existe.
 
-## P2 — Definir y construir la moderación posterior a un reporte
+## Resuelto el 2026-11-18 — P2: la moderación posterior a un reporte (migración 194)
 
-- **Dominio afectado:** perfil y seguridad de la comunidad.
-- **Evidencia:** el flujo permite crear y consultar los propios reportes, pero la documentación y el código no describen moderación, sanción ni apelación.
-- **Acción:** decidir roles, revisión, estados, medidas y apelación; después diseñar políticas, persistencia, interfaz y pruebas de autorización.
-- **Verificación necesaria:** pruebas de RLS y flujos autenticados demuestran que sólo las personas autorizadas revisan o resuelven reportes y que el usuario ve el estado permitido.
+Apple (guía 1.2) y Google Play exigen actuar sobre lo reportado: quitar el contenido y sacar a quien lo publica, en un plazo razonable. La **194** (aplicada el 2026-11-18) lo decide así:
+
+- **Quién:** quien está en el padrón (`es_moderador()`), desde Ajustes → Moderación. `moderacion_resolver_reporte()` lo vuelve a comprobar (42501 si no).
+- **Cuatro decisiones:** descartar (sin aviso), advertir (aviso, sin medida), quitar el contenido (borra la foto de club o de perfil reportada; en un club, escudo, portada y descripción; en un partido, descripción y portada; si se reportó a la persona, su foto, portada y bio) y suspender 7 o 30 días (el servidor acepta de 1 a 365). Los otros reportes pendientes sobre lo mismo se cierran con la misma decisión; queda quién decidió, qué y una nota interna (`moderado_por`, `decision`, `nota_moderacion`).
+- **La suspensión de moderación** (`moderacion_suspensiones`) impide CREAR contenido —mensajes, partidos, clubes, fotos, solicitudes de amistad, desafíos abiertos, calificaciones— con un mensaje que dice hasta cuándo. Reportar sigue permitido. Es distinta de la de TrueScore (`profiles.estado`), que sólo impide inscribirse.
+- **Apelación:** por correo a futfindercl@gmail.com, que es lo que dice el mensaje de la suspensión y lo que ya decían los términos. No hay apelación dentro de la app.
+- **Plazo:** 24 horas, en [Revisión diaria](revision-diaria.md).
+- **Verificación:** arnés `194_resolver_reportes_test.sql` 12/12 contra producción revertido. Sin probar con la sesión real: [Por probar](por-probar.md), 6i.
 
 ## Resuelto el 2026-10-01 — las tablas base ya están en el historial versionado
 
@@ -150,13 +468,15 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Lo que se acepta a cambio:** el rechazo llega como violación de restricción (23514) y no como un `ok:false` con texto en español. A esta ruta sólo se llega llamando la RPC a mano, saltándose la pantalla que ya explica bien el error.
 - **Verificación:** arnés `145_..._test.sql` **8/8**, en el ensayo revertido y otra vez contra el esquema aplicado. Cubre las dos direcciones —rechaza (0,0) y **sigue aceptando** una cancha real de Santiago—, que un punto con **un solo cero** se acepta (la marca es el par, no un cero suelto), que un cambio de sólo hora no queda bloqueado, y que las coordenadas en texto pasan la restricción a propósito, porque de eso se encarga la validación de tipo de la función. Antes de aplicar se confirmó que no había ni una fila en (0,0) en las tres tablas: 27 partidos, 11 propuestas y 3 cambios.
 
-## P3 — La concurrencia de los cambios negociados no tiene prueba de dos sesiones
+## Resuelto el 2026-10-14 — la carrera de dos sesiones, corrida de verdad
 
-- **Dominio afectado:** cambios negociados del partido entre clubes (migración 46).
-- **Evidencia:** el invariante lo sostienen tres piezas de la base —`select … for update` sobre el partido, el índice único parcial `club_match_changes_pendiente_uidx` y el `update … where estado = 'pendiente'`—, pero `46_cambios_de_partido_test.sql` corre en UNA sola sesión: prueba que el invariante se cumple, no la carrera real.
-- **Acción:** repetir el arnés de dos sesiones simultáneas que se usó en U3 (`FOR UPDATE NOWAIT`) para dos aceptaciones a la vez y para dos solicitudes a la vez.
-- **Comprobado el 2026-10-04: no se puede hacer por el MCP de Supabase, y conviene no volver a intentarlo.** Hacen falta dos transacciones vivas a la vez y las dos vías están cerradas: `dblink` **no está instalado** —sí disponible, 1.2— y **no se instala sólo para una prueba**, porque deja en la base la capacidad de abrir conexiones arbitrarias; y `max_prepared_transactions` está en **0**, así que `PREPARE TRANSACTION` tampoco sirve para retener el bloqueo entre llamadas. Quedan dos caminos reales: un PostgreSQL local (el mismo que pide el P1 de arriba), o dos clientes PostgREST de verdad disparados en paralelo desde el navegador con dos sesiones iniciadas — esto último escribe en producción y necesita una segunda cuenta.
-- **Verificación necesaria:** con dos sesiones, sólo una aceptación aplica el cambio y sólo una solicitud queda pendiente; la otra recibe el rechazo esperado y no deja fila.
+- **Qué faltaba.** El invariante de los cambios negociados (migración 46) lo sostienen tres piezas —el `select … for update` sobre el partido, el índice único parcial `club_match_changes_pendiente_uidx` y el `update … where estado = 'pendiente'`— y `46_cambios_de_partido_test.sql` corre en UNA sola sesión: probaba que el invariante se cumple, no que aguante la carrera.
+- **Por qué no se podía antes, y queda anotado para no volver a intentarlo:** contra producción hacen falta dos transacciones vivas a la vez y las dos vías están cerradas — `dblink` no está instalado (y no se instala para una prueba: deja en la base la capacidad de abrir conexiones arbitrarias) y `max_prepared_transactions` es **0**, así que `PREPARE TRANSACTION` tampoco retiene el bloqueo entre llamadas. Lo destrabó la base local.
+- **Cómo corre:** `scripts/carrera-dos-sesiones.sh` lanza **dos procesos `psql` de verdad a la vez** con `&`. No orquesta el entrelazado: los suelta y mira quién gana. Se repite varias vueltas porque una carrera que no llegó a solaparse no prueba nada y con una sola pasada no se distingue. Si no encuentra el fixture, lo siembra solo (`scripts/carrera-semilla.sql`).
+- **Resultado: 6/6, y las dos mitades que pedía la verificación.**
+  - **Dos solicitudes a la vez** → queda **exactamente una** pendiente. El índice único parcial hace su trabajo.
+  - **Dos aceptaciones del mismo cambio a la vez** → **una aplica y la otra contesta `already`**. No es un empate ni una doble aplicación: es la idempotencia que la 46 promete.
+- **Un detalle que el arnés tuvo que aprender, y vale la pena por si alguien lo repite:** aceptar un cambio mueve la hora del partido, así que proponer la misma hora en la vuelta siguiente **no es un cambio** y la RPC lo rechaza con razón. El arnés se lo comía como si fuera un fallo de carrera. Cada vuelta usa una hora distinta.
 
 ## Resuelto el 2026-10-01 — una función de trigger no es un endpoint
 
@@ -235,28 +555,28 @@ Estaba protegida sólo en la interfaz: al publicarse, el partido pasaba a `match
 - **Verificación: arnés `154_..._test.sql` 5/5**, en el ensayo revertido y otra vez contra el esquema aplicado, y **esta vez con `set local role authenticated`**. Su caso 1 es el control que faltaba: comprueba que `cancha_usos` siga ilegible, para que el arreglo no pueda ser «publicar la tabla».
 - **Y comprobado en la pantalla, con la sesión real,** que es lo único que no se puede engañar con el rol equivocado: al publicar un partido, «maiclub» sale con su distintivo «CANCHA FUTFINDER · 4 USOS»; «tangus» —que sigue en la tabla pero tiene un solo organizador— **no sale**, sólo lugares de Mapbox; y «prueba» ya no ofrece ninguna cancha del directorio.
 
-## P4 — `authenticated` tiene TRUNCATE sobre 58 tablas
+## Resuelto el 2026-10-14 — nadie trunca desde el cliente (migración 155)
 
-> Hallazgo del 2026-10-04, al mirar los privilegios de `canchas`. **No es un agujero vivo**, y conviene decirlo antes que nada: PostgREST no emite `TRUNCATE`, así que desde la app no hay forma de llegar. Es defensa en profundidad, no una puerta abierta.
+- **Qué pasaba.** `authenticated` tenía `TRUNCATE` sobre **58 tablas** de `public`, incluidas `profiles`, `matches`, `messages` y `pagos`. No lo pidió ninguna migración: es el reparto por omisión de Supabase, que `pg_default_acl` volvía a aplicar a cada tabla nueva.
+- **Por qué importaba, y por qué no era una alarma.** `TRUNCATE` **no pasa por RLS**: todas las demás escrituras de esas tablas están contenidas por políticas, ésta no. Pero **no era explotable** — PostgREST no emite esa sentencia, así que desde la app no existía el camino. Era defensa en profundidad, no una puerta abierta.
+- **El control fue más fuerte de lo esperado, y conviene que quede escrito:** no se dedujo del catálogo, se **ejecutó**. Con `set local role authenticated`, una sesión truncó de verdad una tabla de `public`, y una tabla recién creada nacía con el privilegio puesto. O sea: a nivel de SQL el agujero era real; lo único que lo tapaba era que ningún camino de la app llega a emitir `TRUNCATE`.
+- **Se quita SÓLO `truncate`.** `insert`, `update` y `delete` de `authenticated` quedan intactos: ésos sí los usa la app y los gobierna la RLS. `service_role` y `postgres` lo conservan, porque son quienes corren migraciones y mantenimiento.
+- **Y un disparador para lo que nazca mañana,** `nadie_trunca_desde_el_cliente`, porque `pg_default_acl` habría vuelto a llenar la lista con la próxima migración que añadiera una tabla. No se tocó `anon_nace_sin_llaves` —que ya cubría a `anon`, y por eso `anon` estaba en cero—: su nombre dice lo que hace y `authenticated` **necesita** las otras tres escrituras. Que los dos se solapen en `anon` es inofensivo.
+- **Verificación: arnés `155_..._test.sql` 8/8**, en el ensayo revertido y otra vez contra el esquema aplicado, llegando las dos veces a la última línea. El caso 7 es el que vale: **con la lente de un usuario real**, publica un partido (la escritura más común de la app, pasando por la RLS de `matches`) y **no** puede truncar. El caso 1 es el control que impide confundir «se cerró `TRUNCATE`» con «se rompió la app».
 
-- **Dominio afectado:** privilegios de base de datos, todas las tablas de `public`.
-- **Evidencia:** `authenticated` tiene el privilegio `TRUNCATE` sobre 58 tablas, incluidas `profiles`, `matches`, `messages` y `pagos`. Es el reparto por omisión de Supabase (`grant all on all tables ... to authenticated`), no algo que ninguna migración haya pedido.
-- **Por qué importa igualmente:** **`TRUNCATE` no pasa por RLS.** Todas las demás escrituras de esas tablas están contenidas por políticas; ésta no lo estaría. La única razón de que no sea explotable hoy es que no existe el camino para emitir la sentencia — una función `security invoker` con SQL dinámico lo abriría sin que nadie lo notara.
-- **Acción:** una migración que revoque `truncate` de `authenticated` y `anon` en todo `public`, más el disparador de eventos que cierre lo que nazca después —el mismo patrón de la 147, que ya existe y funciona—.
-- **Verificación necesaria:** cero tablas de `public` con `truncate` para `authenticated` o `anon`, una tabla nueva creada después nace sin él, y el arnés comprueba antes que el privilegio estaba (control negativo) y después que las escrituras normales de la app siguen funcionando.
-
-## P4 — Restos del rediseño de Clubes que nunca se cerraron
+## Resuelto — Restos del rediseño de Clubes (los tres puntos, cerrados)
 
 - **Dominio afectado:** portada y ficha de club, perfil público.
-- **Contexto:** el rediseño se integró a `main` —`src/contexts/ClubsHomeContext.js`, `ClubsScreen`, `clubsHomeTasks.js`— y la rama `rediseno/portada-clubes` ya no existe. De su handoff quedaron tres cosas sin cerrar; las otras dos que anotaba (el `window.confirm` de salir del club y los `role="radio"` sin `aria-checked`) **sí** se corrigieron y se comprobó que ya no están en el código.
-- **Lo que sigue abierto:**
+- **Contexto:** el rediseño se integró a `main` —`src/contexts/ClubsHomeContext.js`, `ClubsScreen`, `clubsHomeTasks.js`— y la rama `rediseno/portada-clubes` ya no existe. Su handoff anotaba cinco cosas sueltas: el `window.confirm` de salir del club y los `role="radio"` sin `aria-checked` ya estaban corregidos, y las tres que quedaban se cerraron entre el 2026-09-04 y el 2026-10-04.
+- **Los tres puntos:**
   1. ~~`ClubDetailScreen.js:346` navega a `EditClub` pasando el club como objeto.~~ **Corregido el 2026-10-04.** Eran dos mitades y ninguna sola explicaba el fallo: `EditClub` **no estaba en `linking.config.screens`**, así que en web la pantalla no tenía dirección propia y recargar devolvía a la raíz; y el formulario se llenaba de `route.params.club`, de modo que aunque hubiera URL un objeto no cabe en una ruta. Arreglar sólo la primera habría dejado una pantalla accesible por enlace que se abre **vacía**, y «guardar» habría borrado la descripción, la región y la comuna del club: peor que no tener URL. Ahora hay `ClubDetail: 'clubes/:clubId'` y `EditClub: 'clubes/:clubId/editar'`, y la pantalla trae el club con `getClubById()` cuando llega por la URL.
      - **Lo encontró el navegador, no una prueba:** la primera versión seguía mandando el club entero «como camino rápido», y React Navigation serializa los parámetros sobrantes en la query — la dirección quedaba en `…/editar?club=%5Bobject%20Object%5D`. Compartir **esa** URL resucitaba el fallo completo: `route.params.club` llegaba como la **cadena** `'[object Object]'`, que es verdadera, así que la pantalla creía tener el club y no lo pedía. Ahora viaja sólo el id, y un `club` que no sea un objeto se ignora por los enlaces que ya se hayan copiado.
      - **El orden del permiso es deliberado:** se decide por el id ANTES de mirar si el club se pudo leer. Al revés, la diferencia entre «no tienes permiso» y «no se pudo cargar» le contaría a cualquiera qué identificadores de club son reales. Comprobado en el navegador: un club ajeno y un id inventado dan exactamente la misma respuesta.
      - **Verificación:** 10 pruebas en `enlaceEditarClub.test.js` y recorrido con la sesión de Vicente — la URL del editor de SixSiete abre el formulario con `nombre`, `descripcion`, `region` y `comuna` idénticos a los de la base; un club donde sólo es jugador y un id inexistente dan «No tienes permiso»; y entrar desde «Editar» deja la URL limpia, sin query.
   2. ~~El perfil público de un administrador de club muestra «CLUB — Sin club».~~ **Corregido el 2026-10-01.** No era privacidad deliberada ni un hueco de datos: `ProfileScreen` calculaba `clubActual = isOwnProfile ? misClubs[0]?.club?.nombre : null`, así que en un perfil ajeno **siempre** valía `null` y la ficha imprimía «Sin club» sin haberlo consultado nunca. La guarda tampoco era tonta —`misClubs` son MIS clubes, cargados ahí para «Invitar a mi club», y usarlos habría mostrado mi club en el perfil de otro—: lo que faltaba era consultar los suyos. Lo hace `getClubesDe(userId)`, que además distingue «no pertenece a ninguno» de «no pudimos leerlo», y en ese segundo caso la ficha dice «N.A.» y no «Sin club». Comprobado en la app: el perfil de `@vicenteee` muestra «Los Papi Pasty», y el perfil propio sigue igual. Seis pruebas nuevas en `clubEnElPerfilAjeno.test.js`.
-  3. Dieciocho comprobaciones manuales del checklist del rediseño nunca se corrieron: E6–E9 (varios clubes y persistencia), H5–H6 (pila de navegación), K1 (los cuatro temas), L1–L2 (error total), M2–M6 (responsive), C3–C4, D7 y N3. Necesitan sesión iniciada y datos sembrados.
-- **Verificación necesaria:** para (1), que `EditClub` se abra desde una URL con el identificador del club; para (2), mirar el perfil público de una cuenta administradora antes de decidir; para (3), recorrer los dieciocho puntos con datos sembrados.
+  3. ~~Dieciocho comprobaciones manuales del checklist del rediseño nunca se corrieron.~~ **Se corrieron, y se aprobaron las dieciocho el 2026-09-04.** Este punto nunca debió existir: nació de leer la sección «18 puntos bloqueados» del handoff del rediseño sin leer la de más abajo, donde el mismo documento dice «**18 de 18 controles aprobados**» y detalla cada uno con su medición. La evidencia está trasladada a [Pruebas](pruebas.md).
+- **Y una lección sobre la limpieza, porque el error fue mío:** al retirar `HANDOFF_CLUBES.md` en la limpieza del 2026-09-30 se movió a esta nota la sección equivocada —la de arriba, ya derogada— y con el archivo se fue la evidencia que la contradecía. Un pendiente falso sobrevivió seis semanas y estuvo a punto de costar un recorrido entero repitiendo trabajo ya hecho. **Lo que se mueve de un informe que se borra es su estado FINAL, no la primera sección que lo mencione**; si el documento es largo, hay que leerlo hasta el final antes de resumirlo.
+- **Verificación necesaria:** ninguna. Los tres puntos están cerrados: (1) el 2026-10-04, (2) el 2026-10-01 y (3) el 2026-09-04.
 
 ## Resuelto el 2026-09-30 — `push_tickets` ya no tiene privilegios de cliente
 

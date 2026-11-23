@@ -27,7 +27,6 @@ import {
 
 import {
   paleta as C,
-  radios as R,
   fuentes as F,
   alfa,
 } from '../theme/colors';
@@ -48,6 +47,8 @@ import {
 import Sheet from '../components/partidos/Sheet';
 import TrueScoreChip from '../components/TrueScoreChip';
 import ShareSheet from '../components/partidos/ShareSheet';
+import AsientosDelPartido from '../components/partidos/AsientosDelPartido';
+import { contadorDeJugadores } from '../utils/asientos.js';
 import { InlineEmpty, LoadingList, ErrorState } from '../components/partidos/StateViews';
 import { formatFechaCorta } from '../components/partidos/DateTimeSheets';
 import {
@@ -124,6 +125,8 @@ export default function ManageMatchScreen({ route, navigation }) {
   const [requests, setRequests] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
   const [myId, setMyId] = useState(null);
+  // Sube con cada recarga: los asientos sin cuenta se vuelven a leer con la nómina.
+  const [version, setVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -143,9 +146,9 @@ export default function ManageMatchScreen({ route, navigation }) {
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [reason, setReason] = useState('');
   const [canceling, setCanceling] = useState(false);
-  // Si la RPC preexistente `cancel_match` borra la fila en vez de dejarla como
-  // 'cancelado', el partido deja de existir. Guardamos el resultado para
-  // mostrar un cierre claro en vez del error genérico de «no encontramos».
+  // Desde la migración 34 `cancel_match` deja el partido como 'cancelado'.
+  // Si aun así no se puede volver a leer después de cancelar, se muestra un
+  // cierre claro en vez del error genérico de «no encontramos».
   const [canceledGone, setCanceledGone] = useState(false);
 
   const load = useCallback(async () => {
@@ -171,6 +174,7 @@ export default function ManageMatchScreen({ route, navigation }) {
     });
     setMarks((prev) => ({ ...pre, ...prev }));
 
+    setVersion((v) => v + 1);
     setLoading(false);
     setRefreshing(false);
   }, [matchId]);
@@ -422,9 +426,8 @@ export default function ManageMatchScreen({ route, navigation }) {
               text="Avisamos a los jugadores confirmados y a quienes tenían una solicitud pendiente. El partido ya no aparece en Partidos."
             />
             <Note>
-              En esta base de datos `cancel_match` elimina el registro, así que el partido no
-              queda en tu historial. Para conservarlo como «cancelado» —con su chat y su
-              motivo— hay que aplicar la migración 34 en Supabase.
+              No pudimos mostrarte este partido después de cancelarlo, así que no lo vas a
+              encontrar en tu historial. La cancelación sí quedó hecha.
             </Note>
             <PrimaryButton
               label="Volver a Partidos"
@@ -687,6 +690,17 @@ export default function ManageMatchScreen({ route, navigation }) {
           {/* ---------------- CONFIRMADOS ---------------- */}
           {tab === 'confirmados' ? (
             <View style={{ gap: 10 }}>
+              {contadorDeJugadores(match) ? (
+                <AsientosDelPartido
+                  match={match}
+                  nomina={attendees}
+                  editable={isOrganizer && ['abierto', 'lleno'].includes(match.estado) && new Date(match.hora).getTime() > Date.now()}
+                  miId={myId}
+                  version={version}
+                  onCambio={load}
+                  onVerPerfil={(userId) => navigation.navigate('UserProfile', { userId })}
+                />
+              ) : (
               <Card style={{ gap: 9 }} radius={16}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
                   <Text style={styles.planLabel}>Plantel del partido</Text>
@@ -701,6 +715,7 @@ export default function ManageMatchScreen({ route, navigation }) {
                   {requests.length > 0 ? ` · ${requests.length} en revisión` : ''}
                 </Text>
               </Card>
+              )}
 
               {confirmed.length === 0 ? (
                 <InlineEmpty
@@ -1121,7 +1136,7 @@ export default function ManageMatchScreen({ route, navigation }) {
             />
           ) : (
             <Bullet
-              text={`Tu Trust Score baja ${cancelPenaltyFor(match.hora)} puntos${isPenaltyFree(match.hora) ? '' : ' — estás cancelando con poca antelación'}`}
+              text={`Tu ${nombreTS} baja ${cancelPenaltyFor(match.hora)} puntos${isPenaltyFree(match.hora) ? '' : ' — estás cancelando con poca antelación'}`}
             />
           )}
           <Bullet text="El partido no se borra: queda en el historial como cancelado" />

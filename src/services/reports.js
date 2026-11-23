@@ -1,4 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { TIPOS_DE_CONTENIDO, interpretarReporteDeContenido } from '../utils/reporteDeContenido';
+
+export { TIPOS_DE_CONTENIDO };
 
 /**
  * Reportes de un usuario sobre otro ("Reportar esta cuenta").
@@ -96,7 +99,7 @@ export async function reportUser({ reportedId, motivo, descripcion, elemento }) 
     if (error.code === '23505') {
       return {
         data: null,
-        error: { message: 'Ya enviaste un reporte sobre esta cuenta y sigue en revisión.' },
+        error: { message: 'Ya enviaste un reporte sobre esta cuenta y sigue en revisión.', definitivo: true },
       };
     }
     // La tabla no existe todavía (migración 31 sin aplicar). No es un fallo
@@ -115,6 +118,30 @@ export async function reportUser({ reportedId, motivo, descripcion, elemento }) 
   }
 
   return { data, error: null };
+}
+
+/**
+ * Reporta un club, una foto de club o un partido (migración 186). El
+ * servidor decide a quién va (el admin más antiguo, quien subió la foto, el
+ * organizador) y lo deja en la misma cola de moderación que los reportes de
+ * cuentas. Devuelve `{ error }`; un `ok: false` del servidor (lo propio, lo
+ * que ya no existe, un reporte repetido) llega como error con su motivo.
+ */
+export async function reportarContenido({ tipo, id, motivo, descripcion }) {
+  if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
+  if (!TIPOS_DE_CONTENIDO.includes(tipo) || !id) return { error: { message: 'No se puede reportar eso.' } };
+  if (!esMotivoValido(motivo)) return { error: { message: 'Selecciona un motivo' } };
+  const desc = (descripcion || '').trim();
+  if (desc.length > 600) {
+    return { error: { message: 'La descripción no puede superar los 600 caracteres' } };
+  }
+  const { data, error } = await supabase.rpc('reportar_contenido', {
+    p_tipo: tipo,
+    p_id: id,
+    p_motivo: motivo,
+    p_descripcion: desc || null,
+  });
+  return interpretarReporteDeContenido({ data, error });
 }
 
 /**
@@ -161,6 +188,10 @@ export async function getMyPendingReportFor(userId) {
     .eq('reporter_id', me)
     .eq('reported_id', userId)
     .eq('estado', 'pendiente')
+    // Sólo el reporte de la CUENTA: desde la 191 puede haber además uno
+    // pendiente por cada club, foto o partido de esa persona, y esos no
+    // impiden reportarla a ella.
+    .is('elemento', null)
     .maybeSingle();
 
   if (error) {

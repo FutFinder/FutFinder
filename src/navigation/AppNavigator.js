@@ -24,9 +24,11 @@ import WelcomeScreen from '../screens/WelcomeScreen';
 import TutorialScreen from '../screens/TutorialScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import LoginScreen from '../screens/LoginScreen';
+import RecuperarContrasenaScreen from '../screens/RecuperarContrasenaScreen';
 import VerificationScreen from '../screens/VerificationScreen';
 import LocationPermissionScreen from '../screens/LocationPermissionScreen';
 import TermsScreen from '../screens/TermsScreen';
+import LegalScreen from '../screens/LegalScreen';
 import SuccessScreen from '../screens/SuccessScreen';
 import PublishMatchScreen from '../screens/PublishMatchScreen';
 import EditMatchScreen from '../screens/EditMatchScreen';
@@ -57,12 +59,15 @@ import ClubResultScreen from '../screens/ClubResultScreen';
 import ExploreClubsScreen from '../screens/ExploreClubsScreen';
 import EditClubScreen from '../screens/EditClubScreen';
 import PermisosClubScreen from '../screens/PermisosClubScreen';
+import ModeracionScreen from '../screens/ModeracionScreen';
 import ClubInviteScreen from '../screens/ClubInviteScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TrustScoreHistoryScreen from '../screens/TrustScoreHistoryScreen';
 import VerificarTelefonoScreen from '../screens/VerificarTelefonoScreen';
 import BlockedUsersScreen from '../screens/BlockedUsersScreen';
+import MfaSetupScreen from '../screens/MfaSetupScreen';
 import ReservasUiGalleryScreen from '../screens/ReservasUiGalleryScreen';
+import { DIRECCIONES_PROPIAS } from '../utils/direccionPublica';
 import ComplejoDetailScreen from '../screens/ComplejoDetailScreen';
 import ElegirCanchaScreen from '../screens/ElegirCanchaScreen';
 import FechaHoraScreen from '../screens/FechaHoraScreen';
@@ -90,6 +95,7 @@ import SolicitudRecintoScreen from '../screens/SolicitudRecintoScreen';
 import AdministradoresScreen from '../screens/AdministradoresScreen';
 import MainTabs from './MainTabs';
 import withAuthGuard from './withAuthGuard';
+import withTerminosVigentes from './withTerminosVigentes';
 import withErrorBoundary from './withErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -108,15 +114,26 @@ const SafeTutorialScreen = withErrorBoundary(TutorialScreen, 'Tutorial');
 const SafeRegisterScreen = withErrorBoundary(RegisterScreen, 'Register');
 const SafeLoginScreen = withErrorBoundary(LoginScreen, 'Login');
 const SafeVerificationScreen = withErrorBoundary(VerificationScreen, 'Verification');
+// «Olvidé mi contraseña»: por definición se usa sin poder iniciar sesión.
+const SafeRecuperarContrasenaScreen = withErrorBoundary(RecuperarContrasenaScreen, 'RecuperarContrasena');
 const SafeLocationPermissionScreen = withErrorBoundary(LocationPermissionScreen, 'LocationPermission');
 const SafeTermsScreen = withErrorBoundary(TermsScreen, 'Terms');
+// Términos y políticas se leen antes de tener cuenta (Bienvenida, Registro),
+// así que tampoco pasan por la guarda. Son texto fijo: no leen datos de nadie.
+const SafeTerminosScreen = withErrorBoundary(LegalScreen, 'Terminos');
+const SafePrivacidadScreen = withErrorBoundary(LegalScreen, 'Privacidad');
+const SafeCookiesScreen = withErrorBoundary(LegalScreen, 'Cookies');
+const SafeEliminarCuentaScreen = withErrorBoundary(LegalScreen, 'EliminarCuenta');
 const SafeSuccessScreen = withErrorBoundary(SuccessScreen, 'Success');
 // Galería interna de QA (Fase 1 del handoff de Reservas): no muestra datos
 // de usuario, así que no pasa por withAuthGuard — es la misma razón por la
 // que Welcome/Login tampoco lo hacen.
 const SafeReservasUiGalleryScreen = withErrorBoundary(ReservasUiGalleryScreen, 'ReservasUiGallery');
 
-const GuardedMainTabs = withAuthGuard(MainTabs, 'Main');
+// Quien no aceptó la versión vigente de los términos la acepta antes de
+// entrar (`withTerminosVigentes`).
+const MainTabsConTerminosVigentes = withTerminosVigentes(MainTabs);
+const GuardedMainTabs = withAuthGuard(MainTabsConTerminosVigentes, 'Main');
 const GuardedPublishMatchScreen = withAuthGuard(PublishMatchScreen, 'CreateMatch');
 const GuardedEditMatchScreen = withAuthGuard(EditMatchScreen, 'EditMatch');
 const GuardedManageMatchScreen = withAuthGuard(ManageMatchScreen, 'ManageMatch');
@@ -146,11 +163,16 @@ const GuardedClubResultScreen = withAuthGuard(ClubResultScreen, 'ClubResult');
 const GuardedExploreClubsScreen = withAuthGuard(ExploreClubsScreen, 'ExploreClubs');
 const GuardedEditClubScreen = withAuthGuard(EditClubScreen, 'EditClub');
 const GuardedPermisosClubScreen = withAuthGuard(PermisosClubScreen, 'PermisosClub');
+// La guarda de sesión es lo único que se aplica acá: quién MODERA lo
+// decide `es_moderador()` en el servidor, y las tres RPC lo comprueban
+// por su cuenta. Esconder la entrada del menú es cosmética.
+const GuardedModeracionScreen = withAuthGuard(ModeracionScreen, 'Moderacion');
 const GuardedClubInviteScreen = withAuthGuard(ClubInviteScreen, 'ClubInvite');
 const GuardedSettingsScreen = withAuthGuard(SettingsScreen, 'Settings');
 const GuardedTrustScoreHistoryScreen = withAuthGuard(TrustScoreHistoryScreen, 'TrustScoreHistory');
 const GuardedVerificarTelefonoScreen = withAuthGuard(VerificarTelefonoScreen, 'VerificarTelefono');
 const GuardedBlockedUsersScreen = withAuthGuard(BlockedUsersScreen, 'BlockedUsers');
+const GuardedMfaSetupScreen = withAuthGuard(MfaSetupScreen, 'MfaSetup');
 const GuardedComplejoDetailScreen = withAuthGuard(ComplejoDetailScreen, 'ComplejoDetail');
 const GuardedElegirCanchaScreen = withAuthGuard(ElegirCanchaScreen, 'ElegirCancha');
 const GuardedFechaHoraScreen = withAuthGuard(FechaHoraScreen, 'FechaHora');
@@ -204,7 +226,9 @@ const navTheme = {
  * tenga una URL propia, así que recargar no pierde el contexto.
  */
 const linking = {
-  prefixes: ['futfinder://', 'https://futfinder.cl', 'https://www.futfinder.cl'],
+  // La dirección oficial (y las que se suman cuando exista el dominio propio)
+  // viven en `utils/direccionPublica.js`.
+  prefixes: ['futfinder://', ...DIRECCIONES_PROPIAS],
   config: {
     screens: {
       Main: {
@@ -237,7 +261,16 @@ const linking = {
       // poder revisar los componentes en el navegador sin iniciar sesión.
       // No muestra datos de nadie: son las primitivas con textos de
       // ejemplo (por eso tampoco pasa por `withAuthGuard`).
-      ReservasUiGallery: 'ui-reservas',
+      // Sólo en desarrollo: en producción la galería de QA no existe (estaba
+      // pública en la web publicada).
+      ...(__DEV__ ? { ReservasUiGallery: 'ui-reservas' } : {}),
+      // Términos y políticas, en las mismas direcciones a las que ya
+      // apuntaban los enlaces de la app (`futfinder.cl/terminos`, …).
+      Terminos: 'terminos',
+      Privacidad: 'privacidad',
+      Cookies: 'cookies',
+      // La exige Google Play: borrar la cuenta sin tener la app.
+      EliminarCuenta: 'eliminar-cuenta',
     },
   },
 };
@@ -246,11 +279,15 @@ const linking = {
  * Estructura de la app:
  *
  *  RootStack
- *  ├── Welcome (initial)
- *  ├── Tutorial / Register / Login / Verification / LocationPermission / Terms / Success  (onboarding)
- *  ├── Main         ← BottomTabs (HomeTab, SearchTab, CreateTab*, ChatTab, ProfileTab)
- *  ├── CreateMatch  (modal-style, oculta tab bar)
- *  └── EditProfile  (modal-style, oculta tab bar)
+ *  ├── Splash (initial) → decide entre Welcome, LocationPermission o Main
+ *  ├── Welcome / Tutorial / Register / Login / Verification /
+ *  │   LocationPermission / Terms / Success  (onboarding; Terms es el paso
+ *  │   de aceptar las condiciones, no la página legal)
+ *  ├── Terminos / Privacidad / Cookies  (páginas legales públicas)
+ *  ├── Main         ← BottomTabs (HomeTab, SearchTab, ClubsTab, CreateTab*,
+ *  │                  ReservasTab, ChatTab, ProfileTab)
+ *  └── Pantallas de detalle sobre las tabs (CreateMatch, EditProfile,
+ *      MatchDetail, ChatThread…): ocultan la tab bar.
  *
  *  * CreateTab intercepta el press y navega al stack CreateMatch.
  */
@@ -285,8 +322,13 @@ export default function AppNavigator() {
         <Stack.Screen name="Register" component={SafeRegisterScreen} />
         <Stack.Screen name="Login" component={SafeLoginScreen} />
         <Stack.Screen name="Verification" component={SafeVerificationScreen} />
+        <Stack.Screen name="RecuperarContrasena" component={SafeRecuperarContrasenaScreen} />
         <Stack.Screen name="LocationPermission" component={SafeLocationPermissionScreen} />
         <Stack.Screen name="Terms" component={SafeTermsScreen} />
+        <Stack.Screen name="Terminos" component={SafeTerminosScreen} options={{ title: 'Términos y condiciones' }} />
+        <Stack.Screen name="Privacidad" component={SafePrivacidadScreen} options={{ title: 'Política de privacidad' }} />
+        <Stack.Screen name="Cookies" component={SafeCookiesScreen} options={{ title: 'Política de cookies' }} />
+        <Stack.Screen name="EliminarCuenta" component={SafeEliminarCuentaScreen} options={{ title: 'Eliminar tu cuenta' }} />
         <Stack.Screen name="Success" component={SafeSuccessScreen} options={{ animation: 'fade' }} />
 
         {/* Una vez logueado, el usuario vive dentro de Main (tabs) */}
@@ -439,6 +481,11 @@ export default function AppNavigator() {
           options={{ animation: 'slide_from_bottom' }}
         />
         <Stack.Screen
+          name="Moderacion"
+          component={GuardedModeracionScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
           name="PermisosClub"
           component={GuardedPermisosClubScreen}
           options={{ animation: 'slide_from_bottom' }}
@@ -466,6 +513,11 @@ export default function AppNavigator() {
         <Stack.Screen
           name="BlockedUsers"
           component={GuardedBlockedUsersScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="MfaSetup"
+          component={GuardedMfaSetupScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
@@ -518,11 +570,13 @@ export default function AppNavigator() {
           component={GuardedReportarProblemaScreen}
           options={{ animation: 'slide_from_right' }}
         />
-        <Stack.Screen
-          name="ReservasUiGallery"
-          component={SafeReservasUiGalleryScreen}
-          options={{ animation: 'slide_from_right' }}
-        />
+        {__DEV__ ? (
+          <Stack.Screen
+            name="ReservasUiGallery"
+            component={SafeReservasUiGalleryScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+        ) : null}
         <Stack.Screen
           name="MisRecintos"
           component={GuardedMisRecintosScreen}

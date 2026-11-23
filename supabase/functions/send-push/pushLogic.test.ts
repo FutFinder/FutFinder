@@ -17,6 +17,7 @@ import {
   classifyReceipt,
   classifyTickets,
   dedupeValidTokens,
+  hiloQueSilencia,
   isPushAllowed,
   isValidExpoToken,
   summarizePushStatus,
@@ -150,4 +151,28 @@ Deno.test("isPushAllowed: chat_mention_all respeta notif_chat, igual que message
   assert(isPushAllowed({ notif_chat: true }, "chat_mention_all"));
   assertFalse(isPushAllowed({ notif_chat: false }, "chat_mention_all"));
   assert(isPushAllowed({}, "chat_mention_all"));
+});
+
+// ── C05: el silencio del hilo frena el push ─────────────────────
+// La 169 ya no crea el aviso de un hilo silenciado, pero el silencio puede
+// llegar entre el aviso y el push: send-push vuelve a mirar `chat_mutes`.
+Deno.test("hiloQueSilencia: un aviso de chat se silencia por su hilo", () => {
+  assertEquals(
+    hiloQueSilencia({ type: "message_new", data: { threadKey: "dm:u2" } }),
+    "dm:u2",
+  );
+  assertEquals(
+    hiloQueSilencia({ type: "chat_mention_all", data: { threadKey: "club:c1" } }),
+    "club:c1",
+  );
+});
+
+Deno.test("hiloQueSilencia: lo importante y lo que no es de chat no se silencia", () => {
+  assertEquals(
+    hiloQueSilencia({ type: "chat_mention_all", data: { threadKey: "club:c1", important: true } }),
+    null,
+  );
+  assertEquals(hiloQueSilencia({ type: "match_join", data: { threadKey: "dm:u2" } }), null);
+  assertEquals(hiloQueSilencia({ type: "message_new", data: null }), null);
+  assertEquals(hiloQueSilencia({ type: "message_new", data: {} }), null);
 });

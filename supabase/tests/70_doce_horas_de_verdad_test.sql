@@ -57,6 +57,8 @@ begin
   -- ── Caso 0: la premisa de todo lo demás ────────────────────────
   -- Se comprueba el rango 3-4 y no un número fijo: Chile cambia de hora
   -- y fijar 3 haría fallar la prueba media parte del año.
+  -- La fecha fija se queda: esto COMPRUEBA UNA CONVERSIÓN, no reserva.
+  -- No necesita ser futura, así que no caduca.
   v_desfase := public.inicio_de_reserva(date '2027-03-08', time '20:00')
                - (date '2027-03-08' + time '20:00') at time zone 'UTC';
   if v_desfase < interval '3 hours' or v_desfase > interval '4 hours' then

@@ -5,16 +5,25 @@ import {
   paleta as C,
 } from '../../theme/colors';
 
-export default function EmptyMatchesCard({ comuna, onCreate }) {
+/**
+ * El vacío de «Partidos cerca de ti». Con `soloDestacados` (I07) el único
+ * partido cercano ya está arriba, en «Tu club juega»: decir «Sin partidos en
+ * tu radio» contradecía al resumen («1 partido cerca de ti»).
+ */
+export default function EmptyMatchesCard({ comuna, onCreate, soloDestacados = false }) {
   return (
     <View className="items-center gap-3 rounded-[20px] border border-dashed border-verde/28 bg-verde/5 px-5 py-6">
       <View className="h-[46px] w-[46px] items-center justify-center rounded-2xl border border-verde/30 bg-verde/8">
         <Plus size={22} color={C.green} strokeWidth={2.6} />
       </View>
       <View className="items-center">
-        <Text className="text-[16px] font-bold text-white">Sin partidos en tu radio</Text>
+        <Text className="text-[16px] font-bold text-white">
+          {soloDestacados ? 'No hay otros partidos cerca' : 'Sin partidos en tu radio'}
+        </Text>
         <Text className="mt-0.5 text-center text-[13.5px] leading-5 text-white/45">
-          {comuna
+          {soloDestacados
+            ? 'El que hay cerca es de tu club y está arriba. Publica otro si te falta gente.'
+            : comuna
             ? `Publica el primero y deja que los clubes de ${comuna} se sumen.`
             : 'Publica el primero y sé el pionero en tu zona.'}
         </Text>

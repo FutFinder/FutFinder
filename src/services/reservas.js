@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { comoListaRecinto, comoResultadoRecinto } from '../utils/recintoAgenda';
 import {
   nombreDeTipo, jugadoresDeTipo, notaDeCancha, comoComplejoDeLista, comoCancha,
+  horasLibresDeHoy,
 } from '../utils/reservasJugador';
 import { nombresDeServicios } from '../utils/serviciosRecinto';
 import { comoReserva } from '../utils/misReservas';
@@ -74,18 +75,7 @@ export async function listComplejosCerca({ lat, lng, query, limite = 50 } = {}) 
 export async function listHorasLibresHoy({ lat, lng, limite = 6 } = {}) {
   const { data, error } = await listComplejosCerca({ lat, lng });
   if (error) return { data: [], error };
-  const conHora = (data || [])
-    .filter((c) => c.proximaHoraLibre)
-    .slice(0, limite)
-    .map((c) => ({
-      id: `hoy-${c.id}`,
-      hora: c.proximaHoraLibre,
-      complejoId: c.id,
-      nombre: c.nombre,
-      meta: c.tipos.join(' · '),
-      precio: c.desde,
-    }));
-  return { data: conHora, error: null };
+  return { data: horasLibresDeHoy(data, limite), error: null };
 }
 
 /* ── Un complejo ───────────────────────────────────────────────── */

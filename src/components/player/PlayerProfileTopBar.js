@@ -14,12 +14,17 @@ import NotificationBell from '../NotificationBell';
  * Barra superior del perfil.
  *
  * Perfil propio  → pin + "Mi perfil" · compartir · Editar · configuración
+ * Perfil propio abierto encima de otra pantalla (`showBack`, ruta
+ *                  `UserProfile`: p. ej. tocarte en un partido) → volver en
+ *                  vez del pin, y sin la campana, que vive en las pestañas.
+ *                  Así no se pierde espacio a 375 px y siempre hay salida.
  * Perfil ajeno   → volver · @username · compartir · menú (reportar)
  *
  * Los botones miden 44 px, así que ya cumplen el mínimo táctil sin hitSlop.
  */
 export default function PlayerProfileTopBar({
   isOwnProfile,
+  showBack = false,
   title,
   onBack,
   onShare,
@@ -31,7 +36,18 @@ export default function PlayerProfileTopBar({
     <View style={styles.bar}>
       {isOwnProfile ? (
         <View style={styles.titleWrap}>
-          <MapPin color={C.green} size={20} strokeWidth={1.8} />
+          {showBack ? (
+            <Pressable
+              onPress={onBack}
+              accessibilityRole="button"
+              accessibilityLabel="Volver"
+              style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
+            >
+              <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
+            </Pressable>
+          ) : (
+            <MapPin color={C.green} size={20} strokeWidth={1.8} />
+          )}
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
@@ -94,7 +110,7 @@ export default function PlayerProfileTopBar({
               <Settings color={C.textPrimary} size={17} strokeWidth={1.9} />
             </Pressable>
           )}
-          <NotificationBell />
+          {showBack ? null : <NotificationBell />}
         </>
       ) : (
         <Pressable

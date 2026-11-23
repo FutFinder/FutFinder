@@ -41,7 +41,14 @@ declare
   v_complejo uuid := gen_random_uuid();
   v_cancha   uuid := gen_random_uuid();
   v_res      uuid := gen_random_uuid();
-  v_fecha    date := date '2027-03-01';
+  -- EL LUNES DE DENTRO DE DOS SEMANAS, no una fecha de marzo de 2027
+  -- (2026-10-17). Estaba clavada en `date '2027-03-01'`, y a partir del
+  -- 2 de marzo de 2027 esa fecha es PASADO: `crear_reserva` la rechaza
+  -- —es la regla de la 84— y este arnés se habría puesto rojo, junto con
+  -- otros siete, sin que nadie tocara una línea de código. Se calcula
+  -- sobre la hora de CHILE y cae siempre en lunes, que es lo que las
+  -- reglas de horario de más abajo dan por supuesto.
+  v_fecha    date := (date_trunc('week', (now() at time zone 'America/Santiago')::date) + interval '14 days')::date;
   v_j        json;
   v_faltan   text;
 begin
@@ -64,9 +71,9 @@ begin
   insert into public.complejo_admins (complejo_id, user_id, rol)
   values (v_complejo, v_dueno, 'dueño');
 
-  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin,
-                               precio_total, modalidad, medio_pago, estado)
+  insert into public.reservas (id, cancha_id, organizador_id, fecha, hora_inicio, hora_fin, precio_total, precio_cancha, modalidad, medio_pago, estado)
   values (v_res, v_cancha, v_dueno, v_fecha, time '10:00', time '11:00',
+          28000,
           28000, 'completa', 'tarjeta', 'confirmada');
   insert into public.reserva_comisiones (reserva_id, base, tasa, piso, techo, iva_tasa, monto)
   values (v_res, 28000, 0.05, 1000, 2500, 0.19, 1400);

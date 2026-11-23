@@ -38,6 +38,7 @@ const CATEGORIES = {
     'club_member_joined',
     'club_member_left',
     'club_invite_accepted',
+    'club_invite',
     'club_challenge',
     'club_challenge_accepted',
     'club_challenge_rejected',

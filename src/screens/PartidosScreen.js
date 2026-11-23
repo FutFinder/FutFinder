@@ -78,7 +78,7 @@ import {
   useOnline,
 } from '../services/connectivity';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
-import { DIST_OPTS } from '../services/matchRules';
+import { DIST_OPTS, modalidadLabel } from '../services/matchRules';
 import { useTrueScoreAjustes } from '../services/trueScore';
 import { nombrePuntajeDe } from '../utils/trueScore';
 
@@ -178,7 +178,7 @@ export default function PartidosScreen({ navigation, route }) {
       setMode(route.params.initialMode);
       navigation.setParams({ initialMode: undefined });
     }
-  }, [route.params?.initialMode]);
+  }, [route.params?.initialMode, navigation]);
 
   // Quien llega desde «Ver partidos sin mínimo» tiene que aterrizar con ese
   // filtro puesto, no en el buscador general con los mismos partidos que
@@ -188,7 +188,7 @@ export default function PartidosScreen({ navigation, route }) {
       setFilters((prev) => ({ ...prev, ...route.params.initialFilters }));
       navigation.setParams({ initialFilters: undefined });
     }
-  }, [route.params?.initialFilters]);
+  }, [route.params?.initialFilters, navigation]);
 
   // ------------------------------------------------------------- carga
 
@@ -435,7 +435,7 @@ export default function PartidosScreen({ navigation, route }) {
 
       const candidatos = [
         filters.nivel && [{ ...filters, nivel: null }, `Quitar «${filters.nivel}»`],
-        filters.modalidad && [{ ...filters, modalidad: null }, 'Aceptar las dos modalidades'],
+        filters.modalidad && [{ ...filters, modalidad: null }, 'Aceptar todas las modalidades'],
         filters.fecha !== 'todos' && [{ ...filters, fecha: 'todos' }, 'Incluir otros días'],
         filters.comuna && [
           { ...filters, comuna: null },
@@ -651,13 +651,7 @@ export default function PartidosScreen({ navigation, route }) {
                   onPress={() => setFiltersOpen(true)}
                 />
                 <Pill
-                  label={
-                    filters.modalidad === 'futbol7'
-                      ? 'Fútbol 7'
-                      : filters.modalidad === 'futbol11'
-                      ? 'Fútbol 11'
-                      : 'Modalidad'
-                  }
+                  label={modalidadLabel(filters) || 'Modalidad'}
                   active={!!filters.modalidad}
                   onPress={() => setFiltersOpen(true)}
                 />

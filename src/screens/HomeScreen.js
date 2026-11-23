@@ -1,8 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, ScrollView, RefreshControl, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Search, Plus, Star, TrendingUp } from 'lucide-react-native';
 
 import TacticalHeader from '../components/home/TacticalHeader';
 import MyClubCard from '../components/home/MyClubCard';
@@ -11,6 +10,7 @@ import MatchCard from '../components/home/MatchCard';
 import EmptyMatchesCard from '../components/home/EmptyMatchesCard';
 import SectionHeader from '../components/home/SectionHeader';
 import Banner from '../components/Banner';
+import AvisoMfaPersonal from '../components/AvisoMfaPersonal';
 import MatchPreviewSheet from '../components/MatchPreviewSheet';
 
 import {
@@ -26,16 +26,20 @@ import {
   requestJoinMatch,
   applyFilters,
   listPartidosDeMisClubes,
+  getMisInscripcionesYProximo,
 } from '../services/matches';
 import { getCurrentProfile, getCurrentUser } from '../services/auth';
 import { getMyLocation } from '../services/profile';
-import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { isSupabaseConfigured } from '../services/supabase';
 import { getMyClubIds } from '../services/clubs';
+import { countReportsAgainst } from '../services/reports';
 import ClubMatchCard from '../components/partidos/ClubMatchCard';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 import { seleccionInicio } from '../services/clubMatchRules';
 import { useTrueScoreAjustes } from '../services/trueScore';
 import { etiquetaTier, nombrePuntajeDe } from '../utils/trueScore';
+import { etiquetaAdminDeClubes, vistaDePartidosCerca } from '../utils/clubsHomeSources';
+import { crearSecuencia } from '../utils/paginacionPartidos';
 
 function greetingFor(d = new Date()) {
   const h = d.getHours();
@@ -72,11 +76,13 @@ export default function HomeScreen({ navigation }) {
   const [matches, setMatches] = useState([]);
   const [profile, setProfile] = useState(null);
   const [myUserId, setMyUserId] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyMatchId, setBusyMatchId] = useState(null);
   const [previewMatchId, setPreviewMatchId] = useState(null);
-  const [nextMatch, setNextMatch] = useState(null);
+  // El fallo de la última carga de partidos (I02), o null.
+  const [errorPartidos, setErrorPartidos] = useState(null);
+  // `null` es «no se pudo contar»: la tarjeta lo omite en vez de decir 0.
+  const [reportesRecibidos, setReportesRecibidos] = useState(null);
   // Los partidos de MIS clubes, pedidos club por club a la base. No salen de
   // la tanda general de `listOpenMatches()`: esa trae los N partidos abiertos
   // más próximos de toda la app, así que con la app llena los partidos ajenos
@@ -96,64 +102,73 @@ export default function HomeScreen({ navigation }) {
     if (type === 'success') setTimeout(() => setBanner(null), 6000);
   }, []);
 
+  // Una carga por turno (I04): load corre al enfocar, al refrescar y tras
+  // inscribirse, y una respuesta vieja que llega tarde no pisa a la nueva.
+  const secuenciaCarga = useRef(crearSecuencia()).current;
+
   const load = useCallback(async () => {
-    const [{ data: list }, prof, user, misClubes, userCoords] = await Promise.all([
-      listOpenMatches({ limit: 20 }),
+    const turno = secuenciaCarga.abrir();
+    const [prof, user, misClubes, userCoords] = await Promise.all([
       getCurrentProfile(),
       getCurrentUser(),
       getMyClubIds().catch(() => ({ data: [] })),
       getMyLocation().catch(() => null),
     ]);
+    if (!secuenciaCarga.vigente(turno)) return;
     const userId = user?.id || null;
     const radiusKm = prof?.search_radius_km ?? 10;
+    // Con ubicación, la consulta ya trae sólo lo que cae cerca: pedir 20 del
+    // país y filtrar después dejaba fuera al partido cercano (I01).
+    const { data: list, error: errorLista } = await listOpenMatches({
+      limit: 20,
+      cerca: userCoords ? { ...userCoords, km: radiusKm } : null,
+    });
+    if (!secuenciaCarga.vigente(turno)) return;
     const filtered = userCoords
       ? applyFilters(list || [], { maxKm: radiusKm }, userCoords)
       : list || [];
 
     let joinedIds = new Set();
     if (userId && isSupabaseConfigured) {
-      try {
-        const now = new Date().toISOString();
-        const { data: attRows } = await supabase
-          .from('attendees')
-          .select('id_partido')
-          .eq('id_jugador', userId)
-          .in('estado', ['inscrito', 'confirmado_gps']);
-        const matchIds = (attRows || []).map((r) => r.id_partido);
-        joinedIds = new Set(matchIds);
-        if (matchIds.length > 0) {
-          const { data: upcoming } = await supabase
-            .from('matches')
-            .select('id, titulo, hora, cancha_nombre, comuna')
-            .in('id', matchIds)
-            .gt('hora', now)
-            .neq('estado', 'cancelado')
-            .order('hora', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-          setNextMatch(upcoming || null);
-        } else {
-          setNextMatch(null);
-        }
-      } catch {
-        setNextMatch(null);
-      }
+      // Los reportes recibidos, como los cuenta Perfil. No frena la portada.
+      countReportsAgainst(userId)
+        .then((r) => {
+          if (secuenciaCarga.vigente(turno)) setReportesRecibidos(r?.error ? null : r?.data ?? null);
+        })
+        .catch(() => {
+          if (secuenciaCarga.vigente(turno)) setReportesRecibidos(null);
+        });
+      const { inscritos } = await getMisInscripcionesYProximo(userId);
+      if (!secuenciaCarga.vigente(turno)) return;
+      joinedIds = new Set(inscritos);
     }
 
     const clubIds = misClubes?.data || [];
     setMisClubIds(clubIds);
-    setMatches(filtered.map((m) => ({ ...m, _joined: joinedIds.has(m.id) })));
+    // Con error no se pisa la lista: quedan los de la carga anterior y la
+    // vista avisa (I02). Antes el fallo se leía como «sin partidos».
+    if (errorLista) {
+      setErrorPartidos(errorLista);
+    } else {
+      setErrorPartidos(null);
+      setMatches(filtered.map((m) => ({ ...m, _joined: joinedIds.has(m.id) })));
+    }
     setProfile(prof);
     setMyUserId(userId);
 
     // Después del resto: necesita los ids de mis clubes, y nada de lo de
     // arriba necesita esperarla.
-    const { data: deClub } = await listPartidosDeMisClubes(clubIds).catch(() => ({ data: [] }));
-    setPartidosDeClub(deClub || []);
+    const { data: deClub, error: errorClub } = await listPartidosDeMisClubes(clubIds).catch((e) => ({
+      data: null,
+      error: e,
+    }));
+    if (!secuenciaCarga.vigente(turno)) return;
+    // Igual que arriba: un fallo conserva los partidos de club que había.
+    if (errorClub) setErrorPartidos((prev) => prev || errorClub);
+    else setPartidosDeClub(deClub || []);
 
-    setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [secuenciaCarga]);
 
   // Al volver a Inicio, no sólo al montarlo. El navegador de pestañas deja
   // esta pantalla montada, así que un partido de club publicado durante la
@@ -216,8 +231,10 @@ export default function HomeScreen({ navigation }) {
   const trustScore = Number.isFinite(Number(profile?.trust_score))
     ? Number(profile.trust_score)
     : null;
-  const partidosJugados = profile?.partidos_jugados ?? 0;
-  const reports = profile?.reportes ?? 0;
+  // Lo mismo que cuenta Perfil (I03): `partidos_jugados` no lo incrementa
+  // nada y `profiles.reportes` no existe; los reportes salen de la RPC.
+  const partidosJugados = profile?.asistencias_confirmadas ?? 0;
+  const reports = reportesRecibidos;
   const username = profile?.username || 'jugador';
   /*
    * «VERIFICADO» sólo cuando algo está verificado de verdad. Con TrueScore el
@@ -246,23 +263,15 @@ export default function HomeScreen({ navigation }) {
     : null;
 
   /**
-   * «ADMIN · 2 CLUBES». El número estuvo escrito a mano —siempre «1 CLUB»—
-   * desde que se dibujó la cabecera, así que a quien administra dos clubes
-   * leía en su propia portada que administra uno. La cuenta real ya venía
-   * cargada en `misClubIds`; lo único que faltaba era usarla.
-   *
-   * Las dos caídas son para el instante en que una de las dos fuentes todavía
-   * no respondió: si administra un club, administra al menos uno, y «ADMIN ·
-   * 0 CLUBES» sería peor que esperar.
+   * «ADMIN · 2 CLUBES»: cuenta sólo los clubes que administro, no todas mis
+   * membresías (I06). Ver `etiquetaAdminDeClubes`.
    */
-  const cuantosClubes = (misMembresias || []).length || misClubIds.length || 1;
-  const clubRoleLabel =
-    club?.role === 'admin'
-      ? `ADMIN · ${cuantosClubes} ${cuantosClubes === 1 ? 'CLUB' : 'CLUBES'}`
-      : undefined;
+  const clubRoleLabel = etiquetaAdminDeClubes(club?.role, misMembresias);
 
   const summary = matches.length
     ? `${matches.length} ${matches.length === 1 ? 'partido cerca de ti' : 'partidos cerca de ti'}`
+    : errorPartidos
+    ? 'No pudimos cargar los partidos'
     : 'Sin partidos cerca';
 
   // Con TrueScore la etiqueta sale de la tabla de niveles del servidor
@@ -284,6 +293,12 @@ export default function HomeScreen({ navigation }) {
     matches,
     misClubIds
   );
+  // Lista, vacío o error: un fallo de red no se dibuja como «sin partidos» (I02).
+  const vistaCerca = vistaDePartidosCerca({
+    cuantos: partidosCerca.length,
+    error: errorPartidos,
+    destacados: partidosDeMiClub.length,
+  });
 
   const renderMatch = useCallback(
     (m) => (
@@ -325,6 +340,8 @@ export default function HomeScreen({ navigation }) {
             verified={verified}
             clubRoleLabel={clubRoleLabel}
           />
+
+          <AvisoMfaPersonal navigation={navigation} />
 
           {banner && (
             <View style={{ paddingHorizontal: 18, marginBottom: 4 }}>
@@ -408,7 +425,23 @@ export default function HomeScreen({ navigation }) {
                 actionLabel="Ver todos"
                 onAction={() => navigation.navigate('Main', { screen: 'SearchTab' })}
               />
-              {partidosCerca.length ? (
+              {vistaCerca === 'error' || vistaCerca === 'lista-con-error' ? (
+                <View className="mb-3 flex-row items-center gap-3 rounded-[16px] border border-rojo/30 bg-rojo/8 px-4 py-3">
+                  <Text className="flex-1 text-[13px] leading-5 text-white/75">
+                    {vistaCerca === 'error'
+                      ? 'No pudimos cargar los partidos. Revisa tu conexión.'
+                      : 'No pudimos actualizar los partidos; estos son los últimos que cargamos.'}
+                  </Text>
+                  <Pressable
+                    onPress={() => { setRefreshing(true); load(); }}
+                    accessibilityRole="button"
+                    className="h-9 items-center justify-center rounded-[11px] bg-verde px-3 active:opacity-80"
+                  >
+                    <Text className="text-[12.5px] font-bold text-verde-ink">Reintentar</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              {vistaCerca === 'error' ? null : partidosCerca.length ? (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -420,6 +453,7 @@ export default function HomeScreen({ navigation }) {
               ) : (
                 <EmptyMatchesCard
                   comuna={profile?.comuna}
+                  soloDestacados={vistaCerca === 'vacio-con-destacados'}
                   onCreate={() => navigation.navigate('CreateMatch', club ? { clubId: club.id } : {})}
                 />
               )}

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, AlertTriangle, MapPin, CalendarDays } from 'lucide-react-native';
@@ -185,7 +185,7 @@ function Tarjeta({ reserva, onAccion, onResponder }) {
   const etiqueta = etiquetaDeEstado(reserva);
   const acciones = accionesDeReserva(reserva);
   const nota = textoDeCancelacion(reserva);
-  const mapa = enlaceDeMapa(reserva);
+  const mapa = enlaceDeMapa(reserva, Platform.OS);
   const precio = lineaDePrecio(reserva);
   const solicitud = solicitudDeCancelacion(reserva);
 
@@ -261,7 +261,7 @@ function Tarjeta({ reserva, onAccion, onResponder }) {
                 variant="secondary"
                 icon={MapPin}
                 style={{ flex: 1 }}
-                onPress={() => Linking.openURL(mapa)}
+                onPress={() => Linking.openURL(mapa).catch(() => {})}
               />
             ) : null}
             {acciones.map((a) => (

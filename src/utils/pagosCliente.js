@@ -23,6 +23,7 @@ export const FASES = [
   'rechazada',    // el banco dijo que no
   'expirada',     // nunca se pagó
   'nodisponible', // la pasarela todavía no está conectada
+  'pausada',      // los cobros nuevos están cortados por un momento (migración 179)
   'error',
 ];
 
@@ -135,6 +136,12 @@ const TEXTOS = {
     cuerpo: 'La pasarela de pago aún no está conectada, así que esta reserva no se puede '
       + 'completar. Es lo único que falta.',
   },
+  pausada: {
+    tono: 'warning',
+    titulo: 'Los pagos están en pausa',
+    cuerpo: 'Por un momento no estamos recibiendo pagos con tarjeta. No se te cobró nada: '
+      + 'inténtalo de nuevo más tarde.',
+  },
   error: {
     tono: 'warning',
     titulo: 'No pudimos iniciar el pago',
@@ -159,6 +166,20 @@ export function accionDeFase(fase) {
   if (fase === 'confirmada') return { label: 'Ver mi reserva', accion: 'reserva' };
   if (fase === 'rechazada' || fase === 'expirada') return { label: 'Intentar de nuevo', accion: 'reintentar' };
   if (fase === 'devolver' || fase === 'error') return { label: 'Volver a buscar cancha', accion: 'buscar' };
-  if (fase === 'nodisponible') return { label: 'Volver', accion: 'atras' };
+  if (fase === 'nodisponible' || fase === 'pausada') return { label: 'Volver', accion: 'atras' };
   return null;
+}
+
+/**
+ * En qué fase queda la pantalla cuando `iniciarPagoReserva` devuelve error.
+ *
+ * Tres cosas distintas que antes eran dos: «todavía no hay pasarela», «la
+ * pasarela existe pero los cobros están en pausa» y «falló». Se dicen
+ * distinto porque a la persona le sirven para cosas distintas: la segunda es
+ * la única en que volver a intentar en un rato tiene sentido.
+ */
+export function faseAlFallarElInicio(data) {
+  if (data?.configurada === false) return 'nodisponible';
+  if (data?.pausada === true) return 'pausada';
+  return 'error';
 }

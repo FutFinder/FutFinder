@@ -1,6 +1,6 @@
 # Despliegue y entornos
 
-Última revisión: 2026-09-22 (Edge Function reportar-problema, aviso por correo de "Reportar un problema")
+Última revisión: 2026-11-14 (dominio futfinder.cl con DNS en Vercel y `public/` en el export; sin variables de Supabase ya no hay sesión; estados fechados consolidados; reportar-problema y el disparador `notificar_push` en la tabla de Edge Functions)
 
 ## Propósito
 
@@ -14,37 +14,70 @@ La configuración del repositorio define exportación web con Vercel, builds nat
 
 - `vercel.json` ejecuta `npx expo export --platform web`.
 - El resultado se publica desde `dist`.
-- La regla de reescritura dirige todas las rutas a `index.html`, necesaria para las rutas de una aplicación de una sola página.
+- La regla de reescritura dirige todas las rutas a `index.html`, necesaria para las rutas de una aplicación de una sola página. Los archivos que existen en `dist` se sirven antes que la reescritura.
+- **Dominio propio desde el 2026-11-13**: `futfinder.cl`, inscrito a nombre de Vicente en NIC Chile, con los servidores de nombre de Vercel (`ns1`/`ns2.vercel-dns.com`), así que **el DNS se administra en Vercel** (Domains → futfinder.cl → DNS Records). `futfinder.cl` redirige con 308 a `www.futfinder.cl`. El DNS ya trae los registros de Resend para `envios.futfinder.cl` (ver [Autenticación](../funcionalidades/autenticacion.md)); los CAA los puso Vercel para el certificado y no se tocan.
+- `public/` se copia tal cual al export web, incluida la carpeta `.well-known` (comprobado). Hoy tiene `public/correo/logo.png` (el ícono a 192 px), que usan las plantillas de correo de Auth; los dos archivos de enlaces universales irán en `public/.well-known/` cuando se corra `scripts/enlaces-universales.mjs` (ver [Navegación](navegacion.md)). `vercel.json` sirve `apple-app-site-association` con `Content-Type: application/json`.
+
+## Peso del bundle web (medido el 2026-11-14)
+
+El build web es **un solo archivo JS**. Pesaba **7,19 MB (1,52 MB con gzip)**; quedó en **5,50 MB (1,36 MB)**. La diferencia es Lucide: Metro no descarta lo que no se usa, así que importar un ícono desde la raíz de `lucide-react-native` arrastraba los ~1.500 (1,2 MB, más que todas las pantallas juntas). `scripts/babel/lucidePorIcono.js`, enchufado en `babel.config.js`, reescribe cada `import { X } from 'lucide-react-native'` a su archivo (`…/dist/esm/icons/x.js`) con la tabla que lee del propio paquete; lo que no conoce lo deja como estaba. **En el código se sigue importando desde la raíz, como siempre.** Una prueba falla si la app importa de Lucide algo que el plugin no sabe reescribir.
+
+Lo que sigue pesando, de mayor a menor (atribuido con el source map): las pantallas (0,9 MB), `react-native-reanimated` (0,63 MB; lo exige NativeWind), los componentes (0,35 MB), `react-native-web` (0,28 MB) y Sentry (unos 0,75 MB entre sus paquetes, con *replay* y *feedback* incluidos aunque esté apagado). No toqué nada de eso: partir el bundle por rutas o recortar Sentry cambia cómo carga la app y hay que probarlo en teléfono.
+
+Para volver a medir: `npx expo export --platform web --output-dir <carpeta> --dump-sourcemap` y mirar el `.js` de `_expo/static/js/web/`.
 
 ## Builds nativos con EAS
 
 - `eas.json` requiere EAS CLI `>= 12.0.0` y toma la versión de aplicación desde la configuración local.
 - Los perfiles versionados son `development` (cliente de desarrollo y distribución interna), `preview` (distribución interna) y `production` (incremento automático de versión).
-- `app.config.js` declara el identificador de paquete `com.futfinder.app` para Android e iOS, permisos de ubicación y plugins de ubicación, selector de imágenes y notificaciones.
+- `app.config.js` declara el identificador de paquete `com.futfinder.app` para Android e iOS, permisos de ubicación y plugins de Sentry, ubicación, selector de imágenes, notificaciones y `expo-font`.
+- **Ya no hay excepción a «una sola paleta» (2026-11-05):** `app.config.js` usa el verde `#55DF69` de la paleta en `notification.color`, `web.themeColor` y el plugin `expo-notifications` (commit `d11848d`), y una prueba exige que todo color de ese archivo sea de la paleta. El color nativo de la notificación se verá recién con el próximo build.
+- **Íconos, imagen de inicio y permisos (2026-11-13).** `assets/` existe: `icon.png` (1024, sin alfa), `adaptive-icon.png`, `splash-icon.png`, `notification-icon.png` (silueta blanca) y `favicon.png`, dibujados desde la marca por `node scripts/generar-iconos.mjs` (no hay herramienta de imágenes instalada; usa `pngjs`, que llega con Expo). `app.config.js` ya no declara `RECORD_AUDIO`; bloquea micrófono, cámara, ubicación en segundo plano, `SYSTEM_ALERT_WINDOW` y `WRITE_EXTERNAL_STORAGE`; image-picker va con `cameraPermission: false` y `microphonePermission: false`; la ubicación es sólo «mientras se usa», en español; y ATS no permite cargas HTTP arbitrarias. Lo fija `scripts/__tests__/appConfigTienda.test.js`. Comprobado con `expo config --type introspect`; **no hay build todavía que lo muestre**.
 - **`eas-cli` NO va como dependencia del proyecto.** Se probó el 2026-09-18 y `expo-doctor` lo rechaza: «EAS CLI should not be installed in your project. Instead, install it globally or use npx». La instalación global tampoco salió: en esta máquina el prefijo de npm es `/usr/local`, que es de root, y pedía `sudo`. La vía que queda —y que Expo sanciona— es `npx eas-cli@latest`, que no instala nada de forma permanente.
 - Atajos versionados, ya con esa forma: `npm run build:android` y `build:ios` usan el perfil **`preview`**, que es el de distribución interna — el que sirve para llevarle un arreglo a quien ya tiene la app, sin pasar por tienda. `npm run build:store` usa `production` para las dos plataformas. La primera ejecución descarga la CLI y tarda un poco más.
 
 ### Estado al 2026-10-02
 
-- **Sesión de Expo**: activa en la cuenta `futfinder`.
-- **Variables del entorno `preview` de EAS**: creadas `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` y `EXPO_PUBLIC_MAPBOX_TOKEN` (visibilidad *sensitive*). Hacen falta porque `.env` está en `.gitignore` y EAS no lo sube: sin ellas el build sale en modo de demostración, sin backend. Los perfiles `development` y `production` todavía no las tienen.
+- **Sesión de Expo**: estaba activa en la cuenta `futfinder` ese día; después caducó (ver «Lo que falta comprobar» más abajo), así que hoy no se sabe.
+- **Variables del entorno `preview` de EAS**: creadas `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` y `EXPO_PUBLIC_MAPBOX_TOKEN` (visibilidad *sensitive*). Hacen falta porque `.env` está en `.gitignore` y EAS no lo sube: sin las dos de Supabase el build sale **sin sesión posible** (la app no pasa de Login) y sin backend. Los perfiles `development` y `production` todavía no las tenían ese día.
+
+### Qué necesita un build, lista completa (2026-10-14)
+
+Sacada del código, no escrita a mano: la mantiene al día `src/utils/__tests__/variablesDeEntorno.test.js`, que falla si aparece una variable que nadie documentó o si una documentada deja de usarse. **Una variable que falta no rompe el build: lo cambia**, y eso se descubre con el teléfono en la mano.
+
+| Variable | Si falta |
+|---|---|
+| `EXPO_PUBLIC_SUPABASE_URL` | no hay sesión posible: `AuthContext` deja `isAuthenticated` en falso y las rutas privadas mandan a Login (la app queda cerrada, no en demostración) |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | lo mismo |
+| `EXPO_PUBLIC_MAPBOX_TOKEN` | sin mapa ni autocompletado de direcciones; la lista y los filtros siguen |
+| `EXPO_PUBLIC_SENTRY_DSN` | no se manda ningún informe de error; la app funciona igual |
+| `GOOGLE_SERVICES_JSON` (secreto de archivo) | el APK compila pero Android queda **sin push** |
+
+**`EXPO_PUBLIC_APP_VERSION` no existe y no debe crearse.** La versión sale de `app.config.js` vía `Constants.expoConfig.version` (ver `src/utils/appVersion.js`). La primera versión de la integración de Sentry leía esa variable para su `release` y era un fallo: nadie la define, así que el `release` habría llegado vacío y **todos los informes se habrían mezclado**, que es justo lo que el campo existe para evitar. Corregido el 2026-10-14 y fijado por una prueba.
+
+**Lo que falta comprobar, y necesita la sesión de Expo:** si el perfil `production` tiene esas variables. El 2026-10-02 no las tenía, y un build de tienda sin ellas **sale cerrado**: nadie puede iniciar sesión, una app en la tienda sin backend. La sesión caducó (`eas whoami` → `Not logged in`), así que la comprobación es:
+
+```
+npx eas-cli@latest login
+npx eas-cli@latest env:list --environment production
+```
 - **`google-services.json` es opcional**: `app.config.js` sólo declara `android.googleServicesFile` si el archivo existe. Sin el secreto `GOOGLE_SERVICES_JSON` el APK compila y funciona, pero Android queda **sin push**; los fallos del token ya los atrapa `services/notifications.js`.
 - **Keystore de Android**: lo generó EAS en la nube en el primer build (2026-10-02) y vive en sus servidores. Antes de esa fecha no hubo ningún build nativo.
 
-### Lo que faltaba para que un build salga (2026-09-18)
+### Lo que faltaba para que un build salga (2026-09-18, parcialmente superado)
 
-Ninguna de estas tres cosas está en el repositorio, y las tres necesitan las cuentas:
+Ninguna de estas tres cosas está en el repositorio, y las tres necesitan las cuentas. La 1 se resolvió el 2026-10-02 (hubo sesión y salió el primer build de Android, con su keystore), aunque la sesión volvió a caducar; sobre la 2 y la 3 no hay constancia posterior de que se hayan resuelto:
 
-1. **Sesión de Expo** en la cuenta `futfinder` (`npx eas-cli@latest login`). Comprobado: `npx eas whoami` responde `Not logged in`, y sin sesión ni siquiera `eas config` resuelve el perfil.
+1. **Sesión de Expo** en la cuenta `futfinder` (`npx eas-cli@latest login`). Comprobado el 2026-09-18: `npx eas whoami` respondía `Not logged in`, y sin sesión ni siquiera `eas config` resuelve el perfil.
 2. **El secreto de archivo `GOOGLE_SERVICES_JSON`** en el proyecto EAS, que sigue sin crearse. El aviso se ve en cada exportación: `Could not parse Expo config: android.googleServicesFile: "./google-services.json"`. El archivo tampoco está en local.
 3. **Credenciales de Apple** para el build de iOS.
 
-**Posible tropiezo con la versión, sin comprobar.** El perfil `production` combina `appVersionSource: "local"` con `autoIncrement: true`, pero la configuración es dinámica (`app.config.js`, no `app.json`): no hay un campo estático donde EAS pueda dejar escrito el número incrementado. La documentación de Expo no dice qué hace exactamente en ese caso —sólo que con versión local «hay que commitear el cambio en cada build»— y sin sesión no se pudo probar. Si el build se queja, las dos salidas son poner `autoIncrement: false` y subir la versión a mano, o cambiar a `appVersionSource: "remote"`, que es **lo que Expo recomienda desde la CLI 12.0.0**. Es una decisión sobre cómo se numeran todos los builds futuros, así que no se tomó por adelantado.
+**El número de build lo lleva EAS (`appVersionSource: "remote"`, desde el 2026-11-13).** Antes era `"local"` con `autoIncrement: true` y configuración dinámica (`app.config.js`): EAS no tiene dónde escribir el número nuevo y el build de tienda falla con «autoIncrement option is not supported when using app.config.js» (es un error conocido, expo/eas-cli#2279). Con `"remote"`, que es lo que Expo recomienda desde la CLI 12, el `buildNumber` de iOS y el `versionCode` de Android viven en los servidores de EAS y el perfil `production` los sube solo; `version` (1.0.0) se sigue cambiando a mano en `app.config.js`. Para volver atrás basta cambiar `eas.json`. La guarda está en `scripts/__tests__/appConfigTienda.test.js`.
 
-## Configuración de Supabase y modo de demostración
+## Configuración de Supabase y app sin configurar
 
 - Copia `.env.example` a `.env` y proporciona `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY`. El prefijo público permite que Expo inyecte ambos valores en el bundle cliente.
-- Si falta cualquiera de ellas, `isSupabaseConfigured` es falso. Los servicios devuelven datos o resultados de demostración para que la interfaz pueda renderizarse; no equivale a un backend conectado.
+- Si falta cualquiera de ellas, `isSupabaseConfigured` es falso. `AuthContext` deja entonces `isAuthenticated` en falso y las rutas privadas mandan a Login: sin configuración no hay sesión ni acceso (antes se trataba como «autenticado» y la app entera abría con datos de muestra). Varios servicios conservan retornos de demostración (`getDemoMatches`, `Demo` en los errores), pero quedan detrás de esa puerta y no equivalen a un backend conectado.
 - `src/services/supabase.js` configura AsyncStorage para sesiones nativas y conserva el comportamiento de almacenamiento web de Supabase en web.
 
 ## Archivo de servicios Google para Android
@@ -59,7 +92,7 @@ Flujo requerido para builds:
 
 No incorpores una copia ficticia, el contenido del archivo ni credenciales en esta memoria. El repositorio no permite confirmar si el secreto ya existe en EAS.
 
-Al 2026-09-18 sigue sin ejecutarse ningún build nativo; el cierre de U3 del 2026-08-13 tampoco lo hizo. La exportación web pasa, pero sigue avisando que no puede resolver `./google-services.json`; antes de un futuro build Android hay que confirmar que EAS tenga configurado el secreto de archivo `GOOGLE_SERVICES_JSON`.
+Hasta el 2026-09-18 no se había ejecutado ningún build nativo (el cierre de U3 del 2026-08-13 tampoco lo hizo); el primero fue el de Android del 2026-10-02 (ver arriba). La exportación web pasa, pero avisa que no puede resolver `./google-services.json` mientras el archivo no esté en local; antes de cada build Android hay que confirmar que EAS tenga configurado el secreto de archivo `GOOGLE_SERVICES_JSON`.
 
 ## Rutas de código relacionadas
 
@@ -67,9 +100,25 @@ Al 2026-09-18 sigue sin ejecutarse ningún build nativo; el cierre de U3 del 202
 - `.env.example`, `.gitignore` y `package.json`
 - `src/services/supabase.js`, `src/services/notifications.js` y `supabase/functions/send-push/`
 
+## Informes de error (Sentry), desde el 2026-10-14
+
+Hasta ahora un fallo en el teléfono de alguien no dejaba rastro en ninguna parte: la única traza era un `console.error` que nadie iba a leer. No es teórico — en octubre aparecieron dos fallos **vivos en producción** (el editor de club abriéndose vacío y `search_canchas` devolviendo 42501 a todos) y los dos se encontraron mirando a mano.
+
+- **`@sentry/react-native` instalado y registrado como plugin de Expo.** El plugin sólo trabaja en el build nativo, donde sube los mapas de origen; sin ellos el stack llega minificado y el informe no sirve. Para eso hace falta además configurar organización y proyecto (el aviso `Missing config for organization, project` que aparece al arrancar lo recuerda).
+- **No se enciende sin `EXPO_PUBLIC_SENTRY_DSN`,** y eso no es un modo degradado: es que no pasa nada. Un repositorio recién clonado no manda errores a ninguna parte. **Tampoco se enciende en desarrollo**, aunque la variable esté: esos errores ya se ven en la consola y en el boundary con su stack.
+- **El marcador de `.env.example` no cuenta como DSN.** Está escrito a propósito para que copiar el archivo sin reemplazarlo no arranque Sentry con una dirección inventada, que produce errores de red en bucle en el teléfono.
+- **Qué sale y qué no.** Mandar errores a un tercero es publicar datos, y las URL de esta app llevan identificadores de persona y texto que la gente escribió (`/rest/v1/profiles?id=eq.<uuid>`, `?or=(titulo.ilike.%<lo que buscó>%)`, `/clubes/<uuid>/editar`). La aduana vive en `src/utils/observabilidad.js`, es pura y está probada: se va la query entera, los uuid del camino se vuelven `<id>`, **no se adjunta identidad de nadie** (`sendDefaultPii: false` y además se borra `user` del evento) y las migas de consola se descartan enteras, porque los `console.error` de los servicios imprimen el objeto de PostgREST. Se conservan el camino de la URL, el mensaje y el stack, que es lo que sirve para arreglar.
+- **Sin trazas de rendimiento** (`tracesSampleRate: 0`): la pregunta de hoy es si algo se rompió, no cuánto tardó. Multiplicaría el volumen y la cuota.
+- **Un solo enganche.** `ErrorBoundary.componentDidCatch` es por donde pasan todos los errores de render, porque `withAuthGuard` envuelve cada pantalla con él y `App.js` envuelve la raíz. Hay una prueba que fija las dos cosas: si alguien saca el boundary del guard, el informe quedaría cubriendo sólo la raíz sin que nadie lo note.
+- **Lo que falta para que esto sirva de verdad:** crear el proyecto en Sentry, poner el DSN en las variables de EAS (hoy el perfil `preview` tiene las otras tres) y **sacar un build**. Hasta entonces está instalado y apagado.
+
 ## Limitaciones conocidas
 
 Sin el archivo de servicios válido, un prebuild o build Android que evalúe `googleServicesFile` no puede resolver esa entrada. La exportación web y Expo Go no usan ese archivo.
+
+## Limpieza antes del lanzamiento (preparada, sin correr)
+
+Decisión de Vicente (2026-11-18): borrar todo el contenido de prueba de producción —cuentas, partidos, clubes, mensajes, recintos, archivos— **justo antes del lanzamiento**, no antes, para no limpiar dos veces. Está lista en `scripts/limpieza-prelanzamiento/` (SQL + script de Storage + README con los pasos) y ensayada contra producción con rollback. Conserva la configuración y las cuentas que se pongan en la lista. Se frena sola si aparece una tabla nueva sin clasificar: al agregar una tabla a `public`, sumarla a una de las dos listas de `limpieza.sql`.
 
 ## Notas relacionadas
 
@@ -79,15 +128,20 @@ Sin el archivo de servicios válido, un prebuild o build Android que evalúe `go
 
 ## Edge Functions y sus secretos
 
-`supabase/config.toml` (desde 2026-09-10) declara el `verify_jwt` de cada función y por qué. Es la parte que no se ve en el código y la que se rompe en silencio: una función que recibe avisos de afuera con la verificación puesta devuelve 401 al proveedor y el aviso se pierde sin dejar rastro en nuestros logs.
+Hay seis Edge Functions (`send-push`, `pagar-reserva`, `flow-confirmacion`, `flow-retorno`, `solicitud-recinto` y `reportar-problema`); `supabase/functions/despliegues.json` registra la versión desplegada y el hash de cada una.
+
+`supabase/config.toml` (desde 2026-09-10) declara el `verify_jwt` de cinco de ellas y por qué. Es la parte que no se ve en el código y la que se rompe en silencio: una función que recibe avisos de afuera con la verificación puesta devuelve 401 al proveedor y el aviso se pierde sin dejar rastro en nuestros logs. `reportar-problema` **no figura en `config.toml`**: queda con el valor por omisión, `true`, que es el que le corresponde.
 
 | Función | `verify_jwt` | Quién la llama |
 |---|---|---|
-| `send-push` | sí | Database Webhook de Supabase |
+| `send-push` | sí | el disparador `public.notificar_push()` de la base (ver abajo) |
 | `pagar-reserva` | sí | la app, con la sesión del jugador |
 | `flow-confirmacion` | **no** | Flow, de servidor a servidor |
 | `flow-retorno` | **no** | el navegador del jugador volviendo de Flow |
 | `solicitud-recinto` | sí | la app, con la sesión de quien manda el formulario |
+| `reportar-problema` | sí (por omisión, no está en `config.toml`) | la app, con la sesión de quien reporta, después de guardar el ticket |
+
+**`send-push` ya no la llama un Database Webhook** (migraciones 117 y 118): la dispara `public.notificar_push()`, un disparador de la base que saca su cabecera `Authorization` del secreto `send_push_authorization` de Vault. Ese secreto guarda la clave **publicable** (rol `anon`), no la service key: `send-push` no lee esa cabecera —usa su propia service key del entorno— y `verify_jwt` acepta cualquier JWT del proyecto. El comentario de `config.toml` sobre `send-push` todavía habla del webhook y de la service key; quedó atrasado. El secreto no está en el repositorio (ver [Avisos y push](../funcionalidades/avisos-y-push.md)).
 
 Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cree al POST que recibe —solo toma el `token` y va a preguntarle a Flow con una consulta firmada con la Secret Key— y `flow-retorno` no lee ni escribe nada, solo muestra una página que rebota a la app.
 
@@ -102,7 +156,7 @@ Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cre
 
 - `RESEND_API_KEY` — del proveedor de correo. **Cargada el 2026-09-19**: hay cuenta de Resend (con el correo `futfindercl@gmail.com`) y la clave está puesta como secreto. Probada de forma aislada con un `curl` directo a `api.resend.com/emails` fuera de Supabase: responde `200` y entrega — la clave en sí funciona.
 - `SOLICITUDES_EMAIL_TO` — opcional. Pedido explícito: si no está, cae en `futfindercl@gmail.com` (`DESTINO_POR_OMISION` en `correoSolicitud.ts`). Sigue existiendo para el día que haga falta mandarlas a otra parte, o sumar un segundo destinatario, sin tocar código. Admite varias direcciones separadas por coma.
-- `SOLICITUDES_EMAIL_FROM` — opcional; el remitente verificado. Por omisión el de prueba del proveedor.
+- `SOLICITUDES_EMAIL_FROM` — opcional; el remitente verificado. Por omisión el de prueba del proveedor (`onboarding@resend.dev`), que **sólo entrega al dueño de la cuenta de Resend**: sirve mientras el destino sea ese mismo correo. Desde el 2026-11-13 hay dominio verificado (`envios.futfinder.cl`), y **el 2026-11-13 se cargaron este secreto y `REPORTES_EMAIL_FROM` con `FutFinder <no-responder@envios.futfinder.cl>`**. No hizo falta redesplegar: el código los lee en cada llamada (`env(...)` dentro de la función), y un «Reportar un problema» de prueba llegó al correo del equipo ese mismo día.
 
 **Tocar `_shared/` no cambia nada en producción hasta redesplegar la función que lo importa.** Las Edge Functions se despliegan con su copia de `_shared/` adentro, así que un commit que sólo toca `_shared/correoSolicitud.ts` deja el repo y el servidor diciendo cosas distintas. Pasó el 2026-09-18 con `DESTINO_POR_OMISION`: el commit estaba en `main` y la función desplegada seguía siendo la v4, sin el destino por omisión — con la clave ya cargada, dos solicitudes de prueba (02:13 y 00:51 UTC del 19) se guardaron pero `avisada_at` quedó `null` en las dos, porque la v4 exigía además `SOLICITUDES_EMAIL_TO`, que nadie había cargado (no hacía falta con el código nuevo). Se redesplegó dos veces ese día —v5 desde la otra Mac, v6 confirmando la misma fuente— y recién ahí la función quedó ejecutando lo que dice el repo. Al cambiar algo de `_shared/`, redesplegar TODAS las funciones que lo importan.
 
@@ -117,4 +171,4 @@ Las dos sin verificación no quedan desprotegidas: `flow-confirmacion` no le cre
 
 La Edge Function `reportar-problema` (2026-09-22) se desplegó con `_shared/correoReporte.ts` incluido en el MISMO despliegue —no en uno posterior—, así que el problema de deriva de arriba (`_shared/` tocado sin redesplegar) no aplica a su primera versión. Probada de punta a punta contra la base real: cuenta de prueba, ticket insertado en `support_tickets`, token real firmado contra el endpoint de la función (no un mock) → respondió `200` con `{ok:true, avisado:true}` en ~1.9s (tiempo consistente con una llamada real a la API de Resend, no con una ruta que no llegó a intentarlo). Cuenta y ticket de prueba borrados después.
 
-**Sin `FLOW_API_KEY`/`FLOW_SECRET_KEY` nada explota**: `pagar-reserva` contesta `configurada: false` y la app deja el botón de pago apagado diciendo que el medio de pago todavía no está conectado. Comprobado contra producción el 2026-09-10, con las tres funciones desplegadas y sin credenciales cargadas.
+**Sin `FLOW_API_KEY`/`FLOW_SECRET_KEY` nada explota**: `pagar-reserva` contesta `configurada: false` y la app deja el botón de pago apagado diciendo que el medio de pago todavía no está conectado. Comprobado contra producción el 2026-09-10, con las tres funciones desplegadas y sin credenciales cargadas (la pasarela espera a que exista la empresa; sigue sin credenciales según la última medición documentada).

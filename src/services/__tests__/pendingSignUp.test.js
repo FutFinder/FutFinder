@@ -69,3 +69,13 @@ test('no se guarda nada si falta el correo o la contraseña', () => {
   guardarPasswordPendiente('jugador@futfinder.cl', '');
   assert.equal(consumirPasswordPendiente('jugador@futfinder.cl'), null);
 });
+
+test('mirar la contraseña no la borra: si guardarla falla, se puede reintentar', () => {
+  const { verPasswordPendiente } = require('../pendingSignUp.js');
+  guardarPasswordPendiente('jugador@futfinder.cl', 'contrasena123');
+  assert.equal(verPasswordPendiente(' Jugador@FutFinder.cl'), 'contrasena123');
+  assert.equal(verPasswordPendiente('jugador@futfinder.cl'), 'contrasena123');
+  assert.equal(verPasswordPendiente('otro@futfinder.cl'), null);
+  olvidarPasswordPendiente();
+  assert.equal(verPasswordPendiente('jugador@futfinder.cl'), null);
+});

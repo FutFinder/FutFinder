@@ -7,7 +7,6 @@ import {
   Pressable,
   TextInput,
   Platform,
-  Linking,
   ActivityIndicator,
   PanResponder,
   Share,
@@ -30,10 +29,13 @@ import {
   ChevronRight,
   SlidersHorizontal,
   FileLock,
+  Cookie,
   AlertTriangle,
   ShieldOff,
   Download,
   Smartphone,
+  Gavel,
+  ShieldCheck,
 } from 'lucide-react-native';
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -44,24 +46,26 @@ import NotificationBell from '../components/NotificationBell';
 import Banner from '../components/Banner';
 import { getMyProfileWithStatus, updateMyProfile } from '../services/profile';
 import { signOut } from '../services/auth';
+import { soyModerador } from '../services/moderacion';
 import {
   changeEmail,
   changePassword,
   deleteAccount,
   verifyPassword,
-  requestPasswordReset,
   requestEmailChangeOtp,
   verifyEmailChangeOtp,
 } from '../services/settings';
 import { getProfileLoadStatus } from '../utils/profileEdit';
+import { crearSecuencia } from '../utils/paginacionPartidos';
+import { crearGuardadoDeAjustes } from '../utils/guardadoDeAjustes';
 import { APP_VERSION } from '../utils/appVersion';
-import { validarPassword } from '../utils/passwordStrength';
+import { validarPassword, PISTA_PASSWORD } from '../utils/passwordStrength';
 import { describeAuthError } from '../services/authPolicy';
 import { buildMyDataExport } from '../services/dataExport';
 import useConfirmacion from '../components/useConfirmacion';
+import { forgetRememberedAccount } from '../utils/rememberedAccount';
+import { descargarArchivo, nombreArchivoExport } from '../utils/descargaWeb';
 
-const TERMS_URL = 'https://futfinder.cl/terminos';
-const PRIVACY_URL = 'https://futfinder.cl/privacidad';
 
 // ── Custom slider (no deps externos) ─────────────────────────────
 // onValueChange: llama en cada movimiento (UI en tiempo real)
@@ -265,9 +269,35 @@ export default function SettingsScreen({ navigation }) {
   const { confirmar, dialogo } = useConfirmacion();
 
   const [profile, setProfile] = useState(null);
+  // Copia síncrona del perfil para el guardado optimista: dos toques en el
+  // mismo render tienen que ver el valor que dejó el primero.
+  const profileRef = useRef(null);
+  profileRef.current = profile;
+  const guardadoDeAjustes = useRef(
+    crearGuardadoDeAjustes({
+      leer: (campo) => profileRef.current?.[campo],
+      escribir: (campo, valor) => {
+        profileRef.current = { ...(profileRef.current || {}), [campo]: valor };
+        setProfile((p) => ({ ...p, [campo]: valor }));
+      },
+      guardar: (campo, valor) => updateMyProfile({ [campo]: valor }),
+    })
+  ).current;
   const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
+  // La entrada de moderación sólo se dibuja para quien está en el padrón.
+  // Es COSMÉTICA: `es_moderador()` decide en el servidor y las tres RPC lo
+  // comprueban igual. Sin esto, el 99 % vería una pantalla que falla en
+  // cada botón.
+  const [moderador, setModerador] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    soyModerador().then((v) => { if (vivo) setModerador(v); });
+    return () => { vivo = false; };
+  }, []);
+
   const [banner, setBanner] = useState(null);
 
   // Modal state
@@ -293,14 +323,10 @@ export default function SettingsScreen({ navigation }) {
 
   // Preferences
   const [radiusKm, setRadiusKm] = useState(10);
-
-  // Forgot password cooldown (seconds remaining)
-  const [forgotCooldown, setForgotCooldown] = useState(0);
-  const forgotTimerRef = useRef(null);
+  const secuenciaRadio = useRef(crearSecuencia()).current;
 
   useEffect(() => {
     return () => {
-      if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
       if (emailOtpTimerRef.current) clearInterval(emailOtpTimerRef.current);
     };
   }, []);
@@ -346,19 +372,27 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const toggleField = async (field, value) => {
-    setProfile((p) => ({ ...p, [field]: value }));
-    const { error } = await updateMyProfile({ [field]: value });
-    if (error) {
-      setProfile((p) => ({ ...p, [field]: !value }));
-      showBanner('error', 'No se pudo guardar', error.message);
-    }
+    // Turno por campo y rollback al valor anterior (A02): ver
+    // utils/guardadoDeAjustes.js.
+    const { error } = await guardadoDeAjustes.cambiar(field, value);
+    if (error) showBanner('error', 'No se pudo guardar', error.message);
   };
 
+  // A01: si el guardado falla, el radio vuelve al que quedó en la base;
+  // antes la pantalla se quedaba con el nuevo y la app buscaba con el viejo.
+  // Un guardado que vuelve tarde no pisa a uno más nuevo.
   const handleRadiusRelease = async (km) => {
+    const turno = secuenciaRadio.abrir();
+    const anterior = profile?.search_radius_km ?? 10;
     setRadiusKm(km);
     const { error } = await updateMyProfile({ search_radius_km: km });
-    if (error) showBanner('error', 'No se pudo guardar el radio', error.message);
-    else setProfile((p) => ({ ...p, search_radius_km: km }));
+    if (!secuenciaRadio.vigente(turno)) return;
+    if (error) {
+      setRadiusKm(anterior);
+      showBanner('error', 'No se pudo guardar el radio', error.message);
+    } else {
+      setProfile((p) => ({ ...p, search_radius_km: km }));
+    }
   };
 
   // ── Cambiar email ──────────────────────────────────────────────
@@ -499,34 +533,15 @@ export default function SettingsScreen({ navigation }) {
     showBanner('success', 'Contraseña actualizada');
   };
 
-  const handleForgotPassword = async () => {
-    if (forgotCooldown > 0) return;
-
-    const { error, email } = await requestPasswordReset();
-
-    // Siempre mostrar feedback (Supabase no revela si el email existe)
-    if (error) {
-      showBanner('error', 'No se pudo enviar el email', error.message);
-      return;
-    }
-    showBanner(
-      'success',
-      'Email de recuperación enviado',
-      `Revisá la bandeja de ${email || 'tu email registrado'}. Si no llega, revisa el spam.`
-    );
-
-    // Cooldown de 60 segundos para evitar rebotes
-    let remaining = 60;
-    setForgotCooldown(remaining);
-    if (forgotTimerRef.current) clearInterval(forgotTimerRef.current);
-    forgotTimerRef.current = setInterval(() => {
-      remaining -= 1;
-      setForgotCooldown(remaining);
-      if (remaining <= 0) {
-        clearInterval(forgotTimerRef.current);
-        forgotTimerRef.current = null;
-      }
-    }, 1000);
+  // Quien no recuerda la contraseña actual no puede usar el formulario de
+  // arriba (la pide). Antes esto mandaba un enlace que la app no sabía abrir;
+  // ahora lleva al mismo flujo con código de Iniciar sesión.
+  const handleForgotPassword = () => {
+    setModal(null);
+    setCurrentPwdInput('');
+    setPasswordInput('');
+    setPassword2Input('');
+    navigation.navigate('RecuperarContrasena', { desdeAjustes: true });
   };
 
   const handleSaveLocation = async () => {
@@ -556,11 +571,13 @@ export default function SettingsScreen({ navigation }) {
     }
     const json = JSON.stringify(data, null, 2);
     if (Platform.OS === 'web') {
-      try {
-        await navigator.clipboard.writeText(json);
-        showBanner('success', 'Datos copiados', 'Pégalos en un archivo de texto para guardarlos.');
-      } catch {
-        showBanner('error', 'No se pudo copiar', 'Tu navegador no permitió copiar al portapapeles.');
+      // Un archivo .json, no el portapapeles: Safari no deja copiar después
+      // de esperar al servidor (ver utils/descargaWeb.js).
+      const nombre = nombreArchivoExport();
+      if (descargarArchivo(json, nombre)) {
+        showBanner('success', 'Descargamos tus datos', `Quedaron en el archivo ${nombre}, en tus descargas.`);
+      } else {
+        showBanner('error', 'No se pudo descargar', 'Inténtalo de nuevo en unos segundos.');
       }
       return;
     }
@@ -574,7 +591,10 @@ export default function SettingsScreen({ navigation }) {
   const handleDeleteAccount = () => {
     confirmar(
       '¿Eliminar tu cuenta?',
-      'Esta acción es permanente e irreversible. Se borrarán todos tus datos, partidos, mensajes y membresías.',
+      // Lo que hace de verdad `delete_my_account` (migración 176): lo que no
+      // se borra es lo de otros, y el registro de pagos, que la política de
+      // privacidad ya dice que se conserva.
+      'Es permanente. Se borrarán tu perfil, tus fotos, tus mensajes, tus amistades y tu lugar en tus clubes. Los partidos y reservas que organizabas por jugar se cancelarán con aviso. Los partidos ya jugados, los clubes que fundaste y los registros de pagos se conservan sin tu nombre.',
       async () => {
         setSaving(true);
         const { error } = await deleteAccount();
@@ -583,6 +603,9 @@ export default function SettingsScreen({ navigation }) {
           showBanner('error', 'No se pudo eliminar', error.message);
           return;
         }
+        // La cuenta ya no existe: que este dispositivo tampoco recuerde su
+        // correo (lo dice la política de cookies).
+        await forgetRememberedAccount();
         await signOut();
         navigateToAuth();
       },
@@ -612,12 +635,6 @@ export default function SettingsScreen({ navigation }) {
         if (index === 0) toggleField('privacy_friend_requests', 'everyone');
         else if (index === 1) toggleField('privacy_friend_requests', 'nobody');
       },
-    );
-  };
-
-  const openURL = (url) => {
-    Linking.openURL(url).catch(() =>
-      showBanner('error', 'No se pudo abrir el enlace', url)
     );
   };
 
@@ -783,17 +800,20 @@ export default function SettingsScreen({ navigation }) {
             icon={FileText}
             title="Términos y condiciones"
             showChevron
-            onPress={() => {
-              if (Platform.OS === 'web') { openURL(TERMS_URL); }
-              else { navigation.navigate('Terms'); }
-            }}
+            onPress={() => navigation.navigate('Terminos')}
           />
           <Row
             icon={FileLock}
             title="Política de privacidad"
             showChevron
+            onPress={() => navigation.navigate('Privacidad')}
+          />
+          <Row
+            icon={Cookie}
+            title="Política de cookies"
+            showChevron
             last
-            onPress={() => openURL(PRIVACY_URL)}
+            onPress={() => navigation.navigate('Cookies')}
           />
         </Card>
 
@@ -805,13 +825,30 @@ export default function SettingsScreen({ navigation }) {
           <Row icon={Mail} title="Cambiar email" showChevron onPress={() => setModal('email')} />
           <Row icon={Lock} title="Cambiar contraseña" showChevron onPress={() => setModal('password')} />
           <Row
+            icon={ShieldCheck}
+            title="Verificación en dos pasos"
+            subtitle="Un código de tu app de autenticación además de la contraseña"
+            showChevron
+            onPress={() => navigation.navigate('MfaSetup')}
+          />
+          <Row
             icon={Smartphone}
             title="Teléfono"
             subtitle="Una cuenta, un número"
             showChevron
             onPress={() => navigation.navigate('VerificarTelefono')}
           />
-          <Row icon={Download} title="Exportar mis datos" showChevron last onPress={handleExportData} />
+          <Row icon={Download} title="Exportar mis datos" showChevron onPress={handleExportData} />
+          {moderador ? (
+            <Row
+              icon={Gavel}
+              title="Moderación"
+              subtitle="Revisiones, disputas y reportes"
+              showChevron
+              last
+              onPress={() => navigation.navigate('Moderacion')}
+            />
+          ) : null}
         </Card>
 
         <View style={styles.footerBtns}>
@@ -917,15 +954,11 @@ export default function SettingsScreen({ navigation }) {
           autoFocus
         />
         <Pressable
-          onPress={forgotCooldown > 0 ? undefined : handleForgotPassword}
+          onPress={handleForgotPassword}
           style={{ marginTop: 8, marginBottom: 4 }}
-          disabled={forgotCooldown > 0}
+          accessibilityRole="link"
         >
-          <Text style={[styles.forgotLink, forgotCooldown > 0 && { color: C.textMuted }]}>
-            {forgotCooldown > 0
-              ? `Reenviar en ${forgotCooldown}s...`
-              : '¿Olvidaste tu contraseña?'}
-          </Text>
+          <Text style={styles.forgotLink}>¿Olvidaste tu contraseña?</Text>
         </Pressable>
         <Input
           style={[styles.input, { marginTop: 10 }]}
@@ -934,6 +967,9 @@ export default function SettingsScreen({ navigation }) {
           onChangeText={setPasswordInput}
           secureTextEntry
         />
+        {/* Acá no había NADA: la regla se conocía después de apretar el
+            botón y que te la rechazaran. */}
+        <Text style={styles.pistaPassword}>{PISTA_PASSWORD}</Text>
         <Input
           style={[styles.input, { marginTop: 10 }]}
           placeholder="Repetir contraseña"
@@ -1096,6 +1132,10 @@ const styles = StyleSheet.create({
     fontFamily: F.medium, color: C.textSecondary, fontSize: 13, lineHeight: 18, marginBottom: 12,
   },
   forgotLink: { fontFamily: F.semiBold, color: C.green, fontSize: 13 },
+  pistaPassword: {
+    fontFamily: F.medium, color: C.textMuted, fontSize: 12,
+    marginTop: 6, marginLeft: 2,
+  },
   otpRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   otpBox: {
     width: 44, height: 54, borderRadius: R.iconBtn,

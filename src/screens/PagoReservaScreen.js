@@ -10,6 +10,7 @@ import { IconButton, Card, Button, StickyFooter, NoticeCard } from '../component
 import { iniciarPagoReserva, estadoDePago } from '../services/pagos';
 import {
   faseDePago, sigueEsperando, esperaSiguiente, seAcaboLaEspera, textoDeFase, accionDeFase,
+  faseAlFallarElInicio,
 } from '../utils/pagosCliente';
 import { formatCLP } from '../services/reservasRules';
 
@@ -41,6 +42,10 @@ export default function PagoReservaScreen({ navigation, route }) {
   const [pago, setPago] = useState(null);
   const [detalle, setDetalle] = useState(null);
   const [abandonada, setAbandonada] = useState(false);
+  // La pasarela en modo de prueba (Flow sandbox): se dice en pantalla para
+  // que nadie confunda una reserva confirmada con tarjeta de prueba con una
+  // pagada de verdad, y para que se note si quedó así en producción.
+  const [dePrueba, setDePrueba] = useState(false);
 
   // En refs y no en estado: el bucle de consulta se arma una vez y no puede
   // depender de valores que se renderizan, o quedaría preguntando con datos
@@ -80,13 +85,22 @@ export default function PagoReservaScreen({ navigation, route }) {
       const { data, error } = await iniciarPagoReserva(reservaId);
       if (!vivo.current) return;
       if (error) {
-        // `configurada: false` es «la pasarela todavía no existe», que no es
-        // lo mismo que «falló»: se dice distinto porque es otra cosa.
-        fijarFase(data?.configurada === false ? 'nodisponible' : 'error');
+        // «Todavía no hay pasarela», «está en pausa» y «falló» son tres
+        // cosas distintas y se dicen distinto (ver `faseAlFallarElInicio`).
+        fijarFase(faseAlFallarElInicio(data));
         setPago({ reason: error.message });
         return;
       }
+      setDePrueba(data?.ambiente === 'sandbox');
       desde.current = Date.now();
+      // El intento anterior ya se había cobrado y el aviso todavía no llegaba:
+      // `pagar-reserva` lo registró. No hay a dónde mandar a pagar; se espera
+      // a que la reserva se vea confirmada.
+      if (data?.yaPagado) {
+        fijarFase('esperando');
+        consultar().then(programar);
+        return;
+      }
       fijarFase('pagando');
       try {
         await Linking.openURL(data.url);
@@ -98,7 +112,7 @@ export default function PagoReservaScreen({ navigation, route }) {
       programar();
     })();
     return () => { vivo.current = false; clearTimeout(timer.current); };
-  }, [reservaId, fijarFase, programar]);
+  }, [reservaId, fijarFase, programar, consultar]);
 
   // ── Volver a la app es la mejor señal que tenemos ────────────
   useEffect(() => {
@@ -121,7 +135,12 @@ export default function PagoReservaScreen({ navigation, route }) {
   const ejecutar = () => {
     if (accion?.accion === 'reserva') navigation.navigate('MisReservas');
     else if (accion?.accion === 'reintentar') navigation.goBack();
-    else if (accion?.accion === 'buscar') navigation.navigate('Main');
+    // A LA PESTAÑA DE RESERVAS, no a la portada. `navigate('Main')` sin
+    // `screen` cae en la pestaña por defecto, que es Inicio: el botón decía
+    // «Volver a buscar cancha» y dejaba a la persona en la portada, justo
+    // después de que el pago le fallara y cuando lo que quiere es
+    // reintentar. El resto de la app ya navega así.
+    else if (accion?.accion === 'buscar') navigation.navigate('Main', { screen: 'ReservasTab' });
     else navigation.goBack();
   };
 
@@ -152,7 +171,7 @@ export default function PagoReservaScreen({ navigation, route }) {
             <Text style={[styles.estadoTitulo, { color }]}>{texto.titulo}</Text>
           </View>
           <Text style={styles.estadoCuerpo}>{texto.cuerpo}</Text>
-          {pago?.reason && fase !== 'nodisponible' ? (
+          {pago?.reason && fase !== 'nodisponible' && fase !== 'pausada' ? (
             <Text style={styles.estadoDetalle}>{pago.reason}</Text>
           ) : null}
         </Card>
@@ -178,6 +197,12 @@ export default function PagoReservaScreen({ navigation, route }) {
           </Card>
         ) : null}
 
+        {dePrueba ? (
+          <NoticeCard tone="warning">
+            Pagos en modo de prueba: no se cobra dinero real y la reserva no vale como pagada.
+          </NoticeCard>
+        ) : null}
+
         {esperando ? (
           <NoticeCard tone="info" icon={CreditCard}>
             Mientras esto se resuelve, la hora sigue disponible para otros grupos: se toma recién
@@ -191,6 +216,13 @@ export default function PagoReservaScreen({ navigation, route }) {
             Llevamos varios minutos sin novedades del banco. Eso no quiere decir que el pago haya
             fallado: si salió, tu reserva va a aparecer confirmada igual y te avisamos. Puedes
             revisarla en «Mis reservas».
+          </NoticeCard>
+        ) : null}
+
+        {fase === 'pausada' ? (
+          <NoticeCard tone="warning">
+            Tu reserva quedó guardada pero sin pagar, así que la hora no está tomada y se vence
+            sola. Vuelve a intentarlo en un rato.
           </NoticeCard>
         ) : null}
 

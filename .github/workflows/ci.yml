@@ -1,0 +1,56 @@
+# Lo mismo que `npm run verify` más el build web, en cada push y PR a main.
+#
+# Sin secretos: nada acá habla con Supabase, Vercel ni Flow. El build web sale
+# sin variables `EXPO_PUBLIC_*`, o sea en modo de demostración; sirve para
+# saber que el bundle se arma, no para publicarlo (eso lo hace Vercel).
+#
+# Deno es OBLIGATORIO acá (`EXIGIR_DENO=1`): en una Mac sin Deno
+# `npm run test:edge` avisa y sigue, pero en CI nadie lee el aviso.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    name: Lint, pruebas y build web
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint (cero errores)
+        run: npm run lint
+
+      - name: Pruebas de Node
+        run: npm test
+
+      - name: Pruebas y tipos de las Edge Functions (Deno)
+        run: npm run test:edge
+        env:
+          EXIGIR_DENO: '1'
+
+      - name: Build web
+        run: npm run build:web

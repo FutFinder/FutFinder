@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 /**
- * Que todo lo que una pantalla importa de `src/utils` exista de verdad.
+ * Que todo lo que una pantalla importa de `src/utils` o `src/services`
+ * exista de verdad.
  *
  * POR QUÉ ESTA PRUEBA. `TarifasScreen` importaba `horaAMinutos` y
  * `bloquesDeTarifa` de `recintoPantallas`, y las dos viven en
@@ -15,8 +16,16 @@ const path = require('node:path');
  * empaquetado.
  *
  * Es el mismo agujero que `no-undef` cubre para las variables sueltas y que
- * nadie cubría para los imports. Se comprueba solo sobre `src/utils` porque
- * ahí la convención es que los módulos sean puros.
+ * nadie cubría para los imports.
+ *
+ * TAMBIÉN MIRA `src/services` DESDE EL 2026-10-21, y no por simetría: sólo
+ * se cubría `utils`, y el mismo fallo volvió a pasar una carpeta más allá.
+ * `ClubProposalScreen` pedía `NIVELES` a `services/clubChallengeRules`, que
+ * lo IMPORTA de `matchRules` para validar pero no lo reexporta: llegaba
+ * `undefined` y «Crear propuesta oficial» —el paso que convierte un desafío
+ * en partido— reventaba al dibujarse, cada vez, para todos. Los módulos de
+ * reglas de `services` son tan puros como los de `utils`; los que arrastran
+ * Supabase no se pueden cargar desde Node y se saltan solos más abajo.
  *
  * LO QUE NO CUBRE, dicho de frente: unos pocos módulos de `utils` no se
  * pueden cargar desde Node —arrastran `expo-modules-core`, que viene en
@@ -49,7 +58,7 @@ function importacionesDeUtils(codigo) {
   let m = re.exec(codigo);
   while (m) {
     const ruta = m[2];
-    if (/(^|\/)utils\//.test(ruta)) {
+    if (/(^|\/)(utils|services)\//.test(ruta)) {
       const nombres = m[1]
         .split(',')
         .map((x) => x.trim().split(/\s+as\s+/)[0].trim())
@@ -61,7 +70,7 @@ function importacionesDeUtils(codigo) {
   return encontradas;
 }
 
-test('todo lo que se importa de src/utils existe en ese módulo', () => {
+test('todo lo que se importa de src/utils y src/services existe en ese módulo', () => {
   const problemas = [];
 
   for (const archivo of archivosDeFuente()) {
