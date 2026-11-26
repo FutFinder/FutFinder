@@ -9,6 +9,8 @@ import {
   Platform,
   ActivityIndicator,
   AppState,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -23,6 +25,8 @@ import {
   Swords,
   Video,
   RefreshCw,
+  ShieldAlert,
+  SlidersHorizontal,
 } from 'lucide-react-native';
 import EmojiPicker from 'rn-emoji-keyboard';
 
@@ -43,6 +47,7 @@ import ChallengeEventBubble from '../components/clubes/ChallengeEventBubble';
 import CambioPartidoCard from '../components/clubes/CambioPartidoCard';
 import CancelarEncuentroBar from '../components/clubes/CancelarEncuentroBar';
 import IncomparecenciaYRevisionBar from '../components/clubes/IncomparecenciaYRevisionBar';
+import { textoDeSancion } from '../utils/cancelacionEncuentro';
 import Banner from '../components/Banner';
 
 import {
@@ -178,6 +183,10 @@ export default function ChatThreadScreen({ route, navigation }) {
   const [access, setAccess] = useState(null);
   const [muted, setMuted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // «Acciones del partido» (rediseño de Clubes, 2026-11-26): cancelar,
+  // informar incomparecencia, pedir revisión y pedir un cambio viven en una
+  // hoja que se abre desde el menú «⋯», no fijas sobre el hilo.
+  const [accionesOpen, setAccionesOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [context, setContext] = useState(null); // info del club / partido
@@ -1598,6 +1607,18 @@ export default function ChatThreadScreen({ route, navigation }) {
       });
     }
 
+    // Decisión de Vicente (2026-11-26): las acciones del partido entre clubes
+    // van en el menú. Va PRIMERO para que se encuentre sin buscar: cancelar se
+    // necesita con apuro.
+    if (t?.type === 'challenge') {
+      items.unshift({
+        key: 'acciones',
+        label: 'Acciones del partido',
+        icon: <SlidersHorizontal color={C.textStrong} size={17} strokeWidth={1.8} />,
+        onPress: () => setAccionesOpen(true),
+      });
+    }
+
     return items;
   }, [t?.type, t?.id, muted, navigation, openIdentity, handleToggleMute, handleDeleteChat]);
 
@@ -1655,38 +1676,22 @@ export default function ChatThreadScreen({ route, navigation }) {
           </View>
         )}
 
-        {/*
-          «Cancelar encuentro» va ARRIBA y no en el menú de tres puntos: se
-          busca con urgencia y casi siempre con el partido cerca. Enterrarla
-          hace que la cancelación se resuelva por WhatsApp y que el club rival
-          siga organizando gente para un partido que ya no existe. Separada de
-          la barra del ciclo, que vive abajo: aquella lleva la acción que toca
-          ahora, ésta es la salida de emergencia.
-        */}
-        {isChallengeThread && (
-          <CancelarEncuentroBar
-            acciones={accionesCancelar}
-            partido={cambioPartido}
-            sancion={sancion}
-            ocupado={cancelBusy}
-            error={cancelError}
-            onCancelar={cancelarEncuentro}
-          />
-        )}
-
-        {/* Debajo de la cancelación, y no arriba: informar una incomparecencia
-          o pedir una revisión son cosas que se hacen DESPUÉS de que el
-          encuentro salió mal, no en vez de cancelarlo. Cada mitad se dibuja
-          sólo cuando se puede usar o cuando hay algo que contar. */}
-        {isChallengeThread && (
-          <IncomparecenciaYRevisionBar
-            incomparecencia={accionesIncomparecencia}
-            revision={accionesRevision}
-            ocupado={revisionBusy}
-            error={revisionError}
-            onInformar={informarIncomparecencia}
-            onSolicitar={pedirRevision}
-          />
+        {/* La sanción del club NO es una acción, es información: se queda
+          visible sobre el hilo aunque las acciones vivan en el menú. Lleva su
+          sujeto delante («Tu club está sancionado: …») para no leerse como el
+          motivo del hilo en que está pintada. */}
+        {isChallengeThread && !!sancion && (
+          <Pressable
+            onPress={() => setAccionesOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${textoDeSancion(sancion)}. Abrir las acciones del partido`}
+            style={({ pressed }) => [styles.sancionAviso, pressed && { opacity: 0.85 }]}
+          >
+            <ShieldAlert color={C.amber} size={14} strokeWidth={2.2} />
+            <Text style={styles.sancionAvisoTxt} numberOfLines={3}>
+              {textoDeSancion(sancion)}
+            </Text>
+          </Pressable>
         )}
 
         {loading ? (
@@ -1838,30 +1843,6 @@ export default function ChatThreadScreen({ route, navigation }) {
               />
             )}
 
-            {isChallengeThread && !cambioPendiente && accionesCambio.puedePedir && (
-              <Pressable
-                onPress={() =>
-                  navigation.navigate('ClubMatchChange', {
-                    matchId: clubChallenge.match_id,
-                    challengeId,
-                  })
-                }
-                accessibilityRole="button"
-                accessibilityLabel="Pedir un cambio de hora, cancha o cuota del partido"
-                style={({ pressed }) => [styles.cambioBar, pressed && { opacity: 0.85 }]}
-              >
-                <RefreshCw color={C.neon} size={16} strokeWidth={2.2} />
-                <Text style={styles.cambioBarText}>Pedir un cambio del partido</Text>
-              </Pressable>
-            )}
-
-            {isChallengeThread && !cambioPendiente && !accionesCambio.puedePedir
-              && accionesCambio.esDeClubes && accionesCambio.soyAdmin && (
-              <Text style={styles.cambioHint} numberOfLines={2}>
-                {accionesCambio.bloqueoPedir}
-              </Text>
-            )}
-
             {isChallengeThread && (
               <ChallengeHeader
                 challenge={clubChallenge}
@@ -1970,6 +1951,73 @@ export default function ChatThreadScreen({ route, navigation }) {
         onClose={() => setMenuOpen(false)}
       />
 
+      {isChallengeThread && (
+        <Modal
+          visible={accionesOpen}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setAccionesOpen(false)}
+        >
+          <Pressable style={styles.hojaFondo} onPress={() => setAccionesOpen(false)}>
+            <Pressable style={styles.hoja} onPress={() => {}} accessible={false}>
+              <View style={styles.hojaAgarre} />
+              <Text style={styles.hojaTitulo}>Acciones del partido</Text>
+              <ScrollView contentContainerStyle={styles.hojaContenido} keyboardShouldPersistTaps="handled">
+                {!cambioPendiente && accionesCambio.puedePedir ? (
+                  <Pressable
+                    onPress={() => {
+                      setAccionesOpen(false);
+                      navigation.navigate('ClubMatchChange', {
+                        matchId: clubChallenge.match_id,
+                        challengeId,
+                      });
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Pedir un cambio de hora, cancha o cuota del partido"
+                    style={({ pressed }) => [styles.cambioBar, pressed && { opacity: 0.85 }]}
+                  >
+                    <RefreshCw color={C.textPrimary} size={16} strokeWidth={2.2} />
+                    <Text style={styles.cambioBarText}>Pedir un cambio de hora, cancha o cuota</Text>
+                  </Pressable>
+                ) : !cambioPendiente && accionesCambio.esDeClubes && accionesCambio.soyAdmin ? (
+                  <Text style={styles.cambioHint} numberOfLines={2}>
+                    {accionesCambio.bloqueoPedir}
+                  </Text>
+                ) : null}
+
+                {/* Informar y pedir revisión van antes que cancelar: son lo que
+                    se hace después de que el encuentro salió mal. Cancelar va
+                    al final, aparte, porque termina el encuentro. */}
+                <IncomparecenciaYRevisionBar
+                  incomparecencia={accionesIncomparecencia}
+                  revision={accionesRevision}
+                  ocupado={revisionBusy}
+                  error={revisionError}
+                  onInformar={informarIncomparecencia}
+                  onSolicitar={pedirRevision}
+                />
+
+                <CancelarEncuentroBar
+                  acciones={accionesCancelar}
+                  partido={cambioPartido}
+                  // La sanción ya está visible sobre el hilo: repetirla acá
+                  // pondría el mismo aviso dos veces.
+                  sancion={null}
+                  ocupado={cancelBusy}
+                  error={cancelError}
+                  onCancelar={cancelarEncuentro}
+                />
+
+                <Text style={styles.hojaNota}>
+                  Este chat lo ven los administradores y capitanes de los dos clubes.
+                </Text>
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+
       {t?.type === 'dm' && (
         <ReportPlayerSheet
           visible={reportOpen}
@@ -1986,6 +2034,45 @@ export default function ChatThreadScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
+  sancionAviso: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    marginHorizontal: 14,
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: C.amberSoft,
+  },
+  sancionAvisoTxt: { flex: 1, color: C.amber, fontSize: 12, lineHeight: 16, fontFamily: F.bold },
+  hojaFondo: { flex: 1, justifyContent: 'flex-end', backgroundColor: C.scrim },
+  hoja: {
+    maxHeight: '85%',
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingTop: 10,
+    paddingBottom: 28,
+  },
+  hojaAgarre: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.grip,
+    marginBottom: 12,
+  },
+  hojaTitulo: {
+    color: C.textPrimary,
+    fontSize: 17,
+    fontFamily: F.extraBold,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  hojaContenido: { gap: 10, paddingBottom: 6 },
+  hojaNota: { color: C.textSecondary, fontSize: 12, lineHeight: 17, paddingHorizontal: 16, marginTop: 4 },
   bannerWrap: { paddingHorizontal: 14, paddingTop: 10 },
 
   list: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
@@ -2019,11 +2106,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: C.challengeBorder,
-    backgroundColor: 'transparent',
-    maxWidth: 560,
-    width: '100%',
-    alignSelf: 'center',
+    borderColor: C.border,
+    backgroundColor: C.surfaceAlt,
   },
   cambioBarText: {
     color: C.textPrimary,

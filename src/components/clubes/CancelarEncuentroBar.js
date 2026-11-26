@@ -16,15 +16,14 @@ import {
 } from '../../utils/cancelacionEncuentro';
 
 /**
- * «Cancelar encuentro», ARRIBA del hilo.
+ * «Cancelar encuentro», dentro de la hoja «Acciones del partido».
  *
- * POR QUÉ ARRIBA Y NO EN UN MENÚ. Cancelar es la acción que se busca con
- * urgencia —se inundó la cancha, no llegó el equipo— y normalmente con el
- * partido cerca. Enterrarla en un menú de tres puntos hace que se resuelva por
- * WhatsApp, que es exactamente lo que deja al club rival organizando gente para
- * un partido que ya no existe. Va arriba, siempre visible, y separada de la
- * barra del ciclo de abajo: aquella lleva la acción que toca ahora; ésta, la
- * salida de emergencia.
+ * DÓNDE VIVE. Hasta el 2026-11-26 iba fija ARRIBA del hilo, porque cancelar se
+ * busca con urgencia y escondida se terminaba resolviendo por WhatsApp. En el
+ * rediseño de Clubes Vicente decidió moverla al menú «⋯» del chat, junto con
+ * informar incomparecencia, pedir revisión y pedir un cambio: el ítem
+ * «Acciones del partido» va PRIMERO en ese menú para que se encuentre sin
+ * buscar, y la sanción del club sigue visible sobre el hilo.
  *
  * NO DECIDE NADA. Qué se dibuja sale de `accionesDeCancelacion()`, que es puro
  * y está probado, y quién puede cancelar de verdad lo vuelve a comprobar
