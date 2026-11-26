@@ -514,8 +514,8 @@ test('el historial completo pide el tope real de la RPC, no los tres del perfil'
 test('«Ver todo» del historial ya no lleva a la bandeja de desafíos', () => {
   const perfil = fs.readFileSync(path.join(RAIZ, 'src', 'screens', 'ClubDetailScreen.js'), 'utf8');
   const seccion = perfil.slice(
-    perfil.indexOf('Historial de partidos'),
-    perfil.indexOf('Fotos del club')
+    perfil.indexOf('── Historial ──'),
+    perfil.indexOf('── Fotos ──')
   );
   assert.match(seccion, /navigate\('ClubHistory'/);
   assert.equal(

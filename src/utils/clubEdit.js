@@ -18,6 +18,7 @@
 
 import { esModalidadValida } from './clubModalidad.js';
 import { esTemaClubValido } from '../theme/clubThemes.js';
+import { esNivelClubValido } from './nivelClub.js';
 
 /** Largo del nombre aceptado por el CHECK de `clubs.nombre` (migración 11). */
 export const NOMBRE_MIN = 3;
@@ -52,6 +53,7 @@ export function buildClubPatch({
   comuna,
   modalidad,
   tema,
+  nivel,
 } = {}) {
   const patch = {};
 
@@ -105,6 +107,15 @@ export function buildClubPatch({
       return { patch: null, error: { message: 'Tema del club no válido' } };
     }
     patch.tema = tema;
+  }
+
+  if (nivel !== undefined) {
+    // A diferencia del tema, el nivel SÍ se puede vaciar: `null` es «el club
+    // no declara nivel» y la ficha no dibuja nada (migración 199).
+    if (nivel != null && !esNivelClubValido(nivel)) {
+      return { patch: null, error: { message: 'Nivel del club no válido' } };
+    }
+    patch.nivel = nivel || null;
   }
 
   return { patch, error: null };

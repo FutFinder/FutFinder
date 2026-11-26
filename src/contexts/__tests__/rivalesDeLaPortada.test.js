@@ -41,7 +41,11 @@ test('el cálculo real viaja inyectado desde el contexto', () => {
 });
 
 test('la portada sigue leyendo el campo que ahora sí existe', () => {
-  // Si alguien renombra el campo en un lado y no en el otro, vuelve el
-  // «Distancia N.A.» silencioso.
-  assert.match(PORTADA, /distanciaKm: rival\.distanciaKm/);
+  // Desde el rediseño del 2026-11-26 la portada ES la ficha del club
+  // (`FichaClub`), y los rivales cercanos los dibuja ella. Si alguien renombra
+  // el campo en un lado y no en el otro, vuelve el «Distancia N.A.» silencioso.
+  const FICHA = leer('screens/ClubDetailScreen.js');
+  assert.match(PORTADA, /<FichaClub/, 'la portada con club dejó de ser la ficha');
+  assert.match(FICHA, /distanciaKm: c \? distanciaEntreClubesKm\(c, r\)/);
+  assert.match(FICHA, /distanciaKm=\{r\.distanciaKm\}/);
 });

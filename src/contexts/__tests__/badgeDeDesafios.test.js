@@ -41,10 +41,12 @@ test('el badge ya NO cuenta los desafíos directos recibidos', () => {
   // correcto desde la corrección de los hallazgos 1 y 2.
   assert.doesNotMatch(
     PORTADA,
-    /badges=\{\{\s*desafios:\s*contarPorTipo/,
+    /(badges=\{\{\s*desafios|respuestasPorDecidir):\s*contarPorTipo/,
     'el badge volvió a contar los desafíos directos, que no están en el destino del tile'
   );
-  assert.match(PORTADA, /badges=\{\{\s*desafios:\s*openChallengeReplies\s*\}\}/);
+  // Desde el rediseño del 2026-11-26 el acceso «Desafíos abiertos» es una
+  // fila de la ficha y su número le llega por la prop `portada`.
+  assert.match(PORTADA, /respuestasPorDecidir:\s*openChallengeReplies/);
 });
 
 test('el número sale del contexto, no se recalcula en la pantalla', () => {

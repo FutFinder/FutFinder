@@ -21,6 +21,7 @@ import {
 import { TEMA_CLUB_POR_DEFECTO } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import ClubThemePicker from '../components/club/ClubThemePicker';
+import NivelSelector from '../components/club/NivelSelector';
 import { Button, IconButton, Chip } from '../components/reservas/ui';
 import { FieldLabel, TextField } from '../components/reservas/recintoUi';
 import { createClub } from '../services/clubs';
@@ -46,6 +47,7 @@ export default function CreateClubScreen({ navigation }) {
   // otra pantalla larga de la app, arranca con `futbol7` por lo mismo.
   const [modalidad, setModalidad] = useState('futbol7');
   const [tema, setTema] = useState(TEMA_CLUB_POR_DEFECTO);
+  const [nivel, setNivel] = useState(null);
   const [showRegiones, setShowRegiones] = useState(false);
   const [showComunas, setShowComunas] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,7 +82,7 @@ export default function CreateClubScreen({ navigation }) {
     // qué falta — para eso está el botón inactivo, no un cartel.
     if (!listo) return;
     setSaving(true);
-    const { data, error } = await createClub({ nombre, descripcion, region, comuna, modalidad, tema });
+    const { data, error } = await createClub({ nombre, descripcion, region, comuna, modalidad, tema, nivel });
 
     if (error) {
       setSaving(false);
@@ -318,10 +320,16 @@ export default function CreateClubScreen({ navigation }) {
           )}
 
           <View style={styles.grupo}>
-            <FieldLabel>Tema del club</FieldLabel>
+            <FieldLabel>Nivel del club (opcional)</FieldLabel>
+            <Text style={styles.temaHelp}>Lo puedes cambiar después desde Editar club.</Text>
+            <NivelSelector value={nivel} onChange={setNivel} disabled={saving} />
+          </View>
+
+          <View style={styles.grupo}>
+            <FieldLabel>Color del tema</FieldLabel>
             <Text style={styles.temaHelp}>
-              Pinta el escudo y los botones del club. Los resultados de los partidos y
-              los avisos conservan sus colores.
+              Es solo un acento: se usa en el aro del logo, la línea del banner y los
+              enlaces. Los botones principales y el resultado de los partidos no cambian.
             </Text>
             <ClubThemePicker value={tema} onChange={setTema} disabled={saving} />
           </View>

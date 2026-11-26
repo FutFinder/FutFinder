@@ -74,17 +74,18 @@ test('«Pendiente para ti» no dice «Todo al día» mientras llegan las tareas 
 
 test('el selector y el carrusel siguen en pantalla durante el cambio', () => {
   const src = leer('../../screens/ClubsScreen.js');
-  const portada = src.slice(src.indexOf('function Portada({'));
-  // Ninguno de los dos puede quedar detrás de un gate por `cambiandoClub`:
-  // los dos SON la manera de cambiar de club, y esconderlos deja sin salida a
-  // quien se equivocó — al carrusel, además, bajo el dedo que lo desliza.
+  // Desde el rediseño del 2026-11-26 cambiar de club es «Mis clubes»: la
+  // píldora de la cabecera de la ficha abre `MisClubesHoja`. Ninguna de las
+  // dos puede quedar detrás de un gate por `cambiandoClub`: son la manera de
+  // cambiar de club, y esconderlas deja sin salida a quien se equivocó.
+  const conClub = src.slice(src.indexOf("if (membership === 'member' && activeClubId)"));
   assert.doesNotMatch(
-    portada,
+    conClub,
     /cambiandoClub \? <SkeletonHome/,
-    'el esqueleto de carga se lleva por delante los dos selectores'
+    'el esqueleto de carga se lleva por delante el selector de clubes'
   );
-  assert.match(portada, /<ClubSwitcher/);
-  assert.match(portada, /<ClubSummaryCarousel/);
+  assert.match(conClub, /onMisClubes: \(\) => setMisClubesAbierto\(true\)/);
+  assert.match(conClub, /<MisClubesHoja/);
 });
 
 test('Inicio muestra el club ACTIVO, no la membresía más antigua', () => {

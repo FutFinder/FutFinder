@@ -195,6 +195,19 @@ export const paleta = {
   cardChallenge: '#171214',
   challengeBorder: 'rgba(255, 45, 85, 0.22)',
 
+  // Nivel del club (migración 199). Lavanda: un color propio que no es
+  // victoria, empate, derrota ni dorado, y que no pertenece a ningún tema de
+  // club. Se lee por la cantidad de barras (1 a 5) y por el texto; las barras
+  // van subiendo del gris al lavanda. Élite va relleno con `nivelInk` encima.
+  nivel: '#B9A7FF',
+  nivelSoft: 'rgba(185, 167, 255, 0.10)',
+  nivelBorder: 'rgba(185, 167, 255, 0.60)',
+  nivelInk: '#1B1236',
+  nivelBarra1: '#8F9A95',
+  nivelBarra2: '#9DAAC9',
+  nivelBarra3: '#AEA6E8',
+  nivelBarraApagada: '#3A403B',
+
   // ── Degradados ────────────────────────────────────────────
   headerGlowFrom: '#17351E',
   headerGlowTo: '#0A0C0A',

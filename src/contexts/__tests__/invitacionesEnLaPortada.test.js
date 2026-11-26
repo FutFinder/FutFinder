@@ -63,11 +63,12 @@ test('el badge cuenta las invitaciones también SIN club activo', () => {
 });
 
 test('la portada dibuja las invitaciones como tarea, no como bloque aparte', () => {
-  // Si `Portada` volviera a montar <Invitaciones>, la misma invitación
+  // Desde el rediseño del 2026-11-26 las tareas viven tras la campana, en
+  // `AvisosDelClub`. Si volviera a montar <Invitaciones>, la misma invitación
   // saldría dos veces: una como tarjeta de tarea y otra como fila suelta.
-  const portada = cuerpoDe(PANTALLA, 'Portada');
+  const portada = cuerpoDe(PANTALLA, 'AvisosDelClub');
   assert.doesNotMatch(portada, /<Invitaciones/,
-    'Portada monta <Invitaciones> y duplicaría lo que ya sale como tarea');
+    'AvisosDelClub monta <Invitaciones> y duplicaría lo que ya sale como tarea');
   assert.match(portada, /PendingTaskCard/);
 });
 

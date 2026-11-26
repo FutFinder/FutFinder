@@ -1,169 +1,180 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Star } from 'lucide-react-native';
+import { MapPin, Zap } from 'lucide-react-native';
 
-import {
-  paleta as C,
-  radios as R,
-  fuentes as F,
-} from '../../theme/colors';
+import { paleta as C, radios as R, fuentes as F } from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
+import { modalidadInline } from '../../utils/clubModalidad';
 import ClubLogo from './ClubLogo';
+import NivelChip from './NivelChip';
+import VerifiedBadge from './VerifiedBadge';
 
 /**
- * Tarjeta de club rival del carrusel "Buscar rivales".
+ * Tarjeta de club rival (rediseño de Clubes, 2026-11-26).
  *
- * Muestra logo, nombre, "distancia · modalidad", valoración con estrella,
- * nivel y botón "Desafiar".
+ * Logo con el aro del color DEL RIVAL, nombre, «comuna · modalidad», la
+ * distancia arriba a la derecha, el nivel (migración 199, reemplaza al
+ * rating) y el récord V·E·D cuando se conoce. Abajo, «Desafiar» y «Ver club».
  *
- * LO QUE NO SE SABE NO OCUPA SITIO. `meta` y `nivelLabel` llegan resueltos de
- * `clubMeta.js` y pueden venir vacíos; la valoración marca su ausencia con el
- * centinela 'N.A.'. Antes las tres se dibujaban igual, así que la tarjeta de
- * un club nuevo era tres siglas —«Distancia N.A. · Fútbol N.A.», «N.A.»,
- * «Nivel N.A.»— que parecen un error de la app. Ahora la valoración ausente
- * se dice en español y las otras dos se omiten.
+ * «DESAFIAR» ES VERDE DE LA APP, no del club: es la acción principal, y el
+ * tema del club es sólo un acento. El aro del logo sí lleva el tema del
+ * rival —la tarjeta vive dentro de mi club, y pintarla con mi color la
+ * volvería una tarjeta de mi club con el nombre de otro—.
  *
- * EL COLOR ES DEL RIVAL, NO DE QUIEN MIRA. Estas tarjetas viven dentro de
- * «Mi club», así que pintarlas con el tema de la pantalla las volvería
- * tarjetas de mi club con el nombre de otro. El tema sale de la propia fila
- * (`club.tema`, columna que viaja en `RIVAL_CLUB_COLUMNS`); un rival sin
- * tema —o traído por un entorno sin la migración 53— se ve verde.
+ * LO QUE NO SE SABE NO OCUPA SITIO: sin nivel no hay chip, sin distancia no
+ * hay distancia y sin `record` no hay récord. Nada se inventa.
  */
 export default function RivalClubCard({
   club,
-  meta,
-  ratingLabel,
-  nivelLabel,
+  distanciaKm,
+  record,
   onPress,
   onChallenge,
   puedeDesafiar = true,
+  ancho = ANCHO_TARJETA_RIVAL,
 }) {
   const tema = temaDeClub(club);
-  const sinValoracion = !ratingLabel || ratingLabel === 'N.A.';
+  const lugar = [club.comuna, modalidadInline(club.modalidad)].filter(Boolean).join(' · ');
+  const distancia =
+    typeof distanciaKm === 'number' ? `${distanciaKm.toFixed(1).replace('.', ',')} km` : null;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { width: ancho }]}>
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={
-          meta ? `Ver el club ${club.nombre}. ${meta}` : `Ver el club ${club.nombre}`
-        }
+        accessibilityLabel={`Ver el club ${club.nombre}${lugar ? `. ${lugar}` : ''}`}
         style={({ pressed }) => [styles.top, pressed && { opacity: 0.7 }]}
       >
-        <ClubLogo uri={club.foto_url} size={42} borderRadius={R.iconBtn} />
+        <View style={[styles.aro, { borderColor: tema.main }]}>
+          <ClubLogo uri={club.foto_url} size={38} borderRadius={19} />
+        </View>
         <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>
-            {club.nombre}
-          </Text>
-          {meta ? (
+          <View style={styles.nombreFila}>
+            <Text style={styles.name} numberOfLines={1}>
+              {club.nombre}
+            </Text>
+            {club.verificado ? <VerifiedBadge size={14} tema={tema} /> : null}
+          </View>
+          {lugar ? (
             <Text style={styles.meta} numberOfLines={1}>
-              {meta}
+              {lugar}
             </Text>
           ) : null}
         </View>
+        {distancia ? (
+          <View style={styles.distancia}>
+            <MapPin color={C.textSecondary} size={12} strokeWidth={2} />
+            <Text style={styles.distanciaTexto}>{distancia}</Text>
+          </View>
+        ) : null}
       </Pressable>
 
-      <View style={styles.chipRow}>
-        <View
-          style={styles.chip}
-          accessibilityLabel={
-            sinValoracion ? 'Todavía sin valoraciones' : `Valoración ${ratingLabel}`
-          }
-        >
-          <Star color={sinValoracion ? C.textMuted : C.textPrimary} size={11} strokeWidth={2.4} />
-          <Text style={[styles.chipText, sinValoracion && styles.chipTextVacio]} numberOfLines={1}>
-            {sinValoracion ? 'Sin valorar' : ratingLabel}
+      <View style={styles.medio}>
+        <NivelChip nivel={club.nivel} compacto />
+        {record ? (
+          <Text
+            style={styles.record}
+            accessibilityLabel={`${record.v} victorias, ${record.e} empates, ${record.d} derrotas`}
+          >
+            <Text style={{ color: C.win }}>{record.v}</Text>V ·{' '}
+            <Text style={{ color: C.textPrimary }}>{record.e}</Text>E ·{' '}
+            <Text style={{ color: C.loss }}>{record.d}</Text>D
           </Text>
-        </View>
-        {nivelLabel ? (
-          <View style={styles.chip}>
-            <Text style={styles.chipText} numberOfLines={1}>
-              {nivelLabel}
-            </Text>
-          </View>
         ) : null}
       </View>
 
-      {puedeDesafiar ? (
+      <View style={styles.botones}>
+        {puedeDesafiar ? (
+          <Pressable
+            onPress={onChallenge}
+            accessibilityRole="button"
+            accessibilityLabel={`Desafiar a ${club.nombre}`}
+            style={({ pressed }) => [styles.desafiar, pressed && { backgroundColor: C.greenSoftStrong }]}
+          >
+            <Zap color={C.green} size={15} strokeWidth={2.4} />
+            <Text style={styles.desafiarTexto}>Desafiar</Text>
+          </Pressable>
+        ) : null}
         <Pressable
-          onPress={onChallenge}
-          // El botón mide 38 px como en la referencia; el hitSlop lo lleva
-          // al mínimo táctil de 44 sin cambiar el diseño.
-          hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
+          onPress={onPress}
           accessibilityRole="button"
-          accessibilityLabel={`Desafiar a ${club.nombre}`}
+          accessibilityLabel={`Ver el club ${club.nombre}`}
           style={({ pressed }) => [
-            styles.challengeBtn,
-            { borderColor: tema.border, backgroundColor: tema.soft },
-            pressed && { backgroundColor: tema.softStrong },
+            styles.verClub,
+            !puedeDesafiar && styles.verClubAncho,
+            pressed && { backgroundColor: C.surfaceHover },
           ]}
         >
-          <Text style={[styles.challengeText, { color: tema.main }]}>Desafiar</Text>
+          <Text style={styles.verClubTexto}>Ver club</Text>
         </Pressable>
-      ) : null}
+      </View>
     </View>
   );
 }
 
 /**
- * Ancho de la tarjeta, en puntos.
- *
- * Vive acá y no en el theme porque no es un token de la paleta: es una
- * medida de ESTA tarjeta. El carrusel de `ClubDetailScreen` la importa para
- * su `snapToInterval`, que tiene que ser el mismo número o el desplazamiento
- * deja de caer sobre una tarjeta.
+ * Ancho de la tarjeta en el carrusel, en puntos. Los carruseles la importan
+ * para su `snapToInterval`, que tiene que ser el mismo número o el
+ * desplazamiento deja de caer sobre una tarjeta.
  */
-export const ANCHO_TARJETA_RIVAL = 196;
+export const ANCHO_TARJETA_RIVAL = 290;
 
 const styles = StyleSheet.create({
   card: {
-    width: ANCHO_TARJETA_RIVAL,
     backgroundColor: C.surface,
-    borderRadius: R.cardSm,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: C.borderSoft,
-    padding: 12,
+    borderColor: C.border,
+    padding: 14,
   },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  info: { flex: 1, minWidth: 0 },
-  name: {
-    color: C.textPrimary,
-    fontSize: 14,
-    fontFamily: F.bold,
-  },
-  meta: {
-    color: C.textSecondary,
-    fontSize: 11.5,
-    marginTop: 2,
-  },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    maxWidth: '58%',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: R.chip,
-    backgroundColor: C.chip,
-  },
-  chipText: {
-    color: C.textStrong,
-    fontSize: 11.5,
-    fontFamily: F.bold,
-  },
-  chipTextVacio: { color: C.textMuted },
-  challengeBtn: {
-    height: 38,
-    marginTop: 10,
-    borderRadius: R.chip,
-    borderWidth: 1,
+  top: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  aro: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  challengeText: {
-    fontSize: 13,
-    fontFamily: F.bold,
+  info: { flex: 1, minWidth: 0 },
+  nombreFila: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  name: { color: C.textPrimary, fontSize: 15, fontFamily: F.extraBold, flexShrink: 1 },
+  meta: { color: C.textSecondary, fontSize: 12, marginTop: 2 },
+  distancia: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', marginTop: 3 },
+  distanciaTexto: { color: C.textSecondary, fontSize: 12, fontFamily: F.semiBold },
+  medio: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 24,
+    marginTop: 12,
   },
+  record: { color: C.textSecondary, fontSize: 12, fontFamily: F.bold },
+  botones: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  desafiar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    borderRadius: R.chip,
+    borderWidth: 1,
+    borderColor: C.greenBorderStrong,
+    backgroundColor: C.greenSoft,
+  },
+  desafiarTexto: { color: C.green, fontSize: 14, fontFamily: F.bold },
+  verClub: {
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: R.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  verClubAncho: { flex: 1 },
+  verClubTexto: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
 });

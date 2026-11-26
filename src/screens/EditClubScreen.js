@@ -24,6 +24,7 @@ import {
 import { temaClub, TEMA_CLUB_POR_DEFECTO } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import ClubThemePicker from '../components/club/ClubThemePicker';
+import NivelSelector from '../components/club/NivelSelector';
 import { updateClub, getClubById } from '../services/clubs';
 import { getMisClubesConPermiso } from '../services/clubPermissions';
 import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
@@ -91,6 +92,7 @@ export default function EditClubScreen({ navigation, route }) {
   const [comuna, setComuna] = useState(club?.comuna || null);
   const [modalidad, setModalidad] = useState(club?.modalidad || null);
   const [tema, setTema] = useState(club?.tema || TEMA_CLUB_POR_DEFECTO);
+  const [nivel, setNivel] = useState(club?.nivel || null);
   const [showRegiones, setShowRegiones] = useState(false);
   const [showComunas, setShowComunas] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,6 +145,7 @@ export default function EditClubScreen({ navigation, route }) {
       setComuna(data.comuna || null);
       setModalidad(data.modalidad || null);
       setTema(data.tema || TEMA_CLUB_POR_DEFECTO);
+      setNivel(data.nivel || null);
     } else {
       setClub(null);
     }
@@ -206,13 +209,14 @@ export default function EditClubScreen({ navigation, route }) {
       }
     }
 
-    const { error, temaOmitido } = await updateClub(club.id, {
+    const { error, temaOmitido, nivelOmitido } = await updateClub(club.id, {
       nombre,
       descripcion,
       region,
       comuna,
       modalidad,
       tema,
+      nivel,
     });
     setSaving(false);
 
@@ -230,6 +234,15 @@ export default function EditClubScreen({ navigation, route }) {
         type: 'error',
         title: 'El color no se guardó',
         message: 'El resto de los cambios sí. Falta aplicar la migración del tema del club.',
+      });
+      return;
+    }
+
+    if (nivelOmitido) {
+      setBanner({
+        type: 'error',
+        title: 'El nivel no se guardó',
+        message: 'El resto de los cambios sí. Falta aplicar la migración del nivel del club.',
       });
       return;
     }
@@ -559,12 +572,21 @@ export default function EditClubScreen({ navigation, route }) {
             )}
           </View>
 
+          {/* ── Nivel del club (migración 199) ── */}
+          <View style={styles.card}>
+            <Text style={styles.label}>Nivel del club (opcional)</Text>
+            <Text style={styles.help}>
+              Se muestra en la ficha del club y en su tarjeta cuando otros buscan rival.
+            </Text>
+            <NivelSelector value={nivel} onChange={setNivel} disabled={saving} conSinNivel />
+          </View>
+
           {/* ── Tema del club ── */}
           <View style={styles.card}>
-            <Text style={styles.label}>Tema del club</Text>
+            <Text style={styles.label}>Color del tema</Text>
             <Text style={styles.help}>
-              Pinta el banner, el escudo y los botones del club. Los resultados de los
-              partidos y los avisos conservan sus colores.
+              Es solo un acento: se usa en el aro del logo, la línea del banner y los
+              enlaces. Los botones principales y el resultado de los partidos no cambian.
             </Text>
             <ClubThemePicker value={tema} onChange={setTema} disabled={saving} />
           </View>
@@ -580,15 +602,17 @@ export default function EditClubScreen({ navigation, route }) {
             accessibilityState={{ disabled: !nombreValido || saving, busy: saving }}
             style={({ pressed }) => [
               styles.submitBtn,
-              { backgroundColor: t.main, shadowColor: t.main },
+              // El botón principal es siempre el verde de la app: el tema del
+              // club es un acento, no el color de las acciones.
+              { backgroundColor: C.green, shadowColor: C.green },
               (!nombreValido || saving) && styles.submitDisabled,
-              pressed && nombreValido && !saving && { backgroundColor: t.pressed },
+              pressed && nombreValido && !saving && { backgroundColor: C.greenActive },
             ]}
           >
             {saving ? (
-              <ActivityIndicator color={t.ink} />
+              <ActivityIndicator color={C.textOnGreen} />
             ) : (
-              <Text style={[styles.submitLabel, { color: t.ink }]}>Guardar cambios</Text>
+              <Text style={[styles.submitLabel, { color: C.textOnGreen }]}>Guardar cambios</Text>
             )}
           </Pressable>
         </ScrollView>

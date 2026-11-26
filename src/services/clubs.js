@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { esModalidadValida } from '../utils/clubMeta';
 import { buildClubPatch, slugClub } from '../utils/clubEdit';
 import { esTemaClubValido } from '../theme/clubThemes.js';
+import { esNivelClubValido } from '../utils/nivelClub.js';
 import {
   crearRegistroDeColumnas,
   leerTolerandoColumnas,
@@ -45,13 +46,14 @@ export const MAX_CLUBES_POR_JUGADOR = 3;
  *
  *   modalidad → migración 29 (la UI muestra "FÚTBOL N.A." mientras falte)
  *   tema      → migración 53 (el club se ve verde mientras falte)
+ *   nivel     → migración 199 (sin ella el club no muestra nivel)
  *
  * El mecanismo —descubrir el hueco, recordarlo y reintentar sin la columna,
  * avisando de lo que quedó sin guardar— vive en `utils/columnasOpcionales.js`
  * y está probado ahí. Este registro se puede borrar cuando las dos
  * migraciones estén aplicadas en todos los entornos.
  */
-const columnasClub = crearRegistroDeColumnas(['modalidad', 'tema']);
+const columnasClub = crearRegistroDeColumnas(['modalidad', 'tema', 'nivel']);
 
 async function getMe() {
   const { data: { user } } = await supabase.auth.getUser();
@@ -61,7 +63,7 @@ async function getMe() {
 /**
  * Crea un club y deja al creador como admin.
  */
-export async function createClub({ nombre, descripcion, region, comuna, modalidad, tema }) {
+export async function createClub({ nombre, descripcion, region, comuna, modalidad, tema, nivel }) {
   if (!isSupabaseConfigured) return { error: { message: 'Demo' } };
   const me = await getMe();
   if (!me) return { error: { message: 'No autenticado' } };
@@ -97,6 +99,10 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
   if (tema != null && !esTemaClubValido(tema)) {
     return { error: { message: 'Tema del club no válido' } };
   }
+  // El nivel es opcional (migración 199): sin elegir, la columna queda NULL.
+  if (nivel != null && !esNivelClubValido(nivel)) {
+    return { error: { message: 'Nivel del club no válido' } };
+  }
 
   // Máximo 3 clubes por jugador
   const { count: myClubCount } = await supabase
@@ -120,6 +126,7 @@ export async function createClub({ nombre, descripcion, region, comuna, modalida
     // Sin `tema` explícito nunca se manda `null`: violaría el NOT NULL. La
     // columna toma su propio default ('green') en ese caso.
     ...(tema ? { tema } : {}),
+    ...(nivel ? { nivel } : {}),
   };
 
   // Mismo mecanismo que `updateClub()`: si `modalidad` (migración 29) o
@@ -370,7 +377,7 @@ export async function searchClubs(args = '') {
     typeof args === 'string' ? { query: args } : args || {};
 
   const BASE_COLS =
-    'id, nombre, slug, descripcion, foto_url, region, comuna, verificado, modalidad, tema';
+    'id, nombre, slug, descripcion, foto_url, region, comuna, verificado, modalidad, tema, nivel';
 
   const buscar = (cols) => {
     let q = supabase
@@ -1129,6 +1136,8 @@ export async function updateClub(clubId, campos = {}) {
   });
 
   const temaOmitido = 'tema' in patch && omitidas.includes('tema');
+  // Lo mismo con el nivel (migración 199): sin la columna, el resto se guarda.
+  const nivelOmitido = 'nivel' in patch && omitidas.includes('nivel');
 
   if (error) {
     console.error('[FutFinder] updateClub:', error);
@@ -1161,5 +1170,5 @@ export async function updateClub(clubId, campos = {}) {
     return { data: null, error, temaOmitido: false };
   }
 
-  return { data, error: null, temaOmitido };
+  return { data, error: null, temaOmitido, nivelOmitido };
 }

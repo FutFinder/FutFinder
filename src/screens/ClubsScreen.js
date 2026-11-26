@@ -7,10 +7,11 @@ import {
   Animated,
   StyleSheet,
   Easing,
+  Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { AlertTriangle, Check, X, Clock } from 'lucide-react-native';
+import { AlertTriangle, ArrowLeft, Check, X, Clock } from 'lucide-react-native';
 
 import {
   paleta as C,
@@ -20,25 +21,27 @@ import {
   alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
-import { respondToRequest, cancelRequest, getClubById } from '../services/clubs';
+import {
+  respondToRequest,
+  cancelRequest,
+  getClubById,
+  MAX_CLUBES_POR_JUGADOR,
+} from '../services/clubs';
 import { getMatchById } from '../services/matches';
 import { lugarLabel } from '../services/clubMatchRules';
-import { ratingLabel as formatearRating, metaRival, nivelInline } from '../utils/clubMeta';
 import { haceCuanto } from '../utils/tiempoRelativo.js';
 import { destinoDeTarea, etiquetaBadge } from '../utils/clubsHomeTasks.js';
 import { navigateToNotification } from '../utils/notificationTargets';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
 
 import ClubsHeader from '../components/club/ClubsHeader';
-import ClubSwitcher from '../components/club/ClubSwitcher';
 import PendingTaskCard from '../components/club/PendingTaskCard';
 import AllClearBanner from '../components/club/AllClearBanner';
 import NextMatchCard from '../components/club/NextMatchCard';
-import QuickActionGrid from '../components/club/QuickActionGrid';
-import ClubSummaryCarousel from '../components/club/ClubSummaryCarousel';
 import ActivityList from '../components/club/ActivityList';
 import SkeletonHome from '../components/club/SkeletonHome';
-import RivalClubCard from '../components/club/RivalClubCard';
+import ClubLogo from '../components/club/ClubLogo';
+import { FichaClub } from './ClubDetailScreen';
 import Banner from '../components/Banner';
 
 /**
@@ -73,8 +76,6 @@ export default function ClubsScreen({ navigation, route }) {
     clubs,
     activeClubId,
     club,
-    can,
-    misPermisos,
     tasks,
     reparto,
     badgeCount,
@@ -82,7 +83,6 @@ export default function ClubsScreen({ navigation, route }) {
     nextMatchCupos,
     nextMatchPlazo,
     activity,
-    suggestedRivals,
     openChallengeReplies,
     invitations,
     sentRequests,
@@ -92,6 +92,8 @@ export default function ClubsScreen({ navigation, route }) {
   } = useClubsHome();
 
   const [banner, setBanner] = useState(null);
+  const [avisosAbiertos, setAvisosAbiertos] = useState(false);
+  const [misClubesAbierto, setMisClubesAbierto] = useState(false);
   const tema = useMemo(() => temaDeClub(club), [club]);
 
   useFocusEffect(
@@ -117,45 +119,6 @@ export default function ClubsScreen({ navigation, route }) {
   const irA = useCallback(
     (ruta, params) => navigation.navigate(ruta, params),
     [navigation]
-  );
-
-  const onAccionRapida = useCallback(
-    (clave) => {
-      const destinos = {
-        alineacion: ['ClubLineup', { clubId: activeClubId }],
-        desafios: ['ClubChallenges', { clubId: activeClubId }],
-        // `modoRival: true` es lo que hace que ExploreClubs deje de ser el
-        // catálogo completo y liste sólo clubes desafiables; sin él,
-        // `retadorClubId` se ignora y aparecen hasta los clubes propios.
-        rivales: [
-          'ExploreClubs',
-          { modoRival: true, retadorClubId: can?.responderDesafios ? activeClubId : null },
-        ],
-        // Antes saltaba directo a la nómina del próximo partido (o a la
-        // bandeja de desafíos si no había uno) — pedido explícito: ahora
-        // abre el calendario de partidos del club, pasados y por venir.
-        // La bandeja de desafíos sigue alcanzable por su propio acceso
-        // rápido («desafios»), así que no se pierde ningún destino.
-        partido: ['ClubMatchCalendar', { clubId: activeClubId, clubNombre: club?.nombre }],
-        integrantes: ['ClubMembers', { clubId: activeClubId }],
-        // El chat del club sólo se alcanzaba por un icono sin texto dentro de
-        // Integrantes: había que saber que la conversación vive dentro de la
-        // nómina. Es el mismo hilo `club:<id>` de siempre.
-        chat: [
-          'ChatThread',
-          {
-            threadKey: `club:${activeClubId}`,
-            title: club?.nombre,
-            subtitle: 'Chat del club',
-            fotoUrl: club?.foto_url || null,
-          },
-        ],
-        permisos: ['PermisosClub', { clubId: activeClubId, club }],
-      };
-      const destino = destinos[clave];
-      if (destino) irA(destino[0], destino[1]);
-    },
-    [activeClubId, can, club, irA]
   );
 
   /**
@@ -275,36 +238,124 @@ export default function ClubsScreen({ navigation, route }) {
     );
   }
 
+  // CON CLUB, LA PORTADA ES LA FICHA DEL CLUB ACTIVO (rediseño 2026-11-26).
+  // `FichaClub` es el mismo componente de `ClubDetailScreen`; la prop
+  // `portada` cambia volver por «Mis clubes» y agrega la campana y el
+  // próximo partido. Lo que antes encabezaba la portada vive tras la campana.
+  if (membership === 'member' && activeClubId) {
+    const irDesdeHoja = (ruta, params) => {
+      setAvisosAbiertos(false);
+      setMisClubesAbierto(false);
+      irA(ruta, params);
+    };
+    return (
+      <View style={styles.root}>
+        <SafeAreaView edges={['top']} style={styles.root}>
+          {error ? (
+            <View style={styles.bannerHueco}>
+              <Banner
+                type="error"
+                title="No pudimos actualizar"
+                message="Estás viendo los últimos datos que alcanzamos a cargar."
+                onClose={retry}
+              />
+            </View>
+          ) : null}
+          {banner ? (
+            <View style={styles.bannerHueco}>
+              <Banner {...banner} onClose={() => setBanner(null)} />
+            </View>
+          ) : null}
+          <FichaClub
+            key={activeClubId}
+            clubId={activeClubId}
+            navigation={navigation}
+            portada={{
+              totalClubes: (clubs || []).length,
+              onMisClubes: () => setMisClubesAbierto(true),
+              onAvisos: () => setAvisosAbiertos(true),
+              avisosCount: badgeCount,
+              respuestasPorDecidir: openChallengeReplies,
+              paddingBottom: 110 + insets.bottom,
+              proximoPartido: nextMatch ? (
+                <NextMatchCard
+                  partido={nextMatch}
+                  tema={tema}
+                  miClubId={activeClubId}
+                  cupos={nextMatchCupos}
+                  plazo={nextMatchPlazo}
+                  fecha={fechaLegible(nextMatch.hora)}
+                  lugar={lugarLabel(nextMatch, [activeClubId])}
+                  onVerPartido={() => irA('MatchDetail', { matchId: nextMatch.id })}
+                  onNomina={() => irA('ClubMatchRoster', { matchId: nextMatch.id })}
+                  onVerCalendario={() =>
+                    irA('ClubMatchCalendar', { clubId: activeClubId, clubNombre: club?.nombre })
+                  }
+                />
+              ) : null,
+            }}
+          />
+        </SafeAreaView>
+
+        <Modal
+          visible={avisosAbiertos}
+          animationType="slide"
+          onRequestClose={() => setAvisosAbiertos(false)}
+        >
+          <AvisosDelClub
+            {...{
+              club,
+              activeClubId,
+              cambiandoClub,
+              tasks,
+              reparto,
+              badgeCount,
+              nextMatch,
+              nextMatchCupos,
+              nextMatchPlazo,
+              activity,
+              tema,
+              respondiendo,
+              onAccionTarea,
+            }}
+            irA={irDesdeHoja}
+            onTarea={(tarea) => {
+              setAvisosAbiertos(false);
+              onTarea(tarea);
+            }}
+            verActividad={(aviso) => {
+              setAvisosAbiertos(false);
+              verActividad(aviso);
+            }}
+            onCerrar={() => setAvisosAbiertos(false)}
+          />
+        </Modal>
+
+        <Modal
+          visible={misClubesAbierto}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMisClubesAbierto(false)}
+        >
+          <MisClubesHoja
+            clubs={clubs}
+            activeClubId={activeClubId}
+            onSelect={(id) => {
+              setMisClubesAbierto(false);
+              if (id !== activeClubId) setActiveClub(id);
+            }}
+            onCrear={() => irDesdeHoja('CreateClub')}
+            onUnirse={() => irDesdeHoja('ExploreClubs')}
+            onCerrar={() => setMisClubesAbierto(false)}
+          />
+        </Modal>
+      </View>
+    );
+  }
+
   const contenido =
-    membership === 'member' ? (
-      <Portada
-        {...{
-          clubs,
-          activeClubId,
-          cambiandoClub,
-          club,
-          can,
-          misPermisos,
-          tasks,
-          reparto,
-          badgeCount,
-          nextMatch,
-          nextMatchCupos,
-          nextMatchPlazo,
-          activity,
-          suggestedRivals,
-          openChallengeReplies,
-          tema,
-          setActiveClub,
-          onAccionRapida,
-          onTarea,
-          onAccionTarea,
-          verActividad,
-          respondiendo,
-          irA,
-        }}
-      />
-    ) : membership === 'pending' ? (
+    membership === 'pending' ? (
+
       <SolicitudEnRevision
         solicitudes={sentRequests}
         invitaciones={invitations}
@@ -383,15 +434,22 @@ export default function ClubsScreen({ navigation, route }) {
   );
 }
 
-/* ── La portada de quien sí tiene club ─────────────────────────────── */
+/* ── Notificaciones del club (la campana de la portada) ─────────────── */
 
-function Portada({
-  clubs,
+/**
+ * Lo que antes encabezaba la portada —«Pendiente para ti», el próximo
+ * partido y la actividad reciente— vive ahora detrás de la campana de la
+ * ficha, como pide el rediseño: la portada es el club y lo pendiente se
+ * consulta a un toque, con el mismo número en la campana y en la barra
+ * inferior (los dos leen `badgeCount` del mismo contexto).
+ *
+ * Es un `Modal` dentro de la pestaña y no una pantalla de la pila porque el
+ * estado sale de `ClubsHomeContext`, que envuelve sólo las pestañas.
+ */
+function AvisosDelClub({
+  club,
   activeClubId,
   cambiandoClub,
-  club,
-  can,
-  misPermisos,
   tasks,
   reparto,
   badgeCount,
@@ -399,206 +457,220 @@ function Portada({
   nextMatchCupos,
   nextMatchPlazo,
   activity,
-  suggestedRivals,
-  openChallengeReplies,
   tema,
-  setActiveClub,
-  onAccionRapida,
   onTarea,
   onAccionTarea,
   verActividad,
   respondiendo,
   irA,
+  onCerrar,
 }) {
   const sinTareas = (tasks || []).length === 0;
-  // El selector sólo aparece con más de un club: la decisión es de acá, no
-  // del componente, porque de ella depende la separación entre secciones.
-  const hayVariosClubes = (clubs || []).length > 1;
 
   return (
-    <>
-      {hayVariosClubes ? (
-        <View style={styles.seccionSuelta}>
-          <ClubSwitcher
-            clubs={clubs}
-            activeClubId={activeClubId}
-            tema={tema}
-            onSelect={setActiveClub}
-            onExplorar={() => irA('ExploreClubs')}
-          />
+    <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
+      <View style={styles.avisosCabecera}>
+        <Pressable
+          onPress={onCerrar}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+          style={({ pressed }) => [styles.avisosVolver, pressed && { opacity: 0.7 }]}
+        >
+          <ArrowLeft color={C.textPrimary} size={18} strokeWidth={2.2} />
+        </Pressable>
+        <View style={styles.textos}>
+          <Text style={styles.avisosTitulo}>Notificaciones</Text>
+          {club?.nombre ? (
+            <Text style={styles.subtituloTarjeta} numberOfLines={1}>
+              {club.nombre}
+            </Text>
+          ) : null}
         </View>
-      ) : null}
+      </View>
 
-      <View style={styles.seccion}>
-        <View style={styles.cabeceraSeccion}>
-          <View style={styles.tituloConBadge}>
-            <Text style={styles.tituloSeccion}>Pendiente para ti</Text>
-            {/* El badge se enciende con el número que muestra, no con la
-                cantidad de tarjetas: con una única tarea vencida había
-                tareas que enseñar pero el badge decía «0».
-
-                Y el ROTULO sale de `etiquetaBadge()`, el mismo que usa la
-                barra inferior: acá se pintaba el número entero mientras la
-                barra cortaba en «9+», así que con doce pendientes los dos
-                badges del mismo dato decían cosas distintas. */}
-            {badgeCount > 0 ? (
-              <View style={[styles.badge, { backgroundColor: tema.main }]}>
-                <Text style={[styles.badgeTexto, { color: tema.ink }]}>
-                  {etiquetaBadge(badgeCount)}
-                </Text>
-              </View>
-            ) : null}
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.seccion}>
+          <View style={styles.cabeceraSeccion}>
+            <View style={styles.tituloConBadge}>
+              <Text style={styles.tituloSeccion}>Pendiente para ti</Text>
+              {/* El rótulo sale de `etiquetaBadge()`, el mismo que usa la
+                  barra inferior: con doce pendientes los dos dicen «9+». */}
+              {badgeCount > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeTexto}>{etiquetaBadge(badgeCount)}</Text>
+                </View>
+              ) : null}
+            </View>
+            {sinTareas ? null : (
+              <Pressable
+                onPress={() => irA('Notifications')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Ver todo lo pendiente"
+              >
+                <Text style={[styles.verTodo, { color: tema.main }]}>Ver todo</Text>
+              </Pressable>
+            )}
           </View>
-          {sinTareas ? null : (
-            <Pressable
-              onPress={() => irA('Notifications')}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Ver todo lo pendiente"
-            >
-              <Text style={[styles.verTodo, { color: tema.main }]}>Ver todo</Text>
-            </Pressable>
+
+          {/* Cambiando de club no es «todo al día»: las tareas del club nuevo
+              todavía no llegan. */}
+          {cambiandoClub ? (
+            <Text style={styles.cargandoTareas}>Cargando lo de este club…</Text>
+          ) : sinTareas ? (
+            <AllClearBanner tema={tema} />
+          ) : (
+            <View style={styles.pila}>
+              {reparto.visibles.map((tarea, i) => (
+                <PendingTaskCard
+                  key={tarea.id}
+                  tarea={tarea}
+                  tema={tema}
+                  esPrimaria={i === 0}
+                  onPress={() => onTarea(tarea)}
+                  onAccion={(clave) => onAccionTarea(tarea, clave)}
+                  ocupado={respondiendo === tarea.id}
+                />
+              ))}
+              {reparto.etiquetaVerMas ? (
+                <Pressable
+                  onPress={() => irA('Notifications')}
+                  accessibilityRole="button"
+                  accessibilityLabel={reparto.etiquetaVerMas}
+                  style={({ pressed }) => [styles.verMas, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.verMasTexto}>{reparto.etiquetaVerMas}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           )}
         </View>
 
-        {/* CAMBIANDO DE CLUB NO ES «TODO AL DÍA». El nombre, el escudo y el
-            tema del club nuevo ya están en pantalla —los trae `getMyClubs()`,
-            no hacen falta consultas— pero sus tareas todavía no. Sin esta
-            rama, el club al que acabas de cambiar decía «Sin desafíos ni
-            cambios por responder» un segundo antes de enseñar tres. */}
-        {cambiandoClub ? (
-          <Text style={styles.cargandoTareas}>Cargando lo de este club…</Text>
-        ) : sinTareas ? (
-          <AllClearBanner tema={tema} />
-        ) : (
-          <View style={styles.pila}>
-            {reparto.visibles.map((tarea, i) => (
-              <PendingTaskCard
-                key={tarea.id}
-                tarea={tarea}
-                tema={tema}
-                esPrimaria={i === 0}
-                onPress={() => onTarea(tarea)}
-                onAccion={(clave) => onAccionTarea(tarea, clave)}
-                ocupado={respondiendo === tarea.id}
-              />
-            ))}
-            {reparto.etiquetaVerMas ? (
+        {nextMatch ? (
+          <View style={styles.seccion}>
+            <Text style={[styles.tituloSeccion, styles.conMargenAbajo]}>Próximo partido</Text>
+            <NextMatchCard
+              partido={nextMatch}
+              tema={tema}
+              miClubId={activeClubId}
+              cupos={nextMatchCupos}
+              plazo={nextMatchPlazo}
+              fecha={fechaLegible(nextMatch.hora)}
+              lugar={lugarLabel(nextMatch, [activeClubId])}
+              onVerPartido={() => irA('MatchDetail', { matchId: nextMatch.id })}
+              onNomina={() => irA('ClubMatchRoster', { matchId: nextMatch.id })}
+              onVerCalendario={() =>
+                irA('ClubMatchCalendar', { clubId: activeClubId, clubNombre: club?.nombre })
+              }
+            />
+          </View>
+        ) : null}
+
+        {(activity || []).length > 0 ? (
+          <View style={styles.seccion}>
+            <ActivityList
+              items={activity}
+              tema={tema}
+              onVerToda={() => irA('Notifications', { filter: 'clubes', clubId: activeClubId })}
+              onPressItem={verActividad}
+            />
+          </View>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+/* ── «Mis clubes»: cambiar de club activo ─────────────────────────────── */
+
+/**
+ * Hoja que reemplaza al selector de chips y al carrusel de resumen de la
+ * portada anterior: lista mis clubes con mi rol y sus integrantes, marca el
+ * activo y ofrece crear o unirse mientras quede lugar (tope de 3).
+ */
+function MisClubesHoja({ clubs, activeClubId, onSelect, onCrear, onUnirse, onCerrar }) {
+  const lista = clubs || [];
+  const libres = Math.max(0, MAX_CLUBES_POR_JUGADOR - lista.length);
+  const rol = { admin: 'Administrador', capitan: 'Capitán', jugador: 'Jugador' };
+
+  return (
+    <Pressable style={styles.hojaFondo} onPress={onCerrar} accessibilityLabel="Cerrar">
+      <Pressable style={styles.hoja} onPress={() => {}} accessible={false}>
+        <View style={styles.hojaAgarre} />
+        <View style={styles.cabeceraSeccion}>
+          <Text style={styles.tituloSeccion}>Mis clubes</Text>
+          <Text style={styles.subtituloTarjeta}>
+            {lista.length} de {MAX_CLUBES_POR_JUGADOR} clubes
+          </Text>
+        </View>
+
+        <View style={styles.pila}>
+          {lista.map(({ club, miRol, totalMiembros }) => {
+            const activo = club.id === activeClubId;
+            const t = temaDeClub(club);
+            return (
               <Pressable
-                onPress={() => irA('Notifications')}
+                key={club.id}
+                onPress={() => onSelect(club.id)}
                 accessibilityRole="button"
-                accessibilityLabel={reparto.etiquetaVerMas}
-                style={({ pressed }) => [styles.verMas, pressed && { opacity: 0.7 }]}
+                accessibilityState={{ selected: activo }}
+                accessibilityLabel={activo ? `${club.nombre}, club activo` : `Cambiar a ${club.nombre}`}
+                style={({ pressed }) => [
+                  styles.hojaFila,
+                  activo && styles.hojaFilaActiva,
+                  pressed && { opacity: 0.8 },
+                ]}
               >
-                {/* El texto y su plural vienen resueltos de `repartirTareas()`. */}
-                <Text style={styles.verMasTexto}>{reparto.etiquetaVerMas}</Text>
+                <View style={[styles.hojaAro, { borderColor: t.main }]}>
+                  <ClubLogo uri={club.foto_url} size={36} borderRadius={18} />
+                </View>
+                <View style={styles.textos}>
+                  <Text style={styles.tituloTarjeta} numberOfLines={1}>
+                    {club.nombre}
+                  </Text>
+                  <Text style={styles.subtituloTarjeta}>
+                    {rol[miRol] || 'Integrante'} · {totalMiembros}{' '}
+                    {totalMiembros === 1 ? 'integrante' : 'integrantes'}
+                  </Text>
+                </View>
+                {activo ? (
+                  <View style={styles.hojaActivo}>
+                    <Text style={styles.hojaActivoTexto}>Activo</Text>
+                  </View>
+                ) : null}
               </Pressable>
-            ) : null}
-          </View>
-        )}
-      </View>
-
-      {nextMatch ? (
-        <View style={styles.seccion}>
-          <NextMatchCard
-            partido={nextMatch}
-            tema={tema}
-            miClubId={activeClubId}
-            cupos={nextMatchCupos}
-            plazo={nextMatchPlazo}
-            fecha={fechaLegible(nextMatch.hora)}
-            lugar={lugarLabel(nextMatch, [activeClubId])}
-            onVerPartido={() => irA('MatchDetail', { matchId: nextMatch.id })}
-            onNomina={() => irA('ClubMatchRoster', { matchId: nextMatch.id })}
-            onVerCalendario={() => irA('ClubMatchCalendar', { clubId: activeClubId, clubNombre: club?.nombre })}
-          />
+            );
+          })}
         </View>
-      ) : null}
 
-      <View style={styles.seccion}>
-        <QuickActionGrid
-          tema={tema}
-          can={can}
-          misPermisos={misPermisos}
-          // EL BADGE CUENTA LO QUE HAY EN EL DESTINO. Contaba los desafíos
-          // DIRECTOS recibidos, que ya tienen su tarjeta en «Pendiente para
-          // ti» y que desde el tablero abierto no están en la pantalla que
-          // este tile abre: prometía trabajo y llevaba a otro sitio. Lo que sí
-          // espera decisión ahí son las respuestas a las publicaciones.
-          badges={{ desafios: openChallengeReplies }}
-          onPress={onAccionRapida}
-        />
-      </View>
-
-      <View style={styles.seccion}>
-        <ClubSummaryCarousel
-          clubs={clubs}
-          activeClubId={activeClubId}
-          tema={tema}
-          onSelect={setActiveClub}
-          onVerClub={(clubId) => irA('ClubDetail', { clubId })}
-          onCrear={() => irA('CreateClub')}
-          onUnirse={() => irA('ExploreClubs')}
-        />
-      </View>
-
-      {/* `ActivityList` devuelve null sin actividad, pero el margen del
-          contenedor no: sin esta guardia quedaba un hueco de 23px. */}
-      {(activity || []).length > 0 ? (
-        <View style={styles.seccion}>
-          <ActivityList
-            items={activity}
-            tema={tema}
-            onVerToda={() => irA('Notifications', { filter: 'clubes', clubId: activeClubId })}
-            onPressItem={verActividad}
-          />
-        </View>
-      ) : null}
-
-      {(suggestedRivals || []).length > 0 ? (
-        <View style={styles.seccionSuelta}>
-          <View style={[styles.cabeceraSeccion, styles.conMargenLateral]}>
-            <Text style={styles.tituloSeccion}>Rivales sugeridos</Text>
-            <Pressable
-              onPress={() => irA('ExploreClubs', { modoRival: true, retadorClubId: activeClubId })}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Ver todos los rivales"
-            >
-              <Text style={[styles.verTodo, { color: tema.main }]}>Ver todos</Text>
-            </Pressable>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.carrusel}
-          >
-            {suggestedRivals.slice(0, 10).map((rival) => (
-              <View key={rival.id} style={styles.rival}>
-                <RivalClubCard
-                  club={rival}
-                  meta={metaRival({ distanciaKm: rival.distanciaKm, modalidad: rival.modalidad })}
-                  ratingLabel={formatearRating(rival.rating)}
-                  nivelLabel={nivelInline(rival.nivel)}
-                  onPress={() => irA('ClubDetail', { clubId: rival.id })}
-                  onChallenge={() =>
-                    // `ClubChallengeScreen` lee estos tres y elige el club
-                    // retador por su cuenta. Sin el nombre y el escudo, el
-                    // formulario abre con «Club rival» y el escudo genérico.
-                    irA('ClubChallenge', {
-                      rivalClubId: rival.id,
-                      rivalNombre: rival.nombre,
-                      rivalFotoUrl: rival.foto_url,
-                    })
-                  }
-                  puedeDesafiar={!!can?.responderDesafios}
-                />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
-    </>
+        {libres > 0 ? (
+          <>
+            <Text style={styles.hojaLibres}>
+              {libres === 1 ? 'Te queda 1 lugar para otro club' : `Te quedan ${libres} lugares para otros clubes`}
+            </Text>
+            <View style={styles.esperaAcciones}>
+              <Pressable
+                onPress={onCrear}
+                accessibilityRole="button"
+                accessibilityLabel="Crear club"
+                style={({ pressed }) => [styles.botonSecundario, styles.crece, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.botonSecundarioTexto}>Crear club</Text>
+              </Pressable>
+              <Pressable
+                onPress={onUnirse}
+                accessibilityRole="button"
+                accessibilityLabel="Unirse a un club"
+                style={({ pressed }) => [styles.botonSecundario, styles.crece, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.botonSecundarioTexto}>Unirse a un club</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : null}
+      </Pressable>
+    </Pressable>
   );
 }
 
@@ -831,8 +903,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    // El número de pendientes no es identidad del club: va en el verde de la app.
+    backgroundColor: C.green,
   },
-  badgeTexto: { fontSize: 12, fontFamily: F.extraBold },
+  badgeTexto: { fontSize: 12, fontFamily: F.extraBold, color: C.bg },
   verTodo: { fontSize: 12.5, fontFamily: F.bold },
   verMas: {
     paddingVertical: 12,
@@ -843,8 +917,78 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   verMasTexto: { fontSize: 12.5, fontFamily: F.bold, color: C.textDim },
-  carrusel: { paddingHorizontal: 16, gap: 10 },
-  rival: { width: 172 },
+
+  // Notificaciones del club (la campana)
+  avisosCabecera: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 16,
+  },
+  avisosVolver: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  avisosTitulo: { fontSize: 20, fontFamily: F.extraBold, color: C.textPrimary },
+  conMargenAbajo: { marginBottom: 0 },
+
+  // Hoja «Mis clubes»
+  hojaFondo: { flex: 1, justifyContent: 'flex-end', backgroundColor: C.scrim },
+  hoja: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 34,
+    gap: 14,
+  },
+  hojaAgarre: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.grip,
+    marginBottom: 4,
+  },
+  hojaFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surfaceAlt,
+  },
+  hojaFilaActiva: { borderColor: C.greenBorder },
+  hojaAro: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hojaActivo: {
+    paddingHorizontal: 9,
+    height: 22,
+    borderRadius: 999,
+    justifyContent: 'center',
+    backgroundColor: C.greenSoft,
+  },
+  hojaActivoTexto: { fontSize: 11.5, fontFamily: F.bold, color: C.green },
+  hojaLibres: { fontSize: 12.5, color: C.textSecondary, textAlign: 'center' },
 
   centrado: { alignItems: 'center', gap: 10, paddingVertical: 34, paddingHorizontal: 8 },
   circuloError: {

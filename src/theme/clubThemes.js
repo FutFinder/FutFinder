@@ -55,19 +55,21 @@ const DEFINICIONES = [
   {
     value: 'blue',
     label: 'Azul',
-    main: '#4DA3FF',
-    pressed: '#2E86E6',
+    main: '#5BA8FF',
+    pressed: '#3F8FE6',
     ink: '#05192E',
     bannerRgb: '18, 42, 74',
   },
   {
     value: 'red',
     label: 'Rojo',
-    // Bermellón, no el coral de la derrota ni el rojo de error:
-    // se eligió por distancia de color, no por gusto. Ver la prueba
-    // «ningún tema se confunde con derrota, empate ni con el dorado».
-    main: '#FF4B2E',
-    pressed: '#E03A20',
+    // Bermellón APAGADO (rediseño de Clubes, 2026-11-26): el #FF4B2E de antes
+    // gritaba y un club rojo se veía «todo rojo». El diseño pedía un coral
+    // #D9645E, pero queda a 32 del rojo de derrota (#ED6B76) y la prueba
+    // «ningún tema se confunde con derrota, empate ni con el dorado» exige
+    // 50: este es el más sobrio que la cumple (61).
+    main: '#D9583F',
+    pressed: '#BF4A33',
     ink: '#2A0800',
     bannerRgb: '66, 24, 14',
   },
