@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Pressable,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -189,6 +190,18 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
 
   const clubes = useMemo(() => clubesDelPartido(match), [match]);
 
+  // Rediseño de Clubes (2026-11-26): en pantalla angosta las dos nóminas van
+  // en pestañas, una por club, y abre en la de mi club. En pantalla ancha
+  // siguen lado a lado, porque ahí caben sin que haya que bajar.
+  const [pestana, setPestana] = useState(null);
+  const ordenClubes = match
+    ? miClubId === match.club_visitante_id
+      ? ['visitante', 'local']
+      : ['local', 'visitante']
+    : [];
+  const pestanaActiva = pestana || ordenClubes[0];
+  const idDe = (lado) => (lado === 'local' ? match.club_local_id : match.club_visitante_id);
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
       {/* Misma cabecera que el detalle del partido: flecha a la izquierda,
@@ -241,31 +254,44 @@ export default function ClubMatchRosterScreen({ navigation, route }) {
             </>
           ) : (
             <>
+              {!dosColumnas ? (
+                <View style={styles.pestanas} accessibilityRole="tablist">
+                  {ordenClubes.map((lado) => {
+                    const id = idDe(lado);
+                    const r = resumenNomina(nomina, id, match.cupos_por_club);
+                    const activa = pestanaActiva === lado;
+                    return (
+                      <Pressable
+                        key={lado}
+                        onPress={() => setPestana(lado)}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: activa }}
+                        style={[styles.pestana, activa && styles.pestanaActiva]}
+                      >
+                        <Text style={[styles.pestanaTexto, activa && styles.pestanaTextoActivo]} numberOfLines={1}>
+                          {clubes[lado].nombre} · {r.inscritos} de {r.cupos}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
               <View style={[styles.columnas, dosColumnas && styles.columnasAncho]}>
-                <NominaClub
-                  club={clubes.local}
-                  clubId={match.club_local_id}
-                  nomina={nomina}
-                  cuposPorClub={match.cupos_por_club}
-                  esMiClub={miClubId === match.club_local_id}
-                  puedoConfirmar={puedoConfirmarNomina(match.club_local_id, misClubIdsAdmin)}
-                  me={me}
-                  enviando={enviando}
-                  onConfirmar={handleConfirmar}
-                  ancho={dosColumnas}
-                />
-                <NominaClub
-                  club={clubes.visitante}
-                  clubId={match.club_visitante_id}
-                  nomina={nomina}
-                  cuposPorClub={match.cupos_por_club}
-                  esMiClub={miClubId === match.club_visitante_id}
-                  puedoConfirmar={puedoConfirmarNomina(match.club_visitante_id, misClubIdsAdmin)}
-                  me={me}
-                  enviando={enviando}
-                  onConfirmar={handleConfirmar}
-                  ancho={dosColumnas}
-                />
+                {(dosColumnas ? ordenClubes : [pestanaActiva]).map((lado) => (
+                  <NominaClub
+                    key={lado}
+                    club={clubes[lado]}
+                    clubId={idDe(lado)}
+                    nomina={nomina}
+                    cuposPorClub={match.cupos_por_club}
+                    esMiClub={miClubId === idDe(lado)}
+                    puedoConfirmar={puedoConfirmarNomina(idDe(lado), misClubIdsAdmin)}
+                    me={me}
+                    enviando={enviando}
+                    onConfirmar={handleConfirmar}
+                    ancho={dosColumnas}
+                  />
+                ))}
               </View>
 
               {accion === 'ninguna' ? (
@@ -431,6 +457,24 @@ const ETIQUETA_ORIGEN = {
 };
 
 const styles = StyleSheet.create({
+  pestanas: {
+    flexDirection: 'row',
+    gap: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderSoft,
+    marginBottom: 12,
+  },
+  pestana: {
+    flexShrink: 1,
+    height: 40,
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -1,
+  },
+  pestanaActiva: { borderBottomColor: C.textPrimary },
+  pestanaTexto: { color: C.textSecondary, fontSize: 14, fontFamily: F.bold },
+  pestanaTextoActivo: { color: C.textPrimary },
   root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 

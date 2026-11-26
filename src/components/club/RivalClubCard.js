@@ -31,6 +31,9 @@ export default function RivalClubCard({
   onPress,
   onChallenge,
   puedeDesafiar = true,
+  // Ya le mandé un desafío que sigue sin respuesta: el índice único del
+  // servidor rechazaría el segundo, así que va el estado en vez del botón.
+  desafioEnviado = false,
   ancho = ANCHO_TARJETA_RIVAL,
 }) {
   const tema = temaDeClub(club);
@@ -85,7 +88,11 @@ export default function RivalClubCard({
       </View>
 
       <View style={styles.botones}>
-        {puedeDesafiar ? (
+        {puedeDesafiar && desafioEnviado ? (
+          <View style={styles.enviado} accessibilityLabel={`Ya desafiaste a ${club.nombre}`}>
+            <Text style={styles.enviadoTexto}>Desafío enviado</Text>
+          </View>
+        ) : puedeDesafiar ? (
           <Pressable
             onPress={onChallenge}
             accessibilityRole="button"
@@ -176,5 +183,16 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   verClubAncho: { flex: 1 },
+  enviado: {
+    flex: 1,
+    height: 40,
+    borderRadius: R.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surfaceAlt,
+  },
+  enviadoTexto: { color: C.textSecondary, fontSize: 13.5, fontFamily: F.bold },
   verClubTexto: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
 });

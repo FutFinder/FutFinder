@@ -21,7 +21,6 @@ import {
   ChevronDown,
   Check,
   Shield,
-  Swords,
   AlertCircle,
 } from 'lucide-react-native';
 
@@ -34,6 +33,7 @@ import {
 import Banner from '../Banner';
 import BrandMark from '../BrandMark';
 import ClubExplorerCard from './ClubExplorerCard';
+import RivalClubCard from './RivalClubCard';
 import NotificationBell from '../NotificationBell';
 import {
   searchClubs,
@@ -415,37 +415,26 @@ export default function ClubExplorer({
             // estado. Antes seguía diciendo «Desafiar» y el error aparecía
             // recién al final del formulario siguiente.
             const yaLoDesafie = yaDesafiados.has(item.id);
+            // Rediseño de Clubes (2026-11-26): la misma tarjeta que los rivales
+            // de la ficha —nivel, «Desafiar» y «Ver club»—, a todo el ancho.
             return (
-              <ClubExplorerCard
-                club={item}
-                onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
-                onPressMembers={() => navigation.navigate('ClubMembers', { clubId: item.id })}
-                rightAccessory={
-                  puedoDesafiar && yaLoDesafie ? (
-                    <View style={styles.pendienteChip}>
-                      <Text style={styles.pendienteText}>Desafío enviado</Text>
-                    </View>
-                  ) : puedoDesafiar ? (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation?.();
-                        navigation.navigate('ClubChallenge', {
-                          rivalClubId: item.id,
-                          rivalNombre: item.nombre,
-                          rivalFotoUrl: item.foto_url || null,
-                        });
-                      }}
-                      hitSlop={6}
-                      accessible
-                      accessibilityLabel={`Desafiar a ${item.nombre}`}
-                      style={({ pressed }) => [styles.desafiarBtn, pressed && { opacity: 0.7 }]}
-                    >
-                      <Swords color={C.bg} size={14} strokeWidth={2.4} />
-                      <Text style={styles.desafiarText}>Desafiar</Text>
-                    </Pressable>
-                  ) : undefined
-                }
-              />
+              <View style={styles.tarjetaFila}>
+                <RivalClubCard
+                  club={item}
+                  ancho="100%"
+                  distanciaKm={item.distanciaKm}
+                  puedeDesafiar={puedoDesafiar}
+                  desafioEnviado={yaLoDesafie}
+                  onPress={() => navigation.navigate('ClubDetail', { clubId: item.id })}
+                  onChallenge={() =>
+                    navigation.navigate('ClubChallenge', {
+                      rivalClubId: item.id,
+                      rivalNombre: item.nombre,
+                      rivalFotoUrl: item.foto_url || null,
+                    })
+                  }
+                />
+              </View>
             );
           }}
           ListEmptyComponent={
@@ -765,6 +754,7 @@ const styles = StyleSheet.create({
   filterPlaceholder: { color: C.textSecondary, fontSize: 14, fontFamily: F.medium, flex: 1 },
   clearFiltersText: { color: C.green, fontSize: 13, fontFamily: F.semiBold },
 
+  tarjetaFila: { paddingHorizontal: 0, marginBottom: 10 },
   desafiarBtn: {
     flexDirection: 'row',
     alignItems: 'center',

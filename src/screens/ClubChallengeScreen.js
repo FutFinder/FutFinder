@@ -18,7 +18,9 @@ import Banner from '../components/Banner';
 import { Button, IconButton, Chip } from '../components/reservas/ui';
 import { paleta as C, radios as R, fuentes as F } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
-import { getMyClubs } from '../services/clubs';
+import { getMyClubs, getClubById } from '../services/clubs';
+import { modalidadInline } from '../utils/clubModalidad';
+import NivelChip from '../components/club/NivelChip';
 import { createChallenge } from '../services/clubChallenges';
 
 function formatDate(d) {
@@ -71,6 +73,14 @@ export default function ClubChallengeScreen({ navigation, route }) {
   const [banner, setBanner] = useState(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+
+  // El rival se lee entero para la cabecera: comuna, modalidad, tema y nivel
+  // (rediseño de Clubes, 2026-11-26). Los params sólo traen nombre y escudo.
+  const [rival, setRival] = useState(null);
+  useEffect(() => {
+    if (!rivalClubId) return;
+    getClubById(rivalClubId).then(({ data }) => setRival(data || null));
+  }, [rivalClubId]);
 
   useEffect(() => {
     (async () => {
@@ -158,21 +168,27 @@ export default function ClubChallengeScreen({ navigation, route }) {
         >
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             {/* Rival */}
-            <View style={[styles.rivalCard, { borderColor: tema.border }]}>
-              <Swords color={tema.main} size={18} strokeWidth={2} />
-              <Text style={styles.rivalLabel}>Desafías a</Text>
-              <View style={styles.rivalChip}>
-                {rivalFotoUrl ? (
-                  <Image source={{ uri: rivalFotoUrl }} style={styles.rivalLogo} />
+            <View style={styles.rivalCard} accessibilityLabel={`Desafías a ${rivalNombre || 'el club rival'}`}>
+              <View style={[styles.rivalAro, { borderColor: temaDeClub(rival).main }]}>
+                {rival?.foto_url || rivalFotoUrl ? (
+                  <Image source={{ uri: rival?.foto_url || rivalFotoUrl }} style={styles.rivalLogo} />
                 ) : (
                   <View style={[styles.rivalLogo, styles.rivalLogoFallback]}>
-                    <Shield color={C.textMuted} size={14} strokeWidth={1.7} />
+                    <Shield color={C.textMuted} size={16} strokeWidth={1.7} />
                   </View>
                 )}
-                <Text style={styles.rivalName} numberOfLines={1}>
-                  {rivalNombre || 'Club rival'}
-                </Text>
               </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.rivalName} numberOfLines={1}>
+                  {rival?.nombre || rivalNombre || 'Club rival'}
+                </Text>
+                {rival ? (
+                  <Text style={styles.rivalLabel} numberOfLines={1}>
+                    {[rival.comuna, modalidadInline(rival.modalidad)].filter(Boolean).join(' · ')}
+                  </Text>
+                ) : null}
+              </View>
+              <NivelChip nivel={rival?.nivel} compacto />
             </View>
 
             {/* Retador (si tengo más de un club admin) */}
@@ -303,23 +319,24 @@ const styles = StyleSheet.create({
   rivalCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: C.shieldBg,
+    gap: 12,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    // El borde es el acento del club: sale por estilo en línea en el JSX.
-    borderRadius: R.row,
+    borderColor: C.border,
+    borderRadius: 16,
     padding: 14,
     marginBottom: 20,
   },
   rivalLabel: { fontFamily: F.medium, color: C.textSecondary, fontSize: 13 },
-  rivalChip: {
-    flexDirection: 'row',
+  rivalAro: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
     alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
   },
-  rivalLogo: { width: 28, height: 28, borderRadius: 14 },
+  rivalLogo: { width: 38, height: 38, borderRadius: 19 },
   rivalLogoFallback: {
     backgroundColor: C.surface,
     alignItems: 'center',
