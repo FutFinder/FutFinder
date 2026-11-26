@@ -64,6 +64,7 @@ export default function ClubHeader({
 }) {
   const modalidad = modalidadInline(club?.modalidad);
   const lugar = [club?.comuna, modalidad].filter(Boolean);
+  const palabraIntegrantes = totalMiembros === 1 ? 'integrante' : 'integrantes';
 
   return (
     <View>
@@ -108,12 +109,12 @@ export default function ClubHeader({
             onPress={onMiembros}
             disabled={!onMiembros}
             accessibilityRole={onMiembros ? 'button' : undefined}
-            accessibilityLabel={`${totalMiembros ?? 0} integrantes`}
+            accessibilityLabel={`${totalMiembros ?? 0} ${palabraIntegrantes}`}
             style={({ pressed }) => [styles.chipFoto, pressed && styles.presionado]}
           >
             <Users color={C.textPrimary} size={14} strokeWidth={2.2} />
             <Text style={styles.chipFotoNumero}>{totalMiembros ?? 0}</Text>
-            <Text style={styles.chipFotoTexto}>integrantes</Text>
+            <Text style={styles.chipFotoTexto}>{palabraIntegrantes}</Text>
           </Pressable>
 
           {record ? (

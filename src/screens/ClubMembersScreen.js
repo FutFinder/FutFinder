@@ -10,12 +10,12 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ArrowLeft,
-  Shield,
   Crown,
   Star,
   X,
@@ -893,7 +893,7 @@ function MemberAvatar({ foto }) {
   }
   return (
     <View style={[styles.avatar, styles.avatarFallback]}>
-      <Shield color={C.textMuted} size={18} strokeWidth={1.8} />
+      <User color={C.textMuted} size={18} strokeWidth={1.8} />
     </View>
   );
 }
@@ -1072,6 +1072,8 @@ const styles = StyleSheet.create({
     flex: 1,
     color: C.textPrimary,
     fontSize: 14,
+    // La caja ya marca el campo; el contorno naranjo del navegador no va.
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
   searchClear: {
     width: 22,

@@ -518,7 +518,14 @@ export default function ClubChallengesScreen({ navigation, route }) {
         <Text style={styles.sectionTitle}>{filtrosActivos ? 'Resultados' : 'Cerca de ti'} ({listaOrdenada.length})</Text>
         {listaOrdenada.length === 0 ? (
           <View style={styles.emptyBoxDashed}>
-            <Text style={styles.emptyText}>Ningún desafío calza con tus filtros.{'\n'}Amplía la distancia o quita algún criterio.</Text>
+            {/* Sin publicaciones de nadie no hay filtro que culpar: decir «calza
+                con tus filtros» a quien no puso ninguno lo mandaba a buscar un
+                criterio que no existe. */}
+            <Text style={styles.emptyText}>
+              {browsing.length === 0
+                ? 'Todavía no hay desafíos abiertos de otros clubes.\nPublica el tuyo para que te encuentren.'
+                : 'Ningún desafío calza con tus filtros.\nAmplía la distancia o quita algún criterio.'}
+            </Text>
           </View>
         ) : (
           listaOrdenada.map((pub) => (

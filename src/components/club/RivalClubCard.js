@@ -5,6 +5,8 @@ import { MapPin, Zap } from 'lucide-react-native';
 import { paleta as C, radios as R, fuentes as F } from '../../theme/colors';
 import { temaDeClub } from '../../theme/clubThemes';
 import { modalidadInline } from '../../utils/clubModalidad';
+import { formatDistanciaKm } from '../../utils/distancia';
+import { nivelDeClub } from '../../utils/nivelClub';
 import ClubLogo from './ClubLogo';
 import NivelChip from './NivelChip';
 import VerifiedBadge from './VerifiedBadge';
@@ -38,8 +40,10 @@ export default function RivalClubCard({
 }) {
   const tema = temaDeClub(club);
   const lugar = [club.comuna, modalidadInline(club.modalidad)].filter(Boolean).join(' · ');
-  const distancia =
-    typeof distanciaKm === 'number' ? `${distanciaKm.toFixed(1).replace('.', ',')} km` : null;
+  const distancia = typeof distanciaKm === 'number' ? formatDistanciaKm(distanciaKm) : null;
+  // Sin nivel ni récord la fila del medio no tiene nada: si se dibujara igual,
+  // dejaría un hueco entre el nombre y los botones.
+  const hayMedio = !!nivelDeClub(club.nivel) || !!record;
 
   return (
     <View style={[styles.card, { width: ancho }]}>
@@ -73,6 +77,7 @@ export default function RivalClubCard({
         ) : null}
       </Pressable>
 
+      {hayMedio ? (
       <View style={styles.medio}>
         <NivelChip nivel={club.nivel} compacto />
         {record ? (
@@ -86,6 +91,7 @@ export default function RivalClubCard({
           </Text>
         ) : null}
       </View>
+      ) : null}
 
       <View style={styles.botones}>
         {puedeDesafiar && desafioEnviado ? (

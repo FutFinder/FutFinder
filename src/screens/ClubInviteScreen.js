@@ -8,12 +8,13 @@ import {
   Pressable,
   Image,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Search as SearchIcon,
-  Shield,
+  User,
 } from 'lucide-react-native';
 
 import {
@@ -156,7 +157,7 @@ export default function ClubInviteScreen({ navigation, route }) {
                   <Image source={{ uri: item.foto_url }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarFallback]}>
-                    <Shield color={C.textMuted} size={18} strokeWidth={1.8} />
+                    <User color={C.textMuted} size={18} strokeWidth={1.8} />
                   </View>
                 )}
                 <View style={{ flex: 1 }}>
@@ -241,7 +242,14 @@ const styles = StyleSheet.create({
     borderColor: C.border,
     backgroundColor: C.surface,
   },
-  searchInput: { flex: 1, fontFamily: F.medium, fontSize: 14.5, color: C.textPrimary },
+  searchInput: {
+    flex: 1,
+    fontFamily: F.medium,
+    fontSize: 14.5,
+    color: C.textPrimary,
+    // La caja ya marca el campo; el contorno naranjo del navegador no va.
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
+  },
 
   bannerWrap: { paddingHorizontal: S.screenPadding },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },

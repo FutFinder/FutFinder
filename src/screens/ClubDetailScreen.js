@@ -416,6 +416,7 @@ export function FichaClub({ clubId, navigation, initialBanner, portada }) {
               />
               {rivals.length === 0 ? (
                 <EmptyStateCard
+                  sinMargen
                   icon={<Search color={C.textSecondary} size={18} strokeWidth={2} />}
                   title="Sin rivales cerca"
                   subtitle="Amplía la búsqueda para encontrar más clubes"
@@ -481,6 +482,7 @@ export function FichaClub({ clubId, navigation, initialBanner, portada }) {
             {historialError ? (
               // Un fallo de lectura NO se disfraza de historial vacío.
               <EmptyStateCard
+                sinMargen
                 icon={<Trophy color={C.textSecondary} size={18} strokeWidth={2} />}
                 title="No se pudo cargar el historial"
                 subtitle="Revisa tu conexión y vuelve a intentarlo"
@@ -490,6 +492,7 @@ export function FichaClub({ clubId, navigation, initialBanner, portada }) {
               />
             ) : historialVisible.length === 0 ? (
               <EmptyStateCard
+                sinMargen
                 icon={<Trophy color={C.textSecondary} size={18} strokeWidth={2} />}
                 title="Aún no hay partidos en el historial"
                 subtitle="Los partidos aparecerán acá cuando tengan un resultado confirmado"

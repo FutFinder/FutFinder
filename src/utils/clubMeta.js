@@ -23,6 +23,7 @@
 import { getComunaCoords } from '../data/comunas-coords';
 import { haversineKm } from '../services/matches';
 import { modalidadInline } from './clubModalidad.js';
+import { formatDistanciaKm } from './distancia.js';
 
 // El vocabulario de modalidad vive en `clubModalidad.js` —puro, sin
 // Supabase— para que el formulario pueda validarlo sin arrastrar este
@@ -93,19 +94,8 @@ function coordsDeClub(club) {
   return getComunaCoords(club.comuna);
 }
 
-/**
- * Formatea kilómetros al español de Chile: '2,4 km'.
- * @returns {string} 'Distancia desconocida' si km es null/undefined.
- */
-export function formatDistanciaKm(km) {
-  if (km === null || km === undefined || Number.isNaN(Number(km))) {
-    return 'Distancia desconocida';
-  }
-  const n = Number(km);
-  // Bajo 100 m no tiene sentido mostrar decimales de km.
-  if (n < 0.1) return 'menos de 0,1 km';
-  return `${n.toFixed(1).replace('.', ',')} km`;
-}
+// El formateador vive en `distancia.js` (puro, probado en Node).
+export { formatDistanciaKm };
 
 /**
  * Línea de meta de una tarjeta de rival, sólo con lo que se sabe.

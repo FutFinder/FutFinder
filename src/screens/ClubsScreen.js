@@ -208,7 +208,13 @@ export default function ClubsScreen({ navigation, route }) {
 
   const cabecera = (
     <ClubsHeader
-      subtitulo={subtituloDe({ membership, clubs, club, sentRequests, invitations })}
+      // Mientras carga por primera vez todavía no se sabe si hay club: decir
+      // «Aún sin club» a quien sí tiene uno era mentirle un segundo.
+      subtitulo={
+        loading && !cargado
+          ? null
+          : subtituloDe({ membership, clubs, club, sentRequests, invitations })
+      }
       tema={tema}
       hayPendientes={badgeCount > 0}
       onBuscar={() => irA('ExploreClubs')}

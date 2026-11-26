@@ -23,11 +23,14 @@ export default function EmptyStateCard({
   onAction,
   variant = 'ghost', // 'ghost' (borde de color) | 'solid' (color relleno)
   tema = temaClub(),
+  // Dentro de una sección que ya tiene su margen lateral, el margen propio de
+  // la tarjeta la dejaba más angosta que sus vecinas: `sinMargen` lo quita.
+  sinMargen = false,
 }) {
   const solid = variant === 'solid';
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, sinMargen && styles.cardSinMargen]}>
       <View style={styles.icon}>{icon}</View>
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -70,6 +73,7 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
+  cardSinMargen: { marginHorizontal: 0 },
   icon: {
     width: 38,
     height: 38,

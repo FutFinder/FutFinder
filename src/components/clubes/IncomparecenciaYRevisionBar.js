@@ -45,6 +45,8 @@ export default function IncomparecenciaYRevisionBar({
   error = null,
   onInformar,
   onSolicitar,
+  // Dentro de la hoja «Acciones del partido» la barra se dibuja como tarjeta.
+  style = null,
 }) {
   const [abierto, setAbierto] = useState(null); // 'incomparecencia' | 'revision' | null
   const [texto, setTexto] = useState('');
@@ -77,7 +79,7 @@ export default function IncomparecenciaYRevisionBar({
   };
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, style]}>
       {abierto === null ? (
         <>
           {/* De qué se acusa a MI club, con las palabras del rival. Sin esto,

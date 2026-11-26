@@ -47,6 +47,8 @@ export default function CancelarEncuentroBar({
   ocupado = false,
   error = null,
   onCancelar,
+  // Dentro de la hoja «Acciones del partido» la barra se dibuja como tarjeta.
+  style = null,
 }) {
   const [abierto, setAbierto] = useState(false);
   const [motivo, setMotivo] = useState('');
@@ -62,7 +64,7 @@ export default function CancelarEncuentroBar({
   const revision = validarMotivoCancelacion(motivo);
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, style]}>
       {!!sancion && (
         <View style={styles.sancionBox}>
           <ShieldAlert color={C.amber} size={13} strokeWidth={2.2} />

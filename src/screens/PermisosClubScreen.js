@@ -115,7 +115,11 @@ function diffOverrides(original, actual) {
 }
 
 export default function PermisosClubScreen({ navigation, route }) {
-  const { clubId, club: clubDeRuta } = route.params || {};
+  const { clubId, club: clubParam } = route.params || {};
+  // En la web los parámetros viajan en la URL: al recargar, el club llega
+  // como el texto «[object Object]». Sólo se usa si es un objeto de verdad;
+  // si no, se lee por `clubId`.
+  const clubDeRuta = clubParam && typeof clubParam === 'object' ? clubParam : null;
   const { confirmar, dialogo } = useConfirmacion();
 
   const [loading, setLoading] = useState(true);

@@ -1981,9 +1981,12 @@ export default function ChatThreadScreen({ route, navigation }) {
                     <Text style={styles.cambioBarText}>Pedir un cambio de hora, cancha o cuota</Text>
                   </Pressable>
                 ) : !cambioPendiente && accionesCambio.esDeClubes && accionesCambio.soyAdmin ? (
-                  <Text style={styles.cambioHint} numberOfLines={2}>
-                    {accionesCambio.bloqueoPedir}
-                  </Text>
+                  <View style={[styles.hojaTarjeta, styles.hojaFila]}>
+                    <RefreshCw color={C.textGhost} size={15} strokeWidth={2.2} />
+                    <Text style={styles.hojaPista} numberOfLines={2}>
+                      {accionesCambio.bloqueoPedir}
+                    </Text>
+                  </View>
                 ) : null}
 
                 {/* Informar y pedir revisión van antes que cancelar: son lo que
@@ -1996,6 +1999,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                   error={revisionError}
                   onInformar={informarIncomparecencia}
                   onSolicitar={pedirRevision}
+                  style={styles.hojaTarjeta}
                 />
 
                 <CancelarEncuentroBar
@@ -2007,6 +2011,7 @@ export default function ChatThreadScreen({ route, navigation }) {
                   ocupado={cancelBusy}
                   error={cancelError}
                   onCancelar={cancelarEncuentro}
+                  style={styles.hojaTarjeta}
                 />
 
                 <Text style={styles.hojaNota}>
@@ -2072,6 +2077,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   hojaContenido: { gap: 10, paddingBottom: 6 },
+  // Cada acción de la hoja es una tarjeta con el mismo margen: las barras se
+  // diseñaron como franjas sobre el hilo y acá quedaban de borde a borde.
+  hojaTarjeta: {
+    marginHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: C.border,
+    borderBottomColor: C.border,
+    backgroundColor: C.surfaceAlt,
+  },
+  hojaFila: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, minHeight: 44 },
+  hojaPista: { flex: 1, color: C.textSecondary, fontSize: 12, lineHeight: 16, fontFamily: F.medium },
   hojaNota: { color: C.textSecondary, fontSize: 12, lineHeight: 17, paddingHorizontal: 16, marginTop: 4 },
   bannerWrap: { paddingHorizontal: 14, paddingTop: 10 },
 
@@ -2101,8 +2119,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginHorizontal: 14,
-    marginBottom: 8,
+    marginHorizontal: 16,
     minHeight: 44,
     borderRadius: 22,
     borderWidth: 1,
@@ -2114,14 +2131,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: F.extraBold,
     includeFontPadding: false,
-  },
-  cambioHint: {
-    marginHorizontal: 14,
-    marginBottom: 8,
-    color: C.textFaint,
-    fontSize: 12,
-    lineHeight: 16,
-    textAlign: 'center',
   },
   challengeBarText: { color: C.green, fontSize: 14, fontFamily: F.extraBold },
   challengeBarCreate: { backgroundColor: C.green, borderColor: C.green },
