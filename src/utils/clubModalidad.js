@@ -12,7 +12,7 @@
  * import por esto.
  */
 
-/** Valores válidos de `clubs.modalidad`. */
+/** Modalidades sueltas (y valores históricos de `clubs.modalidad`). */
 export const MODALIDADES = {
   FUTBOL_5: 'futbol5',
   FUTBOL_7: 'futbol7',
@@ -21,42 +21,87 @@ export const MODALIDADES = {
 };
 
 /**
- * Opciones para los selectores de crear/editar club. Fútbol 5 llegó con la
- * migración 195; «ambos» sigue siendo 7 y 11, que es lo que guardan los
- * clubes que ya lo eligieron.
+ * VARIAS MODALIDADES (migración 201, pedido de Vicente del 2026-11-26).
+ * Un club puede jugar Fútbol 5, 7 y 11 en cualquier combinación, y se muestran
+ * juntas: «Fútbol 5, 7», «Fútbol 5, 7, 11».
+ *
+ * Se guarda en la MISMA columna de texto con un valor canónico por
+ * combinación, en vez de pasarla a un arreglo: la columna es descriptiva
+ * (ninguna función de la base la lee, comprobado en `pg_proc`) y así no hay
+ * que tocar ningún `select` ni las versiones anteriores de la app, que con un
+ * valor que no conocen simplemente no muestran la modalidad.
+ *
+ * 7 y 11 SIGUE GUARDÁNDOSE COMO 'ambos': es lo que ya tienen los clubes que
+ * la eligieron y lo que entienden las versiones anteriores.
  */
+const ORDEN = ['futbol5', 'futbol7', 'futbol11'];
+const NUMERO = { futbol5: '5', futbol7: '7', futbol11: '11' };
+
+const COMBINACIONES = {
+  futbol5: ['futbol5'],
+  futbol7: ['futbol7'],
+  futbol11: ['futbol11'],
+  futbol5_7: ['futbol5', 'futbol7'],
+  futbol5_11: ['futbol5', 'futbol11'],
+  ambos: ['futbol7', 'futbol11'],
+  futbol5_7_11: ['futbol5', 'futbol7', 'futbol11'],
+};
+
+/** Opciones del selector de crear/editar club: se marcan una o varias. */
 export const OPCIONES_MODALIDAD = [
   { value: MODALIDADES.FUTBOL_5, label: 'Fútbol 5' },
   { value: MODALIDADES.FUTBOL_7, label: 'Fútbol 7' },
   { value: MODALIDADES.FUTBOL_11, label: 'Fútbol 11' },
-  { value: MODALIDADES.AMBOS, label: 'Fútbol 7 y Fútbol 11' },
 ];
 
-/** `true` si el valor es una modalidad conocida (para validar formularios). */
+/** `true` si el valor es una modalidad o combinación conocida. */
 export function esModalidadValida(valor) {
-  return Object.values(MODALIDADES).includes(valor);
+  return Object.prototype.hasOwnProperty.call(COMBINACIONES, valor);
+}
+
+/** Lista de modalidades sueltas de un valor guardado, en orden 5 · 7 · 11. */
+export function modalidadesDe(valor) {
+  return esModalidadValida(valor) ? [...COMBINACIONES[valor]] : [];
+}
+
+/** Valor canónico de una lista de modalidades sueltas; `null` si no hay ninguna. */
+export function valorDeModalidades(lista) {
+  const marcadas = ORDEN.filter((m) => (lista || []).includes(m));
+  if (marcadas.length === 0) return null;
+  const valor = Object.keys(COMBINACIONES).find(
+    (k) => COMBINACIONES[k].join() === marcadas.join()
+  );
+  return valor || null;
 }
 
 /**
- * Etiquetas de modalidad para el banner del club (MAYÚSCULAS).
- * Devuelve un array porque "ambos" se muestra como DOS chips.
- * Sin modalidad → `[]`, y no se dibuja ninguno: uno que dice «FÚTBOL N.A.»
- * ocupa el mismo sitio sin contar nada.
+ * Etiquetas de modalidad para el banner del club (MAYÚSCULAS), una por
+ * modalidad. Sin modalidad → `[]`, y no se dibuja ninguna.
  */
 export function modalidadBadges(modalidad) {
-  if (modalidad === MODALIDADES.FUTBOL_5) return ['FÚTBOL 5'];
-  if (modalidad === MODALIDADES.FUTBOL_7) return ['FÚTBOL 7'];
-  if (modalidad === MODALIDADES.FUTBOL_11) return ['FÚTBOL 11'];
-  if (modalidad === MODALIDADES.AMBOS) return ['FÚTBOL 7', 'FÚTBOL 11'];
-  return [];
+  return modalidadesDe(modalidad).map((m) => `FÚTBOL ${NUMERO[m]}`);
 }
 
 /**
- * Modalidad en línea, para la meta de las tarjetas.
- * Ej: 'Fútbol 5' · 'Fútbol 7' · 'Fútbol 7 y Fútbol 11'.
+ * Modalidad en línea, para la ficha y las tarjetas.
+ * Ej: 'Fútbol 5' · 'Fútbol 5, 7' · 'Fútbol 5, 7, 11'.
  * Sin modalidad declarada devuelve `null`: quien llama la omite.
  */
 export function modalidadInline(modalidad) {
-  const opcion = OPCIONES_MODALIDAD.find((o) => o.value === modalidad);
-  return opcion ? opcion.label : null;
+  const lista = modalidadesDe(modalidad);
+  if (lista.length === 0) return null;
+  return `Fútbol ${lista.map((m) => NUMERO[m]).join(', ')}`;
+}
+
+/**
+ * Marca o desmarca una modalidad suelta sobre el valor guardado y devuelve el
+ * nuevo valor canónico (o `null` si no queda ninguna). Lo usan los selectores
+ * de crear y editar club.
+ */
+export function alternarModalidad(valor, modalidad) {
+  const lista = modalidadesDe(valor);
+  const nueva = lista.includes(modalidad)
+    ? lista.filter((m) => m !== modalidad)
+    : [...lista, modalidad];
+  return valorDeModalidades(nueva);
 }

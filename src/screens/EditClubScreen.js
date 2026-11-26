@@ -30,6 +30,7 @@ import { getMisClubesConPermiso } from '../services/clubPermissions';
 import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD } from '../utils/clubMeta';
+import { alternarModalidad, modalidadesDe } from '../utils/clubModalidad';
 import { getEditClubStatus, clubIdDeRuta, NOMBRE_MIN } from '../utils/clubEdit';
 
 /**
@@ -441,16 +442,18 @@ export default function EditClubScreen({ navigation, route }) {
           {/* ── Modalidad ── */}
           <View style={styles.card}>
             <Text style={styles.label}>Modalidad (opcional)</Text>
+            <Text style={styles.ayudaModalidad}>Puedes marcar más de una.</Text>
             <View style={styles.chipRow}>
               {OPCIONES_MODALIDAD.map((op) => {
-                const activa = modalidad === op.value;
+                const activa = modalidadesDe(modalidad).includes(op.value);
                 return (
                   <Pressable
                     key={op.value}
-                    // Volver a tocar la opción activa la deselecciona.
-                    onPress={() => setModalidad(activa ? null : op.value)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: activa }}
+                    // Se marcan varias (migración 201); tocar una marcada la
+                    // desmarca, y sin ninguna el club queda sin modalidad.
+                    onPress={() => setModalidad(alternarModalidad(modalidad, op.value))}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: activa }}
                     accessibilityLabel={`Modalidad ${op.label}`}
                     style={({ pressed }) => [
                       styles.chip,
@@ -826,6 +829,7 @@ const styles = StyleSheet.create({
 
   // ── Chips de modalidad ──
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  ayudaModalidad: { color: C.textSecondary, fontSize: 12, marginTop: -4, marginBottom: 10 },
   chip: {
     minHeight: 44,
     justifyContent: 'center',

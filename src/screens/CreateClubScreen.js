@@ -28,6 +28,7 @@ import { createClub } from '../services/clubs';
 import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD } from '../utils/clubMeta';
+import { alternarModalidad, modalidadesDe } from '../utils/clubModalidad';
 
 /**
  * Crear un club nuevo (modal sobre las tabs, como CreateMatch).
@@ -203,18 +204,23 @@ export default function CreateClubScreen({ navigation }) {
 
           <View style={styles.grupo}>
             <FieldLabel>Modalidad</FieldLabel>
+            <Text style={styles.ayudaModalidad}>Puedes marcar más de una.</Text>
             <View style={styles.modalidadRow}>
               {OPCIONES_MODALIDAD.map((op) => {
-                const activa = modalidad === op.value;
+                const marcadas = modalidadesDe(modalidad);
+                const activa = marcadas.includes(op.value);
                 return (
                   <Chip
                     key={op.value}
                     label={op.label}
                     active={activa}
-                    // Se puede cambiar de modalidad, pero NO quedarse sin
-                    // ninguna: deseleccionar la activa dejaba el formulario
-                    // en el estado que apaga el botón sin decir por qué.
-                    onPress={() => setModalidad(op.value)}
+                    // Se marcan varias (migración 201), pero NO se queda sin
+                    // ninguna: desmarcar la última dejaba el formulario en el
+                    // estado que apaga el botón sin decir por qué.
+                    onPress={() => {
+                      if (activa && marcadas.length === 1) return;
+                      setModalidad(alternarModalidad(modalidad, op.value));
+                    }}
                     style={styles.modalidadChip}
                   />
                 );
@@ -457,6 +463,7 @@ const styles = StyleSheet.create({
   optionTextActive: { fontFamily: F.extraBold, color: C.green },
 
   modalidadRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  ayudaModalidad: { color: C.textSecondary, fontSize: 12, marginBottom: 8, marginTop: -2 },
   // El kit dibuja el chip a 33 de alto porque allá son filtros; acá son la
   // única forma de elegir modalidad, así que suben al mínimo táctil.
   modalidadChip: { minHeight: 44, paddingHorizontal: 15 },
