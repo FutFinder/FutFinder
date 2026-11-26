@@ -497,6 +497,21 @@ export function cuotaLabel(precio) {
   return p === 0 ? 'Gratis' : `$${p.toLocaleString('es-CL')}`;
 }
 
+/**
+ * Cuota de un partido ENTRE CLUBES (decisión de Vicente, 2026-11-26): es lo
+ * que paga cada club por el partido, vayan los jugadores que vayan. En los
+ * partidos normales la cuota sigue siendo por persona.
+ *
+ * El número es el mismo `matches.precio_cuota` (y `cuota_por_persona` en la
+ * propuesta, que conserva su nombre por compatibilidad con las versiones ya
+ * instaladas): ningún pago sale de él —se paga en la cancha— así que lo único
+ * que cambia es cómo se lee.
+ */
+export function cuotaPorEquipoLabel(precio) {
+  const p = Number(precio || 0);
+  return p === 0 ? 'Sin cuota' : `$${p.toLocaleString('es-CL')} por equipo`;
+}
+
 /** Etiqueta de estado del partido. */
 export function estadoLabel(match) {
   switch (match?.estado) {

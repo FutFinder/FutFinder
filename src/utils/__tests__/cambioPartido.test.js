@@ -242,10 +242,10 @@ test('si el cambio mueve el día, el texto deja de hablar de «la hora»', () =>
 
 test('la cuota se lee en pesos chilenos, y el 0 se dice «gratis»', () => {
   const conMonto = frasesDeCambios([{ campo: 'cuota', antes: 5000, despues: 8000 }]);
-  assert.deepEqual(conMonto, ['la cuota de $5.000 a $8.000']);
+  assert.deepEqual(conMonto, ['la cuota por equipo de $5.000 a $8.000']);
 
   const gratis = frasesDeCambios([{ campo: 'cuota', antes: 0, despues: 12000 }]);
-  assert.deepEqual(gratis, ['la cuota de gratis a $12.000']);
+  assert.deepEqual(gratis, ['la cuota por equipo de gratis a $12.000']);
 });
 
 test('el cambio de cancha nombra la comuna sólo cuando también cambia', () => {
@@ -273,7 +273,7 @@ test('varios cambios se enumeran con comas y una «y» final', () => {
   });
   assert.equal(
     texto,
-    'Club A propone cambiar la hora de 17:00 a 18:00, la cancha de Cancha Uno a Cancha Dos y la cuota de $5.000 a $8.000.'
+    'Club A propone cambiar la hora de 17:00 a 18:00, la cancha de Cancha Uno a Cancha Dos y la cuota por equipo de $5.000 a $8.000.'
   );
 });
 

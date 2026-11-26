@@ -112,6 +112,7 @@ import {
   GPS_RADIUS_METERS,
   WAITLIST_CONFIRM_MINUTES,
   cuotaLabel,
+  cuotaPorEquipoLabel,
   edadLabel,
   enVentanaGps,
   estadoLabel,
@@ -956,7 +957,7 @@ export default function MatchDetailScreen({ route, navigation }) {
               label={esDeClubes && match.cupos_por_club != null ? 'POR CLUB' : contador ? 'JUGADORES' : 'CUPOS'}
               highlight={libres > 0 && !closed}
             />
-            <StatCell value={cuotaLabel(match.precio_cuota)} label="CUOTA" />
+            <StatCell value={cuotaLabel(match.precio_cuota)} label={esDeClubes ? 'POR EQUIPO' : 'CUOTA'} />
             <StatCell value={`${match.duracion_min ?? 90}'`} label="DURACIÓN" />
             <StatCell
               value={trustLabel(match)}
@@ -1141,16 +1142,19 @@ export default function MatchDetailScreen({ route, navigation }) {
               <DetailRow
                 label="Cuota"
                 value={
-                  Number(match.precio_cuota) === 0
-                    ? 'Gratis'
-                    : `${cuotaLabel(match.precio_cuota)} por jugador`
+                  esDeClubes
+                    ? cuotaPorEquipoLabel(match.precio_cuota)
+                    : Number(match.precio_cuota) === 0
+                      ? 'Gratis'
+                      : `${cuotaLabel(match.precio_cuota)} por jugador`
                 }
                 last
               />
             </Card>
             <Note>
-              La cuota se acuerda y paga directamente con el organizador. FutFinder no procesa
-              pagos.
+              {esDeClubes
+                ? 'Cada club paga la cuota completa, vengan los jugadores que vengan. Cómo se reparte dentro del equipo lo define cada club. FutFinder no procesa pagos.'
+                : 'La cuota se acuerda y paga directamente con el organizador. FutFinder no procesa pagos.'}
             </Note>
           </Section>
 

@@ -239,7 +239,7 @@ function fraseCuota(cambio) {
   const antes = montoCLP(cambio.antes);
   const despues = montoCLP(cambio.despues);
   if (!antes || !despues) return null;
-  return `la cuota de ${antes} a ${despues}`;
+  return `la cuota por equipo de ${antes} a ${despues}`;
 }
 
 /**

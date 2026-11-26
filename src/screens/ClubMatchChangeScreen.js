@@ -24,6 +24,7 @@ import { FieldLabel, TextField } from '../components/reservas/recintoUi';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { supabase } from '../services/supabase';
 import { getMatchById, getClubMatchLocation } from '../services/matches';
+import { cuotaPorEquipoLabel } from '../services/matchRules';
 import { nuevoClientToken } from '../services/clubProposals';
 import { getMisMembresiasEn } from '../services/clubs';
 import { getCambioPendiente, proponerCambioPartido } from '../services/clubMatchChanges';
@@ -497,10 +498,10 @@ export default function ClubMatchChangeScreen({ navigation, route }) {
               <Card style={styles.bloque}>
                 <View style={styles.bloqueHead}>
                   <Wallet color={C.green} size={16} strokeWidth={2.2} />
-                  <Text style={styles.bloqueTitulo}>Cuota por persona</Text>
+                  <Text style={styles.bloqueTitulo}>Cuota por equipo</Text>
                 </View>
                 <Text style={styles.actual}>
-                  Actual: {partido?.precio_cuota ? `$${partido.precio_cuota}` : 'gratis'}
+                  Actual: {cuotaPorEquipoLabel(partido?.precio_cuota)}
                 </Text>
                 <TextField
                   placeholder="0"

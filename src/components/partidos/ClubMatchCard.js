@@ -9,7 +9,7 @@ import {
   fuentes as F,
 } from '../../theme/colors';
 import { temaDeClub, temaClub } from '../../theme/clubThemes';
-import { cuotaLabel } from '../../services/matchRules';
+import { cuotaPorEquipoLabel } from '../../services/matchRules';
 import {
   cuposLabel,
   clubesDelPartido,
@@ -140,7 +140,7 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
             <View style={styles.datoRow}>
               <Wallet color={C.textFaint} size={12.5} strokeWidth={2} />
               <Text style={styles.cuota} numberOfLines={1}>
-                {cuotaLabel(match.precio_cuota)}
+                {cuotaPorEquipoLabel(match.precio_cuota)}
               </Text>
             </View>
           ) : null}

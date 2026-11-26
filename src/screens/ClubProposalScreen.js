@@ -419,7 +419,7 @@ export default function ClubProposalScreen({ navigation, route }) {
                   </Row>
                   <Row icon={<Wallet color={C.green} size={16} strokeWidth={2} />} label="Cuota">
                     {propuesta.cuota_por_persona > 0
-                      ? `$${propuesta.cuota_por_persona.toLocaleString('es-CL')} por persona`
+                      ? `$${propuesta.cuota_por_persona.toLocaleString('es-CL')} por equipo`
                       : 'Sin cuota'}
                   </Row>
                   {!!propuesta.instrucciones && (
@@ -511,7 +511,7 @@ export default function ClubProposalScreen({ navigation, route }) {
                           <Text style={styles.confirmLinea}>
                             ·{' '}
                             {propuesta.cuota_por_persona > 0
-                              ? `$${propuesta.cuota_por_persona.toLocaleString('es-CL')} por persona`
+                              ? `$${propuesta.cuota_por_persona.toLocaleString('es-CL')} por equipo`
                               : 'Sin cuota'}
                           </Text>
                           <Text style={styles.confirmLinea}>
@@ -760,7 +760,7 @@ export default function ClubProposalScreen({ navigation, route }) {
                 </View>
 
                 <View style={styles.grupo}>
-                  <FieldLabel>Cuota por persona</FieldLabel>
+                  <FieldLabel>Cuota por equipo</FieldLabel>
                   <TextField
                     placeholder="0 si no hay cuota"
                     value={cuotaPorPersona}
@@ -772,6 +772,10 @@ export default function ClubProposalScreen({ navigation, route }) {
                   {!!errores.cuotaPorPersona && (
                     <Text style={styles.error}>{errores.cuotaPorPersona}</Text>
                   )}
+                  <Text style={styles.ayudaCuota}>
+                    Lo que paga cada club por el partido, vengan los jugadores que vengan. Cómo
+                    se reparte dentro del equipo lo define cada club.
+                  </Text>
                 </View>
 
                 <View style={styles.grupo}>
@@ -861,6 +865,7 @@ function Row({ icon, label, children }) {
 }
 
 const styles = StyleSheet.create({
+  ayudaCuota: { color: C.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 6 },
   root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {

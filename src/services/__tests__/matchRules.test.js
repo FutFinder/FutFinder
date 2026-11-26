@@ -529,3 +529,19 @@ test('T05: la restricción sigue bloqueando — el cambio es el texto, no la reg
   assert.equal(R.getBlockReason({ ...RESTRINGIDO, myProfile: { suspended: false } })?.code, undefined);
   assert.equal(R.getBlockReason({ ...RESTRINGIDO, myProfile: { suspended: true } }).code, 'restringido');
 });
+
+// ── Cuota por equipo en partidos de clubes (decisión de 2026-11-26) ──
+
+test('en un partido de clubes la cuota se lee por equipo', () => {
+  assert.equal(R.cuotaPorEquipoLabel(42000), '$42.000 por equipo');
+});
+
+test('un partido de clubes sin cuota dice «Sin cuota», no «Gratis» por persona', () => {
+  assert.equal(R.cuotaPorEquipoLabel(0), 'Sin cuota');
+  assert.equal(R.cuotaPorEquipoLabel(null), 'Sin cuota');
+});
+
+test('la cuota de un partido normal sigue sin decir «por equipo»', () => {
+  assert.equal(R.cuotaLabel(3500), '$3.500');
+  assert.equal(R.cuotaLabel(0), 'Gratis');
+});
