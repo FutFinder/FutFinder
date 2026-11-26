@@ -1473,8 +1473,12 @@ export default function ChatThreadScreen({ route, navigation }) {
       // El estado del ciclo es lo que de verdad orienta acá: el título dice
       // qué dos clubes se enfrentan, o al menos que esto es un desafío.
       if (!clubChallenge) return paramSubtitle || 'Negociación del desafío';
-      const admins = myClubIds.length > 0 ? 'Administradores de ambos clubes' : 'Solo lectura';
-      return `${estadoLabel(clubChallenge.estado)} · ${admins}`;
+      // Desde la migración 200 el hilo es de los administradores Y los
+      // capitanes. Quién escribe lo dice `canWrite` (el permiso `chatClubs`),
+      // no el rol: mirar sólo el rol le decía «Solo lectura» a un capitán
+      // que sí puede escribir.
+      const quienes = canWrite ? 'Administradores y capitanes' : 'Solo lectura';
+      return `${estadoLabel(clubChallenge.estado)} · ${quienes}`;
     }
     if (t?.type === 'club') {
       const n = context?.memberCount;
@@ -1499,7 +1503,7 @@ export default function ChatThreadScreen({ route, navigation }) {
       return [fecha, m.comuna].filter(Boolean).join(' · ') || 'Chat del partido';
     }
     return canWrite ? 'Amigos · Ver perfil' : 'Ver perfil';
-  }, [t?.type, context, paramSubtitle, canWrite, clubChallenge, myClubIds]);
+  }, [t?.type, context, paramSubtitle, canWrite, clubChallenge]);
 
   const commandSuggestions = useMemo(
     () => (isGroup ? suggestCommands(draft, { isClubAdmin, threadType: t?.type }) : []),

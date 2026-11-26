@@ -542,7 +542,7 @@ export async function getThreadAccess(threadKeyStr, { challengeId = null } = {})
         canWrite: false,
         reason: 'not_challenge_admin',
         title: 'Este chat es solo para quienes negocian el desafío',
-        message: 'La negociación del desafío la lleva el administrador de cada club, o quien tenga el permiso para chatear con otros clubes.',
+        message: 'La conversación del desafío es de los administradores y capitanes de cada club, o de quien tenga el permiso para chatear con otros clubes.',
       };
     }
 
