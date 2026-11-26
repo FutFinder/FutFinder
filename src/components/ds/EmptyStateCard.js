@@ -41,15 +41,15 @@ export default function EmptyStateCard({
           style={({ pressed }) => [
             styles.btn,
             solid
-              ? { backgroundColor: tema.main }
-              : { borderWidth: 1, borderColor: tema.border, backgroundColor: tema.soft },
+              ? { backgroundColor: C.green }
+              : { borderWidth: 1, borderColor: C.border, backgroundColor: C.surfaceAlt },
             pressed && { opacity: 0.8 },
           ]}
         >
           <Text
             style={[
               solid ? styles.btnSolidText : styles.btnGhostText,
-              { color: solid ? tema.ink : tema.main },
+              { color: solid ? C.textOnGreen : C.textPrimary },
             ]}
           >
             {actionLabel}

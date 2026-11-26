@@ -113,13 +113,13 @@ export default function ChallengeHeader({
               accessibilityLabel={dobles.etiquetaSi}
               style={({ pressed }) => [
                 styles.cta,
-                { backgroundColor: tema.main },
+                { backgroundColor: C.green },
                 styles.ctaMitad,
                 pressed && { opacity: 0.85 },
                 ocupado && styles.ctaOcupado,
               ]}
             >
-              <Text style={[styles.ctaText, { color: tema.ink }]}>{dobles.si}</Text>
+              <Text style={[styles.ctaText, { color: C.textOnGreen }]}>{dobles.si}</Text>
             </Pressable>
             <Pressable
               onPress={() => dobles.onElegir(false)}
@@ -128,14 +128,14 @@ export default function ChallengeHeader({
               accessibilityLabel={dobles.etiquetaNo}
               style={({ pressed }) => [
                 styles.cta,
-                { backgroundColor: tema.main },
+                { backgroundColor: C.green },
                 styles.ctaMitad,
                 styles.ctaNo,
                 pressed && { opacity: 0.85 },
                 ocupado && styles.ctaOcupado,
               ]}
             >
-              <Text style={[styles.ctaText, { color: tema.ink }, styles.ctaTextNo]}>{dobles.no}</Text>
+              <Text style={[styles.ctaText, { color: C.textOnGreen }, styles.ctaTextNo]}>{dobles.no}</Text>
             </Pressable>
           </View>
           {!!cta.hint && (
@@ -152,12 +152,12 @@ export default function ChallengeHeader({
           accessibilityLabel={cta.label}
           style={({ pressed }) => [
             styles.cta,
-            { backgroundColor: tema.main },
+            { backgroundColor: C.green },
             pressed && { opacity: 0.85 },
             ocupado && styles.ctaOcupado,
           ]}
         >
-          <Text style={[styles.ctaText, { color: tema.ink }]}>{cta.label}</Text>
+          <Text style={[styles.ctaText, { color: C.textOnGreen }]}>{cta.label}</Text>
         </Pressable>
       ) : cta?.hint ? (
         <Text style={styles.hint} numberOfLines={2}>

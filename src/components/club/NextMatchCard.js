@@ -54,8 +54,8 @@ export default function NextMatchCard({
     <View style={[styles.tarjeta, { borderColor: escala.border, shadowColor: '#000' }]}>
       <View style={styles.cabecera}>
         {plazo ? (
-          <View style={[styles.pill, { backgroundColor: escala.main }]}>
-            <Text style={[styles.pillTexto, { color: escala.ink }]}>{plazo}</Text>
+          <View style={[styles.pill, { borderWidth: 1, borderColor: escala.main }]}>
+            <Text style={[styles.pillTexto, { color: escala.main }]}>{plazo}</Text>
           </View>
         ) : (
           <View />
@@ -119,11 +119,11 @@ export default function NextMatchCard({
           style={({ pressed }) => [
             styles.accion,
             styles.accionPrimaria,
-            { backgroundColor: escala.main },
+            { backgroundColor: C.green },
             pressed && { opacity: 0.85 },
           ]}
         >
-          <Text style={[styles.accionTexto, { color: escala.ink }]}>Ver partido</Text>
+          <Text style={[styles.accionTexto, { color: C.textOnGreen }]}>Ver partido</Text>
         </Pressable>
         <Pressable
           onPress={onNomina}
@@ -150,7 +150,7 @@ function Lado({ club, propio, tema }) {
         size={52}
         borderRadius={17}
         tema={propio ? tema : undefined}
-        style={propio ? { backgroundColor: tema.soft } : undefined}
+        style={propio ? { borderColor: tema.main } : undefined}
       />
       <Text style={styles.nombreClub} numberOfLines={2}>
         {club.nombre}

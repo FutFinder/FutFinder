@@ -11,13 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { AlertTriangle, ArrowLeft, Check, X, Clock } from 'lucide-react-native';
+import { AlertTriangle, ArrowLeft, Clock, Search, ShieldPlus } from 'lucide-react-native';
 
 import {
   paleta as C,
   fuentes as F,
   clubTonos,
-  clubSuperficies,
   alfa,
 } from '../theme/colors';
 import { temaDeClub } from '../theme/clubThemes';
@@ -30,6 +29,7 @@ import {
 import { getMatchById } from '../services/matches';
 import { lugarLabel } from '../services/clubMatchRules';
 import { haceCuanto } from '../utils/tiempoRelativo.js';
+import { modalidadInline } from '../utils/clubModalidad';
 import { destinoDeTarea, etiquetaBadge } from '../utils/clubsHomeTasks.js';
 import { navigateToNotification } from '../utils/notificationTargets';
 import { useClubsHome } from '../contexts/ClubsHomeContext';
@@ -701,28 +701,32 @@ function EstadoDeError({ onReintentar }) {
 function SinClub({ invitaciones, onCrear, onExplorar, onResponder }) {
   return (
     <View style={styles.seccion}>
-      <View style={styles.centrado}>
-        <Text style={styles.tituloVacio}>Aún no tienes club</Text>
+      <View style={styles.sinClubHero}>
+        <View style={styles.sinClubEscudo}>
+          <ShieldPlus color={C.textSoft} size={22} strokeWidth={2} />
+        </View>
+        <Text style={styles.tituloVacio}>Aún no estás en un club</Text>
         <Text style={styles.textoVacio}>
-          Crea el tuyo y arma tu plantel, o busca uno al que unirte.
+          Crea el tuyo o busca uno para sumarte. Puedes estar en hasta {MAX_CLUBES_POR_JUGADOR} clubes.
         </Text>
-        <Pressable
-          onPress={onCrear}
-          accessibilityRole="button"
-          accessibilityLabel="Crear club"
-          style={({ pressed }) => [styles.botonPrimario, pressed && { opacity: 0.85 }]}
-        >
-          <Text style={styles.botonPrimarioTexto}>Crear club</Text>
-        </Pressable>
-        <Pressable
-          onPress={onExplorar}
-          accessibilityRole="button"
-          accessibilityLabel="Explorar clubes"
-          style={({ pressed }) => [styles.botonSecundario, pressed && { opacity: 0.85 }]}
-        >
-          <Text style={styles.botonSecundarioTexto}>Explorar clubes</Text>
-        </Pressable>
       </View>
+      <Pressable
+        onPress={onCrear}
+        accessibilityRole="button"
+        accessibilityLabel="Crear club"
+        style={({ pressed }) => [styles.botonPrimario, pressed && { backgroundColor: C.greenActive }]}
+      >
+        <Text style={styles.botonPrimarioTexto}>Crear club</Text>
+      </Pressable>
+      <Pressable
+        onPress={onExplorar}
+        accessibilityRole="button"
+        accessibilityLabel="Explorar clubes"
+        style={({ pressed }) => [styles.botonSecundario, styles.conIcono, pressed && { opacity: 0.85 }]}
+      >
+        <Search color={C.textPrimary} size={16} strokeWidth={2.2} />
+        <Text style={styles.botonSecundarioTexto}>Explorar clubes</Text>
+      </Pressable>
 
       <Invitaciones lista={invitaciones} onResponder={onResponder} />
     </View>
@@ -731,25 +735,34 @@ function SinClub({ invitaciones, onCrear, onExplorar, onResponder }) {
 
 function SolicitudEnRevision({ solicitudes, invitaciones, onVerClub, onResponder, onCancelar }) {
   const solicitud = (solicitudes || [])[0];
+  const t = temaDeClub(solicitud?.club);
 
   return (
     <View style={styles.seccion}>
       {solicitud ? (
         <View style={styles.tarjetaEspera}>
           <View style={styles.esperaCabecera}>
-            <View style={styles.circuloEspera}>
-              <Clock size={17} color={clubTonos.warn.fg} strokeWidth={2.2} />
+            <View style={[styles.aroLogo, { borderColor: t.main }]}>
+              <ClubLogo uri={solicitud.club?.foto_url} size={36} borderRadius={18} />
             </View>
             <View style={styles.textos}>
-              <Text style={styles.tituloTarjeta}>Solicitud en revisión</Text>
-              <Text style={styles.subtituloTarjeta}>
+              <Text style={styles.tituloTarjeta} numberOfLines={1}>
                 {solicitud.club?.nombre || 'Un club'}
-                {haceCuanto(solicitud.created_at) ? ` · hace ${haceCuanto(solicitud.created_at)}` : ''}
+              </Text>
+              <Text style={styles.subtituloTarjeta}>
+                {haceCuanto(solicitud.created_at)
+                  ? `Solicitud enviada hace ${haceCuanto(solicitud.created_at)}`
+                  : 'Solicitud enviada'}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.textoVacio}>
+          <View style={styles.esperaAviso}>
+            <Clock size={14} color={C.textSecondary} strokeWidth={2.2} />
+            <Text style={styles.esperaAvisoTexto}>En revisión por los administradores</Text>
+          </View>
+
+          <Text style={styles.textoAyuda}>
             Mientras un administrador responde no puedes desafiar clubes ni entrar a una
             nómina. Puedes seguir jugando partidos abiertos.
           </Text>
@@ -759,19 +772,17 @@ function SolicitudEnRevision({ solicitudes, invitaciones, onVerClub, onResponder
               onPress={() => onVerClub(solicitud.club_id)}
               accessibilityRole="button"
               accessibilityLabel="Ver el club"
-              style={({ pressed }) => [styles.botonSecundario, styles.crece, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.botonChico, styles.botonChicoVerde, styles.crece, pressed && { opacity: 0.85 }]}
             >
-              <Text style={styles.botonSecundarioTexto}>Ver el club</Text>
+              <Text style={styles.botonChicoVerdeTexto}>Ver el club</Text>
             </Pressable>
             <Pressable
               onPress={() => onCancelar(solicitud)}
               accessibilityRole="button"
               accessibilityLabel="Cancelar solicitud"
-              style={({ pressed }) => [styles.botonSecundario, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.botonChico, styles.crece, pressed && { opacity: 0.85 }]}
             >
-              <Text style={[styles.botonSecundarioTexto, { color: clubTonos.danger.fg }]}>
-                Cancelar
-              </Text>
+              <Text style={styles.botonChicoTexto}>Cancelar solicitud</Text>
             </Pressable>
           </View>
         </View>
@@ -787,36 +798,55 @@ function Invitaciones({ lista, onResponder }) {
   if (filas.length === 0) return null;
 
   return (
-    <View style={styles.pila}>
-      <Text style={styles.tituloSeccion}>Invitaciones</Text>
-      {filas.map((inv) => (
-        <View key={inv.request_id} style={styles.invitacion}>
-          <View style={styles.textos}>
-            <Text style={styles.tituloTarjeta} numberOfLines={1}>
-              {inv.club?.nombre || 'Un club'}
-            </Text>
-            <Text style={styles.subtituloTarjeta}>te invitó a unirte</Text>
-          </View>
-          <Pressable
-            onPress={() => onResponder(inv, true)}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={`Aceptar la invitación de ${inv.club?.nombre || 'el club'}`}
-            style={({ pressed }) => [styles.iconoAceptar, pressed && { opacity: 0.75 }]}
-          >
-            <Check size={17} color="#0B1F0E" strokeWidth={2.6} />
-          </Pressable>
-          <Pressable
-            onPress={() => onResponder(inv, false)}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={`Rechazar la invitación de ${inv.club?.nombre || 'el club'}`}
-            style={({ pressed }) => [styles.iconoRechazar, pressed && { opacity: 0.75 }]}
-          >
-            <X size={17} color={C.textDim} strokeWidth={2.4} />
-          </Pressable>
+    <View style={[styles.pila, styles.invitacionesBloque]}>
+      <View style={styles.tituloConBadge}>
+        <Text style={styles.tituloSeccion}>Invitaciones recibidas</Text>
+        <View style={styles.badge}>
+          <Text style={styles.badgeTexto}>{filas.length}</Text>
         </View>
-      ))}
+      </View>
+      {filas.map((inv) => {
+        const club = inv.club || {};
+        const t = temaDeClub(club);
+        const meta = ['Te invitó a unirte', club.comuna, modalidadInline(club.modalidad)]
+          .filter(Boolean)
+          .join(' · ');
+        return (
+          <View key={inv.request_id} style={styles.invitacion}>
+            <View style={styles.esperaCabecera}>
+              <View style={[styles.aroLogo, { borderColor: t.main }]}>
+                <ClubLogo uri={club.foto_url} size={36} borderRadius={18} />
+              </View>
+              <View style={styles.textos}>
+                <Text style={styles.tituloTarjeta} numberOfLines={1}>
+                  {club.nombre || 'Un club'}
+                </Text>
+                <Text style={styles.subtituloTarjeta} numberOfLines={1}>
+                  {meta}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.esperaAcciones}>
+              <Pressable
+                onPress={() => onResponder(inv, true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Aceptar la invitación de ${club.nombre || 'el club'}`}
+                style={({ pressed }) => [styles.botonChico, styles.botonChicoVerde, styles.crece, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.botonChicoVerdeTexto}>Aceptar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => onResponder(inv, false)}
+                accessibilityRole="button"
+                accessibilityLabel={`Rechazar la invitación de ${club.nombre || 'el club'}`}
+                style={({ pressed }) => [styles.botonChico, styles.crece, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.botonChicoTexto}>Rechazar</Text>
+              </Pressable>
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -1006,85 +1036,101 @@ const styles = StyleSheet.create({
     color: C.textFaint,
     paddingVertical: 14,
   },
-  tituloVacio: { fontSize: 17, fontFamily: F.extraBold, color: '#FFFFFF', textAlign: 'center' },
+  tituloVacio: { fontSize: 20, fontFamily: F.extraBold, color: C.textPrimary, textAlign: 'center' },
   textoVacio: {
-    fontSize: 13,
+    fontSize: 13.5,
     lineHeight: 19,
-    color: C.textFaint,
+    color: C.textSecondary,
     textAlign: 'center',
   },
   botonPrimario: {
-    marginTop: 6,
-    minWidth: 180,
-    height: 48,
-    borderRadius: 15,
+    height: 50,
+    paddingHorizontal: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: C.green,
   },
-  botonPrimarioTexto: { fontSize: 14, fontFamily: F.bold, color: '#04140A' },
+  botonPrimarioTexto: { fontSize: 15, fontFamily: F.extraBold, color: C.textOnGreen },
   botonSecundario: {
-    minWidth: 140,
-    height: 46,
+    height: 48,
     paddingHorizontal: 18,
-    borderRadius: 15,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: alfa(C.tinta, 0.06),
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: alfa(C.tinta, 0.12),
+    borderColor: C.border,
   },
-  botonSecundarioTexto: { fontSize: 13.5, fontFamily: F.bold, color: '#FFFFFF' },
+  botonSecundarioTexto: { fontSize: 14, fontFamily: F.bold, color: C.textPrimary },
   crece: { flex: 1 },
+  conIcono: { flexDirection: 'row', gap: 8 },
+  sinClubHero: { alignItems: 'center', gap: 8, paddingTop: 18, paddingBottom: 6 },
+  sinClubEscudo: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: C.dashedBorderStrong,
+    backgroundColor: C.surface,
+    marginBottom: 6,
+  },
+  invitacionesBloque: { marginTop: 14 },
+  aroLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  esperaAviso: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: C.surfaceAlt,
+  },
+  esperaAvisoTexto: { fontSize: 12.5, color: C.textSecondary },
+  textoAyuda: { fontSize: 12, lineHeight: 17, color: C.textSecondary },
+  botonChico: {
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  botonChicoVerde: { backgroundColor: C.green, borderColor: C.green },
+  botonChicoTexto: { fontSize: 14, fontFamily: F.bold, color: C.textPrimary },
+  botonChicoVerdeTexto: { fontSize: 14, fontFamily: F.extraBold, color: C.textOnGreen },
 
   tarjetaEspera: {
     gap: 12,
-    padding: 15,
-    borderRadius: 18,
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 197, 49, 0.3)',
-    backgroundColor: clubTonos.warn.soft,
+    borderColor: C.border,
+    backgroundColor: C.surface,
   },
   esperaCabecera: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  circuloEspera: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-  },
   esperaAcciones: { flexDirection: 'row', gap: 9 },
   textos: { flex: 1, minWidth: 0, gap: 2 },
-  tituloTarjeta: { fontSize: 14, fontFamily: F.bold, color: '#FFFFFF' },
+  tituloTarjeta: { fontSize: 15, fontFamily: F.extraBold, color: C.textPrimary },
   subtituloTarjeta: { fontSize: 12, color: C.textSecondary },
 
   invitacion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    padding: 12,
+    gap: 12,
+    padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: clubSuperficies.borde,
-    backgroundColor: clubSuperficies.card,
-  },
-  iconoAceptar: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.green,
-  },
-  iconoRechazar: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: alfa(C.tinta, 0.06),
-    borderWidth: 1,
-    borderColor: alfa(C.tinta, 0.12),
+    borderColor: C.border,
+    backgroundColor: C.surface,
   },
 });

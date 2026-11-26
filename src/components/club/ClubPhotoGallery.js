@@ -28,12 +28,12 @@ function AddClubPhotoCard({ size, onPress, tema }) {
       style={({ pressed }) => [
         styles.cell,
         styles.addCell,
-        { width: size, height: size, borderColor: tema.border, backgroundColor: tema.soft },
-        pressed && { backgroundColor: tema.softStrong },
+        { width: size, height: size, borderColor: C.dashedBorderStrong, backgroundColor: C.surface },
+        pressed && { backgroundColor: C.surfaceHover },
       ]}
     >
-      <Plus color={tema.main} size={20} strokeWidth={2.4} />
-      <Text style={[styles.addLabel, { color: tema.main }]}>Añadir</Text>
+      <Plus color={C.textSoft} size={20} strokeWidth={2.4} />
+      <Text style={[styles.addLabel, { color: C.textSoft }]}>Añadir</Text>
     </Pressable>
   );
 }

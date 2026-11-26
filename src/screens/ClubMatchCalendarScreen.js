@@ -218,7 +218,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                   <View
                     style={[
                       styles.celdaCirculo,
-                      seleccionado && { backgroundColor: tema.main },
+                      seleccionado && { backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.textPrimary },
                       !seleccionado && esHoy && { borderWidth: 1.5, borderColor: tema.main },
                     ]}
                   >
@@ -226,7 +226,7 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                       style={[
                         styles.celdaTexto,
                         (esPasado || fueraDeRango) && styles.celdaTextoApagado,
-                        seleccionado && { color: tema.ink, fontFamily: F.extraBold },
+                        seleccionado && { color: C.textPrimary, fontFamily: F.extraBold },
                       ]}
                     >
                       {d.dia}
@@ -271,12 +271,12 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                   accessibilityLabel="Buscar rival para este día"
                   style={({ pressed }) => [
                     styles.accionBtn,
-                    { backgroundColor: tema.soft, borderColor: tema.border },
-                    pressed && { opacity: 0.8 },
+                    { backgroundColor: 'transparent', borderColor: C.dashedBorderStrong, borderStyle: 'dashed' },
+                    pressed && { backgroundColor: C.surfaceHover },
                   ]}
                 >
-                  <Search color={tema.main} size={16} strokeWidth={2.2} />
-                  <Text style={[styles.accionTexto, { color: tema.main }]}>Buscar rival</Text>
+                  <Search color={C.textPrimary} size={16} strokeWidth={2.2} />
+                  <Text style={[styles.accionTexto, { color: C.textPrimary }]}>Buscar rival</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => navigation.navigate('ClubChallenges', { clubId, prefillFecha: fechaSeleccionada })}
@@ -284,12 +284,12 @@ export default function ClubMatchCalendarScreen({ navigation, route }) {
                   accessibilityLabel="Publicar un desafío para este día"
                   style={({ pressed }) => [
                     styles.accionBtn,
-                    { backgroundColor: 'transparent', borderColor: tema.border },
-                    pressed && { backgroundColor: tema.soft },
+                    { backgroundColor: 'transparent', borderColor: C.dashedBorderStrong, borderStyle: 'dashed' },
+                    pressed && { backgroundColor: C.surfaceHover },
                   ]}
                 >
-                  <Swords color={tema.main} size={16} strokeWidth={2.2} />
-                  <Text style={[styles.accionTexto, { color: tema.main }]}>Publicar un desafío</Text>
+                  <Swords color={C.textPrimary} size={16} strokeWidth={2.2} />
+                  <Text style={[styles.accionTexto, { color: C.textPrimary }]}>Publicar un desafío</Text>
                 </Pressable>
               </View>
             </View>

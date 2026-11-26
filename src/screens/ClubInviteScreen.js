@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Search as SearchIcon,
-  UserPlus,
   Shield,
 } from 'lucide-react-native';
 
@@ -24,7 +23,7 @@ import {
   fuentes as F,
 } from '../theme/colors';
 import Banner from '../components/Banner';
-import { IconButton, Badge } from '../components/reservas/ui';
+import { IconButton } from '../components/reservas/ui';
 import { searchPlayers } from '../services/profile';
 import { inviteToClub, listMembers } from '../services/clubs';
 
@@ -97,8 +96,9 @@ export default function ClubInviteScreen({ navigation, route }) {
     });
   };
 
-  // No tiene sentido invitar a quienes ya son parte del club
-  const candidates = players.filter((p) => !memberIds.has(p.id));
+  // Quienes ya son del club se muestran con «Ya es del club» en vez de
+  // desaparecer: buscar a alguien y no encontrarlo se lee como un error.
+  const candidates = players;
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -114,11 +114,12 @@ export default function ClubInviteScreen({ navigation, route }) {
         </View>
       </View>
 
+      <Text style={styles.label}>Nombre de usuario</Text>
       <View style={styles.searchBox}>
         <SearchIcon color={C.textSecondary} size={18} strokeWidth={2} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar por nombre de usuario"
+          placeholder="@usuario"
           placeholderTextColor={C.textSecondary}
           value={query}
           onChangeText={onSearch}
@@ -145,6 +146,7 @@ export default function ClubInviteScreen({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => {
             const invited = invitedIds.has(item.id);
+            const esDelClub = memberIds.has(item.id);
             return (
               <Pressable
                 onPress={() => navigation.navigate('UserProfile', { userId: item.id })}
@@ -160,12 +162,18 @@ export default function ClubInviteScreen({ navigation, route }) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.playerName}>{item.username}</Text>
                   <Text style={styles.playerMeta}>
-                    Reputación {item.trust_score ?? 'N.A.'}
+                    @{item.username}
                     {item.comuna ? ` · ${item.comuna}` : ''}
                   </Text>
                 </View>
-                {invited ? (
-                  <Badge label="Invitado" tone="green" />
+                {esDelClub ? (
+                  <View style={styles.chipNeutro}>
+                    <Text style={styles.chipNeutroText}>Ya es del club</Text>
+                  </View>
+                ) : invited ? (
+                  <View style={styles.chipNeutro}>
+                    <Text style={styles.chipNeutroText}>Invitado</Text>
+                  </View>
                 ) : sendingId === item.id ? (
                   <ActivityIndicator color={C.green} size="small" />
                 ) : (
@@ -174,14 +182,22 @@ export default function ClubInviteScreen({ navigation, route }) {
                     hitSlop={6}
                     accessibilityRole="button"
                     accessibilityLabel={`Invitar a ${item.username}`}
-                    style={({ pressed }) => [styles.inviteBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [styles.inviteBtn, pressed && { backgroundColor: C.greenSoftStrong }]}
                   >
-                    <UserPlus color={C.textOnGreen} size={16} strokeWidth={2.4} />
+                    <Text style={styles.inviteBtnText}>Invitar</Text>
                   </Pressable>
                 )}
               </Pressable>
             );
           }}
+          ItemSeparatorComponent={() => <View style={styles.separador} />}
+          ListFooterComponent={
+            candidates.length > 0 ? (
+              <Text style={styles.footNote}>
+                La invitación llega a su portada de Clubes. Una persona puede estar en hasta 3 clubes.
+              </Text>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <SearchIcon color={C.textMuted} size={36} strokeWidth={1.5} />
@@ -235,12 +251,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    padding: 12,
-    marginBottom: S.rowGap,
-    borderRadius: R.row,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
+    paddingVertical: 12,
+    paddingHorizontal: 2,
   },
   avatar: { width: 42, height: 42, borderRadius: 21 },
   avatarFallback: {
@@ -254,14 +266,36 @@ const styles = StyleSheet.create({
   playerMeta: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, marginTop: 2 },
 
   inviteBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: C.green,
+    height: 32,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.greenBorderStrong,
+    backgroundColor: C.greenSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
+  inviteBtnText: { fontFamily: F.bold, fontSize: 13, color: C.green },
+  chipNeutro: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surfaceAlt,
+    justifyContent: 'center',
+  },
+  chipNeutroText: { fontFamily: F.bold, fontSize: 12.5, color: C.textSoft },
+  separador: { height: 1, backgroundColor: C.borderSoft, marginLeft: 55 },
+  footNote: { fontFamily: F.medium, fontSize: 12, color: C.textSecondary, lineHeight: 17, marginTop: 14 },
+  label: {
+    fontFamily: F.semiBold,
+    fontSize: 12.5,
+    color: C.textSecondary,
+    marginHorizontal: S.screenPadding,
+    marginBottom: 6,
+  },
   emptyBox: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyTitle: { fontFamily: F.extraBold, fontSize: 16, color: C.textPrimary },
   emptyText: {

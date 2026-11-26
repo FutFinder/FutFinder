@@ -18,19 +18,17 @@ import {
   Shield,
   Crown,
   Star,
-  Check,
   X,
   UserMinus,
   LogOut,
   MessageCircle,
   UserPlus,
-  UserCheck,
-  Clock,
   Search,
   MoreVertical,
   User,
   Pencil,
   Send,
+  Plus,
 } from 'lucide-react-native';
 
 import {
@@ -41,6 +39,8 @@ import {
   alfa,
 } from '../theme/colors';
 import { etiquetaPosiciones } from '../utils/playerMeta';
+import { haceCuanto } from '../utils/tiempoRelativo.js';
+import { temaDeClub } from '../theme/clubThemes';
 import Banner from '../components/Banner';
 import { getCurrentUser } from '../services/auth';
 import {
@@ -443,11 +443,22 @@ export default function ClubMembersScreen({ navigation, route }) {
 
   const limites = CLUB_LIMITS;
   const cuposRestantes = Math.max(0, limites.miembros - members.length);
+  const admins = members.filter((m) => m.rol === 'admin').length;
+  const tema = temaDeClub(club);
   const isSolicitudesTab = soyAdmin && tab === 'solicitudes';
   const listData = isSolicitudesTab ? requests : filteredMembers;
   const listKeyExtractor = isSolicitudesTab
     ? (item) => item.request_id
     : (item) => item.member_id;
+  // Rediseño de Clubes (2026-11-26): el resumen del plantel pasó de una
+  // tarjeta con barra al subtítulo de la cabecera.
+  const subtitulo = isSolicitudesTab
+    ? cuposRestantes > 0
+      ? `Quedan ${cuposRestantes} cupo${cuposRestantes === 1 ? '' : 's'}`
+      : 'Plantel completo'
+    : soyAdmin
+      ? `${members.length} de ${limites.miembros} · ${admins} de ${limites.admins} administradores`
+      : `${club.nombre} · ${members.length} de ${limites.miembros}`;
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
@@ -466,9 +477,28 @@ export default function ClubMembersScreen({ navigation, route }) {
             Integrantes
           </Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {club.nombre}
+            {subtitulo}
           </Text>
         </View>
+        {/* Invitar jugadores (admin, o quien tenga el permiso concedido). */}
+        {puedeInvitar && (
+          <Pressable
+            onPress={() =>
+              navigation.navigate('ClubInvite', {
+                clubId: club.id,
+                clubNombre: club.nombre,
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Invitar jugadores"
+            style={({ pressed }) => [styles.invitarBtn, pressed && { backgroundColor: C.greenSoftStrong }]}
+          >
+            <Plus color={C.green} size={15} strokeWidth={2.6} />
+            <Text style={styles.invitarBtnText}>Invitar</Text>
+          </Pressable>
+        )}
+        {/* El chat del club vive en la cabecera de la ficha; acá queda como
+            segundo camino para quien llega por un enlace a Integrantes. */}
         {soyMiembro && (
           <Pressable
             onPress={() =>
@@ -480,17 +510,43 @@ export default function ClubMembersScreen({ navigation, route }) {
               })
             }
             hitSlop={8}
-            // El globo no decía nada: en el árbol de accesibilidad el control
-            // no tenía nombre ni rol, así que no se podía encontrar ni con
-            // teclado ni con lector de pantalla.
             accessibilityRole="button"
             accessibilityLabel="Chat del club"
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           >
-            <MessageCircle color={C.green} size={18} strokeWidth={2.2} />
+            <MessageCircle color={C.textPrimary} size={18} strokeWidth={2.2} />
           </Pressable>
         )}
       </View>
+
+      {soyAdmin && (
+        <View style={styles.tabRow}>
+          <Pressable
+            onPress={() => setTab('miembros')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === 'miembros' }}
+            style={[styles.tabBtn, tab === 'miembros' && { borderBottomColor: tema.main }]}
+          >
+            <Text style={[styles.tabLabel, tab === 'miembros' && styles.tabLabelActive]}>Miembros</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setTab('solicitudes')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === 'solicitudes' }}
+            accessibilityLabel={`Solicitudes, ${requests.length} pendientes`}
+            style={[styles.tabBtn, tab === 'solicitudes' && { borderBottomColor: tema.main }]}
+          >
+            <Text style={[styles.tabLabel, tab === 'solicitudes' && styles.tabLabelActive]}>
+              Solicitudes
+            </Text>
+            {requests.length > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{requests.length}</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
+      )}
 
       <FlatList
         data={listData}
@@ -508,27 +564,6 @@ export default function ClubMembersScreen({ navigation, route }) {
           <View>
             {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryHeaderRow}>
-                <Text style={styles.summaryTitle}>
-                  Plantel {members.length}/{limites.miembros}
-                </Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${Math.min(100, (members.length / limites.miembros) * 100)}%` },
-                  ]}
-                />
-              </View>
-              <Text style={styles.summaryHint}>
-                {cuposRestantes > 0
-                  ? `Quedan ${cuposRestantes} cupo${cuposRestantes === 1 ? '' : 's'} en el plantel`
-                  : 'Plantel completo'}
-              </Text>
-            </View>
-
             {/* Acción principal para visitantes */}
             {!soyMiembro && !tengoMaxClubs && (
               <Pressable
@@ -541,10 +576,10 @@ export default function ClubMembersScreen({ navigation, route }) {
                 ]}
               >
                 {working ? (
-                  <ActivityIndicator color={myRequest ? C.textPrimary : C.greenInk} />
+                  <ActivityIndicator color={myRequest ? C.textPrimary : C.textOnGreen} />
                 ) : (
                   <>
-                    {!myRequest && <UserPlus color={C.greenInk} size={18} strokeWidth={2.4} />}
+                    {!myRequest && <UserPlus color={C.textOnGreen} size={18} strokeWidth={2.4} />}
                     <Text style={myRequest ? styles.secondaryBtnText : styles.primaryBtnText}>
                       {myRequest ? 'Cancelar solicitud' : 'Solicitar unirme'}
                     </Text>
@@ -560,56 +595,15 @@ export default function ClubMembersScreen({ navigation, route }) {
               />
             )}
 
-            {/* Invitar jugadores (admin, o quien tenga el permiso concedido) */}
-            {puedeInvitar && (
-              <Pressable
-                onPress={() =>
-                  navigation.navigate('ClubInvite', {
-                    clubId: club.id,
-                    clubNombre: club.nombre,
-                  })
-                }
-                style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
-              >
-                <UserPlus color={C.greenInk} size={18} strokeWidth={2.4} />
-                <Text style={styles.primaryBtnText}>Invitar jugadores</Text>
-              </Pressable>
-            )}
-
-            {soyAdmin && (
-              <View style={styles.tabRow}>
-                <Pressable
-                  onPress={() => setTab('miembros')}
-                  style={[styles.tabBtn, tab === 'miembros' && styles.tabBtnActive]}
-                >
-                  <Text style={[styles.tabLabel, tab === 'miembros' && styles.tabLabelActive]}>
-                    Integrantes
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setTab('solicitudes')}
-                  style={[styles.tabBtn, tab === 'solicitudes' && styles.tabBtnActive]}
-                >
-                  <Text style={[styles.tabLabel, tab === 'solicitudes' && styles.tabLabelActive]}>
-                    Solicitudes
-                  </Text>
-                  {requests.length > 0 && (
-                    <View style={styles.tabBadge}>
-                      <Text style={styles.tabBadgeText}>{requests.length}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              </View>
-            )}
-
             {!isSolicitudesTab && (
               <View style={styles.searchBox}>
-                <Search color={C.textSecondary} size={18} strokeWidth={2} />
+                <Search color={C.textSecondary} size={17} strokeWidth={2} />
                 <TextInput
                   value={query}
                   onChangeText={setQuery}
-                  placeholder="Buscar por nombre, apodo o posición"
+                  placeholder="Buscar integrante"
                   placeholderTextColor={C.textSecondary}
+                  accessibilityLabel="Buscar por nombre, apodo o posición"
                   style={styles.searchInput}
                 />
                 {query.length > 0 && (
@@ -628,78 +622,79 @@ export default function ClubMembersScreen({ navigation, route }) {
             )}
           </View>
         }
+        ItemSeparatorComponent={isSolicitudesTab ? null : () => <View style={styles.separador} />}
         renderItem={
           isSolicitudesTab
-            ? ({ item }) => (
-                <View style={styles.requestRow}>
-                  <MemberAvatar foto={item.foto_url} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.memberName}>{item.username}</Text>
-                    <Text style={styles.memberMeta}>
-                      Reputación {item.trust_score ?? 'N.A.'}
-                      {item.comuna ? ` · ${item.comuna}` : ''}
-                    </Text>
+            ? ({ item }) => {
+                const hace = haceCuanto(item.created_at);
+                const meta = [hace ? `Hace ${hace}` : null, item.comuna ? `Vive en ${item.comuna}` : null]
+                  .filter(Boolean)
+                  .join(' · ');
+                return (
+                  <View style={styles.requestCard}>
+                    <Pressable
+                      onPress={() => navigation.navigate('UserProfile', { userId: item.user_id })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Ver el perfil de ${item.username}`}
+                      style={styles.requestTop}
+                    >
+                      <MemberAvatar foto={item.foto_url} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.memberName}>{item.username}</Text>
+                        {meta ? <Text style={styles.memberMeta}>{meta}</Text> : null}
+                      </View>
+                    </Pressable>
+                    <View style={styles.requestActions}>
+                      <Pressable
+                        onPress={() => handleRespond(item, true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Aceptar a ${item.username}`}
+                        style={({ pressed }) => [styles.reqAccept, pressed && { backgroundColor: C.greenActive }]}
+                      >
+                        <Text style={styles.reqAcceptText}>Aceptar</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleRespond(item, false)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Rechazar a ${item.username}`}
+                        style={({ pressed }) => [styles.reqReject, pressed && { backgroundColor: C.surfaceHover }]}
+                      >
+                        <Text style={styles.reqRejectText}>Rechazar</Text>
+                      </Pressable>
+                    </View>
                   </View>
-                  <Pressable
-                    onPress={() => handleRespond(item, true)}
-                    hitSlop={6}
-                    style={({ pressed }) => [
-                      styles.reqBtn,
-                      styles.reqAccept,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                  >
-                    <Check color={C.greenInk} size={16} strokeWidth={2.6} />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleRespond(item, false)}
-                    hitSlop={6}
-                    style={({ pressed }) => [
-                      styles.reqBtn,
-                      styles.reqReject,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                  >
-                    <X color={C.loss} size={16} strokeWidth={2.6} />
-                  </Pressable>
-                </View>
-              )
+                );
+              }
             : ({ item }) => {
                 const posiciones = etiquetaPosiciones(item.posicion_preferida);
+                const esYo = item.user_id === me;
+                const rol =
+                  item.rol === 'admin' ? 'Administrador' : item.rol === 'capitan' ? 'Capitán' : 'Jugador';
+                const linea = [esYo ? `${rol} · tú` : rol, posiciones].filter(Boolean).join(' · ');
                 return (
                   <Pressable
                     onPress={() => navigation.navigate('UserProfile', { userId: item.user_id })}
-                    style={({ pressed }) => [styles.memberRow, pressed && { opacity: 0.9 }]}
+                    style={({ pressed }) => [styles.memberRow, pressed && { backgroundColor: C.surfaceHover }]}
                   >
                     <MemberAvatar foto={item.foto_url} />
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={styles.memberName} numberOfLines={1}>
                         {item.username}
-                        {item.apodo ? <Text style={styles.memberApodo}> "{item.apodo}"</Text> : null}
+                        {item.apodo ? <Text style={styles.memberApodo}> · «{item.apodo}»</Text> : null}
                       </Text>
-                      {(item.rol === 'admin' || item.rol === 'capitan') && (
-                        <View style={styles.badgeRow}>
-                          {item.rol === 'admin' && (
-                            <View style={styles.adminChip}>
-                              <Crown color={C.green} size={10} strokeWidth={2.4} />
-                              <Text style={styles.adminChipText}>Admin</Text>
-                            </View>
-                          )}
-                          {item.rol === 'capitan' && (
-                            <View style={styles.capitanChip}>
-                              <Star color={C.gold} size={10} strokeWidth={2.4} />
-                              <Text style={styles.capitanChipText}>Capitán</Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                      <Text style={styles.memberMeta} numberOfLines={1}>
-                        Reputación {item.trust_score ?? 'N.A.'}
-                        {posiciones ? ` · ${posiciones}` : ''}
-                        {item.comuna ? ` · ${item.comuna}` : ''}
-                      </Text>
+                      <View style={styles.rolFila}>
+                        {item.rol === 'admin' && <Crown color={C.green} size={11} strokeWidth={2.4} />}
+                        {item.rol === 'capitan' && <Star color={C.gold} size={11} strokeWidth={2.4} />}
+                        <Text style={styles.memberMeta} numberOfLines={1}>
+                          {linea}
+                        </Text>
+                      </View>
                     </View>
-                    {item.user_id !== me && (
+                    {esYo ? (
+                      <View style={styles.chipNeutro}>
+                        <Text style={styles.chipNeutroText}>Tú</Text>
+                      </View>
+                    ) : (
                       <FriendControl
                         status={friendStatus.get(item.user_id)?.status || 'none'}
                         onAdd={() => handleAddFriend(item)}
@@ -722,9 +717,18 @@ export default function ClubMembersScreen({ navigation, route }) {
               }
         }
         ListFooterComponent={
-          soyMiembro ? (
+          isSolicitudesTab ? (
+            requests.length > 0 ? (
+              <Text style={styles.footNote}>
+                Al aceptar, la persona entra como jugador. Cada club admite hasta {limites.miembros}{' '}
+                integrantes.
+              </Text>
+            ) : null
+          ) : soyMiembro ? (
             <Pressable
               onPress={handleLeave}
+              accessibilityRole="button"
+              accessibilityLabel="Salir del club"
               style={({ pressed }) => [styles.leaveBtn, pressed && { opacity: 0.7 }]}
             >
               <LogOut color={C.loss} size={16} />
@@ -904,15 +908,15 @@ function MemberAvatar({ foto }) {
 function FriendControl({ status, onAdd, onAccept }) {
   if (status === 'friends') {
     return (
-      <View style={styles.friendIconBox} accessibilityLabel="Ya son amigos">
-        <UserCheck color={C.green} size={16} strokeWidth={2.2} />
+      <View style={styles.chipNeutro} accessibilityLabel="Ya son amigos">
+        <Text style={styles.chipNeutroText}>Amigos</Text>
       </View>
     );
   }
   if (status === 'sent') {
     return (
-      <View style={styles.friendIconBoxMuted} accessibilityLabel="Solicitud enviada">
-        <Clock color={C.textMuted} size={14} strokeWidth={2.2} />
+      <View style={styles.chipNeutro} accessibilityLabel="Solicitud de amistad enviada">
+        <Text style={[styles.chipNeutroText, { color: C.textSecondary }]}>Enviada</Text>
       </View>
     );
   }
@@ -921,10 +925,11 @@ function FriendControl({ status, onAdd, onAccept }) {
       <Pressable
         onPress={onAccept}
         hitSlop={6}
-        style={({ pressed }) => [styles.friendIconBox, pressed && { opacity: 0.7 }]}
+        style={({ pressed }) => [styles.chipVerde, pressed && { backgroundColor: C.greenSoftStrong }]}
+        accessibilityRole="button"
         accessibilityLabel="Aceptar solicitud de amistad"
       >
-        <Check color={C.green} size={16} strokeWidth={2.6} />
+        <Text style={styles.chipVerdeText}>Aceptar</Text>
       </Pressable>
     );
   }
@@ -932,10 +937,11 @@ function FriendControl({ status, onAdd, onAccept }) {
     <Pressable
       onPress={onAdd}
       hitSlop={6}
-      style={({ pressed }) => [styles.friendIconBoxMuted, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.chipVerde, pressed && { backgroundColor: C.greenSoftStrong }]}
+      accessibilityRole="button"
       accessibilityLabel="Agregar amigo"
     >
-      <UserPlus color={C.textSecondary} size={14} strokeWidth={2.4} />
+      <Text style={styles.chipVerdeText}>Agregar</Text>
     </Pressable>
   );
 }
@@ -970,23 +976,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconBtn: {
-    width: S.iconBtn,
-    height: S.iconBtn,
-    borderRadius: R.iconBtn,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: C.border,
-    backgroundColor: C.chip,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnPressed: { backgroundColor: C.chipStrong },
   headerTitles: { flex: 1, minWidth: 0 },
-  headerTitle: {
-    color: C.textPrimary,
-    fontSize: 17,
-    fontFamily: F.bold,
-    letterSpacing: -0.2,
-  },
+  headerTitle: { color: C.textPrimary, fontSize: 19, fontFamily: F.extraBold, letterSpacing: -0.2 },
   headerSubtitle: {
     color: C.textSecondary,
     fontSize: 12.5,
@@ -995,42 +996,6 @@ const styles = StyleSheet.create({
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: S.screenPadding, paddingBottom: 40 },
 
-  summaryCard: {
-    backgroundColor: C.surface,
-    borderRadius: R.row,
-    borderWidth: 1,
-    borderColor: C.borderSoft,
-    padding: 14,
-    marginBottom: 14,
-  },
-  summaryHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  summaryTitle: {
-    color: C.textPrimary,
-    fontSize: 15,
-    fontFamily: F.extraBold,
-    letterSpacing: -0.2,
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: C.chip,
-    marginTop: 10,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: C.green,
-  },
-  summaryHint: {
-    color: C.textMuted,
-    fontSize: 12,
-    marginTop: 8,
-  },
 
   primaryBtn: {
     flexDirection: 'row',
@@ -1042,11 +1007,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.green,
     marginBottom: 12,
   },
-  primaryBtnText: {
-    color: C.greenInk,
-    fontSize: 15,
-    fontFamily: F.extraBold,
-  },
+  primaryBtnText: { color: C.textOnGreen, fontSize: 15, fontFamily: F.extraBold },
   secondaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1067,41 +1028,33 @@ const styles = StyleSheet.create({
 
   tabRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
+    gap: 20,
+    paddingHorizontal: S.screenPadding,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderSoft,
+    marginBottom: 14,
   },
   tabBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    flex: 1,
     height: 40,
-    borderRadius: R.iconBtn,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.chip,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -1,
   },
-  tabBtnActive: {
-    backgroundColor: C.greenSoft,
-    borderColor: C.greenBorder,
-  },
-  tabLabel: {
-    color: C.textSecondary,
-    fontSize: 13,
-    fontFamily: F.bold,
-  },
-  tabLabelActive: { color: C.green },
+  tabLabel: { color: C.textSecondary, fontSize: 14, fontFamily: F.bold },
+  tabLabelActive: { color: C.textPrimary },
   tabBadge: {
     minWidth: 18,
     height: 18,
     paddingHorizontal: 5,
     borderRadius: 9,
-    backgroundColor: C.loss,
+    backgroundColor: C.textPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabBadgeText: { color: '#2A0C0F', fontSize: 10, fontFamily: F.extraBold },
+  tabBadgeText: { color: C.bg, fontSize: 10.5, fontFamily: F.extraBold },
 
   searchBox: {
     flexDirection: 'row',
@@ -1136,27 +1089,12 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
 
-  requestRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: C.surface,
-    borderRadius: R.row,
-    borderWidth: 1,
-    borderColor: C.greenBorder,
-    padding: 12,
-    marginBottom: 8,
-  },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: C.surface,
-    borderRadius: R.row,
-    borderWidth: 1,
-    borderColor: C.borderSoft,
-    padding: 12,
-    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
   },
   avatar: {
     width: 42,
@@ -1170,87 +1108,79 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderSoft,
   },
-  memberName: {
-    color: C.textPrimary,
-    fontSize: 14,
-    fontFamily: F.bold,
-  },
+  memberName: { color: C.textPrimary, fontSize: 15, fontFamily: F.bold },
   memberApodo: {
     color: C.textSecondary,
     fontFamily: F.medium,
     fontSize: 13,
   },
-  memberMeta: {
-    color: C.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
-  },
-  adminChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: C.greenSoft,
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  adminChipText: {
-    color: C.green,
-    fontSize: 9,
-    fontFamily: F.extraBold,
-    letterSpacing: 0.3,
-  },
-  capitanChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: C.goldSoft,
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  capitanChipText: {
-    color: C.gold,
-    fontSize: 9,
-    fontFamily: F.extraBold,
-    letterSpacing: 0.3,
-  },
-  reqBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  memberMeta: { color: C.textSecondary, fontSize: 12.5, flexShrink: 1 },
+  reqAccept: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: C.green,
   },
-  reqAccept: { backgroundColor: C.green },
   reqReject: {
-    backgroundColor: C.chip,
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surfaceAlt,
     borderWidth: 1,
-    borderColor: C.loss,
+    borderColor: C.border,
   },
-  friendIconBox: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  invitarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.greenBorderStrong,
     backgroundColor: C.greenSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  friendIconBoxMuted: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: C.chip,
+  invitarBtnText: { color: C.green, fontSize: 13.5, fontFamily: F.bold },
+  separador: { height: 1, backgroundColor: C.borderSoft, marginLeft: 56 },
+  rolFila: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  chipNeutro: {
+    height: 28,
+    paddingHorizontal: 11,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: C.borderSoft,
-    alignItems: 'center',
+    borderColor: C.border,
+    backgroundColor: C.surfaceAlt,
     justifyContent: 'center',
   },
+  chipNeutroText: { color: C.textPrimary, fontSize: 12, fontFamily: F.bold },
+  chipVerde: {
+    height: 28,
+    paddingHorizontal: 11,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.greenBorderStrong,
+    backgroundColor: C.greenSoft,
+    justifyContent: 'center',
+  },
+  chipVerdeText: { color: C.green, fontSize: 12, fontFamily: F.bold },
+  requestCard: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 14,
+    marginBottom: 10,
+    gap: 12,
+  },
+  requestTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  requestActions: { flexDirection: 'row', gap: 8 },
+  reqAcceptText: { color: C.textOnGreen, fontSize: 14, fontFamily: F.extraBold },
+  reqRejectText: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
+  footNote: { color: C.textSecondary, fontSize: 12, textAlign: 'center', marginTop: 6, lineHeight: 17 },
   menuBtn: {
     width: 30,
     height: 30,
@@ -1261,14 +1191,12 @@ const styles = StyleSheet.create({
   leaveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     gap: 8,
-    marginTop: 16,
+    marginTop: 18,
     paddingVertical: 14,
-    borderRadius: R.row,
-    borderWidth: 1,
-    borderColor: C.loss,
-    backgroundColor: alfa(C.red, 0.1),
+    borderTopWidth: 1,
+    borderTopColor: C.borderSoft,
   },
   leaveText: {
     color: C.loss,

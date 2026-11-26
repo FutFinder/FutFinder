@@ -714,7 +714,7 @@ export async function listMyInvitations() {
   const ids = data.map((r) => r.club_id);
   const { data: clubs } = await supabase
     .from('clubs')
-    .select('id, nombre, foto_url, comuna, verificado')
+    .select('id, nombre, foto_url, comuna, verificado, modalidad, tema')
     .in('id', ids);
   const byId = new Map((clubs || []).map((c) => [c.id, c]));
 
@@ -780,7 +780,7 @@ export async function listMyRequests() {
   const ids = data.map((r) => r.club_id);
   const { data: clubs } = await supabase
     .from('clubs')
-    .select('id, nombre, foto_url, comuna, verificado')
+    .select('id, nombre, foto_url, comuna, verificado, modalidad, tema')
     .in('id', ids);
   const byId = new Map((clubs || []).map((c) => [c.id, c]));
 

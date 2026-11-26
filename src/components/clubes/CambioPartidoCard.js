@@ -119,7 +119,7 @@ export default function CambioPartidoCard({
                 accessibilityLabel="Volver sin rechazar el cambio"
                 style={({ pressed }) => [
                   styles.btn,
-                  { backgroundColor: tema.main },
+                  { backgroundColor: C.green },
                   styles.btnMitad,
                   styles.btnGhost,
                   pressed && styles.pressed,
@@ -133,7 +133,7 @@ export default function CambioPartidoCard({
                 accessibilityLabel="Confirmar el rechazo del cambio"
                 style={({ pressed }) => [
                   styles.btn,
-                  { backgroundColor: tema.main },
+                  { backgroundColor: C.green },
                   styles.btnMitad,
                   styles.btnGhost,
                   pressed && styles.pressed,
@@ -151,12 +151,12 @@ export default function CambioPartidoCard({
               accessibilityLabel="Aceptar el cambio y actualizar el partido"
               style={({ pressed }) => [
                 styles.btn,
-                { backgroundColor: tema.main },
+                { backgroundColor: C.green },
                 styles.btnMitad,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={[styles.btnTxt, { color: tema.ink }]}>Aceptar cambio</Text>
+              <Text style={[styles.btnTxt, { color: C.textOnGreen }]}>Aceptar cambio</Text>
             </Pressable>
             <Pressable
               onPress={() => setRechazando(true)}
@@ -164,7 +164,7 @@ export default function CambioPartidoCard({
               accessibilityLabel="Rechazar el cambio"
               style={({ pressed }) => [
                 styles.btn,
-                { backgroundColor: tema.main },
+                { backgroundColor: C.green },
                 styles.btnMitad,
                 styles.btnGhost,
                 pressed && styles.pressed,

@@ -144,8 +144,8 @@ export default function ClubMatchCard({ match, misClubIds = [], onPress, variant
               </Text>
             </View>
           ) : null}
-          <View style={[styles.cta, { backgroundColor: tema.main }]}>
-            <Text style={[styles.ctaText, { color: tema.ink }]}>Ver partido</Text>
+          <View style={[styles.cta, { backgroundColor: C.green }]}>
+            <Text style={[styles.ctaText, { color: C.textOnGreen }]}>Ver partido</Text>
           </View>
         </View>
       </View>

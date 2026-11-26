@@ -117,12 +117,12 @@ export default function PendingTaskCard({
                 accessibilityLabel={`${a.label}: ${tarea.title}. ${tarea.subtitle || ''}`}
                 style={({ pressed }) => [
                   styles.boton,
-                  principal ? { backgroundColor: escala.main } : styles.botonSecundario,
+                  principal ? { backgroundColor: C.green } : styles.botonSecundario,
                   ocupado && { opacity: 0.5 },
                   pressed && !ocupado && { opacity: 0.8 },
                 ]}
               >
-                <Text style={[styles.botonTexto, principal && { color: escala.ink }]}>
+                <Text style={[styles.botonTexto, principal && { color: C.textOnGreen }]}>
                   {a.label}
                 </Text>
               </Pressable>
@@ -134,11 +134,11 @@ export default function PendingTaskCard({
           style={[
             styles.boton,
             esPrimaria
-              ? { backgroundColor: escala.main }
+              ? { backgroundColor: C.green }
               : styles.botonSecundario,
           ]}
         >
-          <Text style={[styles.botonTexto, esPrimaria && { color: escala.ink }]}>
+          <Text style={[styles.botonTexto, esPrimaria && { color: C.textOnGreen }]}>
             {tarea.cta}
           </Text>
         </View>

@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ShieldCheck, Shield, Check } from 'lucide-react-native';
+import { ArrowLeft, Shield, Check, ChevronRight } from 'lucide-react-native';
 
 import { paleta as C, radios as R, medidas as S, fuentes as F, alfa } from '../theme/colors';
-import { modalidadInline } from '../utils/clubMeta';
 import Banner from '../components/Banner';
 import useConfirmacion from '../components/useConfirmacion';
 import { getCurrentUser } from '../services/auth';
@@ -44,12 +43,12 @@ const GRUPOS = [
     titulo: 'Desafíos',
     permisos: [
       { key: 'pubChallenge', label: 'Publicar desafíos', hint: 'Crear desafíos abiertos a nombre del club' },
-      { key: 'answerChallenge', label: 'Aceptar o rechazar', hint: 'Responder desafíos de otros clubes' },
+      { key: 'answerChallenge', label: 'Aceptar o rechazar desafíos', hint: 'Responder desafíos de otros clubes' },
       { key: 'chatClubs', label: 'Chatear con otros clubes', hint: 'Abrir conversación con el admin rival' },
     ],
   },
   {
-    titulo: 'Plantel',
+    titulo: 'Gente',
     permisos: [
       { key: 'invite', label: 'Invitar jugadores', hint: 'Enviar enlaces e invitaciones' },
       { key: 'removeMembers', label: 'Quitar integrantes', hint: 'Sacar jugadores del club' },
@@ -57,7 +56,7 @@ const GRUPOS = [
     ],
   },
   {
-    titulo: 'Partidos',
+    titulo: 'Partido',
     permisos: [
       // NO ES LA DEL PRÓXIMO PARTIDO. `club_lineups` no tiene `match_id`: es el
       // once base del club, y decía lo contrario justo donde se decide quién
@@ -75,7 +74,6 @@ const GRUPOS = [
 ];
 
 const ROLE_LABEL = { admin: 'Administrador', capitan: 'Capitán', jugador: 'Jugador' };
-const ROLE_TABS = ['capitan', 'jugador', 'admin'];
 
 function permisosVacios() {
   const o = {};
@@ -129,7 +127,9 @@ export default function PermisosClubScreen({ navigation, route }) {
   const [members, setMembers] = useState([]);
   const [soyAdmin, setSoyAdmin] = useState(false);
 
-  const [role, setRole] = useState('capitan');
+  // Rediseño de Clubes (2026-11-26): «Por rol» es una matriz con las dos
+  // columnas a la vista y «Por integrante» la lista de excepciones.
+  const [vista, setVista] = useState('rol');
   const [rolesOriginal, setRolesOriginal] = useState({ capitan: permisosVacios(), jugador: permisosVacios() });
   const [roles, setRoles] = useState({ capitan: permisosVacios(), jugador: permisosVacios() });
   const [overridesOriginal, setOverridesOriginal] = useState({});
@@ -173,33 +173,10 @@ export default function PermisosClubScreen({ navigation, route }) {
     cargar();
   }, [cargar]);
 
-  const current = roles[role] || permisosVacios();
-
-  const toggleRolePermiso = useCallback(
-    (key) => {
-      if (role === 'admin') return;
-      setRoles((prev) => ({ ...prev, [role]: { ...prev[role], [key]: !prev[role][key] } }));
-      setDirty(true);
-    },
-    [role]
-  );
-
-  const toggleGrupoCompleto = useCallback(
-    (grupo) => {
-      if (role === 'admin') return;
-      const activo = roles[role] || permisosVacios();
-      const todosActivos = grupo.permisos.every((p) => activo[p.key]);
-      setRoles((prev) => {
-        const next = { ...prev[role] };
-        grupo.permisos.forEach((p) => {
-          next[p.key] = !todosActivos;
-        });
-        return { ...prev, [role]: next };
-      });
-      setDirty(true);
-    },
-    [role, roles]
-  );
+  const toggleRolePermiso = useCallback((rol, key) => {
+    setRoles((prev) => ({ ...prev, [rol]: { ...prev[rol], [key]: !prev[rol][key] } }));
+    setDirty(true);
+  }, []);
 
   /**
    * Escribe el borrador y devuelve si lo consiguió.
@@ -396,7 +373,7 @@ export default function PermisosClubScreen({ navigation, route }) {
   }
 
   return (
-    <SafeAreaView edges={['top']} style={styles.root}>
+    <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}
@@ -409,142 +386,145 @@ export default function PermisosClubScreen({ navigation, route }) {
         </Pressable>
         <View style={styles.headerTitles}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            Permisos
+            Permisos del club
           </Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {club?.nombre}
-            {club?.modalidad ? ` · ${modalidadInline(club.modalidad)}` : ''}
+            Solo administradores{club?.nombre ? ` · ${club.nombre}` : ''}
           </Text>
         </View>
-        <Pressable
-          onPress={handleRestaurar}
-          disabled={saving}
-          style={({ pressed }) => [styles.restaurarBtn, pressed && { backgroundColor: C.chipStrong }]}
-        >
-          <Text style={styles.restaurarLabel}>Restaurar</Text>
-        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
 
-        <Text style={styles.sectionLabel}>Rol que estoy editando</Text>
-        <View style={styles.tabsRow}>
-          {ROLE_TABS.map((r) => {
-            const activo = role === r;
+        <View style={styles.segmento} accessibilityRole="tablist">
+          {[
+            ['rol', 'Por rol'],
+            ['integrante', 'Por integrante'],
+          ].map(([clave, etiqueta]) => {
+            const activo = vista === clave;
             return (
               <Pressable
-                key={r}
-                onPress={() => setRole(r)}
-                style={[styles.tab, activo && styles.tabActive]}
+                key={clave}
+                onPress={() => setVista(clave)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activo }}
+                style={[styles.segmentoOpcion, activo && styles.segmentoOpcionActiva]}
               >
-                <Text style={[styles.tabLabel, activo && styles.tabLabelActive]}>{ROLE_LABEL[r]}</Text>
+                <Text style={[styles.segmentoTexto, activo && styles.segmentoTextoActivo]}>{etiqueta}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        <View style={[styles.noteCard, role === 'admin' && styles.noteCardAdmin]}>
-          <ShieldCheck color={role === 'admin' ? C.green : C.textFaint} size={18} strokeWidth={2} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.noteTitle}>{ROLE_LABEL[role]}</Text>
-            <Text style={styles.noteText}>
-              {role === 'admin'
-                ? 'Tiene todos los permisos y no se puede limitar. Sólo hay un admin por club: se cede desde Integrantes.'
-                : role === 'capitan'
-                  ? 'Mano derecha del admin. Actívale lo que corresponda sin tocar los datos del club.'
-                  : 'Permisos base de cualquier integrante. Lo que desactives acá lo pierden todos, salvo las excepciones de abajo.'}
-            </Text>
-          </View>
-        </View>
-
-        {role !== 'admin' &&
-          GRUPOS.map((g) => {
-            const todosActivos = g.permisos.every((p) => current[p.key]);
-            return (
+        {vista === 'rol' ? (
+          <>
+            <View style={styles.columnas}>
+              <Text style={styles.columna}>CAPITÁN</Text>
+              <Text style={styles.columna}>JUGADOR</Text>
+            </View>
+            {GRUPOS.map((g) => (
               <View key={g.titulo} style={styles.grupo}>
-                <View style={styles.grupoHeader}>
-                  <Text style={styles.sectionLabel}>{g.titulo}</Text>
-                  <Pressable onPress={() => toggleGrupoCompleto(g)}>
-                    <Text style={styles.grupoAllLabel}>{todosActivos ? 'Quitar todos' : 'Activar todos'}</Text>
-                  </Pressable>
-                </View>
+                <Text style={styles.grupoTitulo}>{g.titulo}</Text>
                 <View style={styles.grupoCard}>
                   {g.permisos.map((p, i) => (
                     <View key={p.key} style={[styles.permRow, i > 0 && styles.permRowDivider]}>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={styles.permLabel}>{p.label}</Text>
-                        <Text style={styles.permHint}>{p.hint}</Text>
-                      </View>
-                      <Toggle on={!!current[p.key]} onPress={() => toggleRolePermiso(p.key)} />
+                      <Text style={styles.permLabel} accessibilityHint={p.hint}>
+                        {p.label}
+                      </Text>
+                      {['capitan', 'jugador'].map((rol) => (
+                        <View key={rol} style={styles.celda}>
+                          <Toggle
+                            on={!!roles[rol]?.[p.key]}
+                            onPress={() => toggleRolePermiso(rol, p.key)}
+                            etiqueta={`${p.label}, ${ROLE_LABEL[rol]}`}
+                          />
+                        </View>
+                      ))}
                     </View>
                   ))}
                 </View>
               </View>
-            );
-          })}
+            ))}
+            <Text style={styles.nota}>
+              El administrador tiene todos los permisos y no se puede limitar. Lo que desactives
+              para un rol lo pierden todos los que lo tienen, salvo sus excepciones.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.nota, { marginTop: 4, marginBottom: 12 }]}>
+              {(() => {
+                const n = Object.values(overrides).filter((o) => Object.keys(o || {}).length > 0).length;
+                return n
+                  ? `${n} ${n === 1 ? 'integrante tiene' : 'integrantes tienen'} excepciones.`
+                  : 'Nadie tiene excepciones: todos usan los permisos de su rol.';
+              })()}
+            </Text>
+            <View style={styles.grupoCard}>
+              {members.map((m, i) => {
+                const n = Object.keys(overrides[m.user_id] || {}).length;
+                const esAdmin = m.rol === 'admin';
+                return (
+                  <Pressable
+                    key={m.member_id}
+                    onPress={() => setSheetUserId(m.user_id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Permisos de ${m.apodo || m.username}`}
+                    style={({ pressed }) => [
+                      styles.memberRow,
+                      i > 0 && styles.permRowDivider,
+                      pressed && { backgroundColor: C.surfaceHover },
+                    ]}
+                  >
+                    <MiniAvatar foto={m.foto_url} size={36} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.memberName} numberOfLines={1}>
+                        {m.apodo || m.username}
+                      </Text>
+                      <Text style={[styles.memberMeta, n > 0 && { color: C.green }]}>
+                        {esAdmin
+                          ? 'Administrador · todos los permisos'
+                          : n
+                            ? `${ROLE_LABEL[m.rol]} · ${n} ${n === 1 ? 'excepción' : 'excepciones'}`
+                            : `${ROLE_LABEL[m.rol]} · permisos del rol`}
+                      </Text>
+                    </View>
+                    <ChevronRight color={C.textMuted} size={18} strokeWidth={2.2} />
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+      </ScrollView>
 
-        <View style={styles.grupoHeader}>
-          <Text style={styles.sectionLabel}>Excepciones por integrante</Text>
-          <Text style={styles.overrideCount}>
-            {(() => {
-              const n = Object.values(overrides).filter((o) => Object.keys(o || {}).length > 0).length;
-              return n ? `${n} con cambios` : 'Sin cambios';
-            })()}
-          </Text>
-        </View>
-
-        <View style={{ gap: 10 }}>
-          {members.map((m) => {
-            const n = Object.keys(overrides[m.user_id] || {}).length;
-            const esAdmin = m.rol === 'admin';
-            return (
-              <Pressable
-                key={m.member_id}
-                onPress={() => setSheetUserId(m.user_id)}
-                style={({ pressed }) => [styles.memberRow, n > 0 && styles.memberRowConCambios, pressed && { backgroundColor: C.chipStrong }]}
-              >
-                <MiniAvatar foto={m.foto_url} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <View style={styles.memberNameRow}>
-                    <Text style={styles.memberName} numberOfLines={1}>
-                      {m.apodo || m.username}
-                    </Text>
-                    {(esAdmin || m.rol === 'capitan') && (
-                      <View style={[styles.tag, esAdmin ? styles.tagAdmin : styles.tagCapitan]}>
-                        <Text style={[styles.tagLabel, { color: esAdmin ? C.green : '#8ACFF0' }]}>
-                          {esAdmin ? 'Admin' : 'Capitán'}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.memberMeta}>
-                    {esAdmin
-                      ? 'Todos los permisos'
-                      : n
-                        ? `${n} ${n === 1 ? 'permiso propio' : 'permisos propios'}`
-                        : `Permisos de ${ROLE_LABEL[m.rol].toLowerCase()}`}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
+      <View style={styles.pie}>
+        <Pressable
+          onPress={handleRestaurar}
+          disabled={saving}
+          accessibilityRole="button"
+          accessibilityLabel="Restaurar los permisos sugeridos"
+          style={({ pressed }) => [styles.pieSecundario, pressed && { backgroundColor: C.surfaceHover }]}
+        >
+          <Text style={styles.pieSecundarioTexto}>Restaurar</Text>
+        </Pressable>
         <Pressable
           onPress={guardar}
           disabled={!dirty || saving}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !dirty || saving, busy: saving }}
           style={[styles.saveBtn, (!dirty || saving) && styles.saveBtnDisabled]}
         >
           {saving ? (
-            <ActivityIndicator color={dirty ? C.greenInk : C.textFaint} />
+            <ActivityIndicator color={dirty ? C.textOnGreen : C.textFaint} />
           ) : (
-            <Text style={[styles.saveLabel, { color: dirty ? C.greenInk : C.textFaint }]}>
-              {dirty ? 'Guardar permisos' : 'Todo guardado'}
+            <Text style={[styles.saveLabel, { color: dirty ? C.textOnGreen : C.textFaint }]}>
+              {dirty ? 'Guardar' : 'Todo guardado'}
             </Text>
           )}
         </Pressable>
-      </ScrollView>
+      </View>
 
       {toast ? (
         <View style={styles.toast}>
@@ -569,7 +549,11 @@ export default function PermisosClubScreen({ navigation, route }) {
                   <MiniAvatar foto={sheetMember.foto_url} size={42} />
                   <View>
                     <Text style={styles.sheetName}>{sheetMember.apodo || sheetMember.username}</Text>
-                    <Text style={styles.sheetMeta}>{ROLE_LABEL[sheetMember.rol]}</Text>
+                    <Text style={styles.sheetMeta}>
+                      {sheetIsAdmin
+                        ? 'Administrador'
+                        : `Hereda los permisos de ${ROLE_LABEL[sheetMember.rol]}`}
+                    </Text>
                   </View>
                 </View>
 
@@ -616,7 +600,9 @@ export default function PermisosClubScreen({ navigation, route }) {
                           <View style={{ flex: 1, minWidth: 0 }}>
                             <Text style={styles.permLabel}>{label}</Text>
                             <Text style={[styles.permOrigin, tieneOverride && { color: C.green }]}>
-                              {tieneOverride ? 'Permiso propio' : 'Heredado del rol'}
+                              {tieneOverride
+                                ? `Excepción: ${valor ? 'activado' : 'desactivado'} solo para ${sheetMember.apodo || sheetMember.username}`
+                                : 'Del rol'}
                             </Text>
                           </View>
                           <Toggle on={valor} onPress={() => toggleOverride(key)} />
@@ -640,12 +626,15 @@ export default function PermisosClubScreen({ navigation, route }) {
   );
 }
 
-function Toggle({ on, onPress, disabled }) {
+function Toggle({ on, onPress, disabled, etiqueta }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       hitSlop={6}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: !!on, disabled: !!disabled }}
+      accessibilityLabel={etiqueta}
       style={[styles.toggleTrack, on && styles.toggleTrackOn, disabled && { opacity: 0.4 }]}
     >
       <View style={[styles.toggleKnob, on && styles.toggleKnobOn]} />
@@ -675,18 +664,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconBtn: {
-    width: S.iconBtn,
-    height: S.iconBtn,
-    borderRadius: R.iconBtn,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: C.border,
-    backgroundColor: C.chip,
+    backgroundColor: C.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnPressed: { backgroundColor: C.chipStrong },
   headerTitles: { flex: 1, minWidth: 0 },
-  headerTitle: { color: C.textPrimary, fontSize: 17, fontFamily: F.bold, letterSpacing: -0.2 },
+  headerTitle: { color: C.textPrimary, fontSize: 19, fontFamily: F.extraBold, letterSpacing: -0.2 },
   headerSubtitle: { color: C.textSecondary, fontSize: 12.5, marginTop: 1 },
   restaurarBtn: {
     height: 36,
@@ -703,7 +692,7 @@ const styles = StyleSheet.create({
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 40 },
   emptyText: { color: C.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
-  scrollContent: { paddingHorizontal: S.screenPadding, paddingBottom: 48, gap: 0 },
+  scrollContent: { paddingHorizontal: S.screenPadding, paddingBottom: 32 },
 
   sectionLabel: {
     fontFamily: F.bold,
@@ -742,7 +731,7 @@ const styles = StyleSheet.create({
   noteTitle: { color: C.textPrimary, fontSize: 13.5, fontFamily: F.extraBold },
   noteText: { marginTop: 4, color: C.textFaint, fontSize: 12.5, lineHeight: 18 },
 
-  grupo: { marginTop: 22 },
+  grupo: { marginTop: 14 },
   grupoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -754,32 +743,23 @@ const styles = StyleSheet.create({
   grupoCard: {
     backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: C.hairline,
-    borderRadius: R.cardSm,
-    paddingHorizontal: 15,
+    borderColor: C.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
   },
-  permRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 14 },
+  permRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   permRowDivider: { borderTopWidth: 1, borderTopColor: C.hairline },
-  permLabel: { color: C.textPrimary, fontSize: 14, fontFamily: F.bold },
+  permLabel: { flex: 1, color: C.textPrimary, fontSize: 14, fontFamily: F.semiBold },
   permHint: { marginTop: 3, color: C.textFaint, fontSize: 12, lineHeight: 16 },
   permOrigin: { marginTop: 3, color: C.textFaint, fontSize: 11.5, fontFamily: F.semiBold },
 
   overrideCount: { color: C.textFaint, fontSize: 11.5, fontFamily: F.bold },
 
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.hairline,
-    borderRadius: R.cardSm,
-    padding: 13,
-  },
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   memberRowConCambios: { borderColor: C.greenBorder },
   memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   memberName: { color: C.textPrimary, fontSize: 14.5, fontFamily: F.bold, flexShrink: 1 },
-  memberMeta: { marginTop: 4, color: C.textFaint, fontSize: 12 },
+  memberMeta: { marginTop: 2, color: C.textSecondary, fontSize: 12 },
   tag: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   tagAdmin: { backgroundColor: C.greenSoft },
   tagCapitan: { backgroundColor: 'rgba(90,184,224,0.16)' },
@@ -805,12 +785,12 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: C.textSecondary,
   },
-  toggleKnobOn: { backgroundColor: C.greenInk, alignSelf: 'flex-end' },
+  toggleKnobOn: { backgroundColor: C.textOnGreen, alignSelf: 'flex-end' },
 
   saveBtn: {
-    marginTop: 28,
-    height: 54,
-    borderRadius: R.row,
+    flex: 1.6,
+    height: 50,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: C.green,
@@ -818,6 +798,45 @@ const styles = StyleSheet.create({
   saveBtnDisabled: { backgroundColor: C.chip },
   saveLabel: { fontSize: 15, fontFamily: F.extraBold },
 
+  segmento: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    marginTop: 4,
+  },
+  segmentoOpcion: { flex: 1, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  segmentoOpcionActiva: { backgroundColor: C.surfaceAlt },
+  segmentoTexto: { color: C.textSecondary, fontSize: 13.5, fontFamily: F.bold },
+  segmentoTextoActivo: { color: C.textPrimary },
+  columnas: { flexDirection: 'row', justifyContent: 'flex-end', gap: 4, marginTop: 16, paddingRight: 14 },
+  columna: { width: 58, textAlign: 'center', color: C.textSecondary, fontSize: 10.5, fontFamily: F.bold, letterSpacing: 0.6 },
+  celda: { width: 58, alignItems: 'center' },
+  grupoTitulo: { color: C.textPrimary, fontSize: 14, fontFamily: F.extraBold, marginBottom: 8 },
+  nota: { color: C.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 16 },
+  pie: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: S.screenPadding,
+    paddingTop: 12,
+    paddingBottom: 18,
+    borderTopWidth: 1,
+    borderTopColor: C.borderSoft,
+    backgroundColor: C.bg,
+  },
+  pieSecundario: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  pieSecundarioTexto: { color: C.textPrimary, fontSize: 14.5, fontFamily: F.bold },
   toast: {
     position: 'absolute',
     left: 20,
@@ -883,5 +902,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetCloseLabel: { color: C.greenInk, fontSize: 14.5, fontFamily: F.extraBold },
+  sheetCloseLabel: { color: C.textOnGreen, fontSize: 14.5, fontFamily: F.extraBold },
 });

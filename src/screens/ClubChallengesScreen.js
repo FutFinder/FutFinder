@@ -15,11 +15,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import NivelChip from '../components/club/NivelChip';
 import {
   ArrowLeft,
   Shield,
   SlidersHorizontal,
   ArrowUpDown,
+  Plus,
 } from 'lucide-react-native';
 
 import Banner from '../components/Banner';
@@ -474,19 +476,15 @@ export default function ClubChallengesScreen({ navigation, route }) {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <Header
-        navigation={navigation}
-        tema={tema}
-        openCount={browsing.length}
-        onPublicar={abrirPublicar}
-        puedoPublicar={puedoPublicar}
-      />
+      <Header navigation={navigation} openCount={browsing.length} />
 
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tema.main} colors={[tema.main]} />}
       >
         {banner && <Banner {...banner} onClose={() => setBanner(null)} />}
+
+        {puedoPublicar ? <PublicarBoton onPublicar={abrirPublicar} /> : null}
 
         <MisDesafiosCarrusel
           tema={tema}
@@ -592,7 +590,7 @@ export default function ClubChallengesScreen({ navigation, route }) {
   );
 }
 
-function Header({ navigation, tema, openCount, onPublicar, puedoPublicar }) {
+function Header({ navigation, openCount }) {
   return (
     <View style={styles.header}>
       <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}>
@@ -604,12 +602,26 @@ function Header({ navigation, tema, openCount, onPublicar, puedoPublicar }) {
           {openCount} {openCount === 1 ? 'club buscando' : 'clubes buscando'} rival
         </Text>
       </View>
-      {puedoPublicar && (
-        <Pressable onPress={onPublicar} style={({ pressed }) => [styles.publishBtnSmall, { backgroundColor: tema.main }, pressed && { opacity: 0.85 }]}>
-          <Text style={[styles.publishBtnSmallText, { color: tema.ink }]}>Publicar</Text>
-        </Pressable>
-      )}
     </View>
+  );
+}
+
+/**
+ * «Publicar desafío abierto», ancho y en el verde de la app (rediseño de
+ * Clubes, 2026-11-26): es la acción principal de la pantalla, no un botón
+ * chico en la esquina, y no lleva el color del club.
+ */
+function PublicarBoton({ onPublicar }) {
+  return (
+    <Pressable
+      onPress={onPublicar}
+      accessibilityRole="button"
+      accessibilityLabel="Publicar desafío abierto"
+      style={({ pressed }) => [styles.publicarAncho, pressed && { backgroundColor: C.greenActive }]}
+    >
+      <Plus color={C.textOnGreen} size={18} strokeWidth={2.6} />
+      <Text style={styles.publicarAnchoTexto}>Publicar desafío abierto</Text>
+    </Pressable>
   );
 }
 
@@ -673,10 +685,10 @@ function MisDesafiosCarrusel({ tema, puedoPublicar, puedoResponder, misPublicaci
           return (
             <LinearGradient
               key={pub.id}
-              colors={[tema.soft, C.surface]}
+              colors={[C.surfaceAlt, C.surface]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.mineCard, { width: cardWidth, borderColor: tema.border }]}
+              style={[styles.mineCard, { width: cardWidth, borderColor: C.border }]}
             >
               <View style={styles.mineHeaderRow}>
                 <View style={[styles.mineStateBadge, { backgroundColor: hayRespuestas ? tema.soft : C.chip }]}>
@@ -760,6 +772,8 @@ function CandidateCard({ pub, tema, miRespuesta, onOpen }) {
         )}
       </View>
 
+      {pub.club?.nivel ? <NivelChip nivel={pub.club.nivel} compacto style={styles.nivelEnTarjeta} /> : null}
+
       <View style={styles.chipsRow}>
         {chips.map((chip, i) => (
           <View key={i} style={styles.infoChip}>
@@ -812,6 +826,7 @@ function DetailSheet({ visible, pub, tema, puedoResponder, miRespuesta, mensaje,
                   <Text style={styles.sheetTitle} numberOfLines={1}>{pub.club?.nombre || 'Club'}</Text>
                   <Text style={styles.sheetSubtitle} numberOfLines={1}>{resumenEstadisticas(pub.estadisticas) || 'Sin partidos jugados'}</Text>
                 </View>
+                <NivelChip nivel={pub.club?.nivel} compacto />
               </View>
 
               <View style={styles.factsGrid}>
@@ -842,9 +857,9 @@ function DetailSheet({ visible, pub, tema, puedoResponder, miRespuesta, mensaje,
                     <Pressable
                       onPress={() => onReconsiderar(miRespuesta)}
                       disabled={working}
-                      style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }]}
+                      style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: C.green }, pressed && !working && { opacity: 0.85 }]}
                     >
-                      <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Volver a responder</Text>
+                      <Text style={[styles.sheetPrimaryText, { color: C.textOnGreen }]}>Volver a responder</Text>
                     </Pressable>
                   ) : (
                     <View style={styles.sheetRespondedBox}>
@@ -865,9 +880,9 @@ function DetailSheet({ visible, pub, tema, puedoResponder, miRespuesta, mensaje,
                     <Pressable
                       onPress={onEnviar}
                       disabled={working}
-                      style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main }, pressed && !working && { opacity: 0.85 }, working && { opacity: 0.6 }]}
+                      style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: C.green }, pressed && !working && { opacity: 0.85 }, working && { opacity: 0.6 }]}
                     >
-                      {working ? <ActivityIndicator color={tema.ink} /> : <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>Enviar respuesta</Text>}
+                      {working ? <ActivityIndicator color={C.textOnGreen} /> : <Text style={[styles.sheetPrimaryText, { color: C.textOnGreen }]}>Enviar respuesta</Text>}
                     </Pressable>
                   </>
                 )
@@ -941,9 +956,9 @@ function FilterSheet({
                   <Pressable
                     key={o.label}
                     onPress={() => setFiltroModalidad(o.value)}
-                    style={[styles.optionChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}
+                    style={[styles.optionChip, activo && { backgroundColor: tema.soft, borderColor: tema.main }]}
                   >
-                    <Text style={[styles.optionChipText, activo && { color: tema.ink }]}>{o.label}</Text>
+                    <Text style={[styles.optionChipText, activo && { color: tema.main }]}>{o.label}</Text>
                   </Pressable>
                 );
               })}
@@ -977,8 +992,8 @@ function FilterSheet({
             </View>
           </ScrollView>
 
-          <Pressable onPress={onClose} style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: tema.main, marginTop: 16 }, pressed && { opacity: 0.85 }]}>
-            <Text style={[styles.sheetPrimaryText, { color: tema.ink }]}>{count ? `Ver ${count} ${count === 1 ? 'desafío' : 'desafíos'}` : 'Ajustar filtros'}</Text>
+          <Pressable onPress={onClose} style={({ pressed }) => [styles.sheetPrimary, { backgroundColor: C.green, marginTop: 16 }, pressed && { opacity: 0.85 }]}>
+            <Text style={[styles.sheetPrimaryText, { color: C.textOnGreen }]}>{count ? `Ver ${count} ${count === 1 ? 'desafío' : 'desafíos'}` : 'Ajustar filtros'}</Text>
           </Pressable>
         </Pressable>
       </Pressable>
@@ -1080,8 +1095,8 @@ function TableroSubScreen({
             {['futbol5', 'futbol7', 'futbol11'].map((m) => {
               const activo = draft.modalidad === m;
               return (
-                <Pressable key={m} onPress={() => patch('modalidad', m)} style={[styles.optionChip, activo && { backgroundColor: tema.main, borderColor: tema.main }]}>
-                  <Text style={[styles.optionChipText, activo && { color: tema.ink }]}>{modalidadInline(m)}</Text>
+                <Pressable key={m} onPress={() => patch('modalidad', m)} style={[styles.optionChip, activo && { backgroundColor: tema.soft, borderColor: tema.main }]}>
+                  <Text style={[styles.optionChipText, activo && { color: tema.main }]}>{modalidadInline(m)}</Text>
                 </Pressable>
               );
             })}
@@ -1163,8 +1178,8 @@ function TableroSubScreen({
                   <Pressable onPress={() => onRechazar(r)} style={({ pressed }) => [styles.rejectBtn, pressed && { opacity: 0.7 }]}>
                     <Text style={styles.rejectBtnText}>Rechazar</Text>
                   </Pressable>
-                  <Pressable onPress={() => onAceptar(r)} style={({ pressed }) => [styles.mineCta, { backgroundColor: tema.main, flex: 1 }, pressed && { opacity: 0.85 }]}>
-                    <Text style={[styles.mineCtaText, { color: tema.ink }]}>Aceptar</Text>
+                  <Pressable onPress={() => onAceptar(r)} style={({ pressed }) => [styles.mineCta, { backgroundColor: C.green, flex: 1 }, pressed && { opacity: 0.85 }]}>
+                    <Text style={[styles.mineCtaText, { color: C.textOnGreen }]}>Aceptar</Text>
                   </Pressable>
                 </View>
               ) : puedoResponder && r.estado === 'rechazada' ? (
@@ -1204,8 +1219,18 @@ const styles = StyleSheet.create({
   iconBtnPressed: { backgroundColor: C.chipStrong },
   headerTitle: { color: C.textPrimary, fontSize: 18, fontFamily: F.extraBold, letterSpacing: -0.3 },
   headerSubtitle: { color: C.textMuted, fontSize: 11.5, fontFamily: F.semiBold, marginTop: 2 },
-  publishBtnSmall: { borderRadius: R.iconBtn, paddingHorizontal: 14, height: S.iconBtn, alignItems: 'center', justifyContent: 'center' },
-  publishBtnSmallText: { fontSize: 12.5, fontFamily: F.extraBold },
+  publicarAncho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: C.green,
+    marginBottom: 14,
+  },
+  nivelEnTarjeta: { marginTop: 10 },
+  publicarAnchoTexto: { fontSize: 15, fontFamily: F.extraBold, color: C.textOnGreen },
   content: { padding: S.screenPadding, paddingBottom: 40 },
 
   emptyBox: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 40, paddingHorizontal: 20 },

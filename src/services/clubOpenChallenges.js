@@ -35,7 +35,8 @@ async function expireOld() {
   }
 }
 
-const CLUB_COLUMNAS = 'nombre, foto_url, comuna, region, modalidad, tema';
+// `nivel` (migración 199) se muestra en la tarjeta y en la hoja de detalle.
+const CLUB_COLUMNAS = 'nombre, foto_url, comuna, region, modalidad, tema, nivel';
 
 /** Publica un desafío abierto. `clubId` debe ser un club donde soy admin. */
 export async function publishOpenChallenge({ clubId, modalidad, fechaPropuesta, zona, mensaje }) {
