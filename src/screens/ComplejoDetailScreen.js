@@ -12,6 +12,7 @@ import { getComplejoById } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { PROPORCION_PORTADA } from '../utils/encuadre';
 import { enlaceComoLlegar } from '../utils/comoLlegar';
+import BarraDelPartido from '../components/reservas/BarraDelPartido';
 
 /** Pantalla 5 del handoff `Reservas.dc.html`: perfil de un complejo. */
 export default function ComplejoDetailScreen({ navigation, route }) {
@@ -81,6 +82,9 @@ export default function ComplejoDetailScreen({ navigation, route }) {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
+      <View style={{ paddingTop: 8 }}>
+        <BarraDelPartido navigation={navigation} />
+      </View>
       <ScrollView
         contentContainerStyle={[styles.scroll, hayCanchas && styles.scrollConBarra]}
         showsVerticalScrollIndicator={false}

@@ -7,6 +7,7 @@ import { paleta as C, fuentes as F } from '../theme/colors';
 import { IconButton, StickyFooter, SlotHora, NoticeCard } from '../components/reservas/ui';
 import { getComplejoById, getDisponibilidad } from '../services/reservas';
 import { formatCLP, buildFechaOptions, fechaLabel, addMinutesToHora } from '../services/reservasRules';
+import BarraDelPartido from '../components/reservas/BarraDelPartido';
 
 
 /** Pantalla 7 del handoff `Reservas.dc.html`: elegir fecha y horario. */
@@ -82,6 +83,7 @@ export default function FechaHoraScreen({ navigation, route }) {
           <Text style={styles.headerSubtitle} numberOfLines={1}>{complejo?.nombre} · {cancha?.nombre}</Text>
         </View>
       </View>
+      <BarraDelPartido navigation={navigation} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionLabel}>FECHA</Text>

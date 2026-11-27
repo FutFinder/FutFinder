@@ -137,6 +137,22 @@ export function textoDelEvento(event) {
     // para el hilo, igual que en `revision_solicitada`.
     case 'resultado_reabierto':
       return 'La moderación reabrió el resultado. Pueden proponerlo otra vez.';
+    // La cancha del partido (migración 202). El payload trae recinto, cancha,
+    // fecha y hora; si falta algo se dice igual, sin inventarlo.
+    case 'cancha_reservada':
+      return p.recinto ? `Se reservó la cancha en ${p.recinto}.` : 'Se reservó la cancha.';
+    case 'mitad_pagada':
+      return p.club ? `${p.club} pagó su mitad.` : 'Un club pagó su mitad de la cancha.';
+    case 'reserva_confirmada':
+      return 'La reserva de la cancha quedó confirmada.';
+    case 'cancha_soltada':
+      if (p.motivo === 'plazo') {
+        return 'Pasaron los 15 minutos sin el pago del rival: se soltó la cancha y no se cobró nada.';
+      }
+      if (p.motivo === 'vencida') return 'La reserva de la cancha venció sin completarse.';
+      return p.estaba_confirmada
+        ? 'Se soltó la cancha y los pagos se devuelven a cada capitán.'
+        : 'Se soltó la cancha.';
     default:
       // Un tipo que este cliente todavía no conoce (una migración más nueva
       // en el servidor) no debe romper la conversación ni mostrar el valor

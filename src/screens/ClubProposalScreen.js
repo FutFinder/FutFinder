@@ -55,6 +55,10 @@ import {
   metodoLabel,
   cuposLabel,
 } from '../services/clubChallengeRules';
+import { anotarCanchaDeLaPropuesta } from '../services/reservas';
+import { formatCLP } from '../services/reservasRules';
+import { guardarIntencion } from '../utils/intencionDeReserva';
+import { irAPestana } from '../utils/navigation';
 
 /**
  * Propuesta oficial de un desafío: crearla o revisar la que mandó el rival.
@@ -111,7 +115,7 @@ function fechaLarga(iso) {
 }
 
 export default function ClubProposalScreen({ navigation, route }) {
-  const { challengeId, modo = 'crear', proposalId = null } = route.params || {};
+  const { challengeId, modo = 'crear', proposalId = null, canchaFutFinder = null } = route.params || {};
 
   /**
    * Vuelve al hilo AVISANDO de que la propuesta cambió.
@@ -178,6 +182,31 @@ export default function ClubProposalScreen({ navigation, route }) {
   const [cuotaPorPersona, setCuotaPorPersona] = useState('0');
   const [instrucciones, setInstrucciones] = useState('');
   const [motivo, setMotivo] = useState('');
+  // Cancha de FutFinder elegida desde Reservas (migración 202, lámina 3). Con
+  // ella la propuesta se llena sola; «Escribir otra» la suelta y vuelve al
+  // formulario de siempre.
+  const [canchaFF, setCanchaFF] = useState(null);
+
+  useEffect(() => {
+    if (!canchaFutFinder) return;
+    setCanchaFF(canchaFutFinder);
+    const c = canchaFutFinder;
+    const direccion = c.direccion || '';
+    const lat = Number(c.latitud);
+    const lng = Number(c.longitud);
+    setUbicacion({
+      direccion,
+      canchaNombre: [c.canchaNombre, c.complejoNombre].filter(Boolean).join(' · '),
+      comuna: c.comuna || '',
+      region: c.region || '',
+      coords: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng, direccion } : null,
+    });
+    if (c.fecha) {
+      const [a, m, d] = String(c.fecha).split('-');
+      setFechaStr(`${d}/${m}/${a}`);
+    }
+    if (c.hora) setHoraStr(c.hora);
+  }, [canchaFutFinder]);
 
   // LAS DOS RESERVAS VOLUNTARIAS, con «No» por defecto en las dos.
   // `proponenteJuega` viaja en la propuesta y NO gasta cupo mientras esté
@@ -277,12 +306,19 @@ export default function ClubProposalScreen({ navigation, route }) {
 
     setEnviando(true);
     const { data, error } = await crearPropuestaOficial(challengeId, draft, tokenRef.current);
-    setEnviando(false);
 
     if (error) {
+      setEnviando(false);
       setBanner({ type: 'error', title: 'No se pudo enviar', message: error.message });
       return;
     }
+    // La cancha de FutFinder se anota aparte (migración 202). Si falla, la
+    // propuesta igual salió, con su cancha escrita: no se le dice «no se
+    // pudo enviar» a algo que sí se envió.
+    if (canchaFF?.canchaId && data?.id) {
+      await anotarCanchaDeLaPropuesta(data.id, canchaFF.canchaId);
+    }
+    setEnviando(false);
     setPropuesta(data);
     setBanner({
       type: 'success',
@@ -291,6 +327,7 @@ export default function ClubProposalScreen({ navigation, route }) {
     });
     setTimeout(volverAlHilo, 1400);
   }, [
+    canchaFF,
     fechaStr,
     horaStr,
     duracionMin,
@@ -400,6 +437,13 @@ export default function ClubProposalScreen({ navigation, route }) {
                   <Row icon={<MapPin color={C.green} size={16} strokeWidth={2} />} label="Dónde">
                     {`${propuesta.cancha_nombre}\n${propuesta.direccion}\n${propuesta.comuna}, ${propuesta.region}`}
                   </Row>
+                  {/* Lámina 3: el rival sabe si la cancha se puede reservar por
+                      la app o si la coordinan ellos (migración 202). */}
+                  <Text style={[styles.origenCancha, propuesta.cancha_reservable_id && styles.origenCanchaFF]}>
+                    {propuesta.cancha_reservable_id
+                      ? `Cancha de FutFinder · horario libre al ${fechaLarga(propuesta.created_at)}`
+                      : 'Cancha escrita a mano · sin reserva por la app'}
+                  </Text>
                   {/* MODALIDAD Y NIVEL SE MUESTRAN ACÁ aunque no se negocien.
                       El formulario los pide y la propuesta los guarda, pero
                       esta pantalla no los enseñaba: quien aprueba estaba
@@ -615,6 +659,46 @@ export default function ClubProposalScreen({ navigation, route }) {
                 </View>
 
                 <View style={styles.grupo}>
+                  <FieldLabel>Cancha</FieldLabel>
+                  <View style={styles.chipsRow}>
+                    <Opcion
+                      label="Elegir de FutFinder"
+                      activa={!!canchaFF}
+                      onPress={() => {
+                        if (canchaFF) return;
+                        guardarIntencion({ challengeId, modalidad });
+                        irAPestana(navigation, 'ReservasTab');
+                      }}
+                    />
+                    <Opcion label="Escribir otra" activa={!canchaFF} onPress={() => setCanchaFF(null)} />
+                  </View>
+                  {canchaFF ? (
+                    <View style={styles.canchaFF}>
+                      <Text style={styles.canchaFFTitulo}>
+                        {[canchaFF.canchaNombre, canchaFF.complejoNombre].filter(Boolean).join(' · ')}
+                      </Text>
+                      <Text style={styles.ayuda}>{canchaFF.direccion}</Text>
+                      {canchaFF.precio ? (
+                        <Text style={styles.ayuda}>
+                          {`Valor de la cancha: ${formatCLP(canchaFF.precio)} (referencia, ${formatCLP(Math.ceil(canchaFF.precio / 2))} por club). Tú decides la cuota.`}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.ayuda}>
+                        Nadie paga ahora: cuando el rival apruebe, el club local reserva con un toque.
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.ayuda}>
+                      Si el recinto no trabaja con FutFinder, la cancha no se reserva por la app: la coordinan ustedes.
+                    </Text>
+                  )}
+                </View>
+
+                {/* Sin coordenadas del recinto la ubicación no queda fijada, y
+                    esconder los campos dejaría un error que no se puede corregir. */}
+                {!canchaFF || !hayUbicacion ? (
+                <>
+                <View style={styles.grupo}>
                   <FieldLabel>Cancha o recinto</FieldLabel>
                   <TextField
                     placeholder="Ej: Complejo Municipal"
@@ -663,6 +747,8 @@ export default function ClubProposalScreen({ navigation, route }) {
                     </Text>
                   )}
                 </View>
+                </>
+                ) : null}
 
                 <View style={styles.grupo}>
                   <View style={styles.row2}>
@@ -865,6 +951,18 @@ function Row({ icon, label, children }) {
 }
 
 const styles = StyleSheet.create({
+  origenCancha: { color: C.textSecondary, fontSize: 12, fontFamily: F.bold, marginTop: 6 },
+  origenCanchaFF: { color: C.green },
+  canchaFF: {
+    marginTop: 10,
+    padding: 12,
+    gap: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.greenBorderStrong,
+    backgroundColor: C.greenSoft,
+  },
+  canchaFFTitulo: { color: C.textPrimary, fontSize: 14, fontFamily: F.extraBold },
   ayudaCuota: { color: C.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 6 },
   root: { flex: 1, backgroundColor: C.bg },
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },

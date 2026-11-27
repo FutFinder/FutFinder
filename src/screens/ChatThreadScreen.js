@@ -27,6 +27,8 @@ import {
   RefreshCw,
   ShieldAlert,
   SlidersHorizontal,
+  CalendarPlus,
+  Search,
 } from 'lucide-react-native';
 import EmojiPicker from 'rn-emoji-keyboard';
 
@@ -47,6 +49,12 @@ import ChallengeEventBubble from '../components/clubes/ChallengeEventBubble';
 import CambioPartidoCard from '../components/clubes/CambioPartidoCard';
 import CancelarEncuentroBar from '../components/clubes/CancelarEncuentroBar';
 import IncomparecenciaYRevisionBar from '../components/clubes/IncomparecenciaYRevisionBar';
+import CanchaDelDesafioCard from '../components/clubes/CanchaDelDesafioCard';
+import { vistaDeLaCancha, bloqueDeLaPropuesta, bloqueALaHora } from '../utils/canchaDelDesafio';
+import { canchaDelDesafio, getDisponibilidad } from '../services/reservas';
+import { guardarIntencion } from '../utils/intencionDeReserva';
+import { irAPestana } from '../utils/navigation';
+import { addMinutesToHora } from '../services/reservasRules';
 import { textoDeSancion } from '../utils/cancelacionEncuentro';
 import Banner from '../components/Banner';
 
@@ -207,6 +215,11 @@ export default function ChatThreadScreen({ route, navigation }) {
   );
 
   const [challengeEvents, setChallengeEvents] = useState([]);
+  // La cancha del partido (migración 202): lo que devuelve
+  // `cancha_del_desafio`, y si el horario elegido ya se ocupó al ir a reservar.
+  const [canchaInfo, setCanchaInfo] = useState(null);
+  const [canchaBusy, setCanchaBusy] = useState(false);
+  const [horarioOcupado, setHorarioOcupado] = useState(false);
   const [challengeProposal, setChallengeProposal] = useState(null);
   const [prorrogaReplies, setProrrogaReplies] = useState([]);
   const [challengeBusy, setChallengeBusy] = useState(false);
@@ -1410,6 +1423,101 @@ export default function ChatThreadScreen({ route, navigation }) {
     [challengeBusy, challengeId]
   );
 
+  // ── La cancha del partido (migración 202) ─────────────────────────
+  // Se vuelve a preguntar cuando cambia el estado del desafío o llega un
+  // evento nuevo: los eventos de la cancha (reservada, mitad pagada,
+  // confirmada, soltada) los escribe la base, y son la señal de que cambió.
+  const cargarCancha = useCallback(async () => {
+    if (!isChallengeThread || !challengeId) return;
+    const { data } = await canchaDelDesafio(challengeId);
+    if (mountedRef.current) setCanchaInfo(data || null);
+  }, [isChallengeThread, challengeId]);
+
+  useEffect(() => {
+    cargarCancha();
+  }, [cargarCancha, clubChallenge?.estado, challengeEvents.length]);
+
+  const vistaCancha = useMemo(() => vistaDeLaCancha(canchaInfo), [canchaInfo]);
+
+  const tituloDelPartido = canchaInfo
+    ? `${canchaInfo.club_local?.nombre || 'Local'} vs ${canchaInfo.club_visitante?.nombre || 'Visita'}`
+    : null;
+
+  // Negociación: se ELIGE cancha para la propuesta (variante A, sin pagar).
+  const irAElegirCancha = useCallback(() => {
+    if (!canchaInfo) return;
+    guardarIntencion({
+      challengeId,
+      titulo: tituloDelPartido,
+      clubRival: canchaInfo.club_visitante?.nombre,
+      modalidad: canchaInfo.modalidad,
+    });
+    setAccionesOpen(false);
+    irAPestana(navigation, 'ReservasTab');
+  }, [canchaInfo, challengeId, tituloDelPartido, navigation]);
+
+  // Partido publicado: se reserva y paga entre los dos capitanes.
+  const intencionDeReservar = useCallback(() => {
+    guardarIntencion({
+      matchId: canchaInfo?.match_id,
+      titulo: tituloDelPartido,
+      clubRival: canchaInfo?.club_visitante?.nombre,
+      capitanRival: canchaInfo?.capitan_rival_username,
+      horaPartido: canchaInfo?.hora_partido,
+      modalidad: canchaInfo?.modalidad,
+    });
+  }, [canchaInfo, tituloDelPartido]);
+
+  const irAReservarBuscando = useCallback(() => {
+    if (!canchaInfo?.match_id) return;
+    intencionDeReservar();
+    setAccionesOpen(false);
+    irAPestana(navigation, 'ReservasTab');
+  }, [canchaInfo, intencionDeReservar, navigation]);
+
+  // «Reservar ahora»: con la cancha y la hora de la propuesta, directo al
+  // resumen. Antes se mira la grilla: si ese horario ya se ocupó se dice acá
+  // (lámina 4A, «Ese horario ya se ocupó») en vez de dejar que el resumen
+  // falle después de llenar el contacto.
+  const reservarAhora = useCallback(async () => {
+    const elegida = canchaInfo?.cancha_elegida;
+    const bloque = bloqueDeLaPropuesta(elegida?.fecha);
+    if (!elegida || !bloque || !canchaInfo?.match_id) return;
+    setCanchaBusy(true);
+    const { data } = await getDisponibilidad(elegida.cancha_id, bloque.fecha);
+    setCanchaBusy(false);
+    const slot = bloqueALaHora(data?.horas, bloque.hora);
+    if (!slot || !slot.disponible) {
+      setHorarioOcupado(true);
+      return;
+    }
+    intencionDeReservar();
+    navigation.navigate('Resumen', {
+      complejoId: elegida.complejo_id,
+      canchaId: elegida.cancha_id,
+      fecha: bloque.fecha,
+      fechaLabel: new Date(`${bloque.fecha}T12:00:00`).toLocaleDateString('es-CL', {
+        weekday: 'short', day: 'numeric', month: 'short',
+      }),
+      horaInicio: slot.hora,
+      horaFin: slot.horaFin || addMinutesToHora(String(slot.hora).slice(0, 5), 60),
+      precioBloque: slot.precio,
+    });
+  }, [canchaInfo, intencionDeReservar, navigation]);
+
+  const elegirOtroHorario = useCallback(() => {
+    const elegida = canchaInfo?.cancha_elegida;
+    if (!elegida) return;
+    setHorarioOcupado(false);
+    intencionDeReservar();
+    navigation.navigate('FechaHora', { complejoId: elegida.complejo_id, canchaId: elegida.cancha_id });
+  }, [canchaInfo, intencionDeReservar, navigation]);
+
+  const abrirReserva = useCallback(() => {
+    const id = canchaInfo?.reserva?.id;
+    if (id) navigation.navigate('ArmarReserva', { reservaId: id });
+  }, [canchaInfo, navigation]);
+
   const handleResponderProrroga = useCallback(
     (respuesta) => {
       if (respuesta) {
@@ -1694,6 +1802,31 @@ export default function ChatThreadScreen({ route, navigation }) {
           </Pressable>
         )}
 
+        {/* La cancha del partido (migración 202, diseño «preservas»). Va a la
+          vista y no en un menú: es lo que se está conversando. */}
+        {isChallengeThread && !!vistaCancha && (
+          <CanchaDelDesafioCard
+            info={canchaInfo}
+            vista={vistaCancha}
+            ocupado={canchaBusy}
+            horarioOcupado={horarioOcupado}
+            onVerCanchas={vistaCancha.tipo === 'reservar' ? irAReservarBuscando : irAElegirCancha}
+            onElegir={irAElegirCancha}
+            onReservarAhora={reservarAhora}
+            onReservar={irAReservarBuscando}
+            onPagar={abrirReserva}
+            onVerReserva={abrirReserva}
+            onElegirOtroHorario={elegirOtroHorario}
+            onPedirCambio={() => {
+              setHorarioOcupado(false);
+              if (clubChallenge?.match_id) {
+                navigation.navigate('ClubMatchChange', { matchId: clubChallenge.match_id, challengeId });
+              }
+            }}
+            onVencido={cargarCancha}
+          />
+        )}
+
         {loading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={C.green} />
@@ -1964,6 +2097,36 @@ export default function ChatThreadScreen({ route, navigation }) {
               <View style={styles.hojaAgarre} />
               <Text style={styles.hojaTitulo}>Acciones del partido</Text>
               <ScrollView contentContainerStyle={styles.hojaContenido} keyboardShouldPersistTaps="handled">
+                {/* La cancha, primero: con el partido conectado de principio a
+                    fin (lámina 1, «Menú ⋯ · Acciones del partido»). */}
+                {vistaCancha && ['elegir', 'reservar', 'reservar_ahora'].includes(vistaCancha.tipo) ? (
+                  <>
+                    <Pressable
+                      onPress={
+                        vistaCancha.tipo === 'elegir'
+                          ? irAElegirCancha
+                          : vistaCancha.tipo === 'reservar_ahora'
+                          ? () => { setAccionesOpen(false); reservarAhora(); }
+                          : irAReservarBuscando
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel="Reservar cancha para este partido"
+                      style={({ pressed }) => [styles.cambioBar, pressed && { opacity: 0.85 }]}
+                    >
+                      <CalendarPlus color={C.textPrimary} size={16} strokeWidth={2.2} />
+                      <Text style={styles.cambioBarText}>Reservar cancha para este partido</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={vistaCancha.tipo === 'elegir' ? irAElegirCancha : irAReservarBuscando}
+                      accessibilityRole="button"
+                      accessibilityLabel="Ver canchas libres en Reservas"
+                      style={({ pressed }) => [styles.cambioBar, pressed && { opacity: 0.85 }]}
+                    >
+                      <Search color={C.textPrimary} size={16} strokeWidth={2.2} />
+                      <Text style={styles.cambioBarText}>Ver canchas libres</Text>
+                    </Pressable>
+                  </>
+                ) : null}
                 {!cambioPendiente && accionesCambio.puedePedir ? (
                   <Pressable
                     onPress={() => {

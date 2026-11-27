@@ -172,7 +172,7 @@ end $$;
 alter table public.club_challenge_events drop constraint if exists club_challenge_events_tipo_check;
 alter table public.club_challenge_events
     add constraint club_challenge_events_tipo_check
-    check (tipo in (
+    check (tipo = any (array[
         'aceptado', 'rechazado', 'cancelado', 'expirado', 'prorroga_abierta',
         'prorroga_respondida', 'sin_acuerdo', 'propuesta_creada', 'propuesta_aprobada',
         'propuesta_rechazada', 'partido_publicado', 'partido_en_juego', 'esperando_resultado',
@@ -182,7 +182,7 @@ alter table public.club_challenge_events
         'resultado_disputado', 'resultado_reabierto',
         -- 202
         'cancha_reservada', 'mitad_pagada', 'reserva_confirmada', 'cancha_soltada'
-    ));
+    ]));
 
 -- El desafío de una reserva, si la reserva es la cancha de un partido de
 -- clubes. `null` para todas las demás.

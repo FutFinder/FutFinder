@@ -8,6 +8,7 @@ import { Card, IconButton, Button, StickyFooter, NoticeCard, Foto } from '../com
 import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
+import BarraDelPartido from '../components/reservas/BarraDelPartido';
 
 /** Pantalla 6 del handoff `Reservas.dc.html`: elegir cancha dentro del complejo. */
 export default function ElegirCanchaScreen({ navigation, route }) {
@@ -51,6 +52,7 @@ export default function ElegirCanchaScreen({ navigation, route }) {
         </View>
         <NotificationBell />
       </View>
+      <BarraDelPartido navigation={navigation} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {canchas.length === 0 ? (

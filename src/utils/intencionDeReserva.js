@@ -24,16 +24,35 @@
 export const VIGENCIA_MS = 30 * 60 * 1000;
 
 let intencion = null;
+// Se acuerda de la ÚLTIMA que caducó por tiempo, para poder decirlo (lámina 9
+// del diseño: «Pasaron 30 minutos: soltamos el partido de esta reserva») en
+// vez de que el aviso del partido desaparezca sin explicación.
+let caducada = null;
 
-/** Guarda a qué partido pertenece la reserva que se va a crear. */
+/**
+ * Guarda a qué partido pertenece lo que se va a hacer en Reservas.
+ *
+ * Dos modos (migración 202):
+ *   · 'reservar' —con `matchId`—: el partido ya está publicado y se reserva y
+ *     paga su cancha entre los dos capitanes.
+ *   · 'elegir'   —con `challengeId`—: el desafío está en negociación y sólo
+ *     se ELIGE cancha y hora para la propuesta oficial. No se paga nada
+ *     (variante A del diseño: nadie pone plata antes de que el rival apruebe).
+ */
 export function guardarIntencion(datos, ahora = Date.now()) {
-  if (!datos || !datos.matchId) return null;
+  if (!datos) return null;
+  const modo = datos.matchId ? 'reservar' : datos.challengeId ? 'elegir' : null;
+  if (!modo) return null;
+  caducada = null;
   intencion = {
-    matchId: datos.matchId,
+    modo,
+    matchId: datos.matchId || null,
+    challengeId: datos.challengeId || null,
     titulo: datos.titulo || null,
     clubRival: datos.clubRival || null,
     capitanRival: datos.capitanRival || null,
     horaPartido: datos.horaPartido || null,
+    modalidad: datos.modalidad || null,
     guardadaEn: ahora,
   };
   return intencion;
@@ -43,15 +62,28 @@ export function guardarIntencion(datos, ahora = Date.now()) {
 export function leerIntencion(ahora = Date.now()) {
   if (!intencion) return null;
   if (ahora - intencion.guardadaEn > VIGENCIA_MS) {
+    caducada = intencion;
     intencion = null;
     return null;
   }
   return intencion;
 }
 
+/**
+ * La que caducó por tiempo, si la hubo, y se olvida al leerla: el aviso se
+ * muestra una vez.
+ */
+export function intencionCaducada(ahora = Date.now()) {
+  leerIntencion(ahora);
+  const c = caducada;
+  caducada = null;
+  return c;
+}
+
 /** La suelta: al usarla, al cancelarla, o al salirse del flujo. */
 export function olvidarIntencion() {
   intencion = null;
+  caducada = null;
 }
 
 /**

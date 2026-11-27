@@ -137,6 +137,10 @@ export async function getComplejoById(id) {
       id: complejo.id,
       nombre: complejo.nombre,
       sector: complejo.comuna,
+      // Con su nombre de siempre, para la propuesta oficial de un desafío
+      // (migración 202), que pide comuna y región aparte.
+      comuna: complejo.comuna,
+      region: complejo.region,
       direccion: complejo.direccion,
       descripcion: complejo.descripcion,
       rating: complejo.rating_avg,
@@ -490,6 +494,35 @@ export async function reservarCanchaDelPartido({
     p_cobros: cobros && cobros.length ? cobros : null,
   });
   return comoResultadoRecinto(data, error, 'reservarCanchaDelPartido');
+}
+
+/**
+ * Todo lo que el chat del desafío necesita saber de su cancha (migración
+ * 202): quién es local, si puedo elegir o reservar, la cancha elegida en la
+ * propuesta y la reserva viva con quién pagó y su plazo de 15 minutos.
+ *
+ * Devuelve el objeto del servidor tal cual: `utils/canchaDelDesafio.js`
+ * decide qué se dibuja con él, y está probado con esa misma forma.
+ */
+export async function canchaDelDesafio(challengeId) {
+  if (!isSupabaseConfigured || !challengeId) return { data: null, error: null };
+  const { data, error } = await supabase.rpc('cancha_del_desafio', { p_challenge_id: challengeId });
+  if (error) return { data: null, error };
+  return { data: data?.ok ? data : null, error: null };
+}
+
+/**
+ * Anota en la propuesta oficial la cancha de FutFinder elegida (migración
+ * 202). Va aparte de `crear_propuesta_oficial` a propósito: si fallara, la
+ * propuesta queda con su cancha escrita, que es lo que había antes.
+ */
+export async function anotarCanchaDeLaPropuesta(propuestaId, canchaId) {
+  if (!isSupabaseConfigured) return { data: null, error: { message: 'Sin conexión a la base' } };
+  const { data, error } = await supabase.rpc('anotar_cancha_de_la_propuesta', {
+    p_propuesta_id: propuestaId,
+    p_cancha_id: canchaId,
+  });
+  return comoResultadoRecinto(data, error, 'anotarCanchaDeLaPropuesta');
 }
 
 export { nombreDeTipo, jugadoresDeTipo, notaDeCancha };

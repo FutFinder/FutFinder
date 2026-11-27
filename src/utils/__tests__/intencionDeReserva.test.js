@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   VIGENCIA_MS, calzaConElPartido, guardarIntencion, leerIntencion, olvidarIntencion,
+  intencionCaducada,
 } = require('../intencionDeReserva.js');
 
 const T0 = 1_757_900_000_000;
@@ -58,4 +59,23 @@ test('sin datos para comparar no inventa un veredicto', () => {
   assert.equal(calzaConElPartido('2026-09-19T23:00:00Z', null, '20:00'), null);
   assert.equal(calzaConElPartido('cualquier cosa', '2026-09-19', '20:00'), null);
   assert.equal(calzaConElPartido('2026-09-19T23:00:00Z', '2026-09-19', 'tarde'), null);
+});
+
+test('en negociación se guarda por desafío y sólo elige (migración 202)', () => {
+  olvidarIntencion();
+  const i = guardarIntencion({ challengeId: 'c1', titulo: 'A vs B', modalidad: 'futbol7' }, T0);
+  assert.equal(i.modo, 'elegir');
+  assert.equal(i.matchId, null);
+  assert.equal(leerIntencion(T0).challengeId, 'c1');
+  // Con partido publicado es para reservar.
+  assert.equal(guardarIntencion({ matchId: 'm1' }, T0).modo, 'reservar');
+});
+
+test('la que caduca por tiempo se puede contar una vez', () => {
+  olvidarIntencion();
+  guardarIntencion(partido, T0);
+  assert.equal(intencionCaducada(T0 + 1), null);
+  const c = intencionCaducada(T0 + VIGENCIA_MS + 1);
+  assert.equal(c.matchId, 'm1');
+  assert.equal(intencionCaducada(T0 + VIGENCIA_MS + 2), null);
 });

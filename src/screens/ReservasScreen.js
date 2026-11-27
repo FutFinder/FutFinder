@@ -31,6 +31,7 @@ import { miSolicitudPendiente } from '../services/solicitudRecinto';
 import { resumenDelPanel } from '../utils/recintoAgenda';
 import { hoyISO } from '../utils/recintoPantallas';
 import { PROPORCION_PORTADA } from '../utils/encuadre';
+import BarraDelPartido from '../components/reservas/BarraDelPartido';
 
 // Búsqueda sin distinguir tilde/mayúscula ("maipu" debe encontrar "Maipú") —
 // mismo patrón que ya usa PickerSheet en el módulo Partidos.
@@ -179,6 +180,9 @@ export default function ReservasScreen({ navigation }) {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
+      <View style={{ paddingTop: 8 }}>
+        <BarraDelPartido navigation={navigation} />
+      </View>
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: 112 + insets.bottom }]}
         showsVerticalScrollIndicator={false}

@@ -19,6 +19,7 @@ import { MAX_JUGADORES, MIN_JUGADORES, repartoDeCuotas } from '../utils/pagoDivi
 import { alcanzaPara } from '../utils/saldo';
 import { calzaConElPartido, leerIntencion, olvidarIntencion } from '../utils/intencionDeReserva';
 import { formatCLP } from '../services/reservasRules';
+import BarraDelPartido from '../components/reservas/BarraDelPartido';
 
 /**
  * Resumen antes de pagar (pantalla 8 del handoff, más lo que sumaron las
@@ -221,12 +222,93 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const calza = desafio ? calzaConElPartido(desafio.horaPartido, fecha, horaInicio) : null;
   const listo = baseLista && !saldoCorto;
 
+  // EN NEGOCIACIÓN SÓLO SE ELIGE (migración 202, variante A). La cancha y la
+  // hora viajan a la propuesta oficial y nadie paga hasta que el rival
+  // apruebe; después, el chat ofrece «Reservar ahora» con todo prellenado.
+  if (desafio?.modo === 'elegir') {
+    const usarEnLaPropuesta = () => {
+      const challengeId = desafio.challengeId;
+      olvidarIntencion();
+      navigation.navigate('ClubProposal', {
+        challengeId,
+        modo: 'crear',
+        canchaFutFinder: {
+          canchaId,
+          canchaNombre: cancha ? cancha.nombre : null,
+          complejoId,
+          complejoNombre: complejo?.nombre || null,
+          direccion: complejo?.direccion || null,
+          comuna: complejo?.comuna || null,
+          region: complejo?.region || null,
+          latitud: complejo?.latitud ?? null,
+          longitud: complejo?.longitud ?? null,
+          fecha,
+          hora: String(horaInicio || '').slice(0, 5),
+          precio: dinero.cancha,
+          verificadaAt: new Date().toISOString(),
+        },
+      });
+    };
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <View style={styles.header}>
+          <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+          <Text style={styles.headerTitle}>Cancha para la propuesta</Text>
+        </View>
+        <BarraDelPartido navigation={navigation} onCambio={() => setDesafio(null)} />
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.complejoRow}>
+            <Foto
+              uri={cancha?.fotoUrl || complejo?.fotoUrl}
+              style={styles.thumb}
+              iconSize={18}
+              alt={`Foto de ${complejo?.nombre || 'el recinto'}`}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.complejoNombre}>{complejo?.nombre}</Text>
+              <Text style={styles.complejoDireccion} numberOfLines={1}>{complejo?.direccion}</Text>
+            </View>
+          </View>
+          <Card style={{ paddingVertical: 6, paddingHorizontal: 16 }}>
+            {detalle.map((d, i) => (
+              <View key={d.k} style={[styles.detalleRow, i < detalle.length - 1 && styles.detalleDivider]}>
+                <Text style={styles.detalleK}>{d.k}</Text>
+                <Text style={styles.detalleV}>{d.v}</Text>
+              </View>
+            ))}
+            <View style={[styles.detalleRow, styles.detalleDivider]}>
+              <Text style={styles.detalleK}>Valor de la cancha</Text>
+              <Text style={styles.detalleV}>{formatCLP(dinero.cancha)}</Text>
+            </View>
+          </Card>
+          <NoticeCard tone="info" icon={Info}>
+            Esta cancha y esta hora van a la propuesta oficial de{' '}
+            <Text style={{ fontFamily: F.extraBold }}>{desafio.titulo || 'tu desafío'}</Text>. Nadie paga
+            todavía: cuando {desafio.clubRival || 'el club rival'} apruebe, reservas con un toque y se
+            divide entre los dos capitanes ({formatCLP(Math.ceil(dinero.cancha / 2))} por club).
+          </NoticeCard>
+          <NoticeCard tone="warning">
+            El horario no queda tomado mientras tanto: si otro grupo lo reserva antes, al aprobarse
+            tendrán que elegir otro.
+          </NoticeCard>
+        </ScrollView>
+        <StickyFooter>
+          <Button label="Usar esta cancha en la propuesta" onPress={usarEnLaPropuesta} />
+        </StickyFooter>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
         <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
         <Text style={styles.headerTitle}>Resumen de la reserva</Text>
       </View>
+      <BarraDelPartido
+        navigation={navigation}
+        onCambio={() => { setDesafio(null); setModalidad('completa'); }}
+      />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.complejoRow}>
