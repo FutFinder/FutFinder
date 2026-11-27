@@ -133,16 +133,20 @@ export default function CanchaDelDesafioCard({
     case 'falta_rival':
       return (
         <Tarjeta Icono={Timer} titulo="Reserva de la cancha"
-          chip={restante ? `${rival} tiene 15 min` : 'Se acabó el tiempo'} texto={lugar}
-          detalle={`${local} pagó su mitad${reserva?.mitad ? ` (${formatCLP(reserva.mitad)} apartados, sin cobrar)` : ''}. Falta ${rival}: quedan ${formatoReloj(restante)}.`}>
+          chip={restante !== 0 ? `${rival} tiene 15 min` : 'Se acabó el tiempo'} texto={lugar}
+          detalle={restante !== 0
+            ? `${local} pagó su mitad${reserva?.mitad ? ` (${formatCLP(reserva.mitad)} apartados, sin cobrar)` : ''}. Falta ${rival}: quedan ${formatoReloj(restante)}.`
+            : `${rival} no pagó a tiempo. La cancha se suelta en menos de un minuto y no se le cobra nada a ${local}.`}>
           <Boton etiqueta="Ver reserva" ancho onPress={onVerReserva} />
         </Tarjeta>
       );
 
     case 'pagar_mi_mitad':
       return (
-        <Tarjeta Icono={Timer} tono="ambar" titulo={`Te quedan ${formatoReloj(restante)}`} texto={lugar}
-          detalle={`${local} ya reservó y pagó su mitad. Si otro equipo reserva ese horario antes, lo pierdes.`}>
+        <Tarjeta Icono={Timer} tono="ambar" titulo={restante !== 0 ? `Te quedan ${formatoReloj(restante)}` : 'Se acabó tu tiempo'} texto={lugar}
+          detalle={restante !== 0
+            ? `${local} ya reservó y pagó su mitad. Si otro equipo reserva ese horario antes, lo pierdes.`
+            : 'No alcanzaste a pagar tu mitad. La cancha se suelta en menos de un minuto y no se te cobra nada.'}>
           <Boton etiqueta={`Pagar con mi balance · ${formatCLP(reserva?.mitad || 0)}`} principal ancho
             onPress={onPagar} deshabilitado={restante === 0} />
         </Tarjeta>
