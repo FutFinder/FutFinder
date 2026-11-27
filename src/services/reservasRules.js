@@ -117,17 +117,21 @@ function toLocalISODate(d) {
  * días, con fecha real (a diferencia del prototipo, que trae "HOY 12 ago",
  * "JUE 13 ago"… fijos). Recibe `baseDate` para poder probarla sin depender
  * del reloj del sistema; en la app se llama sin argumento.
+ *
+ * `primeraEsHoy: false` cuando la tira parte otro día (la del partido de un
+ * desafío que queda a más de 6 días): entonces ninguna dice «HOY».
  */
-export function buildFechaOptions(baseDate = new Date(), days = 6) {
+export function buildFechaOptions(baseDate = new Date(), days = 6, { primeraEsHoy = true } = {}) {
   return Array.from({ length: days }, (_, i) => {
     const d = new Date(baseDate);
     d.setDate(d.getDate() + i);
+    const esHoy = primeraEsHoy && i === 0;
     return {
-      dow: i === 0 ? 'HOY' : DOW_ABBR[d.getDay()],
+      dow: esHoy ? 'HOY' : DOW_ABBR[d.getDay()],
       num: String(d.getDate()),
       mes: d.toLocaleDateString('es-CL', { month: 'short' }).replace('.', ''),
       iso: toLocalISODate(d),
-      esHoy: i === 0,
+      esHoy,
     };
   });
 }

@@ -159,3 +159,27 @@ export function cuandoDeLaCancha(fecha, hora) {
   const texto = `${DIAS[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`;
   return hh ? `${texto} · ${String(hh).slice(0, 5)}` : texto;
 }
+
+/**
+ * Cuando el horario conversado se ocupó, la grilla abre marcando la hora
+ * libre MÁS CERCANA a esa (a igual distancia, la más temprana), no la
+ * primera del día. Devuelve el índice, o -1 si no hay ninguna libre.
+ */
+export function horaLibreMasCercana(horas, hora) {
+  const aMin = (h) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(h || ''));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const meta = aMin(hora);
+  let mejor = -1;
+  let dist = Infinity;
+  (horas || []).forEach((h, i) => {
+    if (!h.disponible) return;
+    const d = meta == null ? i : Math.abs(aMin(h.hora) - meta);
+    if (d < dist) {
+      dist = d;
+      mejor = i;
+    }
+  });
+  return mejor;
+}

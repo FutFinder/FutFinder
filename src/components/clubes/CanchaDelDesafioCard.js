@@ -73,7 +73,7 @@ export default function CanchaDelDesafioCard({
   if (horarioOcupado) {
     return (
       <Tarjeta tono="ambar" Icono={TriangleAlert} titulo="Horario ocupado"
-        texto="Ese horario ya se ocupó: elige otro o pide un cambio.">
+        texto={lugar ? `${lugar}\nEse horario ya se ocupó: elige otro o pide un cambio.` : 'Ese horario ya se ocupó: elige otro o pide un cambio.'}>
         <Fila>
           <Boton etiqueta="Elegir otro horario" principal onPress={onElegirOtroHorario} />
           <Boton etiqueta="Pedir un cambio" onPress={onPedirCambio} />

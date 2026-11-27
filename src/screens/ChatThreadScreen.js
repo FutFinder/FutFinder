@@ -1520,7 +1520,13 @@ export default function ChatThreadScreen({ route, navigation }) {
     if (!elegida) return;
     setHorarioOcupado(false);
     intencionDeReservar();
-    navigation.navigate('FechaHora', { complejoId: elegida.complejo_id, canchaId: elegida.cancha_id });
+    const bloque = bloqueDeLaPropuesta(elegida.fecha);
+    navigation.navigate('FechaHora', {
+      complejoId: elegida.complejo_id,
+      canchaId: elegida.cancha_id,
+      fecha: bloque?.fecha || null,
+      cercaDe: bloque?.hora || null,
+    });
   }, [canchaInfo, intencionDeReservar, navigation]);
 
   const abrirReserva = useCallback(() => {

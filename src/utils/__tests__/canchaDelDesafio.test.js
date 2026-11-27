@@ -149,3 +149,17 @@ test('la tarjeta dice el día y la hora de la cancha', () => {
   assert.equal(cuandoDeLaCancha(instante), 'sáb 5 dic · 21:30');
   assert.equal(cuandoDeLaCancha(null), null);
 });
+
+test('con el horario ocupado, la grilla marca la hora libre más cercana', () => {
+  const { horaLibreMasCercana } = require('../canchaDelDesafio.js');
+  const horas = [
+    { hora: '08:00:00', disponible: true },
+    { hora: '19:00:00', disponible: true },
+    { hora: '20:00:00', disponible: false },
+    { hora: '21:00:00', disponible: true },
+  ];
+  assert.equal(horaLibreMasCercana(horas, '20:00'), 1); // 19 y 21 empatan: la más temprana
+  assert.equal(horaLibreMasCercana(horas, '21:30'), 3);
+  assert.equal(horaLibreMasCercana(horas, null), 0);
+  assert.equal(horaLibreMasCercana([{ hora: '20:00', disponible: false }], '20:00'), -1);
+});

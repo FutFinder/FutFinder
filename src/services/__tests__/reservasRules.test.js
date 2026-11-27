@@ -194,3 +194,10 @@ test('addMinutesToHora: conserva los minutos de la hora de inicio, no sólo la h
   assert.equal(addMinutesToHora('14:30', 60), '15:30');
   assert.equal(addMinutesToHora('14:45', 90), '16:15');
 });
+
+test('buildFechaOptions: una tira que no parte hoy no dice «HOY»', () => {
+  const opciones = buildFechaOptions(new Date(2026, 11, 3), 3, { primeraEsHoy: false });
+  assert.equal(opciones[0].dow, 'JUE');
+  assert.equal(opciones[0].esHoy, false);
+  assert.equal(fechaLabel(opciones[0]).startsWith('jue 3'), true);
+});

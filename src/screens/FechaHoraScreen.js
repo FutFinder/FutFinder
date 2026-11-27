@@ -8,11 +8,15 @@ import { IconButton, StickyFooter, SlotHora, NoticeCard } from '../components/re
 import { getComplejoById, getDisponibilidad } from '../services/reservas';
 import { formatCLP, buildFechaOptions, fechaLabel, addMinutesToHora } from '../services/reservasRules';
 import BarraDelPartido from '../components/reservas/BarraDelPartido';
+import { horaLibreMasCercana } from '../utils/canchaDelDesafio';
 
 
 /** Pantalla 7 del handoff `Reservas.dc.html`: elegir fecha y horario. */
 export default function FechaHoraScreen({ navigation, route }) {
-  const { complejoId, canchaId } = route.params || {};
+  // `fecha` y `cercaDe` llegan desde el chat de un desafío cuando el
+  // horario conversado se ocupó: se abre ESE día, marcando la hora libre más
+  // cercana, en vez de hoy a la primera hora.
+  const { complejoId, canchaId, fecha: fechaInicial = null, cercaDe = null } = route.params || {};
   const [complejo, setComplejo] = useState(null);
   const [horas, setHoras] = useState([]);
   // Distingue «este día no tiene horario» de «hoy ya se acabó»: son dos
@@ -20,8 +24,19 @@ export default function FechaHoraScreen({ navigation, route }) {
   const [todasPasaron, setTodasPasaron] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fechas = useMemo(() => buildFechaOptions(), []);
-  const [fechaIdx, setFechaIdx] = useState(0);
+  // Si el día del partido queda fuera de los 6 días desde hoy, la lista
+  // parte dos días antes de él (nunca antes de hoy) para que aparezca.
+  const fechas = useMemo(() => {
+    const desdeHoy = buildFechaOptions();
+    if (!fechaInicial || desdeHoy.some((f) => f.iso === fechaInicial)) return desdeHoy;
+    const [a, m, d] = String(fechaInicial).split('-').map(Number);
+    const inicio = new Date(a, m - 1, d - 2);
+    return Number.isNaN(inicio.getTime()) || inicio < new Date() ? desdeHoy : buildFechaOptions(inicio, 6, { primeraEsHoy: false });
+  }, [fechaInicial]);
+  const [fechaIdx, setFechaIdx] = useState(() => {
+    const i = fechaInicial ? fechas.findIndex((f) => f.iso === fechaInicial) : -1;
+    return i >= 0 ? i : 0;
+  });
   const [horaIdx, setHoraIdx] = useState(null);
 
   // La disponibilidad se vuelve a pedir CADA VEZ que cambia la fecha. Con los
@@ -49,10 +64,13 @@ export default function FechaHoraScreen({ navigation, route }) {
     const delDia = (disp?.horas || []).filter((h) => !h.pasada);
     setHoras(delDia);
     setTodasPasaron((disp?.horas || []).length > 0 && delDia.length === 0);
-    const primeraDisponible = delDia.findIndex((h) => h.disponible);
-    setHoraIdx(primeraDisponible >= 0 ? primeraDisponible : null);
+    const enElDiaConversado = cercaDe && fechas[fechaIdx].iso === fechaInicial;
+    const marcada = enElDiaConversado
+      ? horaLibreMasCercana(delDia, cercaDe)
+      : delDia.findIndex((h) => h.disponible);
+    setHoraIdx(marcada >= 0 ? marcada : null);
     setLoading(false);
-  }, [complejoId, canchaId, fechas, fechaIdx]);
+  }, [complejoId, canchaId, fechas, fechaIdx, fechaInicial, cercaDe]);
 
   useEffect(() => { load(); }, [load]);
 
