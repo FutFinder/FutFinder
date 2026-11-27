@@ -261,6 +261,8 @@ const linking = {
       // `/ArmarReserva?reservaId=…` y no la reconocía al abrirla: recargar
       // mandaba al inicio al capitán que tenía 15 minutos para pagar.
       ArmarReserva: 'reserva/:reservaId',
+      // Y la lista de donde cuelga, a la que «volver» lleva desde el grupo.
+      MisReservas: 'mis-reservas',
       // La galería de QA del vertical de Reservas, con URL propia para
       // poder revisar los componentes en el navegador sin iniciar sesión.
       // No muestra datos de nadie: son las primitivas con textos de

@@ -53,3 +53,9 @@ test('abierta directo, «volver» tiene a dónde ir', () => {
   assert.equal((pantalla.match(/navigation\.goBack\(\)/g) || []).length, 1,
     'queda un goBack() suelto que no pasa por volver()');
 });
+
+test('Mis reservas, a donde vuelve el grupo, también tiene dirección', () => {
+  // Mismo fallo: `/MisReservas` recargado mandaba al inicio.
+  assert.match(navegador, /MisReservas:\s*'mis-reservas'/,
+    'falta la ruta de MisReservas en `linking.config.screens`');
+});
