@@ -147,7 +147,7 @@ export function textoDelEvento(event) {
       return 'La reserva de la cancha quedó confirmada.';
     case 'cancha_soltada':
       if (p.motivo === 'plazo') {
-        return 'Pasaron los 15 minutos sin el pago del rival: se soltó la cancha y no se cobró nada.';
+        return 'Pasaron los 15 minutos sin las dos mitades pagadas: se soltó la cancha y no se le cobró nada a nadie.';
       }
       if (p.motivo === 'vencida') return 'La reserva de la cancha venció sin completarse.';
       return p.estaba_confirmada

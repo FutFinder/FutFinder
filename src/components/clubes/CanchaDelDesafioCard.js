@@ -96,7 +96,7 @@ export default function CanchaDelDesafioCard({
     case 'cancha_elegida':
       return (
         <Tarjeta Icono={MapPin} titulo="Cancha elegida" chip="Sin reservar todavía" texto={lugar}
-          detalle={`Nadie paga hasta que ${rival} apruebe. Después ${info?.soy_local ? 'reservas' : `${local} reserva`} con un toque.`} />
+          detalle={`Nadie paga hasta que ${info?.soy_visitante ? 'tu club' : rival} apruebe. Después ${info?.soy_local ? 'reservas' : `${local} reserva`} con un toque.`} />
       );
 
     case 'reservar_ahora':
