@@ -10,6 +10,7 @@
  */
 
 import { enlaceComoLlegar } from './comoLlegar.js';
+import { nombreDeTipo } from './reservasJugador.js';
 
 /** Estados en los que la reserva todavía va a pasar. */
 const VIVAS = ['armando', 'procesando', 'confirmada'];
@@ -30,7 +31,7 @@ export function comoReserva(fila) {
     cuota: fila.cuota,
     soyOrganizador: !!fila.soy_organizador,
     canchaNombre: fila.cancha_nombre,
-    canchaTipo: fila.cancha_tipo,
+    canchaTipo: fila.cancha_tipo ? nombreDeTipo(fila.cancha_tipo) : null,
     complejoId: fila.complejo_id,
     complejoNombre: fila.complejo_nombre,
     direccion: fila.complejo_direccion,

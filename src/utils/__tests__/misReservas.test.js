@@ -263,3 +263,10 @@ test('una reserva normal sigue con el texto de siempre', () => {
   assert.match(textoDeCancelacion(r({ estado: 'confirmada', puedeCancelar: true })),
     /hasta 12 horas antes/);
 });
+
+test('el tipo de cancha se lee como persona: «Fútbol 7», no «futbol_7»', () => {
+  // Encontrado en «Mis reservas» con una reserva real (2026-11-27): la
+  // tarjeta decía «Cancha 2 · Techada · futbol_7».
+  assert.equal(comoReserva({ id: 'c', cancha_tipo: 'futbol_7' }).canchaTipo, 'Fútbol 7');
+  assert.equal(comoReserva({ id: 'd' }).canchaTipo, null);
+});
