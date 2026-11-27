@@ -17,6 +17,7 @@ import {
   duracionEnMinutos, etiquetaDuracion, semanaDe, haceCuanto,
 } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
+import { nombreDeTipo } from '../utils/reservasJugador';
 
 const NOTA_PRIVACIDAD =
   'El nombre y el número son solo de esta reserva. No se guardan en una lista de contactos ni se '
@@ -158,7 +159,7 @@ function FilaReserva({ reserva, onPress }) {
               : `@${reserva.organizador_username}`}
           </Text>
           <Text style={styles.donde} numberOfLines={1}>
-            {reserva.cancha_nombre} · {String(reserva.cancha_tipo || '').replace('_', ' ')}
+            {reserva.cancha_nombre} · {nombreDeTipo(reserva.cancha_tipo)}
             {estado === 'jugada' && fin ? ` · terminó ${haceCuanto(fin)}` : ''}
           </Text>
         </View>

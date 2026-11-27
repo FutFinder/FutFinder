@@ -97,3 +97,12 @@ test('«Administradores» abierta por un admin que no es dueño no ofrece cambia
     assert.match(p.slice(Math.max(0, i - 400), i), /soyDueno/, `${accion} se ofrece sin preguntar si es el dueño`);
   }
 });
+
+test('el lado del recinto nombra el tipo de cancha como el jugador («Fútbol 7»)', () => {
+  // Decía «futbol 7»: el valor crudo de la base con el guion bajo cambiado.
+  for (const archivo of ['ReservaRecintoScreen.js', 'AgendaRecintoScreen.js']) {
+    const p = leer(archivo);
+    assert.match(p, /nombreDeTipo\(reserva\.cancha_tipo\)/, `${archivo} no usa nombreDeTipo`);
+    assert.doesNotMatch(p, /cancha_tipo[^\n]*replace\('_', ' '\)/, `${archivo} sigue armando el tipo a mano`);
+  }
+});

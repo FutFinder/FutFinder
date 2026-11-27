@@ -16,6 +16,7 @@ import {
   motivoDeCancelacionValido, MINIMO_MOTIVO,
 } from '../utils/recintoPantallas';
 import { formatCLP } from '../services/reservasRules';
+import { nombreDeTipo } from '../utils/reservasJugador';
 
 const NOTA_CONTACTO =
   'Los dejó al reservar y los ves solo tú, hasta 12 horas después del partido. No quedan guardados '
@@ -118,7 +119,7 @@ export default function ReservaRecintoScreen({ navigation, route }) {
             </View>
             <Text style={styles.subtitulo}>
               {fechaLarga(reserva.fecha)} · {reserva.cancha_nombre}
-              {reserva.cancha_tipo ? ` · ${String(reserva.cancha_tipo).replace('_', ' ')}` : ''}
+              {reserva.cancha_tipo ? ` · ${nombreDeTipo(reserva.cancha_tipo)}` : ''}
               {duracion ? ` · ${duracion}` : ''}
             </Text>
           </Card>
