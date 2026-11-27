@@ -20,7 +20,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const RAIZ = path.resolve(__dirname, '../..');
-const navegador = fs.readFileSync(path.join(RAIZ, 'navigation', 'AppNavigator.js'), 'utf8');
+// Las direcciones viven en `navigation/direcciones.js` desde que todas las
+// pantallas con sesión tienen la suya.
+const navegador = fs.readFileSync(path.join(RAIZ, 'navigation', 'direcciones.js'), 'utf8');
 
 test('ArmarReserva tiene dirección propia, con el id de la reserva', () => {
   assert.match(navegador, /ArmarReserva:\s*'reserva\/:reservaId'/,
@@ -28,7 +30,9 @@ test('ArmarReserva tiene dirección propia, con el id de la reserva', () => {
 });
 
 test('ninguna otra pantalla usa el mismo camino', () => {
-  const rutas = [...navegador.matchAll(/^\s*\w+:\s*'(reserva[^']*)'/gm)].map((m) => m[1]);
+  // `reservas` (la pestaña) es otro camino. El resto de los choques los
+  // revisa `navigation/__tests__/direcciones.test.js` ida y vuelta.
+  const rutas = [...navegador.matchAll(/^\s*\w+:\s*'(reserva\/[^']*)'/gm)].map((m) => m[1]);
   assert.deepEqual(rutas, ['reserva/:reservaId'],
     'hay más de una pantalla compitiendo por el camino de la reserva');
 });

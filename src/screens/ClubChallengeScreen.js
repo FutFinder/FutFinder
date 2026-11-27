@@ -127,7 +127,7 @@ export default function ClubChallengeScreen({ navigation, route }) {
     setBanner({
       type: 'success',
       title: 'Desafío enviado',
-      message: `Se avisó a ${rivalNombre || 'el club rival'}. Te notificaremos cuando respondan.`,
+      message: `Se avisó a ${rival?.nombre || rivalNombre || 'el club rival'}. Te notificaremos cuando respondan.`,
     });
     setTimeout(() => {
       if (navigation.canGoBack()) navigation.goBack();

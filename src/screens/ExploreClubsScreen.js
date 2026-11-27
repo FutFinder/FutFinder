@@ -17,7 +17,8 @@ import ClubExplorer from '../components/club/ClubExplorer';
  * propios del usuario no aparecen.
  */
 export default function ExploreClubsScreen({ navigation, route }) {
-  const modoRival = route?.params?.modoRival === true;
+  // Recargada la página, llega escrito en la URL: «true».
+  const modoRival = route?.params?.modoRival === true || route?.params?.modoRival === 'true';
   const retadorClubId = route?.params?.retadorClubId || null;
 
   return (

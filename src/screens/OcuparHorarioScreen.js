@@ -1,12 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertTriangle, Lock } from 'lucide-react-native';
 
 import { paleta as C, radios as R, medidas as S, fuentes as F, alfa } from '../theme/colors';
 import { Card, IconButton, Button, NoticeCard, StickyFooter } from '../components/reservas/ui';
 import { ChoiceCard, FieldLabel, TextField, TimeField } from '../components/reservas/recintoUi';
-import { crearBloqueo } from '../services/recinto';
+import { crearBloqueo, calendarioDeCancha } from '../services/recinto';
 import {
   fechaLarga, horasElegibles, bloquesEnRango, reservasQueChocan, rangoSinChoque,
   etiquetaOcupar, telefonoAceptable,
@@ -33,7 +33,41 @@ import { formatCLP } from '../services/reservasRules';
  * alguien confirme, así que se puede ocupar.
  */
 export default function OcuparHorarioScreen({ navigation, route }) {
-  const { canchaId, canchaNombre, fecha, desde: desdeInicial, slots = [] } = route.params || {};
+  const { canchaId, canchaNombre, fecha, slots: traidos } = route.params || {};
+  // Desde el calendario llegan los bloques del día. Abierta por su dirección
+  // no llegan (no van en la URL): se le piden a la cancha.
+  const [slots, setSlots] = useState(Array.isArray(traidos) ? traidos : null);
+  const [errorCarga, setErrorCarga] = useState(null);
+  useEffect(() => {
+    if (Array.isArray(traidos)) return undefined;
+    let vivo = true;
+    calendarioDeCancha(canchaId, fecha).then(({ data, error }) => {
+      if (!vivo) return;
+      setSlots(data?.slots || []);
+      setErrorCarga(error?.message || null);
+    });
+    return () => { vivo = false; };
+  }, [canchaId, fecha, traidos]);
+
+  if (slots) return <OcuparConBloques navigation={navigation} route={route} slots={slots} errorCarga={errorCarga} />;
+  return (
+    <SafeAreaView edges={['top']} style={styles.root}>
+      <View style={styles.header}>
+        <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Ocupar un horario</Text>
+          <Text style={styles.headerSub} numberOfLines={1}>
+            {canchaNombre ? `${canchaNombre} · ` : ''}{fechaLarga(fecha)}
+          </Text>
+        </View>
+      </View>
+      <ActivityIndicator color={C.green} style={{ marginTop: 32 }} />
+    </SafeAreaView>
+  );
+}
+
+function OcuparConBloques({ navigation, route, slots, errorCarga }) {
+  const { canchaId, canchaNombre, fecha, desde: desdeInicial } = route.params || {};
 
   const { inicios, terminos } = useMemo(() => horasElegibles(slots), [slots]);
   const [desde, setDesde] = useState(desdeInicial || inicios[0] || null);
@@ -46,7 +80,7 @@ export default function OcuparHorarioScreen({ navigation, route }) {
   const [contactoNombre, setContactoNombre] = useState('');
   const [contactoTelefono, setContactoTelefono] = useState('');
   const [enviando, setEnviando] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(errorCarga);
 
   const externo = tipo === 'externo';
   const bloques = bloquesEnRango(slots, desde, hasta);

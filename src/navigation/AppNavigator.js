@@ -4,7 +4,9 @@ import {
   NavigationContainer,
   createNavigationContainerRef,
   DarkTheme as NavDarkTheme,
+  getStateFromPath,
 } from '@react-navigation/native';
+import { DIRECCIONES, conPantallaDeAbajo } from './direcciones';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 // Ref global para poder navegar desde fuera de las pantallas
@@ -230,39 +232,10 @@ const linking = {
   // viven en `utils/direccionPublica.js`.
   prefixes: ['futfinder://', ...DIRECCIONES_PROPIAS],
   config: {
+    // Cada pantalla y su dirección viven en `./direcciones`, donde se pueden
+    // probar sin montar la app.
     screens: {
-      Main: {
-        screens: {
-          HomeTab: 'inicio',
-          SearchTab: 'partidos',
-          ClubsTab: 'clubes',
-          ChatTab: 'chat',
-          ProfileTab: 'perfil',
-        },
-      },
-      // Destino del CTA «IR AHORA» de los avisos de desafío. Sin esta
-      // entrada, tocar el push con la app cerrada dejaba al usuario en la
-      // raíz en vez de en la conversación.
-      ChatThread: 'chat/:threadKey',
-      // La ficha de un club y su editor. Sin estas dos, «Editar club» no
-      // tenía URL propia: en web la barra de direcciones seguía marcando la
-      // pantalla anterior y recargar devolvía a la raíz. No chocan con
-      // `ClubsTab: 'clubes'` porque ese camino es exacto y estos llevan id.
-      ClubDetail: 'clubes/:clubId',
-      EditClub: 'clubes/:clubId/editar',
-      // `p/<id>` es el formato del enlace público que compartimos.
-      MatchDetail: 'p/:matchId',
-      ManageMatch: 'p/:matchId/gestionar',
-      MatchSpot: 'p/:matchId/mi-cupo',
-      MatchRequestStatus: 'p/:matchId/mi-solicitud',
-      EditMatch: 'p/:matchId/editar',
-      CreateMatch: 'publicar',
-      // El grupo de una reserva dividida. Sin esta entrada la web inventaba
-      // `/ArmarReserva?reservaId=…` y no la reconocía al abrirla: recargar
-      // mandaba al inicio al capitán que tenía 15 minutos para pagar.
-      ArmarReserva: 'reserva/:reservaId',
-      // Y la lista de donde cuelga, a la que «volver» lleva desde el grupo.
-      MisReservas: 'mis-reservas',
+      ...DIRECCIONES,
       // La galería de QA del vertical de Reservas, con URL propia para
       // poder revisar los componentes en el navegador sin iniciar sesión.
       // No muestra datos de nadie: son las primitivas con textos de
@@ -270,15 +243,12 @@ const linking = {
       // Sólo en desarrollo: en producción la galería de QA no existe (estaba
       // pública en la web publicada).
       ...(__DEV__ ? { ReservasUiGallery: 'ui-reservas' } : {}),
-      // Términos y políticas, en las mismas direcciones a las que ya
-      // apuntaban los enlaces de la app (`futfinder.cl/terminos`, …).
-      Terminos: 'terminos',
-      Privacidad: 'privacidad',
-      Cookies: 'cookies',
-      // La exige Google Play: borrar la cuenta sin tener la app.
-      EliminarCuenta: 'eliminar-cuenta',
     },
   },
+  // Entrar directo a una pantalla la deja sobre la que le corresponde (el
+  // grupo sobre «Mis reservas», la propuesta sobre su conversación…) y todo
+  // sobre Main: sin esto «volver» no tenía a dónde ir.
+  getStateFromPath: (camino, opciones) => conPantallaDeAbajo(getStateFromPath(camino, opciones)),
 };
 
 /**

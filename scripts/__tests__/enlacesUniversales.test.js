@@ -58,7 +58,7 @@ test('Android declara el dominio con autoVerify y las mismas rutas', () => {
 });
 
 test('las rutas salen de las URL que de verdad entiende la navegación', () => {
-  const nav = leer('src', 'navigation', 'AppNavigator.js');
+  const nav = leer('src', 'navigation', 'direcciones.js');
   for (const ruta of RUTAS) {
     const primera = ruta.replace(/^\//, '').split('/')[0];
     assert.match(nav, new RegExp(`: '${primera}(/|')`), `${ruta} no existe en el linking de AppNavigator`);

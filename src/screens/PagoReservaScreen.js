@@ -130,7 +130,8 @@ export default function PagoReservaScreen({ navigation, route }) {
   const texto = textoDeFase(fase);
   const accion = accionDeFase(fase);
   const esperando = sigueEsperando(fase);
-  const total = detalle?.precio_total ?? monto ?? null;
+  // `monto` vuelve de la URL como texto.
+  const total = detalle?.precio_total ?? (monto != null ? Number(monto) : null);
 
   const ejecutar = () => {
     if (accion?.accion === 'reserva') navigation.navigate('MisReservas');

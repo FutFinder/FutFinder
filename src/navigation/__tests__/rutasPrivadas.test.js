@@ -77,12 +77,19 @@ function pantallasDelStack() {
   return pantallas;
 }
 
-/** Nombres de ruta alcanzables escribiendo una URL (bloque `const linking`). */
+/**
+ * Nombres de ruta alcanzables escribiendo una URL: el bloque `const linking`
+ * del navegador más `DIRECCIONES` (`navigation/direcciones.js`), de donde
+ * sale casi todo.
+ */
 function rutasConDeepLink(nombresDelStack) {
   const inicio = FUENTE.indexOf('const linking = {');
   assert.ok(inicio > -1, 'debe existir la config de deep links');
   const fin = FUENTE.indexOf('\n};', inicio);
-  const bloque = FUENTE.slice(inicio, fin);
+  const direcciones = fs.readFileSync(path.join(__dirname, '..', 'direcciones.js'), 'utf8');
+  const desde = direcciones.indexOf('export const DIRECCIONES = {');
+  assert.ok(desde > -1, 'debe existir DIRECCIONES');
+  const bloque = FUENTE.slice(inicio, fin) + direcciones.slice(desde, direcciones.indexOf('\n};', desde));
   const claves = new Set();
   const re = /(\w+)\s*:/g;
   let m;

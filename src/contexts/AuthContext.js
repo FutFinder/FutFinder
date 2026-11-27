@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { isSessionUsable } from '../services/authPolicy';
 import { nivelDesdeSesion, necesitaSegundoPaso } from '../services/mfaPolicy';
+import { elegirDestinoPendiente } from '../utils/routing';
 
 /**
  * Fuente única de verdad de la sesión, usada por el guard de navegación
@@ -65,7 +66,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const setPendingDestination = (destination) => {
-    pendingRef.current = destination;
+    pendingRef.current = elegirDestinoPendiente(pendingRef.current, destination);
   };
 
   const consumePendingDestination = () => {

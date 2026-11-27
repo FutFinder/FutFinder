@@ -26,7 +26,8 @@ const path = require('node:path');
 const { getEditClubStatus, clubIdDeRuta } = require('../clubEdit.js');
 
 const RAIZ = path.resolve(__dirname, '../..');
-const navegador = fs.readFileSync(path.join(RAIZ, 'navigation', 'AppNavigator.js'), 'utf8');
+// Las direcciones viven en `navigation/direcciones.js`.
+const navegador = fs.readFileSync(path.join(RAIZ, 'navigation', 'direcciones.js'), 'utf8');
 const detalle = fs.readFileSync(path.join(RAIZ, 'screens', 'ClubDetailScreen.js'), 'utf8');
 
 // ─── 1. La URL existe ────────────────────────────────────────────────
@@ -43,9 +44,8 @@ test('la ruta del club no choca con la pestaña de clubes', () => {
   // `ClubsTab: 'clubes'` ya existe. Si alguien escribiera `ClubDetail:
   // 'clubes'` las dos competirían por el mismo camino.
   const rutas = [...navegador.matchAll(/^\s*\w+:\s*'(clubes[^']*)'/gm)].map((m) => m[1]);
-  assert.deepEqual([...new Set(rutas)].sort(),
-    ['clubes', 'clubes/:clubId', 'clubes/:clubId/editar'],
-    'las rutas de clubes dejaron de ser tres caminos distintos');
+  for (const r of ['clubes', 'clubes/:clubId', 'clubes/:clubId/editar']) assert.ok(rutas.includes(r), `falta ${r}`);
+  assert.equal(new Set(rutas).size, rutas.length, `dos pantallas comparten un camino de clubes: ${rutas.join(', ')}`);
 });
 
 // ─── 2. La pantalla sabe rehidratarse ────────────────────────────────

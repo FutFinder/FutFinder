@@ -82,6 +82,7 @@ export default function CanchasScreen({ navigation, route }) {
 
   const irAHorario = (k) =>
     navigation.navigate('Horarios', {
+      complejoId,
       canchaId: k.id,
       canchaNombre: k.nombre,
       duracionSlotMin: k.duracion_slot_min,

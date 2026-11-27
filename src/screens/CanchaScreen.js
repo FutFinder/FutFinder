@@ -333,6 +333,7 @@ export default function CanchaScreen({ navigation, route }) {
                       : 'Sin horario · la cancha no tiene bloques reservables'
                   }
                   onPress={() => navigation.navigate('Horarios', {
+                    complejoId,
                     canchaId,
                     canchaNombre: cancha?.nombre,
                     duracionSlotMin: cancha?.duracion_slot_min,

@@ -203,7 +203,7 @@ export default function ResumenReservaScreen({ navigation, route }) {
   const elegidosDetalle = cobros.filter((c) => elegidos.includes(c.id));
   // El precio del bloque, no el base de la cancha: con tarifas por franja no
   // son lo mismo.
-  const dinero = totalDeReserva({ precioBloque: precioBloque ?? cancha?.base, cobros: elegidosDetalle });
+  const dinero = totalDeReserva({ precioBloque: precioBloque != null ? Number(precioBloque) : cancha?.base, cobros: elegidosDetalle });
   const telefonoOk = telefonoAceptable(telefono);
   const baseLista = telefonoOk && reservaLista({
     canchaId, fecha, hora: horaInicio, contactoNombre: nombre, contactoTelefono: telefono,

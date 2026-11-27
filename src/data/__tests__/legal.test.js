@@ -76,7 +76,7 @@ test('el aviso de cookies se muestra hasta que se ve la versión vigente', () =>
 test('la página de eliminar la cuenta es pública y dice lo mismo que delete_my_account()', () => {
   // Google Play pide un enlace web para pedir el borrado sin la app.
   const nav = leer('src/navigation/AppNavigator.js');
-  assert.ok(nav.includes("EliminarCuenta: 'eliminar-cuenta'"), 'falta la dirección /eliminar-cuenta');
+  assert.ok(leer('src/navigation/direcciones.js').includes("EliminarCuenta: 'eliminar-cuenta'"), 'falta la dirección /eliminar-cuenta');
   assert.ok(!/EliminarCuenta[^\n]*withAuthGuard/.test(nav), 'la página no puede pedir sesión');
   const texto = JSON.stringify(DOCUMENTOS_LEGALES.eliminarCuenta);
   const sql = leer('supabase/migrations/176_borrar_la_cuenta_de_verdad.sql');

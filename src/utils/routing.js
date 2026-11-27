@@ -31,6 +31,17 @@ export function isPrivateRoute(routeName) {
  * antes sólo Login lo miraba, y quien se registraba desde un link de
  * invitación terminaba en el Home sin su asiento.
  */
+/**
+ * Qué destino guarda la guarda cuando no hay sesión. Al entrar directo por
+ * una dirección, Main queda debajo (`navigation/direcciones.js`) y las dos
+ * guardas se montan a la vez: la de Main no puede pisar el destino que de
+ * verdad pidió la persona, o tras iniciar sesión se cae al inicio.
+ */
+export function elegirDestinoPendiente(actual, nuevo) {
+  if (nuevo?.name === 'Main' && actual?.name && actual.name !== 'Main') return actual;
+  return nuevo;
+}
+
 export function rutasTrasEntrar(pending) {
   if (pending && pending.name && pending.name !== 'Main') {
     return { index: 1, routes: [{ name: 'Main' }, { name: pending.name, params: pending.params }] };

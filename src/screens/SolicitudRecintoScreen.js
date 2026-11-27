@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image, Pressable,
+  View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Image, Pressable, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertTriangle, CheckCircle2, Lock, ImagePlus, X } from 'lucide-react-native';
@@ -12,7 +12,7 @@ import {
   camposFaltantes, formDeSolicitud, MAX_FOTOS, MAX_CANCHAS,
 } from '../utils/solicitudRecinto';
 import { SERVICIOS } from '../utils/serviciosRecinto';
-import { enviarSolicitudRecinto } from '../services/solicitudRecinto';
+import { enviarSolicitudRecinto, miSolicitudPendiente } from '../services/solicitudRecinto';
 import {
   pickImages, uploadFotoSolicitud, removeFotoSolicitudFile, urlsDeFotosSolicitud,
 } from '../services/storage';
@@ -70,6 +70,36 @@ const FORM_VACIO = {
 };
 
 export default function SolicitudRecintoScreen({ navigation, route }) {
+  // Desde Reservas la solicitud a corregir llega entera. Abierta por su
+  // dirección sólo llega que es una corrección (`corregir=si`, ver
+  // `navigation/direcciones.js`): se vuelve a pedir, porque sin ella la
+  // corrección se convertía en una solicitud nueva.
+  const corregir = route?.params?.corregir;
+  const falta = !!corregir && typeof corregir !== 'object';
+  const [cargada, setCargada] = useState(falta ? undefined : corregir || null);
+  useEffect(() => {
+    if (!falta) return undefined;
+    let vivo = true;
+    miSolicitudPendiente().then(({ data }) => { if (vivo) setCargada(data || null); });
+    return () => { vivo = false; };
+  }, [falta]);
+
+  if (cargada === undefined) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <ActivityIndicator color={C.green} style={{ marginTop: 48 }} />
+      </SafeAreaView>
+    );
+  }
+  return (
+    <FormularioSolicitud
+      navigation={navigation}
+      route={{ ...route, params: { ...(route?.params || {}), corregir: cargada } }}
+    />
+  );
+}
+
+function FormularioSolicitud({ navigation, route }) {
   // La solicitud a corregir viene entera desde Reservas, que ya la tenía: así
   // la pantalla abre con los datos puestos y no con un formulario vacío que
   // haga dudar de si se está corrigiendo o empezando de cero.

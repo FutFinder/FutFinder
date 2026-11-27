@@ -8,7 +8,7 @@ import { IconButton, Card, NoticeCard, StickyFooter, Button, Foto, Chip } from '
 import { TextField } from '../components/reservas/recintoUi';
 import { listMyFriends } from '../services/friends';
 import { searchPlayers } from '../services/profile';
-import { invitarParticipante } from '../services/reservas';
+import { invitarParticipante, detalleReserva } from '../services/reservas';
 import { motivoLegible, textosDeModalidad } from '../utils/pagoDividido';
 
 /**
@@ -36,8 +36,34 @@ import { motivoLegible, textosDeModalidad } from '../utils/pagoDividido';
  * al buscador por el tercero y vuelve: perder los dos primeros ahí sería la
  * clase de detalle que obliga a empezar de nuevo sin entender por qué.
  */
+/** Una sola lista vacía, para que no cambie en cada render. */
+const SIN_NADIE = [];
+
 export default function InvitarJugadoresScreen({ navigation, route }) {
-  const { reservaId, faltan = 1, yaEstan = [], modalidad = 'jugadores' } = route.params || {};
+  const params = route.params || {};
+  const { reservaId } = params;
+  // Desde «El grupo» llegan quiénes ya están y cuántos faltan. Abierta por
+  // su dirección no llega la lista (no va en la URL) y los números vuelven
+  // como texto: se le pregunta a la reserva.
+  const traidos = Array.isArray(params.yaEstan);
+  const [grupo, setGrupo] = useState(() => (traidos
+    ? { faltan: Number(params.faltan ?? 1), yaEstan: params.yaEstan, modalidad: params.modalidad || 'jugadores' }
+    : null));
+  useEffect(() => {
+    if (traidos) return undefined;
+    let vivo = true;
+    detalleReserva(reservaId).then(({ data }) => {
+      if (!vivo) return;
+      setGrupo(data
+        ? { faltan: data.faltanInvitar, yaEstan: data.participantes.map((p) => p.userId), modalidad: data.modalidad || 'jugadores' }
+        : { faltan: Number(params.faltan ?? 1), yaEstan: [], modalidad: params.modalidad || 'jugadores' });
+    });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reservaId, traidos]);
+  const faltan = grupo?.faltan ?? Number(params.faltan ?? 1);
+  const yaEstan = grupo?.yaEstan ?? SIN_NADIE;
+  const modalidad = grupo?.modalidad ?? params.modalidad ?? 'jugadores';
   const textos = textosDeModalidad(modalidad);
   const [pestana, setPestana] = useState('amigos');
   const [amigos, setAmigos] = useState([]);
@@ -50,10 +76,12 @@ export default function InvitarJugadoresScreen({ navigation, route }) {
   const [aviso, setAviso] = useState(null);
 
   const cargarAmigos = useCallback(async () => {
+    // Sin saber quiénes ya están, se ofrecería invitar a alguien del grupo.
+    if (!grupo) return;
     const { data: lista } = await listMyFriends();
     setAmigos((lista || []).filter((a) => !yaEstan.includes(a.user_id)));
     setLoading(false);
-  }, [yaEstan]);
+  }, [grupo, yaEstan]);
 
   useEffect(() => { cargarAmigos(); }, [cargarAmigos]);
 
