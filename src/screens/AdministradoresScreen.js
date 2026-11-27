@@ -104,6 +104,11 @@ export default function AdministradoresScreen({ navigation, route }) {
   }, [texto]);
 
   const yaEsta = encontrado && admins.some((a) => a.userId === encontrado.id);
+  // Desde el panel sólo llega el dueño, pero la pantalla tiene dirección
+  // propia y cualquier admin del recinto puede escribirla. A ése se le
+  // muestra la lista, que la RLS ya le deja ver, sin botones: el servidor le
+  // rechaza agregar, quitar y repartir permisos.
+  const soyDueno = admins.some((a) => a.userId === yo && a.rol === 'dueño');
 
   const abrirPermisos = (a) => {
     setPermisosDe(a);
@@ -171,11 +176,18 @@ export default function AdministradoresScreen({ navigation, route }) {
           <NoticeCard tone="warning" icon={AlertTriangle}>{error}</NoticeCard>
         ) : (
           <View style={{ gap: 14 }}>
-            <NoticeCard tone="info">
-              Un administrador entra al día a día —la agenda, el calendario y los bloqueos— y
-              nada más. Lo que puede CAMBIAR —las canchas, los horarios y tarifas, los cobros y la
-              ficha— se lo enciendes tú, uno por uno. Esta lista es solo tuya.
-            </NoticeCard>
+            {soyDueno ? (
+              <NoticeCard tone="info">
+                Un administrador entra al día a día —la agenda, el calendario y los bloqueos— y
+                nada más. Lo que puede CAMBIAR —las canchas, los horarios y tarifas, los cobros y la
+                ficha— se lo enciendes tú, uno por uno. Esta lista es solo tuya.
+              </NoticeCard>
+            ) : (
+              <NoticeCard tone="info">
+                Esta lista la cambia solo el dueño del recinto. Si necesitas cambiar algo que hoy no
+                puedes, pídeselo a él.
+              </NoticeCard>
+            )}
 
             <View style={{ gap: S.cardGap }}>
               {admins.map((a) => {
@@ -198,7 +210,7 @@ export default function AdministradoresScreen({ navigation, route }) {
                         ) : null}
                       </View>
                       <Badge label={esDueno ? 'Dueño' : 'Admin'} tone={esDueno ? 'green' : 'neutral'} />
-                      {!esDueno ? (
+                      {soyDueno && !esDueno ? (
                         <IconButton
                           icon={UserX}
                           onPress={() => setQuitar(a)}
@@ -212,7 +224,7 @@ export default function AdministradoresScreen({ navigation, route }) {
                     {/* El dueño no tiene permisos que editar: los tiene por
                         ser dueño, y ofrecer casillas que no hacen nada sería
                         peor que no ofrecerlas. */}
-                    {!esDueno ? (
+                    {soyDueno && !esDueno ? (
                       <Button
                         label="Editar permisos"
                         variant="secondary"
@@ -226,15 +238,17 @@ export default function AdministradoresScreen({ navigation, route }) {
               })}
             </View>
 
-            <Text style={styles.pie}>
-              Las filas de dueño no traen acción — ni la de otro dueño ni la tuya. Para cambiar un
-              dueño hay que escribirle a FutFinder.
-            </Text>
+            {soyDueno ? (
+              <Text style={styles.pie}>
+                Las filas de dueño no traen acción — ni la de otro dueño ni la tuya. Para cambiar un
+                dueño hay que escribirle a FutFinder.
+              </Text>
+            ) : null}
           </View>
         )}
       </ScrollView>
 
-      {!cargando && !error ? (
+      {!cargando && !error && soyDueno ? (
         <StickyFooter>
           <Button label="Agregar administrador" icon={Plus} onPress={() => setHoja(true)} />
         </StickyFooter>

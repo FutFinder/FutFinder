@@ -83,3 +83,17 @@ test('el resultado del encuentro se arma con sólo el desafío', () => {
   // decía «Este encuentro ya no está disponible»: el partido sale del desafío.
   assert.match(leer('ClubResultScreen.js'), /matchId \|\| \(await refreshChallenge\(challengeId\)\)\.data\?\.match_id/);
 });
+
+test('«Administradores» abierta por un admin que no es dueño no ofrece cambiar nada', () => {
+  // Desde el panel sólo el dueño llega (la fila se esconde al resto), pero
+  // con dirección propia cualquier admin puede escribirla. El servidor ya
+  // rechaza agregar, quitar y repartir permisos; la pantalla no puede
+  // ofrecer botones que siempre fallan.
+  const p = leer('AdministradoresScreen.js');
+  assert.match(p, /const soyDueno = admins\.some\(\(a\) => a\.userId === yo && a\.rol === 'dueño'\)/);
+  for (const accion of ['setQuitar\\(a\\)', 'abrirPermisos\\(a\\)', 'setHoja\\(true\\)']) {
+    const i = p.search(new RegExp(accion));
+    assert.ok(i > -1, `falta ${accion}`);
+    assert.match(p.slice(Math.max(0, i - 400), i), /soyDueno/, `${accion} se ofrece sin preguntar si es el dueño`);
+  }
+});
