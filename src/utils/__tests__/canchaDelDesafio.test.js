@@ -122,3 +122,30 @@ test('el bloque de la hora conversada, aunque la base traiga segundos', () => {
   assert.equal(bloqueALaHora(horas, '20:00').disponible, false);
   assert.equal(bloqueALaHora(horas, '21:00'), null);
 });
+
+test('la duración del bloque elegido pasa a la propuesta', () => {
+  const { minutosEntre } = require('../canchaDelDesafio.js');
+  assert.equal(minutosEntre('20:00', '21:00'), 60);
+  assert.equal(minutosEntre('20:00:00', '21:30:00'), 90);
+  assert.equal(minutosEntre('23:00', '00:00'), 60);
+  assert.equal(minutosEntre('20:00', null), null);
+  assert.equal(minutosEntre('20:00', '20:00'), null);
+});
+
+test('la cancha de la propuesta se lee de texto u objeto, y lo roto es null', () => {
+  const { leerCanchaFutFinder } = require('../canchaDelDesafio.js');
+  const c = { canchaId: 'k', fecha: '2026-11-28', hora: '20:00', duracionMin: 60 };
+  assert.deepEqual(leerCanchaFutFinder(JSON.stringify(c)), c);
+  assert.deepEqual(leerCanchaFutFinder(c), c);
+  assert.equal(leerCanchaFutFinder('[object Object]'), null);
+  assert.equal(leerCanchaFutFinder('{}'), null);
+  assert.equal(leerCanchaFutFinder(null), null);
+});
+
+test('la tarjeta dice el día y la hora de la cancha', () => {
+  const { cuandoDeLaCancha } = require('../canchaDelDesafio.js');
+  assert.equal(cuandoDeLaCancha('2026-11-28', '20:00:00'), 'sáb 28 nov · 20:00');
+  const instante = new Date(2026, 11, 5, 21, 30).toISOString();
+  assert.equal(cuandoDeLaCancha(instante), 'sáb 5 dic · 21:30');
+  assert.equal(cuandoDeLaCancha(null), null);
+});

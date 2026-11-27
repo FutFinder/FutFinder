@@ -55,6 +55,7 @@ import {
   metodoLabel,
   cuposLabel,
 } from '../services/clubChallengeRules';
+import { leerCanchaFutFinder } from '../utils/canchaDelDesafio';
 import { anotarCanchaDeLaPropuesta } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import { guardarIntencion } from '../utils/intencionDeReserva';
@@ -188,9 +189,9 @@ export default function ClubProposalScreen({ navigation, route }) {
   const [canchaFF, setCanchaFF] = useState(null);
 
   useEffect(() => {
-    if (!canchaFutFinder) return;
-    setCanchaFF(canchaFutFinder);
-    const c = canchaFutFinder;
+    const c = leerCanchaFutFinder(canchaFutFinder);
+    if (!c) return;
+    setCanchaFF(c);
     const direccion = c.direccion || '';
     const lat = Number(c.latitud);
     const lng = Number(c.longitud);
@@ -206,6 +207,9 @@ export default function ClubProposalScreen({ navigation, route }) {
       setFechaStr(`${d}/${m}/${a}`);
     }
     if (c.hora) setHoraStr(c.hora);
+    // El bloque reservable manda: si es de 60 min, la propuesta no puede
+    // decir 90.
+    if (DURACIONES.includes(Number(c.duracionMin))) setDuracionMin(Number(c.duracionMin));
   }, [canchaFutFinder]);
 
   // LAS DOS RESERVAS VOLUNTARIAS, con «No» por defecto en las dos.

@@ -104,3 +104,58 @@ export function bloqueALaHora(horas, hora) {
   if (!hora) return null;
   return (horas || []).find((h) => String(h.hora).slice(0, 5) === String(hora).slice(0, 5)) || null;
 }
+
+/** '20:00' y '21:30' → 90. `null` si falta alguna o no avanza. */
+export function minutosEntre(inicio, fin) {
+  const aMin = (h) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(h || ''));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const a = aMin(inicio);
+  const b = aMin(fin);
+  if (a == null || b == null) return null;
+  const d = b > a ? b - a : b + 24 * 60 - a; // un bloque que cruza la medianoche
+  return d > 0 && d < 24 * 60 ? d : null;
+}
+
+/**
+ * La cancha que Reservas le pasa a la propuesta. Llega como texto JSON
+ * (así sobrevive a la URL de la web); se acepta también un objeto por las
+ * navegaciones nativas. Cualquier otra cosa —«[object Object]» de un enlace
+ * viejo, texto roto— es `null`: la propuesta abre vacía, no revienta.
+ */
+export function leerCanchaFutFinder(valor) {
+  if (!valor) return null;
+  if (typeof valor === 'object') return valor.canchaId ? valor : null;
+  if (typeof valor !== 'string') return null;
+  try {
+    const c = JSON.parse(valor);
+    return c && typeof c === 'object' && c.canchaId ? c : null;
+  } catch {
+    return null;
+  }
+}
+
+const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/**
+ * «sáb 28 nov · 20:00» para la tarjeta. Recibe el día ('YYYY-MM-DD') y la
+ * hora ('HH:MM'), o sólo un instante ISO de la propuesta. Sin Intl: el
+ * motor nativo no siempre trae los nombres en español.
+ */
+export function cuandoDeLaCancha(fecha, hora) {
+  let dia = fecha;
+  let hh = hora;
+  if (fecha && !hora && String(fecha).length > 10) {
+    const b = bloqueDeLaPropuesta(fecha);
+    if (!b) return null;
+    dia = b.fecha;
+    hh = b.hora;
+  }
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dia || ''));
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const texto = `${DIAS[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`;
+  return hh ? `${texto} · ${String(hh).slice(0, 5)}` : texto;
+}

@@ -18,6 +18,7 @@ import { telefonoAceptable } from '../utils/recintoPantallas';
 import { MAX_JUGADORES, MIN_JUGADORES, repartoDeCuotas } from '../utils/pagoDividido';
 import { alcanzaPara } from '../utils/saldo';
 import { calzaConElPartido, leerIntencion, olvidarIntencion } from '../utils/intencionDeReserva';
+import { minutosEntre } from '../utils/canchaDelDesafio';
 import { formatCLP } from '../services/reservasRules';
 import BarraDelPartido from '../components/reservas/BarraDelPartido';
 
@@ -229,10 +230,12 @@ export default function ResumenReservaScreen({ navigation, route }) {
     const usarEnLaPropuesta = () => {
       const challengeId = desafio.challengeId;
       olvidarIntencion();
+      // Viaja como texto: en la web los parámetros van en la URL, y un
+      // objeto ahí queda como «[object Object]» y se pierde al recargar.
       navigation.navigate('ClubProposal', {
         challengeId,
         modo: 'crear',
-        canchaFutFinder: {
+        canchaFutFinder: JSON.stringify({
           canchaId,
           canchaNombre: cancha ? cancha.nombre : null,
           complejoId,
@@ -244,9 +247,10 @@ export default function ResumenReservaScreen({ navigation, route }) {
           longitud: complejo?.longitud ?? null,
           fecha,
           hora: String(horaInicio || '').slice(0, 5),
+          duracionMin: minutosEntre(horaInicio, horaFin),
           precio: dinero.cancha,
           verificadaAt: new Date().toISOString(),
-        },
+        }),
       });
     };
     return (

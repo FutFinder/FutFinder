@@ -4,7 +4,7 @@ import { MapPin, Search, CalendarPlus, Timer, CheckCircle2, Lock, TriangleAlert 
 
 import { paleta as C, radios as R, fuentes as F } from '../../theme/colors';
 import { formatCLP } from '../../services/reservasRules';
-import { restanteDelPlazo, formatoReloj } from '../../utils/canchaDelDesafio';
+import { restanteDelPlazo, formatoReloj, cuandoDeLaCancha } from '../../utils/canchaDelDesafio';
 
 /**
  * La cancha del partido, dentro del chat del desafío (migración 202, diseño
@@ -59,10 +59,15 @@ export default function CanchaDelDesafioCard({
   const local = info?.club_local?.nombre || 'El club local';
   const rival = info?.club_visitante?.nombre || 'el club rival';
   const elegida = info?.cancha_elegida || null;
-  const lugar = reserva
-    ? `${reserva.cancha_nombre} · ${reserva.complejo_nombre}`
+  const cuando = reserva
+    ? cuandoDeLaCancha(reserva.fecha, reserva.hora)
     : elegida
-    ? `${elegida.cancha_nombre} · ${elegida.complejo_nombre}`
+    ? cuandoDeLaCancha(elegida.fecha)
+    : null;
+  const lugar = reserva
+    ? [`${reserva.cancha_nombre} · ${reserva.complejo_nombre}`, cuando].filter(Boolean).join('\n')
+    : elegida
+    ? [`${elegida.cancha_nombre} · ${elegida.complejo_nombre}`, cuando].filter(Boolean).join('\n')
     : null;
 
   if (horarioOcupado) {

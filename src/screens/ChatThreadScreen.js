@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -1436,6 +1437,15 @@ export default function ChatThreadScreen({ route, navigation }) {
   useEffect(() => {
     cargarCancha();
   }, [cargarCancha, clubChallenge?.estado, challengeEvents.length]);
+
+  // Y al volver a la pantalla: quien vuelve de Reservas acaba de reservar o
+  // de pagar, y la tarjeta no puede quedarse en «Reservar ahora» hasta que
+  // llegue el evento.
+  useFocusEffect(
+    useCallback(() => {
+      cargarCancha();
+    }, [cargarCancha])
+  );
 
   const vistaCancha = useMemo(() => vistaDeLaCancha(canchaInfo), [canchaInfo]);
 

@@ -9,6 +9,7 @@ import NotificationBell from '../components/NotificationBell';
 import { getComplejoById } from '../services/reservas';
 import { formatCLP } from '../services/reservasRules';
 import BarraDelPartido from '../components/reservas/BarraDelPartido';
+import { leerIntencion } from '../utils/intencionDeReserva';
 
 /** Pantalla 6 del handoff `Reservas.dc.html`: elegir cancha dentro del complejo. */
 export default function ElegirCanchaScreen({ navigation, route }) {
@@ -22,7 +23,16 @@ export default function ElegirCanchaScreen({ navigation, route }) {
     const { data } = await getComplejoById(complejoId);
     setComplejo(data);
     if (data?.canchas?.length) {
-      setSelectedId((prev) => (prev && data.canchas.some((k) => k.id === prev) ? prev : data.canchas[0].id));
+      // Reservando para un partido de clubes, parte en una cancha de SU
+      // modalidad: un Fútbol 7 no debería abrir marcando una de Fútbol 11.
+      // ('futbol7' del desafío ↔ 'futbol_7' de la cancha).
+      const modalidad = leerIntencion()?.modalidad;
+      const deSuModalidad = modalidad
+        ? data.canchas.find((k) => String(k.tipoCrudo || '').replace('_', '') === modalidad)
+        : null;
+      setSelectedId((prev) =>
+        prev && data.canchas.some((k) => k.id === prev) ? prev : (deSuModalidad || data.canchas[0]).id
+      );
     }
     setLoading(false);
   }, [complejoId]);
