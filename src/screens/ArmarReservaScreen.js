@@ -121,13 +121,21 @@ export default function ArmarReservaScreen({ navigation, route }) {
       : { tono: 'warning', texto: data?.reason || e?.message || 'No se pudo avisar.' });
   };
 
+  // Abierta por su dirección (recarga, enlace o aviso con la app cerrada) no
+  // hay pantalla anterior: «volver» lleva a Mis reservas, que es de donde
+  // cuelga el grupo, en vez de quedarse quieto.
+  const volver = () => {
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('MisReservas');
+  };
+
   const salirme = () => {
     confirmar(
       '¿Salirte de esta reserva?',
       'Le avisamos al organizador para que invite a alguien más. No pagaste nada, así que no hay nada que devolver.',
       async () => {
         const { data } = await rechazarInvitacion(reservaId);
-        if (data?.ok) navigation.goBack();
+        if (data?.ok) volver();
         else setAviso({ tono: 'warning', texto: data?.reason || 'No se pudo.' });
       },
       { confirmar: 'Salirme', cancelar: 'Me quedo' }
@@ -146,7 +154,7 @@ export default function ArmarReservaScreen({ navigation, route }) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
         <View style={styles.header}>
-          <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+          <IconButton icon={ArrowLeft} onPress={volver} accessibilityLabel="Volver" />
           <Text style={styles.headerTitle}>El grupo</Text>
         </View>
         <View style={{ padding: 20 }}>
@@ -175,7 +183,7 @@ export default function ArmarReservaScreen({ navigation, route }) {
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
-        <IconButton icon={ArrowLeft} onPress={() => navigation.goBack()} accessibilityLabel="Volver" />
+        <IconButton icon={ArrowLeft} onPress={volver} accessibilityLabel="Volver" />
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>El grupo</Text>
           <Text style={styles.headerSub} numberOfLines={1}>

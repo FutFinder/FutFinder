@@ -257,6 +257,10 @@ const linking = {
       MatchRequestStatus: 'p/:matchId/mi-solicitud',
       EditMatch: 'p/:matchId/editar',
       CreateMatch: 'publicar',
+      // El grupo de una reserva dividida. Sin esta entrada la web inventaba
+      // `/ArmarReserva?reservaId=…` y no la reconocía al abrirla: recargar
+      // mandaba al inicio al capitán que tenía 15 minutos para pagar.
+      ArmarReserva: 'reserva/:reservaId',
       // La galería de QA del vertical de Reservas, con URL propia para
       // poder revisar los componentes en el navegador sin iniciar sesión.
       // No muestra datos de nadie: son las primitivas con textos de
