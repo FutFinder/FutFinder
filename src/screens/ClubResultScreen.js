@@ -73,12 +73,15 @@ export default function ClubResultScreen({ navigation, route }) {
   const vivo = useRef(true);
 
   const cargar = useCallback(async () => {
+    // Desde el chat llega el partido. Abierta con sólo el desafío (un enlace
+    // escrito a mano, `desafio/<id>/resultado`), el partido sale de él.
+    const idPartido = matchId || (await refreshChallenge(challengeId)).data?.match_id;
     const [{ data: m }, { data: ch }, { data: res }, { data: filas }, { data: clubesConResults }, { data: sesion }] =
       await Promise.all([
-        getMatchById(matchId),
+        getMatchById(idPartido),
         refreshChallenge(challengeId),
         getResultadoActivo(challengeId),
-        getNominaPartido(matchId),
+        getNominaPartido(idPartido),
         // Admin del club, o capitán/jugador con `results` concedido
         // (migración 119): cualquiera de las dos alcanza para proponer o
         // confirmar el marcador. `accionesDeResultado` es puro y no sabe de

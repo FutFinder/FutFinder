@@ -77,3 +77,9 @@ test('entrar directo no le quita a la guarda el destino que pidió la persona', 
   const auth = fs.readFileSync(path.join(RAIZ, 'contexts', 'AuthContext.js'), 'utf8');
   assert.match(auth, /pendingRef\.current = elegirDestinoPendiente\(pendingRef\.current, destination\)/);
 });
+
+test('el resultado del encuentro se arma con sólo el desafío', () => {
+  // `desafio/<id>/resultado` sin `?matchId=` (un enlace escrito a mano)
+  // decía «Este encuentro ya no está disponible»: el partido sale del desafío.
+  assert.match(leer('ClubResultScreen.js'), /matchId \|\| \(await refreshChallenge\(challengeId\)\)\.data\?\.match_id/);
+});
