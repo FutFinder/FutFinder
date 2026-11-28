@@ -156,6 +156,17 @@ export function resolveNotificationTarget(n) {
           }
         : null;
 
+    case 'club_open_challenge_response':
+      // Respondieron un desafío abierto de mi club (migración 204): abre las
+      // respuestas de ESA publicación, que es donde se elige.
+      return data.clubId
+        ? {
+            screen: 'ClubChallenges',
+            params: { clubId: data.clubId, respuestasDe: data.openChallengeId },
+            resource: { kind: 'club', id: data.clubId },
+          }
+        : null;
+
     case 'club_challenge_accepted':
     case 'club_challenge_rejected':
     // Ciclo formal (migración 43): prórroga, cierre sin acuerdo,

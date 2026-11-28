@@ -82,6 +82,12 @@
       "archivos": {
         "send-push/index.ts": "6db7b7f16cc11a42de5f96e1de1e6a8a70c53a026fff72bfa5f6a797a58a752f",
         "send-push/pushLogic.ts": "2707fa290adf464c3a0f6be7b1129b7f2dd5c5f16a9c8c36bcaf978c17c58a92"
+      },
+      "pendiente": {
+        "motivo": "Migración 204: el tipo club_open_challenge_response entra al mapa de preferencias (avisos de clubes). Sin redesplegar, ese push sale aunque la persona tenga apagados los avisos de clubes. Se despliega junto con aplicar la 204, con el sí de Vicente.",
+        "archivos": {
+          "send-push/pushLogic.ts": "9e0d62435e58e3d7c05b49b57921b26d45cd090e0c5c1e3fd4418a0b030d988a"
+        }
       }
     },
     "solicitud-recinto": {

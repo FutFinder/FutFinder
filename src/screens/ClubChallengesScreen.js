@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -129,7 +129,12 @@ function fmtFecha(iso) {
  * cierre calculados de verdad (`openChallengeBoard.js`).
  */
 export default function ClubChallengesScreen({ navigation, route }) {
-  const { clubId, prefillFecha, abrirPublicar: abrirPublicarInicial } = route.params || {};
+  const {
+    clubId, prefillFecha, abrirPublicar: abrirPublicarInicial,
+    // El aviso de una respuesta nueva (migración 204) trae la publicación:
+    // se abren directo sus respuestas, que es donde se elige.
+    respuestasDe: respuestasDeAviso,
+  } = route.params || {};
   const { width } = useWindowDimensions();
 
   const [loading, setLoading] = useState(true);
@@ -310,6 +315,11 @@ export default function ClubChallengesScreen({ navigation, route }) {
     const { data } = await listResponsesForOpenChallenge(pub.id);
     setRespuestas(data || []);
   };
+
+  // Llegando desde el aviso, o recargando su dirección, se abre una sola vez.
+  useEffect(() => {
+    if (respuestasDeAviso) abrirRespuestas({ id: respuestasDeAviso });
+  }, [respuestasDeAviso]);
 
   const recargarRespuestas = async () => {
     if (!respuestasDe) return;

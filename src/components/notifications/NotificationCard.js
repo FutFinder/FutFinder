@@ -53,6 +53,7 @@ export const CATEGORY = {
   club_member_left: 'clubes',
   club_invite_accepted: 'clubes',
   club_challenge: 'clubes',
+  club_open_challenge_response: 'clubes',
   club_challenge_accepted: 'clubes',
   club_challenge_rejected: 'clubes',
   club_match_published: 'clubes',
@@ -121,6 +122,7 @@ export const ICON = {
   club_member_left: Shield,
   club_invite_accepted: CheckCheck,
   club_challenge: Swords,
+  club_open_challenge_response: Swords,
   club_challenge_accepted: CheckCheck,
   club_challenge_rejected: Swords,
   club_match_published: Swords,
@@ -177,6 +179,7 @@ export const TAG = {
   club_member_left: { label: 'CLUBES', ...CLUBES },
   club_invite_accepted: { label: 'CLUBES', ...CLUBES },
   club_challenge: { label: 'DESAFÍO', ...AMBAR },
+  club_open_challenge_response: { label: 'DESAFÍO', ...AMBAR },
   club_challenge_accepted: { label: 'DESAFÍO', ...VERDE },
   club_challenge_rejected: { label: 'DESAFÍO', ...ROJO },
   // Verde, no rojo: el rojo está reservado a lo que necesita atención

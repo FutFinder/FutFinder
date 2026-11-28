@@ -48,6 +48,7 @@ const SAMPLE_DATA_BY_TYPE = {
   club_invite_accepted: { clubId: 'c1' },
   club_invite: { clubId: 'c1', requestId: 'r1' },
   club_challenge: { clubRetadoId: 'c1', clubRetadorId: 'c2' },
+  club_open_challenge_response: { clubId: 'c1', openChallengeId: 'o1', responseId: 'r1', clubRespondedorId: 'c2' },
   club_challenge_accepted: { clubRetadorId: 'c1', clubRetadoId: 'c2' },
   club_challenge_rejected: { clubRetadorId: 'c1', clubRetadoId: 'c2' },
   // Ciclo formal (migración 43): los tres primeros ocurren dentro de la
@@ -111,6 +112,7 @@ const EXPECTED_SCREEN_BY_TYPE = {
   club_invite_accepted: 'ClubDetail',
   club_invite: 'Main',
   club_challenge: 'ClubChallenges',
+  club_open_challenge_response: 'ClubChallenges',
   club_challenge_accepted: 'ClubChallenges',
   club_challenge_rejected: 'ClubChallenges',
   club_challenge_extension: 'ChatThread',
@@ -504,4 +506,25 @@ test('resolveNotificationTarget: el turno de la lista que se venció abre el par
     data: { matchId: 'm-9' },
   });
   assert.deepEqual(t, { screen: 'MatchDetail', params: { matchId: 'm-9' } });
+});
+
+test('una respuesta a un desafío abierto abre las respuestas de esa publicación', () => {
+  // Migración 204: el aviso existe para que el club que publicó elija. Abrir
+  // sólo la bandeja obligaba a buscar cuál de sus publicaciones tenía la
+  // respuesta nueva.
+  const destino = resolveNotificationTarget({
+    type: 'club_open_challenge_response',
+    data: { clubId: 'c1', openChallengeId: 'o1', responseId: 'r1', clubRespondedorId: 'c2' },
+  });
+  assert.equal(destino.screen, 'ClubChallenges');
+  assert.deepEqual(destino.params, { clubId: 'c1', respuestasDe: 'o1' });
+  assert.deepEqual(destino.resource, { kind: 'club', id: 'c1' });
+  // Sin el club no hay a dónde ir.
+  assert.equal(resolveNotificationTarget({ type: 'club_open_challenge_response', data: {} }), null);
+  // Y la pantalla sabe abrir las respuestas con ese parámetro.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const pantalla = fs.readFileSync(path.join(__dirname, '..', '..', 'screens', 'ClubChallengesScreen.js'), 'utf8');
+  assert.match(pantalla, /respuestasDe/);
+  assert.match(pantalla, /abrirRespuestas\(\{ id: respuestasDeAviso \}\)/);
 });

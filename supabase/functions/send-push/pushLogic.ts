@@ -35,6 +35,7 @@ export const NOTIF_TYPE_TO_PREFERENCE: Record<string, string> = {
   club_invite_accepted: "notif_clubs",
   club_invite: "notif_clubs",
   club_challenge: "notif_clubs",
+  club_open_challenge_response: "notif_clubs",
   club_challenge_accepted: "notif_clubs",
   club_challenge_rejected: "notif_clubs",
   club_challenge_extension: "notif_clubs",

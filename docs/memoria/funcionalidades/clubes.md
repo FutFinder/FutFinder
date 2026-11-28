@@ -102,6 +102,19 @@ migraciones intermedias — a diferencia de la alineación, esta se implementó
 completa de una vez porque el diseño (reusar `aceptar_desafio()` en vez de
 duplicar su lógica) quedó claro antes de escribir la primera línea de SQL.
 
+**Responder una publicación no avisaba a nadie hasta la 204** (2026-11-28,
+lo encontró Vicente publicando con Los Papi Pasty y respondiendo con
+SixSiete): el acceso «Desafíos» marcaba 1 pero la campana no traía nada. La
+112 sólo avisaba lo que pasa después de elegir (`aceptar_desafio()`). La
+migración 204 suma el tipo `club_open_challenge_response` y un disparador
+que, cuando una respuesta queda `pendiente` (al nacer o al volver a
+responder), avisa a los integrantes del club que publicó con permiso
+`answerChallenge`. No excluye a quien respondió: si administra los dos
+clubes, le llega igual. Tocar el aviso abre `ClubChallenges` con
+`respuestasDe` = la publicación, directo en sus respuestas. `send-push`
+necesita redesplegarse para respetar la preferencia de avisos de clubes
+(queda como `pendiente` en `despliegues.json`).
+
 **Corresponde a un pedido explícito del usuario de construir la funcionalidad
 de verdad** (mockup «FutFinder Desafíos»), tras preguntar y descartar dos
 alternativas más chicas —redisño visual nada más, o un híbrido con sólo
