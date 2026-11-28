@@ -46,6 +46,7 @@ import { isSupabaseConfigured } from '../services/supabase';
 import { REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD, OPCIONES_NIVEL, inicialDe } from '../utils/playerMeta';
 import { validateImageAsset, commitProfileSave, getProfileLoadStatus } from '../utils/profileEdit';
+import AjustarFotoSheet, { AJUSTE_PROPIO } from '../components/AjustarFotoSheet';
 import { EDAD_MIN } from '../utils/fechaNacimiento';
 import useConfirmacion from '../components/useConfirmacion';
 
@@ -143,6 +144,9 @@ export default function EditProfileScreen({ navigation }) {
   // sin subir nada) hasta que se confirme con «Guardar cambios».
   const [pendingAvatar, setPendingAvatar] = useState(null);
   const [pendingBanner, setPendingBanner] = useState(null);
+  // En la web la foto pasa por «Ajusta la foto» (agrandar, achicar y mover)
+  // antes de quedar elegida; en la app nativa ya la recortó el selector.
+  const [porAjustar, setPorAjustar] = useState(null);
 
   const [regionOpen, setRegionOpen] = useState(false);
   const [comunaOpen, setComunaOpen] = useState(false);
@@ -208,7 +212,8 @@ export default function EditProfileScreen({ navigation }) {
       setBanner({ type: 'error', title: 'Imagen no válida', message: invalidReason });
       return;
     }
-    setPendingBanner(asset);
+    if (AJUSTE_PROPIO) setPorAjustar({ asset, proporcion: 16 / 9, destino: 'portada' });
+    else setPendingBanner(asset);
     setBanner(null);
   };
 
@@ -226,7 +231,8 @@ export default function EditProfileScreen({ navigation }) {
       setBanner({ type: 'error', title: 'Imagen no válida', message: invalidReason });
       return;
     }
-    setPendingAvatar(asset);
+    if (AJUSTE_PROPIO) setPorAjustar({ asset, proporcion: 1, destino: 'avatar' });
+    else setPendingAvatar(asset);
     setBanner(null);
   };
 
@@ -781,6 +787,21 @@ export default function EditProfileScreen({ navigation }) {
           </View>
         )}
       </SafeAreaView>
+
+      <AjustarFotoSheet
+        visible={!!porAjustar}
+        asset={porAjustar?.asset}
+        proporcion={porAjustar?.proporcion}
+        redonda={porAjustar?.destino === 'avatar'}
+        titulo={porAjustar?.destino === 'avatar' ? 'Ajusta tu foto' : 'Ajusta tu portada'}
+        maxDimension={porAjustar?.destino === 'avatar' ? 800 : 1600}
+        onCancelar={() => setPorAjustar(null)}
+        onListo={(foto) => {
+          if (porAjustar?.destino === 'avatar') setPendingAvatar(foto);
+          else setPendingBanner(foto);
+          setPorAjustar(null);
+        }}
+      />
 
       {dialogo}
     </KeyboardAvoidingView>

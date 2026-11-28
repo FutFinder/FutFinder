@@ -28,6 +28,7 @@ import NivelSelector from '../components/club/NivelSelector';
 import { updateClub, getClubById } from '../services/clubs';
 import { getMisClubesConPermiso } from '../services/clubPermissions';
 import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
+import AjustarFotoSheet, { AJUSTE_PROPIO } from '../components/AjustarFotoSheet';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD } from '../utils/clubMeta';
 import { alternarModalidad, modalidadesDe } from '../utils/clubModalidad';
@@ -100,6 +101,9 @@ export default function EditClubScreen({ navigation, route }) {
   const [banner, setBanner] = useState(null);
   const [newLogoAsset, setNewLogoAsset] = useState(null);
   const [newBannerAsset, setNewBannerAsset] = useState(null);
+  // En la web la foto pasa por «Ajusta la foto» (agrandar, achicar y mover)
+  // antes de quedar elegida; en la app nativa ya la recortó el selector.
+  const [porAjustar, setPorAjustar] = useState(null);
 
   // Permiso: `null` es «todavía no se sabe / no se pudo averiguar», que no es
   // lo mismo que `[]` («no administro ninguno»). Ver utils/clubEdit.js.
@@ -165,7 +169,8 @@ export default function EditClubScreen({ navigation, route }) {
   const handlePickLogo = async () => {
     const result = await pickImage({ aspect: [1, 1], quality: 0.8 });
     if (result.ok) {
-      setNewLogoAsset(result.asset);
+      if (AJUSTE_PROPIO) setPorAjustar({ asset: result.asset, proporcion: 1, destino: 'logo' });
+      else setNewLogoAsset(result.asset);
     } else if (result.reason !== 'Cancelado') {
       setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
     }
@@ -174,7 +179,8 @@ export default function EditClubScreen({ navigation, route }) {
   const handlePickBanner = async () => {
     const result = await pickImage({ aspect: [16, 9], quality: 0.8 });
     if (result.ok) {
-      setNewBannerAsset(result.asset);
+      if (AJUSTE_PROPIO) setPorAjustar({ asset: result.asset, proporcion: 16 / 9, destino: 'banner' });
+      else setNewBannerAsset(result.asset);
     } else if (result.reason !== 'Cancelado') {
       setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
     }
@@ -620,6 +626,19 @@ export default function EditClubScreen({ navigation, route }) {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+      <AjustarFotoSheet
+        visible={!!porAjustar}
+        asset={porAjustar?.asset}
+        proporcion={porAjustar?.proporcion}
+        titulo={porAjustar?.destino === 'logo' ? 'Ajusta el logo' : 'Ajusta el banner'}
+        maxDimension={porAjustar?.destino === 'logo' ? 800 : 1600}
+        onCancelar={() => setPorAjustar(null)}
+        onListo={(foto) => {
+          if (porAjustar?.destino === 'logo') setNewLogoAsset(foto);
+          else setNewBannerAsset(foto);
+          setPorAjustar(null);
+        }}
+      />
     </SafeAreaView>
   );
 }

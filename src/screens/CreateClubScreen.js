@@ -26,6 +26,7 @@ import { Button, IconButton, Chip } from '../components/reservas/ui';
 import { FieldLabel, TextField } from '../components/reservas/recintoUi';
 import { createClub } from '../services/clubs';
 import { pickImage, uploadClubLogo, uploadClubBanner } from '../services/storage';
+import AjustarFotoSheet, { AJUSTE_PROPIO } from '../components/AjustarFotoSheet';
 import { NOMBRES_REGIONES, getComunasOfRegion } from '../data/regiones-chile';
 import { OPCIONES_MODALIDAD } from '../utils/clubMeta';
 import { alternarModalidad, modalidadesDe } from '../utils/clubModalidad';
@@ -55,6 +56,9 @@ export default function CreateClubScreen({ navigation }) {
   const [banner, setBanner] = useState(null);
   const [logoAsset, setLogoAsset] = useState(null);
   const [bannerAsset, setBannerAsset] = useState(null);
+  // En la web la foto pasa por «Ajusta la foto» (agrandar, achicar y mover)
+  // antes de quedar elegida; en la app nativa ya la recortó el selector.
+  const [porAjustar, setPorAjustar] = useState(null);
 
   const comunas = region ? getComunasOfRegion(region) : [];
   const listo = nombre.trim().length >= 3 && !!modalidad && !!region && !!comuna;
@@ -62,7 +66,8 @@ export default function CreateClubScreen({ navigation }) {
   const handlePickLogo = async () => {
     const result = await pickImage({ aspect: [1, 1], quality: 0.8 });
     if (result.ok) {
-      setLogoAsset(result.asset);
+      if (AJUSTE_PROPIO) setPorAjustar({ asset: result.asset, proporcion: 1, destino: 'logo' });
+      else setLogoAsset(result.asset);
     } else if (result.reason !== 'Cancelado') {
       setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
     }
@@ -71,7 +76,8 @@ export default function CreateClubScreen({ navigation }) {
   const handlePickBanner = async () => {
     const result = await pickImage({ aspect: [16, 9], quality: 0.8 });
     if (result.ok) {
-      setBannerAsset(result.asset);
+      if (AJUSTE_PROPIO) setPorAjustar({ asset: result.asset, proporcion: 16 / 9, destino: 'banner' });
+      else setBannerAsset(result.asset);
     } else if (result.reason !== 'Cancelado') {
       setBanner({ type: 'error', title: 'No se pudo abrir la galería', message: result.reason });
     }
@@ -349,6 +355,19 @@ export default function CreateClubScreen({ navigation }) {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+      <AjustarFotoSheet
+        visible={!!porAjustar}
+        asset={porAjustar?.asset}
+        proporcion={porAjustar?.proporcion}
+        titulo={porAjustar?.destino === 'logo' ? 'Ajusta el logo' : 'Ajusta el banner'}
+        maxDimension={porAjustar?.destino === 'logo' ? 800 : 1600}
+        onCancelar={() => setPorAjustar(null)}
+        onListo={(foto) => {
+          if (porAjustar?.destino === 'logo') setLogoAsset(foto);
+          else setBannerAsset(foto);
+          setPorAjustar(null);
+        }}
+      />
     </SafeAreaView>
   );
 }

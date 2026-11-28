@@ -208,6 +208,21 @@ async function resizeAndCompress(asset, { maxDimension, compress = 0.7, recorte 
 }
 
 /**
+ * Recorta la foto al rectángulo que eligió la persona en `AjustarFotoSheet`
+ * (agrandar, achicar, mover) y la deja de `maxDimension` como mucho.
+ *
+ * Devuelve un asset nuevo, con su `uri`, `width` y `height`: quien llama lo
+ * guarda como la foto elegida y se sube igual que antes, así que ninguna de
+ * las funciones de subida cambia. Si el recorte falla, vuelve la foto
+ * original (lo mismo que hace `resizeAndCompress`): mejor subir la foto
+ * entera que no poder subir nada.
+ */
+export async function recortarFoto(asset, recorte, { maxDimension = 1600 } = {}) {
+  if (!asset) return asset;
+  return resizeAndCompress(asset, { maxDimension, compress: 0.85, recorte });
+}
+
+/**
  * Redimensiona/comprime y sube mi foto de perfil al bucket `avatars`.
  * A propósito NO toca `profiles`: quien llama decide cuándo confirmar el
  * cambio (ver `commitProfileSave` en `utils/profileEdit.js`), para poder
