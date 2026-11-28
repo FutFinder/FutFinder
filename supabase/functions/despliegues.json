@@ -9,7 +9,8 @@
     "Las seis se compararon contra la copia desplegada el 2026-10-16 y las seis coincidían con el repositorio, salvo send-push, que venía atrasada y se redesplegó. El 2026-11-13 se trajeron con get_edge_function las cuatro que estaban con `comparada: null` (pagar-reserva, flow-confirmacion, solicitud-recinto y reportar-problema): los diez archivos dan el mismo sha256 que el repositorio y que este registro, `_shared` incluido.",
     "`pendiente` (opcional, por función) = contenido YA escrito en el repositorio que todavía NO se desplegó, con el sha256 exacto de cada archivo. La guarda lo deja pasar —y lo anuncia— mientras el archivo coincida con ese hash; si se edita otra vez, vuelve a fallar. AL DESPLEGAR: mueve esos hashes a `archivos`, sube `version`/`desplegada` y borra `pendiente`.",
     "La plataforma reporta en `version` UNO MÁS que el número de acá en las siete funciones (comprobado el 2026-11-13 con list_edge_functions): es otra numeración, no código viejo. Lo que manda es el hash; `updated_at` coincide con `desplegada` y `entrypoint_path` termina en el número de acá.",
-    "pagar-reserva se redesplegó el 2026-11-14 (la plataforma reporta version 6): mira el resultado de anotar_referencia_pago y consulta la pausa de la migración 179; trae _shared/pagarReserva.ts. Ese mismo día se trajo con get_edge_function y sus cuatro archivos dan el mismo sha256 que el repositorio. El primer intento falló al empaquetar por un 521 de esm.sh y no cambió nada."
+    "pagar-reserva se redesplegó el 2026-11-14 (la plataforma reporta version 6): mira el resultado de anotar_referencia_pago y consulta la pausa de la migración 179; trae _shared/pagarReserva.ts. Ese mismo día se trajo con get_edge_function y sus cuatro archivos dan el mismo sha256 que el repositorio. El primer intento falló al empaquetar por un 521 de esm.sh y no cambió nada.",
+    "send-push se redesplegó el 2026-11-28 (la plataforma reporta version 14) con la migración 204: suma club_open_challenge_response a las preferencias. `comparada: null` porque no se trajo la copia; se comprobó por comportamiento: un aviso de ese tipo a una cuenta con notif_clubs=false quedó en skipped_preference."
   ],
   "proyecto": "jvfoendzblkoxvwvommz",
   "funciones": {
@@ -76,18 +77,12 @@
       }
     },
     "send-push": {
-      "version": 13,
-      "desplegada": "2026-11-18T17:32:21Z",
-      "comparada": "2026-11-18",
+      "version": 14,
+      "desplegada": "2026-11-28T00:49:28Z",
+      "comparada": null,
       "archivos": {
         "send-push/index.ts": "6db7b7f16cc11a42de5f96e1de1e6a8a70c53a026fff72bfa5f6a797a58a752f",
-        "send-push/pushLogic.ts": "2707fa290adf464c3a0f6be7b1129b7f2dd5c5f16a9c8c36bcaf978c17c58a92"
-      },
-      "pendiente": {
-        "motivo": "Migración 204: el tipo club_open_challenge_response entra al mapa de preferencias (avisos de clubes). Sin redesplegar, ese push sale aunque la persona tenga apagados los avisos de clubes. Se despliega junto con aplicar la 204, con el sí de Vicente.",
-        "archivos": {
-          "send-push/pushLogic.ts": "9e0d62435e58e3d7c05b49b57921b26d45cd090e0c5c1e3fd4418a0b030d988a"
-        }
+        "send-push/pushLogic.ts": "9e0d62435e58e3d7c05b49b57921b26d45cd090e0c5c1e3fd4418a0b030d988a"
       }
     },
     "solicitud-recinto": {

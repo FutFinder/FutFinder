@@ -111,9 +111,10 @@ que, cuando una respuesta queda `pendiente` (al nacer o al volver a
 responder), avisa a los integrantes del club que publicó con permiso
 `answerChallenge`. No excluye a quien respondió: si administra los dos
 clubes, le llega igual. Tocar el aviso abre `ClubChallenges` con
-`respuestasDe` = la publicación, directo en sus respuestas. `send-push`
-necesita redesplegarse para respetar la preferencia de avisos de clubes
-(queda como `pendiente` en `despliegues.json`).
+`respuestasDe` = la publicación, directo en sus respuestas. **Aplicada en
+producción el 2026-11-28**, con el arnés 5/5 contra el esquema aplicado, y
+`send-push` redesplegada (versión 14) para respetar la preferencia de avisos
+de clubes.
 
 **Corresponde a un pedido explícito del usuario de construir la funcionalidad
 de verdad** (mockup «FutFinder Desafíos»), tras preguntar y descartar dos
