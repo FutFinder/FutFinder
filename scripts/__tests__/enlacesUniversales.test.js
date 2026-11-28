@@ -70,6 +70,46 @@ test('las rutas salen de las URL que de verdad entiende la navegación', () => {
   }
 });
 
+/** ¿Abre la app esta URL? Con la sintaxis de Apple: `/x/*` es todo lo que sigue. */
+const reclamada = (url) => RUTAS.some((r) => (r.endsWith('/*') ? url.startsWith(r.slice(0, -1)) : url === r));
+
+test('toda dirección con sesión abre la app, y ninguna pública', () => {
+  // EL FALLO (2026-11-27): desde `02f35b4` todas las pantallas con sesión
+  // tienen dirección, pero aquí seguían sólo las nueve del 2026-11-13. Un
+  // aviso que llevara a `/reserva/<id>` abría el navegador en vez de la app.
+  // Se recorre `DIRECCIONES` con un valor en cada parámetro (`:id` → `x`).
+  const { DIRECCIONES, SIN_SESION } = require(path.join(RAIZ, 'src', 'navigation', 'direcciones.js'));
+  const ejemplo = (camino) => `/${camino.replace(/:\w+\??/g, 'x')}`;
+  const caminos = [];
+  for (const [nombre, valor] of Object.entries(DIRECCIONES)) {
+    if (nombre === 'Main') {
+      for (const tab of Object.values(valor.screens)) caminos.push({ nombre, url: ejemplo(tab) });
+    } else {
+      caminos.push({ nombre, url: ejemplo(typeof valor === 'string' ? valor : valor.path) });
+    }
+  }
+  assert.ok(caminos.length >= 60, `se leyeron ${caminos.length} direcciones`);
+  const faltan = caminos.filter((c) => !SIN_SESION.has(c.nombre) && !reclamada(c.url)).map((c) => c.url);
+  assert.deepEqual(faltan, [], `abren el navegador en vez de la app: ${faltan.join(', ')}`);
+  const deMas = caminos.filter((c) => SIN_SESION.has(c.nombre) && reclamada(c.url)).map((c) => c.url);
+  assert.deepEqual(deMas, [], `se leen en el navegador y abrirían la app: ${deMas.join(', ')}`);
+});
+
+test('ninguna ruta reclama algo que la app no sabe abrir', () => {
+  // Al revés: un prefijo de más mandaría a la app una página que sólo existe
+  // en la web, y la app caería al inicio.
+  const { DIRECCIONES } = require(path.join(RAIZ, 'src', 'navigation', 'direcciones.js'));
+  const prefijos = new Set();
+  for (const [nombre, valor] of Object.entries(DIRECCIONES)) {
+    const lista = nombre === 'Main' ? Object.values(valor.screens) : [typeof valor === 'string' ? valor : valor.path];
+    for (const c of lista) prefijos.add(c.split('/')[0]);
+  }
+  for (const ruta of RUTAS) {
+    const primera = ruta.replace(/^\//, '').split('/')[0];
+    assert.ok(prefijos.has(primera), `${ruta} no es una dirección de la app`);
+  }
+});
+
 // La dirección pública vive en un solo lugar (`utils/direccionPublica.js`):
 // la hoja de compartir y el `linking` la toman de ahí.
 const escapar = (s) => s.replace(/\./g, '\\.');
